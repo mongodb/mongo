@@ -57,6 +57,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/exec/sbe/vm/label.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/compiler.h"
@@ -842,6 +843,14 @@ enum class Builtin : uint16_t {
     aggLinearFillCanAdd,
     aggLinearFillAdd,
     aggLinearFillFinalize,
+    aggRemovableFirstNInit,
+    aggRemovableFirstNAdd,
+    aggRemovableFirstNRemove,
+    aggRemovableFirstNFinalize,
+    aggRemovableLastNInit,
+    aggRemovableLastNAdd,
+    aggRemovableLastNRemove,
+    aggRemovableLastNFinalize,
 
     // Additional one-byte builtins go here.
 
@@ -871,8 +880,17 @@ std::string builtinToString(Builtin b);
  * - The element at index `kMaxSize` is the maximum number entries the data structure holds.
  * - The element at index `kMemUsage` holds the current memory usage
  * - The element at index `kMemLimit` holds the max memory limit allowed
+ * - The element at index `kIsGroupAccum` specifices if the accumulator belongs to group-by stage
  */
-enum class AggMultiElems { kInternalArr, kStartIdx, kMaxSize, kMemUsage, kMemLimit, kSizeOfArray };
+enum class AggMultiElems {
+    kInternalArr,
+    kStartIdx,
+    kMaxSize,
+    kMemUsage,
+    kMemLimit,
+    kIsGroupAccum,
+    kSizeOfArray
+};
 
 /**
  * Less than comparison based on a sort pattern.
@@ -1080,6 +1098,12 @@ enum class AggRemovableStdDevElems { kSum, kM2, kCount, kNonFiniteCount, kSizeOf
  * while (X1, Y1) is set to previous (X2, Y2))
  */
 enum class AggLinearFillElems { kX1, kY1, kX2, kY2, kPrevX, kCount, kSizeOfArray };
+
+/**
+ * This enum defines indices into an 'Array' that store state for $firstN/$lastN
+ * window functions
+ */
+enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -1962,6 +1986,11 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableStdDevPopFinalize(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAvgFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstLastNInit(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstLastNAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstLastNRemove(ArityType arity);
+    template <AccumulatorFirstLastN::Sense S>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstLastNFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);

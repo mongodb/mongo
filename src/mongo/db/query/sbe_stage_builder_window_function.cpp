@@ -338,6 +338,86 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeAvg(StageBuilderState& stat
     return makeFunction("aggRemovableAvgFinalize", std::move(exprs));
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeFirstN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    auto it = args.find(AccArgs::kMaxSize);
+    uassert(8070617, "Expected max size argument", it != args.end());
+    auto maxSizeArg = std::move(it->second);
+    uassert(8070609,
+            "$firstN init argument should be a constant",
+            maxSizeArg->as<sbe::EConstant>() != nullptr);
+    exprs.push_back(makeFunction("aggRemovableFirstNInit", std::move(maxSizeArg)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddFirstN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableFirstNAdd", std::move(arg)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveFirstN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableFirstNRemove", std::move(arg)));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstN(StageBuilderState& state,
+                                                            const WindowFunctionStatement& stmt,
+                                                            sbe::value::SlotVector slots) {
+    tassert(8070605, "Expected a single slot", slots.size() == 1);
+    return makeFunction("aggRemovableFirstNFinalize", makeVariable(slots[0]));
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeLastN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    auto it = args.find(AccArgs::kMaxSize);
+    uassert(8070616, "Expected max size argument", it != args.end());
+    auto maxSizeArg = std::move(it->second);
+    uassert(8070610,
+            "$lastN init argument should be a constant",
+            maxSizeArg->as<sbe::EConstant>() != nullptr);
+    exprs.push_back(makeFunction("aggRemovableLastNInit", std::move(maxSizeArg)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddLastN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableLastNAdd", std::move(arg)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveLastN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> arg) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("aggRemovableLastNRemove", std::move(arg)));
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeLastN(StageBuilderState& state,
+                                                           const WindowFunctionStatement& stmt,
+                                                           sbe::value::SlotVector slots) {
+    tassert(8070606, "Expected a single slot", slots.size() == 1);
+    return makeFunction("aggRemovableLastNFinalize", makeVariable(slots[0]));
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
@@ -365,6 +445,28 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     return std::invoke(kWindowFunctionBuilders.at(opName), state, stmt, std::move(arg));
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    using BuildInitFn = std::function<std::vector<std::unique_ptr<sbe::EExpression>>(
+        StageBuilderState&,
+        const WindowFunctionStatement&,
+        StringDataMap<std::unique_ptr<sbe::EExpression>>)>;
+
+    static const StringDataMap<BuildInitFn> kWindowFunctionBuilders = {
+        {"$firstN", &buildWindowInitializeFirstN},
+        {"$lastN", &buildWindowInitializeLastN},
+    };
+
+    auto opName = stmt.expr->getOpName();
+    uassert(8070615,
+            str::stream() << "Unsupported window function in SBE stage builder: " << opName,
+            kWindowFunctionBuilders.find(opName) != kWindowFunctionBuilders.end());
+
+    return std::invoke(kWindowFunctionBuilders.at(opName), state, stmt, std::move(args));
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
@@ -378,6 +480,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
         {"$stdDevSamp", &buildWindowAddStdDev},
         {"$stdDevPop", &buildWindowAddStdDev},
         {AccumulatorAvg::kName, &buildWindowAddAvg},
+        {"$firstN", &buildWindowAddFirstN},
+        {"$lastN", &buildWindowAddLastN},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -425,6 +529,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
         {"$stdDevSamp", &buildWindowRemoveStdDev},
         {"$stdDevPop", &buildWindowRemoveStdDev},
         {AccumulatorAvg::kName, &buildWindowRemoveAvg},
+        {"$firstN", &buildWindowRemoveFirstN},
+        {"$lastN", &buildWindowRemoveLastN},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -474,6 +580,8 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
         {"$stdDevSamp", &buildWindowFinalizeStdDevSamp},
         {"$stdDevPop", &buildWindowFinalizeStdDevPop},
         {AccumulatorAvg::kName, &buildWindowFinalizeAvg},
+        {"$firstN", &buildWindowFinalizeFirstN},
+        {"$lastN", &buildWindowFinalizeLastN},
     };
 
     auto opName = stmt.expr->getOpName();

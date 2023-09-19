@@ -190,6 +190,7 @@ env.CppUnitTest(
         'expressions/sbe_exp_moving_avg_test.cpp',
         'expressions/sbe_extract_sub_array_builtin_test.cpp',
         'expressions/sbe_fail_test.cpp',
+        'expressions/sbe_firstn_lastn_test.cpp',
         'expressions/sbe_get_element_builtin_test.cpp',
         'expressions/sbe_if_test.cpp',
         'expressions/sbe_index_of_test.cpp',

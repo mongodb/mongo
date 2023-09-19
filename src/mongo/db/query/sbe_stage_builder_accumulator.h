@@ -51,6 +51,9 @@ const StringData kTopBottomNSortSpec = "sortSpec"_sd;
 const StringData kTopBottomNKey = "key"_sd;
 const StringData kTopBottomNValue = "value"_sd;
 
+const StringData kMaxSize = "maxSize"_sd;
+const StringData kIsGroupAccum = "isGroupAccum"_sd;
+
 const StringData kCovarianceX = "x"_sd;
 const StringData kCovarianceY = "y"_sd;
 
@@ -135,4 +138,22 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> initExpr,
     sbe::value::FrameIdGenerator&);
+
+/**
+ * Translates an input AccumulationStatement into an SBE EExpression for the initialization of the
+ * accumulator state.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
+    const AccumulationStatement& acc,
+    std::unique_ptr<sbe::EExpression> initExpr,
+    sbe::value::FrameIdGenerator&);
+
+/**
+ * Similar to above but takes multiple arguments
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
+    const AccumulationStatement& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    sbe::value::FrameIdGenerator&);
+
 }  // namespace mongo::stage_builder

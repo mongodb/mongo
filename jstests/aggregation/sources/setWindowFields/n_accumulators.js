@@ -64,7 +64,7 @@ for (const acc of Object.keys(nAccumulators)) {
     function testError(accSpec, expectedCode) {
         assert.throwsWithCode(() => coll.aggregate([{
             $setWindowFields: {
-                partitionBy: "$ticket",
+                partitionBy: "$ticker",
                 sortBy: {ts: 1},
                 output: {outputField: accSpec},
             }
@@ -91,7 +91,7 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({[acc]: {input: "$foo", n: "$a"}, window: {documents: [-1, 1]}}, 5787902);
 
         // Can't reference partition key.
-        testError({[acc]: {input: "$foo", n: "$ticket"}, window: {documents: [-1, 1]}}, 5787902);
+        testError({[acc]: {input: "$foo", n: "$ticker"}, window: {documents: [-1, 1]}}, 5787902);
 
         // n = 0
         testError({[acc]: {input: "$foo", n: 0}, window: {documents: [-1, 1]}}, 5787908);
@@ -119,7 +119,7 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({[acc]: {output, sortBy, n: "$a"}, window: {documents: [-1, 1]}}, 5787902);
 
         // Can't reference partition key.
-        testError({[acc]: {output, sortBy, n: "$ticket"}, window: {documents: [-1, 1]}}, 5787902);
+        testError({[acc]: {output, sortBy, n: "$ticker"}, window: {documents: [-1, 1]}}, 5787902);
 
         // n = 0
         testError({[acc]: {output, sortBy, n: 0}, window: {documents: [-1, 1]}}, 5787908);

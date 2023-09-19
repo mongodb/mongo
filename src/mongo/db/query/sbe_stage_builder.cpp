@@ -113,6 +113,7 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
@@ -2492,6 +2493,18 @@ bool isTopBottomN(const AccumulationStatement& accStmt) {
         accStmt.expr.name == AccumulatorTopBottomN<kBottom, false>::getName();
 }
 
+// Return true iff 'accStmt' is one of $topN, $bottomN, $minN, $maxN, $firstN or $lastN.
+bool isAccumulatorN(const AccumulationStatement& accStmt) {
+    return accStmt.expr.name == AccumulatorTopBottomN<kTop, true>::getName() ||
+        accStmt.expr.name == AccumulatorTopBottomN<kBottom, true>::getName() ||
+        accStmt.expr.name == AccumulatorTopBottomN<kTop, false>::getName() ||
+        accStmt.expr.name == AccumulatorTopBottomN<kBottom, false>::getName() ||
+        accStmt.expr.name == AccumulatorMinN::getName() ||
+        accStmt.expr.name == AccumulatorMaxN::getName() ||
+        accStmt.expr.name == AccumulatorFirstN::getName() ||
+        accStmt.expr.name == AccumulatorLastN::getName();
+}
+
 // Compute what values 'groupNode' will need from its child node in order to build expressions for
 // the group-by key ("_id") and the accumulators.
 MONGO_COMPILER_NOINLINE
@@ -2814,10 +2827,37 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
         }
     }();
 
-    auto initExpr =
-        generateExpression(state, accStmt.expr.initializer.get(), initializerRootSlot, nullptr);
-    auto accInitExprs = stage_builder::buildInitialize(
-        accStmt, initExpr.extractExpr(state).expr, *state.frameIdGenerator);
+    auto initExprs = [&]() {
+        StringDataMap<std::unique_ptr<sbe::EExpression>> initExprArgs;
+        if (isAccumulatorN(accStmt)) {
+            initExprArgs.emplace(
+                AccArgs::kMaxSize,
+                generateExpression(
+                    state, accStmt.expr.initializer.get(), initializerRootSlot, nullptr)
+                    .extractExpr(state)
+                    .expr);
+            initExprArgs.emplace(
+                AccArgs::kIsGroupAccum,
+                makeConstant(sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(true)));
+        } else {
+            initExprArgs.emplace(
+                "",
+                generateExpression(
+                    state, accStmt.expr.initializer.get(), initializerRootSlot, nullptr)
+                    .extractExpr(state)
+                    .expr);
+        }
+        return initExprArgs;
+    }();
+    auto accInitExprs = [&]() {
+        if (initExprs.size() == 1) {
+            return stage_builder::buildInitialize(
+                accStmt, std::move(initExprs.begin()->second), *state.frameIdGenerator);
+        } else {
+            return stage_builder::buildInitialize(
+                accStmt, std::move(initExprs), *state.frameIdGenerator);
+        }
+    }();
 
     tassert(7567301,
             "The accumulation and initialization expression should have the same length",
@@ -3714,7 +3754,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 return makeNullConstant();
             }
         };
-        auto initExprArg = [&]() {
+        auto initExprArgs = [&]() {
+            StringDataMap<std::unique_ptr<sbe::EExpression>> initExprArgs;
             if (outputField.expr->getOpName() == AccumulatorExpMovingAvg::kName) {
                 auto alpha = [&]() {
                     auto emaExpr = dynamic_cast<window_function::ExpressionExpMovingAvg*>(
@@ -3725,13 +3766,41 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                         return emaExpr->getAlpha().get();
                     }
                 }();
-                return makeDecimalConstant(alpha);
+                initExprArgs.emplace("", makeDecimalConstant(alpha));
             } else if (outputField.expr->getOpName() == AccumulatorIntegral::kName) {
-                return getUnitArg(
-                    dynamic_cast<window_function::ExpressionWithUnit*>(outputField.expr.get()));
+                initExprArgs.emplace("",
+                                     getUnitArg(dynamic_cast<window_function::ExpressionWithUnit*>(
+                                         outputField.expr.get())));
+            } else if (outputField.expr->getOpName() == "$firstN") {
+                auto nExprPtr =
+                    dynamic_cast<
+                        window_function::ExpressionN<WindowFunctionFirstN, AccumulatorFirstN>*>(
+                        outputField.expr.get())
+                        ->nExpr.get();
+                initExprArgs.emplace(AccArgs::kMaxSize,
+                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
+                                         .extractExpr(_state)
+                                         .expr);
+                initExprArgs.emplace(AccArgs::kIsGroupAccum,
+                                     makeConstant(sbe::value::TypeTags::Boolean,
+                                                  sbe::value::bitcastFrom<bool>(false)));
+            } else if (outputField.expr->getOpName() == "$lastN") {
+                auto nExprPtr =
+                    dynamic_cast<
+                        window_function::ExpressionN<WindowFunctionLastN, AccumulatorLastN>*>(
+                        outputField.expr.get())
+                        ->nExpr.get();
+                initExprArgs.emplace(AccArgs::kMaxSize,
+                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
+                                         .extractExpr(_state)
+                                         .expr);
+                initExprArgs.emplace(AccArgs::kIsGroupAccum,
+                                     makeConstant(sbe::value::TypeTags::Boolean,
+                                                  sbe::value::bitcastFrom<bool>(false)));
             } else {
-                return std::unique_ptr<mongo::sbe::EExpression>(nullptr);
+                initExprArgs.emplace("", std::unique_ptr<mongo::sbe::EExpression>(nullptr));
             }
+            return initExprArgs;
         }();
 
         // Create init/add/remove expressions.
@@ -3747,7 +3816,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             return exprMapClone;
         };
         if (removable) {
-            initExprs = buildWindowInit(_state, outputField, std::move(initExprArg));
+            if (initExprArgs.size() == 1) {
+                initExprs =
+                    buildWindowInit(_state, outputField, std::move(initExprArgs.begin()->second));
+            } else {
+                initExprs = buildWindowInit(_state, outputField, std::move(initExprArgs));
+            }
             if (argExprs.size() == 1) {
                 addExprs = buildWindowAdd(_state, outputField, argExprs.begin()->second->clone());
                 removeExprs =
@@ -3757,7 +3831,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
             }
         } else {
-            initExprs = buildInitialize(accStmt, std::move(initExprArg), _frameIdGenerator);
+            if (initExprArgs.size() == 1) {
+                initExprs = buildInitialize(
+                    accStmt, std::move(initExprArgs.begin()->second), _frameIdGenerator);
+            } else {
+                initExprs = buildInitialize(accStmt, std::move(initExprArgs), _frameIdGenerator);
+            }
             if (argExprs.size() == 1) {
                 addExprs = buildAccumulator(
                     accStmt, argExprs.begin()->second->clone(), collatorSlot, _frameIdGenerator);

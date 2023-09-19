@@ -994,7 +994,13 @@ public:
         : Expression(expCtx, std::move(name), std::move(input), std::move(bounds)),
           nExpr(std::move(nExpr)),
           sortPattern(std::move(sortPattern)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        StringDataSet compatibleAccumulators{"$firstN", "$lastN"};
+        if (compatibleAccumulators.count(_accumulatorName)) {
+            expCtx->sbeWindowCompatibility =
+                std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
+        } else {
+            expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        }
     }
 
     Value serialize(const SerializationOptions& opts) const final;

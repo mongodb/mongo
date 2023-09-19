@@ -601,8 +601,23 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsMergeObjec
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
-    std::unique_ptr<sbe::EExpression> maxSizeExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {
-    // Create an array of four elements [value holder, max size, memory used, memory limit].
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+
+    auto it = argExprs.find(AccArgs::kMaxSize);
+    tassert(8070612,
+            str::stream() << "Expected a '" << AccArgs::kMaxSize << "' argument",
+            it != argExprs.end());
+    auto maxSizeExpr = std::move(it->second);
+
+    it = argExprs.find(AccArgs::kIsGroupAccum);
+    tassert(8070613,
+            str::stream() << "Expected a '" << AccArgs::kIsGroupAccum << "' argument",
+            it != argExprs.end());
+    auto isGroupAccumExpr = std::move(it->second);
+
+    // Create an array of four elements [value holder, max size, memory used, memory limit,
+    // isGroupAccum].
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     auto maxAccumulatorBytes = internalQueryTopNAccumulatorBytes.load();
     if (auto* maxSizeConstExpr = maxSizeExpr->as<sbe::EConstant>()) {
@@ -618,7 +633,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
                                     makeInt64Constant(0),
                                     makeConstant(convertTag, convertVal),
                                     makeInt32Constant(0),
-                                    makeInt32Constant(maxAccumulatorBytes)));
+                                    makeInt32Constant(maxAccumulatorBytes),
+                                    std::move(isGroupAccumExpr)));
     } else {
         auto localBind = makeLocalBind(
             &frameIdGenerator,
@@ -635,7 +651,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeAccumulatorMulti(
                                  makeInt64Constant(0),
                                  maxSizeConvertVar.clone(),
                                  makeInt32Constant(0),
-                                 makeInt32Constant(maxAccumulatorBytes)),
+                                 makeInt32Constant(maxAccumulatorBytes),
+                                 std::move(isGroupAccumExpr)),
                     makeFail(7548607,
                              "parameter 'n' must be coercible to a positive 64-bit integer"));
             },
@@ -1514,18 +1531,6 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
         {AccumulatorMergeObjects::kName, &emptyInitializer<1>},
         {AccumulatorStdDevPop::kName, &emptyInitializer<1>},
         {AccumulatorStdDevSamp::kName, &emptyInitializer<1>},
-        {AccumulatorFirstN::kName, &buildInitializeAccumulatorMulti},
-        {AccumulatorLastN::kName, &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kTop, true /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kBottom, true /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kTop, false /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
-         &buildInitializeAccumulatorMulti},
-        {AccumulatorMaxN::kName, &buildInitializeAccumulatorMulti},
-        {AccumulatorMinN::kName, &buildInitializeAccumulatorMulti},
         {AccumulatorCovarianceSamp::kName, &emptyInitializer<1>},
         {AccumulatorCovariancePop::kName, &emptyInitializer<1>},
         {AccumulatorExpMovingAvg::kName, &buildInitializeExpMovingAvg},
@@ -1544,5 +1549,35 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
             kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
 
     return std::invoke(kAccumulatorBuilders.at(accExprName), std::move(initExpr), frameIdGenerator);
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
+    const AccumulationStatement& acc,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    using BuildInitializeFn = std::function<std::vector<std::unique_ptr<sbe::EExpression>>(
+        StringDataMap<std::unique_ptr<sbe::EExpression>>, sbe::value::FrameIdGenerator&)>;
+
+    static const StringDataMap<BuildInitializeFn> kAccumulatorBuilders = {
+        {AccumulatorFirstN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorLastN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorTopBottomN<kTop, true /* single */>::getName(),
+         &buildInitializeAccumulatorMulti},
+        {AccumulatorTopBottomN<kBottom, true /* single */>::getName(),
+         &buildInitializeAccumulatorMulti},
+        {AccumulatorTopBottomN<kTop, false /* single */>::getName(),
+         &buildInitializeAccumulatorMulti},
+        {AccumulatorTopBottomN<kBottom, false /* single */>::getName(),
+         &buildInitializeAccumulatorMulti},
+        {AccumulatorMaxN::kName, &buildInitializeAccumulatorMulti},
+        {AccumulatorMinN::kName, &buildInitializeAccumulatorMulti},
+    };
+
+    auto accExprName = acc.expr.name;
+    uassert(8070614,
+            str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
+            kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
+
+    return std::invoke(kAccumulatorBuilders.at(accExprName), std::move(argExprs), frameIdGenerator);
 }
 }  // namespace mongo::stage_builder
