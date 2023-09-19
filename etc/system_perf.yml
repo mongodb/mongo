@@ -14,9 +14,9 @@ parameters:
 variables:
   ###
   # Leave this section uncommented to enable compile.
-  _real_compile_amazon2: &_compile_amazon2
-      - name: compile
-        variant: compile-amazon2
+  #_real_compile_amazon2: &_compile_amazon2
+  #    - name: compile
+  #      variant: compile-amazon2
   _real_compile_rhel70: &_compile_rhel70
       - name: compile
         variant: compile-rhel70
@@ -38,27 +38,22 @@ variables:
 
 ###
 # **Or**: Leave this section uncommented to bypass/skip compile.
-#  _skip_compile_amazon2: &_compile_amazon2
-#      - name: schedule_global_auto_tasks
-#        variant: task_generation
-#  _skip_compile_rhel70: &_compile_rhel70
-#      - name: schedule_global_auto_tasks
-#        variant: task_generation
-#  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-#  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-#  _skip_compile_amazon2_streams: &_compile_amazon2_streams
-#     - name: schedule_global_auto_tasks
-#       variant: task_generation
-#  _skip_expansions: &_expansion_updates
-#      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
-#      - key: mdb_binary_for_client
-#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
-#      - key: mdb_binary_for_server
-#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+  # _skip_compile_amazon2: &_compile_amazon2
+  #     []
+  # _skip_compile_rhel70: &_compile_rhel70
+  #     []
+  # _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+  #     []
+  # _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+  #     []
+  # _skip_compile_amazon2_streams: &_compile_amazon2_streams
+  #     []
+  # _skip_expansions: &_expansion_updates
+  #     # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
+  #     - key: mdb_binary_for_client
+  #       value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+  #     - key: mdb_binary_for_server
+  #       value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
 ###
 
   _src_dir: &src_dir src/mongo
