@@ -189,12 +189,23 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void createTempCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& collectionOptions) override {
+        MONGO_UNREACHABLE;
+    }
+
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) override {
         MONGO_UNREACHABLE;
     }
+
     void dropCollection(OperationContext* opCtx, const NamespaceString& ns) override {
+        MONGO_UNREACHABLE;
+    }
+
+    void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) override {
         MONGO_UNREACHABLE;
     }
 

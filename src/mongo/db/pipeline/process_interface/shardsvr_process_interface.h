@@ -137,10 +137,15 @@ public:
     void createCollection(OperationContext* opCtx,
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) final;
+    void createTempCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& collectionOptions) final;
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) final;
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) final;
+
+    void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) final;
 
     /**
      * If 'allowTargetingShards' is true, splits the pipeline and dispatch half to the shards,

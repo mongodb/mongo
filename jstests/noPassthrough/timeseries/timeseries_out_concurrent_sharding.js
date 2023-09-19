@@ -84,8 +84,8 @@ function runOutAndShardCollectionConcurrently_shardCollectionMustFail(st, testDB
     fp.wait();
 
     // Validate the temporary collection exists, meaning we are in the middle of the $out stage.
-    const collNames = testDB.getCollectionNames();
-    assert.eq(collNames.filter(col => col.includes('tmp.agg_out')).length, 1, collNames);
+    let collNames = testDB.getCollectionNames();
+    assert.eq(collNames.filter(col => col.startsWith('tmp.agg_out')).length, 1, collNames);
 
     // Assert sharding the target collection fails, since the rename command has a lock on the
     // view namespace.
@@ -108,6 +108,10 @@ function runOutAndShardCollectionConcurrently_shardCollectionMustFail(st, testDB
 
     // Assert the metadata is consistent.
     checkMetadata(testDB);
+
+    // Assert no temporary collection is left over.
+    collNames = testDB.getCollectionNames();
+    assert.eq(collNames.filter(col => col.startsWith('tmp.agg_out')).length, 0, collNames);
 
     sourceColl.drop();
     targetColl.drop();
@@ -133,8 +137,8 @@ function runOutAndShardCollectionConcurrently_OutMustFail(st, testDB, primarySha
     fp.wait();
 
     // Validate the temporary collection exists, meaning we are in the middle of the $out stage.
-    const collNames = testDB.getCollectionNames();
-    assert.eq(collNames.filter(col => col.includes('tmp.agg_out')).length, 1, collNames);
+    let collNames = testDB.getCollectionNames();
+    assert.eq(collNames.filter(col => col.startsWith('tmp.agg_out')).length, 1, collNames);
 
     // Assert sharding the target collection fails, since the rename command has a lock on the
     // view namespace.
@@ -149,6 +153,10 @@ function runOutAndShardCollectionConcurrently_OutMustFail(st, testDB, primarySha
 
     // Assert the metadata is consistent.
     checkMetadata(testDB);
+
+    // Assert to temp collection is left over.
+    collNames = testDB.getCollectionNames();
+    assert.eq(collNames.filter(col => col.startsWith('tmp.agg_out')).length, 0, collNames);
 
     sourceColl.drop();
     targetColl.drop();

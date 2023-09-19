@@ -183,11 +183,7 @@ private:
 
         if (_timeseries) {
             uassertStatusOK(pExpCtx->mongoProcessInterface->insertTimeseries(
-                pExpCtx,
-                _tempNs.getTimeseriesViewNamespace(),
-                std::move(insertCommand),
-                _writeConcern,
-                targetEpoch));
+                pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));
         } else {
             uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
                 pExpCtx, _tempNs, std::move(insertCommand), _writeConcern, targetEpoch));

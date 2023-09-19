@@ -84,9 +84,6 @@ DocumentSourceOut::~DocumentSourceOut() {
 
         // If creating a time-series collection, we must drop the "real" buckets collection, if
         // anything goes wrong creating the view.
-
-        // If creating a time-series collection, '_tempNs' is translated to include the
-        // "system.buckets" prefix.
         if (_tempNs.size() || (_timeseries && !_timeseriesStateConsistent)) {
             auto cleanupClient =
                 pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
@@ -100,7 +97,7 @@ DocumentSourceOut::~DocumentSourceOut() {
 
             auto deleteNs = _tempNs.size() ? _tempNs : makeBucketNsIfTimeseries(getOutputNs());
             try {
-                pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), deleteNs);
+                pExpCtx->mongoProcessInterface->dropTempCollection(cleanupOpCtx.get(), deleteNs);
             } catch (const DBException& e) {
                 LOGV2_WARNING(7466203,
                               "Unexpected error dropping temporary collection; drop will complete ",
@@ -224,27 +221,23 @@ void DocumentSourceOut::initialize() {
             _originalOutOptions["capped"].eoo());
 
     {
-        BSONObjBuilder cmd;
-        cmd << "create" << _tempNs.coll();
-        cmd << "temp" << true;
+        BSONObjBuilder collectionOptions;
         if (_timeseries) {
             // Append the original collection options without the 'validator' and 'clusteredIndex'
             // fields since these fields are invalid with the 'timeseries' field and will be
             // recreated when the buckets collection is created.
             _originalOutOptions.isEmpty()
-                ? cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON()
-                : cmd.appendElementsUnique(_originalOutOptions.removeFields(
+                ? collectionOptions << DocumentSourceOutSpec::kTimeseriesFieldName
+                                    << _timeseries->toBSON()
+                : collectionOptions.appendElementsUnique(_originalOutOptions.removeFields(
                       StringDataSet{"clusteredIndex", "validator"}));
         } else {
-            cmd.appendElementsUnique(_originalOutOptions);
+            collectionOptions.appendElementsUnique(_originalOutOptions);
         }
-        pExpCtx->mongoProcessInterface->createCollection(
-            pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
-    }
 
-    // After creating the tmp collection we should update '_tempNs' to represent the buckets
-    // collection if the collection is time-series.
-    _tempNs = makeBucketNsIfTimeseries(_tempNs);
+        pExpCtx->mongoProcessInterface->createTempCollection(
+            pExpCtx->opCtx, _tempNs, collectionOptions.done());
+    }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitAfterTempCollectionCreation,
@@ -259,11 +252,12 @@ void DocumentSourceOut::initialize() {
     }
 
     // Copy the indexes of the output collection to the temp collection.
+    // Note that on timeseries collections, indexes are to be created on the buckets collection.
     try {
         std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
                                               std::end(_originalIndexes)};
         pExpCtx->mongoProcessInterface->createIndexesOnEmptyCollection(
-            pExpCtx->opCtx, _tempNs, tempNsIndexes);
+            pExpCtx->opCtx, makeBucketNsIfTimeseries(_tempNs), tempNsIndexes);
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;
@@ -281,16 +275,20 @@ void DocumentSourceOut::finalize() {
 
     // If the collection is time-series, we must rename to the "real" buckets collection.
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
+    const NamespaceString fromNs = makeBucketNsIfTimeseries(_tempNs);
 
     pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(pExpCtx->opCtx,
-                                                                            _tempNs,
+                                                                            fromNs,
                                                                             outputNs,
                                                                             true /* dropTarget */,
                                                                             false /* stayTemp */,
                                                                             _originalOutOptions,
                                                                             _originalIndexes);
 
-    // The rename succeeded, so the temp collection no longer exists.
+    // The rename succeeded, so the temp collection no longer exists. Call 'dropTempCollection'
+    // anyway to ensure that we remove it from the list of in-use temporary collections that will be
+    // dropped on stepup (relevant on sharded clusters).
+    pExpCtx->mongoProcessInterface->dropTempCollection(pExpCtx->opCtx, _tempNs);
     _tempNs = {};
 
     _timeseriesStateConsistent = false;
@@ -308,10 +306,7 @@ void DocumentSourceOut::finalize() {
 }
 
 BatchedCommandRequest DocumentSourceOut::makeBatchedWriteRequest() const {
-    // Note that our insert targets '_tempNs' (or the associated timeseries view) since we will
-    // never write to 'outputNs' directly.
-    const auto& targetNss = _timeseries ? _tempNs.getTimeseriesViewNamespace() : _tempNs;
-    return makeInsertCommand(targetNss, pExpCtx->bypassDocumentValidation);
+    return makeInsertCommand(_tempNs, pExpCtx->bypassDocumentValidation);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(

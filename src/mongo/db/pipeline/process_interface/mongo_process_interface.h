@@ -332,6 +332,19 @@ public:
     virtual void createCollection(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   const BSONObj& cmdObj) = 0;
+
+    /**
+     * Creates a temporary collection 'nss', with the given 'collectionOptions'.
+     *
+     * On non-shard servers, temporary collections are collections with the 'temp' property set to
+     * true. On shard servers, temporary collections don't set the 'temp' property to true; instead,
+     * they are annotated on the 'kAggTempCollections' collection on this shard. In both cases,
+     * temporary collections are dropped (garbage-collected) on stepup (or startup in the case of
+     * standalone nodes).
+     */
+    virtual void createTempCollection(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const BSONObj& collectionOptions) = 0;
     /**
      * Creates the view backing a time-series collection.
      */
@@ -349,6 +362,11 @@ public:
                                                 const std::vector<BSONObj>& indexSpecs) = 0;
 
     virtual void dropCollection(OperationContext* opCtx, const NamespaceString& collection) = 0;
+
+    /**
+     * Drops a temporary collection that was previously created using 'createTempCollection'.
+     */
+    virtual void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     /**
      * Accepts a pipeline and returns a new one which will draw input from the underlying

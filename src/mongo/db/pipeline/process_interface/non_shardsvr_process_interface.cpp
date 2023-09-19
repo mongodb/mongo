@@ -258,10 +258,26 @@ void NonShardServerProcessInterface::createCollection(OperationContext* opCtx,
     uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
 }
 
+void NonShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          const BSONObj& collectionOptions) {
+    BSONObjBuilder cmd;
+    cmd << "create" << nss.coll();
+    cmd << "temp" << true;
+    cmd.appendElementsUnique(collectionOptions);
+    createCollection(opCtx, nss.dbName(), cmd.done());
+}
+
 void NonShardServerProcessInterface::dropCollection(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
-    uassertStatusOK(mongo::dropCollectionForApplyOps(
-        opCtx, ns, {}, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    DropReply dropReply;
+    uassertStatusOK(mongo::dropCollection(
+        opCtx, ns, &dropReply, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+}
+
+void NonShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
+                                                        const NamespaceString& nss) {
+    dropCollection(opCtx, nss);
 }
 
 BSONObj NonShardServerProcessInterface::preparePipelineAndExplain(

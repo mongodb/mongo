@@ -152,12 +152,18 @@ public:
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) override;
 
+    void createTempCollection(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const BSONObj& collectionOptions) override;
+
     void createTimeseriesView(OperationContext* opCtx,
                               const NamespaceString& ns,
                               const BSONObj& cmdObj,
                               const TimeseriesOptions& userOpts) override;
 
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
+
+    void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) override;
 
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,

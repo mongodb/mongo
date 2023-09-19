@@ -86,6 +86,31 @@ namespace mongo {
 
 using namespace fmt::literals;
 
+namespace {
+
+// Writes to the local shard. It shall only be used to write to collections that are always
+// untracked (e.g. collections under the admin/config db).
+void writeToLocalShard(OperationContext* opCtx,
+                       const BatchedCommandRequest& batchedCommandRequest) {
+    tassert(8144401,
+            "Forbidden to write directly to local shard unless namespace is always untracked",
+            batchedCommandRequest.getNS().isNamespaceAlwaysUntracked());
+    tassert(8144402,
+            "Explicit write concern required for internal cluster operation",
+            batchedCommandRequest.hasWriteConcern());
+
+    const auto cmdResponse =
+        repl::ReplicationCoordinator::get(opCtx)->runCmdOnPrimaryAndAwaitResponse(
+            opCtx,
+            batchedCommandRequest.getNS().dbName(),
+            batchedCommandRequest.toBSON(),
+            [](executor::TaskExecutor::CallbackHandle handle) {},
+            [](executor::TaskExecutor::CallbackHandle handle) {});
+    uassertStatusOK(getStatusFromCommandResult(cmdResponse));
+}
+
+}  // namespace
+
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     const auto [cm, _] =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -350,6 +375,25 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
                                    << "write concern failed while running command " << finalCmdObj);
 }
 
+void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
+                                                       const NamespaceString& nss,
+                                                       const BSONObj& collectionOptions) {
+    // Insert an entry on the 'kAggTempCollections' collection on this shard to indicate that 'nss'
+    // is a temporary collection that shall be garbage-collected (dropped) on the next stepup.
+    BatchedCommandRequest bcr(write_ops::InsertCommandRequest{
+        NamespaceString(NamespaceString::kAggTempCollections),
+        std::vector<BSONObj>({BSON("_id" << NamespaceStringUtil::serialize(nss))})});
+    bcr.setWriteConcern(CommandHelpers::kMajorityWriteConcern.toBSON());
+    writeToLocalShard(opCtx, bcr);
+
+    // Create the collection. Note we don't set the 'temp: true' option. The temporary-ness comes
+    // from having registered on kAggTempCollections.
+    BSONObjBuilder cmd;
+    cmd << "create" << nss.coll();
+    cmd.appendElementsUnique(collectionOptions);
+    createCollection(opCtx, nss.dbName(), cmd.done());
+}
+
 void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     OperationContext* opCtx, const NamespaceString& ns, const std::vector<BSONObj>& indexSpecs) {
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns.dbName());
@@ -415,6 +459,20 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
     uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
                                str::stream()
                                    << "write concern failed while running command " << cmdObj);
+}
+
+void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
+    // Drop the collection.
+    dropCollection(opCtx, nss);
+
+    // Remove the garbage-collector entry associated to it.
+    BatchedCommandRequest bcr(write_ops::DeleteCommandRequest{
+        NamespaceString(NamespaceString::kAggTempCollections),
+        {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(nss)),
+                                  false /* multi */)}});
+    bcr.setWriteConcern(CommandHelpers::kMajorityWriteConcern.toBSON());
+    writeToLocalShard(opCtx, std::move(bcr));
 }
 
 void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,

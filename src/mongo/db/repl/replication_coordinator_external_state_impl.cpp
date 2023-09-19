@@ -91,6 +91,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/drop_agg_temp_collections.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
@@ -1011,6 +1012,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
             const bool scheduleAsyncRefresh = true;
             resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+
+            // Schedule a drop of the temporary collections used by aggregations ($out
+            // specifically).
+            dropAggTempCollections(opCtx);
         }
         // The code above will only be executed after a stepdown happens, however the code below
         // needs to be executed also on startup, and the enabled check might fail in shards during
