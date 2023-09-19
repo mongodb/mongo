@@ -48,10 +48,6 @@ constexpr auto kAllShardsLowestRemainingOperationTimeEstimatedSecs =
     "allShardsLowestRemainingOperationTimeEstimatedSecs";
 constexpr auto kAllShardsHighestRemainingOperationTimeEstimatedSecs =
     "allShardsHighestRemainingOperationTimeEstimatedSecs";
-constexpr auto kIsSameKeyResharding = "isSameKeyResharding";
-constexpr auto kIndexesToBuild = "indexesToBuild";
-constexpr auto kIndexesBuilt = "indexesBuilt";
-constexpr auto kIndexBuildTimeElapsed = "indexBuildTimeElapsedSecs";
 }  // namespace
 
 StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForType() const {
@@ -121,18 +117,4 @@ StringData ShardingDataTransformInstanceMetricsFieldNameProvider::
     return kAllShardsHighestRemainingOperationTimeEstimatedSecs;
 }
 
-StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForIsSameKeyResharding()
-    const {
-    return kIsSameKeyResharding;
-}
-StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForIndexesToBuild() const {
-    return kIndexesToBuild;
-}
-StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForIndexesBuilt() const {
-    return kIndexesBuilt;
-}
-StringData ShardingDataTransformInstanceMetricsFieldNameProvider::getForIndexBuildTimeElapsed()
-    const {
-    return kIndexBuildTimeElapsed;
-}
 }  // namespace mongo

@@ -200,6 +200,15 @@ public:
     void fillDonorCtxOnCompletion(DonorShardContext& donorCtx);
     void fillRecipientCtxOnCompletion(RecipientShardContext& recipientCtx);
 
+    void onStarted();
+    void onSuccess();
+    void onFailure();
+    void onCanceled();
+
+    void setIsSameKeyResharding(bool isSameKeyResharding);
+    void setIndexesToBuild(int64_t numIndexes);
+    void setIndexesBuilt(int64_t numIndexes);
+
 protected:
     boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
     virtual StringData getStateString() const noexcept override;
@@ -273,6 +282,10 @@ private:
     }
 
     AtomicWord<bool> _ableToEstimateRemainingRecipientTime;
+
+    AtomicWord<bool> _isSameKeyResharding;
+    AtomicWord<int64_t> _indexesToBuild;
+    AtomicWord<int64_t> _indexesBuilt;
 
     ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
     ReshardingMetricsFieldNameProvider* _reshardingFieldNames;

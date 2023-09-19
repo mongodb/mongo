@@ -258,6 +258,19 @@ BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
             serverGlobalParams.featureCompatibility)) {
         reportDurationsForAllPhases<Seconds>(
             kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});
+        switch (_role) {
+            case Role::kCoordinator:
+                builder.append(_reshardingFieldNames->getForIsSameKeyResharding(),
+                               _isSameKeyResharding.load());
+                break;
+            case Role::kRecipient:
+                builder.append(_reshardingFieldNames->getForIndexesToBuild(),
+                               _indexesToBuild.load());
+                builder.append(_reshardingFieldNames->getForIndexesBuilt(), _indexesBuilt.load());
+                break;
+            default:
+                break;
+        }
     } else {
         reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMapWithoutReshardingImprovements,
                                              getClockSource(),
@@ -355,6 +368,34 @@ void ReshardingMetrics::fillRecipientCtxOnCompletion(RecipientShardContext& reci
     recipientCtx.setBytesCopied(getBytesWrittenCount());
     recipientCtx.setOplogFetched(getOplogEntriesFetched());
     recipientCtx.setOplogApplied(getOplogEntriesApplied());
+}
+
+void ReshardingMetrics::onStarted() {
+    getReshardingCumulativeMetrics()->onStarted(_isSameKeyResharding.load());
+}
+
+void ReshardingMetrics::onSuccess() {
+    getReshardingCumulativeMetrics()->onSuccess(_isSameKeyResharding.load());
+}
+
+void ReshardingMetrics::onFailure() {
+    getReshardingCumulativeMetrics()->onFailure(_isSameKeyResharding.load());
+}
+
+void ReshardingMetrics::onCanceled() {
+    getReshardingCumulativeMetrics()->onCanceled(_isSameKeyResharding.load());
+}
+
+void ReshardingMetrics::setIsSameKeyResharding(bool isSameKeyResharding) {
+    _isSameKeyResharding.store(isSameKeyResharding);
+}
+
+void ReshardingMetrics::setIndexesToBuild(int64_t numIndexes) {
+    _indexesToBuild.store(numIndexes);
+}
+
+void ReshardingMetrics::setIndexesBuilt(int64_t numIndexes) {
+    _indexesBuilt.store(numIndexes);
 }
 
 }  // namespace mongo

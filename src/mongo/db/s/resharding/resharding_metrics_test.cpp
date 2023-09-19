@@ -765,5 +765,32 @@ TEST_F(ReshardingMetricsTest, OnStateTransitionInformsCumulativeMetrics) {
         });
 }
 
+TEST_F(ReshardingMetricsTest, onSameKeyResharding) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kCoordinator);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getBoolField("isSameKeyResharding"), false);
+    metrics->setIsSameKeyResharding(true);
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getBoolField("isSameKeyResharding"), true);
+}
+
+TEST_F(ReshardingMetricsTest, onIndexBuild) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("indexesToBuild"), 0);
+    ASSERT_EQ(report.getIntField("indexesBuilt"), 0);
+    metrics->setIndexesToBuild(2);
+    metrics->setIndexesBuilt(1);
+
+    report = metrics->reportForCurrentOp();
+    ASSERT_EQ(report.getIntField("indexesToBuild"), 2);
+    ASSERT_EQ(report.getIntField("indexesBuilt"), 1);
+}
+
 }  // namespace
 }  // namespace mongo

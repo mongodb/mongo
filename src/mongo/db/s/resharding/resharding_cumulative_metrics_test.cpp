@@ -44,6 +44,7 @@
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
@@ -595,5 +596,109 @@ TEST_F(ReshardingCumulativeMetricsTest,
     ASSERT(simulateTransitionTo(boost::none));
 }
 
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsRunCount) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countStarted"), 0);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyStarted"), 0);
+    }
+
+    _reshardingCumulativeMetrics->onStarted(false /*isSameKeyResharding*/);
+    _reshardingCumulativeMetrics->onStarted(true /*isSameKeyResharding*/);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countStarted"), 2);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyStarted"), 1);
+    }
+}
+
+
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsSucceededCount) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _cumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSucceeded"), 0);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeySucceeded"), 0);
+    }
+
+    _reshardingCumulativeMetrics->onSuccess(false /*isSameKeyResharding*/);
+    _reshardingCumulativeMetrics->onSuccess(true /*isSameKeyResharding*/);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSucceeded"), 2);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeySucceeded"), 1);
+    }
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsFailedCount) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countFailed"), 0);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyFailed"), 0);
+    }
+
+    _reshardingCumulativeMetrics->onFailure(false /*isSameKeyResharding*/);
+    _reshardingCumulativeMetrics->onFailure(true /*isSameKeyResharding*/);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countFailed"), 2);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyFailed"), 1);
+    }
+}
+
+TEST_F(ReshardingCumulativeMetricsTest, ReportContainsCanceledCount) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    using Role = ShardingDataTransformMetrics::Role;
+    ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
+    auto ignore = _reshardingCumulativeMetrics->registerInstanceMetrics(&coordinator);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countCanceled"), 0);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyCanceled"), 0);
+    }
+
+    _reshardingCumulativeMetrics->onCanceled(false /*isSameKeyResharding*/);
+    _reshardingCumulativeMetrics->onCanceled(true /*isSameKeyResharding*/);
+
+    {
+        BSONObjBuilder bob;
+        _reshardingCumulativeMetrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countCanceled"), 2);
+        ASSERT_EQ(report.getObjectField(kResharding).getIntField("countSameKeyCanceled"), 1);
+    }
+}
 }  // namespace
 }  // namespace mongo

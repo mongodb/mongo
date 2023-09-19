@@ -39,6 +39,12 @@ namespace mongo {
 class ReshardingCumulativeMetricsFieldNameProvider
     : public WithOplogApplicationLatencyMetricsFieldNames<
           WithOplogApplicationCountFieldNames<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {};
+              ShardingDataTransformCumulativeMetricsFieldNameProvider>>> {
+public:
+    StringData getForCountSameKeyStarted() const;
+    StringData getForCountSameKeySucceeded() const;
+    StringData getForCountSameKeyFailed() const;
+    StringData getForCountSameKeyCanceled() const;
+};
 
 }  // namespace mongo

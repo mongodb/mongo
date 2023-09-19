@@ -39,6 +39,12 @@ namespace mongo {
 class ReshardingMetricsFieldNameProvider
     : public WithOplogApplicationCountFieldNames<
           WithDocumentCopyApproximationFieldNameOverrides<WithDocumentCopyCountFieldNameOverrides<
-              ShardingDataTransformInstanceMetricsFieldNameProvider>>> {};
+              ShardingDataTransformInstanceMetricsFieldNameProvider>>> {
+public:
+    StringData getForIsSameKeyResharding() const;
+    StringData getForIndexesToBuild() const;
+    StringData getForIndexesBuilt() const;
+    StringData getForIndexBuildTimeElapsed() const;
+};
 
 }  // namespace mongo

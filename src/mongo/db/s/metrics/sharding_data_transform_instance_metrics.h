@@ -84,10 +84,10 @@ public:
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
 
-    void onStarted(bool isSameKeyResharding);
-    void onSuccess(bool isSameKeyResharding);
-    void onFailure(bool isSameKeyResharding);
-    void onCanceled(bool isSameKeyResharding);
+    void onStarted();
+    void onSuccess();
+    void onFailure();
+    void onCanceled();
 
     void onDocumentsProcessed(int64_t documentCount,
                               int64_t totalDocumentsSizeBytes,
@@ -111,10 +111,6 @@ public:
     Seconds getOperationRunningTimeSecs() const;
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
-
-    void setIsSameKeyResharding(bool isSameKeyResharding);
-    void setIndexesToBuild(int64_t numIndexes);
-    void setIndexesBuilt(int64_t numIndexes);
 
 protected:
     static constexpr auto kNoDate = Date_t::min();
@@ -169,10 +165,6 @@ private:
 
     AtomicWord<int64_t> _readsDuringCriticalSection;
     AtomicWord<int64_t> _writesDuringCriticalSection;
-
-    AtomicWord<bool> _isSameKeyResharding;
-    AtomicWord<int64_t> _indexesToBuild;
-    AtomicWord<int64_t> _indexesBuilt;
 };
 
 }  // namespace mongo

@@ -27,37 +27,26 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/util/duration.h"
+#include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 
 namespace mongo {
+namespace {
+constexpr auto kIsSameKeyResharding = "isSameKeyResharding";
+constexpr auto kIndexesToBuild = "indexesToBuild";
+constexpr auto kIndexesBuilt = "indexesBuilt";
+constexpr auto kIndexBuildTimeElapsed = "indexBuildTimeElapsedSecs";
+}  // namespace
 
-class ShardingDataTransformInstanceMetricsFieldNameProvider {
-public:
-    ShardingDataTransformInstanceMetricsFieldNameProvider() {}
-    virtual ~ShardingDataTransformInstanceMetricsFieldNameProvider() = default;
-
-    virtual StringData getForApproxDocumentsToProcess() const = 0;
-    virtual StringData getForApproxBytesToScan() const = 0;
-    virtual StringData getForBytesWritten() const = 0;
-    virtual StringData getForDocumentsProcessed() const = 0;
-    virtual StringData getForCoordinatorState() const;
-    virtual StringData getForDonorState() const;
-    virtual StringData getForRecipientState() const;
-    StringData getForType() const;
-    StringData getForDescription() const;
-    StringData getForNamespace() const;
-    StringData getForOp() const;
-    StringData getForOriginatingCommand() const;
-    StringData getForOpTimeElapsed() const;
-    StringData getForRemainingOpTimeEstimated() const;
-    StringData getForCountWritesDuringCriticalSection() const;
-    StringData getForCountWritesToStashCollections() const;
-    StringData getForCountReadsDuringCriticalSection() const;
-    StringData getForAllShardsLowestRemainingOperationTimeEstimatedSecs() const;
-    StringData getForAllShardsHighestRemainingOperationTimeEstimatedSecs() const;
-};
+StringData ReshardingMetricsFieldNameProvider::getForIsSameKeyResharding() const {
+    return kIsSameKeyResharding;
+}
+StringData ReshardingMetricsFieldNameProvider::getForIndexesToBuild() const {
+    return kIndexesToBuild;
+}
+StringData ReshardingMetricsFieldNameProvider::getForIndexesBuilt() const {
+    return kIndexesBuilt;
+}
+StringData ReshardingMetricsFieldNameProvider::getForIndexBuildTimeElapsed() const {
+    return kIndexBuildTimeElapsed;
+}
 }  // namespace mongo

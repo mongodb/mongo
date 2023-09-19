@@ -49,8 +49,8 @@ assert.commandFailedWithCode(shard.adminCommand(cmdObj), ErrorCodes.CommandNotFo
 
 const metrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.unshardCollection;
 
-assert.eq(metrics.countStarted, 1);
-assert.eq(metrics.countSucceeded, 1);
+assert.eq(metrics.countStarted, 2);
+assert.eq(metrics.countSucceeded, 2);
 assert.eq(metrics.countFailed, 0);
 assert.eq(metrics.countCanceled, 0);
 

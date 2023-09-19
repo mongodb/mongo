@@ -56,10 +56,6 @@ constexpr auto kCollectionCloningTotalRemoteBatchesRetrieved =
 constexpr auto kCollectionCloningTotalLocalInsertTimeMillis =
     "collectionCloningTotalLocalInsertTimeMillis";
 constexpr auto kCollectionCloningTotalLocalInserts = "collectionCloningTotalLocalInserts";
-constexpr auto kCountSameKeyStarted = "countSameKeyStarted";
-constexpr auto kCountSameKeySucceeded = "countSameKeySucceeded";
-constexpr auto kCountSameKeyFailed = "countSameKeyFailed";
-constexpr auto kCountSameKeyCanceled = "countSameKeyCanceled";
 }  // namespace
 
 StringData Provider::getForCountStarted() const {
@@ -107,18 +103,6 @@ StringData Provider::getForCollectionCloningTotalLocalInsertTimeMillis() const {
 }
 StringData Provider::getForCollectionCloningTotalLocalInserts() const {
     return kCollectionCloningTotalLocalInserts;
-}
-StringData Provider::getForCountSameKeyStarted() const {
-    return kCountSameKeyStarted;
-}
-StringData Provider::getForCountSameKeySucceeded() const {
-    return kCountSameKeySucceeded;
-}
-StringData Provider::getForCountSameKeyFailed() const {
-    return kCountSameKeyFailed;
-}
-StringData Provider::getForCountSameKeyCanceled() const {
-    return kCountSameKeyCanceled;
 }
 
 }  // namespace mongo

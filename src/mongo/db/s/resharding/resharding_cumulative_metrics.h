@@ -72,10 +72,18 @@ using Base = WithOplogApplicationLatencyMetrics<WithOplogApplicationCountMetrics
 
 class ReshardingCumulativeMetrics : public resharding_cumulative_metrics::Base {
 public:
+    using Base = resharding_cumulative_metrics::Base;
+
     ReshardingCumulativeMetrics();
     ReshardingCumulativeMetrics(const std::string& rootName);
 
     static boost::optional<StringData> fieldNameFor(AnyState state);
+    void reportForServerStatus(BSONObjBuilder* bob) const override;
+
+    void onStarted(bool isSameKeyResharding);
+    void onSuccess(bool isSameKeyResharding);
+    void onFailure(bool isSameKeyResharding);
+    void onCanceled(bool isSameKeyResharding);
 
 private:
     virtual void reportActive(BSONObjBuilder* bob) const;
@@ -83,6 +91,11 @@ private:
     virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
 
     const ReshardingCumulativeMetricsFieldNameProvider* _fieldNames;
+
+    AtomicWord<int64_t> _countSameKeyStarted{0};
+    AtomicWord<int64_t> _countSameKeySucceeded{0};
+    AtomicWord<int64_t> _countSameKeyFailed{0};
+    AtomicWord<int64_t> _countSameKeyCancelled{0};
 };
 
 }  // namespace mongo
