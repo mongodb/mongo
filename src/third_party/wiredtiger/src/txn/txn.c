@@ -1431,28 +1431,31 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         WT_ERR(__txn_fixup_hs_update(session, hs_cursor));
 
 prepare_verify:
-    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_PREPARED)) {
+    /*
+     * If we are committing a prepared transaction we can check that we resolved the whole update
+     * chain. As long as we don't walk past a globally visible update we are guaranteed that the
+     * update chain won't be freed concurrently. In the commit case prepared updates cannot become
+     * globally visible before we finish resolving them, this is an implicit contract within
+     * WiredTiger.
+     *
+     * In the rollback case the updates are changed to aborted and in theory a newer update could be
+     * added to the chain concurrently and become globally visible. Thus our updates could be freed.
+     * We don't walk the chain in rollback for that reason.
+     */
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_PREPARED) && commit) {
         for (; head_upd != NULL; head_upd = head_upd->next) {
             /*
-             * Assert if we still have an update from the current transaction that hasn't been
-             * resolved or aborted.
+             * Ignore aborted updates. We could have them in the middle of the relevant update
+             * chain, as a result of the cursor reserve API.
              */
-            WT_ASSERT_ALWAYS(session,
-              head_upd->txnid == WT_TXN_ABORTED || head_upd->prepare_state == WT_PREPARE_RESOLVED ||
-                head_upd->txnid != txn->id,
-              "Failed to resolve all updates associated with a prepared transaction");
-
             if (head_upd->txnid == WT_TXN_ABORTED)
                 continue;
-
-            /*
-             * If we restored an update from the history store, it should be the last update on the
-             * chain.
-             */
-            if (!commit && resolve_case == RESOLVE_PREPARE_ON_DISK &&
-              head_upd->type == WT_UPDATE_STANDARD && F_ISSET(head_upd, WT_UPDATE_RESTORED_FROM_HS))
-                WT_ASSERT_ALWAYS(session, head_upd->next == NULL,
-                  "Rolling back a prepared transaction resulted in an invalid update chain");
+            /* Exit once we have visited all updates from the current transaction. */
+            if (head_upd->txnid != txn->id)
+                break;
+            /* Any update we find should be resolved. */
+            WT_ASSERT_ALWAYS(session, head_upd->prepare_state == WT_PREPARE_RESOLVED,
+              "A prepared update wasn't resolved when it should be");
         }
     }
 
