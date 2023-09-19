@@ -250,7 +250,7 @@ class _DockerComposeInterface:
 
         processes = []
 
-        # If `mongo_d_s.EXTERNAL_SUT=True`, `mongo_d_s.setup()` will setup a dummy process
+        # If `mongo_d_s.NOOP_MONGO_D_S_PROCESSES=True`, `mongo_d_s.setup()` will setup a dummy process
         # to extract args from instead of a real `mongo{d,s}`.
         for mongo_d_s in self._all_mongo_d_s():
             if mongo_d_s.__class__.__name__ == "MongoDFixture":

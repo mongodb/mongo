@@ -7,6 +7,7 @@ import os
 import os.path
 import random
 import shlex
+import subprocess
 import sys
 import textwrap
 import time
@@ -213,6 +214,10 @@ class TestRunner(Subcommand):
 
     def run_tests(self):
         """Run the suite and tests specified."""
+        # This code path should only execute when resmoke is running from a workload container.
+        if config.REQUIRES_WORKLOAD_CONTAINER_SETUP:
+            self._setup_workload_container()
+
         self._resmoke_logger.info("verbatim resmoke.py invocation: %s",
                                   " ".join([shlex.quote(arg) for arg in sys.argv]))
         self._check_for_mongo_processes()
@@ -254,6 +259,31 @@ class TestRunner(Subcommand):
             self._exit_archival()
             if suites:
                 reportfile.write(suites)
+
+    def _setup_workload_container(self):
+        """Perform any setup needed to run this resmoke suite from within the workload container."""
+        # Right now, this is only needed to setup jstestfuzz suites. We do a simple check
+        # of the 'roots' and generate jstestfuzz test files if they are expected.
+        #
+        # If this expands, we should definitely do this more intelligently.
+        # ie: run the exact bash scripts from the corresponding evergreen task defintion
+        #     so that everything is setup exactly how it would be in Evergreen.
+
+        jstestfuzz_repo_dir = "/mongo/jstestfuzz"
+        jstests_dir = "/mongo/jstests"
+        jstestfuzz_tests_dir = "/mongo/jstestfuzz/out"
+
+        # Currently, you can only run one suite at a time from within a workload container
+        suite = self._get_suites()[0]
+        if "jstestfuzz/out/*.js" in suite.get_selector_config().get("roots", []) and not any(
+                filename.endswith(".js") for filename in os.listdir(jstestfuzz_tests_dir)):
+            subprocess.run([
+                "./src/scripts/npm_run.sh",
+                "jstestfuzz",
+                "--",
+                "--jsTestsDir",
+                jstests_dir,
+            ], cwd=jstestfuzz_repo_dir, stdout=sys.stdout, stderr=sys.stderr, check=True)
 
     def _run_suite(self, suite: Suite):
         """Run a test suite."""
@@ -503,7 +533,12 @@ class TestRunner(Subcommand):
         execute_suite_span = trace.get_current_span()
         execute_suite_span.set_attributes(attributes=suite.get_suite_otel_attributes())
         self._shuffle_tests(suite)
-        if not suite.tests:
+
+        # During "docker image build", we are not actually running any tests, so we do not care if there are no tests.
+        # Specifically, when building the images for a jstestfuzz external SUT the jstestfuzz test files will not exist yet -- but we still want to
+        # build the external SUT infrastructure. The jstestfuzz tests will be generated at runtime via the `_setup_workload_container` method when
+        # actually running resmoke from within the workload container against the jstestfuzz external SUT.
+        if not config.DOCKER_COMPOSE_BUILD_IMAGES and not suite.tests:
             self._exec_logger.info("Skipping %s, no tests to run", suite.test_kind)
             suite.return_code = 0
             execute_suite_span.set_status(StatusCode.OK)

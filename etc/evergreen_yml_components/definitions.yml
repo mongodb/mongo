@@ -8828,6 +8828,28 @@ tasks:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
 
 - <<: *antithesis_task_template
+  name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_replication
+      resmoke_args: >-
+        --fuzzMongodConfigs=stress
+        --fuzzMongosConfigs=normal
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+
+- <<: *antithesis_task_template
+  name: antithesis_jstestfuzz_sharded
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: jstestfuzz_sharded
+
+- <<: *antithesis_task_template
   name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
   commands:
   - func: "do setup"

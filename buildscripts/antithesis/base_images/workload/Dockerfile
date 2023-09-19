@@ -33,6 +33,16 @@ COPY libvoidstar.so /usr/lib/libvoidstar.so
 
 RUN /usr/bin/mongo --version
 
+# Copy the QA directory
+COPY QA /QA
+
+# Initialize the jstestfuzz repository
+WORKDIR /jstestfuzz
+COPY jstestfuzz /jstestfuzz
+
+# Install jstestfuzz deps
+RUN ./src/scripts/npm_run.sh jstestfuzz -- --help
+
 # Initialize the MongoDB repository
 WORKDIR /mongo
 
@@ -51,3 +61,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # copy mongo
 COPY src /mongo
 WORKDIR /mongo
+
+# create symlinks to complete setup
+RUN ln -s /jstestfuzz /mongo/jstestfuzz
+RUN ln -s /QA /mongo/jstests/qa_tests
+RUN ln -s /mongo/src/mongo/db/modules/enterprise /mongo/jstests/enterprise_tests

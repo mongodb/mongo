@@ -100,7 +100,8 @@ class Process(object):
 
         # If we are running against an External System Under Test & this is a `mongo{d,s}` process, we make this process a NOOP.
         # `mongo{d,s}` processes are not running locally for an External System Under Test.
-        self.NOOP = _config.EXTERNAL_SUT and os.path.basename(self.args[0]) in ["mongod", "mongos"]
+        self.NOOP = _config.NOOP_MONGO_D_S_PROCESSES and os.path.basename(
+            self.args[0]) in ["mongod", "mongos"]
 
         # The `pid` attribute is assigned after the local process is started. If this process is a NOOP, we assign it a dummy value.
         self.pid = 1 if self.NOOP else None

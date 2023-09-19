@@ -131,7 +131,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
     def _do_teardown(self, mode=None):
-        if self.config.EXTERNAL_SUT:
+        if self.config.NOOP_MONGO_D_S_PROCESSES:
             self.logger.info(
                 "This is running against an External System Under Test setup with `docker-compose.yml` -- skipping teardown."
             )
@@ -188,7 +188,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        return f"{self.logger.external_sut_hostname if self.config.EXTERNAL_SUT else 'localhost'}:{self.port}"
+        return f"{self.logger.external_sut_hostname if self.config.NOOP_MONGO_D_S_PROCESSES else 'localhost'}:{self.port}"
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

@@ -649,3 +649,12 @@ DOCKER_COMPOSE_TAG = "development"
 
 # Whether or not this resmoke suite is running against an External System Under Test
 EXTERNAL_SUT = False
+
+# This will be set to True when:
+# (1) We are building images for an External SUT
+# (2) Running against an External SUT
+NOOP_MONGO_D_S_PROCESSES = False
+
+# If resmoke is running from within a `workload` container,
+# we may need to do additional setup to run the suite successfully.
+REQUIRES_WORKLOAD_CONTAINER_SETUP = False

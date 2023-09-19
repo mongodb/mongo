@@ -183,6 +183,11 @@ class Suite(object):
 
         :return: Number of jobs to start.
         """
+        # If we are building images for an external SUT, we are not actually running
+        # any tests & just need a single "job" to create a resmoke fixture to base the
+        # external SUT off of.
+        if _config.DOCKER_COMPOSE_BUILD_IMAGES:
+            return 1
         num_jobs_to_start = self.options.num_jobs
         num_tests = self._get_num_test_runs()
 

@@ -85,7 +85,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     args = [executable]
     mongod_options = mongod_options.copy()
 
-    if config.EXTERNAL_SUT:
+    if config.NOOP_MONGO_D_S_PROCESSES:
         args[0] = os.path.basename(args[0])
         mongod_options["set_parameters"]["fassertOnLockTimeoutForStepUpDown"] = 0
         mongod_options["set_parameters"].pop("backtraceLogFile", None)
@@ -130,7 +130,7 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
 
     mongos_options = mongos_options.copy()
 
-    if config.EXTERNAL_SUT:
+    if config.NOOP_MONGO_D_S_PROCESSES:
         args[0] = os.path.basename(args[0])
         mongos_options["set_parameters"]["fassertOnLockTimeoutForStepUpDown"] = 0
         mongos_options.update({"logpath": "/var/log/mongodb/mongodb.log", "bind_ip": "0.0.0.0"})

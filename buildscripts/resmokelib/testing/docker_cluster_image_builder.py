@@ -65,6 +65,10 @@ class DockerComposeImageBuilder:
         self.LIBVOIDSTAR_PATH = "/usr/lib/libvoidstar.so"
         self.MONGODB_DEBUGSYMBOLS = "mongo-debugsymbols.tgz"
 
+        # MongoDB Enterprise Modules constants
+        self.MODULES_RELATIVE_PATH = "src/mongo/db/modules"
+        self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH = f"{self.MODULES_RELATIVE_PATH}/enterprise"
+
         # Port suffix ranging from 1-24 is subject to fault injection while ports 130+ are safe.
         self.next_available_fault_enabled_ip = 2
         self.next_available_fault_disabled_ip = 130
@@ -216,12 +220,17 @@ class DockerComposeImageBuilder:
         :param tag: Tag to use for the image.
         :return: None.
         """
+        assert os.path.exists(
+            self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH
+        ), f"Please set up `mongo_enterprise_modules` and try again. No `mongo_enterprise_modules` repo available at: {self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH}"
 
         print("Prepping `workload` image build context...")
         # Set up build context
         self._fetch_mongodb_binaries()
         self._copy_mongo_binary_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._clone_mongo_repo_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
+        self._clone_qa_repo_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
+        self._clone_jstestfuzz_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
 
         # Build docker image
@@ -378,6 +387,56 @@ class DockerComposeImageBuilder:
         active_branch = git.Repo("./").active_branch.name
         git.Repo.clone_from("./", mongo_repo_destination, branch=active_branch)
         print("Done cloning MongoDB repo to build context.")
+
+        print("Cloning current MongoDB Enterprise Modules repo to build context...")
+        print(clone_repo_warning_message)
+
+        # Create the modules directory in the mongo repo at the build context
+        modules_directory_at_build_context = os.path.join(mongo_repo_destination,
+                                                          self.MODULES_RELATIVE_PATH)
+        os.mkdir(modules_directory_at_build_context)
+
+        mongo_enterprise_modules_destination = os.path.join(
+            mongo_repo_destination, self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH)
+
+        # Copy the mongo enterprise modules repo to the build context.
+        # If this fails to clone, the `git` library will raise an exception.
+        active_branch = git.Repo(self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH).active_branch.name
+        git.Repo.clone_from(self.MONGO_ENTERPRISE_MODULES_RELATIVE_PATH,
+                            mongo_enterprise_modules_destination, branch=active_branch)
+        print("Done cloning MongoDB Enterprise Modules repo to build context.")
+
+    def _clone_qa_repo_to_build_context(self, dir_path):
+        """
+        Clone the QA repo to the build context.
+
+        :param dir_path: Directory path to clone QA repo to.
+        """
+        qa_repo_destination = os.path.join(dir_path, "QA")
+
+        # Clone QA repo if it does not already exist
+        if os.path.exists(qa_repo_destination):
+            print(f"\n\tFound existing QA repo at: {qa_repo_destination}\n")
+        else:
+            print("Cloning QA repo to build context...")
+            git.Repo.clone_from("git@github.com:10gen/QA.git", qa_repo_destination)
+            print("Done cloning QA repo to build context.")
+
+    def _clone_jstestfuzz_to_build_context(self, dir_path):
+        """
+        Clone the jstestfuzz repo to the build context.
+
+        :param dir_path: Directory path to clone jstestfuzz repo to.
+        """
+        jstestfuzz_repo_destination = os.path.join(dir_path, "jstestfuzz")
+
+        # Clone jstestfuzz repo if it does not already exist
+        if os.path.exists(jstestfuzz_repo_destination):
+            print(f"\n\tFound existing jstestfuzz repo at: {jstestfuzz_repo_destination}\n")
+        else:
+            print("Cloning jstestfuzz repo to build context...")
+            git.Repo.clone_from("git@github.com:10gen/jstestfuzz.git", jstestfuzz_repo_destination)
+            print("Done cloning jstestfuzz repo to build context.")
 
     def _copy_mongodb_binaries_to_build_context(self, dir_path):
         """

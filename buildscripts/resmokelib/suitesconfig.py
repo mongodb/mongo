@@ -473,7 +473,7 @@ class SuiteFinder(object):
         suite = matrix_suite or explicit_suite
 
         # If this is running against an External System Under Test, we need to make the suite compatible.
-        if _config.EXTERNAL_SUT:
+        if _config.NOOP_MONGO_D_S_PROCESSES:
             make_external(suite)
 
         return suite

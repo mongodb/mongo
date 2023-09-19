@@ -3027,6 +3027,7 @@ buildvariants:
 
 - name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
   display_name: "~ Enterprise Ubuntu 22.04 w/ libvoidstar"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
