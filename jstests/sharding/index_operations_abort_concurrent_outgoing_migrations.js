@@ -1,12 +1,15 @@
 /*
  * Test that the index commands abort concurrent outgoing migrations.
  */
+
 (function() {
 "use strict";
 
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/sharded_index_util.js");
+load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/feature_flag_util.js");
 
 // Test deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
@@ -14,12 +17,13 @@ TestData.skipCheckOrphans = true;
 /*
  * Runs moveChunk on the host to move the chunk to the given shard.
  */
-function runMoveChunk(host, ns, findCriteria, toShard) {
+function runMoveChunk(host, ns, fromShard, toShard, findOneChunkFunction) {
     const mongos = new Mongo(host);
+    const chunk = findOneChunkFunction(mongos.getDB('config'), ns, {shard: fromShard});
     let res, hasRetriableError;
     do {
         hasRetriableError = false;
-        res = mongos.adminCommand({moveChunk: ns, find: findCriteria, to: toShard});
+        res = mongos.adminCommand({moveChunk: ns, bounds: [chunk.min, chunk.max], to: toShard});
         // If a migration is interrupted by an index build, the test may run another migration
         // before the recipient discovers the first one failed, leading to transient
         // ConflictingOperationInProgress errors.
@@ -41,7 +45,12 @@ function assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, cmdFun
 
     // Turn on the fail point and wait for moveChunk to hit the fail point.
     pauseMoveChunkAtStep(fromShard, stepName);
-    let moveChunkThread = new Thread(runMoveChunk, st.s.host, ns, {_id: MinKey}, toShard.shardName);
+    let moveChunkThread = new Thread(runMoveChunk,
+                                     st.s.host,
+                                     ns,
+                                     fromShard.shardName,
+                                     toShard.shardName,
+                                     findChunksUtil.findOneChunkByNs);
     moveChunkThread.start();
     waitForMoveChunkStep(fromShard, stepName);
 
@@ -161,6 +170,33 @@ stepNames.forEach((stepName) => {
         ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, index);
     }
 });
+
+// TODO: Remove feature flag check once project is backported.
+if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'),
+                                        "ShardKeyIndexOptionalHashedSharding")) {
+    stepNames.forEach((stepName) => {
+        jsTest.log(
+            `Testing that dropIndex of a hashed shard key index aborts concurrent outgoing migrations that are in step ${
+                stepName}...`);
+        const collName = "testDropHashedShardKeyIndexMoveChunkStep" + stepName;
+        const ns = dbName + "." + collName;
+        const hashedShardKey = {_id: "hashed"};
+
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: hashedShardKey}));
+        ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, hashedShardKey);
+        ShardedIndexUtil.assertIndexExistsOnShard(st.shard1, dbName, collName, hashedShardKey);
+
+        assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
+            assert.commandWorked(st.s.getCollection(ns).dropIndexes(hashedShardKey));
+        });
+
+        // Verify dropping the shard key index succeeds.
+        ShardedIndexUtil.assertIndexDoesNotExistOnShard(
+            st.shard0, dbName, collName, hashedShardKey);
+        ShardedIndexUtil.assertIndexDoesNotExistOnShard(
+            st.shard1, dbName, collName, hashedShardKey);
+    });
+}
 
 st.stop();
 })();
