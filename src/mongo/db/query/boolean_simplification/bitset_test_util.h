@@ -29,36 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/boolean_simplification/bitset_tree.h"
 
-namespace mongo {
-/**
- * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
- * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes.
- */
-size_t calculateHash(const MatchExpression& expr);
+namespace mongo::boolean_simplification {
+inline BitsetTerm makeBitsetTerm(const Minterm& minterm) {
+    return BitsetTerm{minterm.predicates, minterm.mask};
+}
 
-/**
- * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
- * be consistent with 'MatchExpression::equivalent()'. The functor does not support $jsonSchema and
- * will tassert() if provided an input that contains any $jsonSchema-related nodes.
- */
-struct MatchExpressionHasher {
-    size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr);
-    }
-};
-
-/**
- * MatchExpression's equality functor implementation compatible with unordered containers. It uses
- * 'MatchExpression::equivalent()' under the hood and compatible with 'MatchExpressionHasher'
- * defined above.
- */
-struct MatchExpressionEq {
-    bool operator()(const MatchExpression* lhs, const MatchExpression* rhs) const {
-        return lhs->equivalent(rhs);
-    }
-};
-
-}  // namespace mongo
+inline BitsetTerm makeBitsetTerm(StringData predicates, StringData mask) {
+    return BitsetTerm{Bitset{predicates.toString()}, Bitset{mask.toString()}};
+}
+}  // namespace mongo::boolean_simplification

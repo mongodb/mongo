@@ -30,35 +30,15 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_bitset_tree_converter.h"
+#include "mongo/db/query/boolean_simplification/bitset_algebra.h"
 
 namespace mongo {
 /**
- * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
- * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes.
+ * Restore MatchExpression tree from a maxterm and a list of expressions representing bits in the
+ * maxterm: i-th expression in the expressions lists represents i-th bit in the maxterm.
  */
-size_t calculateHash(const MatchExpression& expr);
-
-/**
- * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
- * be consistent with 'MatchExpression::equivalent()'. The functor does not support $jsonSchema and
- * will tassert() if provided an input that contains any $jsonSchema-related nodes.
- */
-struct MatchExpressionHasher {
-    size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr);
-    }
-};
-
-/**
- * MatchExpression's equality functor implementation compatible with unordered containers. It uses
- * 'MatchExpression::equivalent()' under the hood and compatible with 'MatchExpressionHasher'
- * defined above.
- */
-struct MatchExpressionEq {
-    bool operator()(const MatchExpression* lhs, const MatchExpression* rhs) const {
-        return lhs->equivalent(rhs);
-    }
-};
-
+std::unique_ptr<MatchExpression> restoreMatchExpression(
+    const boolean_simplification::Maxterm& maxterm,
+    const std::vector<ExpressionBitInfo>& expressions);
 }  // namespace mongo

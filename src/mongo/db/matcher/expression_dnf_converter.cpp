@@ -27,38 +27,28 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/matcher/expression_dnf_converter.h"
 
-#include "mongo/db/matcher/expression.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-/**
- * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
- * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes.
- */
-size_t calculateHash(const MatchExpression& expr);
+std::pair<boolean_simplification::Maxterm, std::vector<ExpressionBitInfo>> transformToDNF(
+    const MatchExpression* root) {
+    LOGV2_DEBUG(7767000,
+                5,
+                "Converting MatchExpression to corresponding DNF",
+                "expression"_attr = root->debugString());
 
-/**
- * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
- * be consistent with 'MatchExpression::equivalent()'. The functor does not support $jsonSchema and
- * will tassert() if provided an input that contains any $jsonSchema-related nodes.
- */
-struct MatchExpressionHasher {
-    size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr);
-    }
-};
+    auto [bitsetRoot, expressions] = transformToBitsetTree(root);
 
-/**
- * MatchExpression's equality functor implementation compatible with unordered containers. It uses
- * 'MatchExpression::equivalent()' under the hood and compatible with 'MatchExpressionHasher'
- * defined above.
- */
-struct MatchExpressionEq {
-    bool operator()(const MatchExpression* lhs, const MatchExpression* rhs) const {
-        return lhs->equivalent(rhs);
-    }
-};
+    auto maxterm = boolean_simplification::convertToDNF(bitsetRoot);
+    maxterm.removeRedundancies();
 
+    LOGV2_DEBUG(
+        7767001, 5, "MatchExpression in DNF representation", "maxterm"_attr = maxterm.toString());
+
+    return {std::move(maxterm), std::move(expressions)};
+}
 }  // namespace mongo

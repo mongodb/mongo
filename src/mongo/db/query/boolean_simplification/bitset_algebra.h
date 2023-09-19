@@ -57,6 +57,50 @@ inline Bitset operator""_b(const char* bits, size_t len) {
     return Bitset{std::string{bits, len}};
 }
 
+/**
+ * Represent a conjunctive or disjunctive term in a condensed bitset form.
+ */
+struct BitsetTerm {
+    explicit BitsetTerm(size_t nbits) : predicates(nbits, 0), mask(nbits, 0) {}
+
+    BitsetTerm(Bitset bitset, Bitset mask) : predicates(bitset), mask(mask) {}
+
+    BitsetTerm(size_t nbits, size_t bitIndex, bool val) : predicates(nbits, 0), mask(nbits, 0) {
+        predicates.set(bitIndex, val);
+        mask.set(bitIndex, true);
+    }
+
+    void set(size_t bitIndex, bool value) {
+        if (mask.size() <= bitIndex) {
+            constexpr size_t blockSize = sizeof(Bitset::block_type);
+            const size_t newSize = (1 + bitIndex / blockSize) * blockSize;
+            resize(newSize);
+        }
+        mask.set(bitIndex);
+        predicates.set(bitIndex, value);
+    }
+
+    size_t size() const {
+        return mask.size();
+    }
+
+    void resize(size_t newSize) {
+        predicates.resize(newSize);
+        mask.resize(newSize);
+    }
+
+    /**
+     * Predicates bitset, if a predicate takes part in the conjunction its corresponding bit in the
+     * predicates bitset set to 1 if the predicate in true form or to 0 otherwise.
+     */
+    Bitset predicates;
+
+    /**
+     * Predicates mask, if a predicate takes part in the conjunction its corresponding bit set to 1.
+     */
+    Bitset mask;
+};
+
 struct Minterm;
 
 /**
@@ -112,55 +156,27 @@ private:
  * predicate A the false form is the negation of A: ~A). Every predicate is represented by a bit in
  * the predicates bitset.
  */
-struct Minterm {
-    explicit Minterm(size_t nbits) : predicates(nbits, 0), mask(nbits, 0) {}
-    Minterm(StringData bits, StringData mask)
-        : predicates{bits.toString()}, mask{mask.toString()} {}
-    Minterm(size_t nbits, size_t bitIndex, bool val) : predicates(nbits, 0), mask(nbits, 0) {
-        predicates.set(bitIndex, val);
-        mask.set(bitIndex, true);
-    }
-    Minterm(Bitset bitset, Bitset mask) : predicates(bitset), mask(mask) {}
+struct Minterm : private BitsetTerm {
+    using BitsetTerm::BitsetTerm;
+    using BitsetTerm::mask;
+    using BitsetTerm::predicates;
+    using BitsetTerm::resize;
+    using BitsetTerm::set;
+    using BitsetTerm::size;
 
-    void set(size_t bitIndex, bool value) {
-        if (mask.size() <= bitIndex) {
-            constexpr size_t blockSize = sizeof(Bitset::block_type);
-            const size_t newSize = (1 + bitIndex / blockSize) * blockSize;
-            resize(newSize);
-        }
-        mask.set(bitIndex);
-        predicates.set(bitIndex, value);
-    }
+    Minterm(StringData bits, StringData mask)
+        : Minterm{Bitset{bits.toString()}, Bitset{mask.toString()}} {}
 
     /**
-     * Returns the set of bits in which the conflicting bits of the minterms are set. The bits of
-     * two minterms are conflicting if in one minterm the bit is set to 1 and in another to 0.
+     * Returns the set of bits in which the conflicting bits of the minterms are set. The bits
+     * of two minterms are conflicting if in one minterm the bit is set to 1 and in another to
+     * 0.
      */
     inline Bitset getConflicts(const Minterm& other) const {
         return (predicates ^ other.predicates) & (mask & other.mask);
     }
 
     Maxterm operator~() const;
-
-    size_t size() const {
-        return mask.size();
-    }
-
-    void resize(size_t newSize) {
-        predicates.resize(newSize);
-        mask.resize(newSize);
-    }
-
-    /**
-     * Predicates bitset, if a predicate takes part in the conjunction its corresponding bit in the
-     * predicates bitset set to 1 if the predicate in true form or to 0 otherwise.
-     */
-    Bitset predicates;
-
-    /**
-     * Predicates mask, if a predicate takes part in the conjunction its corresponding bit set to 1.
-     */
-    Bitset mask;
 };
 
 inline Maxterm operator&(const Minterm& lhs, const Minterm& rhs) {
@@ -181,11 +197,12 @@ inline Maxterm operator&(const Maxterm& lhs, const Maxterm& rhs) {
     return result;
 }
 
+bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs);
+std::ostream& operator<<(std::ostream& os, const BitsetTerm& term);
 bool operator==(const Minterm& lhs, const Minterm& rhs);
 std::ostream& operator<<(std::ostream& os, const Minterm& minterm);
 bool operator==(const Maxterm& lhs, const Maxterm& rhs);
 std::ostream& operator<<(std::ostream& os, const Maxterm& maxterm);
-
 }  // namespace mongo::boolean_simplification
 
 namespace std {

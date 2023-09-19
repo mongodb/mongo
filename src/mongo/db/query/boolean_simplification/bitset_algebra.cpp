@@ -119,6 +119,15 @@ Maxterm Minterm::operator~() const {
     return result;
 }
 
+bool operator==(const BitsetTerm& lhs, const BitsetTerm& rhs) {
+    return lhs.predicates == rhs.predicates && lhs.mask == rhs.mask;
+}
+
+std::ostream& operator<<(std::ostream& os, const BitsetTerm& term) {
+    os << '(' << term.predicates << ", " << term.mask << ")";
+    return os;
+}
+
 bool operator==(const Minterm& lhs, const Minterm& rhs) {
     return lhs.predicates == rhs.predicates && lhs.mask == rhs.mask;
 }

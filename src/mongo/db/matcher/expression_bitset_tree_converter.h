@@ -30,35 +30,25 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/boolean_simplification/bitset_tree.h"
 
 namespace mongo {
 /**
- * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
- * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes.
+ * ExpressionBitInfo class stores the original predicate from the MatchExpression in its
+ * 'expression' member.
  */
-size_t calculateHash(const MatchExpression& expr);
-
-/**
- * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
- * be consistent with 'MatchExpression::equivalent()'. The functor does not support $jsonSchema and
- * will tassert() if provided an input that contains any $jsonSchema-related nodes.
- */
-struct MatchExpressionHasher {
-    size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr);
-    }
+struct ExpressionBitInfo {
+    explicit ExpressionBitInfo(std::unique_ptr<MatchExpression> expression)
+        : expression(std::move(expression)) {}
+    std::unique_ptr<MatchExpression> expression;
 };
 
 /**
- * MatchExpression's equality functor implementation compatible with unordered containers. It uses
- * 'MatchExpression::equivalent()' under the hood and compatible with 'MatchExpressionHasher'
- * defined above.
+ * Transform the given MatchExpression tree into a Bitset tree. Returns the bitset tree and a
+ * vector of ExpressionBitInfo representing bits in the bitset tree. Every bitset in the BitsetTree
+ * has the same number of bits and the size of the vector equals to the number of bits of the
+ * bitsets.
  */
-struct MatchExpressionEq {
-    bool operator()(const MatchExpression* lhs, const MatchExpression* rhs) const {
-        return lhs->equivalent(rhs);
-    }
-};
-
+std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>
+transformToBitsetTree(const MatchExpression* root);
 }  // namespace mongo

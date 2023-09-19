@@ -29,36 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_bitset_tree_converter.h"
 
 namespace mongo {
-/**
- * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
- * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes.
- */
-size_t calculateHash(const MatchExpression& expr);
 
 /**
- * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
- * be consistent with 'MatchExpression::equivalent()'. The functor does not support $jsonSchema and
- * will tassert() if provided an input that contains any $jsonSchema-related nodes.
+ * The function takes the root node of a match expression and converts it into a Disjunctive Normal
+ * Form (DNF) represented using bitsets.
  */
-struct MatchExpressionHasher {
-    size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr);
-    }
-};
-
-/**
- * MatchExpression's equality functor implementation compatible with unordered containers. It uses
- * 'MatchExpression::equivalent()' under the hood and compatible with 'MatchExpressionHasher'
- * defined above.
- */
-struct MatchExpressionEq {
-    bool operator()(const MatchExpression* lhs, const MatchExpression* rhs) const {
-        return lhs->equivalent(rhs);
-    }
-};
-
+std::pair<boolean_simplification::Maxterm, std::vector<ExpressionBitInfo>> transformToDNF(
+    const MatchExpression* root);
 }  // namespace mongo

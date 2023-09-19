@@ -28,9 +28,7 @@
  */
 
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
-
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::boolean_simplification {
 constexpr size_t nbits = 64;
