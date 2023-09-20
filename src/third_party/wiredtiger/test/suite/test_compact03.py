@@ -103,6 +103,10 @@ class test_compact03(wttest.WiredTigerTestCase):
 
     # Create a table, add keys with both big and small values.
     def test_compact03(self):
+        # FIXME-WT-11399: check the other assertions that are skipped when the tiered hook is
+        # enabled.
+        if self.runningHook('tiered'):
+            self.skipTest("this test generates occasional rollback errors when tiered is enabled")
 
         mb = 1024 * 1024
         # 1. Create a table with relatively small page size.
