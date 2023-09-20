@@ -1,0 +1,205 @@
+/**
+ *    Copyright (C) 2023-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/query/sbe_stage_builder_vectorizer.h"
+
+#include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_sbexpr.h"
+
+namespace mongo::stage_builder {
+
+Vectorizer::Tree Vectorizer::vectorize(optimizer::ABT& node,
+                                       const VariableTypes& externalBindings) {
+    _variableTypes = externalBindings;
+    auto result = node.visit(*this);
+    foldIfNecessary(result);
+    return result;
+}
+
+void Vectorizer::foldIfNecessary(Tree& tree) {
+    if (tree.sourceCell.has_value()) {
+        tassert(7946501,
+                "Expansion of a cell should generate a block of values",
+                TypeSignature::kBlockType.isSubset(tree.typeSignature));
+        if (_purpose == Purpose::Filter) {
+            tree.expr = makeABTFunction(
+                "cellFoldValues_F"_sd, std::move(*tree.expr), makeVariable(*tree.sourceCell));
+            // The output of a folding in this case is a block of boolean values.
+            tree.typeSignature = TypeSignature::kBlockType.include(TypeSignature::kBooleanType);
+        } else {
+            tree.expr = makeABTFunction(
+                "cellFoldValues_P"_sd, std::move(*tree.expr), makeVariable(*tree.sourceCell));
+            // The output of a folding in this case is a block of arrays or single values, so we
+            // can't be more precise.
+            tree.typeSignature = TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType);
+        }
+        tree.sourceCell.reset();
+    }
+}
+
+Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& node,
+                                        const optimizer::Constant& value) {
+    // A constant can be used as is.
+    auto [tag, val] = value.get();
+    return {node, getTypeSignature(tag), {}};
+}
+
+Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::Variable& var) {
+    if (auto varIt = _variableTypes.find(var.name()); varIt != _variableTypes.end()) {
+        // If the variable holds a cell, extract the block variable from that and propagate the name
+        // of the cell variable to the caller to be used when folding back the result.
+        if (TypeSignature::kCellType.isSubset(varIt->second)) {
+            return {
+                makeABTFunction("cellBlockGetFlatValuesBlock"_sd, n),
+                varIt->second.exclude(TypeSignature::kCellType).include(TypeSignature::kBlockType),
+                var.name()};
+        } else {
+            return {n, varIt->second, {}};
+        }
+    }
+    return {n, TypeSignature::kAnyScalarType, {}};
+}
+
+Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op) {
+
+    switch (op.op()) {
+        case optimizer::Operations::FillEmpty: {
+            Tree lhs = op.getLeftChild().visit(*this);
+            if (!lhs.expr.has_value()) {
+                return lhs;
+            }
+            Tree rhs = op.getRightChild().visit(*this);
+            if (!rhs.expr.has_value()) {
+                return rhs;
+            }
+
+            // If the argument is a block, and the replacement value is a scalar, create a
+            // block-generating operation.
+            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature) &&
+                !TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                return {makeABTFunction(
+                            "valueBlockFillEmpty"_sd, std::move(*lhs.expr), std::move(*rhs.expr)),
+                        lhs.typeSignature.exclude(TypeSignature::kNothingType)
+                            .include(rhs.typeSignature),
+                        lhs.sourceCell};
+            }
+            break;
+        }
+        case optimizer::Operations::Gt:
+        case optimizer::Operations::Gte:
+        case optimizer::Operations::Eq:
+        case optimizer::Operations::Neq:
+        case optimizer::Operations::Lt:
+        case optimizer::Operations::Lte: {
+
+            Tree lhs = op.getLeftChild().visit(*this);
+            if (!lhs.expr.has_value()) {
+                return lhs;
+            }
+            Tree rhs = op.getRightChild().visit(*this);
+            if (!rhs.expr.has_value()) {
+                return rhs;
+            }
+
+            // If one of the argument is a block, and the other is a scalar value, create a
+            // block-generating operation.
+            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature) !=
+                TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                StringData fnName = [&]() {
+                    switch (op.op()) {
+                        case optimizer::Operations::Gt:
+                            return "valueBlockGt"_sd;
+                        case optimizer::Operations::Gte:
+                            return "valueBlockGte"_sd;
+                        case optimizer::Operations::Eq:
+                            return "valueBlockEq"_sd;
+                        case optimizer::Operations::Neq:
+                            return "valueBlockNeq"_sd;
+                        case optimizer::Operations::Lt:
+                            return "valueBlockLt"_sd;
+                        case optimizer::Operations::Lte:
+                            return "valueBlockLte"_sd;
+                        default:
+                            MONGO_UNREACHABLE;
+                    }
+                }();
+                // Propagate the name of the associated cell variable, this is not the place to fold
+                // (there could be a fillEmpty node on top of this comparison).
+                return {makeABTFunction(fnName, std::move(*lhs.expr), std::move(*rhs.expr)),
+                        TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                            .include(lhs.typeSignature.include(rhs.typeSignature)
+                                         .intersect(TypeSignature::kNothingType)),
+                        TypeSignature::kBlockType.isSubset(lhs.typeSignature) ? lhs.sourceCell
+                                                                              : rhs.sourceCell};
+            }
+            break;
+        }
+        case optimizer::Operations::And: {
+            Tree lhs = op.getLeftChild().visit(*this);
+            if (!lhs.expr.has_value()) {
+                return lhs;
+            }
+            // An And operation between two blocks has to work at the level of measures, not on the
+            // expanded arrays.
+            foldIfNecessary(lhs);
+
+            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
+                // Treat the result of the left side as the mask to be applied on the right side.
+                // This way, the right side can decide whether to skip the processing of the indexes
+                // where the left side produced a false result.
+                auto lhsVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+                _activeMasks.push_back(lhsVar);
+                Tree rhs = op.getRightChild().visit(*this);
+                _activeMasks.pop_back();
+                if (!rhs.expr.has_value()) {
+                    return rhs;
+                }
+                foldIfNecessary(rhs);
+
+                if (TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                    return {makeLet(lhsVar,
+                                    std::move(*lhs.expr),
+                                    makeABTFunction("valueBlockAnd"_sd,
+                                                    makeVariable(lhsVar),
+                                                    std::move(*rhs.expr))),
+                            TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                                .include(lhs.typeSignature.include(rhs.typeSignature)
+                                             .intersect(TypeSignature::kNothingType)),
+                            {}};
+                }
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    return {{}, TypeSignature::kAnyScalarType, {}};
+}
+
+}  // namespace mongo::stage_builder
