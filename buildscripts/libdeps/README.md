@@ -6,7 +6,7 @@ The Libdeps Graph analysis tools perform analysis and queries on graph represent
 
 The scons build can create the graph files for analysis. To build the graphml file run the build with this minimal set of args required:
 
-    python3 buildscripts/scons.py --link-model=dynamic --build-tools=next generate-libdeps-graph --linker=gold
+    python3 buildscripts/scons.py --link-model=dynamic --build-tools=next generate-libdeps-graph --linker=gold --modules=
 
 The target `generate-libdeps-graph` has special meaning and will turn on extra build items to generate the graph. This target will build everything so that the graph is fully representative of the build. The graph file by default will be found at `build/opt/libdeps/libdeps.graphml` (where `build/opt` is the `$BUILD_DIR`).
 

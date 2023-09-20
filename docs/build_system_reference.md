@@ -304,7 +304,7 @@ The command line interface tool (gacli) has a comprehensive help text which will
 To generate the full graph, build the target `generate-libdeps-graph`. This will build all things involving libdeps and construct a graphml file representing the library dependency graph. The graph can be used in the command line interface tool or the visualizer web service tool. The minimal set of required SCons arguments to build the graph file is shown below:
 
 ```
-python3 buildscripts/scons.py --link-model=dynamic --build-tools=next generate-libdeps-graph
+python3 buildscripts/scons.py --link-model=dynamic --build-tools=next generate-libdeps-graph --linker=gold --modules=
 ```
 
 The graph file by default will be generate to `build/opt/libdeps/libdeps.graphml` (where `build/opt` is the `$BUILD_DIR`).
