@@ -1655,6 +1655,16 @@ functions:
       args:
       - "./src/evergreen/lint_fuzzer_sanity_all.sh"
 
+  "sync repo with copybara":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/sync_repo_with_copybara.py"
+
   # Used by generator
   "run jstestfuzz":
   - *f_expansions_write
@@ -5075,6 +5085,18 @@ tasks:
   - *set_up_venv
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity all"
+
+
+- name: sync_repo_with_copybara
+  tags: []
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
+  - func: "sync repo with copybara"
 
 ## integration test suites ##
 
