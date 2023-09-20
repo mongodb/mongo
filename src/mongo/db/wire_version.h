@@ -214,6 +214,7 @@ public:
     // Calling `get()` on uninitialized instances of `WireSpec` is an invariant failure.
     std::shared_ptr<const Specification> get();
 
+    // Do not call this, it requires the caller to hold the lock on _spec.
     bool isInitialized() const {
         return _spec ? true : false;
     }

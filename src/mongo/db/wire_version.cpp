@@ -60,16 +60,19 @@ WireSpec& WireSpec::getWireSpec(ServiceContext* sc) {
 }
 
 void WireSpec::appendInternalClientWireVersionIfNeeded(BSONObjBuilder* builder) {
-    fassert(ErrorCodes::NotYetInitialized, isInitialized());
+    bool isInternalClient;
+    WireVersionInfo outgoing;
 
-    auto isInternalClient = [&]() -> bool {
+    {
         stdx::lock_guard<Latch> lk(_mutex);
-        return _spec->isInternalClient;
-    }();
+        fassert(ErrorCodes::NotYetInitialized, isInitialized());
+        isInternalClient = _spec->isInternalClient;
+        outgoing = _spec->outgoing;
+    }
 
     if (isInternalClient) {
         BSONObjBuilder subBuilder(builder->subobjStart("internalClient"));
-        WireVersionInfo::appendToBSON(_spec->outgoing, &subBuilder);
+        WireVersionInfo::appendToBSON(outgoing, &subBuilder);
     }
 }
 
@@ -80,6 +83,7 @@ BSONObj specToBSON(const WireSpec::Specification& spec) {
 }
 
 void WireSpec::initialize(Specification spec) {
+    stdx::lock_guard<Latch> lk(_mutex);
     fassert(ErrorCodes::AlreadyInitialized, !isInitialized());
     BSONObj newSpec = specToBSON(spec);
     _spec = std::make_shared<Specification>(std::move(spec));
