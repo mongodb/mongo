@@ -512,6 +512,7 @@ buildvariants:
   - name: lint_fuzzer_sanity_all
   - name: powercycle_sentinel
   - name: powercycle_smoke_skip_compile_gen
+  - name: monitor_mongo_fork_10gen
 
 - name: tooling-metrics-x86
   display_name: "* Tooling Metrics x86"

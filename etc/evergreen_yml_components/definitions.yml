@@ -1656,6 +1656,16 @@ functions:
       args:
       - "./src/evergreen/lint_fuzzer_sanity_all.sh"
 
+  "monitor mongo fork 10gen":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/monitor_mongo_fork_10gen.py"
+
   "sync repo with copybara":
   - *f_expansions_write
   - command: subprocess.exec
@@ -5112,7 +5122,6 @@ tasks:
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity all"
 
-
 - name: sync_repo_with_copybara
   tags: []
   commands:
@@ -5123,6 +5132,17 @@ tasks:
   - *cleanup_environment
   - *set_up_venv
   - func: "sync repo with copybara"
+
+- name: monitor_mongo_fork_10gen
+  tags: []
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - *set_up_venv
+  - func: "monitor mongo fork 10gen"
 
 ## integration test suites ##
 
