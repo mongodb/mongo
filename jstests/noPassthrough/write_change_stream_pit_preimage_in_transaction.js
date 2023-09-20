@@ -1,11 +1,14 @@
 /**
  * Tests that pre-images are written to the pre-images collection on updates and deletes in
  * transactions and for "applyOps" command.
+ * Note that as we are already testing split of transactions that don't fit into 16MB, we
+ * can safely remove it from the large transactions variant without reducing the coverage.
  * @tags: [
  *  requires_fcv_60,
  *  requires_replication,
  *  no_selinux,
  *  requires_majority_read_concern,
+ *  exclude_from_large_txns,
  * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
@@ -44,8 +47,7 @@ rst.nodes.forEach(conn => {
     }));
 });
 
-// Verifies that the expected pre-images are written during function 'ops' invocation. The returned
-// value is the last pre-image written.
+// Verifies that the expected pre-images are written during function 'ops' invocation.
 function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
     const writtenPreImages = preImagesForOps(db, ops);
     assert.eq(
@@ -58,7 +60,6 @@ function assertPreImagesWrittenForOps(db, ops, expectedPreImages) {
         assert.eq(writtenPreImages[idx].preImage, expectedPreImages[idx]);
         assertValidChangeStreamPreImageDocument(writtenPreImages[idx]);
     }
-    return writtenPreImages[writtenPreImages.length - 1];
 }
 
 // Cross-checks the content of the pre-image document 'preImage' against the associated oplog entry.
@@ -96,7 +97,7 @@ const otherColl = assertDropAndRecreateCollection(testDB, "coll_regular");
 // Returns 'timestamp' - 1 increment for Timestamp type value.
 function getPreviousTimestampValue(timestamp) {
     assert(timestamp.getInc() > 0, `Non-positive timestamp inc value ${timestamp.getInc()}`);
-    if (timestamp.getInc() == 1) {
+    if (timestamp.getInc() === 1) {
         return new Timestamp(timestamp.getTime() - 1, Math.pow(2, 32) - 1);
     } else {
         return new Timestamp(timestamp.getTime(), timestamp.getInc() - 1);
@@ -115,11 +116,15 @@ function assertDocumentInsertedAtTimestamp(commitTimestamp, insertedDocumentId) 
         1, coll.find({_id: insertedDocumentId}).readConcern("snapshot", commitTimestamp).itcount());
 }
 
-// Checks that a change stream pre-image 'preImage' was written with timestamp 'commitTimestamp'.
-function assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, preImage) {
+// Verifies that the change stream pre-image corresponding to a write operation on the document with
+// '_id' equal to 'modifiedDocumentId' within the 'coll' collection matches the expected
+// 'commitTimestamp'.
+function assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, modifiedDocumentId) {
     const preImagesCollection = getPreImagesCollection(testDB.getMongo());
-    assert(preImagesCollection.findOne(
-        {"_id.nsUUID": preImage._id.nsUUID, "_id.ts": commitTimestamp}));
+    assert.eq(
+        1,
+        preImagesCollection.find({"preImage._id": modifiedDocumentId, "_id.ts": commitTimestamp})
+            .itcount());
 }
 
 // Gets collections used in the test for database 'db'. In some passthroughs the collections get
@@ -135,7 +140,7 @@ function getCollections(db) {
     assert.commandWorked(coll.insert([{_id: 1, a: 1}, {_id: 2, a: 1}, {_id: 3, a: 1}]));
     assert.commandWorked(otherColl.insert([{_id: 1, a: 1}]));
     let commitTimestamp;
-    let lastPreImage = assertPreImagesWrittenForOps(testDB, function() {
+    assertPreImagesWrittenForOps(testDB, function() {
         const result = TransactionsUtil.runInTransaction(
             testDB, getCollections, function(db, {coll, otherColl}) {
                 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
@@ -146,22 +151,25 @@ function getCollections(db) {
             });
         commitTimestamp = result.operationTime;
     }, [{_id: 1, a: 1}, {_id: 2, a: 1}, {_id: 3, a: 1}]);
-    // Verify that the pre-images are recorded at the same timestamp as the transaction
-    // operations.
+    // Verify that the insert of a new document and the pre-images saved during the
+    // updates/deletes of existing documents were recorded with the same timestamp as the
+    // transaction operations.
     assertDocumentInsertedAtTimestamp(commitTimestamp, 4);
-    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, lastPreImage);
+    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, 1);
+    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, 2);
+    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, 3);
 
     // Verify that the pre-images are written correctly for a transaction with update and delete
     // operations consisting of multiple "applyOps" entries.
     const stringSizeInBytes = 15 * 1024 * 1024;
     const largeString = "b".repeat(stringSizeInBytes);
     assert.commandWorked(coll.insert([{_id: 3, a: 1}, {_id: 10}]));
-    lastPreImage = assertPreImagesWrittenForOps(testDB, function() {
+    assertPreImagesWrittenForOps(testDB, function() {
         const result = TransactionsUtil.runInTransaction(
             testDB, getCollections, function(db, {coll, otherColl}) {
                 assert.commandWorked(otherColl.insert({b: largeString}));
                 assert.commandWorked(coll.updateOne({_id: 1}, {$inc: {a: 1}}));
-
+                // We're expecting a split transaction here.
                 assert.commandWorked(otherColl.insert({b: largeString}));
                 assert.commandWorked(coll.updateOne({_id: 2}, {$inc: {a: 1}}));
                 assert.commandWorked(coll.deleteOne({_id: 3}));
@@ -171,10 +179,16 @@ function getCollections(db) {
         commitTimestamp = result.operationTime;
     }, [{_id: 1, a: 2}, {_id: 2, a: 2}, {_id: 3, a: 1}, {_id: 10}]);
 
-    // Verify that the pre-images are recorded at the same timestamp as the transaction
-    // operations.
+    // Verify that when the transaction doesn't fit in 16MB, it is split.
+    const beforeCommitTimestamp = getPreviousTimestampValue(commitTimestamp);
+    assertDocumentPreImageWrittenWithTimestamp(beforeCommitTimestamp, 1);
+    // Verify that the insert of a new document and the pre-images saved during the
+    // updates/deletes of existing documents were recorded with the same timestamp as the
+    // transaction operations.
     assertDocumentInsertedAtTimestamp(commitTimestamp, 5);
-    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, lastPreImage);
+    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, 2);
+    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, 3);
+    assertDocumentPreImageWrittenWithTimestamp(commitTimestamp, 10);
 
     // Verify that large pre-images are written correctly for a transaction.
     assert.commandWorked(coll.insert([{_id: 3, a: largeString}]));
@@ -210,7 +224,7 @@ function getCollections(db) {
     // Verify that pre-images are written correctly for a transaction that is prepared and then
     // committed.
     let prepareTimestamp;
-    let lastPreImage = assertPreImagesWrittenForOps(testDB, function() {
+    assertPreImagesWrittenForOps(testDB, function() {
         const session = testDB.getMongo().startSession();
         const sessionDb = session.getDatabase(jsTestName());
         session.startTransaction({readConcern: {level: "majority"}});
@@ -221,12 +235,14 @@ function getCollections(db) {
         assert.commandWorked(collInner.insert({_id: 12}));
         prepareTimestamp = PrepareHelpers.prepareTransaction(session);
         assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
-
-        // Verify that the pre-images are recorded at the same timestamp as the transaction
-        // operations.
     }, [{_id: 1, a: 1}, {_id: 3, a: 1}, {_id: 11}]);
+    // Verify that the insert of a new document and the pre-images saved during the
+    // updates/deletes of existing documents were recorded with the same timestamp as the
+    // transaction operations.
     assertDocumentInsertedAtTimestamp(prepareTimestamp, 12);
-    assertDocumentPreImageWrittenWithTimestamp(prepareTimestamp, lastPreImage);
+    assertDocumentPreImageWrittenWithTimestamp(prepareTimestamp, 1);
+    assertDocumentPreImageWrittenWithTimestamp(prepareTimestamp, 3);
+    assertDocumentPreImageWrittenWithTimestamp(prepareTimestamp, 11);
 })();
 
 (function testPreImageWritingForAbortedPreparedTransaction() {
