@@ -3710,6 +3710,18 @@ functions:
         files:
           - wiki_page_location.json
 
+  "sync repo with copybara":
+    - command: shell.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        working_dir: src
+        script: |
+          set -o verbose
+          set -o errexit
+
+          ${activate_virtualenv}
+          $python buildscripts/sync_repo_with_copybara.py
 
 # Pre task steps
 pre:
@@ -5319,6 +5331,15 @@ tasks:
   - func: "set task expansion macros"
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity all"
+
+- name: sync_repo_with_copybara
+  tags: []
+  commands:
+  - command: manifest.load
+  - *git_get_project
+  - *set_task_expansion_macros
+  - *set_up_virtualenv
+  - func: "sync repo with copybara"
 
 ## integration test suites ##
 
@@ -12450,3 +12471,18 @@ buildvariants:
     distros:
     - rhel62-large
   - name: validate_commit_message
+
+###########################################
+#          Copybara buildvariants           #
+###########################################
+
+- name: copybara-sync-between-repos
+  modules:
+  - enterprise
+  display_name: "* Copybara Sync Between Repos"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - ubuntu2204-small
+  stepback: false
+  tasks:
+  - name: sync_repo_with_copybara
