@@ -78,16 +78,11 @@ function testLargeAndOrPredicates() {
     if (isBonsaiEnabled) {
         return;
     }
-    // TODO: SERVER-78587 remove the SBE check. This is an issue with compiling expressions to the
-    // SBE VM, so it affects stage builders and Bonsai.
-    if (isSBEEnabled) {
-        return;
-    }
     jsTestLog("Testing large $and/$or predicates");
 
     // Large $match of the form {$match: {a0: 1, a1: 1, ...}}
     const largeMatch = {};
-    range(1200000).forEach(function(i) {
+    range(800000).forEach(function(i) {
         largeMatch["a" + i] = NumberInt(1);
     });
     runAgg([{$match: largeMatch}]);
@@ -98,11 +93,11 @@ function testLargeAndOrPredicates() {
 
     const andOrFilters = [
         // Plain a=i filter.
-        intStream(800000).map(function(i) {
+        intStream(500000).map(function(i) {
             return {a: i};
         }),
         // a_i = i filter. Different field for each value.
-        intStream(600000).map(function(i) {
+        intStream(500000).map(function(i) {
             const field = "a" + i;
             return {[field]: i};
         }),

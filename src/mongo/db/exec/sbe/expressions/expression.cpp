@@ -210,118 +210,88 @@ std::unique_ptr<EExpression> EPrimBinary::clone() const {
     }
 }
 
+
+/*
+ * Given a vector of clauses named [lhs1,...,lhsN-1, rhs], and a boolean isDisjunctive to indicate
+ * whether we are ANDing or ORing the clauses, we output the appropriate short circuiting
+ * CodeFragment. For AND (conjunctive) we compile them as following byte code:
+ * @true1:    lhs1
+ *            jumpNothing @end
+ *            jumpFalse @false
+ * ...
+ * @trueN-1:  lhsN-1
+ *            jumpNothing @end
+ *            jumpFalse @false
+ * @trueN:    rhs
+ *            jmp @end
+ * @false:    push false
+ * @end:
+ *
+ * For OR (disjunctive) we compile them as:
+ * @false1:   lhs1
+ *            jumpNothing @end
+ *            jumpTrue @true
+ * ...
+ * @falseN-1: lhsN-1
+ *            jumpNothing @end
+ *            jumpTrue @true
+ * @tfalseN:  rhs
+ *            jmp @end
+ * @true:     push true
+ * @end:
+ */
+vm::CodeFragment buildShortCircuitCode(CompileCtx& ctx,
+                                       const std::vector<const EExpression*>& clauses,
+                                       bool isDisjunction) {
+    return withNewLabels(ctx, [&](vm::LabelId endLabel, vm::LabelId resultLabel) {
+        // Build code fragment for all but the last clause, which is used for the final result
+        // branch.
+        tassert(7858700,
+                "There should be two or more clauses when compiling a logicAnd/logicOr.",
+                clauses.size() >= 2);
+        vm::CodeFragment code;
+        for (size_t i = 0; i < clauses.size() - 1; i++) {
+            auto clauseCode = clauses.at(i)->compileDirect(ctx);
+            clauseCode.appendLabelJumpNothing(endLabel);
+
+            if (isDisjunction) {
+                clauseCode.appendLabelJumpTrue(resultLabel);
+            } else {
+                clauseCode.appendLabelJumpFalse(resultLabel);
+            }
+
+            code.append(std::move(clauseCode));
+        }
+
+        // Build code fragment for final clause.
+        auto finalClause = clauses.back()->compileDirect(ctx);
+        finalClause.appendLabelJump(endLabel);
+
+        // Build code fragment for the short-circuited result.
+        vm::CodeFragment resultBranch;
+        resultBranch.appendLabel(resultLabel);
+        resultBranch.appendConstVal(value::TypeTags::Boolean,
+                                    value::bitcastFrom<bool>(isDisjunction));
+
+        // Only one of `finalClause` or `resultBranch` will execute, so the stack size adjustment
+        // should only be made one time here, rather than one adjustment for each CodeFragment.
+        code.append(std::move(finalClause), std::move(resultBranch));
+        code.appendLabel(endLabel);
+        return code;
+    });
+}
+
 vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
     const bool hasCollatorArg = (_nodes.size() == 3);
 
     invariant(!hasCollatorArg || isComparisonOp(_op));
 
     if (_op == EPrimBinary::logicAnd) {
-        /*
-         * We collect all connected AND clauses, named [lhs1,...,lhsN-1, rhs],
-         *  and compile them as following byte code:
-         *
-         * @true1:    lhs1
-         *            jumpNothing @end
-         *            jumpFalse @false
-         * ...
-         * @trueN-1:  lhsN-1
-         *            jumpNothing @end
-         *            jumpFalse @false
-         * @trueN:    rhs
-         *            jmp @end
-         * @false:    push false
-         * @end:
-         */
         auto clauses = collectAndClauses();
-        invariant(clauses.size() >= 2);
-
-        return withNewLabels(ctx, [&](vm::LabelId endLabel, vm::LabelId falseLabel) {
-            vm::CodeFragment code;
-
-            // Build code fragment for @false
-            vm::CodeFragment codeFalseBranch;
-            codeFalseBranch.appendLabel(falseLabel);
-            codeFalseBranch.appendConstVal(value::TypeTags::Boolean,
-                                           value::bitcastFrom<bool>(false));
-
-            // Build code fragment for @trueN
-            auto it = clauses.rbegin();
-            auto rhs = (*it)->compileDirect(ctx);
-            rhs.appendLabelJump(endLabel);
-
-            code.append(std::move(rhs), std::move(codeFalseBranch));
-
-            ++it;
-            invariant(it != clauses.rend());
-
-            // Build code fragment for @trueN-1 to @true1
-            for (; it != clauses.rend(); ++it) {
-                auto lhs = (*it)->compileDirect(ctx);
-                lhs.appendLabelJumpNothing(endLabel);
-                lhs.appendLabelJumpFalse(falseLabel);
-
-                lhs.append(std::move(code));
-                code = std::move(lhs);
-            }
-
-            // Append the end label
-            code.appendLabel(endLabel);
-
-            return code;
-        });
+        return buildShortCircuitCode(ctx, clauses, false /*isDisjunction*/);
     } else if (_op == EPrimBinary::logicOr) {
-        /*
-         * We collect all connected OR clauses, named [lhs1,...,lhsN-1, rhs],
-         * and compile them as following byte code:
-         *
-         * @false1:   lhs1
-         *            jumpNothing @end
-         *            jumpTrue @true
-         * ...
-         * @falseN-1: lhsN-1
-         *            jumpNothing @end
-         *            jumpTrue @true
-         * @tfalseN:  rhs
-         *            jmp @end
-         * @true:     push true
-         * @end:
-         */
         auto clauses = collectOrClauses();
-        invariant(clauses.size() >= 2);
-
-        return withNewLabels(ctx, [&](vm::LabelId endLabel, vm::LabelId trueLabel) {
-            vm::CodeFragment code;
-
-            auto it = clauses.rbegin();
-
-            // Build code fragment for @true
-            vm::CodeFragment codeTrueBranch;
-            codeTrueBranch.appendLabel(trueLabel);
-            codeTrueBranch.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
-
-            // Build code fragment for @falseN
-            auto rhs = (*it)->compileDirect(ctx);
-            rhs.appendLabelJump(endLabel);
-            code.append(std::move(rhs), std::move(codeTrueBranch));
-
-            ++it;
-            invariant(it != clauses.rend());
-
-            // Build code fragment for @falseN-1 to @true1
-            for (; it != clauses.rend(); ++it) {
-                auto lhs = (*it)->compileDirect(ctx);
-                lhs.appendLabelJumpNothing(endLabel);
-                lhs.appendLabelJumpTrue(trueLabel);
-
-                lhs.append(std::move(code));
-                code = std::move(lhs);
-            }
-
-            // Append the end label
-            code.appendLabel(endLabel);
-
-            return code;
-        });
+        return buildShortCircuitCode(ctx, clauses, true /*isDisjunction*/);
     } else if (_op == EPrimBinary::fillEmpty) {
         // Special cases: rhs is trivial to evaluate -> avoid a jump
         if (EConstant* rhsConst = _nodes[1]->as<EConstant>()) {

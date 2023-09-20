@@ -1128,6 +1128,9 @@ public:
 
     void append(CodeFragment&& code);
     void appendNoStack(CodeFragment&& code);
+    // Used when either `lhs` or `rhs` will run, but not both. This method will adjust the stack
+    // size once in this call, rather than twice (once for each CodeFragment). The CodeFragments
+    // must have the same stack size for us to know how to adjust the stack at compile time.
     void append(CodeFragment&& lhs, CodeFragment&& rhs);
     void appendConstVal(value::TypeTags tag, value::Value val);
     void appendAccessVal(value::SlotAccessor* accessor);
