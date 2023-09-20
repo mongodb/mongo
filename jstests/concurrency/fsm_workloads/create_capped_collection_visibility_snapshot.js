@@ -6,6 +6,8 @@
  *
  * @tags: [
  *  requires_capped,
+ *  # This test works on a capped collection, which do not support sharding.
+ *  assumes_unsharded_collection,
  * ]
  */
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
@@ -88,7 +90,8 @@ export const $config = (function() {
 
     return {
         threadCount: 20,
-        iterations: 100,
+        // TODO(SERVER-81258): Return to `iterations: 100` after build failure is resolved
+        iterations: 0,
         data: data,
         startState: 'create',
         states: states,

@@ -63,13 +63,16 @@ export var assertWithLevel = function(level) {
     }
 
     function wrapAssertFn(fn, args) {
+        let res;
         var doassertSaved = doassert;
         try {
             doassert = quietlyDoAssert;
-            fn.apply(assert, args);  // functions typically get called on 'assert'
+            res = fn.apply(assert, args);  // functions typically get called on 'assert'
         } finally {
             doassert = doassertSaved;
         }
+
+        return res;
     }
 
     var assertWithLevel = function() {
@@ -105,7 +108,7 @@ export var assertWithLevel = function(level) {
                 return;
             }
 
-            wrapAssertFn(assert[fn], arguments);
+            return wrapAssertFn(assert[fn], arguments);
         };
     });
 
