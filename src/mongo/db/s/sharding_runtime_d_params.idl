@@ -167,3 +167,13 @@ server_parameters:
         cpp_vartype: int
         cpp_varname: shardedIndexConsistencyCheckIntervalMS
         default: 600000
+
+    persistedChunkCacheUpdateMaxBatchSize:
+        description: >-
+          Maximum batch size used for updating shard persisted chunk cache.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: persistedChunkCacheUpdateMaxBatchSize
+        validator:
+          gte: 1
+        default: 1000
