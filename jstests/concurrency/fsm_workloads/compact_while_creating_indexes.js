@@ -10,14 +10,10 @@
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
-// TODO(SERVER-81114): re-enable the buildInfo checks below when the cache eviction issue is
-// resolved.
-const skipTest = true;
-
-// WiredTiger eviction is slow on Windows debug variants and can cause timeouts when
-// taking a checkpoint through compaction.
-// const buildInfo = getBuildInfo();
-// const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
+// WiredTiger eviction is slow on Windows debug variants and can cause timeouts when taking a
+// checkpoint through compaction.
+const buildInfo = getBuildInfo();
+const skipTest = buildInfo.debug && buildInfo.buildEnvironment.target_os == "windows";
 
 export const $config = (function() {
     var states = (function() {

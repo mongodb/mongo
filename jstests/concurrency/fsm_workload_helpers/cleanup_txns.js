@@ -17,9 +17,7 @@ export function abortTransaction(sessionAwareDB, txnNumber) {
         ErrorCodes.TransactionCommitted,
         ErrorCodes.TransactionTooOld,
         ErrorCodes.Interrupted,
-        ErrorCodes.LockTimeout,
-        // TransactionRouter will error when trying to abort txns that have not been started
-        8027900
+        ErrorCodes.LockTimeout
     ];
     const abortCmd = {
         abortTransaction: 1,
@@ -35,40 +33,44 @@ export function abortTransaction(sessionAwareDB, txnNumber) {
 /**
  * This function operates on the last iteration of each thread to abort any active transactions.
  */
-export function cleanupOnLastIteration(data, func) {
-    let lastIteration = ++data.iteration >= data.iterations;
-    let activeException = null;
+export var {cleanupOnLastIteration} = (function() {
+    function cleanupOnLastIteration(data, func) {
+        let lastIteration = ++data.iteration >= data.iterations;
+        let activeException = null;
 
-    try {
-        func();
-    } catch (e) {
-        lastIteration = true;
-        activeException = e;
+        try {
+            func();
+        } catch (e) {
+            lastIteration = true;
+            activeException = e;
 
-        throw e;
-    } finally {
-        if (lastIteration) {
-            // Abort the latest transactions for this session as some may have been skipped due
-            // to incrementing data.txnNumber. Go in increasing order, so as to avoid bumping
-            // the txnNumber on the server past that of an in-progress transaction. See
-            // SERVER-36847.
-            for (let i = 0; i <= data.txnNumber; i++) {
-                try {
-                    let res = abortTransaction(data.sessionDb, i);
-                    if (res.ok === 1) {
-                        break;
+            throw e;
+        } finally {
+            if (lastIteration) {
+                // Abort the latest transactions for this session as some may have been skipped due
+                // to incrementing data.txnNumber. Go in increasing order, so as to avoid bumping
+                // the txnNumber on the server past that of an in-progress transaction. See
+                // SERVER-36847.
+                for (let i = 0; i <= data.txnNumber; i++) {
+                    try {
+                        let res = abortTransaction(data.sessionDb, i);
+                        if (res.ok === 1) {
+                            break;
+                        }
+                    } catch (exceptionDuringAbort) {
+                        if (activeException !== null) {
+                            print('Exception occurred: in finally block while another exception ' +
+                                  'is active: ' + tojson(activeException));
+                            print('Original exception stack trace: ' + activeException.stack);
+                        }
+
+                        /* eslint-disable-next-line */
+                        throw exceptionDuringAbort;
                     }
-                } catch (exceptionDuringAbort) {
-                    if (activeException !== null) {
-                        print('Exception occurred: in finally block while another exception ' +
-                              'is active: ' + tojson(activeException));
-                        print('Original exception stack trace: ' + activeException.stack);
-                    }
-
-                    /* eslint-disable-next-line */
-                    throw exceptionDuringAbort;
                 }
             }
         }
     }
-}
+
+    return {cleanupOnLastIteration};
+})();

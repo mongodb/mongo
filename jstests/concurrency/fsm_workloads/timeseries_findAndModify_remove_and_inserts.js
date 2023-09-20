@@ -50,8 +50,5 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         insert: {findAndRemove: 0.4, deleteBucket: 0.2, insert: 0.4}
     };
 
-    // TODO(SERVER-81240): Remove next line after resolving build failure
-    $config.iterations = 0;
-
     return $config;
 });

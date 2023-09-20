@@ -49,8 +49,5 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         moveChunk: {insert: 1, doFindAndRemove: 1, moveChunk: 0},
     };
 
-    // TODO(SERVER-81239): Remove next line after resolving build failure
-    $config.iterations = 0;
-
     return $config;
 });

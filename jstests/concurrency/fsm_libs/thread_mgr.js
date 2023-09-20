@@ -201,10 +201,10 @@ workerThread.fsm = async function(workloads, args, options) {
     const {workerThread} = await import("jstests/concurrency/fsm_libs/worker_thread.js");
     const {fsm} = await import("jstests/concurrency/fsm_libs/fsm.js");
 
-    return workerThread.main(workloads, args, async function(configs) {
+    return workerThread.main(workloads, args, function(configs) {
         var workloads = Object.keys(configs);
         assert.eq(1, workloads.length);
-        await fsm.run(configs[workloads[0]]);
+        fsm.run(configs[workloads[0]]);
     });
 };
 

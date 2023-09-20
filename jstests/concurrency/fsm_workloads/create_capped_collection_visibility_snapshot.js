@@ -6,8 +6,6 @@
  *
  * @tags: [
  *  requires_capped,
- *  # This test works on a capped collection, which do not support sharding.
- *  assumes_unsharded_collection,
  * ]
  */
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";

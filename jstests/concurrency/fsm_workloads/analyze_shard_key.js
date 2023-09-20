@@ -35,8 +35,7 @@ const kBaseConfig = {
 
 export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.threadCount = 10;
-    // TODO(SERVER-81234): Reset to `iterations: 500` after resolving build failure
-    $config.iterations = 0;
+    $config.iterations = 500;
 
     // The sample rate range for query sampling.
     $config.data.minSamplesPerSecond = 1000;
@@ -921,11 +920,6 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        // TODO(SERVER-81234): Remove early return after resolving build failure
-        if ($config.iterations === 0) {
-            return;
-        }
-
         if (cluster.isSharded) {
             cluster.executeOnMongosNodes((adminDb) => {
                 configureFailPoint(adminDb, "queryAnalysisSamplerFilterByComment", {}, "off");
