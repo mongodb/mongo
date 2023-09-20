@@ -57,14 +57,6 @@ var res = convertTrafficRecordingToBSON(recordingFilePath);
 res.forEach((obj) => {
     assert.eq(obj["rawop"]["header"]["opcode"], 2013);
     assert.eq(obj["seenconnectionnum"], 1);
-    var responseTo = obj["rawop"]["header"]["responseto"];
-    if (responseTo == 0) {
-        assert.eq(obj["destendpoint"], serverPort.toString());
-        numRequest++;
-    } else {
-        assert.eq(obj["srcendpoint"], serverPort.toString());
-        numResponse++;
-    }
     opTypes[obj["opType"]] = (opTypes[obj["opType"]] || 0) + 1;
 });
 

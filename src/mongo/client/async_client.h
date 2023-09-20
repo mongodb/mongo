@@ -117,7 +117,6 @@ public:
     void end();
 
     const HostAndPort& remote() const;
-    const HostAndPort& local() const;
     static constexpr Seconds kSlowConnAcquiredToWireLogSuppresionPeriod{5};
 
 private:

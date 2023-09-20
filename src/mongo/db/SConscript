@@ -2775,7 +2775,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/net/network',
             '$BUILD_DIR/mongo/util/net/ssl_options_server',
             'auth/auth',
-            'auth/authentication_restriction',
             'auth/authmocks',
             'auth/security_token',
             'catalog/catalog_test_fixture',

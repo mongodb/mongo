@@ -171,9 +171,9 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     Date_t now = Grid::get(opCtx)->getNetwork()->now();
 
     const auto& session = opCtx->getClient()->session();
-    const int port = session ? session->local().port() : serverGlobalParams.port;
+    const std::string sessionStr = session ? fmt::format(":{}", session->toBSON().toString()) : "";
     const std::string serverName = str::stream()
-        << Grid::get(opCtx)->getNetwork()->getHostName() << ":" << port;
+        << Grid::get(opCtx)->getNetwork()->getHostName() << sessionStr;
     const std::string changeId = str::stream()
         << serverName << "-" << now.toString() << "-" << OID::gen();
 

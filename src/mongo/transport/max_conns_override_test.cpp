@@ -59,7 +59,6 @@ stdx::variant<CIDR, std::string> makeExemption(T exemption) {
 
 std::shared_ptr<transport::Session> makeIPSession(StringData ip) {
     return transport::MockSession::create(HostAndPort(ip.toString(), 27017),
-                                          HostAndPort(),
                                           SockAddr::create(ip, 27017, AF_INET),
                                           SockAddr(),
                                           nullptr);
@@ -68,10 +67,8 @@ std::shared_ptr<transport::Session> makeIPSession(StringData ip) {
 #ifndef _WIN32
 std::shared_ptr<transport::Session> makeUNIXSession(StringData path) {
     return transport::MockSession::create(HostAndPort(""_sd.toString(), -1),
-                                          HostAndPort(path.toString(), -1),
                                           SockAddr::create(""_sd, -1, AF_UNIX),
                                           SockAddr::create(path, -1, AF_UNIX),
-
                                           nullptr);
 }
 #endif
@@ -79,9 +76,9 @@ std::shared_ptr<transport::Session> makeUNIXSession(StringData path) {
 TEST(MaxConnsOverride, NormalCIDR) {
     ExemptionVector cidrOnly{makeExemption("127.0.0.1"), makeExemption("10.0.0.0/24")};
 
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("127.0.0.1"), cidrOnly));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("10.0.0.35"), cidrOnly));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeIPSession("192.168.0.53"), cidrOnly));
+    ASSERT_TRUE(makeIPSession("127.0.0.1")->shouldOverrideMaxConns(cidrOnly));
+    ASSERT_TRUE(makeIPSession("10.0.0.35")->shouldOverrideMaxConns(cidrOnly));
+    ASSERT_FALSE(makeIPSession("192.168.0.53")->shouldOverrideMaxConns(cidrOnly));
 }
 
 #ifndef _WIN32
@@ -90,11 +87,11 @@ TEST(MaxConnsOverride, UNIXPaths) {
                           makeExemption("10.0.0.0/24"),
                           makeExemption("/tmp/mongod.sock")};
 
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("127.0.0.1"), mixed));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeIPSession("10.0.0.35"), mixed));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeIPSession("192.168.0.53"), mixed));
-    ASSERT_TRUE(shouldOverrideMaxConns(makeUNIXSession("/tmp/mongod.sock"), mixed));
-    ASSERT_FALSE(shouldOverrideMaxConns(makeUNIXSession("/tmp/other-mongod.sock"), mixed));
+    ASSERT_TRUE(makeIPSession("127.0.0.1")->shouldOverrideMaxConns(mixed));
+    ASSERT_TRUE(makeIPSession("10.0.0.35")->shouldOverrideMaxConns(mixed));
+    ASSERT_FALSE(makeIPSession("192.168.0.53")->shouldOverrideMaxConns(mixed));
+    ASSERT_TRUE(makeUNIXSession("/tmp/mongod.sock")->shouldOverrideMaxConns(mixed));
+    ASSERT_FALSE(makeUNIXSession("/tmp/other-mongod.sock")->shouldOverrideMaxConns(mixed));
 }
 #endif
 

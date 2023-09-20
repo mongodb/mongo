@@ -21,17 +21,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='authentication_restriction',
-    source=[
-        'restriction_environment.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/net/network',
-    ],
-)
-
 # The Auth library should consist only of the shimmed API for Auth usage and the implementations of
 # the data structures used in that API.  No actual Auth subsystem implementation should exist in
 # this library.
@@ -101,7 +90,6 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/db/server_base',
         'auth',
-        'authentication_restriction',
         'authprivilege',
     ],
 )
@@ -516,7 +504,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/net/network',
-        'authentication_restriction',
     ],
 )
 
@@ -590,7 +577,6 @@ env.CppUnitTest(
         'auth',
         'auth_impl_internal',
         'auth_op_observer',
-        'authentication_restriction',
         'authentication_session',
         'authmocks',
         'oidc_protocol',

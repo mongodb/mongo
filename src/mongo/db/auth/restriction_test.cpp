@@ -37,6 +37,7 @@
 #include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/restriction_mock.h"
 #include "mongo/db/auth/restriction_set.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -46,23 +47,33 @@ namespace mongo {
 
 using namespace restriction_detail;
 
-TEST(RestrictionSetTest, EmptyRestrictionSetAllValidates) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+class RestrictionSetTestWithSession : public unittest::Test {
+public:
+    const transport::Session& getSession() {
+        return _session;
+    }
+
+private:
+    transport::MockSession _session = transport::MockSession(HostAndPort(), {}, {}, nullptr);
+};
+
+TEST_F(RestrictionSetTestWithSession, EmptyRestrictionSetAllValidates) {
+    auto env = getSession().getAuthEnvironment();
     RestrictionSetAll<UnnamedRestriction> set;
     Status status = set.validate(env);
     ASSERT_OK(status);
 }
 
-TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionValidates) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAllWithMetRestrictionValidates) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(true));
     RestrictionSetAll<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_OK(set.validate(env));
 }
 
-TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionsValidates) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAllWithMetRestrictionsValidates) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(true));
     restrictions.push_back(std::make_unique<RestrictionMock>(true));
@@ -70,16 +81,16 @@ TEST(RestrictionSetTest, RestrictionSetAllWithMetRestrictionsValidates) {
     ASSERT_OK(set.validate(env));
 }
 
-TEST(RestrictionSetTest, RestrictionSetAllWithFailedRestrictionFails) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAllWithFailedRestrictionFails) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(false));
     RestrictionSetAll<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_NOT_OK(set.validate(env));
 }
 
-TEST(RestrictionSetTest, RestrictionSetAllWithMetAndUnmetRestrictionsFails) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAllWithMetAndUnmetRestrictionsFails) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(true));
     restrictions.push_back(std::make_unique<RestrictionMock>(false));
@@ -87,31 +98,31 @@ TEST(RestrictionSetTest, RestrictionSetAllWithMetAndUnmetRestrictionsFails) {
     ASSERT_NOT_OK(set.validate(env));
 }
 
-TEST(RestrictionSetTest, EmptyRestrictionSetAnyValidates) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, EmptyRestrictionSetAnyValidates) {
+    auto env = getSession().getAuthEnvironment();
     RestrictionSetAny<UnnamedRestriction> set;
     Status status = set.validate(env);
     ASSERT_OK(status);
 }
 
-TEST(RestrictionSetTest, RestrictionSetAnyWithMetRestrictionValidates) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAnyWithMetRestrictionValidates) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(true));
     RestrictionSetAny<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_OK(set.validate(env));
 }
 
-TEST(RestrictionSetTest, RestrictionSetAnyWithFailedRestrictionFails) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAnyWithFailedRestrictionFails) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(false));
     RestrictionSetAny<UnnamedRestriction> set(std::move(restrictions));
     ASSERT_NOT_OK(set.validate(env));
 }
 
-TEST(RestrictionSetTest, RestrictionSetAnyWithMetAndUnmetRestrictionsValidates) {
-    RestrictionEnvironment env{SockAddr(), SockAddr()};
+TEST_F(RestrictionSetTestWithSession, RestrictionSetAnyWithMetAndUnmetRestrictionsValidates) {
+    auto env = getSession().getAuthEnvironment();
     std::vector<std::unique_ptr<UnnamedRestriction>> restrictions;
     restrictions.push_back(std::make_unique<RestrictionMock>(true));
     restrictions.push_back(std::make_unique<RestrictionMock>(false));

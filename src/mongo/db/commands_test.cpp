@@ -45,7 +45,6 @@
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
@@ -435,8 +434,6 @@ public:
         _session = _transportLayer.createSession();
         _client = getServiceContext()->makeClient("testClient", _session);
         _registry = getCommandRegistry(_client->getService());
-        RestrictionEnvironment::set(
-            _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         _authzSession = AuthorizationSession::get(_client.get());
 
         // Insert a user document that will represent the user used for running the commands.

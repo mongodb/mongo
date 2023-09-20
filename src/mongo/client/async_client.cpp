@@ -439,8 +439,4 @@ const HostAndPort& AsyncDBClient::remote() const {
     return _peer;
 }
 
-const HostAndPort& AsyncDBClient::local() const {
-    return _session->local();
-}
-
 }  // namespace mongo

@@ -32,8 +32,6 @@
 #include <memory>
 #include <utility>
 
-#include "mongo/db/client.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
@@ -45,16 +43,9 @@ namespace mongo {
 // which attempt to perform authentication or authorization must have a RestrictionEnvironment.
 class RestrictionEnvironment {
 public:
+    RestrictionEnvironment() = default;
     RestrictionEnvironment(SockAddr clientSource, SockAddr serverAddress)
         : clientSource(std::move(clientSource)), serverAddress(std::move(serverAddress)) {}
-
-    // Retrieve a RestrictionEnvironment from a Client.
-    static const RestrictionEnvironment& get(const Client& client);
-    static void get(Client&&) = delete;
-
-    // Set a RestrictionEnvironment on a transport Session
-    static void set(const std::shared_ptr<transport::Session>& session,
-                    std::unique_ptr<RestrictionEnvironment> environment);
 
     // Returns the source address of the client.
     // This value is useful for filering clients by their address, or network block. Note that

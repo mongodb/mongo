@@ -38,6 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
+#include "mongo/transport/session_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/socket_utils.h"
@@ -137,6 +138,7 @@ CommonAsioSession::CommonAsioSession(
     }
 
     _remote = HostAndPort(_remoteAddr.toString(true));
+    _restrictionEnvironment = RestrictionEnvironment(_remoteAddr, _localAddr);
 #ifdef MONGO_CONFIG_SSL
     _sslContext = transientSSLContext ? transientSSLContext : tl->sslContext();
     if (transientSSLContext) {
@@ -792,6 +794,11 @@ Future<Message> CommonAsioSession::sendHTTPResponse(const BatonHandle& baton) {
                 ErrorCodes::ProtocolError,
                 "Client sent an HTTP request over a native MongoDB connection");
         });
+}
+
+bool CommonAsioSession::shouldOverrideMaxConns(
+    const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const {
+    return transport::util::shouldOverrideMaxConns(remoteAddr(), localAddr(), exemptions);
 }
 
 }  // namespace mongo::transport

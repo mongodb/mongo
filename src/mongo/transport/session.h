@@ -37,13 +37,16 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/restriction_environment.h"
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/cidr.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/time_support.h"
@@ -161,10 +164,17 @@ public:
     }
 
     virtual const HostAndPort& remote() const = 0;
-    virtual const HostAndPort& local() const = 0;
 
-    virtual const SockAddr& remoteAddr() const = 0;
-    virtual const SockAddr& localAddr() const = 0;
+    virtual void appendToBSON(BSONObjBuilder& bb) const = 0;
+
+    BSONObj toBSON() const {
+        BSONObjBuilder builder;
+        appendToBSON(builder);
+        return builder.obj();
+    }
+
+    virtual bool shouldOverrideMaxConns(
+        const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     /**
@@ -172,6 +182,8 @@ public:
      */
     virtual const std::shared_ptr<SSLManagerInterface>& getSSLManager() const = 0;
 #endif
+
+    virtual const RestrictionEnvironment& getAuthEnvironment() const = 0;
 
 protected:
     Session();

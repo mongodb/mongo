@@ -65,10 +65,6 @@ inline Future<void> futurize(const std::error_code& ec) {
  * Extends the interface of transport::Session to include any ASIO-specific functionality. The
  * intention of this class is to expose any ASIO-specific information necessary to systems outside
  * of the transport layer, separate from other implementation details.
- *
- * NOTE: Moving forward, the expectation is to expand this interface and reduce the interface of
- * Session:
- * TODO(SERVER-71100): Move ASIO-specific `remoteAddr` and `localAddr` into AsioSession.
  */
 class AsioSession : public Session {
 public:

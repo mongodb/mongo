@@ -53,6 +53,7 @@
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/net/sockaddr.h"
@@ -502,9 +503,12 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival
         {"127.0.0.1", "::1", false},
     };
     for (const auto& p : tests) {
-        const RestrictionEnvironment re(SockAddr::create(p.client, 1024, AF_UNSPEC),
-                                        SockAddr::create(p.server, 1025, AF_UNSPEC));
-        ASSERT_EQ(doc.validate(re).isOK(), p.valid);
+        auto session =
+            std::make_shared<transport::MockSession>(HostAndPort(),
+                                                     SockAddr::create(p.client, 1024, AF_UNSPEC),
+                                                     SockAddr::create(p.server, 1025, AF_UNSPEC),
+                                                     nullptr);
+        ASSERT_EQ(doc.validate(session->getAuthEnvironment()).isOK(), p.valid);
     }
 }
 

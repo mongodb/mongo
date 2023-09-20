@@ -189,7 +189,7 @@ void User::setIndirectRestrictions(RestrictionDocuments restrictions) & {
 }
 
 Status User::validateRestrictions(OperationContext* opCtx) const {
-    const auto& env = RestrictionEnvironment::get(*(opCtx->getClient()));
+    auto& env = opCtx->getClient()->session()->getAuthEnvironment();
     auto status = _restrictions.validate(env);
     if (!status.isOK()) {
         return {status.code(),

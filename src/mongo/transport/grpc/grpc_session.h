@@ -215,16 +215,19 @@ public:
     }
 #endif
 
-    // TODO SERVER-71100: remove `local()`, `remoteAddr()`, and `localAddr()`.
-    const HostAndPort& local() const final {
+    void appendToBSON(BSONObjBuilder& bb) const override {
+        // No uint64_t BSON type
+        bb.append("id", static_cast<long>(id()));
+        bb.append("clientId", clientIdStr());
+        bb.append("remote", remote().toString());
+    }
+
+    bool shouldOverrideMaxConns(
+        const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const override {
         MONGO_UNIMPLEMENTED;
     }
 
-    const SockAddr& remoteAddr() const final {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    const SockAddr& localAddr() const final {
+    const RestrictionEnvironment& getAuthEnvironment() const override {
         MONGO_UNIMPLEMENTED;
     }
 
@@ -279,12 +282,8 @@ public:
           _stream(stream),
           _authToken(std::move(authToken)),
           _encodedClientMetadata(std::move(encodedClientMetadata)) {
-        LOGV2_DEBUG(7401101,
-                    2,
-                    "Constructed a new gRPC ingress session",
-                    "id"_attr = id(),
-                    "remoteClientId"_attr = clientIdStr(),
-                    "remote"_attr = remote());
+        LOGV2_DEBUG(
+            7401101, 2, "Constructed a new gRPC ingress session", "session"_attr = toBSON());
     }
 
     ~IngressSession() {
@@ -294,9 +293,7 @@ public:
         LOGV2_DEBUG(7401402,
                     2,
                     "Finished cleaning up a gRPC ingress session",
-                    "id"_attr = id(),
-                    "remoteClientId"_attr = clientIdStr(),
-                    "remote"_attr = remote(),
+                    "session"_attr = toBSON(),
                     "status"_attr = *ts);
     }
 
@@ -397,12 +394,7 @@ public:
           _ctx(std::move(ctx)),
           _stream(std::move(stream)),
           _sharedState(std::move(sharedState)) {
-        LOGV2_DEBUG(7401401,
-                    2,
-                    "Constructed a new gRPC egress session",
-                    "id"_attr = id(),
-                    "remoteClientId"_attr = clientIdStr(),
-                    "remote"_attr = remote());
+        LOGV2_DEBUG(7401401, 2, "Constructed a new gRPC egress session", "session"_attr = toBSON());
     }
 
     ~EgressSession() {
@@ -412,9 +404,7 @@ public:
         LOGV2_DEBUG(7401403,
                     2,
                     "Finished cleaning up a gRPC egress session",
-                    "id"_attr = id(),
-                    "localClientId"_attr = clientIdStr(),
-                    "remote"_attr = remote(),
+                    "session"_attr = toBSON(),
                     "status"_attr = *ts);
     }
 

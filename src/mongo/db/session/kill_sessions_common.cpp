@@ -122,7 +122,7 @@ void killSessionsReport(OperationContext* opCtx, const BSONObj& cmdObj) {
         }
 
         if (client->session()) {
-            attr.add("remote", client->session()->remote());
+            attr.add("session", client->session()->toBSON());
         }
 
         if (auto metadata = ClientMetadata::get(client)) {

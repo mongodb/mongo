@@ -72,6 +72,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/assert.h"
@@ -94,8 +95,8 @@ public:
     AuthorizationSession* authzSession;
 
     LogicalSessionIdTest() {
-        RestrictionEnvironment::set(
-            session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
+        auto session = std::make_shared<transport::MockSession>(
+            HostAndPort(), SockAddr(), SockAddr(), nullptr);
         auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
         {

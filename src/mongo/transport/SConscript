@@ -53,11 +53,25 @@ env.Library(
 )
 
 env.Library(
+    target='session_util',
+    source=[
+        'session_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/net/network',
+    ],
+)
+
+env.Library(
     target='transport_layer_mock',
     source=[
         'transport_layer_mock.cpp',
     ],
     LIBDEPS=[
+        'session_util',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
@@ -99,9 +113,9 @@ tlEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/system_error',
-        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/executor_stats',
+        'session_util',
         'transport_layer_common',
     ],
     LIBDEPS_PRIVATE=[
@@ -158,7 +172,6 @@ env.Library(
         'session_workflow.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/auth/authentication_restriction',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',

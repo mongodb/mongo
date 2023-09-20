@@ -35,8 +35,11 @@
 #include "mongo/config.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_util.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 namespace transport {
@@ -45,28 +48,21 @@ class MockSessionBase : public Session {
 public:
     MockSessionBase() = default;
 
-    explicit MockSessionBase(HostAndPort remote,
-                             HostAndPort local,
-                             SockAddr remoteAddr,
-                             SockAddr localAddr)
+    explicit MockSessionBase(HostAndPort remote, SockAddr remoteAddr, SockAddr localAddr)
         : _remote(std::move(remote)),
-          _local(std::move(local)),
           _remoteAddr(std::move(remoteAddr)),
-          _localAddr(std::move(localAddr)) {}
+          _localAddr(std::move(localAddr)),
+          _restrictionEnvironment(_remoteAddr, _localAddr) {}
 
     const HostAndPort& remote() const override {
         return _remote;
     }
 
-    const HostAndPort& local() const override {
-        return _local;
-    }
-
-    const SockAddr& remoteAddr() const override {
+    const SockAddr& remoteAddr() const {
         return _remoteAddr;
     }
 
-    const SockAddr& localAddr() const override {
+    const SockAddr& localAddr() const {
         return _localAddr;
     }
 
@@ -82,17 +78,30 @@ public:
         return false;
     }
 
+    void appendToBSON(BSONObjBuilder& bb) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    bool shouldOverrideMaxConns(
+        const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const override {
+        return transport::util::shouldOverrideMaxConns(remoteAddr(), localAddr(), exemptions);
+    }
+
 #ifdef MONGO_CONFIG_SSL
     const std::shared_ptr<SSLManagerInterface>& getSSLManager() const override {
         return _sslManager;
     }
 #endif
 
+    const RestrictionEnvironment& getAuthEnvironment() const override {
+        return _restrictionEnvironment;
+    }
+
 private:
     const HostAndPort _remote;
-    const HostAndPort _local;
     const SockAddr _remoteAddr;
     const SockAddr _localAddr;
+    RestrictionEnvironment _restrictionEnvironment;
     std::shared_ptr<SSLManagerInterface> _sslManager;
 };
 
@@ -107,12 +116,11 @@ public:
     }
 
     static std::shared_ptr<MockSession> create(HostAndPort remote,
-                                               HostAndPort local,
                                                SockAddr remoteAddr,
                                                SockAddr localAddr,
                                                TransportLayer* tl) {
         auto handle = std::make_shared<MockSession>(
-            std::move(remote), std::move(local), std::move(remoteAddr), std::move(localAddr), tl);
+            std::move(remote), std::move(remoteAddr), std::move(localAddr), tl);
         return handle;
     }
 
@@ -182,12 +190,10 @@ public:
     explicit MockSession(TransportLayer* tl)
         : MockSessionBase(), _tl(checked_cast<TransportLayerMock*>(tl)) {}
     explicit MockSession(HostAndPort remote,
-                         HostAndPort local,
                          SockAddr remoteAddr,
                          SockAddr localAddr,
                          TransportLayer* tl)
-        : MockSessionBase(
-              std::move(remote), std::move(local), std::move(remoteAddr), std::move(localAddr)),
+        : MockSessionBase(std::move(remote), std::move(remoteAddr), std::move(localAddr)),
           _tl(checked_cast<TransportLayerMock*>(tl)) {}
 
 protected:

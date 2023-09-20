@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,35 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
+#include "mongo/transport/session_util.h"
 
-#include "mongo/db/auth/restriction_environment.h"
-#include "mongo/transport/session.h"
-#include "mongo/util/assert_util_core.h"
-#include "mongo/util/decorable.h"
+namespace mongo::transport::util {
+bool shouldOverrideMaxConns(const SockAddr& ra,
+                            const SockAddr& la,
+                            const std::vector<stdx::variant<CIDR, std::string>>& exemptions) {
+    if (exemptions.empty())
+        return false;
 
-namespace mongo {
-namespace {
-const auto getRestrictionEnvironment =
-    transport::Session::declareDecoration<std::unique_ptr<RestrictionEnvironment>>();
-}  // namespace
+    boost::optional<CIDR> remoteCIDR;
+    if (ra.isValid() && ra.isIP())
+        remoteCIDR = uassertStatusOK(CIDR::parse(ra.getAddr()));
 
-const RestrictionEnvironment& RestrictionEnvironment::get(const Client& client) {
-    RestrictionEnvironment* ptr = getRestrictionEnvironment(client.session().get()).get();
-    // All clients used for AuthZ/N must have a RestrictionEnvironment.
-    invariant(ptr);
-    return *ptr;
+    return std::any_of(exemptions.begin(), exemptions.end(), [&](const auto& exemption) {
+        return stdx::visit(
+            [&](auto&& ex) {
+                using Alt = std::decay_t<decltype(ex)>;
+                if constexpr (std::is_same_v<Alt, CIDR>)
+                    return remoteCIDR && ex.contains(*remoteCIDR);
+#ifndef _WIN32
+                // Otherwise the exemption is a UNIX path and we should check the local path
+                // (the remoteAddr == "anonymous unix socket") against the exemption string.
+                // On Windows we don't check this at all and only CIDR ranges are supported.
+                if constexpr (std::is_same_v<Alt, std::string>)
+                    return la.isValid() && la.getAddr() == ex;
+#endif
+                return false;
+            },
+            exemption);
+    });
 }
-
-void RestrictionEnvironment::set(const std::shared_ptr<transport::Session>& session,
-                                 std::unique_ptr<RestrictionEnvironment> environment) {
-    getRestrictionEnvironment(session.get()) = std::move(environment);
-}
-
-}  // namespace mongo
+}  // namespace mongo::transport::util

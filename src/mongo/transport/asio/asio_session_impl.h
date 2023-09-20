@@ -72,16 +72,17 @@ public:
         return _remote;
     }
 
-    const HostAndPort& local() const override {
-        return _local;
-    }
-
-    const SockAddr& remoteAddr() const override {
+    const SockAddr& remoteAddr() const {
         return _remoteAddr;
     }
 
-    const SockAddr& localAddr() const override {
+    const SockAddr& localAddr() const {
         return _localAddr;
+    }
+
+    void appendToBSON(BSONObjBuilder& bb) const override {
+        bb.append("remote", _remote.toString());
+        bb.append("local", _local.toString());
     }
 
     void end() override;
@@ -128,6 +129,10 @@ protected:
 
     GenericSocket& getSocket() override;
     ExecutorFuture<void> parseProxyProtocolHeader(const ReactorHandle& reactor) override;
+
+    const RestrictionEnvironment& getAuthEnvironment() const override {
+        return _restrictionEnvironment;
+    }
 
     /**
      * Provides the means to track and cancel async I/O operations scheduled through `Session`.
@@ -241,6 +246,9 @@ protected:
      */
     Future<Message> sendHTTPResponse(const BatonHandle& baton = nullptr);
 
+    bool shouldOverrideMaxConns(
+        const std::vector<stdx::variant<CIDR, std::string>>& exemptions) const override;
+
     enum BlockingMode {
         unknown,
         sync,
@@ -254,6 +262,8 @@ protected:
 
     SockAddr _remoteAddr;
     SockAddr _localAddr;
+
+    RestrictionEnvironment _restrictionEnvironment;
 
     boost::optional<Milliseconds> _configuredTimeout;
     boost::optional<Milliseconds> _socketTimeout;

@@ -411,8 +411,7 @@ void ShardingTestFixture::expectFindSendBSONObjVector(const HostAndPort& configH
 }
 
 void ShardingTestFixture::setRemote(const HostAndPort& remote) {
-    _transportSession =
-        transport::MockSession::create(remote, HostAndPort{}, SockAddr(), SockAddr(), nullptr);
+    _transportSession = transport::MockSession::create(remote, SockAddr(), SockAddr(), nullptr);
 }
 
 void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,

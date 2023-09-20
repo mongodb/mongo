@@ -84,6 +84,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/assert.h"
@@ -132,8 +133,6 @@ public:
 
         _session = transportLayer.createSession();
         _client = getServiceContext()->makeClient("testClient", _session);
-        RestrictionEnvironment::set(
-            _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
         _opCtx = _client->makeOperationContext();
         managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
 
@@ -624,22 +623,27 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
 
 
     auto assertWorks = [this](StringData clientSource, StringData serverAddress) {
-        RestrictionEnvironment::set(_session,
-                                    std::make_unique<RestrictionEnvironment>(
-                                        SockAddr::create(clientSource, 5555, AF_UNSPEC),
-                                        SockAddr::create(serverAddress, 27017, AF_UNSPEC)));
-        ASSERT_OK(
-            authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
-        authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
+        auto mock_session = std::make_shared<transport::MockSession>(
+            HostAndPort(),
+            SockAddr::create(clientSource, 5555, AF_UNSPEC),
+            SockAddr::create(serverAddress, 27017, AF_UNSPEC),
+            nullptr);
+        auto client = getServiceContext()->makeClient("testClient", mock_session);
+        auto opCtx = client->makeOperationContext();
+        ASSERT_OK(authzSession->addAndAuthorizeUser(opCtx.get(), kSpencerTestRequest, boost::none));
+        authzSession->logoutDatabase(client.get(), kTestDB, "Kill the test!"_sd);
     };
 
     auto assertFails = [this](StringData clientSource, StringData serverAddress) {
-        RestrictionEnvironment::set(_session,
-                                    std::make_unique<RestrictionEnvironment>(
-                                        SockAddr::create(clientSource, 5555, AF_UNSPEC),
-                                        SockAddr::create(serverAddress, 27017, AF_UNSPEC)));
+        auto mock_session = std::make_shared<transport::MockSession>(
+            HostAndPort(),
+            SockAddr::create(clientSource, 5555, AF_UNSPEC),
+            SockAddr::create(serverAddress, 27017, AF_UNSPEC),
+            nullptr);
+        auto client = getServiceContext()->makeClient("testClient", mock_session);
+        auto opCtx = client->makeOperationContext();
         ASSERT_NOT_OK(
-            authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+            authzSession->addAndAuthorizeUser(opCtx.get(), kSpencerTestRequest, boost::none));
     };
 
     // The empty RestrictionEnvironment will cause addAndAuthorizeUser to fail.
