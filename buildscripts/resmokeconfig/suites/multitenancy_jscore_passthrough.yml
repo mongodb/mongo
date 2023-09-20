@@ -27,9 +27,6 @@ selector:
   # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
   - jstests/core/query/explain/explain_agg_write_concern.js
 
-  # TODO(SERVER-80569): Remove the test exclusion when $listCatalog in response has expected prefix.
-  - jstests/core/catalog/list_catalog.js
-
   # `rolesInfo` is returning unprefixed database names
   - jstests/core/administrative/builtin_roles_external.js
 

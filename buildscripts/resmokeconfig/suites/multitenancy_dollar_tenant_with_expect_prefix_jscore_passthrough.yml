@@ -8,9 +8,6 @@ selector:
   # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
   - jstests/core/query/explain/explain_agg_write_concern.js
 
-  # TODO(SERVER-80569): Remove the test exclusion when $listCatalog in response has expected prefix.
-  - jstests/core/catalog/list_catalog.js
-
   # TODO(SERVER-80641): Remove the test exclusion when the reponses of `validate` have expected prefix.
   - jstests/core/compound_wildcard_index_validation.js
   - jstests/core/write/delete/remove2.js
