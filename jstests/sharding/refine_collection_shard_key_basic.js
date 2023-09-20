@@ -127,9 +127,6 @@ function validateCRUDAfterRefine() {
         assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
         assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
         mongos.setReadPref(null);
-
-        assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true));
-        assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true));
     } else {
         // The full shard key is not required in the resulting document when updating. The full
         // shard key is still required in the query, however.
@@ -148,13 +145,10 @@ function validateCRUDAfterRefine() {
         assert.eq(2, sessionDB.getCollection(kCollName).findOne({c: 1}).b);
         assert.eq(4, sessionDB.getCollection(kCollName).findOne({c: -1}).b);
         mongos.setReadPref(null);
-
-        // The full shard key is required when removing documents.
-        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true),
-                                  ErrorCodes.ShardKeyNotFound);
-        assert.writeErrorWithCode(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true),
-                                  ErrorCodes.ShardKeyNotFound);
     }
+
+    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 1}, true));
+    assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: -1, b: -1}, true));
 
     assert.commandWorked(sessionDB.getCollection(kCollName).remove({a: 1, b: 2, c: 1, d: 1}, true));
     assert.commandWorked(
