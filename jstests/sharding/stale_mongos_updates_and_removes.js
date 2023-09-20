@@ -127,43 +127,17 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
         }
     }
 
-    function checkRemoveIsInvalid(query, multiOption, makeMongosStaleFunc) {
-        makeMongosStaleFunc();
-        const res = staleMongos.getCollection(collNS).remove(query, multiOption);
-        assert.writeError(res);
-    }
-
-    // Sharded deleteOnes that do not directly target a shard can now use the two phase write
-    // protocol to execute.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-        doRemove(emptyQuery, single, makeMongosStaleFunc);
-    } else {
-        // Not possible because single remove requires equality match on shard key.
-        checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
-    }
+    doRemove(emptyQuery, single, makeMongosStaleFunc);
     doRemove(emptyQuery, multi, makeMongosStaleFunc);
 
     doRemove(pointQuery, single, makeMongosStaleFunc);
     doRemove(pointQuery, multi, makeMongosStaleFunc);
 
-    // Sharded deleteOnes that do not directly target a shard can now use the two phase write
-    // protocol to execute.
-    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-        doRemove(rangeQuery, single, makeMongosStaleFunc);
-        doRemove(rangeQuery, multi, makeMongosStaleFunc);
+    doRemove(rangeQuery, single, makeMongosStaleFunc);
+    doRemove(rangeQuery, multi, makeMongosStaleFunc);
 
-        doRemove(multiPointQuery, single, makeMongosStaleFunc);
-        doRemove(multiPointQuery, multi, makeMongosStaleFunc);
-    } else {
-        // Not possible because can't do range query on a single remove.
-        checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
-        doRemove(rangeQuery, multi, makeMongosStaleFunc);
-
-        // Not possible because single remove must contain _id or shard key at top level
-        // (not within $or).
-        checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
-        doRemove(multiPointQuery, multi, makeMongosStaleFunc);
-    }
+    doRemove(multiPointQuery, single, makeMongosStaleFunc);
+    doRemove(multiPointQuery, multi, makeMongosStaleFunc);
 }
 
 function checkAllUpdateQueries(makeMongosStaleFunc) {
