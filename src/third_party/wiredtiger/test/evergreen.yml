@@ -3257,6 +3257,21 @@ tasks:
             set -o verbose
             test/evergreen/compatibility_test_for_releases.sh -p
 
+  - name: compatibility-test-suite
+    tags: ["python"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            ${python_binary|python3} test/compatibility/suite/compatibility_test.py ${compat_suite_args|-v 2} 2>&1
+
   - name: compatibility-test-for-wt-standalone-releases
     commands:
       - func: "get project"

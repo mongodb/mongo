@@ -141,6 +141,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   tasks:
+    - name: compatibility-test-suite
     - name: compatibility-test-upgrade-to-latest
 
 - name: compatibility-tests
@@ -160,10 +161,10 @@ buildvariants:
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
-  # As these tests run infrequently by the time they fail we may have had 
-  # a lot of prior commits that would also fail for the same test. This is acceptable 
-  # as our infrequent tests aren't tracking critical failures, but we don't want 
-  # to perform stepback as evergreen will run the same test on all of these older commits 
+  # As these tests run infrequently by the time they fail we may have had
+  # a lot of prior commits that would also fail for the same test. This is acceptable
+  # as our infrequent tests aren't tracking critical failures, but we don't want
+  # to perform stepback as evergreen will run the same test on all of these older commits
   # and generate a lot of redundant BFGs.
   stepback: false
   tasks:
