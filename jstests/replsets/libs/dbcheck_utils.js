@@ -93,6 +93,27 @@ export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 100
         timeout);
 };
 
+// Temporarily restart the secondary as a standalone, inject an inconsistency and
+// restart it back as a secondary.
+export const injectInconsistencyOnSecondary = (replSet, dbName, cmd, noCleanData = true) => {
+    const secondaryConn = replSet.getSecondary();
+    const secondaryNodeId = replSet.getNodeId(secondaryConn);
+    replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
+
+    const standaloneConn = MongoRunner.runMongod({
+        dbpath: secondaryConn.dbpath,
+        noCleanData: noCleanData,
+    });
+
+    const standaloneDB = standaloneConn.getDB(dbName);
+    assert.commandWorked(standaloneDB.runCommand(cmd));
+
+    // Shut down the secondary and restart it as a member of the replica set.
+    MongoRunner.stopMongod(standaloneConn);
+    replSet.start(secondaryNodeId, {}, true /*restart*/);
+    replSet.awaitNodesAgreeOnPrimaryNoAuth();
+};
+
 // Returns a list of all collections in a given database excluding views.
 function listCollectionsWithoutViews(database) {
     var failMsg = "'listCollections' command failed";

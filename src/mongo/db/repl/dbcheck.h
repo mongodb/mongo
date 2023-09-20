@@ -131,7 +131,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
 class DbCheckHasher {
 public:
     /**
-     * Create a new DbCheckHasher hashing documents within the given limits.
+     * Creates a new DbCheckHasher hashing documents within the given limits.
      *
      * The check will end when any of the specified limits are reached.  Must be called on a
      * collection with an _id index; otherwise a DBException with code ErrorCodes::IndexNotFound
@@ -147,23 +147,35 @@ public:
                   const CollectionPtr& collection,
                   const BSONKey& start,
                   const BSONKey& end,
+                  boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
     ~DbCheckHasher();
 
     /**
-     * Hash all documents up to the deadline.
+     * Checks if a document has missing index keys by finding the index keys that should be
+     * generated for each document and checking that they actually exist in the index.
      */
-    Status hashAll(OperationContext* opCtx, Date_t deadline = Date_t::max());
+    Status validateMissingKeys(OperationContext* opCtx,
+                               BSONObj& currentObj,
+                               RecordId& currentRecordId,
+                               const CollectionPtr& collPtr);
 
     /**
-     * Return the total hash of all documents seen so far.
+     * Hashes all documents up to the deadline.
+     */
+    Status hashAll(OperationContext* opCtx,
+                   const CollectionPtr& collPtr,
+                   Date_t deadline = Date_t::max());
+
+    /**
+     * Returns the total hash of all documents seen so far.
      */
     std::string total(void);
 
     /**
-     * Get the last key this hasher has hashed.
+     * Gets the last key this hasher has hashed.
      *
      * Again, not the same as the `end` passed in; this is MinKey if no documents have been hashed.
      */
@@ -194,12 +206,18 @@ private:
 
     DataCorruptionDetectionMode _previousDataCorruptionMode;
     PrepareConflictBehavior _previousPrepareConflictBehavior;
+
+    std::vector<const IndexCatalogEntry*> _indexes;
+    std::vector<BSONObj> _missingIndexKeys;
+    std::vector<BSONObj> _mismatchedIndexKeys;
+
+    boost::optional<SecondaryIndexCheckParameters> _secondaryIndexCheckParameters;
 };
 
 namespace repl {
 
 /**
- * Perform the dbCheck oplog command.
+ * Performs the dbCheck oplog command.
  *
  * Returns a `Status` to match the type used for oplog command hooks, but in fact always handles
  * errors (primarily by writing to the health log), so always returns `Status::OK`.

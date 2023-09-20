@@ -1754,9 +1754,17 @@ Status IndexCatalogImpl::_indexRecords(OperationContext* opCtx,
                                        const IndexCatalogEntry* index,
                                        const std::vector<BsonRecord>& bsonRecords,
                                        int64_t* keysInsertedOut) const {
-    if (MONGO_unlikely(skipIndexNewRecords.shouldFail())) {
+    bool skip = false;
+    skipIndexNewRecords.execute([&](const BSONObj& dataObj) {
+        // Skip the _id index by default.
+        if (!dataObj.hasField("skipIdIndex") || dataObj["skipIdIndex"].Bool() == true) {
+            skip = true;
+        } else if (!index->descriptor()->isIdIndex()) {
+            skip = true;
+        }
+    });
+    if (skip)
         return Status::OK();
-    }
 
     const MatchExpression* filter = index->getFilterExpression();
     if (!filter)

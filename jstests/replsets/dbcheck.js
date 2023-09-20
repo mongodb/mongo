@@ -17,6 +17,7 @@ import {
     dbCheckCompleted,
     forEachNonArbiterNode,
     forEachNonArbiterSecondary,
+    injectInconsistencyOnSecondary,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 
@@ -401,27 +402,6 @@ function testSucceedsOnStepdown() {
 
 testSucceedsOnStepdown();
 
-// Temporarily restart the secondary as a standalone, inject an inconsistency and
-// restart it back as a secondary.
-function injectInconsistencyOnSecondary(cmd) {
-    const secondaryConn = replSet.getSecondary();
-    const secondaryNodeId = replSet.getNodeId(secondaryConn);
-    replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
-
-    const standaloneConn = MongoRunner.runMongod({
-        dbpath: secondaryConn.dbpath,
-        noCleanData: true,
-    });
-
-    const standaloneDB = standaloneConn.getDB(dbName);
-    assert.commandWorked(standaloneDB.runCommand(cmd));
-
-    // Shut down the secondary and restart it as a member of the replica set.
-    MongoRunner.stopMongod(standaloneConn);
-    replSet.start(secondaryNodeId, {}, true /*restart*/);
-    replSet.awaitNodesAgreeOnPrimaryNoAuth();
-}
-
 // Just add an extra document, and test that it catches it.
 function simpleTestCatchesExtra() {
     {
@@ -435,7 +415,7 @@ function simpleTestCatchesExtra() {
     }
 
     replSet.awaitReplication();
-    injectInconsistencyOnSecondary({insert: collName, documents: [{}]});
+    injectInconsistencyOnSecondary(replSet, dbName, {insert: collName, documents: [{}]});
     replSet.awaitReplication();
 
     {

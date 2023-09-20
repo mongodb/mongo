@@ -1132,6 +1132,12 @@ private:
                                                        "dbCheck batch failed",
                                                        OplogEntriesEnum::Batch,
                                                        result.getStatus());
+                    if (code == ErrorCodes::NoSuchKey) {
+                        entry->setScope(ScopeEnum::Index);
+                        entry->setOperation("Index scan");
+                        entry->setMsg(
+                            "dbCheck found record with missing and/or mismatched index keys");
+                    }
                 }
                 HealthLogInterface::get(opCtx)->log(*entry);
                 if (retryable) {
@@ -1250,6 +1256,7 @@ private:
                            collectionPtr,
                            first,
                            info.end,
+                           info.secondaryIndexCheckParameters,
                            std::min(batchDocs, info.maxCount),
                            std::min(batchBytes, info.maxSize));
         } catch (const DBException& e) {
@@ -1257,7 +1264,7 @@ private:
         }
 
         const auto batchDeadline = Date_t::now() + Milliseconds(info.maxBatchTimeMillis);
-        Status status = hasher->hashAll(opCtx, batchDeadline);
+        Status status = hasher->hashAll(opCtx, collectionPtr, batchDeadline);
 
         if (!status.isOK()) {
             return status;
