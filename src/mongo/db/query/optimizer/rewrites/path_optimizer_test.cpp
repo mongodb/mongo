@@ -1102,5 +1102,516 @@ TEST(Path, NoDefaultSimplifyUnderFilter) {
     }
 }
 
+TEST(Path, FusePathsWithEqualTraverseDepths) {
+    // This ABT sets every element (if its an array) of the field 'a' to 2 (via the PathTraverse) by
+    // the bottom-most EvalPath and then retrieves the value of the field 'a' by the top-most
+    // PathTraverse.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .eval("x",
+                         _evalp(_get("a", _traverseN(_id())),
+                                _evalp(_field("a", _traverseN(_pconst("2"_cint64))), "root"_var)))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   EvalPath []\n"
+        "|   |   |   Variable [root]\n"
+        "|   |   PathField [a] PathTraverse [inf] PathConstant [] Const [2]\n"
+        "|   PathGet [a] PathTraverse [inf] PathIdentity []\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrite simplifies the tree such that we simply set every
+    // element (if its an array) of the field 'a' to 2 and return the value of the field 'a'.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a] PathTraverse [inf] PathConstant [] Const [2]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, FuseTraverseWithConstant) {
+    // This ABT sets the field 'a' to "hello" and then checks if the value of the field 'a' is equal
+    // to 2.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("Eq", "2"_cint64))), "x"_var))
+                   .eval("x", _evalp(_field("a", _pconst("hello"_cstr)), "root"_var))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathGet [a] PathTraverse [1] PathCompare [Eq] Const [2]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrite simplifies the tree such that (1) the PathTraverse is
+    // eliminated, since the constant that we are setting the field 'a' to is not an array and (2)
+    // we directly compare "hello" to 2 instead of retrieving the field 'a' in the Filter. Note that
+    // further optimizations with different rewrites (i.e. ConstEval) would simplify the tree
+    // further (constant folding could determine that "hello" != 2 and replace the right child of
+    // the Filter node with Const [false]). However, this unit test just exercises PathFusion
+    // optimizations.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   BinaryOp [Eq]\n"
+        "|   |   Const [0]\n"
+        "|   BinaryOp [Cmp3w]\n"
+        "|   |   Const [2]\n"
+        "|   Const [\"hello\"]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathConstantArrayBool) {
+    // This test tests the rewriting of ABTs with array and boolean constants.
+    // This ABT sets the field 'a' to an empty array and the field 'b' to 'true' and then projects
+    // those two fields.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .eval("x",
+                         _evalp(_composem(_composem(_obj(), _keep("a", "b")),
+                                          _composem(_field("a", _pconst(_cemparray())),
+                                                    _field("b", _pconst(_cbool(true))))),
+                                "root"_var))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathComposeM []\n"
+        "|   |   |   PathField [b] PathConstant [] Const [true]\n"
+        "|   |   PathField [a] PathConstant [] Const [[]]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathKeep [a, b]\n"
+        "|   PathObj []\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrite simplifies the tree such that we directly construct the
+    // object {a: [], b: true}
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Const [{}]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathField [b] PathConstant [] Const [true]\n"
+        "|   PathField [a] PathConstant [] Const [[]]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathConstantArrayBool2) {
+    // This test tests the rewriting of ABTs with array and boolean constants.
+    // This ABT sets the field 'a' to an empty array and the field 'b' to 'true' and then projects
+    // those two fields, similar to PathConstantArrayBool. The difference between this test and
+    // PathConstantArrayBool is the order of the children under the leftmost PathComposeM (the
+    // PathKeep and PathObj). Regardless of this order, we will arrive at the same optimized tree.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .eval("x",
+                         _evalp(_composem(_composem(_keep("a", "b"), _obj()),
+                                          _composem(_field("a", _pconst(_cemparray())),
+                                                    _field("b", _pconst(_cbool(true))))),
+                                "root"_var))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathComposeM []\n"
+        "|   |   |   PathField [b] PathConstant [] Const [true]\n"
+        "|   |   PathField [a] PathConstant [] Const [[]]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathObj []\n"
+        "|   PathKeep [a, b]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrite simplifies the tree such that we directly construct the
+    // object {a: [], b: true}
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Const [{}]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathField [b] PathConstant [] Const [true]\n"
+        "|   PathField [a] PathConstant [] Const [[]]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathConstantNothing) {
+    // This test tests the rewriting of ABTs with a Nothing constant.
+    // This ABT sets the field 'a' to Nothing and then checks if the field 'a.b' is equal to 3.
+    ABT tree =
+        NodeBuilder{}
+            .root("x")
+            .filter(_evalf(_get("a", _traverse1(_get("b", _traverse1(_cmp("Eq", "3"_cint64))))),
+                           "x"_var))
+            .eval("x", _evalp(_field("a", _pconst(_cnothing())), "root"_var))
+            .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathGet [a] PathTraverse [1] PathGet [b] PathTraverse [1] PathCompare [Eq] Const [3]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [Nothing]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrites will remove the PathTraverse under PathGet [a] in the
+    // Filter since we know that a is set to be a non-array by the projection.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathGet [a] PathGet [b] PathTraverse [1] PathCompare [Eq] Const [3]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [Nothing]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, FusionPathComposeMIdentity1) {
+    // Observe the path law Id * p2 -> p2 via the PathFusion rewrites in action.
+    auto tree = make<EvalPath>(
+        make<PathComposeM>(make<PathIdentity>(),
+                           make<PathField>("a", make<PathConstant>(Constant::int64(100)))),
+        make<Variable>("root"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "EvalPath []\n"
+        "|   Variable [root]\n"
+        "PathComposeM []\n"
+        "|   PathField [a] PathConstant [] Const [100]\n"
+        "PathIdentity []\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "EvalPath []\n"
+        "|   Variable [root]\n"
+        "PathField [a] PathConstant [] Const [100]\n",
+        tree);
+}
+
+TEST(Path, FusionPathComposeMIdentity2) {
+    // Observe the path law p1 * Id -> p1 via the PathFusion rewrites in action.
+    auto tree = make<EvalPath>(
+        make<PathComposeM>(make<PathField>("a", make<PathConstant>(Constant::int64(100))),
+                           make<PathIdentity>()),
+        make<Variable>("root"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "EvalPath []\n"
+        "|   Variable [root]\n"
+        "PathComposeM []\n"
+        "|   PathIdentity []\n"
+        "PathField [a] PathConstant [] Const [100]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "EvalPath []\n"
+        "|   Variable [root]\n"
+        "PathField [a] PathConstant [] Const [100]\n",
+        tree);
+}
+
+
+TEST(Path, PathDefaultNotNothing1) {
+    // The following ABT returns the object {a: 3}. Notice the PathDefault is the first child of the
+    // PathComposeM.
+    ABT tree =
+        NodeBuilder{}
+            .root("x")
+            .eval("x",
+                  _evalp(_composem(_default(_cbool(false)), _field("a", _pconst("3"_cint64))),
+                         "root"_var))
+            .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathField [a] PathConstant [] Const [3]\n"
+        "|   PathDefault [] Const [false]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect to see that the PathComposeM and the PathDefault are removed by the PathFusion
+    // rewrites since the constant overwrites whatever its input is.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [3]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathDefaultNotNothing2) {
+    // The following ABT returns the object {a: 3}. Notice the PathDefault is the second child of
+    // the PathComposeM.
+    ABT tree =
+        NodeBuilder{}
+            .root("x")
+            .eval("x",
+                  _evalp(_composem(_field("a", _pconst("3"_cint64)), _default(_cbool(false))),
+                         "root"_var))
+            .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathDefault [] Const [false]\n"
+        "|   PathField [a] PathConstant [] Const [3]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect to see that the PathComposeM and the PathDefault are removed by the PathFusion
+    // rewrites since we know that the first child of the PathComposeM will not produce Nothing, as
+    // it produces a constant object.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [3]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, TwoPathKeep) {
+    // The following ABT does an inclusion projection on the field 'a' and then on the fields 'a',
+    // 'b', and 'c'.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .eval("x", _evalp(_composem(_keep("a"), _keep("a", "b", "c")), "root"_var))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathKeep [a, b, c]\n"
+        "|   PathKeep [a]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect to see that the unused PathKeeps for fields 'b' and 'c' are removed by the
+    // PathFusion rewrites.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathKeep [a]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, FieldDefinedAndKeptInComposeM) {
+    // The following ABT defines the field 'a' to be 2, then projects 'a' and defines the field 'b'
+    // to be 3.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .eval("x",
+                         _evalp(_composem(_keep("a"), _field("b", _pconst("3"_cint64))),
+                                _evalp(_field("a", _pconst("2"_cint64)), "root"_var)))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   EvalPath []\n"
+        "|   |   |   Variable [root]\n"
+        "|   |   PathField [a] PathConstant [] Const [2]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathField [b] PathConstant [] Const [3]\n"
+        "|   PathKeep [a]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect to see that the PathFusion rewrites simplify the tree such that we project {a: 2,
+    // b: 3} at once.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Const [{}]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathField [b] PathConstant [] Const [3]\n"
+        "|   PathField [a] PathConstant [] Const [2]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathDefaultSimple) {
+    // The following ABT defines the field 'a' to be 2, then also projects 'b'.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .eval("x",
+                         _evalp(_composem(_default(_cempobj()), _keep("b")),
+                                _evalp(_field("a", _pconst("2"_cint64)), "root"_var)))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   EvalPath []\n"
+        "|   |   |   Variable [root]\n"
+        "|   |   PathField [a] PathConstant [] Const [2]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathKeep [b]\n"
+        "|   PathDefault [] Const [{}]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect to see that the PathFusion rewrites simplify the tree such that we compose the
+    // projections.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathComposeM []\n"
+        "|   |   |   PathKeep [b]\n"
+        "|   |   PathDefault [] Const [{}]\n"
+        "|   PathField [a] PathConstant [] Const [2]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathDefaultObjectInput) {
+    ABT tree = make<EvalPath>(make<PathComposeM>(make<PathDefault>(Constant::emptyObject()),
+                                                 make<PathDefault>(Constant::emptyObject())),
+                              Constant::emptyObject());
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "EvalPath []\n"
+        "|   Const [{}]\n"
+        "PathComposeM []\n"
+        "|   PathDefault [] Const [{}]\n"
+        "PathDefault [] Const [{}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect to see that the PathFusion rewrites remove the unnecessary PathDefaults.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "EvalPath []\n"
+        "|   Const [{}]\n"
+        "PathIdentity []\n",
+        tree);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

@@ -118,6 +118,11 @@ inline auto _cnull() {
     return ExprHolder{Constant::null()};
 }
 
+// Nothing constant.
+inline auto _cnothing() {
+    return ExprHolder{Constant::nothing()};
+}
+
 // Boolean constant.
 inline auto _cbool(const bool val) {
     return ExprHolder{Constant::boolean(val)};
