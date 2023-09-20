@@ -765,7 +765,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                 DebugInfo::kDefaultForProd,
                 {._numSamplingChunks = hints._numSamplingChunks} /*hints*/};
 
-            return {OptPhaseManager::getAllRewritesSet(),
+            return {OptPhaseManager::getAllProdRewrites(),
                     prefixId,
                     requireRID,
                     std::move(metadata),
@@ -782,7 +782,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
         }
 
         case CEMode::kHistogram:
-            return {OptPhaseManager::getAllRewritesSet(),
+            return {OptPhaseManager::getAllProdRewrites(),
                     prefixId,
                     requireRID,
                     std::move(metadata),
@@ -797,7 +797,7 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                     std::move(hints)};
 
         case CEMode::kHeuristic:
-            return {OptPhaseManager::getAllRewritesSet(),
+            return {OptPhaseManager::getAllProdRewrites(),
                     prefixId,
                     requireRID,
                     std::move(metadata),

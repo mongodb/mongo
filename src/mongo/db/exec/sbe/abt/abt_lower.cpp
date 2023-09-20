@@ -1141,12 +1141,7 @@ void SBENodeLowering::generateSlots(SlotVarMap& slotMap,
         mapProjToSlot(slotMap, *projName, rootSlot.value());
     }
 
-    // Soring is not essential. Here we sort only for SBE plan stability.
-    std::map<FieldNameType, ProjectionName> ordered;
-    for (const auto& entry : fieldProjectionMap._fieldProjections) {
-        ordered.insert(entry);
-    }
-    for (const auto& [fieldName, projectionName] : ordered) {
+    for (const auto& [fieldName, projectionName] : fieldProjectionMap._fieldProjections) {
         vars.push_back(_slotIdGenerator.generate());
         mapProjToSlot(slotMap, projectionName, vars.back());
         fields.push_back(fieldName.value().toString());

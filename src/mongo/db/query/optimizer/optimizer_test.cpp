@@ -43,6 +43,7 @@
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/rewrites/normalize_projections.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -208,6 +209,59 @@ TEST(Optimizer, ConstFoldIf2) {
         "|   Variable [z]\n"
         "Variable [x]\n",
         tree);
+}
+
+TEST(Optimizer, ProjRenameLet) {
+    auto tree = _let("var", _binary("Add", "1"_cint64, "2"_cint64), "var"_var)._n;
+
+    auto prefixId = PrefixId::createForTests();
+
+    str::stream s;
+    const auto renameHandler = [&](const ProjectionName& target, const ProjectionName& source) {
+        s << target << ", " << source << "\n";
+    };
+
+    while (ProjNormalize{renameHandler, prefixId}.optimize(tree))
+        ;
+
+    // Variable is renamed.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Let [renamed_0]\n"
+        "|   Variable [renamed_0]\n"
+        "BinaryOp [Add]\n"
+        "|   Const [2]\n"
+        "Const [1]\n",
+        tree);
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "var, renamed_0\n",
+        s);
+}
+
+TEST(Optimizer, ProjRenameLambdaAbstr) {
+    auto tree = _lambda("var", _binary("Add", "1"_cint64, "var"_var))._n;
+
+    auto prefixId = PrefixId::createForTests();
+
+    str::stream s;
+    const auto renameHandler = [&](const ProjectionName& target, const ProjectionName& source) {
+        s << target << ", " << source << "\n";
+    };
+
+    while (ProjNormalize{renameHandler, prefixId}.optimize(tree))
+        ;
+
+    // Variable is renamed.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "LambdaAbstraction [renamed_0]\n"
+        "BinaryOp [Add]\n"
+        "|   Variable [renamed_0]\n"
+        "Const [1]\n",
+        tree);
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "var, renamed_0\n",
+        s);
 }
 
 TEST(Optimizer, Tracker1) {

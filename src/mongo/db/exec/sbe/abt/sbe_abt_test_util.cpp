@@ -154,7 +154,7 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
     OPTIMIZER_DEBUG_LOG(
         6264807, 5, "SBE translated ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
 
-    auto phaseManager = makePhaseManager(OptPhaseManager::getAllRewritesSet(),
+    auto phaseManager = makePhaseManager(OptPhaseManager::getAllProdRewrites(),
                                          prefixId,
                                          {{}},
                                          boost::none /*costModel*/,

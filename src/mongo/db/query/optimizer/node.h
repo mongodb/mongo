@@ -303,7 +303,6 @@ public:
     const std::string& getScanDefName() const;
 
 private:
-    const ProjectionName _ridProjectionName;
     const FieldProjectionMap _fieldProjectionMap;
     const std::string _scanDefName;
 };

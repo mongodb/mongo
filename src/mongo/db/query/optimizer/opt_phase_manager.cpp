@@ -42,6 +42,7 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/rewrites/normalize_projections.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/rewrites/sampling_const_eval.h"
@@ -53,13 +54,13 @@
 
 namespace mongo::optimizer {
 
-OptPhaseManager::PhaseSet OptPhaseManager::_allRewrites = {OptPhase::ConstEvalPre,
-                                                           OptPhase::PathFuse,
-                                                           OptPhase::MemoSubstitutionPhase,
-                                                           OptPhase::MemoExplorationPhase,
-                                                           OptPhase::MemoImplementationPhase,
-                                                           OptPhase::PathLower,
-                                                           OptPhase::ConstEvalPost};
+OptPhaseManager::PhaseSet OptPhaseManager::_allProdRewrites = {OptPhase::ConstEvalPre,
+                                                               OptPhase::PathFuse,
+                                                               OptPhase::MemoSubstitutionPhase,
+                                                               OptPhase::MemoExplorationPhase,
+                                                               OptPhase::MemoImplementationPhase,
+                                                               OptPhase::PathLower,
+                                                               OptPhase::ConstEvalPost};
 
 OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
@@ -391,6 +392,8 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
             ConstEval{env, {} /*canInlineEvalFn*/, erasedProjFn, renamedProjFn},
             env,
             planEntry._node);
+        runStructuralPhase<OptPhase::ProjNormalize, ProjNormalize>(
+            ProjNormalize{renamedProjFn, _prefixId}, env, planEntry._node);
 
         runStructuralPhase<OptPhase::ConstEvalPost_ForSampling, SamplingConstEval>(
             SamplingConstEval{}, env, planEntry._node);
@@ -417,8 +420,8 @@ bool OptPhaseManager::hasPhase(const OptPhase phase) const {
     return _phaseSet.find(phase) != _phaseSet.cend();
 }
 
-const OptPhaseManager::PhaseSet& OptPhaseManager::getAllRewritesSet() {
-    return _allRewrites;
+const OptPhaseManager::PhaseSet& OptPhaseManager::getAllProdRewrites() {
+    return _allProdRewrites;
 }
 
 MemoPhysicalNodeId OptPhaseManager::getPhysicalNodeId() const {

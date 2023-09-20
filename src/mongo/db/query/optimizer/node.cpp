@@ -238,13 +238,12 @@ SeekNode::SeekNode(ProjectionName ridProjectionName,
                    FieldProjectionMap fieldProjectionMap,
                    std::string scanDefName)
     : Base(buildSimpleBinder(extractProjectionNamesForScan(fieldProjectionMap)),
-           make<References>(ProjectionNameVector{ridProjectionName})),
-      _ridProjectionName(std::move(ridProjectionName)),
+           make<References>(ProjectionNameVector{std::move(ridProjectionName)})),
       _fieldProjectionMap(std::move(fieldProjectionMap)),
       _scanDefName(std::move(scanDefName)) {}
 
 bool SeekNode::operator==(const SeekNode& other) const {
-    return _ridProjectionName == other._ridProjectionName &&
+    return getRIDProjectionName() == other.getRIDProjectionName() &&
         _fieldProjectionMap == other._fieldProjectionMap && _scanDefName == other._scanDefName;
 }
 
@@ -257,7 +256,7 @@ const std::string& SeekNode::getScanDefName() const {
 }
 
 const ProjectionName& SeekNode::getRIDProjectionName() const {
-    return _ridProjectionName;
+    return get<1>().cast<References>()->nodes()[0].cast<Variable>()->name();
 }
 
 MemoLogicalDelegatorNode::MemoLogicalDelegatorNode(const GroupIdType groupId)

@@ -86,7 +86,10 @@ using namespace cascades;
     /* Final round of constant folding, identical to the first ConstEval stage. */                 \
     F(ConstEvalPost)                                                                               \
     /* Simplified constant folding for sampling estimator. */                                      \
-    F(ConstEvalPost_ForSampling)
+    F(ConstEvalPost_ForSampling)                                                                   \
+                                                                                                   \
+    /* DEBUGGING ONLY: Normalize projection names to ensure assertable plan. */                    \
+    F(ProjNormalize)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(OptPhase, OPT_PHASE);
 #undef OPT_PHASE
@@ -140,7 +143,7 @@ public:
      */
     [[nodiscard]] PlanExtractorResult optimizeNoAssert(ABT input, bool includeRejected);
 
-    static const PhaseSet& getAllRewritesSet();
+    static const PhaseSet& getAllProdRewrites();
 
     MemoPhysicalNodeId getPhysicalNodeId() const;
     const boost::optional<PlanAndProps>& getPostMemoPlan() const;
@@ -190,7 +193,11 @@ private:
                                                            ABT& input);
 
 
-    static PhaseSet _allRewrites;
+    /**
+     * Set of rewrites intended for use in production; excludes rewrites that only make the plan
+     * easier to read or easier to compare.
+     */
+    static PhaseSet _allProdRewrites;
 
     const PhaseSet _phaseSet;
 

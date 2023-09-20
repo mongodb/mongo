@@ -2475,7 +2475,8 @@ TEST(PhysRewriter, CompoundIndex1) {
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+         OptPhase::MemoImplementationPhase,
+         OptPhase::ProjNormalize},
         prefixId,
         {{{"c1",
            createScanDef(
@@ -2495,16 +2496,24 @@ TEST(PhysRewriter, CompoundIndex1) {
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN(25, 40, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
-    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.nodeType");
-    ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.leftChild.indexDefName");
-    ASSERT_BSON_PATH(
-        "\"IndexScan\"", explainRoot, "child.leftChild.rightChild.children.0.child.nodeType");
-    ASSERT_BSON_PATH(
-        "\"index2\"", explainRoot, "child.leftChild.rightChild.children.0.child.indexDefName");
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{renamed_4}]\n"
+        "NestedLoopJoin [joinType: Inner, {renamed_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: renamed_0, {'<root>': renamed_4}, c1]\n"
+        "MergeJoin []\n"
+        "|   |   |   Condition\n"
+        "|   |   |       renamed_0 = renamed_2\n"
+        "|   |   Collation\n"
+        "|   |       Ascending\n"
+        "|   Union [{renamed_2}]\n"
+        "|   Evaluation [{renamed_2} = Variable [renamed_0]]\n"
+        "|   IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index2, interval: "
+        "{=Const [2 | 4]}]\n"
+        "IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Const [1 | 3]}]\n",
+        optimized);
 }
 
 TEST(PhysRewriter, CompoundIndex2) {
@@ -2565,7 +2574,8 @@ TEST(PhysRewriter, CompoundIndex2) {
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+         OptPhase::MemoImplementationPhase,
+         OptPhase::ProjNormalize},
         prefixId,
         {{{"c1",
            createScanDef(
@@ -2587,16 +2597,24 @@ TEST(PhysRewriter, CompoundIndex2) {
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN(45, 65, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
-    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.nodeType");
-    ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.leftChild.indexDefName");
-    ASSERT_BSON_PATH(
-        "\"IndexScan\"", explainRoot, "child.leftChild.rightChild.children.0.child.nodeType");
-    ASSERT_BSON_PATH(
-        "\"index2\"", explainRoot, "child.leftChild.rightChild.children.0.child.indexDefName");
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{renamed_4}]\n"
+        "NestedLoopJoin [joinType: Inner, {renamed_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: renamed_0, {'<root>': renamed_4}, c1]\n"
+        "MergeJoin []\n"
+        "|   |   |   Condition\n"
+        "|   |   |       renamed_0 = renamed_2\n"
+        "|   |   Collation\n"
+        "|   |       Ascending\n"
+        "|   Union [{renamed_2}]\n"
+        "|   Evaluation [{renamed_2} = Variable [renamed_0]]\n"
+        "|   IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index2, interval: "
+        "{=Const [2 | 4]}]\n"
+        "IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Const [1 | 3]}]\n",
+        optimized);
 }
 
 TEST(PhysRewriter, CompoundIndex3) {
@@ -2657,7 +2675,8 @@ TEST(PhysRewriter, CompoundIndex3) {
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+         OptPhase::MemoImplementationPhase,
+         OptPhase::ProjNormalize},
         prefixId,
         {{{"c1",
            createScanDef({},
@@ -2677,32 +2696,26 @@ TEST(PhysRewriter, CompoundIndex3) {
     ASSERT_BETWEEN(50, 70, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate we have a merge join because we have point predicates.
-    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"Collation\"", explainRoot, "child.nodeType");
-    ASSERT_BSON_PATH("\"pa\"", explainRoot, "child.collation.0.projectionName");
-    ASSERT_BSON_PATH("\"pb\"", explainRoot, "child.collation.1.projectionName");
-    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.child.nodeType");
-    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.child.rightChild.child.nodeType");
-    ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.child.leftChild.nodeType");
-
-    const BSONObj& explainIndex1 =
-        dotted_path_support::extractElementAtPath(
-            explainRoot, "child.child.leftChild.rightChild.children.0.child")
-            .Obj();
-    ASSERT_BSON_PATH("\"IndexScan\"", explainIndex1, "nodeType");
-    ASSERT_BSON_PATH("2", explainIndex1, "interval.lowBound.bound.0.value");
-    ASSERT_BSON_PATH("2", explainIndex1, "interval.highBound.bound.0.value");
-    ASSERT_BSON_PATH("4", explainIndex1, "interval.lowBound.bound.1.value");
-    ASSERT_BSON_PATH("4", explainIndex1, "interval.highBound.bound.1.value");
-
-    const BSONObj& explainIndex2 =
-        dotted_path_support::extractElementAtPath(explainRoot, "child.child.leftChild.leftChild")
-            .Obj();
-    ASSERT_BSON_PATH("\"IndexScan\"", explainIndex2, "nodeType");
-    ASSERT_BSON_PATH("1", explainIndex2, "interval.lowBound.bound.0.value");
-    ASSERT_BSON_PATH("1", explainIndex2, "interval.highBound.bound.0.value");
-    ASSERT_BSON_PATH("3", explainIndex2, "interval.lowBound.bound.1.value");
-    ASSERT_BSON_PATH("3", explainIndex2, "interval.highBound.bound.1.value");
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{renamed_4}]\n"
+        "Collation [{renamed_5: Ascending, renamed_6: Ascending}]\n"
+        "NestedLoopJoin [joinType: Inner, {renamed_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: renamed_0, {'<root>': renamed_4, 'a': renamed_5, 'b': "
+        "renamed_6}, c1]\n"
+        "MergeJoin []\n"
+        "|   |   |   Condition\n"
+        "|   |   |       renamed_0 = renamed_2\n"
+        "|   |   Collation\n"
+        "|   |       Ascending\n"
+        "|   Union [{renamed_2}]\n"
+        "|   Evaluation [{renamed_2} = Variable [renamed_0]]\n"
+        "|   IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index2, interval: "
+        "{=Const [2 | 4]}]\n"
+        "IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Const [1 | 3]}]\n",
+        optimized);
 }
 
 TEST(PhysRewriter, CompoundIndex4Negative) {
@@ -2747,7 +2760,8 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+         OptPhase::MemoImplementationPhase,
+         OptPhase::ProjNormalize},
         prefixId,
         {{{"c1",
            createScanDef(
@@ -2774,15 +2788,20 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     // matching keys will be sorted, and therefore they cannot be merge-joined.
     // Also demonstrate we pick index1 with the more selective predicate.
 
-    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
-    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
-    ASSERT_BSON_PATH("2", explainRoot, "child.rightChild.filter.path.value.value");
-    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
-
-    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
-    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.lowBound.bound.0.value");
-    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.highBound.bound.0.value");
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{renamed_1}]\n"
+        "NestedLoopJoin [joinType: Inner, {renamed_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [renamed_2]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [2]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: renamed_0, {'<root>': renamed_1, 'b': renamed_2}, c1]\n"
+        "IndexScan [{'<rid>': renamed_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{[Const [1 | maxKey], Const [1 | minKey]]}]\n",
+        optimized);
 }
 
 TEST(PhysRewriter, CompoundIndex5) {
@@ -3676,6 +3695,9 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
     // ComposeA PathArr PathObj is true when the input is an array or object.
     // But the other 'Get Traverse Compare' here can only be true when the input is an object.
     // So the 'ComposeA PathArr PathObj' is redundant and we could remove it.
+
+    // Note: currently we can pick non-deterministically to satisfy either a.b or a.c as a filter
+    // node over the scan.
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
 

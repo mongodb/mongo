@@ -47,23 +47,23 @@
 
 namespace mongo::optimizer {
 
-// Handler which should return a boolean indicating if we are allowed to inline an EvaluationNode.
-// If the handler returns "true" we can inline, otherwise we are not allowed to.
-using CanInlineEvalFn = std::function<bool(const EvaluationNode& node)>;
-
-// Handler which is called when we erase an unused projection name.
-using ErasedProjFn = std::function<void(const ProjectionName& erasedProjName)>;
-
-// Handler which is called when we inline a projection name (target) with another projection name
-// (source).
-using RenamedProjFn =
-    std::function<void(const ProjectionName& target, const ProjectionName& source)>;
-
 /**
- * This is an example rewriter that does constant evaluation in-place.
+ * This is a rewriter that does constant evaluation in-place.
  */
 class ConstEval {
 public:
+    // Handler which should return a boolean indicating if we are allowed to inline an
+    // EvaluationNode. If the handler returns "true" we can inline, otherwise we are not allowed to.
+    using CanInlineEvalFn = std::function<bool(const EvaluationNode& node)>;
+
+    // Handler which is called when we erase an unused projection name.
+    using ErasedProjFn = std::function<void(const ProjectionName& erasedProjName)>;
+
+    // Handler which is called when we inline a projection name (target) with another projection
+    // name (source).
+    using RenamedProjFn =
+        std::function<void(const ProjectionName& target, const ProjectionName& source)>;
+
     ConstEval(VariableEnvironment& env,
               const CanInlineEvalFn& canInlineEval = {},
               const ErasedProjFn& erasedProj = {},

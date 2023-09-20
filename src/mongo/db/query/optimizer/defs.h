@@ -133,7 +133,7 @@ QUERY_UTIL_NAMED_ENUM_DEFINE(DistributionType, DISTRIBUTIONTYPE_NAMES);
 struct FieldProjectionMap {
     boost::optional<ProjectionName> _ridProjection;
     boost::optional<ProjectionName> _rootProjection;
-    opt::unordered_map<FieldNameType, ProjectionName, FieldNameType::Hasher> _fieldProjections;
+    std::map<FieldNameType, ProjectionName> _fieldProjections;
 
     bool operator==(const FieldProjectionMap& other) const;
 };

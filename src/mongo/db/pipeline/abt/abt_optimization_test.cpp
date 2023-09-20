@@ -120,7 +120,7 @@ TEST_F(ABTOptimizationTest, OptimizePipelineTests) {
     testABTTranslationAndOptimization("optimized $unwind then $sort",
                                       "[{$unwind: '$x'}, {$sort: {'x': 1}}]",
                                       "collection",
-                                      OptPhaseManager::getAllRewritesSet());
+                                      OptPhaseManager::getAllProdRewrites());
 
     testABTTranslationAndOptimization(
         "optimized $match with index",
@@ -269,7 +269,7 @@ TEST_F(ABTOptimizationTest, OptimizePipelineTests) {
         "expression, but is coming from the physical scan",
         "[{$group: {_id: null, a: {$first: '$b'}}}]",
         "collection",
-        OptPhaseManager::getAllRewritesSet());
+        OptPhaseManager::getAllProdRewrites());
 
     std::string scanDefA = "collA";
     std::string scanDefB = "collB";
@@ -344,14 +344,14 @@ TEST_F(ABTOptimizationTest, PartialIndex) {
         "optimized partial index: the expression matches the pipeline",
         "[{$match: {'a': 3, 'b': 2}}]",
         scanDefName,
-        OptPhaseManager::getAllRewritesSet(),
+        OptPhaseManager::getAllProdRewrites(),
         metadata);
 
     testABTTranslationAndOptimization(
         "optimized partial index negative: the expression does not match the pipeline",
         "[{$match: {'a': 3, 'b': 3}}]",
         scanDefName,
-        OptPhaseManager::getAllRewritesSet(),
+        OptPhaseManager::getAllProdRewrites(),
         metadata);
 }
 }  // namespace mongo::optimizer

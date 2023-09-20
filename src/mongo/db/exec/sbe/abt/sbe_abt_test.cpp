@@ -489,7 +489,7 @@ TEST_F(NodeSBE, Lower1) {
                                                           true /*hasRID*/),
                                       prefixId);
 
-    auto phaseManager = makePhaseManager(OptPhaseManager::getAllRewritesSet(),
+    auto phaseManager = makePhaseManager(OptPhaseManager::getAllProdRewrites(),
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
@@ -655,7 +655,7 @@ TEST_F(NodeSBE, RequireRID) {
                                                    true /*hasRID*/),
                                prefixId);
 
-    auto phaseManager = makePhaseManagerRequireRID(OptPhaseManager::getAllRewritesSet(),
+    auto phaseManager = makePhaseManagerRequireRID(OptPhaseManager::getAllProdRewrites(),
                                                    prefixId,
                                                    {{{"test", createScanDef({}, {})}}},
                                                    DebugInfo::kDefaultForTests);
