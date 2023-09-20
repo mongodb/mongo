@@ -1,8 +1,8 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
-GRS_CONFIG_USER1_USERNAME=${garasign_jsign_username}
-GRS_CONFIG_USER1_PASSWORD=${garasign_jsign_password}
+export GRS_CONFIG_USER1_USERNAME=${garasign_jsign_username}
+export GRS_CONFIG_USER1_PASSWORD=${garasign_jsign_password}
 
 set -o errexit
 set -o verbose

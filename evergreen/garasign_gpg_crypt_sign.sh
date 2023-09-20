@@ -1,8 +1,8 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
-GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}
-GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}
+export GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}
+export GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}
 
 cd src
 
