@@ -181,3 +181,13 @@ server_parameters:
         validator:
           gte: 0
         default: 500
+    
+    persistedChunkCacheUpdateMaxBatchSize:
+        description: >-
+          Maximum batch size used for updating shard persisted chunk cache.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: persistedChunkCacheUpdateMaxBatchSize
+        validator:
+          gte: 1
+        default: 1000

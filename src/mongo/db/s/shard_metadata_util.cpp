@@ -33,10 +33,13 @@
 
 #include "mongo/db/s/shard_metadata_util.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/s/type_shard_database.h"
 #include "mongo/db/write_concern_options.h"
@@ -351,35 +354,51 @@ Status updateShardChunks(OperationContext* opCtx,
          * {_id: 19, max: 22, version 2.0}
          *
          */
-        for (auto& chunk : chunks) {
-            invariant(chunk.getVersion().epoch() == currEpoch);
+        auto chunkIt = chunks.cbegin();
+        while (chunkIt != chunks.cend()) {
+            const auto currBatchSize =
+                std::min(static_cast<ptrdiff_t>(persistedChunkCacheUpdateMaxBatchSize.load()),
+                         std::distance(chunkIt, chunks.end()));
 
-            // Delete any overlapping chunk ranges. Overlapping chunks will have a min value
-            // ("_id") between (chunk.min, chunk.max].
-            //
-            // query: { "_id" : {"$gte": chunk.min, "$lt": chunk.max}}
-            auto deleteCommandResponse = client.runCommand([&] {
-                write_ops::DeleteCommandRequest deleteOp(chunkMetadataNss);
-                deleteOp.setDeletes({[&] {
-                    write_ops::DeleteOpEntry entry;
-                    entry.setQ(BSON(ChunkType::minShardID
-                                    << BSON("$gte" << chunk.getMin() << "$lt" << chunk.getMax())));
-                    entry.setMulti(true);
-                    return entry;
-                }()});
-                return deleteOp.serialize({});
-            }());
-            uassertStatusOK(
-                getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
+            {
+                // Delete any overlapping chunk ranges. Overlapping chunks will have a min value
+                // ("_id") between (chunk.min, chunk.max].
+                //
+                // query: { "_id" : {"$gte": chunk.min, "$lt": chunk.max}}
+                std::vector<write_ops::DeleteOpEntry> deletes;
+                deletes.reserve(currBatchSize);
+                for (auto it = chunkIt; it < chunkIt + currBatchSize; it++) {
+                    const auto& chunk = *it;
+                    invariant(chunk.getVersion().epoch() == currEpoch);
+                    auto query = BSON(ChunkType::minShardID
+                                      << BSON("$gte" << chunk.getMin() << "$lt" << chunk.getMax()));
+                    deletes.emplace_back(std::move(query), true /* multi */);
+                }
+                write_ops::DeleteCommandRequest deleteReq{chunkMetadataNss, std::move(deletes)};
+                deleteReq.getWriteCommandRequestBase().setOrdered(true);
+                deleteReq.getWriteCommandRequestBase().setBypassDocumentValidation(true);
+                auto deleteResp = write_ops_exec::performDeletes(opCtx, deleteReq);
+                // Since the writes are ordered, it's ok to check just the last writeOp result.
+                uassertStatusOK(deleteResp.results.back());
+            }
 
-            // Now the document can be expected to cleanly insert without overlap
-            auto insertCommandResponse = client.runCommand([&] {
-                write_ops::InsertCommandRequest insertOp(chunkMetadataNss);
-                insertOp.setDocuments({chunk.toShardBSON()});
-                return insertOp.serialize({});
-            }());
-            uassertStatusOK(
-                getStatusFromWriteCommandResponse(insertCommandResponse->getCommandReply()));
+            // Now the documents can be expected to cleanly insert without overlap
+            {
+                std::vector<BSONObj> docs;
+                docs.reserve(currBatchSize);
+                for (auto it = chunkIt; it < chunkIt + currBatchSize; it++) {
+                    const auto& chunk = *it;
+                    docs.emplace_back(chunk.toShardBSON());
+                }
+                write_ops::InsertCommandRequest insertReq{chunkMetadataNss, std::move(docs)};
+                insertReq.getWriteCommandRequestBase().setOrdered(true);
+                insertReq.getWriteCommandRequestBase().setBypassDocumentValidation(true);
+                auto insertResp = write_ops_exec::performInserts(opCtx, insertReq);
+                // Since the writes are ordered, it's ok to check just the last writeOp result.
+                uassertStatusOK(insertResp.results.back());
+            }
+
+            std::advance(chunkIt, currBatchSize);
         }
 
         return Status::OK();
