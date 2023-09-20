@@ -107,3 +107,7 @@ structs:
                 type: ReshardingRecipientMetrics
                 description: "Metrics related to this recipient."
                 optional: true
+            indexBuildUUID:
+                type: uuid
+                description: "Index build ID, only gets filled after building-index phase starts."
+                optional: true
