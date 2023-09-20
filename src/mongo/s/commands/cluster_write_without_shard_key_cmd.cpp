@@ -48,6 +48,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/bulk_write_common.h"
+#include "mongo/db/commands/bulk_write_crud_op.h"
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/explain_gen.h"
@@ -140,12 +143,47 @@ bool requiresOriginalQuery(OperationContext* opCtx,
     return false;
 }
 
-BSONObj _createCmdObj(OperationContext* opCtx,
-                      const ShardId& shardId,
-                      const NamespaceString& nss,
-                      const StringData& commandName,
-                      const BSONObj& writeCmd,
-                      const BSONObj& targetDocId) {
+/*
+ * Helper function to construct a write request against the targetDocId for the write phase.
+ *
+ * Returns the database name to run the write request against and the BSON representation of the
+ * write request.
+ */
+std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
+                                                        const ShardId& shardId,
+                                                        const DatabaseName& dbName,
+                                                        const BSONObj& writeCmd,
+                                                        const BSONObj& targetDocId) {
+    const auto commandName = writeCmd.firstElementFieldNameStringData();
+
+    // Parse into OpMsgRequest to append the $db field, which is required for command
+    // parsing.
+    const auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, writeCmd);
+
+    DatabaseName requestDbName = dbName;
+    boost::optional<BulkWriteCommandRequest> bulkWriteRequest;
+    const NamespaceString nss = [&] {
+        if (commandName == BulkWriteCommandRequest::kCommandName) {
+            bulkWriteRequest = BulkWriteCommandRequest::parse(
+                IDLParserContext("_clusterWriteWithoutShardKeyForBulkWrite"), opMsgRequest.body);
+            tassert(7298305,
+                    "Only bulkWrite with a single op is allowed in _clusterWriteWithoutShardKey",
+                    bulkWriteRequest->getOps().size() == 1);
+            auto op = BulkWriteCRUDOp(bulkWriteRequest->getOps()[0]);
+            tassert(
+                7298306,
+                str::stream()
+                    << op.getType()
+                    << " is not a supported opType for bulkWrite in _clusterQueryWithoutShardKey",
+                op.getType() == BulkWriteCRUDOp::kUpdate ||
+                    op.getType() == BulkWriteCRUDOp::kDelete);
+            requestDbName = DatabaseName::kAdmin;
+            return bulkWriteRequest->getNsInfo()[op.getNsInfoIdx()].getNs();
+        } else {
+            return CommandHelpers::parseNsCollectionRequired(dbName, writeCmd);
+        }
+    }();
+
     const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
     uassert(ErrorCodes::NamespaceNotSharded,
             "_clusterWriteWithoutShardKey can only be run against sharded collections.",
@@ -157,12 +195,60 @@ BSONObj _createCmdObj(OperationContext* opCtx,
     // forward the full query to the chosen shard and it will be executed again on the target shard.
     BSONObjBuilder queryBuilder(nss.isTimeseriesBucketsCollection() ? BSONObj() : targetDocId);
 
-    // Parse into OpMsgRequest to append the $db field, which is required for command
-    // parsing.
-    const auto opMsgRequest = OpMsgRequest::fromDBAndBody(nss.dbName(), writeCmd);
-
     // Parse original write command and set _id as query filter for new command object.
-    if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
+    if (commandName == BulkWriteCommandRequest::kCommandName) {
+        invariant(bulkWriteRequest.has_value());
+        auto op = BulkWriteCRUDOp(bulkWriteRequest->getOps()[0]);
+
+        NamespaceInfoEntry newNsEntry = bulkWriteRequest->getNsInfo()[op.getNsInfoIdx()];
+        newNsEntry.setShardVersion(shardVersion);
+
+        if (op.getType() == BulkWriteCRUDOp::kUpdate) {
+            // The update case.
+            auto updateOp = op.getUpdate();
+
+            // TODO (SERVER-77871): Support shard key metrics sampling.
+
+            // If the original query contains either a positional operator ($) or targets a
+            // time-series collection, include the original query alongside the target doc.
+            BulkWriteUpdateOp newUpdateOp = *updateOp;
+            auto updateOpWithNamespace =
+                UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(updateOp));
+            updateOpWithNamespace.setNamespaceString(nss);
+            if (requiresOriginalQuery(opCtx, updateOpWithNamespace) ||
+                nss.isTimeseriesBucketsCollection()) {
+                queryBuilder.appendElementsUnique(updateOp->getFilter());
+            } else {
+                // Unset the collation because targeting by _id uses default collation.
+                newUpdateOp.setCollation(boost::none);
+            }
+
+            newUpdateOp.setFilter(queryBuilder.obj());
+            newUpdateOp.setUpdate(0);
+            bulkWriteRequest->setOps({newUpdateOp});
+        } else {
+            // The delete case.
+            auto deleteOp = op.getDelete();
+
+            // TODO (SERVER-77871): Support shard key metrics sampling.
+
+            // If the query targets a time-series collection, include the original query alongside
+            // the target doc.
+            BulkWriteDeleteOp newDeleteOp = *deleteOp;
+            if (nss.isTimeseriesBucketsCollection()) {
+                queryBuilder.appendElementsUnique(deleteOp->getFilter());
+            } else {
+                // Unset the collation because targeting by _id uses default collation.
+                newDeleteOp.setCollation(boost::none);
+            }
+
+            newDeleteOp.setFilter(queryBuilder.obj());
+            newDeleteOp.setDeleteCommand(0);
+            bulkWriteRequest->setOps({newDeleteOp});
+        }
+        bulkWriteRequest->setNsInfo({newNsEntry});
+        return std::make_pair(requestDbName, bulkWriteRequest->toBSON({}));
+    } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
 
@@ -193,7 +279,7 @@ BSONObj _createCmdObj(OperationContext* opCtx,
 
         auto batchedCommandRequest = BatchedCommandRequest(updateRequest);
         batchedCommandRequest.setShardVersion(shardVersion);
-        return batchedCommandRequest.toBSON();
+        return std::make_pair(requestDbName, batchedCommandRequest.toBSON());
     } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
         auto deleteRequest = write_ops::DeleteCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
@@ -222,7 +308,7 @@ BSONObj _createCmdObj(OperationContext* opCtx,
 
         auto batchedCommandRequest = BatchedCommandRequest(deleteRequest);
         batchedCommandRequest.setShardVersion(shardVersion);
-        return batchedCommandRequest.toBSON();
+        return std::make_pair(requestDbName, batchedCommandRequest.toBSON());
     } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
@@ -279,7 +365,8 @@ BSONObj _createCmdObj(OperationContext* opCtx,
         // transactions. This object will be used to construct the command request used by
         // _clusterWriteWithoutShardKey.
         findAndModifyRequest.setWriteConcern(boost::none);
-        return appendShardVersion(findAndModifyRequest.toBSON({}), shardVersion);
+        return std::make_pair(requestDbName,
+                              appendShardVersion(findAndModifyRequest.toBSON({}), shardVersion));
     } else {
         uasserted(ErrorCodes::InvalidOptions,
                   "_clusterWriteWithoutShardKey only supports update, delete, and "
@@ -307,18 +394,19 @@ public:
 
             const auto writeCmd = request().getWriteCmd();
             const auto shardId = ShardId(request().getShardId().toString());
+            const auto targetDocId = request().getTargetDocId();
             LOGV2(6962400,
                   "Running write phase for a write without a shard key.",
                   "clientWriteRequest"_attr = writeCmd,
                   "shardId"_attr = shardId);
 
-            const NamespaceString nss(
-                CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmd));
-            const auto targetDocId = request().getTargetDocId();
-            const auto commandName = writeCmd.firstElementFieldNameStringData();
+            const auto [requestDbName, cmdObj] =
+                makeTargetWriteRequest(opCtx, shardId, ns().dbName(), writeCmd, targetDocId);
 
-            const BSONObj cmdObj =
-                _createCmdObj(opCtx, shardId, nss, commandName, writeCmd, targetDocId);
+            LOGV2_DEBUG(7298307,
+                        2,
+                        "Constructed targeted write command for a write without shard key",
+                        "cmdObj"_attr = cmdObj);
 
             AsyncRequestsSender::Request arsRequest(shardId, cmdObj);
             std::vector<AsyncRequestsSender::Request> arsRequestVector({arsRequest});
@@ -326,7 +414,7 @@ public:
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                request().getDbName(),
+                requestDbName,
                 std::move(arsRequestVector),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry);
@@ -335,6 +423,24 @@ public:
             // We uassert on the extracted write status in order to preserve error labels for the
             // transaction api to use in case of a retry.
             uassertStatusOK(getStatusFromWriteCommandReply(response.data));
+            if (cmdObj.firstElementFieldNameStringData() == BulkWriteCommandRequest::kCommandName &&
+                response.data[BulkWriteCommandReply::kNumErrorsFieldName].Int() != 0) {
+                // It was a bulkWrite, extract the first and only reply item and uassert on error so
+                // that we can fail the internal transaction correctly.
+                auto bulkWriteResponse = BulkWriteCommandReply::parse(
+                    IDLParserContext("BulkWriteCommandReply_clusterWriteWithoutShardKey"),
+                    response.data);
+                const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
+                tassert(7298309,
+                        "unexpected bulkWrite reply for writes without shard key",
+                        replyItems.size() == 1);
+                uassertStatusOK(replyItems[0].getStatus());
+            }
+
+            LOGV2_DEBUG(7298308,
+                        2,
+                        "Finished targeted write command for a write without shard key",
+                        "response"_attr = response.data);
 
             return Response(response.data, shardId.toString());
         }
@@ -354,13 +460,8 @@ public:
                 return explainRequest.getCommandParameter().getOwned();
             }();
 
-            const NamespaceString nss =
-                CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmdObj);
-            const auto targetDocId = request().getTargetDocId();
-            const auto commandName = writeCmdObj.firstElementFieldNameStringData();
-
-            const BSONObj cmdObj =
-                _createCmdObj(opCtx, shardId, nss, commandName, writeCmdObj, targetDocId);
+            const auto [requestDbName, cmdObj] = makeTargetWriteRequest(
+                opCtx, shardId, ns().dbName(), writeCmdObj, request().getTargetDocId());
 
             const auto explainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
 
@@ -371,7 +472,7 @@ public:
             MultiStatementTransactionRequestsSender ars(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                request().getDbName(),
+                requestDbName,
                 std::move(arsRequestVector),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry);

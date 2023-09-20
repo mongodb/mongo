@@ -338,9 +338,18 @@ int getUpdateSizeEstimate(const BSONObj& q,
     return estSize;
 }
 
-// TODO SERVER-77871: Ensure sampleId size is accounted for in this method.
-// TODO SERVER-72983: If we need to add a allowShardKeyUpdatesWithoutFullShardKeyInQuery field,
-// ensure the size is accounted for in this method.
+/*
+ * Helper function to calculate the estimated size of an update operation in a bulkWrite command.
+ *
+ * Note: This helper function doesn't currently account for the size needed for the internal field
+ * '_allowShardKeyUpdatesWithoutFullShardKeyInQuery' for updateOne without shard key. This should be
+ * safe for now because each update operation without shard key is always executed in its own child
+ * batch. See `targetWriteOps` for more details.
+ * (This needs to change once we start batching multiple updateOne operations without shard key in
+ * the same batch.)
+ *
+ * TODO SERVER-77871: Ensure sampleId size is accounted for in this method.
+ */
 int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
                                    const write_ops::UpdateModification& updateMods,
                                    const boost::optional<mongo::BSONObj>& constants,

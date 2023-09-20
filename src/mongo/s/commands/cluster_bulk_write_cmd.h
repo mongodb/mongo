@@ -223,10 +223,11 @@ public:
             params.originatingPrivileges = bulk_write_common::getPrivileges(req);
 
             auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
-            auto& [replyItems, numErrors, wcErrors] = replyInfo;
+            auto& [replyItems, numErrors, wcErrors, retriedStmtIds] = replyInfo;
             BulkWriteCommandReply reply;
             reply.setNumErrors(numErrors);
             reply.setWriteConcernError(wcErrors);
+            reply.setRetriedStmtIds(retriedStmtIds);
 
             for (auto& replyItem : replyItems) {
                 queuedDataStage->queueResult(replyItem.toBSON());

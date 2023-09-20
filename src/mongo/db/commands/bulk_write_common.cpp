@@ -175,6 +175,22 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     return request;
 }
 
+write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* op) {
+    write_ops::UpdateOpEntry update;
+    update.setQ(op->getFilter());
+    update.setMulti(op->getMulti());
+    update.setC(op->getConstants());
+    update.setU(op->getUpdateMods());
+    update.setHint(op->getHint());
+    update.setCollation(op->getCollation());
+    update.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
+    update.setUpsert(op->getUpsert());
+    update.setUpsertSupplied(op->getUpsertSupplied());
+    update.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
+        op->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
+    return update;
+}
+
 write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
     const BulkWriteUpdateOp* op, const BulkWriteCommandRequest& req, size_t currentOpIdx) {
     auto idx = op->getUpdate();
@@ -182,19 +198,7 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
 
     auto stmtId = bulk_write_common::getStatementId(req, currentOpIdx);
 
-    write_ops::UpdateOpEntry update;
-    update.setQ(op->getFilter());
-    update.setMulti(op->getMulti());
-    update.setC(op->getConstants());
-    update.setU(op->getUpdateMods());
-    update.setHint(op->getHint());
-    if (op->getCollation()) {
-        update.setCollation(op->getCollation().value());
-    }
-    update.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
-    update.setUpsert(op->getUpsert());
-
-    std::vector<write_ops::UpdateOpEntry> updates{update};
+    std::vector<write_ops::UpdateOpEntry> updates{makeUpdateOpEntryFromUpdateOp(op)};
     write_ops::UpdateCommandRequest updateCommand(nsEntry.getNs(), updates);
 
     updateCommand.setDollarTenant(req.getDollarTenant());

@@ -63,6 +63,7 @@ struct BulkWriteReplyInfo {
     std::vector<BulkWriteReplyItem> replyItems;
     int numErrors = 0;
     boost::optional<BulkWriteWriteConcernError> wcErrors;
+    boost::optional<std::vector<StmtId>> retriedStmtIds;
 };
 
 /**
@@ -148,7 +149,8 @@ public:
      */
     BulkWriteCommandRequest buildBulkCommandRequest(
         const std::vector<std::unique_ptr<NSTargeter>>& targeters,
-        const TargetedWriteBatch& targetedBatch) const;
+        const TargetedWriteBatch& targetedBatch,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const;
 
     /**
      * Returns false if the bulk write op needs more processing.
@@ -178,6 +180,7 @@ public:
     void noteChildBatchResponse(
         const TargetedWriteBatch& targetedBatch,
         const std::vector<BulkWriteReplyItem>& replyItems,
+        const boost::optional<std::vector<StmtId>>& retriedStmtIds,
         boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace);
 
 
@@ -207,7 +210,9 @@ public:
      * This is currently used by retryable timeseries updates and writes without shard key because
      * those operations are processed individually with the use of internal transactions.
      */
-    void noteWriteOpFinalResponse(size_t opIdx, const BulkWriteReplyItem& reply);
+    void noteWriteOpFinalResponse(size_t opIdx,
+                                  const BulkWriteReplyItem& reply,
+                                  const boost::optional<std::vector<StmtId>>& retriedStmtIds);
 
     /**
      * Mark the corresponding targeter stale based on errorsPerNamespace.
@@ -256,6 +261,10 @@ private:
     WriteConcernOptions _writeConcern;
     // A list of write concern errors from all shards.
     std::vector<ShardWCError> _wcErrors;
+
+    // Statement ids for the ops that had already been executed, thus were not executed in this
+    // bulkWrite.
+    boost::optional<std::vector<StmtId>> _retriedStmtIds;
 
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};

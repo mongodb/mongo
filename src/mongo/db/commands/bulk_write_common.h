@@ -76,6 +76,11 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     const mongo::NamespaceInfoEntry& nsInfoEntry);
 
 /**
+ * Helper function to build an UpdateOpEntry based off the BulkWriteUpdateOp passed in.
+ */
+write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* op);
+
+/**
  * Helper function to build an UpdateCommandRequest based off the update operation in the bulkWrite
  * request at index currentOpIdx.
  */

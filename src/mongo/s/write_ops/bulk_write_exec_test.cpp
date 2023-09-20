@@ -1009,7 +1009,8 @@ TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
 
     auto& batch = targeted.begin()->second;
 
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
     ASSERT_EQUALS(childRequest.getOrdered(), request.getOrdered());
     ASSERT_EQUALS(childRequest.getBypassDocumentValidation(),
@@ -1064,7 +1065,8 @@ TEST_F(BulkWriteOpTest, TestOrderedOpsNoExistingStmtIds) {
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
 
     auto* batch = targeted.begin()->second.get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 0);
@@ -1075,7 +1077,8 @@ TEST_F(BulkWriteOpTest, TestOrderedOpsNoExistingStmtIds) {
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
 
     batch = targeted.begin()->second.get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 2);
@@ -1118,7 +1121,8 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsNoExistingStmtIds) {
 
     // The batch to shard A contains op 0 and op 2.
     auto* batch = targeted[ShardId("shardA")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 0);
@@ -1126,7 +1130,8 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsNoExistingStmtIds) {
 
     // The batch to shard B contains op 1 and op 3.
     batch = targeted[ShardId("shardB")].get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 1);
@@ -1170,7 +1175,8 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdsExist) {
 
     // The batch to shard A contains op 0 and op 2.
     auto* batch = targeted[ShardId("shardA")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 6);
@@ -1178,7 +1184,8 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdsExist) {
 
     // The batch to shard B contains op 1 and op 3.
     batch = targeted[ShardId("shardB")].get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 7);
@@ -1222,7 +1229,8 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdFieldExists) {
 
     // The batch to shard A contains op 0 and op 2.
     auto* batch = targeted[ShardId("shardA")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     auto childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 6);
@@ -1230,7 +1238,8 @@ TEST_F(BulkWriteOpTest, TestUnorderedOpsStmtIdFieldExists) {
 
     // The batch to shard B contains op 1 and op 3.
     batch = targeted[ShardId("shardB")].get();
-    childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
     childStmtIds = childRequest.getStmtIds();
     ASSERT_EQUALS(childStmtIds->size(), 2u);
     ASSERT_EQUALS(childStmtIds->at(0), 7);
@@ -1261,7 +1270,8 @@ TEST_F(BulkWriteOpTest, BuildTimeseriesChildRequest) {
     std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
     ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
     auto* batch = targeted[ShardId("shard")].get();
-    auto childRequest = bulkWriteOp.buildBulkCommandRequest(targeters, *batch);
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(
+        targeters, *batch, /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
     // Test that we translate to bucket namespace and set the isTimeseriesNamespace flag.
     auto& nsInfoEntry = childRequest.getNsInfo()[0];
@@ -1287,6 +1297,56 @@ TEST_F(BulkWriteOpTest, BatchItemRefGetLet) {
     const auto& letOption = bulkWriteOp.getWriteOp_forTest(0).getWriteItem().getLet();
     ASSERT(letOption.has_value());
     ASSERT_BSONOBJ_EQ(letOption.value(), expected);
+}
+
+TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpointA(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointB(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterSplitRange(nss, endpointA, endpointB));
+
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << -1)),  // shard A
+                                     BulkWriteInsertOp(0, BSON("x" << -2)),  // shard A
+                                     BulkWriteInsertOp(0, BSON("x" << 1))},  // shard B
+                                    {NamespaceInfoEntry(nss)});
+    request.setOrdered(true);
+    request.setStmtIds(std::vector<StmtId>{2, 3, 4});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 2u);
+
+    // Test BulkWriteOp::noteChildBatchResponse with retriedStmtIds.
+    bulkWriteOp.noteChildBatchResponse(*targeted[shardIdA],
+                                       {BulkWriteReplyItem(0), BulkWriteReplyItem(1)},
+                                       std::vector<StmtId>{2, 3},
+                                       boost::none);
+
+    targeted.clear();
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
+
+    // Test BulkWriteOp::noteWriteOpFinalResponse with retriedStmtIds.
+    bulkWriteOp.noteWriteOpFinalResponse(2, BulkWriteReplyItem(2), std::vector<StmtId>{4});
+
+    ASSERT(bulkWriteOp.isFinished());
+
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replyInfo.replyItems.size(), 3);
+    ASSERT_EQ(replyInfo.numErrors, 0);
+    ASSERT_EQ(replyInfo.wcErrors, boost::none);
+    ASSERT(replyInfo.retriedStmtIds.has_value());
+    std::vector<StmtId> expectedRetriedStmtIds = {2, 3, 4};
+    ASSERT_EQ(replyInfo.retriedStmtIds.value(), expectedRetriedStmtIds);
 }
 
 using BulkOp =
@@ -1612,7 +1672,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorNotInShutdown) {
     // The error for the first op should be the cancellation error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kCallbackCanceledResponse.swResponse.getStatus());
-    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kCallbackCanceledResponse.swResponse.getStatus());
     ASSERT_EQ(numErrors, 1);
@@ -1678,7 +1738,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorOrdered) {
     // The error for the first op should be the network error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kNetworkErrorResponse.swResponse.getStatus());
-    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(numErrors, 1);
@@ -1705,8 +1765,10 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorUnordered) {
     ASSERT(!bulkWriteOp.isFinished());
 
     // Simulate successful response to the second batch.
-    bulkWriteOp.noteChildBatchResponse(
-        *targeted[kShardId2], {BulkWriteReplyItem(0), BulkWriteReplyItem(1)}, boost::none);
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2],
+                                       {BulkWriteReplyItem(0), BulkWriteReplyItem(1)},
+                                       boost::none,
+                                       boost::none);
 
     // We should now be finished.
     ASSERT(bulkWriteOp.isFinished());
@@ -1716,7 +1778,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorUnordered) {
               kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
               kNetworkErrorResponse.swResponse.getStatus());
-    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 4);
     ASSERT_EQ(replies[0].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
     ASSERT_EQ(replies[1].getStatus(), kNetworkErrorResponse.swResponse.getStatus());
@@ -1787,7 +1849,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnOrdered)
     // The error for the first op should be the interruption error.
     ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
               kInterruptedErrorResponse.swResponse.getStatus());
-    auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
     ASSERT_EQ(numErrors, 1);
@@ -1844,6 +1906,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnUnordered) 
                                                BulkWriteReplyItem(0),
                                                BulkWriteReplyItem(1),
                                            },
+                                           boost::none,
                                            boost::none);
 
         // Simulate a network error (which is a transient transaction error.)
@@ -1905,7 +1968,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordere
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
 
-        auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
+        auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 2);
         ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
         ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
@@ -1924,6 +1987,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordere
                                                BulkWriteReplyItem(0),
                                                BulkWriteReplyItem(1),
                                            },
+                                           boost::none,
                                            boost::none);
 
         // Simulate an interruption error (which is not a TransientTransactionError.)
@@ -1944,7 +2008,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordere
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
 
-        auto [replies, numErrors, _] = bulkWriteOp.generateReplyInfo();
+        auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
         ASSERT_EQ(replies.size(), 4);
         ASSERT_EQ(replies[0].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
         ASSERT_EQ(replies[1].getStatus(), kInterruptedErrorResponse.swResponse.getStatus());
@@ -2028,7 +2092,7 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and
         // try to refresh the targeters upon targeting errors.
         request.setOrdered(false);
-        auto [replyItems, numErrors, _] =
+        auto [replyItems, numErrors, _, __] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 2u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
@@ -2052,7 +2116,7 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         // Test ordered operations. This is mostly the same as the test case above except that we
         // should only return the first error for ordered operations.
         request.setOrdered(true);
-        auto [replyItems, numErrors, _] =
+        auto [replyItems, numErrors, _, __] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 1u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
@@ -2095,7 +2159,7 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
 
     // After the targeting error from the first op, targeter refresh will throw a StaleEpoch
     // exception which should abort the entire bulkWrite.
-    auto [replyItems, numErrors, _] =
+    auto [replyItems, numErrors, _, __] =
         bulk_write_exec::execute(operationContext(), targeters, request);
     ASSERT_EQUALS(replyItems.size(), 2u);
     ASSERT_EQUALS(replyItems[0].getStatus().code(), ErrorCodes::StaleEpoch);
@@ -2118,7 +2182,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
 
     LOGV2(7695401, "Case 1) WCE with successful op.");
     auto future = launchAsync([&] {
-        auto [replyItems, numErrors, writeConcernError] =
+        auto [replyItems, numErrors, writeConcernError, _] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 1u);
         ASSERT_OK(replyItems[0].getStatus());
@@ -2136,7 +2200,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorSingleShardTest) {
     // occurs should be returned to the user.
     LOGV2(7695402, "Case 2) WCE with unsuccessful op (BadValue).");
     future = launchAsync([&] {
-        auto [replyItems, numErrors, writeConcernError] =
+        auto [replyItems, numErrors, writeConcernError, _] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         ASSERT_EQUALS(replyItems.size(), 1u);
         ASSERT_NOT_OK(replyItems[0].getStatus());
@@ -2179,7 +2243,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
 
     LOGV2(7695403, "Case 1) WCE in ordered case.");
     auto future = launchAsync([&] {
-        auto [replyItems, numErrors, writeConcernError] =
+        auto [replyItems, numErrors, writeConcernError, _] =
             bulk_write_exec::execute(operationContext(), targeters, request);
         // Both operations executed, therefore the size of reply items is 2.
         ASSERT_EQUALS(replyItems.size(), 2u);
@@ -2210,7 +2274,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     unorderedReq.setOrdered(false);
 
     future = launchAsync([&] {
-        auto [replyItems, numErrors, writeConcernError] =
+        auto [replyItems, numErrors, writeConcernError, _] =
             bulk_write_exec::execute(operationContext(), targeters, unorderedReq);
         ASSERT_EQUALS(replyItems.size(), 2u);
         ASSERT_OK(replyItems[0].getStatus());
@@ -2239,7 +2303,7 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     oneErrorReq.setOrdered(false);
 
     future = launchAsync([&] {
-        auto [replyItems, numErrors, writeConcernError] =
+        auto [replyItems, numErrors, writeConcernError, _] =
             bulk_write_exec::execute(operationContext(), targeters, oneErrorReq);
         ASSERT_EQUALS(replyItems.size(), 2u);
         // We don't really know which of the two mock responses below will be used for

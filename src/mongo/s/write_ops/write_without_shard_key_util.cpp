@@ -147,8 +147,18 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
     BSONObj reply;
     auto upsertedId = IDLAnyTypeOwned::parseFromBSON(targetDoc.getField(kIdFieldName));
 
-    if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
-        commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
+    if (commandName == BulkWriteCommandRequest::kCommandName) {
+        BulkWriteReplyItem replyItem(0);
+        replyItem.setOk(1);
+        replyItem.setN(writeRes.getN());
+        replyItem.setUpserted(upsertedId);
+        BulkWriteCommandReply bulkWriteReply(
+            BulkWriteCommandResponseCursor(
+                0, {replyItem}, NamespaceString::makeBulkWriteNSS(boost::none)),
+            0);
+        reply = bulkWriteReply.toBSON();
+    } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
+               commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
         write_ops::FindAndModifyLastError lastError;
         lastError.setNumDocs(writeRes.getN());
         lastError.setUpdatedExisting(false);

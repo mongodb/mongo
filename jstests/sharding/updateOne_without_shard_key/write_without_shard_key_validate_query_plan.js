@@ -99,7 +99,14 @@ let testCases = [
             update: collName,
             updates: [{q: {y: 1}, u: {$set: {a: 3}}}],
         },
-        profileDocToFind: {"op": "update", "ns": nss}
+        profileDocToFind: {
+            $or: [
+                {"op": "update"},
+                // Account for single_crud_op_as_bulk_write.js override.
+                {"op": "bulkWrite", "command.update": {$exists: true}},
+            ],
+            "ns": nss
+        }
     },
     {
         logMessage: "Running updateOne without positional update and non-default collation.",
@@ -109,7 +116,14 @@ let testCases = [
                 {q: {y: 1}, u: {$set: {a: 3}}, collation: {locale: "en", strength: 2}},
             ],
         },
-        profileDocToFind: {"op": "update", "ns": nss}
+        profileDocToFind: {
+            $or: [
+                {"op": "update"},
+                // Account for single_crud_op_as_bulk_write.js override.
+                {"op": "bulkWrite", "command.update": {$exists: true}},
+            ],
+            "ns": nss
+        }
     },
     {
         logMessage: "Running updateOne with positional update.",
@@ -118,7 +132,14 @@ let testCases = [
             updates: [{q: {y: 1, z: 1}, u: {$set: {"z.$": 3}}}],
         },
         hasPositionalUpdate: true,
-        profileDocToFind: {"op": "update", "ns": nss}
+        profileDocToFind: {
+            $or: [
+                {"op": "update"},
+                // Account for single_crud_op_as_bulk_write.js override.
+                {"op": "bulkWrite", "command.update": {$exists: true}},
+            ],
+            "ns": nss
+        }
     },
     {
         logMessage: "Running updateOne with positional update and non-default collation.",
@@ -128,7 +149,14 @@ let testCases = [
                 [{q: {y: 1, z: 1}, u: {$set: {"z.$": 3}}, collation: {locale: "en", strength: 2}}],
         },
         hasPositionalUpdate: true,
-        profileDocToFind: {"op": "update", "ns": nss}
+        profileDocToFind: {
+            $or: [
+                {"op": "update"},
+                // Account for single_crud_op_as_bulk_write.js override.
+                {"op": "bulkWrite", "command.update": {$exists: true}},
+            ],
+            "ns": nss
+        }
     },
     {
         logMessage: "Running findAndModify update without positional update.",
@@ -222,7 +250,14 @@ let testCases = [
             delete: collName,
             deletes: [{q: {y: 1}, limit: 1}],
         },
-        profileDocToFind: {"op": "remove", "ns": nss}
+        profileDocToFind: {
+            $or: [
+                {"op": "remove"},
+                // Account for single_crud_op_as_bulk_write.js override.
+                {"op": "bulkWrite", "command.delete": {$exists: true}},
+            ],
+            "ns": nss
+        }
     },
     {
         logMessage: "Running deleteOne and non-default collation.",
@@ -231,7 +266,14 @@ let testCases = [
             delete: collName,
             deletes: [{q: {y: 1}, limit: 1, collation: {locale: "en", strength: 2}}],
         },
-        profileDocToFind: {"op": "remove", "ns": nss}
+        profileDocToFind: {
+            $or: [
+                {"op": "remove"},
+                // Account for single_crud_op_as_bulk_write.js override.
+                {"op": "bulkWrite", "command.delete": {$exists: true}},
+            ],
+            "ns": nss
+        }
     }
 ];
 

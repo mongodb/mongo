@@ -52,6 +52,9 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/bulk_write_common.h"
+#include "mongo/db/commands/bulk_write_crud_op.h"
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/explain_gen.h"
@@ -119,6 +122,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeMetadataRefreshClusterQuery);
 constexpr auto kIdFieldName = "_id"_sd;
 
 struct ParsedCommandInfo {
+    NamespaceString nss;
     BSONObj query;
     BSONObj collation;
     boost::optional<BSONObj> sort;
@@ -251,10 +255,58 @@ BSONObj createAggregateCmdObj(
     return aggregate.toBSON({});
 }
 
-ParsedCommandInfo parseWriteCommand(OperationContext* opCtx, const BSONObj& writeCmdObj) {
-    auto commandName = writeCmdObj.firstElementFieldNameStringData();
+ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest& writeReq) {
+    const auto& writeCmdObj = writeReq.body;
+    auto commandName = writeReq.getCommandName();
+
     ParsedCommandInfo parsedInfo;
-    if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
+
+    // For bulkWrite request, we set the nss when we parse the bulkWrite command.
+    if (commandName != BulkWriteCommandRequest::kCommandName) {
+        parsedInfo.nss =
+            CommandHelpers::parseNsCollectionRequired(writeReq.getDbName(), writeCmdObj);
+    }
+
+    if (commandName == BulkWriteCommandRequest::kCommandName) {
+        auto bulkWriteRequest = BulkWriteCommandRequest::parse(
+            IDLParserContext("_clusterQueryWithoutShardKeyForBulkWrite"), writeCmdObj);
+        tassert(7298303,
+                "Only bulkWrite with a single op is allowed in _clusterQueryWithoutShardKey",
+                bulkWriteRequest.getOps().size() == 1);
+        auto op = BulkWriteCRUDOp(bulkWriteRequest.getOps()[0]);
+        tassert(7298304,
+                str::stream()
+                    << op.getType()
+                    << " is not a supported opType for bulkWrite in _clusterQueryWithoutShardKey",
+                op.getType() == BulkWriteCRUDOp::kUpdate ||
+                    op.getType() == BulkWriteCRUDOp::kDelete);
+        parsedInfo.nss = bulkWriteRequest.getNsInfo()[op.getNsInfoIdx()].getNs();
+        if (op.getType() == BulkWriteCRUDOp::kUpdate) {
+            // The update case.
+            auto updateOp = op.getUpdate();
+            parsedInfo.query = updateOp->getFilter();
+            parsedInfo.hint = updateOp->getHint();
+            if ((parsedInfo.upsert = updateOp->getUpsert())) {
+                parsedInfo.updateRequest =
+                    bulk_write_common::makeUpdateOpEntryFromUpdateOp(updateOp);
+                parsedInfo.updateRequest->setNamespaceString(parsedInfo.nss);
+            }
+            if (auto parsedCollation = updateOp->getCollation()) {
+                parsedInfo.collation = parsedCollation.value();
+            }
+        } else {
+            // The delete case.
+            auto deleteOp = op.getDelete();
+            parsedInfo.query = deleteOp->getFilter();
+            parsedInfo.hint = deleteOp->getHint();
+            if (auto parsedCollation = deleteOp->getCollation()) {
+                parsedInfo.collation = parsedCollation.value();
+            }
+        }
+        if (auto stmtIds = bulkWriteRequest.getStmtIds()) {
+            parsedInfo.stmtId = stmtIds->front();
+        }
+    } else if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
             IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"), writeCmdObj);
         parsedInfo.query = updateRequest.getUpdates().front().getQ();
@@ -340,17 +392,15 @@ public:
 
             const auto writeCmdObj = request().getWriteCmd();
 
-            // Get all shard ids for shards that have chunks in the desired namespace.
-            const NamespaceString nss =
-                CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmdObj);
-
-            hangBeforeMetadataRefreshClusterQuery.pauseWhileSet(opCtx);
-            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-
             // Parse into OpMsgRequest to append the $db field, which is required for command
             // parsing.
             const auto opMsgRequest = OpMsgRequest::fromDBAndBody(ns().dbName(), writeCmdObj);
-            auto parsedInfoFromRequest = parseWriteCommand(opCtx, opMsgRequest.body);
+            auto parsedInfoFromRequest = parseWriteRequest(opCtx, opMsgRequest);
+            const auto& nss = parsedInfoFromRequest.nss;
+
+            // Get all shard ids for shards that have chunks in the desired namespace.
+            hangBeforeMetadataRefreshClusterQuery.pauseWhileSet(opCtx);
+            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
             auto allShardsContainingChunksForNs =
                 getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
@@ -492,16 +542,15 @@ public:
                 return explainRequest.getCommandParameter().getOwned();
             }();
 
-            // Get all shard ids for shards that have chunks in the desired namespace.
-            const NamespaceString nss =
-                CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmdObj);
-            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
-
             // Parse into OpMsgRequest to append the $db field, which is required for command
             // parsing.
             const auto opMsgRequestWriteCmd =
                 OpMsgRequest::fromDBAndBody(ns().dbName(), writeCmdObj);
-            auto parsedInfoFromRequest = parseWriteCommand(opCtx, opMsgRequestWriteCmd.body);
+            auto parsedInfoFromRequest = parseWriteRequest(opCtx, opMsgRequestWriteCmd);
+
+            // Get all shard ids for shards that have chunks in the desired namespace.
+            const auto& nss = parsedInfoFromRequest.nss;
+            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
             auto allShardsContainingChunksForNs =
                 getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);

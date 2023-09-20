@@ -1025,23 +1025,13 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         // Handle non-retryable normal and timeseries updates, as well as retryable normal
         // updates that were not already executed.
-        auto updateRequest = UpdateRequest();
+        auto updateRequest = UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(op));
         updateRequest.setNamespaceString(nsString);
         updateRequest.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
-        updateRequest.setQuery(op->getFilter());
         updateRequest.setProj(BSONObj());
-        updateRequest.setUpdateModification(op->getUpdateMods());
         updateRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        updateRequest.setUpdateConstants(op->getConstants());
         updateRequest.setLetParameters(req.getLet());
-        updateRequest.setHint(op->getHint());
-        updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
-        updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
-        updateRequest.setUpsert(op->getUpsert());
-        updateRequest.setUpsertSuppliedDocument(op->getUpsertSupplied().value_or(false));
         updateRequest.setReturnDocs(UpdateRequest::RETURN_NONE);
-        updateRequest.setMulti(op->getMulti());
-
         updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
         // We only execute one update op at a time.

@@ -174,12 +174,12 @@ export const BulkWriteUtils = (function() {
                                 resp["upserted"] = [];
                             }
                             // Need to add the index of the upserted doc.
-                            current.upserted["index"] = cursorIdx;
-                            resp["upserted"].push(current.upserted);
+                            resp["upserted"].push({index: cursorIdx, ...current.upserted});
                         }
                     }
 
                     ["writeConcernError",
+                     "retriedStmtIds",
                      "opTime",
                      "$clusterTime",
                      "electionId",

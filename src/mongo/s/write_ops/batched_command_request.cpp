@@ -402,7 +402,7 @@ int BatchItemRef::getSizeForBulkWriteBytes() const {
 
     switch (_batchType) {
         case BatchedCommandRequest::BatchType_Insert: {
-            auto insertOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getInsert();
+            auto& insertOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getInsert();
             auto estSize = write_ops::getBulkWriteInsertSizeEstimate(insertOp.getDocument());
             // When running a debug build, verify that estSize is at least the BSON serialization
             // size.
@@ -411,7 +411,7 @@ int BatchItemRef::getSizeForBulkWriteBytes() const {
         }
 
         case BatchedCommandRequest::BatchType_Update: {
-            auto updateOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getUpdate();
+            auto& updateOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getUpdate();
             auto estSize =
                 write_ops::getBulkWriteUpdateSizeEstimate(updateOp.getFilter(),
                                                           updateOp.getUpdateMods(),
@@ -426,7 +426,7 @@ int BatchItemRef::getSizeForBulkWriteBytes() const {
             return estSize;
         }
         case BatchedCommandRequest::BatchType_Delete: {
-            auto deleteOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getDelete();
+            auto& deleteOp = *BulkWriteCRUDOp(_bulkWriteRequest->getOps()[_index]).getDelete();
             auto estSize = write_ops::getBulkWriteDeleteSizeEstimate(
                 deleteOp.getFilter(), deleteOp.getCollation(), deleteOp.getHint());
             // When running a debug build, verify that estSize is at least the BSON serialization
