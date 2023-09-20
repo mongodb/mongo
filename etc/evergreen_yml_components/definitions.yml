@@ -238,6 +238,7 @@ variables:
   - func: "kill processes"
   - func: "save code coverage data"
   - func: "save mongo coredumps"
+  - func: "generate hang analyzer tasks"
   - func: "save failed unittests"
   - func: "save UndoDB recordings"
   - func: "save unstripped dbtest"
@@ -2201,6 +2202,30 @@ functions:
   - *archive_mongo_coredumps
   - *upload_coredumps_json
 
+  "generate hang analyzer tasks":
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/resmokelib/hang_analyzer/gen_hang_analyzer_tasks.py"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/hang_analyzer_task.json
+      remote_file: ${project}/${build_variant}/${revision}/hang_analyzer_tasks/${task_name}-${build_id}.json
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/json
+      display_name: Generated Hang Analyzer Task Config - Execution ${execution}
+      optional: true
+  - command: generate.tasks
+    params:
+      optional: true
+      files:
+      - src/hang_analyzer_task.json
+
   ### Process & archive failed unittest artifacts ###
   "gather failed unittests": &gather_failed_unittests
     command: subprocess.exec
@@ -2647,6 +2672,7 @@ post:
 - func: "save jepsen artifacts"
 - func: "save blackduck artifacts"
 - func: "save mongo coredumps"
+- func: "generate hang analyzer tasks"
 - func: "save failed unittests"
 - func: "save hang analyzer debugger files"
 - func: "save disk statistics"

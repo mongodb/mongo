@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tarfile
 import time
-from typing import Callable
+from typing import Callable, Optional
 import urllib.request
 
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
@@ -52,7 +52,7 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str) -> b
     artifacts = task.artifacts
     core_dumps_found = False
     core_dumps_dir = os.path.join(download_dir, "core-dumps")
-    os.mkdir(core_dumps_dir)
+    os.makedirs(core_dumps_dir, exist_ok=True)
     try:
         for artifact in artifacts:
             if not artifact.name.startswith("Core Dump"):
@@ -223,7 +223,8 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
 
 
 def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str,
-                            retry_secs: int = 10, download_timeout_secs: int = 20 * 60) -> bool:
+                            execution: Optional[int] = None, retry_secs: int = 10,
+                            download_timeout_secs: int = 30 * 60) -> bool:
     if os.path.exists(download_dir):
         # quick sanity check to ensure we don't delete a repo
         if os.path.exists(os.path.join(download_dir, ".git")):
@@ -235,7 +236,10 @@ def download_task_artifacts(root_logger: Logger, task_id: str, download_dir: str
     os.mkdir(download_dir)
 
     evg_api = evergreen_conn.get_evergreen_api()
-    task_info = evg_api.task_by_id(task_id)
+    if execution is not None:
+        task_info = evg_api.task_by_id(task_id=task_id, execution=execution)
+    else:
+        task_info = evg_api.task_by_id(task_id)
     binary_download_options = _DownloadOptions(db=True, ds=False, da=False, dv=False)
     debugsymbols_download_options = _DownloadOptions(db=False, ds=True, da=False, dv=False)
 

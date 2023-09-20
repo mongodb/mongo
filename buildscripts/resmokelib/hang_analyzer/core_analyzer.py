@@ -12,6 +12,7 @@ class CoreAnalyzer(Subcommand):
     def __init__(self, options: argparse.Namespace, logger: logging.Logger = None):
         self.options = options
         self.task_id = options.task_id
+        self.execution = options.execution
         self.root_logger = self.setup_logging(logger)
 
     def execute(self):
@@ -28,7 +29,7 @@ class CoreAnalyzer(Subcommand):
                             "Files from task id provided were already on disk, skipping download.")
 
             if not skip_download and not download_task_artifacts(self.root_logger, self.task_id,
-                                                                 base_dir):
+                                                                 base_dir, self.execution):
                 self.root_logger.error("Artifacts were not found.")
                 raise RuntimeError(
                     "Artifacts were not found for specified task. Could not analyze cores.")
@@ -74,6 +75,11 @@ class CoreAnalyzerPlugin(PluginInterface):
 
         parser.add_argument("--task-id", '-t', action="store", type=str, default=None,
                             help="Fetch corresponding core dumps and binaries for a given task id.")
+
+        parser.add_argument(
+            "--execution", '-e', action="store", type=int, default=None,
+            help="The execution of the task you want to download core dumps for."
+            " This will default to the latest execution if left blank.")
 
         parser.add_argument("--install-dir", '-b', action="store", type=str, default=None,
                             help="Directory that contains binaires and debugsymbols.")
