@@ -410,7 +410,7 @@ void updateCollectionMetadataInTransaction(OperationContext* opCtx,
                         entries.push_back(chunk.toConfigBSON());
                         chunkStmts.push_back({counter++});
                     }
-                    insertOp.setDocuments(entries);
+                    insertOp.setDocuments(std::move(entries));
                     insertOp.setWriteCommandRequestBase([] {
                         write_ops::WriteCommandRequestBase wcb;
                         wcb.setOrdered(false);
