@@ -103,6 +103,11 @@ public:
         return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
     }
 
+    bool shouldDecompressBSONColumn() const {
+        return isFullValidation() || _mode == ValidateMode::kBackgroundCheckBSON ||
+            _mode == ValidateMode::kForegroundCheckBSON;
+    }
+
     BSONValidateMode getBSONValidateMode() const {
         return isFullValidation() || _mode == ValidateMode::kForegroundCheckBSON ||
                 _mode == ValidateMode::kBackgroundCheckBSON

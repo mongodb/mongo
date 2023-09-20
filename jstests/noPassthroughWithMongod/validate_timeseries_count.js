@@ -65,7 +65,7 @@ coll.insertMany([...Array(1002).keys()].map(i => ({
                 {ordered: false});
 bucket.updateOne({"meta.sensorId": 2, 'control.version': TimeseriesTest.BucketVersion.kCompressed},
                  {"$set": {"control.count": 10}});
-res = bucket.validate();
+res = bucket.validate({checkBSONConformance: true});
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.warnings.length, 1);

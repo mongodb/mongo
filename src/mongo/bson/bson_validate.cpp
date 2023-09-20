@@ -324,9 +324,12 @@ public:
                         // Calling size() decompresses the entire column.
                         try {
                             BSONColumn(BSONElement(ptr)).size();
-                        } catch (...) {
-                            uasserted(NonConformantBSON,
-                                      "Exception ocurred while decompressing a BSON column.");
+                        } catch (DBException& e) {
+                            uasserted(
+                                NonConformantBSON,
+                                str::stream()
+                                    << "Exception occurred while decompressing a BSON column: "
+                                    << e.toString());
                         }
                         break;
                     }

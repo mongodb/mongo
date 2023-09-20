@@ -272,7 +272,7 @@ coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 bucket.updateOne({"meta.sensorId": 2, "control.version": TimeseriesTest.BucketVersion.kCompressed},
                  {"$set": {"control.max.temp": 800}});
-res = bucket.validate();
+res = bucket.validate({checkBSONConformance: true});
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
 assert.eq(res.warnings.length, 1);
@@ -283,7 +283,7 @@ jsTestLog(
 setUpCollection(lotsOfData);
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
-res = bucket.validate();
+res = bucket.validate({checkBSONConformance: true});
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
@@ -294,7 +294,7 @@ jsTestLog(
 setUpCollection(skipFieldData);
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
-res = bucket.validate();
+res = bucket.validate({checkBSONConformance: true});
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 0);
 assert.eq(res.warnings.length, 0);
