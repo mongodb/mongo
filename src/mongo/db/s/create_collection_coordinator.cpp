@@ -292,7 +292,7 @@ void insertChunks(OperationContext* opCtx,
         for (const auto& chunk : chunks) {
             entries.push_back(chunk.toConfigBSON());
         }
-        insertOp.setDocuments(entries);
+        insertOp.setDocuments(std::move(entries));
         insertOp.setWriteCommandRequestBase([] {
             write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
