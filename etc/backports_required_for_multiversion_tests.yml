@@ -959,9 +959,9 @@ last-lts:
   - test_file: jstests/noPassthrough/read_preference_metrics.js
     ticket: SERVER-66018
   - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js
-    ticket: SERVER-78530
+    ticket: SERVER-80947
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
-    ticket: SERVER-78530
+    ticket: SERVER-80947
   - test_file: jstests/core/timeseries/nondefault_collation.js
     ticket: SERVER-81013
   - test_file: jstests/core/timeseries/timeseries_delete_collation.js
