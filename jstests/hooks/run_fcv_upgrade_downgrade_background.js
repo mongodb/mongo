@@ -51,6 +51,12 @@ const sendFCVUpDown = function(ver) {
                 builds are concurrently running');
             return;
         }
+        if (e.code === ErrorCodes.MovePrimaryInProgress) {
+            jsTestLog(
+                'setFCV: Cannot downgrade the FCV that requires a collMod command when a move \
+                Primary operation is running concurrently');
+            return;
+        }
         throw e;
     }
 };
