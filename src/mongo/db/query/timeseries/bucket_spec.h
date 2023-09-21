@@ -46,7 +46,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 
-namespace mongo {
+namespace mongo::timeseries {
 /**
  * Carries parameters for unpacking a bucket. The order of operations applied to determine which
  * fields are in the final document are:
@@ -309,4 +309,4 @@ inline bool determineIncludeField(StringData fieldName,
         unpackFieldsToIncludeExclude.cend();
     return isInclude == unpackFieldsContains;
 }
-}  // namespace mongo
+}  // namespace mongo::timeseries

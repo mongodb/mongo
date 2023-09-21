@@ -75,7 +75,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace mongo {
+namespace mongo::timeseries {
 
 using IneligiblePredicatePolicy = BucketSpec::IneligiblePredicatePolicy;
 
@@ -90,8 +90,7 @@ bool BucketSpec::fieldIsComputed(StringData field) const {
 namespace {
 std::unique_ptr<MatchExpression> createTightExprComparisonPredicate(
     const ExprMatchExpression* matchExpr,
-    const timeseries::BucketLevelComparisonPredicateGeneratorBase::Params params) {
-    using namespace timeseries;
+    const BucketLevelComparisonPredicateGeneratorBase::Params params) {
     auto rewriteMatchExpr =
         RewriteExpr::rewrite(matchExpr->getExpression(), params.pExpCtx->getCollator())
             .releaseMatchExpression();
@@ -140,7 +139,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
 
     tassert(5916304, "BucketSpec::createPredicatesOnBucketLevelField nullptr", matchExpr);
 
-    auto bucketPredicateParams = timeseries::BucketLevelComparisonPredicateGeneratorBase::Params{
+    auto bucketPredicateParams = BucketLevelComparisonPredicateGeneratorBase::Params{
         bucketSpec, bucketMaxSpanSeconds, pExpCtx, assumeNoMixedSchemaData, policy, fixedBuckets};
     // If we have a leaf predicate on a meta field, we can map it to the bucket's meta field.
     // This includes comparisons such as $eq and $lte, as well as other non-comparison predicates
@@ -164,8 +163,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
 
         if (auto looseResult = expression::copyExpressionAndApplyRenames(
-                matchExpr,
-                {{bucketSpec.metaField().value(), timeseries::kBucketMetaFieldName.toString()}});
+                matchExpr, {{bucketSpec.metaField().value(), kBucketMetaFieldName.toString()}});
             looseResult) {
             auto tightResult = looseResult->clone();
             return {std::move(looseResult), std::move(tightResult)};
@@ -288,12 +286,12 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
                 rewriteProvidesExactMatchPredicate};
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr) ||
                ComparisonMatchExpressionBase::isInternalExprComparison(matchExpr->matchType())) {
-        auto result = timeseries::BucketLevelComparisonPredicateGenerator::createPredicate(
+        auto result = BucketLevelComparisonPredicateGenerator::createPredicate(
             checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
             bucketPredicateParams,
             false /* tight */);
 
-        auto tightResult = timeseries::BucketLevelComparisonPredicateGenerator::createPredicate(
+        auto tightResult = BucketLevelComparisonPredicateGenerator::createPredicate(
             checked_cast<const ComparisonMatchExpressionBase*>(matchExpr),
             bucketPredicateParams,
             true /* tight */);
@@ -320,10 +318,10 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         if (assumeNoMixedSchemaData) {
             // We know that every field that appears in an event will also appear in the min/max.
             auto result = std::make_unique<AndMatchExpression>();
-            result->add(std::make_unique<ExistsMatchExpression>(StringData(
-                std::string{timeseries::kControlMinFieldNamePrefix} + matchExpr->path())));
-            result->add(std::make_unique<ExistsMatchExpression>(StringData(
-                std::string{timeseries::kControlMaxFieldNamePrefix} + matchExpr->path())));
+            result->add(std::make_unique<ExistsMatchExpression>(
+                StringData(std::string{kControlMinFieldNamePrefix} + matchExpr->path())));
+            result->add(std::make_unique<ExistsMatchExpression>(
+                StringData(std::string{kControlMaxFieldNamePrefix} + matchExpr->path())));
             return {std::move(result), nullptr};
         } else {
             // At time of writing, we only pass 'kError' when creating a partial index, and
@@ -355,7 +353,7 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             // If inExpr is {$in: [X, Y]} then the elems are '0: X' and '1: Y'.
             auto eq = std::make_unique<EqualityMatchExpression>(
                 inExpr->path(), elem, nullptr /*annotation*/, inExpr->getCollator());
-            auto child = timeseries::BucketLevelComparisonPredicateGenerator::createPredicate(
+            auto child = BucketLevelComparisonPredicateGenerator::createPredicate(
                 eq.get(), bucketPredicateParams, false /* tight */);
             rewriteProvidesExactMatchPredicate =
                 rewriteProvidesExactMatchPredicate && child.rewriteProvidesExactMatchPredicate;
@@ -419,7 +417,7 @@ BucketSpec::splitOutMetaOnlyPredicate(std::unique_ptr<MatchExpression> expr,
     return expression::splitMatchExpressionBy(
         std::move(expr),
         {metaField->toString()},
-        {{metaField->toString(), timeseries::kBucketMetaFieldName.toString()}},
+        {{metaField->toString(), kBucketMetaFieldName.toString()}},
         expression::isOnlyDependentOn);
 }
 
@@ -567,4 +565,4 @@ const boost::optional<std::string>& BucketSpec::metaField() const {
 boost::optional<HashedFieldName> BucketSpec::metaFieldHashed() const {
     return _metaFieldHashed;
 }
-}  // namespace mongo
+}  // namespace mongo::timeseries

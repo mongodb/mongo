@@ -82,13 +82,13 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       BucketUnpacker bucketUnpacker,
+                                       timeseries::BucketUnpacker bucketUnpacker,
                                        int bucketMaxSpanSeconds,
                                        bool assumeNoMixedSchemaData = false,
                                        bool fixedBuckets = false);
 
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       BucketUnpacker bucketUnpacker,
+                                       timeseries::BucketUnpacker bucketUnpacker,
                                        int bucketMaxSpanSeconds,
                                        const boost::optional<BSONObj>& eventFilterBson,
                                        const boost::optional<BSONObj>& wholeBucketFilterBson,
@@ -161,7 +161,7 @@ public:
         return boost::none;
     };
 
-    const BucketUnpacker& bucketUnpacker() const {
+    const timeseries::BucketUnpacker& bucketUnpacker() const {
         return _bucketUnpacker;
     }
 
@@ -194,7 +194,7 @@ public:
     /**
      * Convenience wrapper around BucketSpec::createPredicatesOnBucketLevelField().
      */
-    BucketSpec::BucketPredicate createPredicatesOnBucketLevelField(
+    timeseries::BucketSpec::BucketPredicate createPredicatesOnBucketLevelField(
         const MatchExpression* matchExpr) const;
 
     /**
@@ -319,7 +319,7 @@ private:
     // the _id index, as _id is truncates to 32 bits
     bool _usesExtendedRange = false;
 
-    BucketUnpacker _bucketUnpacker;
+    timeseries::BucketUnpacker _bucketUnpacker;
     int _bucketMaxSpanSeconds;
 
     int _bucketMaxCount = 0;

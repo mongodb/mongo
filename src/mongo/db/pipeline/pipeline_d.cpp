@@ -783,7 +783,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     Pipeline* pipeline,
     long long sampleSize,
     long long numRecords,
-    boost::optional<BucketUnpacker> bucketUnpacker) {
+    boost::optional<timeseries::BucketUnpacker> bucketUnpacker) {
     OperationContext* opCtx = expCtx->opCtx;
 
     // Verify that we are already under a collection lock or in a lock-free read. We avoid taking
@@ -1038,7 +1038,7 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
     const long long sampleSize = sampleStage->getSampleSize();
     const long long numRecords = collection->getRecordStore()->numRecords(expCtx->opCtx);
 
-    boost::optional<BucketUnpacker> bucketUnpacker;
+    boost::optional<timeseries::BucketUnpacker> bucketUnpacker;
     if (unpackBucketStage) {
         bucketUnpacker = unpackBucketStage->bucketUnpacker().copy();
     }
@@ -1303,7 +1303,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
 }  // namespace
 
 boost::optional<std::pair<PipelineD::IndexSortOrderAgree, PipelineD::IndexOrderedByMinTime>>
-PipelineD::supportsSort(const BucketUnpacker& bucketUnpacker,
+PipelineD::supportsSort(const timeseries::BucketUnpacker& bucketUnpacker,
                         PlanStage* root,
                         const SortPattern& sort) {
     using SortPatternPart = SortPattern::SortPatternPart;
@@ -1460,7 +1460,7 @@ PipelineD::supportsSort(const BucketUnpacker& bucketUnpacker,
 }  // namespace mongo
 
 boost::optional<std::pair<PipelineD::IndexSortOrderAgree, PipelineD::IndexOrderedByMinTime>>
-PipelineD::checkTimeHelper(const BucketUnpacker& bucketUnpacker,
+PipelineD::checkTimeHelper(const timeseries::BucketUnpacker& bucketUnpacker,
                            BSONObj::iterator& keyPatternIter,
                            bool scanIsForward,
                            const FieldPath& timeSortFieldPath,
@@ -1486,9 +1486,10 @@ PipelineD::checkTimeHelper(const BucketUnpacker& bucketUnpacker,
     return boost::none;
 }
 
-bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(const BucketUnpacker& bucketUnpacker,
-                                                    StringData keyPatternFieldName,
-                                                    const FieldPath& sortFieldPath) {
+bool PipelineD::sortAndKeyPatternPartAgreeAndOnMeta(
+    const timeseries::BucketUnpacker& bucketUnpacker,
+    StringData keyPatternFieldName,
+    const FieldPath& sortFieldPath) {
     FieldPath keyPatternFieldPath = FieldPath(keyPatternFieldName);
 
     // If they don't have the same path length they cannot agree.

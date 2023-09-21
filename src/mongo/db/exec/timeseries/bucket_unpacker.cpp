@@ -55,7 +55,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
+namespace mongo::timeseries {
 
 class BucketUnpacker::UnpackingImpl {
 public:
@@ -202,7 +202,7 @@ void BucketUnpackerV1::extractSingleMeasurement(
     bool includeMetaField) {
     auto rowKey = std::to_string(j);
     auto targetIdx = StringData{rowKey};
-    auto&& dataRegion = bucket.getField(timeseries::kBucketDataFieldName).Obj();
+    auto&& dataRegion = bucket.getField(kBucketDataFieldName).Obj();
 
     if (includeMetaField && !metaValue.missing()) {
         measurement.addField(*spec.metaFieldHashed(), metaValue);
@@ -497,7 +497,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
     _bucketMatchedQuery = bucketMatchedQuery;
     uassert(5346510, "An empty bucket cannot be unpacked", !_bucket.isEmpty());
 
-    auto&& dataRegion = _bucket.getField(timeseries::kBucketDataFieldName).Obj();
+    auto&& dataRegion = _bucket.getField(kBucketDataFieldName).Obj();
     if (dataRegion.isEmpty()) {
         // If the data field of a bucket is present but it holds an empty object, there's nothing to
         // unpack.
@@ -509,7 +509,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
             "The $_internalUnpackBucket stage requires the data region to have a timeField object",
             timeFieldElem);
 
-    _metaBSONElem = _bucket[timeseries::kBucketMetaFieldName];
+    _metaBSONElem = _bucket[kBucketMetaFieldName];
     _metaValue = Value{_metaBSONElem};
     if (_spec.metaField()) {
         // The spec indicates that there might be a metadata region. Missing metadata in
@@ -528,45 +528,45 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
                 _metaValue.missing());
     }
 
-    auto&& controlField = _bucket[timeseries::kBucketControlFieldName];
+    auto&& controlField = _bucket[kBucketControlFieldName];
     uassert(5857902,
             "The $_internalUnpackBucket stage requires 'control' object to be present",
             controlField && controlField.type() == BSONType::Object);
 
-    auto&& controlClosed = controlField.Obj()[timeseries::kBucketControlClosedFieldName];
+    auto&& controlClosed = controlField.Obj()[kBucketControlClosedFieldName];
     _closedBucket = controlClosed.booleanSafe();
 
     if (_includeMinTimeAsMetadata) {
-        auto&& controlMin = controlField.Obj()[timeseries::kBucketControlMinFieldName];
+        auto&& controlMin = controlField.Obj()[kBucketControlMinFieldName];
         uassert(6460203,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
-                              << timeseries::kControlMinFieldNamePrefix << "' object to be present",
+                              << kControlMinFieldNamePrefix << "' object to be present",
                 controlMin && controlMin.type() == BSONType::Object);
         auto&& minTime = controlMin.Obj()[_spec.timeField()];
         uassert(6460204,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
-                              << timeseries::kControlMinFieldNamePrefix << "." << _spec.timeField()
+                              << kControlMinFieldNamePrefix << "." << _spec.timeField()
                               << "' to be a date",
                 minTime && minTime.type() == BSONType::Date);
         _minTime = minTime.date();
     }
 
     if (_includeMaxTimeAsMetadata) {
-        auto&& controlMax = controlField.Obj()[timeseries::kBucketControlMaxFieldName];
+        auto&& controlMax = controlField.Obj()[kBucketControlMaxFieldName];
         uassert(6460205,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
-                              << timeseries::kControlMaxFieldNamePrefix << "' object to be present",
+                              << kControlMaxFieldNamePrefix << "' object to be present",
                 controlMax && controlMax.type() == BSONType::Object);
         auto&& maxTime = controlMax.Obj()[_spec.timeField()];
         uassert(6460206,
                 str::stream() << "The $_internalUnpackBucket stage requires '"
-                              << timeseries::kControlMaxFieldNamePrefix << "." << _spec.timeField()
+                              << kControlMaxFieldNamePrefix << "." << _spec.timeField()
                               << "' to be a date",
                 maxTime && maxTime.type() == BSONType::Date);
         _maxTime = maxTime.date();
     }
 
-    auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
+    auto&& versionField = controlField.Obj()[kBucketControlVersionFieldName];
     uassert(5857903,
             "The $_internalUnpackBucket stage requires 'control.version' field to be present",
             versionField && isNumericBSONType(versionField.type()));
@@ -575,7 +575,7 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
     if (version == 1) {
         _unpackingImpl = std::make_unique<BucketUnpackerV1>(timeFieldElem);
     } else if (version == 2) {
-        auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
+        auto countField = controlField.Obj()[kBucketControlCountFieldName];
         _unpackingImpl =
             std::make_unique<BucketUnpackerV2>(timeFieldElem,
                                                countField && isNumericBSONType(countField.type())
@@ -691,9 +691,6 @@ const std::set<std::string>& BucketUnpacker::fieldsToIncludeExcludeDuringUnpack(
 }
 
 const std::set<StringData> BucketUnpacker::reservedBucketFieldNames = {
-    timeseries::kBucketIdFieldName,
-    timeseries::kBucketDataFieldName,
-    timeseries::kBucketMetaFieldName,
-    timeseries::kBucketControlFieldName};
+    kBucketIdFieldName, kBucketDataFieldName, kBucketMetaFieldName, kBucketControlFieldName};
 
-}  // namespace mongo
+}  // namespace mongo::timeseries

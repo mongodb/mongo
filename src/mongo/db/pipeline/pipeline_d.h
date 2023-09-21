@@ -244,7 +244,7 @@ private:
                                Pipeline* pipeline,
                                long long sampleSize,
                                long long numRecords,
-                               boost::optional<BucketUnpacker> bucketUnpacker);
+                               boost::optional<timeseries::BucketUnpacker> bucketUnpacker);
 
     typedef bool IndexSortOrderAgree;
     typedef bool IndexOrderedByMinTime;
@@ -257,7 +257,7 @@ private:
      * Note that the index scan order is different from the index order.
      */
     static boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> supportsSort(
-        const BucketUnpacker& bucketUnpacker, PlanStage* root, const SortPattern& sort);
+        const timeseries::BucketUnpacker& bucketUnpacker, PlanStage* root, const SortPattern& sort);
 
     /* This is a helper method for supportsSort. It takes the current iterator for the index
      * keyPattern, the direction of the index scan, the timeField path we're sorting on, and the
@@ -271,15 +271,16 @@ private:
      * timeSortFieldPath is in fact the path on time.
      */
     static boost::optional<std::pair<IndexSortOrderAgree, IndexOrderedByMinTime>> checkTimeHelper(
-        const BucketUnpacker& bucketUnpacker,
+        const timeseries::BucketUnpacker& bucketUnpacker,
         BSONObj::iterator& keyPatternIter,
         bool scanIsForward,
         const FieldPath& timeSortFieldPath,
         bool sortIsAscending);
 
-    static bool sortAndKeyPatternPartAgreeAndOnMeta(const BucketUnpacker& bucketUnpacker,
-                                                    StringData keyPatternFieldName,
-                                                    const FieldPath& sortFieldPath);
+    static bool sortAndKeyPatternPartAgreeAndOnMeta(
+        const timeseries::BucketUnpacker& bucketUnpacker,
+        StringData keyPatternFieldName,
+        const FieldPath& sortFieldPath);
 };
 
 }  // namespace mongo

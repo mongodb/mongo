@@ -51,7 +51,7 @@ public:
     UnpackTimeseriesBucket(ExpressionContext* expCtx,
                            WorkingSet* ws,
                            std::unique_ptr<PlanStage> child,
-                           BucketUnpacker bucketUnpacker);
+                           timeseries::BucketUnpacker bucketUnpacker);
 
     StageType stageType() const final {
         return STAGE_UNPACK_SAMPLED_TS_BUCKET;
@@ -71,7 +71,7 @@ public:
 
 private:
     WorkingSet& _ws;
-    BucketUnpacker _bucketUnpacker;
+    timeseries::BucketUnpacker _bucketUnpacker;
     UnpackTimeseriesBucketStats _specificStats;
 };
 }  //  namespace mongo

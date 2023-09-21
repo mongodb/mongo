@@ -2007,7 +2007,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             ws.get(),
             std::move(root),
             coll,
-            BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+            timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
             parsedDelete->releaseResidualExpr());
     } else if (batchDelete) {
         root = std::make_unique<BatchedDeleteStage>(expCtxRaw,
@@ -2197,7 +2197,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 ws.get(),
                 std::move(root),
                 coll,
-                BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+                timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
                 parsedUpdate->releaseResidualExpr(),
                 parsedUpdate->releaseOriginalExpr(),
                 *request);
@@ -2208,7 +2208,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 ws.get(),
                 std::move(root),
                 coll,
-                BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
+                timeseries::BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
                 parsedUpdate->releaseResidualExpr(),
                 parsedUpdate->releaseOriginalExpr());
         }

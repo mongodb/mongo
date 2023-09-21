@@ -147,7 +147,7 @@ public:
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child,
                           CollectionAcquisition coll,
-                          BucketUnpacker bucketUnpacker,
+                          timeseries::BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
                           std::unique_ptr<MatchExpression> originalPredicate = nullptr);
     ~TimeseriesModifyStage();
@@ -284,7 +284,7 @@ private:
     // Main execution machinery data structures.
     //
 
-    BucketUnpacker _bucketUnpacker;
+    timeseries::BucketUnpacker _bucketUnpacker;
 
     // Determines the measurements to modify in this bucket, and by inverse, those to keep
     // unmodified. This predicate can be null if we have a meta-only or empty predicate on singleton

@@ -295,8 +295,9 @@ void statsToBSON(const QuerySolutionNode* node,
             auto utsbn = static_cast<const UnpackTsBucketNode*>(node);
             {
                 const auto behaviorField =
-                    utsbn->bucketSpec.behavior() == BucketSpec::Behavior::kInclude ? "include"
-                                                                                   : "exclude";
+                    utsbn->bucketSpec.behavior() == timeseries::BucketSpec::Behavior::kInclude
+                    ? "include"
+                    : "exclude";
                 BSONArrayBuilder fieldsBab{bob->subarrayStart(behaviorField)};
                 for (const auto& field : utsbn->bucketSpec.fieldSet()) {
                     fieldsBab.append(field);

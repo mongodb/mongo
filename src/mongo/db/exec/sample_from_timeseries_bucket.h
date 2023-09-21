@@ -74,7 +74,7 @@ public:
     SampleFromTimeseriesBucket(ExpressionContext* expCtx,
                                WorkingSet* ws,
                                std::unique_ptr<PlanStage> child,
-                               BucketUnpacker bucketUnpacker,
+                               timeseries::BucketUnpacker bucketUnpacker,
                                boost::optional<std::unique_ptr<ShardFilterer>> shardFilterer,
                                int maxConsecutiveAttempts,
                                long long sampleSize,
@@ -130,7 +130,7 @@ private:
     void materializeMeasurement(int64_t measurementIdx, WorkingSetMember* out);
 
     WorkingSet& _ws;
-    BucketUnpacker _bucketUnpacker;
+    timeseries::BucketUnpacker _bucketUnpacker;
     boost::optional<std::unique_ptr<ShardFilterer>> _shardFilterer;
     SampleFromTimeseriesBucketStats _specificStats;
 

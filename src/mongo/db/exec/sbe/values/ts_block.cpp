@@ -80,7 +80,8 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
         if (auto ct = bucketControl.Obj()[timeseries::kBucketControlCountFieldName]) {
             return static_cast<int>(ct.numberLong());
         }
-        return BucketUnpacker::computeMeasurementCount(bucketObj, StringData(_timeField));
+        return timeseries::BucketUnpacker::computeMeasurementCount(bucketObj,
+                                                                   StringData(_timeField));
     }();
 
     BSONElement data = bucketObj[timeseries::kBucketDataFieldName];
@@ -143,14 +144,12 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
         }
     }
 
-    size_t idx = 0;
     for (auto& cellBlock : out) {
         if (!cellBlock) {
             auto emptyBlock = std::make_unique<value::ScalarMonoCellBlock>(
                 noOfMeasurements, value::TypeTags::Nothing, value::Value(0));
             cellBlock = std::move(emptyBlock);
         }
-        ++idx;
     }
 
     return out;

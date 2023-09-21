@@ -116,6 +116,9 @@ REGISTER_DOCUMENT_SOURCE(_unpackBucket,
                          AllowedWithApiStrict::kAlways);
 
 namespace {
+using timeseries::BucketSpec;
+using timeseries::BucketUnpacker;
+
 /**
  * A projection can be internalized if every field corresponds to a boolean value. Note that this
  * correctly rejects dotted fieldnames, which are mapped to objects internally.

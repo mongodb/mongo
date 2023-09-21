@@ -64,7 +64,7 @@ SampleFromTimeseriesBucket::SampleFromTimeseriesBucket(
     ExpressionContext* expCtx,
     WorkingSet* ws,
     std::unique_ptr<PlanStage> child,
-    BucketUnpacker bucketUnpacker,
+    timeseries::BucketUnpacker bucketUnpacker,
     boost::optional<std::unique_ptr<ShardFilterer>> shardFilterer,
     int maxConsecutiveAttempts,
     long long sampleSize,

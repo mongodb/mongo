@@ -60,6 +60,9 @@
 namespace mongo {
 namespace {
 
+using timeseries::BucketSpec;
+using timeseries::BucketUnpacker;
+
 constexpr auto kUserDefinedTimeName = "time"_sd;
 constexpr auto kUserDefinedMetaName = "myMeta"_sd;
 

@@ -53,7 +53,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
+namespace mongo::timeseries {
 namespace {
 // A table that is useful for interpolations between the number of measurements in a bucket and
 // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
@@ -111,17 +111,17 @@ public:
      * Returns the number of measurements in the bucket in O(1) time.
      */
     static int computeMeasurementCount(const BSONObj& bucket, StringData timeField) {
-        auto&& controlField = bucket[timeseries::kBucketControlFieldName];
+        auto&& controlField = bucket[kBucketControlFieldName];
         uassert(5857904,
                 "The $_internalUnpackBucket stage requires 'control' object to be present",
                 controlField && controlField.type() == BSONType::Object);
 
-        auto&& versionField = controlField.Obj()[timeseries::kBucketControlVersionFieldName];
+        auto&& versionField = controlField.Obj()[kBucketControlVersionFieldName];
         uassert(5857905,
                 "The $_internalUnpackBucket stage requires 'control.version' field to be present",
                 versionField && isNumericBSONType(versionField.type()));
 
-        auto&& dataField = bucket[timeseries::kBucketDataFieldName];
+        auto&& dataField = bucket[kBucketDataFieldName];
         if (!dataField || dataField.type() != BSONType::Object)
             return 0;
 
@@ -131,10 +131,10 @@ public:
         }
 
         auto version = versionField.Number();
-        if (version == timeseries::kTimeseriesControlUncompressedVersion) {
+        if (version == kTimeseriesControlUncompressedVersion) {
             return computeElementCountFromTimestampObjSize(time.objsize());
-        } else if (version == timeseries::kTimeseriesControlCompressedVersion) {
-            auto countField = controlField.Obj()[timeseries::kBucketControlCountFieldName];
+        } else if (version == kTimeseriesControlCompressedVersion) {
+            auto countField = controlField.Obj()[kBucketControlCountFieldName];
             if (countField && isNumericBSONType(countField.type())) {
                 return static_cast<int>(countField.Number());
             }
@@ -242,11 +242,11 @@ public:
     }
 
     std::string getMinField(StringData field) const {
-        return std::string{timeseries::kControlMinFieldNamePrefix} + field;
+        return std::string{kControlMinFieldNamePrefix} + field;
     }
 
     std::string getMaxField(StringData field) const {
-        return std::string{timeseries::kControlMaxFieldNamePrefix} + field;
+        return std::string{kControlMaxFieldNamePrefix} + field;
     }
 
     bool isClosedBucket() const {
@@ -333,4 +333,4 @@ private:
     // first doGetNext call so we don't have to recalculate every time we reach a new bucket.
     boost::optional<std::set<std::string>> _unpackFieldsToIncludeExclude = boost::none;
 };
-}  // namespace mongo
+}  // namespace mongo::timeseries

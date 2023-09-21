@@ -1800,7 +1800,7 @@ struct SearchNode : public QuerySolutionNode {
  */
 struct UnpackTsBucketNode : public QuerySolutionNode {
     UnpackTsBucketNode(std::unique_ptr<QuerySolutionNode> child,
-                       const BucketSpec& spec,
+                       const timeseries::BucketSpec& spec,
                        std::unique_ptr<MatchExpression> eventFilter,
                        std::unique_ptr<MatchExpression> wholeBucketFilter,
                        bool includeMeta)
@@ -1811,7 +1811,7 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
           includeMeta(includeMeta) {
         tassert(7969700,
                 "Only support unpacking with a statically known set of fields.",
-                bucketSpec.behavior() == BucketSpec::Behavior::kInclude);
+                bucketSpec.behavior() == timeseries::BucketSpec::Behavior::kInclude);
     }
 
     StageType getType() const override {
@@ -1854,7 +1854,7 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
                                                     includeMeta);
     }
 
-    BucketSpec bucketSpec;
+    timeseries::BucketSpec bucketSpec;
     std::unique_ptr<MatchExpression> eventFilter = nullptr;
     std::unique_ptr<MatchExpression> wholeBucketFilter = nullptr;
     bool includeMeta = false;

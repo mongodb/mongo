@@ -57,7 +57,7 @@ public:
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child,
                           CollectionAcquisition coll,
-                          BucketUnpacker bucketUnpacker,
+                          timeseries::BucketUnpacker bucketUnpacker,
                           std::unique_ptr<MatchExpression> residualPredicate,
                           std::unique_ptr<MatchExpression> originalPredicate,
                           const UpdateRequest& request);

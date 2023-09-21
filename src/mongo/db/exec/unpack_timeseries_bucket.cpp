@@ -53,7 +53,7 @@ const char* UnpackTimeseriesBucket::kStageType = "UNPACK_BUCKET";
 UnpackTimeseriesBucket::UnpackTimeseriesBucket(ExpressionContext* expCtx,
                                                WorkingSet* ws,
                                                std::unique_ptr<PlanStage> child,
-                                               BucketUnpacker bucketUnpacker)
+                                               timeseries::BucketUnpacker bucketUnpacker)
     : PlanStage{kStageType, expCtx}, _ws{*ws}, _bucketUnpacker{std::move(bucketUnpacker)} {
     _children.emplace_back(std::move(child));
 }
