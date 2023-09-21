@@ -47,6 +47,11 @@ class TimeoutEstimate(NamedTuple):
         """Create an instance with no estimation data."""
         return cls(max_test_runtime=None, expected_task_runtime=None)
 
+    @classmethod
+    def only_task_timeout(cls, expected_task_runtime) -> "TimeoutEstimate":
+        """Create an instance with only task timeout estimation."""
+        return cls(max_test_runtime=None, expected_task_runtime=expected_task_runtime)
+
     def is_specified(self) -> bool:
         """Determine if any specific timeout value has been specified."""
         return self.max_test_runtime is not None or self.expected_task_runtime is not None
