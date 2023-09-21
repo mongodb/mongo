@@ -616,7 +616,7 @@ resource contention in the storage engine. This exception is the base of excepti
 concurrency (`WriteConflict`) and to those related to cache pressure (`TemporarilyUnavailable` and
 `TransactionTooLargeForCache`).
 
-We recommend using the [writeConflictRetry](https://github.com/10gen/mongo/blob/9381db6748aada1d9a0056cea0e9899301e7f70b/src/mongo/db/concurrency/exception_util.h#L140)
+We recommend using the [writeConflictRetry](https://github.com/mongodb/mongo/blob/9381db6748aada1d9a0056cea0e9899301e7f70b/src/mongo/db/concurrency/exception_util.h#L140)
 helper which transparently handles all exceptions related to this error category.
 
 ### WriteConflictException
@@ -1556,7 +1556,7 @@ threads are restarted, and two-phase index builds are resumed.
 See [here](https://source.wiredtiger.com/develop/arch-rts.html) for WiredTiger's architecture guide
 on rollback-to-stable.
 
-See [here](https://github.com/10gen/mongo/blob/5bd1d0880a7519e54678684b3d243f590936c46a/src/mongo/db/repl/README.md#rollback-recover-to-a-timestamp-rtt)
+See [here](https://github.com/mongodb/mongo/blob/5bd1d0880a7519e54678684b3d243f590936c46a/src/mongo/db/repl/README.md#rollback-recover-to-a-timestamp-rtt)
 for more information on what happens in the replication layer during rollback-to-stable.
 
 # File-System Backups
@@ -1693,7 +1693,7 @@ The preferred method for setting an operation's priority is through the RAII typ
 ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
 ```
 
-Since the GlobalLock may be acquired and released multiple times throughout an operation's lifetime, it's important to limit the scope of reprioritization to prevent unintentional side-effects. However, if there is a special circumstance where the RAII cannot possibly be used, the priority can be set directly through [Locker::setAdmissionPriority()](https://github.com/10gen/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L525).
+Since the GlobalLock may be acquired and released multiple times throughout an operation's lifetime, it's important to limit the scope of reprioritization to prevent unintentional side-effects. However, if there is a special circumstance where the RAII cannot possibly be used, the priority can be set directly through [Locker::setAdmissionPriority()](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L525).
 
 ### Developer Guidelines for Declaring Low Admission Priority
 Developers must evaluate the consequences of each low priority operation from falling too far behind, and should try to implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
@@ -1708,10 +1708,10 @@ unbounded collection growth. To remedy this issue, TTL deletes on a collection [
 
 Examples of Deprioritized Operations:
 * [TTL deletes](https://github.com/mongodb/mongo/blob/0ceb784512f81f77f0bc55001f83ca77d1aa1d84/src/mongo/db/ttl.cpp#L488)
-* [Persisting sampled queries for analyze shard key](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/commands/write_commands.cpp#L295)
-* [Unbounded Index Scans](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_access.cpp#L1913)
-* [Unbounded Collection Scans](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
-* Index Builds [(1)](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064), [(2)](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
+* [Persisting sampled queries for analyze shard key](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/commands/write_commands.cpp#L295)
+* [Unbounded Index Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_access.cpp#L1913)
+* [Unbounded Collection Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
+* Index Builds [(1)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064), [(2)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
 
 ## Execution Admission Control
 A ticketing mechanism that limits the number of concurrent storage engine transactions in a single mongod to reduce contention on storage engine resources.

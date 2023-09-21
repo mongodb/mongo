@@ -2006,7 +2006,7 @@ oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastApplied` tim
 If the node shuts down before it finishes writing the batch, then during startup recovery the node will truncate
 the oplog back to the point saved before the batch application began. If the node successfully
 finishes writing the batch to the oplog, it will
-[reset the `oplogTruncateAfterPoint` to null](https://github.com/10gen/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L499)
+[reset the `oplogTruncateAfterPoint` to null](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L499)
 since there are no oplog holes and the oplog will not need to be truncated if the node restarts.
 
 The second scenario for setting the `oplogTruncateAfterPoint` is while primary. A primary allows
@@ -2014,7 +2014,7 @@ secondaries to replicate one of its oplog entries as soon as there are no oplog 
 behind the entry. However, secondaries do not have to wait for the oplog entry to make it to disk
 on the primary nor for there to be no holes behind it on disk on the primary. Therefore, some
 already replicated writes may disappear from the primary if the primary crashes. The primary will
-continually [update the `oplogTruncateAfterPoint`](https://github.com/10gen/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1150-L1154)
+continually [update the `oplogTruncateAfterPoint`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1150-L1154)
 in order to track and forward the no oplog holes
 point on disk, in case of an unclean shutdown. Then startup recovery can take care of any oplog
 inconsistency with the rest of the replica set.
