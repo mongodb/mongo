@@ -476,6 +476,42 @@ assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: kNsName, key: {aKey: 1, bKey: 1}}),
     ErrorCodes.InvalidOptions);
 
+// Should fail because index key is sparse and index has non-simple collation.
+dropAndReshardColl({_id: 1, aKey: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1, bKey: 1}, {
+    sparse: true,
+    collation: {
+        locale: "en",
+    }
+}));
+let result =
+    mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1, bKey: 1}});
+assert.commandFailedWithCode(result, ErrorCodes.InvalidOptions);
+
+// Should fail because index key is multikey and is partial.
+dropAndReshardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(
+    {_id: 1, aKey: 1}, {name: "index_1_part", partialFilterExpression: {aKey: {$gt: 0}}}));
+assert.commandWorked(
+    mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1, bKey: 1}, {name: "index_2"}));
+assert.commandWorked(mongos.getCollection(kNsName).insert({bKey: [1, 2, 3, 4, 5]}));
+
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, [ErrorCodes.InvalidOptions, ErrorCodes.OperationFailed]);
+assert(result.errmsg.includes("Index key is multikey.") &&
+       result.errmsg.includes("Index key is partial."));
+
+// Should fail because both indexes have keys that are incompatible: partial; sparse
+dropAndReshardColl({_id: 1});
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(
+    {_id: 1, aKey: 1}, {name: "index_1_part", partialFilterExpression: {aKey: {$gt: 0}}}));
+assert.commandWorked(mongos.getCollection(kNsName).createIndex(
+    {_id: 1, aKey: 1, bKey: 1}, {name: "index_2_sparse", sparse: true}));
+result = mongos.adminCommand({refineCollectionShardKey: kNsName, key: {_id: 1, aKey: 1}});
+assert.commandFailedWithCode(result, [ErrorCodes.InvalidOptions, ErrorCodes.OperationFailed]);
+assert(result.errmsg.includes("Index key is partial.") &&
+       result.errmsg.includes("Index key is sparse."));
+
 // Should work because a 'useful' index exists for new shard key {_id: 1, aKey: 1}.
 dropAndReshardColl({_id: 1});
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));

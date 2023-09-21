@@ -1231,30 +1231,96 @@ void IndexCatalogImpl::findIndexesByKeyPattern(OperationContext* opCtx,
     }
 }
 
+bool _isCompatibleWithShardKey(OperationContext* opCtx,
+                               const IndexDescriptor* desc,
+                               const BSONObj& shardKey,
+                               bool requireSingleKey,
+                               std::string* errMsg) {
+    // Return a descriptive error for each index that shares a prefix with shardKey but
+    // cannot be used for sharding.
+    const int kErrorPartial = 0x01;
+    const int kErrorSparse = 0x02;
+    const int kErrorMultikey = 0x04;
+    const int kErrorCollation = 0x08;
+    const int kErrorNotPrefix = 0x10;
+    int reasons = 0;
+
+    bool hasSimpleCollation = desc->infoObj().getObjectField("collation").isEmpty();
+
+    if (desc->isPartial()) {
+        reasons |= kErrorPartial;
+    }
+    if (desc->isSparse()) {
+        reasons |= kErrorSparse;
+    }
+    if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance)) {
+        reasons |= kErrorNotPrefix;
+    }
+    if (reasons == 0) {  // index is not partial, is not sparse, is a prefix
+        if (!desc->isMultikey()) {
+            if (hasSimpleCollation) {
+                return true;
+            }
+        } else {
+            reasons |= kErrorMultikey;
+        }
+        if (!requireSingleKey && hasSimpleCollation) {
+            return true;
+        }
+    }
+
+    // To reach here: index is multikey, or
+    // (index is not multikey and does not have a simple collation)
+    if (!hasSimpleCollation) {
+        reasons |= kErrorCollation;
+    }
+
+    if (errMsg && reasons != 0) {
+        std::string errors = "Index " + desc->indexName() + " cannot be used for sharding because:";
+        if (reasons & kErrorPartial) {
+            errors += " Index key is partial.";
+        }
+        if (reasons & kErrorSparse) {
+            errors += " Index key is sparse.";
+        }
+        if (reasons & kErrorMultikey) {
+            errors += " Index key is multikey.";
+        }
+        if (reasons & kErrorCollation) {
+            errors += " Index has a non-simple collation.";
+        }
+        if (reasons & kErrorNotPrefix) {
+            errors += " Shard key " + shardKey.toString() + " is not a prefix of index key.";
+        }
+        if (!errMsg->empty()) {
+            *errMsg += "\n";
+        }
+        *errMsg += errors;
+    }
+    return false;
+}
+
 const IndexDescriptor* IndexCatalogImpl::findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                                    const BSONObj& shardKey,
-                                                                   bool requireSingleKey) const {
+                                                                   bool requireSingleKey,
+                                                                   std::string* errMsg) const {
     const IndexDescriptor* best = nullptr;
+    const IndexDescriptor* desc = nullptr;
 
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, false);
     while (ii->more()) {
-        const IndexDescriptor* desc = ii->next()->descriptor();
-        bool hasSimpleCollation = desc->infoObj().getObjectField("collation").isEmpty();
-
-        if (desc->isPartial() || desc->isSparse())
-            continue;
-
-        if (!shardKey.isPrefixOf(desc->keyPattern(), SimpleBSONElementComparator::kInstance))
-            continue;
-
-        if (!desc->isMultikey() && hasSimpleCollation)
-            return desc;
-
-        if (!requireSingleKey && hasSimpleCollation)
+        desc = ii->next()->descriptor();
+        if (_isCompatibleWithShardKey(opCtx, desc, shardKey, requireSingleKey, errMsg)) {
+            if (!desc->isMultikey()) {
+                return desc;
+            }
             best = desc;
+        }
     }
-
-    return best;
+    if (best != nullptr) {
+        return desc;
+    }
+    return nullptr;
 }
 
 void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,

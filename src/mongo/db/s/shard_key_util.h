@@ -163,7 +163,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const ShardKeyPattern& shardKeyPattern,
                               const boost::optional<BSONObj>& defaultCollation,
                               bool requiresUnique,
-                              const ShardKeyValidationBehaviors& behaviors);
+                              const ShardKeyValidationBehaviors& behaviors,
+                              std::string* errMsg = nullptr);
 
 }  // namespace shardkeyutil
 }  // namespace mongo

@@ -97,7 +97,8 @@ public:
 
     IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
                                                const BSONObj& shardKey,
-                                               const bool requireSingleKey) const override {
+                                               const bool requireSingleKey,
+                                               std::string* errMsg = nullptr) const override {
         return nullptr;
     }
 

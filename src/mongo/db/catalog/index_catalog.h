@@ -260,9 +260,11 @@ public:
      *
      * If no such index exists, returns NULL.
      */
-    virtual const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* const opCtx,
-                                                             const BSONObj& shardKey,
-                                                             const bool requireSingleKey) const = 0;
+    virtual const IndexDescriptor* findShardKeyPrefixedIndex(
+        OperationContext* const opCtx,
+        const BSONObj& shardKey,
+        const bool requireSingleKey,
+        std::string* errMsg = nullptr) const = 0;
 
     virtual void findIndexByType(OperationContext* const opCtx,
                                  const std::string& type,

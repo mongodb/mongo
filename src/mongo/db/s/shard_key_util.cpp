@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 #include "mongo/platform/basic.h"
 
@@ -36,6 +37,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -108,9 +110,12 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                               const ShardKeyPattern& shardKeyPattern,
                               const boost::optional<BSONObj>& defaultCollation,
                               bool requiresUnique,
-                              const ShardKeyValidationBehaviors& behaviors) {
+                              const ShardKeyValidationBehaviors& behaviors,
+                              std::string* errMsg) {
     auto indexes = behaviors.loadIndexes(nss);
 
+    LOGV2_DEBUG(
+        1234200, 1, "Checking shard key pattern", "shkey"_attr = shardKeyPattern.toString());
     // 1.  Verify consistency with existing unique indexes
     for (const auto& idx : indexes) {
         BSONObj currentKey = idx["key"].embeddedObject();
@@ -124,7 +129,9 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     // 2. Check for a useful index
     bool hasUsefulIndexForKey = false;
+    std::string allReasons;
     for (const auto& idx : indexes) {
+        std::string reasons;
         BSONObj currentKey = idx["key"].embeddedObject();
         // Check 2.i. and 2.ii.
         if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
@@ -141,6 +148,19 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                     !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||
                         idx["seed"].numberInt() == BSONElementHasher::DEFAULT_HASH_SEED);
             hasUsefulIndexForKey = true;
+        }
+        if (idx["sparse"].trueValue()) {
+            reasons += " Index key is sparse.";
+        }
+        if (idx["filter"].ok()) {
+            reasons += " Index key is partial.";
+        }
+        if (idx["collation"].ok()) {
+            reasons += " Index has a non-simple collation.";
+        }
+        if (!reasons.empty()) {
+            allReasons = " Index " + idx["name"] + " cannot be used for shard key pattern " +
+                shardKeyPattern.toString() + " because [" + reasons + " ]";
         }
     }
 
@@ -169,6 +189,10 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
                                   << " index not unique, and unique index explicitly specified",
                     isExplicitlyUnique || isCurrentID);
         }
+    }
+
+    if (errMsg && !allReasons.empty()) {
+        *errMsg += allReasons;
     }
 
     if (hasUsefulIndexForKey) {

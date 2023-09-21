@@ -132,11 +132,13 @@ public:
      * If the parameter 'requireSingleKey' is true, then this index additionally must not be
      * multi-key.
      *
-     * If no such index exists, returns NULL.
+     * If no such index exists, returns NULL. If errMsg is non-null, the reasons that the existing
+     * indexes are incompatible will be appended to errMsg.
      */
     const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                      const BSONObj& shardKey,
-                                                     bool requireSingleKey) const override;
+                                                     bool requireSingleKey,
+                                                     std::string* errMsg = nullptr) const override;
 
     void findIndexByType(OperationContext* opCtx,
                          const std::string& type,
