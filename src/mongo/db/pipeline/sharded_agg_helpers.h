@@ -141,6 +141,16 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
 SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
 
 /**
+ * Used to indicate if a pipeline contains any data source requiring extra handling for targeting
+ * shards.
+ */
+enum class PipelineDataSource {
+    kNormal,
+    kChangeStream,  // Indicates a pipeline has a $changeStream stage.
+    kQueue,         // Indicates the desugared pipeline starts with a $queue stage.
+};
+
+/**
  * Targets shards for the pipeline and returns a struct with the remote cursors or results, and the
  * pipeline that will need to be executed to merge the results from the remotes. If a stale shard
  * version is encountered, refreshes the routing table and tries again. If the command is eligible
@@ -163,8 +173,7 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
  */
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
-    bool hasChangeStream,
-    bool startsWithDocuments,
+    PipelineDataSource pipelineDataSource,
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
@@ -225,9 +234,7 @@ StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* op
 /**
  * Returns true if an aggregation over 'nss' must run on all shards.
  */
-bool checkIfMustRunOnAllShards(const NamespaceString& nss,
-                               bool hasChangeStream,
-                               bool startsWithDocuments);
+bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pipelineDataSource);
 
 /**
  * Retrieves the desired retry policy based on whether the default writeConcern is set on 'opCtx'.

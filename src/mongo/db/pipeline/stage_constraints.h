@@ -71,6 +71,10 @@ struct StageConstraints {
         // Indicates that the stage must run on the host to which it was originally sent and
         // cannot be forwarded from mongoS to the shards.
         kLocalOnly,
+        // Indicates that the stage must run exactly once, but it is ok to forward it from the
+        // router to a shard to execute if some other stage in the pipeline needs to run on a
+        // shard. The stage provides its own data and is independent of any collection.
+        kRunOnceAnyNode,
         // Indicates that the stage must run on the primary shard.
         kPrimaryShard,
         // Indicates that the stage must run on any participating shard.

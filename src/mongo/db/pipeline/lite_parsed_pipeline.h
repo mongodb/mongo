@@ -133,10 +133,10 @@ public:
     }
 
     /**
-     * Returns true if the pipeline begins with a $documents stage.
+     * Returns true if the desugared pipeline begins with a $queue stage.
      */
-    bool startsWithDocuments() const {
-        return !_stageSpecs.empty() && _stageSpecs.front()->isDocuments();
+    bool startsWithQueue() const {
+        return !_stageSpecs.empty() && _stageSpecs.front()->startsWithQueue();
     }
 
     /**

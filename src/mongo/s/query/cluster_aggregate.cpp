@@ -105,6 +105,7 @@
 namespace mongo {
 
 constexpr unsigned ClusterAggregate::kMaxViewRetries;
+using sharded_agg_helpers::PipelineDataSource;
 
 namespace {
 
@@ -389,7 +390,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
     auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
-    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
+    auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
+        : startsWithQueue                     ? PipelineDataSource::kQueue
+                                              : PipelineDataSource::kNormal;
 
     // If the routing table is not already taken by the higher level, fill it now.
     if (!cri) {
@@ -420,7 +424,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         if (executionNsRoutingInfoStatus.isOK()) {
             cri = executionNsRoutingInfoStatus.getValue();
-        } else if (!((hasChangeStream || startsWithDocuments) &&
+        } else if (!((hasChangeStream || startsWithQueue) &&
                      executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
             appendEmptyResultSetWithStatus(
                 opCtx, namespaces.requestedNss, executionNsRoutingInfoStatus.getStatus(), result);
@@ -466,8 +470,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         opCtx,
         pipelineBuilder,
         cri,
-        hasChangeStream,
-        startsWithDocuments,
+        pipelineDataSource,
         request.getPassthroughToShard().has_value());
 
     uassert(
@@ -545,8 +548,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     namespaces,
                     privileges,
                     result,
-                    hasChangeStream,
-                    startsWithDocuments,
+                    pipelineDataSource,
                     eligibleForSampling);
             }
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::

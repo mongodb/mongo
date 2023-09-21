@@ -847,12 +847,14 @@ ShardId getLocalShardId(OperationContext* opCtx) {
 }
 
 boost::optional<CollectionRoutingInfo> getCollectionRoutingInfoForTargeting(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, bool hasChangeStream) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, PipelineDataSource pipelineDataSource) {
     auto executionNsRoutingInfoStatus = getExecutionNsRoutingInfo(expCtx->opCtx, expCtx->ns);
 
-    // If this is a $changeStream, we swallow NamespaceNotFound exceptions and continue.
-    // Otherwise, uassert on all exceptions here.
-    if (!(hasChangeStream && executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
+    // If this is a $changeStream or the desugared pipeline starts with $queue, we swallow
+    // NamespaceNotFound exceptions and continue. Otherwise, uassert on all exceptions here.
+    if (!((pipelineDataSource == PipelineDataSource::kChangeStream ||
+           pipelineDataSource == PipelineDataSource::kQueue) &&
+          executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
         uassertStatusOK(executionNsRoutingInfoStatus);
     }
 
@@ -1070,8 +1072,7 @@ struct TargetingResults {
 
 TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 const Pipeline* pipeline,
-                                bool hasChangeStream,
-                                bool startsWithDocuments,
+                                PipelineDataSource pipelineDataSource,
                                 ShardTargetingPolicy shardTargetingPolicy,
                                 const boost::optional<CollectionRoutingInfo>& cri) {
     const bool needsPrimaryShardMerge =
@@ -1091,8 +1092,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
         : expCtx->getCollatorBSON();
 
     // Determine whether we can run the entire aggregation on a single shard.
-    const bool mustRunOnAllShards =
-        checkIfMustRunOnAllShards(expCtx->ns, hasChangeStream, startsWithDocuments);
+    const bool mustRunOnAllShards = checkIfMustRunOnAllShards(expCtx->ns, pipelineDataSource);
     std::set<ShardId> shardIds =
         getTargetedShards(expCtx, mustRunOnAllShards, cri, shardQuery, shardTargetingCollation);
 
@@ -1117,7 +1117,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
     // target an unsplit pipeline to more than one shard.
     const auto currentTime = VectorClock::get(expCtx->opCtx)->getTime();
     auto shardRegistryReloadTime = currentTime.clusterTime().asTimestamp();
-    if (hasChangeStream) {
+    if (pipelineDataSource == PipelineDataSource::kChangeStream) {
         Grid::get(expCtx->opCtx)->shardRegistry()->reload(expCtx->opCtx);
         // Rebuild the set of shards as the shard registry might have changed.
         shardIds =
@@ -1308,8 +1308,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
 
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
-    bool hasChangeStream,
-    bool startsWithDocuments,
+    PipelineDataSource pipelineDataSource,
     bool eligibleForSampling,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<ExplainOptions::Verbosity> explain,
@@ -1318,16 +1317,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
     stdx::unordered_map<ShardId, BSONObj> resumeTokenMap) {
     const auto& expCtx = pipeline->getContext();
-    auto executionNsRoutingInfo = getCollectionRoutingInfoForTargeting(expCtx, hasChangeStream);
-    TargetingResults targeting = targetPipeline(expCtx,
-                                                pipeline.get(),
-                                                hasChangeStream,
-                                                startsWithDocuments,
-                                                shardTargetingPolicy,
-                                                executionNsRoutingInfo);
+    auto executionNsRoutingInfo = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
+    TargetingResults targeting = targetPipeline(
+        expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, executionNsRoutingInfo);
     return dispatchTargetedShardPipeline(std::move(serializedCommand),
                                          targeting,
-                                         hasChangeStream,
+                                         pipelineDataSource == PipelineDataSource::kChangeStream,
                                          eligibleForSampling,
                                          executionNsRoutingInfo,
                                          std::move(pipeline),
@@ -1587,11 +1582,13 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     AggregateCommandRequest aggRequest(expCtx->ns, rawStages);
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
+    auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
+        : startsWithQueue                     ? PipelineDataSource::kQueue
+                                              : PipelineDataSource::kNormal;
     auto shardDispatchResults =
         dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
-                              hasChangeStream,
-                              startsWithDocuments,
+                              pipelineDataSource,
                               expCtx->eligibleForSampling(),
                               std::move(pipeline),
                               expCtx->explain);
@@ -1628,13 +1625,13 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx) {
     return Shard::RetryPolicy::kIdempotent;
 }
 
-bool checkIfMustRunOnAllShards(const NamespaceString& nss,
-                               bool hasChangeStream,
-                               bool startsWithDocuments) {
+bool checkIfMustRunOnAllShards(const NamespaceString& nss, PipelineDataSource pipelineDataSource) {
     // The following aggregations must be routed to all shards:
     // - Any collectionless aggregation, such as non-localOps $currentOp.
     // - Any aggregation which begins with a $changeStream stage.
-    return !startsWithDocuments && (nss.isCollectionlessAggregateNS() || hasChangeStream);
+    return pipelineDataSource != PipelineDataSource::kQueue &&
+        (nss.isCollectionlessAggregateNS() ||
+         pipelineDataSource == PipelineDataSource::kChangeStream);
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> dispatchTargetedPipelineAndAddMergeCursors(
@@ -1724,10 +1721,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
-    auto cri = getCollectionRoutingInfoForTargeting(expCtx, hasChangeStream);
-    auto targeting = targetPipeline(
-        expCtx, pipeline.get(), hasChangeStream, startsWithDocuments, shardTargetingPolicy, cri);
+    auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
+        : startsWithQueue                     ? PipelineDataSource::kQueue
+                                              : PipelineDataSource::kNormal;
+    auto cri = getCollectionRoutingInfoForTargeting(expCtx, pipelineDataSource);
+    auto targeting =
+        targetPipeline(expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, cri);
     return dispatchTargetedPipelineAndAddMergeCursors(expCtx,
                                                       std::move(aggRequest),
                                                       std::move(pipeline),
@@ -1758,7 +1758,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
         // does not require input data, but is still expected to fan out and contact remote shards
         // nonetheless.
         if (auto constraints = firstStage->constraints(); !constraints.requiresInputDocSource &&
-            (constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly)) {
+            (constraints.hostRequirement == StageConstraints::HostTypeRequirement::kLocalOnly ||
+             constraints.hostRequirement ==
+                 StageConstraints::HostTypeRequirement::kRunOnceAnyNode)) {
             // There's no need to attach a cursor here - the first stage provides its own data and
             // is meant to be run locally (e.g. $documents).
             return pipeline;
@@ -1794,18 +1796,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             AggregateCommandRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
             LiteParsedPipeline liteParsedPipeline{aggRequest};
             const bool hasChangeStream = liteParsedPipeline.hasChangeStream();
+            const bool startsWithQueue = liteParsedPipeline.startsWithQueue();
+            auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
+                : startsWithQueue                     ? PipelineDataSource::kQueue
+                                                      : PipelineDataSource::kNormal;
             // CRI, provided by CollectionRouter, contains the latest data. We call
             // getCollectionRoutingInfoForTxnCmd to get CRI with historical data for transactions
             // with snapshot isolations. We wrap the result into boost::optional, as the next
             // function accept only boost::optional.
             boost::optional<CollectionRoutingInfo> targetingCri =
                 uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, expCtx->ns));
-            TargetingResults targeting = targetPipeline(expCtx,
-                                                        pipeline.get(),
-                                                        hasChangeStream,
-                                                        liteParsedPipeline.startsWithDocuments(),
-                                                        shardTargetingPolicy,
-                                                        targetingCri);
+            TargetingResults targeting = targetPipeline(
+                expCtx, pipeline.get(), pipelineDataSource, shardTargetingPolicy, targetingCri);
 
             const ShardId localShardId = getLocalShardId(opCtx);
             // If there is no targetingCri, we can't enter the shard role correctly, so we need to

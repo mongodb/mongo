@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog_cache.h"
@@ -98,8 +99,7 @@ struct AggregationTargeter {
         OperationContext* opCtx,
         std::function<std::unique_ptr<Pipeline, PipelineDeleter>()> buildPipelineFn,
         boost::optional<CollectionRoutingInfo> cri,
-        bool hasChangeStream,
-        bool startsWithDocuments,
+        sharded_agg_helpers::PipelineDataSource pipelineDataSource,
         bool perShardCursor);
 
     enum TargetingPolicy {
@@ -135,8 +135,7 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 const ClusterAggregate::Namespaces& namespaces,
                                 const PrivilegeVector& privileges,
                                 BSONObjBuilder* result,
-                                bool hasChangeStream,
-                                bool startsWithDocuments,
+                                sharded_agg_helpers::PipelineDataSource pipelineDataSource,
                                 bool eligibleForSampling);
 
 /**

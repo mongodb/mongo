@@ -637,8 +637,7 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
 
     auto dispatchResults =
         sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
-                                                   false /* hasChangeStream */,
-                                                   false /* startsWithDocuments */,
+                                                   sharded_agg_helpers::PipelineDataSource::kNormal,
                                                    false /* eligibleForSampling */,
                                                    std::move(pipeline),
                                                    boost::none /* explain */,

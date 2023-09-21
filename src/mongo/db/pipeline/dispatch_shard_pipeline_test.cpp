@@ -81,6 +81,7 @@ namespace {
 
 // Use this new name to register these tests under their own unit test suite.
 using DispatchShardPipelineTest = ShardedAggTestFixture;
+using sharded_agg_helpers::PipelineDataSource;
 
 TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
     // Sharded by {_id: 1}, [MinKey, 0) on shard "0", [0, MaxKey) on shard "1".
@@ -96,14 +97,12 @@ TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
-    const bool hasChangeStream = false;
-    const bool startsWithDocuments = false;
+    const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
 
     auto future = launchAsync([&] {
         auto results = sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
-                                                                  hasChangeStream,
-                                                                  startsWithDocuments,
+                                                                  pipelineDataSource,
                                                                   eligibleForSampling,
                                                                   std::move(pipeline),
                                                                   boost::none /*explain*/);
@@ -133,14 +132,12 @@ TEST_F(DispatchShardPipelineTest, DoesSplitPipelineIfMatchSpansTwoShards) {
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
-    const bool hasChangeStream = false;
-    const bool startsWithDocuments = false;
+    const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
 
     auto future = launchAsync([&] {
         auto results = sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
-                                                                  hasChangeStream,
-                                                                  startsWithDocuments,
+                                                                  pipelineDataSource,
                                                                   eligibleForSampling,
                                                                   std::move(pipeline),
                                                                   boost::none /*explain*/);
@@ -173,14 +170,12 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineRetriesOnNetworkError) {
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
-    const bool hasChangeStream = false;
-    const bool startsWithDocuments = false;
+    const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
         auto results = sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
-                                                                  hasChangeStream,
-                                                                  startsWithDocuments,
+                                                                  pipelineDataSource,
                                                                   eligibleForSampling,
                                                                   std::move(pipeline),
                                                                   boost::none /*explain*/);
@@ -224,14 +219,12 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
-    const bool hasChangeStream = false;
-    const bool startsWithDocuments = false;
+    const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
 
     auto future = launchAsync([&] {
         ASSERT_THROWS_CODE(sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
-                                                                      hasChangeStream,
-                                                                      startsWithDocuments,
+                                                                      pipelineDataSource,
                                                                       eligibleForSampling,
                                                                       std::move(pipeline),
                                                                       boost::none /*explain*/),
@@ -268,8 +261,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
         AggregateCommandRequest(expCtx()->ns, stages));
-    const bool hasChangeStream = false;
-    const bool startsWithDocuments = false;
+    const auto pipelineDataSource = PipelineDataSource::kNormal;
     const bool eligibleForSampling = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
@@ -279,8 +271,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
                                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                                         return sharded_agg_helpers::dispatchShardPipeline(
                                             serializedCommand,
-                                            hasChangeStream,
-                                            startsWithDocuments,
+                                            pipelineDataSource,
                                             eligibleForSampling,
                                             pipeline->clone(),
                                             boost::none /*explain*/);

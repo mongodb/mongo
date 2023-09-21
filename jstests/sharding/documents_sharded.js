@@ -143,7 +143,7 @@ assert.throwsWithCode(() => {
 // Test that $documents fails due when provided a non-array.
 assert.throwsWithCode(() => {
     db.aggregate([{$documents: "string"}]);
-}, 5858203);
+}, [40228, 5858203]);
 
 // Test that $documents succeeds when given a singleton object.
 assert.eq(db.aggregate([{$documents: [{x: [1, 2, 3]}]}]).toArray(), [{x: [1, 2, 3]}]);

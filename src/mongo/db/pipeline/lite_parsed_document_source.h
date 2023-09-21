@@ -183,9 +183,9 @@ public:
     }
 
     /**
-     * Returns true if this is a $documents stage.
+     * Returns true if this desugars to a pipeline starting with a $queue stage.
      */
-    virtual bool isDocuments() const {
+    virtual bool startsWithQueue() const {
         return false;
     }
 

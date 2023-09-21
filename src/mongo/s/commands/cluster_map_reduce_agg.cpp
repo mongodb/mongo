@@ -87,6 +87,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+
+using sharded_agg_helpers::PipelineDataSource;
+
 namespace {
 
 Rarely _sampler;
@@ -231,8 +234,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         cluster_aggregation_planner::AggregationTargeter::make(opCtx,
                                                                pipelineBuilder,
                                                                cri,
-                                                               false,   // hasChangeStream
-                                                               false,   // startsWithDocuments
+                                                               PipelineDataSource::kNormal,
                                                                false);  // perShardCursor
     try {
         switch (targeter.policy) {
@@ -258,8 +260,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     namespaces,
                     privileges,
                     &tempResults,
-                    false /* hasChangeStream */,
-                    false /* startsWithDocuments */,
+                    PipelineDataSource::kNormal,
                     expCtx->eligibleForSampling()));
                 break;
             }

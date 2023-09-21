@@ -66,6 +66,13 @@ public:
             return _privileges;
         }
 
+        /**
+         * Returns true as the desugared pipeline begins with a $queue stage.
+         */
+        bool startsWithQueue() const final {
+            return true;
+        }
+
         bool isInitialSource() const {
             return true;
         }
