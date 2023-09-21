@@ -326,10 +326,16 @@ boost::optional<BSONObj> CompactStructuredEncryptionDataCoordinator::reportForCu
     auto bob = basicReportBuilder();
 
     stdx::lock_guard lg{_docMutex};
-    bob.append("escNss", NamespaceStringUtil::serialize(_doc.getEscNss()));
-    bob.append("ecocNss", NamespaceStringUtil::serialize(_doc.getEcocNss()));
+    bob.append(
+        "escNss",
+        NamespaceStringUtil::serialize(_doc.getEscNss(), SerializationContext::stateDefault()));
+    bob.append(
+        "ecocNss",
+        NamespaceStringUtil::serialize(_doc.getEcocNss(), SerializationContext::stateDefault()));
     bob.append("ecocUuid", _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none");
-    bob.append("ecocRenameNss", NamespaceStringUtil::serialize(_doc.getEcocRenameNss()));
+    bob.append("ecocRenameNss",
+               NamespaceStringUtil::serialize(_doc.getEcocRenameNss(),
+                                              SerializationContext::stateDefault()));
     bob.append("ecocRenameUuid",
                _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
     return bob.obj();

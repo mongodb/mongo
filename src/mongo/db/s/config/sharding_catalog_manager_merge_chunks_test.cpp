@@ -855,7 +855,9 @@ protected:
 
         const auto onlyZonesOverlappingWithChunkFilter = [&]() {
             BSONObjBuilder queryBuilder;
-            queryBuilder.append(TagsType::ns(), NamespaceStringUtil::serialize(_nss));
+            queryBuilder.append(
+                TagsType::ns(),
+                NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
             BSONArrayBuilder norBuilder(queryBuilder.subarrayStart("$nor"));
             norBuilder.append(BSON(TagsType::min() << BSON("$gte" << chunkMaxKey)));
             norBuilder.append(BSON(TagsType::max() << BSON("$lte" << chunkMinKey)));

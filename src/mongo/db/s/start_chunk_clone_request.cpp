@@ -195,7 +195,8 @@ void StartChunkCloneRequest::appendAsCommand(
     invariant(nss.isValid());
     invariant(fromShardConnectionString.isValid());
 
-    builder->append(kRecvChunkStart, NamespaceStringUtil::serialize(nss));
+    builder->append(kRecvChunkStart,
+                    NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     builder->append(kParallelMigration, true);
 
     migrationId.appendToBuilder(builder, kMigrationId);

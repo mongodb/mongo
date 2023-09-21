@@ -115,8 +115,8 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
             write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
-                entry.setQ(
-                    BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss())));
+                entry.setQ(BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                    nss(), SerializationContext::stateDefault())));
                 if (_allowMigrations) {
                     entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
                         "$unset" << BSON(CollectionType::kPermitMigrationsFieldName << true))));

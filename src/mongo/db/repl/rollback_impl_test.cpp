@@ -2131,10 +2131,17 @@ TEST_F(RollbackImplObserverInfoTest,
     auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
     auto toNss = NamespaceString::createNamespaceString_forTest(tid, "test", "dest");
 
-    auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(fromNss) << "to"
-                                          << NamespaceStringUtil::serialize(toNss));
-    auto cmdOp = makeCommandOp(
-        Timestamp(2, 2), UUID::gen(), NamespaceStringUtil::serialize(fromNss), cmdObj, 2);
+    auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(
+                                                 fromNss, SerializationContext::stateDefault())
+                                          << "to"
+                                          << NamespaceStringUtil::serialize(
+                                                 toNss, SerializationContext::stateDefault()));
+    auto cmdOp =
+        makeCommandOp(Timestamp(2, 2),
+                      UUID::gen(),
+                      NamespaceStringUtil::serialize(fromNss, SerializationContext::stateDefault()),
+                      cmdObj,
+                      2);
 
 
     std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
@@ -2152,15 +2159,19 @@ TEST_F(RollbackImplObserverInfoTest,
     auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
     auto toNss = NamespaceString::createNamespaceString_forTest(tid, "test", "dest");
 
-    auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(fromNss) << "to"
-                                          << NamespaceStringUtil::serialize(toNss));
-    auto cmdOp = makeCommandOp(Timestamp(2, 2),
-                               UUID::gen(),
-                               NamespaceStringUtil::serialize(fromNss),
-                               cmdObj,
-                               2,
-                               boost::none,
-                               tid);
+    auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(
+                                                 fromNss, SerializationContext::stateDefault())
+                                          << "to"
+                                          << NamespaceStringUtil::serialize(
+                                                 toNss, SerializationContext::stateDefault()));
+    auto cmdOp =
+        makeCommandOp(Timestamp(2, 2),
+                      UUID::gen(),
+                      NamespaceStringUtil::serialize(fromNss, SerializationContext::stateDefault()),
+                      cmdObj,
+                      2,
+                      boost::none,
+                      tid);
 
     std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
     auto namespaces =

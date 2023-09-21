@@ -76,7 +76,8 @@ repl::MutableOplogEntry createEndOfTransactionOplogEntry(
     {
         BSONArrayBuilder namespaces{o2.subarrayStart("endOfTransaction")};
         for (const auto& nss : affectedNamespaces) {
-            namespaces.append(NamespaceStringUtil::serialize(nss));
+            namespaces.append(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         }
     }
     {

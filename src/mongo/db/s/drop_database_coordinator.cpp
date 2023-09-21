@@ -204,7 +204,8 @@ bool isDbAlreadyDropped(OperationContext* opCtx,
 BSONObj getReasonForDropCollection(const NamespaceString& nss) {
     return BSON("command"
                 << "dropCollection fromDropDatabase"
-                << "nss" << NamespaceStringUtil::serialize(nss));
+                << "nss"
+                << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 }
 
 }  // namespace

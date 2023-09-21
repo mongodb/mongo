@@ -242,7 +242,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             opCtx->recoveryUnit()->onCommit(
                 [insertedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
                     OperationContext* opCtx, boost::optional<Timestamp>) {
-                    if (nsIsDbOnly(NamespaceStringUtil::serialize(insertedNss))) {
+                    if (nsIsDbOnly(NamespaceStringUtil::serialize(
+                            insertedNss, SerializationContext::stateDefault()))) {
                         boost::optional<AutoGetDb> lockDbIfNotPrimary;
                         if (!isStandaloneOrPrimary(opCtx)) {
                             lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
@@ -389,39 +390,40 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
         invariant(collCSDoc.getBlockReads());
 
-        opCtx->recoveryUnit()->onCommit(
-            [updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
-                OperationContext* opCtx, boost::optional<Timestamp>) {
-                if (nsIsDbOnly(NamespaceStringUtil::serialize(updatedNss))) {
-                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
-                        lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
-                    }
-
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
-                        opCtx, updatedNss.dbName());
-                    scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
-                } else {
-                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
-                        lockCollectionIfNotPrimary.emplace(
-                            opCtx,
-                            updatedNss,
-                            fixLockModeForSystemDotViewsChanges(updatedNss, MODE_IX),
-                            AutoGetCollection::Options{}.viewMode(
-                                auto_get_collection::ViewMode::kViewsPermitted));
-                    }
-
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, updatedNss);
-                    scopedCsr->enterCriticalSectionCommitPhase(reason);
+        opCtx->recoveryUnit()->onCommit([updatedNss = collCSDoc.getNss(),
+                                         reason = collCSDoc.getReason().getOwned()](
+                                            OperationContext* opCtx, boost::optional<Timestamp>) {
+            if (nsIsDbOnly(NamespaceStringUtil::serialize(updatedNss,
+                                                          SerializationContext::stateDefault()))) {
+                boost::optional<AutoGetDb> lockDbIfNotPrimary;
+                if (!isStandaloneOrPrimary(opCtx)) {
+                    lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
                 }
-            });
+
+                // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                    opCtx, updatedNss.dbName());
+                scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
+            } else {
+                boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
+                if (!isStandaloneOrPrimary(opCtx)) {
+                    lockCollectionIfNotPrimary.emplace(
+                        opCtx,
+                        updatedNss,
+                        fixLockModeForSystemDotViewsChanges(updatedNss, MODE_IX),
+                        AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::ViewMode::kViewsPermitted));
+                }
+
+                // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                        opCtx, updatedNss);
+                scopedCsr->enterCriticalSectionCommitPhase(reason);
+            }
+        });
     }
 
     const auto& nss = args.coll->ns();
@@ -623,53 +625,54 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), deletedDoc);
 
-        opCtx->recoveryUnit()->onCommit(
-            [deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
-                OperationContext* opCtx, boost::optional<Timestamp>) {
-                if (nsIsDbOnly(NamespaceStringUtil::serialize(deletedNss))) {
-                    boost::optional<AutoGetDb> lockDbIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
-                        lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
-                    }
-
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
-                        opCtx, deletedNss.dbName());
-
-                    // Secondary nodes must clear the database metadata before releasing the
-                    // in-memory critical section.
-                    if (!isStandaloneOrPrimary(opCtx)) {
-                        scopedDss->clearDbInfo(opCtx);
-                    }
-
-                    scopedDss->exitCriticalSection(opCtx, reason);
-                } else {
-                    boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
-                        lockCollectionIfNotPrimary.emplace(
-                            opCtx,
-                            deletedNss,
-                            fixLockModeForSystemDotViewsChanges(deletedNss, MODE_IX),
-                            AutoGetCollection::Options{}.viewMode(
-                                auto_get_collection::ViewMode::kViewsPermitted));
-                    }
-
-                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                    auto scopedCsr =
-                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
-                            opCtx, deletedNss);
-
-                    // Secondary nodes must clear the collection filtering metadata before releasing
-                    // the in-memory critical section.
-                    if (!isStandaloneOrPrimary(opCtx)) {
-                        scopedCsr->clearFilteringMetadata(opCtx);
-                    }
-
-                    scopedCsr->exitCriticalSection(reason);
+        opCtx->recoveryUnit()->onCommit([deletedNss = collCSDoc.getNss(),
+                                         reason = collCSDoc.getReason().getOwned()](
+                                            OperationContext* opCtx, boost::optional<Timestamp>) {
+            if (nsIsDbOnly(NamespaceStringUtil::serialize(deletedNss,
+                                                          SerializationContext::stateDefault()))) {
+                boost::optional<AutoGetDb> lockDbIfNotPrimary;
+                if (!isStandaloneOrPrimary(opCtx)) {
+                    lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
                 }
-            });
+
+                // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                    opCtx, deletedNss.dbName());
+
+                // Secondary nodes must clear the database metadata before releasing the
+                // in-memory critical section.
+                if (!isStandaloneOrPrimary(opCtx)) {
+                    scopedDss->clearDbInfo(opCtx);
+                }
+
+                scopedDss->exitCriticalSection(opCtx, reason);
+            } else {
+                boost::optional<AutoGetCollection> lockCollectionIfNotPrimary;
+                if (!isStandaloneOrPrimary(opCtx)) {
+                    lockCollectionIfNotPrimary.emplace(
+                        opCtx,
+                        deletedNss,
+                        fixLockModeForSystemDotViewsChanges(deletedNss, MODE_IX),
+                        AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::ViewMode::kViewsPermitted));
+                }
+
+                // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                        opCtx, deletedNss);
+
+                // Secondary nodes must clear the collection filtering metadata before releasing
+                // the in-memory critical section.
+                if (!isStandaloneOrPrimary(opCtx)) {
+                    scopedCsr->clearFilteringMetadata(opCtx);
+                }
+
+                scopedCsr->exitCriticalSection(reason);
+            }
+        });
     }
 
     if (nss == NamespaceString::kRangeDeletionNamespace) {

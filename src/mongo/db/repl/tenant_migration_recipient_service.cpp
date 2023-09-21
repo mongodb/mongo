@@ -1110,9 +1110,9 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
 
     // Write a fake applyOps with the tenantId as the namespace so that this will be picked
     // up by the committed transaction prefetch pipeline in subsequent migrations.
-    noopEntry.setObject(
-        BSON("applyOps" << BSON_ARRAY(
-                 BSON(OplogEntry::kNssFieldName << NamespaceStringUtil::serialize(tenantNss)))));
+    noopEntry.setObject(BSON(
+        "applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << NamespaceStringUtil::serialize(
+                                          tenantNss, SerializationContext::stateDefault())))));
 
     noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
     noopEntry.setSessionId(sessionId);

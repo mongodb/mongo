@@ -83,12 +83,13 @@ void notifyChangeStreamsOnRefineCollectionShardKeyComplete(OperationContext* opC
                                                            const KeyPattern& oldShardKey,
                                                            const UUID& collUUID) {
 
+    const auto collNssStr =
+        NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault());
     const std::string oMessage = str::stream()
-        << "Refine shard key for collection " << NamespaceStringUtil::serialize(collNss) << " with "
-        << shardKey.toString();
+        << "Refine shard key for collection " << collNssStr << " with " << shardKey.toString();
 
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("refineCollectionShardKey", NamespaceStringUtil::serialize(collNss));
+    cmdBuilder.append("refineCollectionShardKey", collNssStr);
     cmdBuilder.append("shardKey", shardKey.toBSON());
     cmdBuilder.append("oldShardKey", oldShardKey.toBSON());
 
@@ -137,7 +138,9 @@ RefineCollectionShardKeyCoordinator::RefineCollectionShardKeyCoordinator(
       _request(_doc.getRefineCollectionShardKeyRequest()),
       _critSecReason(BSON("command"
                           << "refineCollectionShardKey"
-                          << "ns" << NamespaceStringUtil::serialize(nss()))) {}
+                          << "ns"
+                          << NamespaceStringUtil::serialize(
+                                 nss(), SerializationContext::stateDefault()))) {}
 
 void RefineCollectionShardKeyCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two refine collections on the same namespace, then the arguments must be the same.

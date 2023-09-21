@@ -75,7 +75,8 @@ using namespace fmt::literals;
 
 auto constructFinalMetadataRemovalUpdateOperation(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
-    auto query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss));
+    auto query = BSON(CollectionType::kNssFieldName
+                      << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 
     auto collEntryFieldsToUnset = BSON(CollectionType::kReshardingFieldsFieldName
                                        << 1 << CollectionType::kAllowMigrationsFieldName << 1);

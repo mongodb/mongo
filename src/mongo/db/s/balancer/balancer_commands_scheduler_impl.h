@@ -189,8 +189,8 @@ public:
 
         const auto updateOp = BatchedCommandRequest::buildUpdateOp(
             CollectionType::ConfigNS,
-            BSON(CollectionType::kNssFieldName
-                 << NamespaceStringUtil::serialize(getNameSpace())) /* query */,
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                     getNameSpace(), SerializationContext::stateDefault())) /* query */,
             updateCmd.obj() /* update */,
             false /* upsert */,
             false /* multi */);
@@ -222,7 +222,10 @@ public:
         boundsArrayBuilder.append(_lowerBoundKey).append(_upperBoundKey);
 
         BSONObjBuilder commandBuilder;
-        commandBuilder.append(kCommandName, NamespaceStringUtil::serialize(getNameSpace()))
+        commandBuilder
+            .append(kCommandName,
+                    NamespaceStringUtil::serialize(getNameSpace(),
+                                                   SerializationContext::stateDefault()))
             .appendArray(kBounds, boundsArrayBuilder.arr())
             .append(kShardName, getTarget().toString())
             .append(kEpoch, _version.epoch())
@@ -265,7 +268,10 @@ public:
 
     BSONObj serialise() const override {
         BSONObjBuilder commandBuilder;
-        commandBuilder.append(kCommandName, NamespaceStringUtil::serialize(getNameSpace()))
+        commandBuilder
+            .append(kCommandName,
+                    NamespaceStringUtil::serialize(getNameSpace(),
+                                                   SerializationContext::stateDefault()))
             .append(kKeyPattern, _shardKeyPattern)
             .append(kMinValue, _lowerBoundKey)
             .append(kMaxValue, _upperBoundKey)

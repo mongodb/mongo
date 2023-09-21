@@ -208,8 +208,9 @@ void deleteCollection(OperationContext* opCtx,
         // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
         // 'uuid')
         const auto deleteCollectionQuery =
-            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)
-                                               << CollectionType::kUuidFieldName << uuid);
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                 << CollectionType::kUuidFieldName << uuid);
 
         write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
         deleteOp.setDeletes({[&]() {
@@ -632,15 +633,15 @@ void resumeMigrations(OperationContext* opCtx,
 
 bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
     auto collDoc =
-        uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                repl::ReadConcernLevel::kMajorityReadConcern,
-                CollectionType::ConfigNS,
-                BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
-                BSONObj(),
-                1))
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                            opCtx,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                            repl::ReadConcernLevel::kMajorityReadConcern,
+                            CollectionType::ConfigNS,
+                            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                     nss, SerializationContext::stateDefault())),
+                            BSONObj(),
+                            1))
             .docs;
 
     uassert(ErrorCodes::NamespaceNotFound,
@@ -712,10 +713,11 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
 }
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {
-    return BSON("command"
-                << "rename"
-                << "from" << NamespaceStringUtil::serialize(from) << "to"
-                << NamespaceStringUtil::serialize(to));
+    return BSON(
+        "command"
+        << "rename"
+        << "from" << NamespaceStringUtil::serialize(from, SerializationContext::stateDefault())
+        << "to" << NamespaceStringUtil::serialize(to, SerializationContext::stateDefault()));
 }
 
 void runTransactionOnShardingCatalog(OperationContext* opCtx,

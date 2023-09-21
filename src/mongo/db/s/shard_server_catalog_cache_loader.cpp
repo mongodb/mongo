@@ -160,7 +160,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     Status status = updateShardCollectionsEntry(
         opCtx,
         BSON(ShardCollectionType::kNssFieldName
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateCommandRequest())),
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         update.toBSON(),
         true /*upsert*/);
     if (!status.isOK()) {
@@ -1362,7 +1362,7 @@ ShardServerCatalogCacheLoader::_forcePrimaryCollectionRefreshAndWaitForReplicati
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
         BSON("_flushRoutingTableCacheUpdates"
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateCommandRequest())),
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
 

@@ -128,7 +128,8 @@ public:
 
         // Add only collectionsharded as a response parameter and remove the version to maintain the
         // same format as before.
-        result.append("collectionsharded", NamespaceStringUtil::serialize(nss));
+        result.append("collectionsharded",
+                      NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         return true;
     }
 };

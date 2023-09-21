@@ -103,7 +103,8 @@ void dropAggTempCollections(OperationContext* opCtx) {
                 // entry.
                 DBDirectClient client(opCtx.get());
                 client.remove(NamespaceString::kAggTempCollections,
-                              BSON("_id" << NamespaceStringUtil::serialize(nss)));
+                              BSON("_id" << NamespaceStringUtil::serialize(
+                                       nss, SerializationContext::stateDefault())));
             }
         })
         .getAsync([](auto) {});

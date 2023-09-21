@@ -493,7 +493,9 @@ TEST(CursorResponseTest, addToBSONInitialResponseWithTenantId) {
 
         BSONObj expectedResponse =
             BSON("cursor" << BSON("id" << CursorId(123) << "ns"
-                                       << NamespaceStringUtil::serialize(nss) << "firstBatch"
+                                       << NamespaceStringUtil::serialize(
+                                              nss, SerializationContext::stateDefault())
+                                       << "firstBatch"
                                        << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                           << "ok" << 1.0);
         ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);

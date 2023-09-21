@@ -94,8 +94,9 @@ const auto serviceDecorator =
 BSONObj findRecoverableCriticalSectionDoc(OperationContext* opCtx, const NamespaceString& nss) {
     DBDirectClient dbClient(opCtx);
 
-    const auto queryNss = BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName
-                               << NamespaceStringUtil::serialize(nss));
+    const auto queryNss =
+        BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     FindCommandRequest findRequest{NamespaceString::kUserWritesCriticalSectionsNamespace};
     findRequest.setFilter(queryNss);
     return dbClient.findOne(std::move(findRequest));
@@ -109,7 +110,7 @@ void setBlockUserWritesDocumentField(OperationContext* opCtx,
     store.update(
         opCtx,
         BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName
-             << NamespaceStringUtil::serialize(nss)),
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << BSON(UserWriteBlockingCriticalSectionDocument::kBlockUserWritesFieldName
                             << blockUserWrites)),
         ShardingCatalogClient::kLocalWriteConcern);
@@ -369,8 +370,9 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
 
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(UserWriteBlockingCriticalSectionDocument::kNssFieldName
-                                << NamespaceStringUtil::serialize(nss)));
+                entry.setQ(BSON(
+                    UserWriteBlockingCriticalSectionDocument::kNssFieldName
+                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
                 // At most one doc can possibly match the above query.
                 entry.setMulti(false);
                 return entry;

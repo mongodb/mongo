@@ -382,7 +382,8 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
     // is a temporary collection that shall be garbage-collected (dropped) on the next stepup.
     BatchedCommandRequest bcr(write_ops::InsertCommandRequest{
         NamespaceString(NamespaceString::kAggTempCollections),
-        std::vector<BSONObj>({BSON("_id" << NamespaceStringUtil::serialize(nss))})});
+        std::vector<BSONObj>({BSON(
+            "_id" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))})});
     bcr.setWriteConcern(CommandHelpers::kMajorityWriteConcern.toBSON());
     writeToLocalShard(opCtx, bcr);
 
@@ -399,7 +400,8 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), ns.dbName());
     router.route(
         opCtx,
-        "copying index for empty collection {}"_format(NamespaceStringUtil::serialize(ns)),
+        "copying index for empty collection {}"_format(
+            NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())),
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
             BSONObjBuilder cmdBuilder;
             cmdBuilder.append("createIndexes", ns.coll());
@@ -469,7 +471,8 @@ void ShardServerProcessInterface::dropTempCollection(OperationContext* opCtx,
     // Remove the garbage-collector entry associated to it.
     BatchedCommandRequest bcr(write_ops::DeleteCommandRequest{
         NamespaceString(NamespaceString::kAggTempCollections),
-        {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(nss)),
+        {write_ops::DeleteOpEntry(BSON("_id" << NamespaceStringUtil::serialize(
+                                           nss, SerializationContext::stateDefault())),
                                   false /* multi */)}});
     bcr.setWriteConcern(CommandHelpers::kMajorityWriteConcern.toBSON());
     writeToLocalShard(opCtx, std::move(bcr));

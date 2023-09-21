@@ -256,13 +256,15 @@ DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      StringData reason,
                                                      LockMode mode,
                                                      bool waitForRecovery)
-    : ScopedBaseDDLLock(opCtx,
-                        locker,
-                        NamespaceStringUtil::serialize(ns),
-                        ResourceId{RESOURCE_DDL_COLLECTION, NamespaceStringUtil::serialize(ns)},
-                        reason,
-                        mode,
-                        waitForRecovery) {}
+    : ScopedBaseDDLLock(
+          opCtx,
+          locker,
+          NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault()),
+          ResourceId{RESOURCE_DDL_COLLECTION,
+                     NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())},
+          reason,
+          mode,
+          waitForRecovery) {}
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,
                                                      Locker* locker,

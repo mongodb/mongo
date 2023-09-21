@@ -143,7 +143,9 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
     //     }
     // }
     stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss)}}.toBson(),
+        Doc{{CollectionType::kNssFieldName,
+             NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())}}
+            .toBson(),
         expCtx));
 
     // 2. Two $unionWith stages guarded by a mutually exclusive condition on whether the refresh is
@@ -268,9 +270,10 @@ AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opC
         return Doc{
             {"coll", CollectionType::ConfigNS.coll()},
             {"pipeline",
-             Arr{Value{Doc{
-                     {"$match",
-                      Doc{{CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss)}}}}},
+             Arr{Value{Doc{{"$match",
+                            Doc{{CollectionType::kNssFieldName,
+                                 NamespaceStringUtil::serialize(
+                                     nss, SerializationContext::stateDefault())}}}}},
                  Value{Doc{{"$match", Doc{{CollectionType::kEpochFieldName, lastmodEpochMatch}}}}},
                  Value{Doc{{"$lookup", lookupPipeline}}},
                  Value{Doc{{"$unwind", Doc{{"path", "$" + chunksLookupOutputFieldName}}}}},
@@ -314,7 +317,9 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     //     }
     // }
     stages.emplace_back(DocumentSourceMatch::create(
-        Doc{{CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss)}}.toBson(),
+        Doc{{CollectionType::kNssFieldName,
+             NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())}}
+            .toBson(),
         expCtx));
 
     // 2. Retrieve config.csrs.indexes entries with the same uuid as the one from the
@@ -559,14 +564,15 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         repl::ReadConcernLevel readConcernLevel) {
     auto collDoc =
-        uassertStatusOK(_exhaustiveFindOnConfig(opCtx,
-                                                kConfigReadSelector,
-                                                readConcernLevel,
-                                                CollectionType::ConfigNS,
-                                                BSON(CollectionType::kNssFieldName
-                                                     << NamespaceStringUtil::serialize(nss)),
-                                                BSONObj(),
-                                                1))
+        uassertStatusOK(_exhaustiveFindOnConfig(
+                            opCtx,
+                            kConfigReadSelector,
+                            readConcernLevel,
+                            CollectionType::ConfigNS,
+                            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                     nss, SerializationContext::stateDefault())),
+                            BSONObj(),
+                            1))
             .value;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "collection " << nss.toStringForErrorMsg() << " not found",
@@ -960,14 +966,14 @@ ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
 
 StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
     OperationContext* opCtx, const NamespaceString& nss) {
-    auto findStatus =
-        _exhaustiveFindOnConfig(opCtx,
-                                kConfigReadSelector,
-                                repl::ReadConcernLevel::kMajorityReadConcern,
-                                TagsType::ConfigNS,
-                                BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))),
-                                BSON(TagsType::min() << 1),
-                                boost::none);  // no limit
+    auto findStatus = _exhaustiveFindOnConfig(opCtx,
+                                              kConfigReadSelector,
+                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              TagsType::ConfigNS,
+                                              BSON(TagsType::ns(NamespaceStringUtil::serialize(
+                                                  nss, SerializationContext::stateDefault()))),
+                                              BSON(TagsType::min() << 1),
+                                              boost::none);  // no limit
     if (!findStatus.isOK()) {
         return findStatus.getStatus().withContext("Failed to load tags");
     }
@@ -1569,7 +1575,8 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
     // 1. Get all the history entries prior to the requested time concerning either the collection
     // or the parent database.
     const auto& kMarkerNss = NamespaceStringUtil::serialize(
-        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker);
+        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+        SerializationContext::stateDefault());
     auto matchStage = [&]() {
         bool isClusterSearch = !nss.has_value();
         if (isClusterSearch)

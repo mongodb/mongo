@@ -590,7 +590,8 @@ void setInitializationTimeOnPlacementHistory(
         write_ops::DeleteOpEntry entryDelMarker;
         entryDelMarker.setQ(
             BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(
-                     ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker)));
+                     ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+                     SerializationContext::stateDefault())));
         entryDelMarker.setMulti(true);
         deleteRequest.setDeletes({entryDelMarker});
 
@@ -1483,9 +1484,10 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
              << "$" + NamespacePlacementType::kNssFieldName << "mostRecentTimestamp"
              << BSON("$max"
                      << "$" + NamespacePlacementType::kTimestampFieldName)));
-    pipeline.addStage<DocumentSourceMatch>(BSON(
-        "_id" << BSON("$ne" << NamespaceStringUtil::serialize(
-                          ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker))));
+    pipeline.addStage<DocumentSourceMatch>(
+        BSON("_id" << BSON("$ne" << NamespaceStringUtil::serialize(
+                               ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker,
+                               SerializationContext::stateDefault()))));
 
     auto aggRequest = pipeline.buildAsAggregateCommandRequest();
 
@@ -1506,10 +1508,11 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
             write_ops::DeleteOpEntry stmt;
 
             const auto minTimeToPreserve = std::min(timeOfMostRecentDoc, earliestClusterTime);
-            stmt.setQ(BSON(NamespacePlacementType::kNssFieldName
-                           << NamespaceStringUtil::serialize(nss)
-                           << NamespacePlacementType::kTimestampFieldName
-                           << BSON("$lt" << minTimeToPreserve)));
+            stmt.setQ(
+                BSON(NamespacePlacementType::kNssFieldName
+                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                     << NamespacePlacementType::kTimestampFieldName
+                     << BSON("$lt" << minTimeToPreserve)));
             stmt.setMulti(true);
             deleteStatements.emplace_back(std::move(stmt));
         }

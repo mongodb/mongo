@@ -58,7 +58,9 @@ BSONObj ClonerUtils::makeTenantDatabaseFilter(StringData prefix) {
 
 BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
     BSONObjBuilder bob;
-    bob.append("find", NamespaceStringUtil::serialize(NamespaceString::kSystemReplSetNamespace));
+    bob.append("find",
+               NamespaceStringUtil::serialize(NamespaceString::kSystemReplSetNamespace,
+                                              SerializationContext::stateDefault()));
     bob.append("filter", BSONObj());
     ReadConcernArgs readConcern(LogicalTime(operationTime), ReadConcernLevel::kMajorityReadConcern);
     readConcern.appendInfo(&bob);

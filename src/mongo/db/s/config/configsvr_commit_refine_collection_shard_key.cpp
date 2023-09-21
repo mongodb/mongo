@@ -64,9 +64,10 @@ public:
             // finishes the writes will be majority written.
             opCtx->setWriteConcern(opCtx->getWriteConcern());
 
-            audit::logRefineCollectionShardKey(opCtx->getClient(),
-                                               NamespaceStringUtil::serialize(ns()),
-                                               request().getKey().toBSON());
+            audit::logRefineCollectionShardKey(
+                opCtx->getClient(),
+                NamespaceStringUtil::serialize(ns(), SerializationContext::stateDefault()),
+                request().getKey().toBSON());
 
             ShardingCatalogManager::get(opCtx)->commitRefineCollectionShardKey(
                 opCtx,

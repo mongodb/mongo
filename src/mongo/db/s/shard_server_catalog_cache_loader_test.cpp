@@ -623,7 +623,8 @@ TEST_F(ShardServerCatalogCacheLoaderTest, RecoverAfterPartiallyFlushedMetadata) 
 
     ASSERT_OK(shardmetadatautil::updateShardCollectionsEntry(
         operationContext(),
-        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(kNss)),
+        BSON(ShardCollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(kNss, SerializationContext::stateDefault())),
         BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
         false));
 

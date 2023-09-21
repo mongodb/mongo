@@ -462,7 +462,8 @@ void OpObserverImpl::onStartIndexBuildSinglePhase(OperationContext* opCtx,
         {},
         boost::none,
         BSON("msg" << std::string(str::stream() << "Creating indexes. Coll: "
-                                                << NamespaceStringUtil::serialize(nss))),
+                                                << NamespaceStringUtil::serialize(
+                                                       nss, SerializationContext::stateDefault()))),
         boost::none,
         boost::none,
         boost::none,
@@ -481,7 +482,8 @@ void OpObserverImpl::onAbortIndexBuildSinglePhase(OperationContext* opCtx,
         {},
         boost::none,
         BSON("msg" << std::string(str::stream() << "Aborting indexes. Coll: "
-                                                << NamespaceStringUtil::serialize(nss))),
+                                                << NamespaceStringUtil::serialize(
+                                                       nss, SerializationContext::stateDefault()))),
         boost::none,
         boost::none,
         boost::none,
@@ -1322,8 +1324,11 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  bool markFromMigrate) {
     BSONObjBuilder builder;
 
-    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection));
-    builder.append("to", NamespaceStringUtil::serialize(toCollection));
+    builder.append(
+        "renameCollection",
+        NamespaceStringUtil::serialize(fromCollection, SerializationContext::stateDefault()));
+    builder.append(
+        "to", NamespaceStringUtil::serialize(toCollection, SerializationContext::stateDefault()));
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
@@ -1955,7 +1960,8 @@ void OpObserverImpl::onModifyCollectionShardingIndexCatalog(OperationContext* op
                                                             const UUID& uuid,
                                                             BSONObj opDoc) {
     repl::MutableOplogEntry oplogEntry;
-    auto obj = BSON(kShardingIndexCatalogOplogEntryName << NamespaceStringUtil::serialize(nss))
+    auto obj = BSON(kShardingIndexCatalogOplogEntryName
+                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))
                    .addFields(opDoc);
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(nss);

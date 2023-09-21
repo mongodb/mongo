@@ -124,7 +124,8 @@ StatusWith<long long> retrieveCollectionShardSize(OperationContext* opCtx,
 
     const Minutes maxTimeMSOverride{10};
     const auto cmdObj =
-        BSON("dataSize" << NamespaceStringUtil::serialize(ns) << "estimate" << estimate);
+        BSON("dataSize" << NamespaceStringUtil::serialize(ns, SerializationContext::stateDefault())
+                        << "estimate" << estimate);
     auto statStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
@@ -226,7 +227,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     }
 
     BSONObjBuilder cmd;
-    cmd.append("splitChunk", NamespaceStringUtil::serialize(nss));
+    cmd.append("splitChunk",
+               NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     cmd.append("epoch", epoch);

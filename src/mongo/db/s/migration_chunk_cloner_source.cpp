@@ -144,7 +144,8 @@ BSONObj createRequestWithSessionId(StringData commandName,
                                    const MigrationSessionId& sessionId,
                                    bool waitForSteadyOrDone = false) {
     BSONObjBuilder builder;
-    builder.append(commandName, NamespaceStringUtil::serialize(nss));
+    builder.append(commandName,
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     builder.append("waitForSteadyOrDone", waitForSteadyOrDone);
     sessionId.append(&builder);
     return builder.obj();
@@ -455,7 +456,8 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
 
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
-        builder.append(kRecvChunkCommit, NamespaceStringUtil::serialize(nss()));
+        builder.append(kRecvChunkCommit,
+                       NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault()));
         _sessionId.append(&builder);
         return builder.obj();
     }());
@@ -1316,7 +1318,8 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                                   << migrationSessionIdStatus.getStatus().toString()};
         }
 
-        if (res["ns"].str() != NamespaceStringUtil::serialize(nss()) ||
+        if (NamespaceStringUtil::deserialize(
+                boost::none, res["ns"].str(), SerializationContext::stateDefault()) != nss() ||
             (res.hasField("fromShardId")
                  ? (res["fromShardId"].str() != _args.getFromShard().toString())
                  : (res["from"].str() != _donorConnStr.toString())) ||

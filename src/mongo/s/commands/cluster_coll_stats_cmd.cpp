@@ -382,7 +382,8 @@ public:
             shardStats.append(shardId.toString(), scaleIndividualShardStatistics(res, scale));
         }
 
-        result.append("ns", NamespaceStringUtil::serialize(nss));
+        result.append("ns",
+                      NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 
         for (const auto& countEntry : counts) {
             if (fieldIsAnyOf(countEntry.first,

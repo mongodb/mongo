@@ -148,7 +148,8 @@ BSONObj SplitChunkRequest::toConfigCommandBSON(const BSONObj& writeConcern) {
 }
 
 void SplitChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append(kConfigsvrSplitChunk, NamespaceStringUtil::serialize(_nss));
+    cmdBuilder->append(kConfigsvrSplitChunk,
+                       NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
     cmdBuilder->append(kCollEpoch, _epoch);
     _chunkRange.append(cmdBuilder);
     {

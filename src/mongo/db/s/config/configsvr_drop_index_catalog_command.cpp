@@ -112,7 +112,8 @@ void dropIndexInTransaction(OperationContext* opCtx,
     updateCollectionOp->setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
         entry.setQ(BSON(CollectionType::kNssFieldName
-                        << NamespaceStringUtil::serialize(userCollectionNss)
+                        << NamespaceStringUtil::serialize(userCollectionNss,
+                                                          SerializationContext::stateDefault())
                         << CollectionType::kUuidFieldName << collectionUUID));
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$set" << BSON(CollectionType::kUuidFieldName

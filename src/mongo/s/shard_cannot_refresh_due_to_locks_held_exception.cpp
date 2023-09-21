@@ -41,7 +41,8 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ShardCannotRefreshDueToLocksHeldInfo);
 }  // namespace
 
 void ShardCannotRefreshDueToLocksHeldInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append(kNssFieldName, NamespaceStringUtil::serialize(_nss));
+    bob->append(kNssFieldName,
+                NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
 }
 
 std::shared_ptr<const ErrorExtraInfo> ShardCannotRefreshDueToLocksHeldInfo::parse(

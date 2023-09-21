@@ -175,10 +175,10 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
                                           const boost::optional<UUID>& dropTargetUUID,
                                           bool stayTemp) {
     const auto cmdNss = fromCollection.getCommandNS();
-
+    const auto sc = SerializationContext::stateDefault();
     BSONObjBuilder builder;
-    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection));
-    builder.append("to", NamespaceStringUtil::serialize(toCollection));
+    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection, sc));
+    builder.append("to", NamespaceStringUtil::serialize(toCollection, sc));
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");

@@ -838,8 +838,10 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
 
     BSONObjBuilder newCmd;
     newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);
-    newCmd.append("from", NamespaceStringUtil::serialize(sourceNs));
-    newCmd.append("to", NamespaceStringUtil::serialize(targetNs));
+    newCmd.append("from",
+                  NamespaceStringUtil::serialize(sourceNs, SerializationContext::stateDefault()));
+    newCmd.append("to",
+                  NamespaceStringUtil::serialize(targetNs, SerializationContext::stateDefault()));
     newCmd.append("collectionOptions", originalCollectionOptions);
     BSONArrayBuilder indexArrayBuilder(newCmd.subarrayStart("indexes"));
     for (auto&& index : originalIndexes) {

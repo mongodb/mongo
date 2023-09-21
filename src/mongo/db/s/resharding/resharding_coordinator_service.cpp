@@ -521,7 +521,8 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
     auto request = BatchedCommandRequest::buildUpdateOp(
         CollectionType::ConfigNS,
         BSON(CollectionType::kNssFieldName
-             << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss())),  // query
+             << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss(),
+                                               SerializationContext::stateDefault())),  // query
         writeOp,
         false,  // upsert
         false   // multi
@@ -569,7 +570,8 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 return BatchedCommandRequest::buildUpdateOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss())),
+                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                           SerializationContext::stateDefault())),
                     BSON("$set" << BSON(
                              "reshardingFields.state"
                              << CoordinatorState_serializer(nextState).toString()
@@ -591,7 +593,8 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 return BatchedCommandRequest::buildDeleteOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss())),
+                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                           SerializationContext::stateDefault())),
                     false  // multi
                 );
             default: {
@@ -618,7 +621,8 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 return BatchedCommandRequest::buildUpdateOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss())),
+                         << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                                           SerializationContext::stateDefault())),
                     updateBuilder.obj(),
                     true,  // upsert
                     false  // multi
@@ -893,8 +897,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                                         txnNumber);
 
             // Delete all of the config.tags entries for the user collection namespace.
-            const auto removeTagsQuery =
-                BSON(TagsType::ns(NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss())));
+            const auto removeTagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
+                coordinatorDoc.getSourceNss(), SerializationContext::stateDefault())));
             removeTagsDocs(opCtx, removeTagsQuery, txnNumber);
 
             // Update all of the config.tags entries for the temporary resharding namespace
@@ -910,12 +914,14 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
         BSON(TagsType::ns(
-            NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss()))),  // query
-        BSON("$set" << BSON(
-                 "ns" << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss()))),  // update
-        false,                                                                             // upsert
-        true,                                                                              // multi
-        hint                                                                               // hint
+            NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss(),
+                                           SerializationContext::stateDefault()))),  // query
+        BSON("$set" << BSON("ns" << NamespaceStringUtil::serialize(
+                                coordinatorDoc.getSourceNss(),
+                                SerializationContext::stateDefault()))),  // update
+        false,                                                            // upsert
+        true,                                                             // multi
+        hint                                                              // hint
     );
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
@@ -935,8 +941,8 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                 opCtx,
                 CollectionType::ConfigNS,
                 txnNumber,
-                BSON(CollectionType::kNssFieldName
-                     << NamespaceStringUtil::serialize(coordinatorDoc.getSourceNss())));
+                BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                         coordinatorDoc.getSourceNss(), SerializationContext::stateDefault())));
 
             uassert(5808200,
                     str::stream() << "config.collection entry not found for "
@@ -969,8 +975,8 @@ void writeParticipantShardsAndTempCollInfo(
     std::vector<BSONObj> zones,
     boost::optional<CollectionIndexes> indexVersion,
     boost::optional<bool> isUnsplittable) {
-    const auto tagsQuery = BSON(
-        TagsType::ns(NamespaceStringUtil::serialize(updatedCoordinatorDoc.getTempReshardingNss())));
+    const auto tagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
+        updatedCoordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
 
     removeChunkAndTagsDocs(opCtx, tagsQuery, updatedCoordinatorDoc.getReshardingUUID());
     insertChunkAndTagDocsForTempNss(opCtx, initialChunks, zones);
@@ -1073,8 +1079,8 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
     }
     emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
-    const auto tagsQuery =
-        BSON(TagsType::ns(NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss())));
+    const auto tagsQuery = BSON(TagsType::ns(NamespaceStringUtil::serialize(
+        coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())));
     // Once the decision has been persisted, the coordinator would have modified the
     // config.chunks and config.collections entry. This means that the UUID of the
     // non-temp collection is now the UUID of what was previously the UUID of the temp
@@ -1086,8 +1092,8 @@ ReshardingCoordinatorDocument removeOrQuiesceCoordinatorDocAndRemoveReshardingFi
         uassertStatusOK(catalogClient->removeConfigDocuments(
             opCtx,
             CollectionType::ConfigNS,
-            BSON(CollectionType::kNssFieldName
-                 << NamespaceStringUtil::serialize(coordinatorDoc.getTempReshardingNss())),
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                     coordinatorDoc.getTempReshardingNss(), SerializationContext::stateDefault())),
             kMajorityWriteConcern));
 
         removeChunkAndTagsDocs(opCtx, tagsQuery, coordinatorDoc.getReshardingUUID());
@@ -1464,7 +1470,9 @@ void ReshardingCoordinator::installCoordinatorDoc(
     BSONObjBuilder bob;
     bob.append("newState", CoordinatorState_serializer(doc.getState()));
     bob.append("oldState", CoordinatorState_serializer(_coordinatorDoc.getState()));
-    bob.append("namespace", NamespaceStringUtil::serialize(doc.getSourceNss()));
+    bob.append(
+        "namespace",
+        NamespaceStringUtil::serialize(doc.getSourceNss(), SerializationContext::stateDefault()));
     bob.append("collectionUUID", doc.getSourceUUID().toString());
     bob.append("reshardingUUID", doc.getReshardingUUID().toString());
 
@@ -1907,7 +1915,8 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
                     auto ns = data.getStringField("sourceNamespace");
                     return ns.empty() ? true
                                       : ns.toString() ==
-                            NamespaceStringUtil::serialize(_coordinatorDoc.getSourceNss());
+                            NamespaceStringUtil::serialize(_coordinatorDoc.getSourceNss(),
+                                                           SerializationContext::stateDefault());
                 });
 
             {

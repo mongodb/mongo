@@ -253,7 +253,8 @@ void statsToBSON(const QuerySolutionNode* node,
             auto eln = static_cast<const EqLookupNode*>(node);
 
             bob->append("foreignCollection",
-                        NamespaceStringUtil::serialize(eln->foreignCollection));
+                        NamespaceStringUtil::serialize(eln->foreignCollection,
+                                                       SerializationContext::stateDefault()));
             bob->append("localField", eln->joinFieldLocal.fullPath());
             bob->append("foreignField", eln->joinFieldForeign.fullPath());
             bob->append("asField", eln->joinField.fullPath());

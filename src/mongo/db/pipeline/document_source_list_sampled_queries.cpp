@@ -87,8 +87,10 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
 
         std::vector<BSONObj> stages;
         if (auto& nss = _spec.getNamespace()) {
-            stages.push_back(BSON("$match" << BSON(SampledQueryDocument::kNsFieldName
-                                                   << NamespaceStringUtil::serialize(*nss))));
+            stages.push_back(
+                BSON("$match" << BSON(SampledQueryDocument::kNsFieldName
+                                      << NamespaceStringUtil::serialize(
+                                             *nss, SerializationContext::stateDefault()))));
         }
         try {
             _pipeline = Pipeline::makePipeline(stages, foreignExpCtx, opts);

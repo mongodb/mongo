@@ -200,8 +200,9 @@ boost::optional<BSONObj> RenameParticipantInstance::reportForCurrentOp(
     bob.append("type", "op");
     bob.append("desc", "RenameParticipantInstance");
     bob.append("op", "command");
-    bob.append("ns", NamespaceStringUtil::serialize(fromNss()));
-    bob.append("to", NamespaceStringUtil::serialize(toNss()));
+    bob.append("ns",
+               NamespaceStringUtil::serialize(fromNss(), SerializationContext::stateDefault()));
+    bob.append("to", NamespaceStringUtil::serialize(toNss(), SerializationContext::stateDefault()));
     bob.append("command", cmdBob.obj());
     bob.append("currentPhase", _doc.getPhase());
     bob.append("active", true);
@@ -238,7 +239,8 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
         }
     } else {
         store.update(opCtx.get(),
-                     BSON(StateDoc::kFromNssFieldName << NamespaceStringUtil::serialize(fromNss())),
+                     BSON(StateDoc::kFromNssFieldName << NamespaceStringUtil::serialize(
+                              fromNss(), SerializationContext::stateDefault())),
                      newDoc.toBSON(),
                      WriteConcerns::kMajorityWriteConcernNoTimeout);
     }
@@ -255,7 +257,8 @@ void RenameParticipantInstance::_removeStateDocument(OperationContext* opCtx) {
 
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingRenameParticipantsNamespace);
     store.remove(opCtx,
-                 BSON(StateDoc::kFromNssFieldName << NamespaceStringUtil::serialize(fromNss())),
+                 BSON(StateDoc::kFromNssFieldName << NamespaceStringUtil::serialize(
+                          fromNss(), SerializationContext::stateDefault())),
                  WriteConcerns::kMajorityWriteConcernNoTimeout);
 
     _doc = {};
@@ -443,8 +446,12 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 // released.
                 const auto reason = BSON("command"
                                          << "rename"
-                                         << "from" << NamespaceStringUtil::serialize(fromNss())
-                                         << "to" << NamespaceStringUtil::serialize(toNss()));
+                                         << "from"
+                                         << NamespaceStringUtil::serialize(
+                                                fromNss(), SerializationContext::stateDefault())
+                                         << "to"
+                                         << NamespaceStringUtil::serialize(
+                                                toNss(), SerializationContext::stateDefault()));
                 auto service = ShardingRecoveryService::get(opCtx);
                 service->releaseRecoverableCriticalSection(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);

@@ -52,7 +52,7 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTe
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
-    ASSERT_EQ(NamespaceStringUtil::serialize(nss), "foo.bar");
+    ASSERT_EQ(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()), "foo.bar");
 }
 
 // TenantID is included in serialization when multitenancySupport is enabled and
@@ -63,14 +63,15 @@ TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTe
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
-    ASSERT_EQ(NamespaceStringUtil::serialize(nss), tenantNsStr);
+    ASSERT_EQ(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
+              tenantNsStr);
 }
 
 // Serialize correctly when multitenancySupport is disabled.
 TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOff) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
-    ASSERT_EQ(NamespaceStringUtil::serialize(nss), "foo.bar");
+    ASSERT_EQ(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()), "foo.bar");
 }
 
 // Assert that if multitenancySupport and featureFlagRequireTenantID are on, then tenantId is set.

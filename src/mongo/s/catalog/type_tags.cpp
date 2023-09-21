@@ -144,7 +144,9 @@ BSONObj TagsType::toBSON() const {
     BSONObjBuilder builder;
 
     if (_ns)
-        builder.append(ns.name(), NamespaceStringUtil::serialize(getNS()));
+        builder.append(
+            ns.name(),
+            NamespaceStringUtil::serialize(getNS(), SerializationContext::stateDefault()));
     if (_tag)
         builder.append(tag.name(), getTag());
     if (_minKey)

@@ -149,7 +149,8 @@ ReshardingCollectionCloner::makeRawPipeline(
     auto tempNss =
         resharding::constructTemporaryReshardingNss(_sourceNss.db_forSharding(), _sourceUUID);
     auto tempCacheChunksNss = NamespaceString::makeGlobalConfigCollection(
-        "cache.chunks." + NamespaceStringUtil::serialize(tempNss));
+        "cache.chunks." +
+        NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()));
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
 
     // Pipeline::makePipeline() ignores the collation set on the AggregationRequest (or lack
@@ -219,7 +220,8 @@ ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
     auto tempNss =
         resharding::constructTemporaryReshardingNss(_sourceNss.db_forSharding(), _sourceUUID);
     auto tempCacheChunksNss = NamespaceString::makeGlobalConfigCollection(
-        "cache.chunks." + NamespaceStringUtil::serialize(tempNss));
+        "cache.chunks." +
+        NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()));
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,

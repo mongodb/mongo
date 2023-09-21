@@ -231,7 +231,8 @@ std::string DocumentSourceChangeStream::getCmdNsRegexForChangeStream(
         case ChangeStreamType::kSingleDatabase:
             // Match the target database command namespace exactly.
             return "^" +
-                regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(nss.getCommandNS())) +
+                regexEscapeNsForChangeStream(NamespaceStringUtil::serialize(
+                    nss.getCommandNS(), SerializationContext::stateDefault())) +
                 "$";
         case ChangeStreamType::kAllChangesForCluster:
             // Match all command namespaces on any database.

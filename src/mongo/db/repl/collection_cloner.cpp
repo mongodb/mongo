@@ -116,7 +116,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
                      "documents copied",
-                     str::stream() << NamespaceStringUtil::serialize(_sourceNss)
+                     str::stream() << NamespaceStringUtil::serialize(
+                                          _sourceNss, SerializationContext::stateDefault())
                                    << " collection clone progress"),
       _scheduleDbWorkFn([this](executor::TaskExecutor::CallbackFn work) {
           auto task = [this, work = std::move(work)](
@@ -540,7 +541,7 @@ std::string CollectionCloner::Stats::toString() const {
 
 BSONObj CollectionCloner::Stats::toBSON() const {
     BSONObjBuilder bob;
-    bob.append("ns", NamespaceStringUtil::serialize(nss));
+    bob.append("ns", NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     append(&bob);
     return bob.obj();
 }

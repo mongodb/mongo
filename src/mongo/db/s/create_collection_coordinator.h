@@ -82,7 +82,9 @@ public:
           _request(_doc.getShardsvrCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
-                              << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
+                              << "ns"
+                              << NamespaceStringUtil::serialize(
+                                     originalNss(), SerializationContext::stateDefault()))) {}
 
     ~CreateCollectionCoordinatorLegacy() = default;
 
@@ -138,7 +140,9 @@ public:
           _request(_doc.getShardsvrCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
-                              << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
+                              << "ns"
+                              << NamespaceStringUtil::serialize(
+                                     originalNss(), SerializationContext::stateDefault()))) {}
 
     ~CreateCollectionCoordinator() = default;
 

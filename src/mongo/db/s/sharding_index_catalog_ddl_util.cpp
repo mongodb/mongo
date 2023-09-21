@@ -120,8 +120,9 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
 
             {
                 // First get the document to check the index version if the document already exists
-                const auto queryTo = BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                                          << NamespaceStringUtil::serialize(toNss));
+                const auto queryTo = BSON(
+                    ShardAuthoritativeCollectionType::kNssFieldName
+                    << NamespaceStringUtil::serialize(toNss, SerializationContext::stateDefault()));
                 BSONObj collectionToDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollectionPtr(), queryTo, collectionToDoc);
@@ -154,7 +155,8 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
                 // Replace the _id in the 'From' entry.
                 BSONObj collectionFromDoc;
                 auto queryFrom =
-                    BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(fromNss));
+                    BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                             fromNss, SerializationContext::stateDefault()));
                 fassert(7082801,
                         Helpers::findOne(
                             opCtx, collsColl.getCollectionPtr(), queryFrom, collectionFromDoc));
@@ -216,12 +218,13 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
 
             auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
-
+            const auto usserCollectionNssStr = NamespaceStringUtil::serialize(
+                userCollectionNss, SerializationContext::stateDefault());
             {
                 // First get the document to check the index version if the document already exists
                 const auto query =
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(userCollectionNss)
+                         << usserCollectionNssStr
                          << ShardAuthoritativeCollectionType::kUuidFieldName << collectionUUID);
                 BSONObj collectionDoc;
                 bool docExists =
@@ -247,7 +250,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                 request.setQuery(query);
                 request.setUpdateModification(
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(userCollectionNss)
+                         << usserCollectionNssStr
                          << ShardAuthoritativeCollectionType::kUuidFieldName << collectionUUID
                          << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
@@ -300,13 +303,13 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
 
             auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
-
+            const auto nssStr =
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
             {
                 // First get the document to check the index version if the document already exists
                 const auto query =
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(nss)
-                         << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
+                         << nssStr << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc);
@@ -331,8 +334,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                 request.setQuery(query);
                 request.setUpdateModification(
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(nss)
-                         << ShardAuthoritativeCollectionType::kUuidFieldName << uuid
+                         << nssStr << ShardAuthoritativeCollectionType::kUuidFieldName << uuid
                          << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
@@ -385,12 +387,12 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
 
             auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
-
+            const auto nssStr =
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
             {
                 const auto query =
                     BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(nss)
-                         << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
+                         << nssStr << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc);
@@ -418,8 +420,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                 request.setQuery(query);
                 request.setUpdateModification(BSON(
                     ShardAuthoritativeCollectionType::kNssFieldName
-                    << NamespaceStringUtil::serialize(nss)
-                    << ShardAuthoritativeCollectionType::kUuidFieldName << uuid
+                    << nssStr << ShardAuthoritativeCollectionType::kUuidFieldName << uuid
                     << ShardAuthoritativeCollectionType::kIndexVersionFieldName << indexVersion));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
@@ -479,10 +480,10 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
             const auto& collsColl =
                 acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
             const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
-
             {
-                const auto query = BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                                        << NamespaceStringUtil::serialize(nss));
+                const auto query = BSON(
+                    ShardAuthoritativeCollectionType::kNssFieldName
+                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
                 BSONObj collectionDoc;
                 // Get the collection UUID, if nothing is found, return early.
                 if (!Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc)) {
@@ -544,10 +545,10 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
 
             {
                 // First unset the index version.
-                const auto query =
-                    BSON(ShardAuthoritativeCollectionType::kNssFieldName
-                         << NamespaceStringUtil::serialize(nss)
-                         << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
+                const auto query = BSON(
+                    ShardAuthoritativeCollectionType::kNssFieldName
+                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
+                    << ShardAuthoritativeCollectionType::kUuidFieldName << uuid);
                 BSONObj collectionDoc;
                 bool docExists =
                     Helpers::findOne(opCtx, collsColl.getCollectionPtr(), query, collectionDoc);

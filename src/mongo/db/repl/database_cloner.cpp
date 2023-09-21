@@ -228,8 +228,8 @@ void DatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
     }
 
     for (auto&& collection : collectionStats) {
-        BSONObjBuilder collectionBuilder(
-            builder->subobjStart(NamespaceStringUtil::serialize(collection.nss)));
+        BSONObjBuilder collectionBuilder(builder->subobjStart(
+            NamespaceStringUtil::serialize(collection.nss, SerializationContext::stateDefault())));
         collection.append(&collectionBuilder);
         collectionBuilder.doneFast();
     }

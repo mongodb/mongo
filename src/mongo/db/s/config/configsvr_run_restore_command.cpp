@@ -107,9 +107,11 @@ ShouldRestoreDocument shouldRestoreDocument(OperationContext* opCtx,
     auto findRequest = FindCommandRequest(NamespaceString::kConfigsvrRestoreNamespace);
     if (nss && uuid) {
         findRequest.setFilter(
-            BSON("ns" << NamespaceStringUtil::serialize(*nss) << "uuid" << *uuid));
+            BSON("ns" << NamespaceStringUtil::serialize(*nss, SerializationContext::stateDefault())
+                      << "uuid" << *uuid));
     } else if (nss) {
-        findRequest.setFilter(BSON("ns" << NamespaceStringUtil::serialize(*nss)));
+        findRequest.setFilter(BSON(
+            "ns" << NamespaceStringUtil::serialize(*nss, SerializationContext::stateDefault())));
     } else if (uuid) {
         findRequest.setFilter(BSON("uuid" << *uuid));
     }

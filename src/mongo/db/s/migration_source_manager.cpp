@@ -461,7 +461,8 @@ void MigrationSourceManager::enterCriticalSection() {
     uassertStatusOKWithContext(
         shardmetadatautil::updateShardCollectionsEntry(
             _opCtx,
-            BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss())),
+            BSON(ShardCollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())),
             BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
             false /*upsert*/),
         "Persist critical section signal for secondaries");

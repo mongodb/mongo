@@ -275,7 +275,9 @@ protected:
 
         // Append static info
         bob.append("type", "op");
-        bob.append("ns", NamespaceStringUtil::serialize(originalNss()));
+        bob.append(
+            "ns",
+            NamespaceStringUtil::serialize(originalNss(), SerializationContext::stateDefault()));
         bob.append("desc", _coordinatorName);
         bob.append("op", "command");
         bob.append("active", true);
@@ -285,7 +287,9 @@ protected:
             stdx::lock_guard lk{_docMutex};
             if (const auto& bucketNss = _doc.getBucketNss()) {
                 // Bucket namespace is only present in case the collection is a sharded timeseries
-                bob.append("bucketNamespace", NamespaceStringUtil::serialize(bucketNss.get()));
+                bob.append("bucketNamespace",
+                           NamespaceStringUtil::serialize(bucketNss.get(),
+                                                          SerializationContext::stateDefault()));
             }
         }
 

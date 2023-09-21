@@ -290,7 +290,7 @@ void DropCollectionCoordinator::_commitDropCollection(
     sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(
         opCtx,
         BSON(analyze_shard_key::QueryAnalyzerDocument::kNsFieldName
-             << NamespaceStringUtil::serialize(nss())));
+             << NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault())));
 
     if (collIsSharded) {
         invariant(_doc.getCollInfo());

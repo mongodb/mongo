@@ -50,7 +50,7 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 }  // namespace
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", NamespaceStringUtil::serialize(_nss));
+    bob->append("ns", NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
     _received.serialize("vReceived", bob);
     if (_wanted)
         _wanted->serialize("vWanted", bob);
@@ -76,7 +76,7 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
 }
 
 void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", NamespaceStringUtil::serialize(_nss));
+    bob->append("ns", NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
     _received.serialize("vReceived", bob);
     _wanted.serialize("vWanted", bob);
 }

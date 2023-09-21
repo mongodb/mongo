@@ -99,7 +99,8 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         nss.tenantId()->serializeToBSON(OplogEntryBase::kTidFieldName, &builder);
     }
-    builder.append(OplogEntryBase::kNssFieldName, NamespaceStringUtil::serialize(nss));
+    builder.append(OplogEntryBase::kNssFieldName,
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime);
     if (uuid) {
         uuid->appendToBuilder(&builder, OplogEntryBase::kUuidFieldName);

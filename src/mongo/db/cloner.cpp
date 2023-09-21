@@ -639,7 +639,8 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
 
         const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 
-        clonedColls->insert(NamespaceStringUtil::serialize(nss));
+        clonedColls->insert(
+            NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 
         LOGV2_DEBUG(20421, 1, "\t\t cloning", logAttrs(nss), "host"_attr = masterHost);
 

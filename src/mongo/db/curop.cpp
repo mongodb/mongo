@@ -615,7 +615,7 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
 }
 
 std::string CurOp::getNS() const {
-    return NamespaceStringUtil::serialize(_nss);
+    return NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault());
 }
 
 // Failpoints after commands are logged.
@@ -1803,7 +1803,8 @@ static void appendResolvedViewsInfoImpl(
         const std::vector<BSONObj>& pipeline = kv.second.second;
 
         BSONObjBuilder aView;
-        aView.append("viewNamespace", NamespaceStringUtil::serialize(viewNss));
+        aView.append("viewNamespace",
+                     NamespaceStringUtil::serialize(viewNss, SerializationContext::stateDefault()));
 
         BSONArrayBuilder dependenciesArr(aView.subarrayStart("dependencyChain"));
         for (const auto& nss : dependencies) {

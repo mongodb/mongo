@@ -69,14 +69,11 @@ public:
      *
      * Do not use this function when serializing a NamespaceString object for catalog.
      */
-    static std::string serialize(
-        const NamespaceString& ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serialize(const NamespaceString& ns, const SerializationContext& context);
 
-    static std::string serialize(
-        const NamespaceString& ns,
-        const SerializationOptions& options,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static std::string serialize(const NamespaceString& ns,
+                                 const SerializationOptions& options,
+                                 const SerializationContext& context);
 
     /**
      * Serializes a NamespaceString object for catalog.

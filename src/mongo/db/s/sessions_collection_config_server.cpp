@@ -161,7 +161,8 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
     if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         replCoord->canAcceptWritesFor(opCtx, CollectionType::ConfigNS)) {
         auto filterQuery =
-            BSON("_id" << NamespaceStringUtil::serialize(NamespaceString::kLogicalSessionsNamespace)
+            BSON("_id" << NamespaceStringUtil::serialize(NamespaceString::kLogicalSessionsNamespace,
+                                                         SerializationContext::stateDefault())
                        << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
         auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
                                                << logical_sessions::kMaxChunkSizeBytes));

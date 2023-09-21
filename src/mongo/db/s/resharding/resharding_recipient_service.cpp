@@ -304,7 +304,8 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _critSecReason(BSON("command"
                           << "resharding_recipient"
                           << "collection"
-                          << NamespaceStringUtil::serialize(_metadata.getSourceNss()))),
+                          << NamespaceStringUtil::serialize(_metadata.getSourceNss(),
+                                                            SerializationContext::stateDefault()))),
       _isAlsoDonor([&]() {
           auto myShardId = _externalState->myShardId(_serviceContext);
           return std::find_if(_donorShards.begin(),

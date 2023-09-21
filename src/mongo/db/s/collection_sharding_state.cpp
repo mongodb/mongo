@@ -65,7 +65,9 @@ public:
 
     struct CSSAndLock {
         CSSAndLock(std::unique_ptr<CollectionShardingState> css)
-            : cssMutex("CSSMutex::" + NamespaceStringUtil::serialize(css->nss())),
+            : cssMutex(
+                  "CSSMutex::" +
+                  NamespaceStringUtil::serialize(css->nss(), SerializationContext::stateDefault())),
               css(std::move(css)) {}
 
         const Lock::ResourceMutex cssMutex;
@@ -81,8 +83,9 @@ public:
     }
 
     CSSAndLock* getOrCreate(const NamespaceString& nss) noexcept {
+        const auto nssStr =
+            NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
         stdx::lock_guard<Latch> lg(_mutex);
-        const auto nssStr = NamespaceStringUtil::serialize(nss);
         auto it = _collections.find(nssStr);
         if (it == _collections.end()) {
             auto inserted =

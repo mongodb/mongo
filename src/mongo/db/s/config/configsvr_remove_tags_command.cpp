@@ -112,7 +112,8 @@ public:
                 uassertStatusOK(catalogClient->removeConfigDocuments(
                     newOpCtxPtr.get(),
                     TagsType::ConfigNS,
-                    BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))),
+                    BSON(TagsType::ns(
+                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))),
                     ShardingCatalogClient::kLocalWriteConcern));
             }
 

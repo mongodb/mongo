@@ -592,7 +592,8 @@ void ParseAndRunCommand::_parseCommand() {
     // Set the logical optype, command object and namespace as soon as we identify the command. If
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
     // namespace db.$cmd.
-    _ns.emplace(NamespaceStringUtil::serialize(_invocation->ns()));
+    _ns.emplace(
+        NamespaceStringUtil::serialize(_invocation->ns(), SerializationContext::stateDefault()));
     const auto nss = (request.getDatabase() == *_ns
                           ? NamespaceString::makeCommandNamespace(_invocation->ns().dbName())
                           : _invocation->ns());
@@ -939,7 +940,8 @@ void ParseAndRunCommand::RunAndRetry::_setup() {
         // Re-parse before retrying in case the process of run()-ning the invocation could
         // affect the parsed result.
         _parc->_invocation = command->parse(opCtx, request);
-        invariant(NamespaceStringUtil::serialize(_parc->_invocation->ns()) == _parc->_ns,
+        invariant(NamespaceStringUtil::serialize(
+                      _parc->_invocation->ns(), SerializationContext::stateDefault()) == _parc->_ns,
                   "unexpected change of namespace when retrying");
     }
 
@@ -1284,8 +1286,8 @@ Future<void> ClientCommand::_handleException(Status status) {
     CommandHelpers::appendCommandStatusNoThrow(bob, status);
     appendRequiredFieldsToResponse(opCtx, &bob);
 
-    // Only attach the topology version to the response if mongos is in quiesce mode. If mongos is
-    // in quiesce mode, this shutdown error is due to mongos rather than a shard.
+    // Only attach the topology version to the response if mongos is in quiesce mode. If mongos
+    // is in quiesce mode, this shutdown error is due to mongos rather than a shard.
     if (ErrorCodes::isA<ErrorCategory::ShutdownError>(status)) {
         if (auto mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
             mongosTopCoord && mongosTopCoord->inQuiesceMode()) {

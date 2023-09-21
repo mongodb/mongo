@@ -143,11 +143,12 @@ void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
 
             // This is a best-effort attempt to refresh the shard 'shardEntry'. Fire and forget an
             // asynchronous '_flushRoutingTableCacheUpdates' request.
-            shard->runFireAndForgetCommand(opCtx,
-                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                           DatabaseName::kAdmin,
-                                           BSON("_flushRoutingTableCacheUpdates"
-                                                << NamespaceStringUtil::serialize(coll.getNss())));
+            shard->runFireAndForgetCommand(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                DatabaseName::kAdmin,
+                BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(
+                         coll.getNss(), SerializationContext::stateDefault())));
         }
     }
 }
@@ -275,7 +276,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
                                            ExecutorPtr txnExec) -> SemiFuture<void> {
         FindCommandRequest collQuery{CollectionType::ConfigNS};
         BSONObjBuilder builder;
-        builder.append(CollectionType::kNssFieldName, NamespaceStringUtil::serialize(nss));
+        builder.append(CollectionType::kNssFieldName,
+                       NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         if (oldTimestamp.is_initialized()) {
             builder.append(CollectionType::kTimestampFieldName, *oldTimestamp);
         }
@@ -300,7 +302,8 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         // Update the config.collections entry for the given namespace.
         auto catalogUpdateRequest = BatchedCommandRequest::buildUpdateOp(
             CollectionType::ConfigNS,
-            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+            BSON(CollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             collType.toBSON(),
             false /* upsert */,
             false /* multi */);
@@ -351,7 +354,7 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         executionTimer.reset();
         auto tagUpdateRequest = BatchedCommandRequest::buildPipelineUpdateOp(
             TagsType::ConfigNS,
-            BSON("ns" << NamespaceStringUtil::serialize(nss)),
+            BSON("ns" << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
             tagUpdates,
             false /* upsert */,
             true /* useMultiUpdate */);
@@ -594,8 +597,9 @@ void ShardingCatalogManager::configureCollectionBalancing(
         withTransaction(opCtx,
                         CollectionType::ConfigNS,
                         [this, &nss, &update](OperationContext* opCtx, TxnNumber txnNumber) {
-                            const auto query = BSON(CollectionType::kNssFieldName
-                                                    << NamespaceStringUtil::serialize(nss));
+                            const auto query = BSON(
+                                CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                    nss, SerializationContext::stateDefault()));
                             const auto res = writeToConfigDocumentInTxn(
                                 opCtx,
                                 CollectionType::ConfigNS,
@@ -682,16 +686,17 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
             }
             updateCmd.append("$set", bucketUp);
 
-            writeToConfigDocumentInTxn(opCtx,
-                                       CollectionType::ConfigNS,
-                                       BatchedCommandRequest::buildUpdateOp(
-                                           CollectionType::ConfigNS,
-                                           BSON(CollectionType::kNssFieldName
-                                                << NamespaceStringUtil::serialize(nss)) /* query */,
-                                           updateCmd.obj() /* update */,
-                                           false /* upsert */,
-                                           false /* multi */),
-                                       txnNumber);
+            writeToConfigDocumentInTxn(
+                opCtx,
+                CollectionType::ConfigNS,
+                BatchedCommandRequest::buildUpdateOp(
+                    CollectionType::ConfigNS,
+                    BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                             nss, SerializationContext::stateDefault())) /* query */,
+                    updateCmd.obj() /* update */,
+                    false /* upsert */,
+                    false /* multi */),
+                txnNumber);
 
             // Bump the chunk version for shards.
             bumpMajorVersionOneChunkPerShard(opCtx,

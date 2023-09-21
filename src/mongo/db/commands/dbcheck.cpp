@@ -1356,8 +1356,8 @@ private:
 
 
     void _dataConsistencyCheck(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
-        const std::string curOpMessage =
-            "Scanning namespace " + NamespaceStringUtil::serialize(info.nss);
+        const std::string curOpMessage = "Scanning namespace " +
+            NamespaceStringUtil::serialize(info.nss, SerializationContext::stateDefault());
         ProgressMeterHolder progress;
         {
             bool collectionFound = false;

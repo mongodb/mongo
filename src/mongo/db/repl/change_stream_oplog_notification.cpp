@@ -102,7 +102,7 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
             MONGO_UNREACHABLE;
     }
 
-    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     cmdBuilder.append(opName, nssStr);
     cmdBuilder.appendElements(cmd);
 
@@ -188,7 +188,8 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
         oplogEntry.setNss(notification.getNss());
         oplogEntry.setTid(notification.getNss().tenantId());
         oplogEntry.setUuid(notification.getSourceUUID());
-        const auto nss = NamespaceStringUtil::serialize(notification.getNss());
+        const auto nss = NamespaceStringUtil::serialize(notification.getNss(),
+                                                        SerializationContext::stateDefault());
         {
             const std::string oMessage = str::stream()
                 << "Reshard collection " << nss << " with shard key "

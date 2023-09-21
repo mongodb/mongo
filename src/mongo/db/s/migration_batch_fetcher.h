@@ -187,7 +187,8 @@ private:
     // Only should be created once for the lifetime of the object.
     BSONObj _createMigrateCloneRequest() const {
         BSONObjBuilder builder;
-        builder.append("_migrateClone", NamespaceStringUtil::serialize(_nss));
+        builder.append("_migrateClone",
+                       NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
         _sessionId.append(&builder);
         return builder.obj();
     }

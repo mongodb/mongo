@@ -273,7 +273,8 @@ BSONObjBuilder _makeMigrationStatusDocumentCommon(const NamespaceString& nss,
     builder.append(kDestinationShard, toShard.toString());
     builder.append(kIsDonorShard, isDonorShard);
     builder.append(kChunk, BSON(ChunkType::min(min) << ChunkType::max(max)));
-    builder.append(kCollection, NamespaceStringUtil::serialize(nss));
+    builder.append(kCollection,
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     return builder;
 }
 
@@ -389,8 +390,9 @@ void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
 
     // The message expected by change streams
     const auto o2Message =
-        BSON("migrateChunkToNewShard" << NamespaceStringUtil::serialize(collNss) << "fromShardId"
-                                      << fromShardId << "toShardId" << toShardId);
+        BSON("migrateChunkToNewShard"
+             << NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault())
+             << "fromShardId" << fromShardId << "toShardId" << toShardId);
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
@@ -423,8 +425,9 @@ void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
 
     // The message expected by change streams
     const auto o2Message =
-        BSON("migrateLastChunkFromShard" << NamespaceStringUtil::serialize(collNss) << "shardId"
-                                         << donorShardId);
+        BSON("migrateLastChunkFromShard"
+             << NamespaceStringUtil::serialize(collNss, SerializationContext::stateDefault())
+             << "shardId" << donorShardId);
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
@@ -580,7 +583,8 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
         NamespaceString::kMigrationCoordinatorsNamespace);
     store.forEach(
         opCtx,
-        BSON(MigrationCoordinatorDocument::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(MigrationCoordinatorDocument::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         [&opCtx, &nss, &migrationRecoveryCount, &cancellationToken](
             const MigrationCoordinatorDocument& doc) {
             LOGV2_DEBUG(4798502,
@@ -721,7 +725,8 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, recipientShardId));
 
         BSONObjBuilder builder;
-        builder.append("_recvChunkReleaseCritSec", NamespaceStringUtil::serialize(nss));
+        builder.append("_recvChunkReleaseCritSec",
+                       NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         sessionId.append(&builder);
         const auto commandObj = CommandHelpers::appendMajorityWriteConcern(builder.obj());
 

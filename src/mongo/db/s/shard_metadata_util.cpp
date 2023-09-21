@@ -99,7 +99,8 @@ Status getStatusFromWriteCommandResponse(const BSONObj& commandResult) {
 Status setPersistedRefreshFlags(OperationContext* opCtx, const NamespaceString& nss) {
     return updateShardCollectionsEntry(
         opCtx,
-        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(ShardCollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
         false /*upsert*/);
 }
@@ -136,7 +137,8 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
 
     return updateShardCollectionsEntry(
         opCtx,
-        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(ShardCollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         BSON("$set" << updateBuilder.obj()),
         false /*upsert*/);
 }
@@ -178,7 +180,8 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{NamespaceString::kShardConfigCollectionsNamespace};
         findRequest.setFilter(
-            BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)));
+            BSON(ShardCollectionType::kNssFieldName
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
         findRequest.setLimit(1);
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         if (!cursor) {
@@ -369,14 +372,12 @@ Status updateShardChunks(OperationContext* opCtx,
     const auto sc = SerializationContext::stateDefault();
     const auto chunksNss = NamespaceStringUtil::deserialize(
         nss.tenantId(), ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss, sc), sc);
-
     try {
         DBDirectClient client(opCtx);
 
         // This may be the first update, so the first opportunity to create an index.
         // If the index already exists, this is a no-op.
         client.createIndex(chunksNss, BSON(ChunkType::lastmod() << 1));
-
         /**
          * Here are examples of the operations that can happen on the config server to update
          * the config.cache.chunks collection. 'chunks' only includes the chunks that result from
@@ -463,8 +464,9 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
                 NamespaceString::kShardConfigCollectionsNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ShardCollectionType::kNssFieldName
-                                << NamespaceStringUtil::serialize(nss)));
+                entry.setQ(BSON(
+                    ShardCollectionType::kNssFieldName
+                    << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
                 entry.setMulti(true);
                 return entry;
             }()});

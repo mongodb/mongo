@@ -196,7 +196,8 @@ void abortAllReshardCollection(OperationContext* opCtx) {
 
     std::vector<std::string> nsWithReshardColl;
     store.forEach(opCtx, {}, [&](const ReshardingCoordinatorDocument& doc) {
-        nsWithReshardColl.push_back(NamespaceStringUtil::serialize(doc.getSourceNss()));
+        nsWithReshardColl.push_back(NamespaceStringUtil::serialize(
+            doc.getSourceNss(), SerializationContext::stateDefault()));
         return true;
     });
 

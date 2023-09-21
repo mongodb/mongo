@@ -65,7 +65,8 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::parseFromConfig
 }
 
 void UpdateZoneKeyRangeRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
-    cmdBuilder->append(kConfigsvrUpdateZoneKeyRange, NamespaceStringUtil::serialize(_ns));
+    cmdBuilder->append(kConfigsvrUpdateZoneKeyRange,
+                       NamespaceStringUtil::serialize(_ns, SerializationContext::stateDefault()));
     _range.append(cmdBuilder);
 
     if (_isRemove) {

@@ -203,7 +203,9 @@ BSONObj buildCountChunksInRangeCommand(const UUID& collectionUUID,
     AggregateCommandRequest countRequest(ChunkType::ConfigNS);
 
     BSONObjBuilder builder;
-    builder.append("aggregate", NamespaceStringUtil::serialize(ChunkType::ConfigNS));
+    builder.append(
+        "aggregate",
+        NamespaceStringUtil::serialize(ChunkType::ConfigNS, SerializationContext::stateDefault()));
 
     BSONObjBuilder queryBuilder;
     queryBuilder << ChunkType::collectionUUID << collectionUUID;
@@ -298,7 +300,8 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
         1);
     if (!findCollResponse.isOK()) {
@@ -368,7 +371,8 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
         1));
     uassert(
@@ -1202,7 +1206,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
             DBDirectClient zonesClient{opCtx};
             FindCommandRequest zonesFindRequest{TagsType::ConfigNS};
             zonesFindRequest.setSort(BSON(TagsType::min << 1));
-            zonesFindRequest.setFilter(BSON(TagsType::ns(NamespaceStringUtil::serialize(nss))));
+            zonesFindRequest.setFilter(BSON(TagsType::ns(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))));
             zonesFindRequest.setProjection(BSON(TagsType::min << 1 << TagsType::max << 1));
             const auto zonesCursor{zonesClient.find(std::move(zonesFindRequest))};
 
@@ -1385,7 +1390,8 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
         1));
     uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -1769,7 +1775,8 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
-                BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)),
+                BSON("_flushRoutingTableCacheUpdates"
+                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
                 Shard::RetryPolicy::kIdempotent)));
     }
 }
@@ -1791,7 +1798,8 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        BSON(CollectionType::kNssFieldName
+             << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
         {},
         1));
     uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -2171,7 +2179,8 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 repl::ReadConcernLevel::kLocalReadConcern,
                 CollectionType::ConfigNS,
-                BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+                BSON(CollectionType::kNssFieldName
+                     << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())),
                 {},
                 1));
             uassert(ErrorCodes::ConflictingOperationInProgress,
@@ -2253,8 +2262,8 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                 ? BSON("$unset" << BSON(CollectionType::kAllowMigrationsFieldName << ""))
                 : BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false));
 
-            BSONObj query =
-                BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss));
+            BSONObj query = BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                     nss, SerializationContext::stateDefault()));
             if (collectionUUID) {
                 query = query.addFields(BSON(CollectionType::kUuidFieldName << *collectionUUID));
             }
@@ -2272,8 +2281,8 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                 updateCollResponse.getN() == 1);
 
         FindCommandRequest collQuery{CollectionType::ConfigNS};
-        collQuery.setFilter(
-            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)));
+        collQuery.setFilter(BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(
+                                     nss, SerializationContext::stateDefault())));
         collQuery.setLimit(1);
 
         const auto findCollResponse = txnClient.exhaustiveFindSync(collQuery);

@@ -690,7 +690,7 @@ void logStartCreateCollection(OperationContext* opCtx,
     collectionDetail.append("shardKey", *request.getShardKey());
     collectionDetail.append(
         "collection",
-        NamespaceStringUtil::serialize(originalNss, SerializationContext::stateCommandRequest()));
+        NamespaceStringUtil::serialize(originalNss, SerializationContext::stateDefault()));
     collectionDetail.append("primary", ShardingState::get(opCtx)->shardId().toString());
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "shardCollection.start", originalNss, collectionDetail.obj());
@@ -1177,7 +1177,8 @@ boost::optional<CreateCollectionResponse> commit(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)));
+            BSON("_flushRoutingTableCacheUpdates"
+                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())));
     }
 
     LOGV2(5277901,
@@ -1357,10 +1358,11 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                                              nss(),
                                                              _doc.getTranslatedRequestParams());
 
-                audit::logShardCollection(opCtx->getClient(),
-                                          NamespaceStringUtil::serialize(nss()),
-                                          *_request.getShardKey(),
-                                          _request.getUnique());
+                audit::logShardCollection(
+                    opCtx->getClient(),
+                    NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault()),
+                    *_request.getShardKey(),
+                    _request.getUnique());
 
                 _initialChunks =
                     createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
@@ -1566,10 +1568,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                                              nss(),
                                                              _doc.getTranslatedRequestParams());
 
-                audit::logShardCollection(opCtx->getClient(),
-                                          NamespaceStringUtil::serialize(nss()),
-                                          *_request.getShardKey(),
-                                          _request.getUnique());
+                audit::logShardCollection(
+                    opCtx->getClient(),
+                    NamespaceStringUtil::serialize(nss(), SerializationContext::stateDefault()),
+                    *_request.getShardKey(),
+                    _request.getUnique());
 
                 _initialChunks =
                     createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());

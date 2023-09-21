@@ -353,9 +353,11 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
 }
 
 void CommandHelpers::ensureNsNotCommand(const NamespaceString& nss) {
+    // TODO SERVER-81638 this method needs to be simplified and more explicit.
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid collection name specified '" << nss.toStringForErrorMsg(),
-            !(NamespaceStringUtil::serialize(nss).find('$') != std::string::npos &&
+            !(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()).find('$') !=
+                  std::string::npos &&
               nss != NamespaceString::kLocalOplogDollarMain));
 }
 
@@ -369,7 +371,6 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
 
 ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceString& ns) {
     if (!NamespaceString::validCollectionComponent(ns)) {
-        const auto nss = NamespaceStringUtil::serialize(ns);
         return ResourcePattern::forDatabaseName(ns.dbName());
     }
     return ResourcePattern::forExactNamespace(ns);

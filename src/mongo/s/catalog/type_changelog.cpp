@@ -169,7 +169,9 @@ BSONObj ChangeLogType::toBSON() const {
     if (_what)
         builder.append(what.name(), getWhat());
     if (_ns)
-        builder.append(ns.name(), NamespaceStringUtil::serialize(getNS()));
+        builder.append(
+            ns.name(),
+            NamespaceStringUtil::serialize(getNS(), SerializationContext::stateDefault()));
     if (_details)
         builder.append(details.name(), getDetails());
 

@@ -107,7 +107,9 @@ public:
             const NamespaceString& nss = ns();
 
             audit::logRefineCollectionShardKey(
-                opCtx->getClient(), NamespaceStringUtil::serialize(nss), request().getKey());
+                opCtx->getClient(),
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
+                request().getKey());
 
             // Set the operation context read concern level to local for reads into the config
             // database.

@@ -308,7 +308,8 @@ bool opReplicatedEnough(OperationContext* opCtx,
  */
 BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_migrateClone", NamespaceStringUtil::serialize(nss));
+    builder.append("_migrateClone",
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -320,7 +321,8 @@ BSONObj createMigrateCloneRequest(const NamespaceString& nss, const MigrationSes
  */
 BSONObj createTransferModsRequest(const NamespaceString& nss, const MigrationSessionId& sessionId) {
     BSONObjBuilder builder;
-    builder.append("_transferMods", NamespaceStringUtil::serialize(nss));
+    builder.append("_transferMods",
+                   NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -483,7 +485,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
         b.append("sessionId", _sessionId->toString());
     }
 
-    b.append("ns", NamespaceStringUtil::serialize(_nss));
+    b.append("ns", NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
     b.append("from", _fromShardConnString.toString());
     b.append("fromShardId", _fromShard.toString());
     b.append("min", _min);

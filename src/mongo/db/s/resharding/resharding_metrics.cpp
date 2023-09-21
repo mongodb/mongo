@@ -87,10 +87,12 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
     using Arr = std::vector<Value>;
     using V = Value;
 
-    return Doc{{"reshardCollection", V{StringData{NamespaceStringUtil::serialize(nss)}}},
-               {"key", std::move(shardKey)},
-               {"unique", V{StringData{"false"}}},
-               {"collation", V{Doc{{"locale", V{StringData{"simple"}}}}}}}
+    return Doc{
+        {"reshardCollection",
+         V{StringData{NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())}}},
+        {"key", std::move(shardKey)},
+        {"unique", V{StringData{"false"}}},
+        {"collation", V{Doc{{"locale", V{StringData{"simple"}}}}}}}
         .toBson();
 }
 

@@ -83,8 +83,9 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     auto& oss = OperationShardingState::get(opCtx);
 
     if (shardVersion) {
-        auto emplaceResult =
-            oss._shardVersions.try_emplace(NamespaceStringUtil::serialize(nss), *shardVersion);
+        auto emplaceResult = oss._shardVersions.try_emplace(
+            NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
+            *shardVersion);
         auto& tracker = emplaceResult.first->second;
         if (!emplaceResult.second) {
             uassert(ErrorCodes::IllegalChangeToExpectedShardVersion,
@@ -115,7 +116,8 @@ void OperationShardingState::unsetShardRoleForLegacyDDLOperationsSentWithShardVe
     OperationContext* opCtx, const NamespaceString& nss) {
     auto& oss = OperationShardingState::get(opCtx);
 
-    auto it = oss._shardVersions.find(NamespaceStringUtil::serialize(nss));
+    auto it = oss._shardVersions.find(
+        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     if (it != oss._shardVersions.end()) {
         auto& tracker = it->second;
         tassert(6848500,
@@ -128,7 +130,8 @@ void OperationShardingState::unsetShardRoleForLegacyDDLOperationsSentWithShardVe
 }
 
 boost::optional<ShardVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {
-    const auto it = _shardVersions.find(NamespaceStringUtil::serialize(nss));
+    const auto it = _shardVersions.find(
+        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     if (it != _shardVersions.end()) {
         return it->second.v;
     }
@@ -235,7 +238,8 @@ ScopedSetShardRole::~ScopedSetShardRole() {
     auto& oss = OperationShardingState::get(_opCtx);
 
     if (_shardVersion) {
-        auto it = oss._shardVersions.find(NamespaceStringUtil::serialize(_nss));
+        auto it = oss._shardVersions.find(
+            NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
         invariant(it != oss._shardVersions.end());
         auto& tracker = it->second;
         invariant(--tracker.recursion >= 0);

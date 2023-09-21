@@ -107,7 +107,7 @@ void Top::record(OperationContext* opCtx,
                  long long micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
-    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     if (nssStr[0] == '?')
         return;
 
@@ -181,7 +181,7 @@ void Top::_record(OperationContext* opCtx,
 }
 
 void Top::collectionDropped(const NamespaceString& nss) {
-    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     stdx::lock_guard<Latch> lk(_lock);
     _usage.erase(nssStr);
 }
@@ -234,7 +234,7 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
 void Top::appendLatencyStats(const NamespaceString& nss,
                              bool includeHistograms,
                              BSONObjBuilder* builder) {
-    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
     stdx::lock_guard<Latch> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;

@@ -315,7 +315,8 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
             NamespaceString::kRsOplogNamespace,
             [&] {
                 const auto message =
-                    BSON("sessionMigrateCloneStart" << NamespaceStringUtil::serialize(_ns));
+                    BSON("sessionMigrateCloneStart" << NamespaceStringUtil::serialize(
+                             _ns, SerializationContext::stateDefault()));
 
                 WriteUnitOfWork wuow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(

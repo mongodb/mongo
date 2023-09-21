@@ -135,14 +135,15 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
                      "documents copied",
-                     str::stream() << NamespaceStringUtil::serialize(_sourceNss)
+                     str::stream() << NamespaceStringUtil::serialize(
+                                          _sourceNss, SerializationContext::stateDefault())
                                    << " tenant collection clone progress"),
       _tenantId(tenantId) {
     invariant(sourceNss.isValid());
     invariant(sourceNss.isNamespaceForTenant(tenantId));
     invariant(collectionOptions.uuid);
     _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.dbName(), *collectionOptions.uuid);
-    _stats.ns = NamespaceStringUtil::serialize(sourceNss);
+    _stats.ns = NamespaceStringUtil::serialize(sourceNss, SerializationContext::stateDefault());
 }
 
 BaseCloner::ClonerStages TenantCollectionCloner::getStages() {
