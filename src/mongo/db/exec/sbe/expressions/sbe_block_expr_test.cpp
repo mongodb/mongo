@@ -52,6 +52,15 @@ public:
         assertBlockEq(tag, val, tvPairs);
     }
 
+    std::unique_ptr<value::ValueBlock> makeBoolBlock(std::vector<bool> bools) {
+        std::unique_ptr<value::ValueBlock> block = std::make_unique<value::HeterogeneousBlock>();
+        for (auto b : bools) {
+            auto [t, v] = makeBool(b);
+            static_cast<value::HeterogeneousBlock*>(block.get())->push_back(t, v);
+        }
+        return block;
+    }
+
     void assertBlockEq(value::TypeTags blockTag,
                        value::Value blockVal,
                        const std::vector<std::pair<value::TypeTags, value::Value>>& expected) {
@@ -124,6 +133,45 @@ TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
                   runVal,
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeInt32(84), makeInt32(86), makeInt32(88), makeNothing(), makeInt32(92)});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
+    value::ViewOfValueAccessor blockAccessorLeft;
+    value::ViewOfValueAccessor blockAccessorRight;
+    auto blockLeftSlot = bindAccessor(&blockAccessorLeft);
+    auto blockRightSlot = bindAccessor(&blockAccessorRight);
+
+    auto leftBlock = makeBoolBlock({true, false, true, false});
+    blockAccessorLeft.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(leftBlock.get()));
+
+    auto rightBlock = makeBoolBlock({true, true, false, false});
+    blockAccessorRight.reset(sbe::value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(rightBlock.get()));
+
+    {
+        auto expr = makeE<sbe::EFunction>(
+            "valueBlockLogicalAnd",
+            sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(blockRightSlot)));
+        auto compiledExpr = compileExpression(*expr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, {true, false, false, false});
+    }
+
+    {
+        auto expr = makeE<sbe::EFunction>(
+            "valueBlockLogicalOr",
+            sbe::makeEs(makeE<EVariable>(blockLeftSlot), makeE<EVariable>(blockRightSlot)));
+        auto compiledExpr = compileExpression(*expr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, {true, true, true, false});
+    }
 }
 
 }  // namespace mongo::sbe

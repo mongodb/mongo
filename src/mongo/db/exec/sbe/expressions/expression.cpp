@@ -892,6 +892,14 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockLteScalar, false}},
     {"valueBlockCombine",
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::valueBlockCombine, false}},
+    {"valueBlockLogicalAnd",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockLogicalAnd, false}},
+    {"valueBlockLogicalOr",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockLogicalOr, false}},
+    {"cellFoldValues_F",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::cellFoldValues_F, false}},
+    {"cellFoldValues_P",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::cellFoldValues_P, false}},
 };
 
 /**

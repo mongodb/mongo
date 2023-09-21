@@ -866,6 +866,11 @@ enum class Builtin : uint16_t {
     valueBlockLtScalar,
     valueBlockLteScalar,
     valueBlockCombine,
+    valueBlockLogicalAnd,
+    valueBlockLogicalOr,
+
+    cellFoldValues_F,
+    cellFoldValues_P,
 };
 
 std::string builtinToString(Builtin b);
@@ -1996,7 +2001,18 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstLastNRemove(ArityType arity);
     template <AccumulatorFirstLastN::Sense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggFirstLastNFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillCanAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> linearFillInterpolate(
+        std::pair<value::TypeTags, value::Value> x1,
+        std::pair<value::TypeTags, value::Value> y1,
+        std::pair<value::TypeTags, value::Value> x2,
+        std::pair<value::TypeTags, value::Value> y2,
+        std::pair<value::TypeTags, value::Value> x);
 
+
+    // Block builtins
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
@@ -2008,15 +2024,11 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLtScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLteScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCombine(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillCanAdd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillAdd(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillFinalize(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> linearFillInterpolate(
-        std::pair<value::TypeTags, value::Value> x1,
-        std::pair<value::TypeTags, value::Value> y1,
-        std::pair<value::TypeTags, value::Value> x2,
-        std::pair<value::TypeTags, value::Value> y2,
-        std::pair<value::TypeTags, value::Value> x);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalAnd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalOr(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_F(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
+
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,

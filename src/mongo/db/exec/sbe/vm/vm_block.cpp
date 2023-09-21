@@ -187,4 +187,78 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
               value::TypeTags::valueBlock,
               value::bitcastFrom<value::ValueBlock*>(outBlock.release()));
 }
+
+template <class Op>
+std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
+                                                  value::ValueBlock* rightBlock,
+                                                  Op op = {}) {
+    auto left = leftBlock->extract();
+    auto right = rightBlock->extract();
+
+    tassert(7953531, "Mismatch on size", left.count == right.count);
+    // Check that both contain all booleans.
+    bool allBool = true;
+    for (size_t i = 0; i < left.count; ++i) {
+        allBool = allBool && (left.tags[i] == value::TypeTags::Boolean);
+    }
+    for (size_t i = 0; i < right.count; ++i) {
+        allBool = allBool && (right.tags[i] == value::TypeTags::Boolean);
+    }
+    tassert(7953532, "Expected all bool inputs", allBool);
+
+    std::vector<value::Value> boolOut(left.count);
+    std::vector<value::TypeTags> tagOut(left.count, value::TypeTags::Boolean);
+
+    for (size_t i = 0; i < left.count; ++i) {
+        const auto leftBool = value::bitcastTo<bool>(left.vals[i]);
+        const auto rightBool = value::bitcastTo<bool>(right.vals[i]);
+        boolOut[i] = value::bitcastFrom<bool>(op(leftBool, rightBool));
+    }
+
+    return std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(boolOut));
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogicalAnd(
+    ArityType arity) {
+    invariant(arity == 2);
+
+    auto [leftOwned, leftTag, leftVal] = getFromStack(1);
+    invariant(leftTag == value::TypeTags::valueBlock);
+    auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftVal);
+
+    auto [rightOwned, rightTag, rightVal] = getFromStack(0);
+    invariant(rightTag == value::TypeTags::valueBlock);
+    auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
+
+    auto blockOut = applyBoolBinOp<std::logical_and<>>(leftValueBlock, rightValueBlock);
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogicalOr(
+    ArityType arity) {
+    invariant(arity == 2);
+
+    auto [leftOwned, leftTag, leftVal] = getFromStack(1);
+    invariant(leftTag == value::TypeTags::valueBlock);
+    auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftVal);
+
+    auto [rightOwned, rightTag, rightVal] = getFromStack(0);
+    invariant(rightTag == value::TypeTags::valueBlock);
+    auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
+
+    auto blockOut = applyBoolBinOp<std::logical_or<>>(leftValueBlock, rightValueBlock);
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F(ArityType arity) {
+    MONGO_UNREACHABLE;
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P(ArityType arity) {
+    MONGO_UNREACHABLE;
+}
 }  // namespace mongo::sbe::vm

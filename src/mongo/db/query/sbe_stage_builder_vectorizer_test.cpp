@@ -99,7 +99,7 @@ TEST(VectorizerTest, ConvertBooleanOpOnCell) {
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Let [__l1_0]\n"
-        "|   FunctionCall [valueBlockAnd]\n"
+        "|   FunctionCall [valueBlockLogicalAnd]\n"
         "|   |   FunctionCall [cellFoldValues_F]\n"
         "|   |   |   Variable [inputVar]\n"
         "|   |   FunctionCall [valueBlockGt]\n"

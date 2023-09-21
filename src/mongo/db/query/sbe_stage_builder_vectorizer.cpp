@@ -185,7 +185,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 if (TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
                     return {makeLet(lhsVar,
                                     std::move(*lhs.expr),
-                                    makeABTFunction("valueBlockAnd"_sd,
+                                    makeABTFunction("valueBlockLogicalAnd"_sd,
                                                     makeVariable(lhsVar),
                                                     std::move(*rhs.expr))),
                             TypeSignature::kBlockType.include(TypeSignature::kBooleanType)

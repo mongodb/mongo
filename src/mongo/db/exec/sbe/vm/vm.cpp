@@ -8793,6 +8793,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggFirstLastNRemove(arity);
         case Builtin::aggRemovableLastNFinalize:
             return builtinAggFirstLastNFinalize<AccumulatorFirstLastN::Sense::kLast>(arity);
+        case Builtin::aggLinearFillCanAdd:
+            return builtinAggLinearFillCanAdd(arity);
+        case Builtin::aggLinearFillAdd:
+            return builtinAggLinearFillAdd(arity);
+        case Builtin::aggLinearFillFinalize:
+            return builtinAggLinearFillFinalize(arity);
         case Builtin::valueBlockExists:
             return builtinValueBlockExists(arity);
         case Builtin::valueBlockFillEmpty:
@@ -8815,12 +8821,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockLteScalar(arity);
         case Builtin::valueBlockCombine:
             return builtinValueBlockCombine(arity);
-        case Builtin::aggLinearFillCanAdd:
-            return builtinAggLinearFillCanAdd(arity);
-        case Builtin::aggLinearFillAdd:
-            return builtinAggLinearFillAdd(arity);
-        case Builtin::aggLinearFillFinalize:
-            return builtinAggLinearFillFinalize(arity);
+        case Builtin::valueBlockLogicalAnd:
+            return builtinValueBlockLogicalAnd(arity);
+        case Builtin::valueBlockLogicalOr:
+            return builtinValueBlockLogicalOr(arity);
+        case Builtin::cellFoldValues_F:
+            return builtinCellFoldValues_F(arity);
+        case Builtin::cellFoldValues_P:
+            return builtinCellFoldValues_P(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -9209,6 +9217,12 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableLastNRemove";
         case Builtin::aggRemovableLastNFinalize:
             return "aggRemovableLastNFinalize";
+        case Builtin::aggLinearFillCanAdd:
+            return "aggLinearFillCanAdd";
+        case Builtin::aggLinearFillAdd:
+            return "aggLinearFillAdd";
+        case Builtin::aggLinearFillFinalize:
+            return "aggLinearFillFinalize";
         case Builtin::valueBlockExists:
             return "valueBlockExists";
         case Builtin::valueBlockFillEmpty:
@@ -9231,12 +9245,14 @@ std::string builtinToString(Builtin b) {
             return "valueBlockLteScalar";
         case Builtin::valueBlockCombine:
             return "valueBlockCombine";
-        case Builtin::aggLinearFillCanAdd:
-            return "aggLinearFillCanAdd";
-        case Builtin::aggLinearFillAdd:
-            return "aggLinearFillAdd";
-        case Builtin::aggLinearFillFinalize:
-            return "aggLinearFillFinalize";
+        case Builtin::valueBlockLogicalAnd:
+            return "valueBlockLogicalAnd";
+        case Builtin::valueBlockLogicalOr:
+            return "valueBlockLogicalOr";
+        case Builtin::cellFoldValues_F:
+            return "cellFoldValues_F";
+        case Builtin::cellFoldValues_P:
+            return "cellFoldValues_P";
         default:
             MONGO_UNREACHABLE;
     }
