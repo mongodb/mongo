@@ -9,6 +9,7 @@ from buildscripts.util.teststats import HistoricTaskData, normalize_test_name
 
 LOGGER = structlog.get_logger(__name__)
 CLEAN_EVERY_N_HOOK = "CleanEveryN"
+REQUIRED_STATS_THRESHOLD = 0.8
 
 
 class TimeoutParams(NamedTuple):
@@ -50,6 +51,7 @@ class TimeoutService:
         """
         historic_stats = self.lookup_historic_stats(timeout_params)
         if not historic_stats:
+            LOGGER.warning("Missing historic runtime information, using default timeout")
             return TimeoutEstimate.no_timeouts()
 
         test_set = {
@@ -60,14 +62,11 @@ class TimeoutService:
             stat for stat in historic_stats.get_tests_runtimes() if stat.test_name in test_set
         ]
         test_runtime_set = {test.test_name for test in test_runtimes}
+        num_tests_missing_historic_data = 0
         for test in test_set:
             if test not in test_runtime_set:
-                # If we don't have historic runtime information for all the tests, we cannot
-                # reliable determine a timeout, so fallback to a default timeout.
-                LOGGER.warning(
-                    "Could not find historic runtime information for test, using default timeout",
-                    test=test)
-                return TimeoutEstimate.no_timeouts()
+                LOGGER.warning("Could not find historic runtime information for test", test=test)
+                num_tests_missing_historic_data += 1
 
         total_runtime = 0.0
         max_runtime = 0.0
@@ -77,15 +76,30 @@ class TimeoutService:
                 total_runtime += runtime.runtime
                 max_runtime = max(max_runtime, runtime.runtime)
             else:
-                LOGGER.warning("Found a test with 0 runtime, using default timeouts",
-                               test=runtime.test_name)
-                # We found a test with a runtime of 0, which indicates that it does not have a
-                # proper runtime history, so fall back to a default timeout.
-                return TimeoutEstimate.no_timeouts()
+                LOGGER.warning("Found a test with 0 runtime", test=runtime.test_name)
+                num_tests_missing_historic_data += 1
+
+        total_num_tests = len(test_set)
+        if not self._have_enough_historic_stats(total_num_tests, num_tests_missing_historic_data):
+            LOGGER.warning(
+                "Not enough historic runtime information, using default timeout",
+                total_num_tests=total_num_tests,
+                num_tests_missing_historic_data=num_tests_missing_historic_data,
+                required_stats_threshold=REQUIRED_STATS_THRESHOLD,
+            )
+            return TimeoutEstimate.no_timeouts()
 
         hook_overhead = self.get_task_hook_overhead(
-            timeout_params.suite_name, timeout_params.is_asan, len(test_set), historic_stats)
+            timeout_params.suite_name, timeout_params.is_asan, total_num_tests, historic_stats)
         total_runtime += hook_overhead
+
+        if num_tests_missing_historic_data > 0:
+            total_runtime += num_tests_missing_historic_data * max_runtime
+            LOGGER.warning(
+                "At least one test misses historic runtime information, using default idle timeout",
+                num_tests_missing_historic_data=num_tests_missing_historic_data,
+            )
+            return TimeoutEstimate.only_task_timeout(expected_task_runtime=total_runtime)
 
         return TimeoutEstimate(max_test_runtime=max_runtime, expected_task_runtime=total_runtime)
 
@@ -143,6 +157,21 @@ class TimeoutService:
             LOGGER.warning("Error querying history runtime information from evergreen",
                            exc_info=True)
             return None
+
+    @staticmethod
+    def _have_enough_historic_stats(num_tests: int, num_tests_missing_data: int) -> bool:
+        """
+        Check whether the required number of stats threshold is met.
+
+        :param num_tests: Number of tests to run.
+        :param num_tests_missing_data: Number of test that misses historic runtime data.
+        :return: Whether the required number of stats threshold is met.
+        """
+        if num_tests < 0:
+            raise ValueError("Number of tests cannot be less than 0")
+        if num_tests == 0:
+            return True
+        return (num_tests - num_tests_missing_data) / num_tests > REQUIRED_STATS_THRESHOLD
 
     def _get_clean_every_n_cadence(self, suite_name: str, is_asan: bool) -> int:
         """

@@ -50,15 +50,17 @@ class TestGetTimeoutEstimate(unittest.TestCase):
         self.assertFalse(timeout.is_specified())
 
     @patch(ns("HistoricTaskData.from_s3"))
-    def test_a_test_with_missing_history_should_cause_a_default_timeout(
+    def test_too_many_tests_missing_history_should_cause_a_default_timeout(
             self, from_s3_mock: MagicMock):
         test_stats = [
-            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=60, num_pass=1, hooks=[])
-            for i in range(30)
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=600.0, num_pass=1, hooks=[])
+            for i in range(23)
         ]
         from_s3_mock.return_value = HistoricTaskData(test_stats)
         mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
-        mock_resmoke_proxy.list_tests.return_value = ["test_with_no_stats.js"]
+        test_names = [ts.test_name for ts in test_stats]
+        test_names.extend([f"test_with_no_stats_{i}.js" for i in range(7)])
+        mock_resmoke_proxy.list_tests.return_value = test_names
         timeout_service = build_mock_service(resmoke_proxy=mock_resmoke_proxy)
         timeout_params = under_test.TimeoutParams(
             evg_project="my project",
@@ -73,14 +75,16 @@ class TestGetTimeoutEstimate(unittest.TestCase):
         self.assertFalse(timeout.is_specified())
 
     @patch(ns("HistoricTaskData.from_s3"))
-    def test_a_test_with_zero_runtime_history_should_cause_a_default_timeout(
+    def test_too_many_tests_with_zero_runtime_history_should_cause_a_default_timeout(
             self, from_s3_mock: MagicMock):
         test_stats = [
-            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=60, num_pass=1, hooks=[])
-            for i in range(30)
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=600.0, num_pass=1, hooks=[])
+            for i in range(23)
         ]
-        test_stats.append(
-            HistoricTestInfo(test_name="zero.js", avg_duration=0.0, num_pass=1, hooks=[]))
+        test_stats.extend([
+            HistoricTestInfo(test_name=f"zero_{i}.js", avg_duration=0.0, num_pass=1, hooks=[])
+            for i in range(7)
+        ])
         from_s3_mock.return_value = HistoricTaskData(test_stats)
         mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
         mock_resmoke_proxy.list_tests.return_value = [ts.test_name for ts in test_stats]
@@ -98,13 +102,67 @@ class TestGetTimeoutEstimate(unittest.TestCase):
         self.assertFalse(timeout.is_specified())
 
     @patch(ns("HistoricTaskData.from_s3"))
+    def test_enough_history_but_some_tests_missing_history_should_cause_custom_task_and_default_test_timeout(
+            self, from_s3_mock: MagicMock):
+        test_stats = [
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=600.0, num_pass=1, hooks=[])
+            for i in range(25)
+        ]
+        from_s3_mock.return_value = HistoricTaskData(test_stats)
+        mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
+        test_names = [ts.test_name for ts in test_stats]
+        test_names.extend([f"test_with_no_stats_{i}.js" for i in range(5)])
+        mock_resmoke_proxy.list_tests.return_value = test_names
+        timeout_service = build_mock_service(resmoke_proxy=mock_resmoke_proxy)
+        timeout_params = under_test.TimeoutParams(
+            evg_project="my project",
+            build_variant="bv",
+            task_name="my task",
+            suite_name="my suite",
+            is_asan=False,
+        )
+
+        timeout = timeout_service.get_timeout_estimate(timeout_params)
+
+        self.assertTrue(timeout.is_specified())
+        self.assertEqual(None, timeout.calculate_test_timeout(1))
+        self.assertEqual(54180, timeout.calculate_task_timeout(1))
+
+    @patch(ns("HistoricTaskData.from_s3"))
+    def test_enough_history_but_some_tests_with_zero_runtime_should_cause_custom_task_and_default_test_timeout(
+            self, from_s3_mock: MagicMock):
+        test_stats = [
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=600.0, num_pass=1, hooks=[])
+            for i in range(25)
+        ]
+        test_stats.extend([
+            HistoricTestInfo(test_name=f"zero_{i}.js", avg_duration=0.0, num_pass=1, hooks=[])
+            for i in range(5)
+        ])
+        from_s3_mock.return_value = HistoricTaskData(test_stats)
+        mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
+        mock_resmoke_proxy.list_tests.return_value = [ts.test_name for ts in test_stats]
+        timeout_service = build_mock_service(resmoke_proxy=mock_resmoke_proxy)
+        timeout_params = under_test.TimeoutParams(
+            evg_project="my project",
+            build_variant="bv",
+            task_name="my task",
+            suite_name="my suite",
+            is_asan=False,
+        )
+
+        timeout = timeout_service.get_timeout_estimate(timeout_params)
+
+        self.assertTrue(timeout.is_specified())
+        self.assertEqual(None, timeout.calculate_test_timeout(1))
+        self.assertEqual(54180, timeout.calculate_task_timeout(1))
+
+    @patch(ns("HistoricTaskData.from_s3"))
     def test_all_tests_with_runtime_history_should_use_custom_timeout(self,
                                                                       from_s3_mock: MagicMock):
-        n_tests = 30
-        test_runtime = 600
         test_stats = [
-            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=test_runtime, num_pass=1,
-                             hooks=[]) for i in range(n_tests)
+            HistoricTestInfo(test_name=f"test_{i}.js", avg_duration=600.0, num_pass=1, hooks=[])
+            for i in range(30)
         ]
         from_s3_mock.return_value = HistoricTaskData(test_stats)
         mock_resmoke_proxy = MagicMock(spec_set=ResmokeProxyService)
@@ -270,3 +328,34 @@ class TestGetCleanEveryNCadence(unittest.TestCase):
         cadence = timeout_service._get_clean_every_n_cadence("suite", False)
 
         self.assertEqual(1, cadence)
+
+
+class TestHaveEnoughHistoricStats(unittest.TestCase):
+    def test_should_return_true_when_number_of_tests_equals_zero(self):
+        timeout_service = build_mock_service()
+        self.assertTrue(
+            timeout_service._have_enough_historic_stats(num_tests=0, num_tests_missing_data=0))
+
+    def test_should_return_true_when_number_of_tests_with_historic_data_more_than_threshold(self):
+        timeout_service = build_mock_service()
+        self.assertTrue(
+            timeout_service._have_enough_historic_stats(num_tests=100, num_tests_missing_data=19))
+        self.assertTrue(
+            timeout_service._have_enough_historic_stats(num_tests=100, num_tests_missing_data=0))
+
+    def test_should_return_false_when_number_of_tests_with_historic_data_less_or_equal_to_threshold(
+            self):
+        timeout_service = build_mock_service()
+        self.assertFalse(
+            timeout_service._have_enough_historic_stats(num_tests=100, num_tests_missing_data=20))
+        self.assertFalse(
+            timeout_service._have_enough_historic_stats(num_tests=100, num_tests_missing_data=21))
+        self.assertFalse(
+            timeout_service._have_enough_historic_stats(num_tests=100, num_tests_missing_data=100))
+
+    def test_exception_raised_when_number_of_tests_less_than_zero(self):
+        timeout_service = build_mock_service()
+        with self.assertRaises(ValueError):
+            timeout_service._have_enough_historic_stats(num_tests=-1, num_tests_missing_data=0)
+        with self.assertRaises(ValueError):
+            timeout_service._have_enough_historic_stats(num_tests=-100, num_tests_missing_data=0)
