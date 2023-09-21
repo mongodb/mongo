@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_compact.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/compact_gen.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
@@ -99,10 +100,13 @@ public:
         NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto params = CompactCommand::parse(IDLParserContext("compact"), cmdObj);
+        bool force = params.getForce() && *params.getForce();
+
         uassert(ErrorCodes::IllegalOperation,
                 "will not run compact on an active replica set primary as this will slow down "
                 "other running operations. use force:true to force",
-                !replCoord->getMemberState().primary() || cmdObj["force"].trueValue());
+                !replCoord->getMemberState().primary() || force);
 
         StatusWith<int64_t> status = compactCollection(opCtx, nss);
         uassertStatusOK(status.getStatus());
