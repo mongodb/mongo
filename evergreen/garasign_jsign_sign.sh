@@ -1,13 +1,13 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
+cd src
+
 echo "GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}" >> "signing-envfile"
 echo "GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}" >> "signing-envfile"
 
 set -o errexit
 set -o verbose
-
-cd src
 
 msi_filename=mongodb-${push_name}-${push_arch}-${suffix}.msi
 /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename $msi_filename || true
