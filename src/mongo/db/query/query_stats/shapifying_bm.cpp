@@ -79,7 +79,8 @@ auto kMockClientMetadataElem = kMetadataWrapper["metadata"];
 
 auto makeFindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const ParsedFindCommand& parsedFind) {
-    return std::make_unique<query_stats::FindKeyGenerator>(expCtx, parsedFind, kCollectionType);
+    return std::make_unique<const query_stats::FindKeyGenerator>(
+        expCtx, parsedFind, kCollectionType);
 }
 
 int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,

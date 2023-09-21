@@ -290,6 +290,14 @@ public:
     const BSONObj& getDocument() const;
 
     /**
+     * Get the simple hash of the client metadata document.
+     *
+     * The hash is generated on the first call to this method. Future calls will return the cached
+     * hash rather than recomputing.
+     */
+    unsigned long getHash() const;
+
+    /**
      * Log client and client metadata information to disk.
      */
     void logClientMetadata(Client* client) const;
@@ -340,6 +348,10 @@ private:
     // Application Name extracted from the client metadata document.
     // May be empty
     StringData _appName;
+
+    // Simple hash of the Client Metadata document.
+    // Generated lazily on the first call to getHash().
+    mutable boost::optional<unsigned long> _hash = boost::none;
 };
 
 }  // namespace mongo

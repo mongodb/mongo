@@ -48,6 +48,7 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
       _apiParams(std::move(apiParams)),
       _comment(commentObj ? _commentObj.firstElement() : BSONElement()),
       _collectionType(collectionType),
+      _clientMetaDataHash(clientMetadata ? clientMetadata->getHash() : simpleHash(BSONObj())),
       _hasField{.clientMetaData = bool(clientMetadata),
                 .comment = bool(commentObj),
                 .hint = bool(hint),

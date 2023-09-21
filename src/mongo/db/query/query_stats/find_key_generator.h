@@ -127,6 +127,18 @@ public:
                        collectionType),
           _components(request.findCommandRequest.get()) {}
 
+    // The default implementation of hashing for smart pointers is not a good one for our purposes.
+    // Here we overload them to actually take the hash of the object, rather than hashing the
+    // pointer itself.
+    template <typename H>
+    friend H AbslHashValue(H h, const std::unique_ptr<const FindKeyGenerator>& keyGenerator) {
+        return H::combine(std::move(h), *keyGenerator);
+    }
+    template <typename H>
+    friend H AbslHashValue(H h, const std::shared_ptr<const FindKeyGenerator>& keyGenerator) {
+        return H::combine(std::move(h), *keyGenerator);
+    }
+
 protected:
     const SpecificKeyComponents& specificComponents() const {
         return _components;

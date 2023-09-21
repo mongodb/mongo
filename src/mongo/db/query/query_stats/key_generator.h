@@ -100,6 +100,11 @@ struct UniversalKeyComponents {
     // is not set through that code path.
     query_shape::CollectionType _collectionType;
 
+    // Simple hash of the client metadata object. This value is stored separately because it is
+    // cached on the client to avoid re-computing on every operation. If no client metadata is
+    // present, this will be the hash of an empty BSON object (otherwise known as 0).
+    const unsigned long _clientMetaDataHash;
+
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
     struct HasField {
@@ -146,7 +151,7 @@ template <typename H>
 H AbslHashValue(H h, const UniversalKeyComponents& components) {
     return H::combine(std::move(h),
                       *components._queryShape,
-                      simpleHash(components._clientMetaData),
+                      components._clientMetaDataHash,
                       // Note we use the comment's type in the hash function.
                       components._comment.type(),
                       simpleHash(components._hintObj),
