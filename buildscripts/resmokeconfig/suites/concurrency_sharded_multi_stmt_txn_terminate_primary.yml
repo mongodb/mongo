@@ -167,6 +167,7 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_deletes.js
   - jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js
+  - jstests/concurrency/fsm_workloads/timeseries_updates_and_inserts.js
 
   ##
   # Denylists specific to this suite
