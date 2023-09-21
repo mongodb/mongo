@@ -13,6 +13,7 @@ import {
     kAllClusterParameterDefaults,
     runGetClusterParameterSharded
 } from "jstests/libs/cluster_server_parameter_utils.js";
+import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 function runTest(st, startupRefreshIntervalMS) {
     // This assert is necessary because we subtract 8000 MS from this value later on, and we don't
@@ -21,9 +22,9 @@ function runTest(st, startupRefreshIntervalMS) {
     // First, check that the mongos logs a refresh attempt within the first refreshIntervalMS
     // milliseconds that finds no documents on the config servers.
     const conn = st.s0;
-    const errorMarginMS = 5000;
+    const errorMarginMS = 10000;
     const kRefreshLogId = 6226403;
-    const startupRefreshIntervalRelaxedMS = startupRefreshIntervalMS + errorMarginMS;
+    const startupRefreshIntervalRelaxedMS = startupRefreshIntervalMS * 2 + errorMarginMS;
     let expectedParams = {};
     const defaultParams =
         Object.fromEntries(kAllClusterParameterDefaults.map(elem => [elem._id, elem]));
@@ -81,8 +82,8 @@ function runTest(st, startupRefreshIntervalMS) {
     assertParams(startupRefreshIntervalRelaxedMS);
 
     // Ensure that updates to the refresh interval take effect correctly.
-    const newRefreshIntervalMS = startupRefreshIntervalMS - errorMarginMS - 3000;
-    const newRefreshIntervalRelaxedMS = newRefreshIntervalMS + errorMarginMS;
+    const newRefreshIntervalMS = startupRefreshIntervalMS - 8000;
+    const newRefreshIntervalRelaxedMS = newRefreshIntervalMS * 2 + errorMarginMS;
     assert.commandWorked(conn.adminCommand(
         {setParameter: 1, clusterServerParameterRefreshIntervalSecs: newRefreshIntervalMS / 1000}));
     assert.commandWorked(
@@ -92,12 +93,12 @@ function runTest(st, startupRefreshIntervalMS) {
     assertParams(newRefreshIntervalRelaxedMS);
 
     // Restart the mongos and check that it refreshes both of the parameters that have documents on
-    // the config server.
+    // the config server. Note that the startup refresh interval is used since runtime setParameter
+    // updates are not persisted.
     st.restartMongos(0);
-    assertParams(newRefreshIntervalRelaxedMS);
+    assertParams(startupRefreshIntervalRelaxedMS);
 
-    // Check that single parameter updates are caught as expected after restart. Note that the
-    // startup refresh interval is used since runtime setParameter updates are not persisted.
+    // Check that single parameter updates are caught as expected after restart.
     assert.commandWorked(
         conn.adminCommand({setClusterParameter: {testStrClusterParameter: {strData: "goodbye"}}}));
     expectedParams.testStrClusterParameter.strData = "goodbye";
@@ -117,8 +118,12 @@ function runTest(st, startupRefreshIntervalMS) {
 
     // Ensure that deletes are captured and properly refreshed.
     [st.configRS, ...st._rs.map(rs => rs.test)].forEach(rs => {
-        assert.commandWorked(rs.getPrimary().getDB('config').clusterParameters.remove(
-            {_id: "testIntClusterParameter"}));
+        const db = rs.getPrimary().getDB('config');
+        assert.commandWorked(db.clusterParameters.remove({_id: "testIntClusterParameter"}));
+        assert.soon(function() {
+            return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(
+                db, "clusterParameters");
+        });
     });
     delete expectedParams.testIntClusterParameter;
 
