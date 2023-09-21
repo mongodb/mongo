@@ -623,6 +623,26 @@ certs:
     keyUsage: [digitalSignature, keyEncipherment]
     extendedKeyUsage: [serverAuth, clientAuth]
 
+- name: 'server_ocsp_invalid.pem'
+  description: >-
+    An expired OCSP certificate for the mongodb server.
+  Subject:
+    CN: 'badHost'
+    C: US
+    ST: NY
+    L: OCSP-1
+  Issuer: 'ca_ocsp.pem'
+  include_header: false
+  output_path: 'jstests/libs/ocsp/'
+  extensions:
+    basicConstraints: {CA: false}
+    subjectAltName:
+      DNS: badHost
+    authorityInfoAccess: 'OCSP;URI:http://localhost:8100/status'
+    subjectKeyIdentifier: hash
+    keyUsage: [digitalSignature, keyEncipherment]
+    extendedKeyUsage: [serverAuth, clientAuth]
+
 - name: 'server_ocsp_revoked.pem'
   description: >-
     OCSP certificate for the mongodb server.

@@ -132,12 +132,7 @@ struct X509StackDeleter {
         }
     }
 };
-
-// If we have an X509 Stack that is owned by an internal SSL Object, we need to use this
-// deleter.
-struct X509StackDeleterNoOp {
-    void operator()(STACK_OF(X509) * chain) {}
-};
+using UniqueStackOfX509 = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
 
 // Modulus for Diffie-Hellman parameter 'ffdhe3072' defined in RFC 7919
 constexpr std::array<std::uint8_t, 384> ffdhe3072_p = {
@@ -321,12 +316,10 @@ X509* X509_OBJECT_get0_X509(const X509_OBJECT* a) {
     return a->data.x509;
 }
 
-using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), X509StackDeleter>;
-
-STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
+UniqueStackOfX509 SSLgetVerifiedChain(SSL* s) {
     auto* store = SSL_CTX_get_cert_store(SSL_get_SSL_CTX(s));
-    UniqueX509 peer(SSL_get_peer_certificate(s));
     auto* peerChain = SSL_get_peer_cert_chain(s);
+    UniqueX509 peer(SSL_get_peer_certificate(s));
 
     UniqueX509StoreCtx ctx(X509_STORE_CTX_new());
     if (!X509_STORE_CTX_init(ctx.get(), store, peer.get(), peerChain)) {
@@ -337,7 +330,7 @@ STACK_OF(X509) * SSL_get0_verified_chain(SSL* s) {
         return nullptr;
     }
 
-    return X509_STORE_CTX_get1_chain(ctx.get());
+    return UniqueStackOfX509(X509_STORE_CTX_get1_chain(ctx.get()));
 }
 
 const OCSP_CERTID* OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP* single) {
@@ -374,13 +367,14 @@ static int const NID_tlsfeature = OBJ_create(tlsFeatureOID.identifier.c_str(),
                                              tlsFeatureOID.longDescription.c_str());
 
 #else
-using UniqueVerifiedChainPolyfill = std::unique_ptr<STACK_OF(X509), X509StackDeleterNoOp>;
+UniqueStackOfX509 SSLgetVerifiedChain(SSL* s) {
+    auto chain = SSL_get0_verified_chain(s);
+
+    return UniqueStackOfX509(X509_chain_up_ref(chain));
+}
 
 #endif
 
-UniqueVerifiedChainPolyfill SSLgetVerifiedChain(SSL* s) {
-    return UniqueVerifiedChainPolyfill(SSL_get0_verified_chain(s));
-}
 
 SSLX509Name convertX509ToSSLX509Name(X509_NAME* x509Name) {
     std::vector<std::vector<SSLX509Name::Entry>> entries;
@@ -653,7 +647,7 @@ std::vector<std::vector<unsigned char>> convertStackOfX509ToDERVec(STACK_OF(X509
 }
 
 struct OCSPCacheKey {
-    OCSPCacheKey(UniqueX509 cert, SSL_CTX* context, UniqueVerifiedChainPolyfill intermediateCerts)
+    OCSPCacheKey(UniqueX509 cert, SSL_CTX* context, UniqueStackOfX509 intermediateCerts)
         : peerCert(std::move(cert)),
           context(context),
           intermediateCerts(std::move(intermediateCerts)),

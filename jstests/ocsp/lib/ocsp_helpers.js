@@ -14,6 +14,7 @@ export const OCSP_SERVER_CERT = "jstests/libs/ocsp/server_ocsp.pem";
 export const OCSP_CLIENT_CERT = "jstests/libs/ocsp/client_ocsp.pem";
 export const OCSP_SERVER_MUSTSTAPLE_CERT = "jstests/libs/ocsp/server_ocsp_mustStaple.pem";
 export const OCSP_SERVER_CERT_REVOKED = "jstests/libs/ocsp/server_ocsp_revoked.pem";
+export const OCSP_SERVER_CERT_INVALID = "jstests/libs/ocsp/server_ocsp_invalid.pem";
 export const OCSP_RESPONDER_CERT = "jstests/libs/ocsp/ocsp_responder.crt";
 export const OCSP_RESPONDER_KEY = "jstests/libs/ocsp/ocsp_responder.key";
 export const OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM =
