@@ -12,7 +12,7 @@ import {reconfig, isConfigCommitted} from "jstests/replsets/rslib.js";
 
 function addNonArbiterNode(nodeId, rst) {
     const config = rst.getReplSetConfigFromNode();
-    config.members.push({_id: nodeId, host: rst.add().host});
+    config.members.push({_id: nodeId, host: rst.add({shardsvr: ""}).host});
     reconfig(rst, config);
     assert.soon(() => isConfigCommitted(rst.getPrimary()));
     rst.waitForConfigReplication(rst.getPrimary());

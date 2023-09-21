@@ -31,7 +31,7 @@ st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 5}}));
 assert.commandWorked(
-    mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 5}, to: "view_rewrite-rs1"}));
+    mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 5}, to: st.shard1.shardName}));
 
 for (let i = 0; i < 10; ++i) {
     assert.commandWorked(coll.insert({a: i}));

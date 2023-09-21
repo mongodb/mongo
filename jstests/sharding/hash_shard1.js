@@ -32,7 +32,8 @@ assert.eq(t.find().count(), numitems, "count off after inserts");
 printjson(t.find().explain());
 
 // find a chunk that's not on s.shard0.shardName
-var chunk = s.config.chunks.findOne({shard: {$ne: s.shard0.shardName}});
+let collEntry = s.config.collections.findOne({_id: ns});
+var chunk = s.config.chunks.findOne({uuid: collEntry.uuid, shard: {$ne: s.shard0.shardName}});
 assert.neq(chunk, null, "all chunks on s.shard0.shardName!");
 printjson(chunk);
 

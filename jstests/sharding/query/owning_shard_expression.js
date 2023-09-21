@@ -112,8 +112,8 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(destinationColl, {_id: 1},
 ]);
 const expectedResult = [
     {shard: st.shard0.shardName, indexData: documentOnShard0},
-    {shard: `${dbName}-rs1`, indexData: documentOnShard1},
-    {shard: `${dbName}-rs2`, indexData: documentOnShard2},
+    {shard: st.shard1.shardName, indexData: documentOnShard1},
+    {shard: st.shard2.shardName, indexData: documentOnShard2},
 ];
 
 // Assert that every document belongs to a different shard.

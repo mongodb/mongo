@@ -72,6 +72,9 @@ let st = new ShardingTest({
     // Create shards with more than one node because we test for writeConcern majority failing.
     config: TestData.configShard ? undefined : 1,
     other: {
+        // The name of the shards affects the ordering of which shard will be targeted first
+        // for broadcast operations so always use the same names for each test run.
+        alwaysUseTestNameForShardName: true,
         mongosOptions: {
             verbose: 3,
             setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}

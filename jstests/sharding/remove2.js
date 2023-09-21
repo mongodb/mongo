@@ -3,7 +3,7 @@
  *
  * This test is labeled resource intensive because its total io_write is 59MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
- * @tags: [resource_intensive]
+ * @tags: [resource_intensive, requires_persistence]
  */
 
 // The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
@@ -12,7 +12,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
-import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+import {moveOutSessionChunks, removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -83,6 +83,8 @@ function removeShardAndCleanup(st, coll, replTest) {
               findChunksUtil.countChunksForNs(
                   st.s0.getDB('config'), coll.getFullName(), {shard: st.shard1.shardName}));
 
+    moveOutSessionChunks(st, replTest.name, st.shard0.shardName);
+
     jsTest.log("Removing shard with name: " + replTest.name);
     removeShard(st, replTest.name);
 
@@ -93,17 +95,17 @@ function removeShardAndCleanup(st, coll, replTest) {
 function addShard(st, coll, replTest) {
     var seed = seedString(replTest);
     jsTest.log("Adding shard with seed: " + seed);
-    assert.eq(true, st.adminCommand({addshard: seed}));
+    assert.eq(true, st.adminCommand({addshard: seed, name: replTest.name}));
     awaitRSClientHosts(st.s, replTest.getPrimary(), {ok: true, ismaster: true});
 
-    jsTest.log("Moving chunk from shard0 to shard1");
-    assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, st.shard1.shardName));
+    jsTest.log(`Moving chunk from shard0 to ${replTest.name}`);
+    assert.commandWorked(st.moveChunk(coll.getFullName(), {i: 6}, replTest.name));
     assert.eq(1,
               findChunksUtil.countChunksForNs(
                   st.s0.getDB('config'), coll.getFullName(), {shard: st.shard0.shardName}));
     assert.eq(1,
               findChunksUtil.countChunksForNs(
-                  st.s0.getDB('config'), coll.getFullName(), {shard: st.shard1.shardName}));
+                  st.s0.getDB('config'), coll.getFullName(), {shard: replTest.name}));
 
     assert.eq(300, coll.find().itcount());
     jsTest.log("Shard added successfully");
@@ -125,13 +127,12 @@ jsTestLog("Test basic removal and re-addition of shard with shutting down the re
 const originalSeed = seedString(rst1);
 
 removeShardAndCleanup(st, coll, rst1);
-rst1.stopSet();
+rst1.stopSet(null, true /* forRestart */);
 
 // Await that both mongos and rs0 remove RSM for removed replicaset
 awaitReplicaSetMonitorRemoval([st.s, st.rs0.getPrimary()], rst1.name);
 
 rst1.startSet({restart: true});
-rst1.initiate();
 rst1.awaitReplication();
 
 assert.eq(originalSeed, seedString(rst1), "Set didn't come back up with the same hosts as before");
@@ -141,12 +142,12 @@ jsTestLog(
     "Test removal and re-addition of shard with an identical replica set name and different port.");
 
 removeShardAndCleanup(st, coll, rst1);
-rst1.stopSet();
+rst1.stopSet(null, true /* forRestart */);
 
 // Await that both mongos and rs0 remove RSM for removed replicaset
 awaitReplicaSetMonitorRemoval([st.s, st.rs0.getPrimary()], rst1.name);
 
-let rst2 = new ReplSetTest({name: rst1.name, nodes: 2, useHostName: true});
+let rst2 = new ReplSetTest({name: "dummy", nodes: 2, useHostName: true});
 rst2.startSet({shardsvr: ""});
 rst2.initiate();
 rst2.awaitReplication();
@@ -164,13 +165,12 @@ assert.eq(1, st.s.getDB('test2').foo.find().itcount());
 jsTestLog("Resetting the sharding test to its initial state to allow the test to shut down.");
 assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: st.shard0.shardName}));
 removeShardAndCleanup(st, coll, rst2);
-rst2.stopSet();
+rst2.stopSet(null, true /* forRestart */);
 
 // Await that both mongos and rs0 remove RSM for removed replicaset
 awaitReplicaSetMonitorRemoval([st.s, st.rs0.getPrimary()], rst2.name);
 
 rst1.startSet({restart: true});
-rst1.initiate();
 rst1.awaitReplication();
 
 assert.eq(originalSeed, seedString(rst1), "Set didn't come back up with the same hosts as before");

@@ -2,14 +2,14 @@
  * Test that removeShard disallows removing shards whose chunks cannot be drained
  * to other shards.
  */
-import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+import {moveOutSessionChunks, removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
 // therefore preventing orphans from being cleaned up.
 TestData.skipCheckOrphans = true;
 
-let st = new ShardingTest({shards: 3});
+let st = new ShardingTest({shards: 3, other: {enableBalancer: true}});
 let dbName = "test";
 let collName = "user";
 let ns = dbName + "." + collName;
@@ -33,6 +33,7 @@ assert.commandFailedWithCode(st.s.adminCommand({removeShard: st.shard2.shardName
 
 // Can remove a shard is if it is not the only shard for any zone.
 assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: "zoneC"}));
+moveOutSessionChunks(st, st.shard2.shardName, st.shard0.shardName);
 removeShard(st, st.shard2.shardName);
 
 st.stop();

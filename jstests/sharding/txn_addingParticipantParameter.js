@@ -47,7 +47,10 @@ const runCommitThroughMongosInParallelShellExpectSuccess = function(st, lsid) {
     return startParallelShell(runCommitExpectSuccessCode, st.s.port);
 };
 
-const testAddingParticipant = function(turnFailPointOn, expectedParticipantList, fpData = {}) {
+const testAddingParticipant = function(
+    turnFailPointOn, expectedParticipantIndexList, fpDataFunc = () => {
+        return {};
+    }) {
     let st = new ShardingTest({shards: 4, causallyConsistent: true});
 
     // SERVER-67748
@@ -72,7 +75,7 @@ const testAddingParticipant = function(turnFailPointOn, expectedParticipantList,
         // Turn on failpoint so that the shard1 writes the participant paramenter in its
         // response body to transaction router.
         configureFailPoint(
-            participant1, "includeAdditionalParticipantInResponse", fpData, "alwaysOn");
+            participant1, "includeAdditionalParticipantInResponse", fpDataFunc(st), "alwaysOn");
     }
 
     // Create a sharded collection with a chunk on each shard:
@@ -123,6 +126,9 @@ const testAddingParticipant = function(turnFailPointOn, expectedParticipantList,
 
     // Check that the coordinator wrote the participant list.
     hangBeforeWaitingForParticipantListWriteConcernFp.wait();
+    let expectedParticipantList = expectedParticipantIndexList.map((idx) => {
+        return st['shard' + idx].shardName;
+    });
     checkParticipantListMatches(coordinator, lsid, 1, expectedParticipantList);
     hangBeforeWaitingForParticipantListWriteConcernFp.off();
 
@@ -140,25 +146,21 @@ const testAddingParticipant = function(turnFailPointOn, expectedParticipantList,
 
 jsTestLog("===Additional Participants Fail Point is OFF===");
 
-let expectedParticipantListNormal = [shard0Name, shard1Name];
+let expectedParticipantListNormal = [0, 1];
 testAddingParticipant(false, expectedParticipantListNormal);
 
 jsTestLog("===Additional Participants Fail Point is ON===");
 
 print("Adding one additional participant:");
-const fpDataOne = {
-    "cmdName": "insert",
-    "ns": ns,
-    "shardId": ["txn_addingParticipantParameter-rs2"]
+const fpDataOneFunc = (st) => {
+    return {"cmdName": "insert", "ns": ns, "shardId": [st.shard2.shardName]};
 };
-let expectedParticipantListOne = [shard0Name, shard1Name, shard2Name];
-testAddingParticipant(true, expectedParticipantListOne, fpDataOne);
+let expectedParticipantListOne = [0, 1, 2];
+testAddingParticipant(true, expectedParticipantListOne, fpDataOneFunc);
 
 print("Adding multiple additional participants:");
-const fpDataMultiple = {
-    "cmdName": "insert",
-    "ns": ns,
-    "shardId": ["txn_addingParticipantParameter-rs2", "txn_addingParticipantParameter-rs3"]
+const fpDataMultipleFunc = (st) => {
+    return {"cmdName": "insert", "ns": ns, "shardId": [st.shard2.shardName, st.shard3.shardName]};
 };
-let expectedParticipantListMultiple = [shard0Name, shard1Name, shard2Name, shard3Name];
-testAddingParticipant(true, expectedParticipantListMultiple, fpDataMultiple);
+let expectedParticipantListMultiple = [0, 1, 2, 3];
+testAddingParticipant(true, expectedParticipantListMultiple, fpDataMultipleFunc);

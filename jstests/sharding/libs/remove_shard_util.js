@@ -25,3 +25,19 @@ export function removeShard(st, shardName, timeout) {
         return res.state == 'completed';
     }, "failed to remove shard " + shardName + " within " + timeout + "ms", timeout);
 }
+
+export function moveOutSessionChunks(st, fromShard, toShard) {
+    const kSessionsColl = 'config.system.sessions';
+    let sessionCollEntry = st.s.getDB('config').collections.findOne({_id: kSessionsColl});
+
+    st.s.getDB('config')
+        .chunks.find({uuid: sessionCollEntry.uuid, shard: fromShard})
+        .forEach((chunkEntry) => {
+            assert.commandWorked(st.s.adminCommand({
+                moveChunk: kSessionsColl,
+                find: chunkEntry.min,
+                to: toShard,
+                _waitForDelete: true
+            }));
+        });
+}

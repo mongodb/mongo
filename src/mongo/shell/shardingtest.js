@@ -89,6 +89,7 @@
  *       configShard {boolean}: Add the config server as a shard if true.
  *       useAutoBootstrapProcedure {boolean}: Use the auto-bootstrapping procedure on every shard
  *          and config server if set to true.
+ *       alwaysUseTestNameForShardName {boolean}: Always use the testname as the name of the shard.
  *     }
  *   }
  *
@@ -1187,6 +1188,9 @@ var ShardingTest = function ShardingTest(params) {
         : false;
     useAutoBootstrapProcedure =
         useAutoBootstrapProcedure || jsTestOptions().useAutoBootstrapProcedure;
+    let alwaysUseTestNameForShardName = otherParams.hasOwnProperty('alwaysUseTestNameForShardName')
+        ? otherParams.alwaysUseTestNameForShardName
+        : false;
 
     let isConfigShardMode =
         otherParams.hasOwnProperty('configShard') ? otherParams.configShard : false;
@@ -1848,7 +1852,12 @@ var ShardingTest = function ShardingTest(params) {
                     } else {
                         print("ShardingTest " + testName + " going to add shard : " + n);
 
-                        var result = assert.commandWorked(admin.runCommand({addshard: n}),
+                        let addShardCmd = {addShard: n};
+                        if (alwaysUseTestNameForShardName) {
+                            addShardCmd.name = `${testName}-${idx}`;
+                        }
+
+                        var result = assert.commandWorked(admin.runCommand(addShardCmd),
                                                           "Failed to add shard " + n);
                         z.shardName = result.shardAdded;
                     }

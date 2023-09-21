@@ -66,7 +66,7 @@ shardServer.startSet();
 shardServer.initiateWithHighElectionTimeout();
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should succeed.");
-let arbiter = shardServer.add();
+let arbiter = shardServer.add({shardsvr: ""});
 testReconfig(shardServer,
              addNodeConfig(shardServer, 1 /* nodeId */, arbiter /* conn */, true /* arbiter */),
              true /* shouldSucceed */);
@@ -93,13 +93,15 @@ assert.commandWorked(admin.runCommand({addshard: shardServer.getURL()}));
 
 jsTestLog(logPrefix +
           "Adding an non-arbiter node that will keep IDWC set to (w: 'Majority') should succeed.");
-testReconfig(
-    shardServer,
-    addNodeConfig(shardServer, 1 /* nodeId */, shardServer.add() /* conn */, false /* arbiter */),
-    true /* shouldSucceed */);
+testReconfig(shardServer,
+             addNodeConfig(shardServer,
+                           1 /* nodeId */,
+                           shardServer.add({shardsvr: ""}) /* conn */,
+                           false /* arbiter */),
+             true /* shouldSucceed */);
 
 jsTestLog(logPrefix + "Adding an arbiter node that will change IDWC to (w:1) should fail.");
-arbiter = shardServer.add();
+arbiter = shardServer.add({shardsvr: ""});
 testReconfig(shardServer,
              addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
              false /* shouldSucceed */,
@@ -148,7 +150,7 @@ print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetM
 sleep(60000);
 
 jsTestLog(logPrefix + "Adding an arbiter node will change IDWC to (w:1) should succeed.");
-arbiter = shardServer.add();
+arbiter = shardServer.add({shardsvr: ""});
 testReconfig(shardServer,
              addNodeConfig(shardServer, 2 /* nodeId */, arbiter /* conn */, true /* arbiter */),
              true /* shouldSucceed */);

@@ -8,6 +8,9 @@
  *   # (e.g. sdam), because non-streamable rsm is generally slower to learn of new replica set info.
  *   requires_streamable_rsm,
  *   uses_change_streams,
+ *   # This test expects that there's only one shard (so no config shard) that has all the
+ *   # replSet tags set.
+ *   config_shard_incompatible,
  * ]
  */
 import {
@@ -31,7 +34,6 @@ const rsNodeOptions = {
     },
     shardsvr: "",
 };
-const replSetName = jsTestName();
 
 // Note that we include {chainingAllowed: false} in the replica set settings, because this test
 // assumes that both secondaries sync from the primary. Without this setting, the
@@ -39,7 +41,6 @@ const replSetName = jsTestName();
 // later disables replication on one secondary, but with chaining, that would effectively
 // disable replication on both secondaries, deadlocking the test.
 const rst = new ReplSetTest({
-    name: replSetName,
     nodes: [
         {rsConfig: {priority: 1, tags: {tag: "primary"}}},
         {rsConfig: {priority: 0, tags: {tag: "closestSecondary"}}},
@@ -55,7 +56,7 @@ rst.awaitSecondaryNodes();
 
 // Start the sharding test and add the replica set.
 const st = new ShardingTest({manualAddShard: true});
-assert.commandWorked(st.s.adminCommand({addShard: replSetName + "/" + rst.getPrimary().host}));
+assert.commandWorked(st.s.adminCommand({addShard: rst.name + "/" + rst.getPrimary().host}));
 
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
 assert.commandWorked(st.s.adminCommand(

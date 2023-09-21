@@ -489,25 +489,19 @@ assert.commandFailedWithCode(clusterAdminDB.currentOp({$ownOps: true}), ErrorCod
 assert(clusterAdminDB.logout());
 assert(clusterAdminDB.auth("user_inprog", "pwd"));
 
-const expectedOutput = TestData.configShard ?
-[
-    {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
-    {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}},
-    {_id: {shard: "config", host: st.rs0.getPrimary().host}}
-] :
-[
-    {_id: {shard: "aggregation_currentop-rs0", host: st.rs0.getPrimary().host}},
-    {_id: {shard: "aggregation_currentop-rs1", host: st.rs1.getPrimary().host}},
-    {_id: {shard: "aggregation_currentop-rs2", host: st.rs2.getPrimary().host}}
+const expectedOutput = [
+    {_id: {shard: st.shard0.shardName, host: st.rs0.getPrimary().host}},
+    {_id: {shard: st.shard1.shardName, host: st.rs1.getPrimary().host}},
+    {_id: {shard: st.shard2.shardName, host: st.rs2.getPrimary().host}}
 ];
-assert.eq(clusterAdminDB
-              .aggregate([
-                  {$currentOp: {allUsers: true, idleConnections: true}},
-                  {$group: {_id: {shard: "$shard", host: "$host"}}},
-                  {$sort: {_id: 1}}
-              ])
-              .toArray(),
-          expectedOutput);
+assert.sameMembers(clusterAdminDB
+                       .aggregate([
+                           {$currentOp: {allUsers: true, idleConnections: true}},
+                           {$group: {_id: {shard: "$shard", host: "$host"}}},
+                           {$sort: {_id: 1}}
+                       ])
+                       .toArray(),
+                   expectedOutput);
 
 // Test that a $currentOp pipeline with {localOps:true} returns operations from the mongoS
 // itself rather than the shards.

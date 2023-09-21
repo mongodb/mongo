@@ -140,8 +140,8 @@ confirmReadPreference(rs0Primary.getDB(mongosDB.getName()), rs0Secondary.getDB(m
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
-assert.commandWorked(mongosDB.adminCommand(
-    {moveChunk: coll.getFullName(), find: {a: 25}, to: "agg_explain_readPref-rs1"}));
+assert.commandWorked(
+    mongosDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
 
 // Sharded tests are run against the non-primary shard for the "agg_explain_readPref" db.
 confirmReadPreference(rs1Primary.getDB(mongosDB.getName()), rs1Secondary.getDB(mongosDB.getName()));
