@@ -558,12 +558,11 @@ let viewsCommandTests = {
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
     },
     moveCollection: {
-        // TODO(SERVER-80156): update test case to succeed on unsharded collections
         command: {moveCollection: "test.view", toShard: "move_collection-rs"},
         setup: function(conn) {
             assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
         },
-        expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
+        expectedErrorCode: [ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,

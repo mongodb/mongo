@@ -460,6 +460,11 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                     BSON("indexVersion" << newCollectionIndexVersion->indexVersion()));
             }
 
+            auto provenance = coordinatorDoc.getCommonReshardingMetadata().getProvenance();
+            if (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection) {
+                setFields = setFields.addFields(BSON("unsplittable" << true));
+            }
+
             return BSON("$set" << setFields);
         }
         case mongo::CoordinatorStateEnum::kQuiesced:
@@ -2249,8 +2254,10 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
         updatedCoordinatorDoc.getSourceNss(),
         updatedCoordinatorDoc.getReshardingUUID());
 
+    auto provenance = updatedCoordinatorDoc.getCommonReshardingMetadata().getProvenance();
     auto isUnsplittable = _reshardingCoordinatorExternalState->getIsUnsplittable(
-        opCtx.get(), updatedCoordinatorDoc.getSourceNss());
+                              opCtx.get(), updatedCoordinatorDoc.getSourceNss()) ||
+        (provenance && provenance.get() == ProvenanceEnum::kUnshardCollection);
 
     resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
                                                       _metrics.get(),

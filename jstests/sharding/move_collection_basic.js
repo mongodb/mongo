@@ -4,11 +4,12 @@
  * @tags: [
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
- *  featureFlagMoveCollection
+ *  featureFlagMoveCollection,
+ *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  multiversion_incompatible,
+ *  assumes_balancer_off,
  * ]
  */
-
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 
 (function() {
 'use strict';
@@ -19,42 +20,70 @@ const dbName = 'db';
 const collName = 'foo';
 const ns = dbName + '.' + collName;
 let mongos = st.s0;
-let shard = st.shard0;
-let cmdObj = {moveCollection: ns, toShard: st.shard0.shardName};
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const configsvr = new Mongo(topology.configsvr.nodes[0]);
+let shard0 = st.shard0.shardName;
+let shard1 = st.shard1.shardName;
 
-// Fail if sharding is disabled.
-assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
-
-// Implicit collection creation.
-const coll = st.s.getDB(dbName)["collName"];
-assert.commandWorked(coll.insert({oldKey: 1}));
+let cmdObj = {moveCollection: ns, toShard: shard0};
 
 // Fail if collection is not tracked.
-// TODO(SERVER-80156): update test case to succeed on unsharded collections
 assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-assert.commandWorked(mongos.getCollection(ns).createIndex({oldKey: 1}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shard0}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
+// Fail if collection is sharded.
+assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
+
+const unsplittableCollName = "foo_unsplittable"
+const unsplittableCollNs = dbName + '.' + unsplittableCollName;
+assert.commandWorked(
+    st.s.getDB(dbName).runCommand({createUnsplittableCollection: unsplittableCollName}));
+
 // Fail if missing required field toShard.
-assert.commandFailedWithCode(mongos.adminCommand({moveCollection: ns}),
+assert.commandFailedWithCode(mongos.adminCommand({moveCollection: unsplittableCollNs}),
                              ErrorCodes.IDLFailedToParse);
 
-// Succeed if command called on mongos.
-assert.commandWorked(mongos.adminCommand(cmdObj));
-
 // Fail if command called on shard.
-assert.commandFailedWithCode(shard.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
+assert.commandFailedWithCode(
+    st.shard0.adminCommand({moveCollection: unsplittableCollNs, toShard: shard1}),
+    ErrorCodes.CommandNotFound);
 
-const metrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.moveCollection;
+const coll = mongos.getDB(dbName)[unsplittableCollName];
+for (let i = -25; i < 25; ++i) {
+    assert.commandWorked(coll.insert({oldKey: i}));
+}
+assert.eq(50, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
 
-assert.eq(metrics.countStarted, 1);
-assert.eq(metrics.countSucceeded, 1);
-assert.eq(metrics.countFailed, 0);
-assert.eq(metrics.countCanceled, 0);
+// move to non-primary shard.
+assert.commandWorked(mongos.adminCommand({moveCollection: unsplittableCollNs, toShard: shard1}));
+
+// Should have unsplittable set to true
+let configDb = mongos.getDB('config');
+let unshardedColl = configDb.collections.findOne({_id: unsplittableCollNs});
+assert.eq(unshardedColl.unsplittable, true);
+let unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();
+assert.eq(1, unshardedChunk.length);
+
+assert.eq(50, st.rs1.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
+assert.eq(0, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
+
+const metrics = st.config0.getDB('admin').serverStatus({}).shardingStatistics.moveCollection;
+
+// TODO(SERVER-81282): Fix these metrics so we check countStarted instead of countKeyStarted.
+assert.eq(metrics.countSameKeyStarted, 1);
+assert.eq(metrics.countSameKeySucceeded, 1);
+assert.eq(metrics.countSameKeyFailed, 0);
+assert.eq(metrics.countSameKeyCanceled, 0);
+
+// move to primary shard.
+assert.commandWorked(mongos.adminCommand({moveCollection: unsplittableCollNs, toShard: shard0}));
+unshardedColl = configDb.collections.findOne({_id: unsplittableCollNs});
+assert.eq(unshardedColl.unsplittable, true);
+unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();
+assert.eq(1, unshardedChunk.length);
+
+assert.eq(0, st.rs1.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
+assert.eq(50, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocuments({}));
 
 st.stop();
 })();

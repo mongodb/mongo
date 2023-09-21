@@ -69,6 +69,7 @@ public:
             std::vector<mongo::ShardKeyRange> destinationShard = {request().getToShard()};
             reshardCollectionRequest.setShardDistribution(destinationShard);
             reshardCollectionRequest.setForceRedistribution(true);
+            reshardCollectionRequest.setNumInitialChunks(1);
 
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));

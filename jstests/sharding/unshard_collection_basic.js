@@ -4,7 +4,10 @@
  * @tags: [
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
- *  featureFlagUnshardCollection
+ *  featureFlagUnshardCollection,
+ *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  multiversion_incompatible,
+ *  assumes_balancer_off,
  * ]
  */
 
@@ -19,35 +22,80 @@ const dbName = 'db';
 const collName = 'foo';
 const ns = dbName + '.' + collName;
 let mongos = st.s0;
-let shard = st.shard0;
-let cmdObj = {unshardCollection: ns, toShard: st.shard0.shardName};
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const configsvr = new Mongo(topology.configsvr.nodes[0]);
+let shard0 = st.shard0.shardName;
+let shard1 = st.shard1.shardName;
+let cmdObj = {unshardCollection: ns, toShard: shard1};
 
-// Fail if collection does not exist.
+// Fail if unsharded collection.
 assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
 
-// Implicit collection creation.
-const coll = st.s.getDB(dbName)["collName"];
-assert.commandWorked(coll.insert({oldKey: 1}));
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: shard0}));
 
-// Fail if collection is unsharded.
-let result = mongos.adminCommand(cmdObj);
-assert.commandFailedWithCode(result, ErrorCodes.NamespaceNotSharded);
-assert.eq(result.errmsg, "Namespace must be sharded to perform an unshardCollection command");
+let coll = mongos.getDB(dbName)[collName];
+assert.commandWorked(coll.insert({oldKey: 50}));
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
+// Fail if untracked collection.
+assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
+
+// Fail if unsplittable tracked collection.
+const unsplittableCollName = "foo_unsplittable"
+const unsplittableCollNs = dbName + '.' + unsplittableCollName;
+assert.commandWorked(
+    st.s.getDB(dbName).runCommand({createUnsplittableCollection: unsplittableCollName}));
+assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: unsplittableCollNs}),
+                             ErrorCodes.NamespaceNotSharded);
+
 assert.commandWorked(coll.createIndex({oldKey: 1}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-// Unshard collection should succeed with and without toShard option.
-assert.commandWorked(mongos.adminCommand({unshardCollection: ns}));
-assert.commandWorked(mongos.adminCommand(cmdObj));
+assert.commandWorked(mongos.adminCommand({split: ns, middle: {oldKey: 0}}));
+assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {oldKey: -1}, to: shard0}));
+assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {oldKey: 10}, to: shard1}));
+
+coll = mongos.getDB(dbName)[collName];
+for (let i = -25; i < 25; ++i) {
+    assert.commandWorked(coll.insert({oldKey: i}));
+}
+
+assert.eq(26, st.rs1.getPrimary().getCollection(ns).countDocuments({}));
+
+// Unshard collection should succeed with toShard option.
+assert.commandWorked(mongos.adminCommand({unshardCollection: ns, toShard: shard1}));
+
+// Should have unsplittable set to true
+let configDb = mongos.getDB('config');
+let unshardedColl = configDb.collections.findOne({_id: ns});
+assert.eq(unshardedColl.unsplittable, true);
+
+assert.eq(51, st.rs1.getPrimary().getCollection(ns).countDocuments({}));
+assert.eq(0, st.rs0.getPrimary().getCollection(ns).countDocuments({}));
+
+let unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();
+assert.eq(1, unshardedChunk.length);
+
+// TODO (SEVER-81296): Enable after fix
+// Fail since collection is unsharded now
+// assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}),
+//                              ErrorCodes.NamespaceNotSharded);
+
+const newCollName = "foo1"
+const newCollNs = dbName + '.' + newCollName
+assert.commandWorked(mongos.adminCommand({shardCollection: newCollNs, key: {oldKey: 1}}));
+coll = mongos.getDB(dbName)[newCollName];
+for (let i = 0; i < 150; ++i) {
+    assert.commandWorked(coll.insert({oldKey: i}));
+}
+
+// Unshard collection should succeed without toShard option.
+assert.commandWorked(mongos.adminCommand({unshardCollection: newCollNs}));
+
+assert.eq(150, st.rs1.getPrimary().getCollection(newCollNs).countDocuments({}));
+assert.eq(0, st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}));
 
 // Fail if command called on shard.
-assert.commandFailedWithCode(shard.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
+assert.commandFailedWithCode(st.shard0.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
 
-const metrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.unshardCollection;
+const metrics = st.config0.getDB('admin').serverStatus({}).shardingStatistics.unshardCollection;
 
 assert.eq(metrics.countStarted, 2);
 assert.eq(metrics.countSucceeded, 2);

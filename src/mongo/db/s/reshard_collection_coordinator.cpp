@@ -173,7 +173,20 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
-            configsvrReshardCollection.setProvenance(_doc.getProvenance());
+
+            auto provenance = _doc.getProvenance();
+            if (provenance && provenance.get() == ProvenanceEnum::kMoveCollection) {
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream()
+                            << "MoveCollection can only be called on an unsharded collection.",
+                        !cmOld.isSharded() && cmOld.hasRoutingTable());
+            } else {
+                uassert(ErrorCodes::NamespaceNotSharded,
+                        "Collection has to be a sharded collection.",
+                        cmOld.isSharded());
+            }
+
+            configsvrReshardCollection.setProvenance(provenance);
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

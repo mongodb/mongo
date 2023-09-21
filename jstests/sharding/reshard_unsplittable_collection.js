@@ -1,8 +1,9 @@
 /*
- * Test that resharding works on unsplittable collections.
+ * Tests resharding and moveCollection behaviour on unsplittable collections.
  * @tags: [
  *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  *   featureFlagReshardingImprovements,
+ *   featureFlagMoveCollection,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]
@@ -28,12 +29,15 @@ for (let i = 0; i < kNumObjs; ++i) {
 
 assert.eq(kNumObjs, st.rs0.getPrimary().getCollection(kDataCollNss).countDocuments({}));
 
-assert.commandWorked(st.s.adminCommand({
+assert.commandFailedWithCode(st.s.adminCommand({
     reshardCollection: kDataCollNss,
     key: {_id: 1},
     forceRedistribution: true,
     shardDistribution: [{shard: shard1, min: {_id: MinKey}, max: {_id: MaxKey}}]
-}));
+}),
+                             ErrorCodes.NamespaceNotSharded);
+
+assert.commandWorked(st.s.adminCommand({moveCollection: kDataCollNss, toShard: shard1}));
 
 assert.eq(kNumObjs, st.rs1.getPrimary().getCollection(kDataCollNss).countDocuments({}));
 assert.eq(0, st.rs0.getPrimary().getCollection(kDataCollNss).countDocuments({}));

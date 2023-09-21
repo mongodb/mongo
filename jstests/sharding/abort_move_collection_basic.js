@@ -4,11 +4,13 @@
  * @tags: [
  *  requires_fcv_72,
  *  featureFlagReshardingImprovements,
- *  featureFlagMoveCollection
+ *  featureFlagMoveCollection,
+ *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  multiversion_incompatible,
+ *  assumes_balancer_off,
  * ]
  */
 
-import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 
@@ -21,21 +23,25 @@ const dbName = 'db';
 const collName = 'foo';
 const ns = dbName + '.' + collName;
 let mongos = st.s0;
-const topology = DiscoverTopology.findConnectedNodes(mongos);
-const configsvr = new Mongo(topology.configsvr.nodes[0]);
+let shard0 = st.shard0.shardName;
+let shard1 = st.shard1.shardName;
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shard0}));
+assert.commandWorked(st.s.getDB(dbName).runCommand({createUnsplittableCollection: collName}));
 
-let failpoint = configureFailPoint(st.rs1.getPrimary(), 'reshardingPauseRecipientBeforeCloning');
+const coll = mongos.getDB(dbName)[collName];
+for (let i = -5; i < 5; ++i) {
+    assert.commandWorked(coll.insert({oldKey: i}));
+}
+
+let failpoint = configureFailPoint(st.rs1.getPrimary(), 'reshardingPauseRecipientDuringCloning');
 
 // Starting the parallel shell for moveCollectionCmd
-// TODO(SERVER-80156): update test case to use an unsharded collection
 const awaitResult = startParallelShell(
     funWithArgs(function(ns, toShardId) {
         assert.commandFailedWithCode(db.adminCommand({moveCollection: ns, toShard: toShardId}),
                                      ErrorCodes.ReshardCollectionAborted);
-    }, ns, st.shard1.shardName), st.s.port);
+    }, ns, shard1), st.s.port);
 
 // Waiting to reach failpoint
 failpoint.wait();
@@ -60,12 +66,16 @@ assert.commandWorked(mongos.adminCommand({abortMoveCollection: ns}));
 failpoint.off();
 awaitResult();
 
-const metrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.moveCollection;
+const metrics = st.config0.getDB('admin').serverStatus({}).shardingStatistics.moveCollection;
 
-assert.eq(metrics.countStarted, 1);
-assert.eq(metrics.countSucceeded, 0);
-assert.eq(metrics.countFailed, 0);
-assert.eq(metrics.countCanceled, 1);
+// TODO(SERVER-81282): Fix these metrics so we check countStarted instead of countKeyStarted.
+assert.eq(metrics.countSameKeyStarted, 1);
+assert.eq(metrics.countSameKeySucceeded, 0);
+assert.eq(metrics.countSameKeyFailed, 0);
+assert.eq(metrics.countSameKeyCanceled, 1);
+
+assert.eq(0, st.rs1.getPrimary().getCollection(ns).countDocuments({}));
+assert.eq(10, st.rs0.getPrimary().getCollection(ns).countDocuments({}));
 
 st.stop();
 })();
