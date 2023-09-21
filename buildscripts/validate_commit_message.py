@@ -268,8 +268,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         default=EVG_CONFIG_FILE,
         help="Path to evergreen configuration file containing auth information.",
     )
+
     args = parser.parse_args(argv)
-    evg_api = RetryingEvergreenApi.get_api(config_file=os.path.expanduser(args.evg_config_file))
+    evg_api = RetryingEvergreenApi.get_api(
+        config_file=os.path.expanduser(args.evg_config_file), log_on_error=True)
     jira_auth = JiraAuth()
     jira_client = JiraClient(JIRA_SERVER, jira_auth)
     orchestrator = CommitMessageValidationOrchestrator(evg_api, jira_client)
