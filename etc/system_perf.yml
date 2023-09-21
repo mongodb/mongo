@@ -2674,6 +2674,27 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
 
+  - name: perf-1-node-replSet.arm.aws.2023-09
+    display_name: PERF 1-Node ReplSet ARM AWS 2023-09
+    # Leave off for now
+    activate: false
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *1nodetasks
+
   - name: linux-1-node-replSet-test-commands.2022-11
     display_name: Linux 1-Node ReplSet With Test Commands 2022-11
     cron: *linux-1-node-repl-cron
