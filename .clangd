@@ -8,6 +8,16 @@ If:
     ]
 CompileFlags:
   CompilationDatabase: ./
+Diagnostics:
+  UnusedIncludes: Strict
+  ClangTidy:
+    Add: [
+        # modernize-*,
+        cppcoreguidelines-*,
+        performance-*,
+        bugprone-*,
+        google-*,
+      ]
 
 ---
 If:

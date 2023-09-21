@@ -26,6 +26,11 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include <mutex>
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include <memory>
@@ -39,6 +44,7 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -198,27 +204,56 @@ Status KVDatabaseCatalogEntryBase::createCollection(OperationContext* opCtx,
                                                     bool allocateDefaultSpace) {
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_X));
 
+    MONGO_LOG(1) << "KVDatabaseCatalogEntryBase::createCollection"
+                 << ". ns: " << ns;
+
     if (ns.empty()) {
         return Status(ErrorCodes::BadValue, "Collection namespace cannot be empty");
     }
 
-    if (_collections.count(ns.toString())) {
-        invariant(_collections[ns.toString()]);
-        return Status(ErrorCodes::NamespaceExists, "collection already exists");
+
+    Status status = Status::OK();
+    // string ident = _engine->getCatalog()->getCollectionIdent(ns);
+    MONGO_LOG(1) << "Generate ident";
+    std::string nsStr = ns.toString();
+    {
+        // only one ident is valid
+        std::lock_guard<std::mutex> lk(_collectionsMutex);
+        if (_collections.find(nsStr) == _collections.end()) {
+            _collections[nsStr] = nullptr;
+        } else {
+            status = Status(ErrorCodes::NamespaceExists,
+                            "Duplicate collection ident for the same namespace");
+            MONGO_LOG(1) << "Duplicate collection ident for the same namespace";
+        }
     }
+    if (status != Status::OK()) {
+        return status;
+    }
+
+    std::string ident = _engine->getCatalog()->newUniqueIdent(ns, "collection");
 
     KVPrefix prefix = KVPrefix::getNextPrefix(NamespaceString(ns));
 
-    // need to create it
-    Status status = _engine->getCatalog()->newCollection(opCtx, ns, options, prefix);
-    if (!status.isOK())
-        return status;
-
-    string ident = _engine->getCatalog()->getCollectionIdent(ns);
-
+    // barrier provided by Monograph UpsertTableTxRequest
+    MONGO_LOG(1) << "Try to create table";
     status = _engine->getEngine()->createGroupedRecordStore(opCtx, ns, ident, options, prefix);
+    if (!status.isOK()) {
+        MONGO_LOG(1) << "Failed to create table";
+        return status;
+    }
+    // only one thread who has created table successfully can enter
+    MONGO_LOG(1) << "Create table successfully";
+    // insert record into _mbd_catalog
+    status = _engine->getCatalog()->newCollection(opCtx, ns, ident, options, prefix);
     if (!status.isOK())
         return status;
+
+    // if (_collections.count(ns.toString())) {
+    //     invariant(_collections[ns.toString()]);
+    //     return Status(ErrorCodes::NamespaceExists, "collection already exists");
+    // }
+
 
     // Mark collation feature as in use if the collection has a non-simple default collation.
     if (!options.collation.isEmpty()) {

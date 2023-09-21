@@ -419,7 +419,7 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
     DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage);
-    
+
     // guard.release();
     // guard = ThreadGuard(this);
 
@@ -521,6 +521,7 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
                     _source =
                         boost::context::callcc([this, &guard](boost::context::continuation&& sink) {
                             _coroYield = [this, &sink]() {
+                                MONGO_LOG(1) << "call yield";
                                 _dbClient = Client::releaseCurrent();
                                 sink = sink.resume();
                             };

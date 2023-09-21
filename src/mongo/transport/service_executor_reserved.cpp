@@ -69,12 +69,12 @@ void ThreadGroup::TrySleep() {
         _is_sleep.store(false, std::memory_order_relaxed);
         return;
     }
-    log() << "thread sleep";
+    MONGO_LOG(1) << "thread sleep";
     _sleep_cv.wait(lk, [this] { return !IsIdle(); });
 
     // Woken up from sleep.
     _is_sleep.store(false, std::memory_order_relaxed);
-    log() << "thread wake up";
+    MONGO_LOG(1) << "thread wake up";
 }
 
 void ThreadGroup::Terminate() {
@@ -92,7 +92,7 @@ ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx, size_t res
     : _name{"coroutine"}, _reservedThreads(reservedThreads), _threadGroups(reservedThreads) {}
 
 Status ServiceExecutorReserved::start() {
-    log() << "ServiceExecutorReserved::start";
+    MONGO_LOG(0) << "ServiceExecutorReserved::start";
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _stillRunning.store(true, std::memory_order_relaxed);
@@ -110,8 +110,8 @@ Status ServiceExecutorReserved::start() {
 }
 
 Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
-    log() << "Starting new worker thread for " << _name << " service executor. "
-          << " group id: " << groupId;
+    MONGO_LOG(0) << "Starting new worker thread for " << _name << " service executor. "
+                 << " group id: " << groupId;
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
         std::string threadName("thread_group_");
         threadName += std::to_string(threadGroupId);
@@ -148,7 +148,7 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
                 }
                 if (cnt > 0) {
-                    MONGO_LOG(0) << "get resume task";
+                    MONGO_LOG(1) << "get resume task";
                 }
             }
 
@@ -160,7 +160,7 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
                 }
                 if (cnt > 0) {
-                    MONGO_LOG(0) << "get normal task";
+                    MONGO_LOG(1) << "get normal task";
                 }
             }
 
@@ -188,9 +188,9 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
 
             while (!_localWorkQueue.empty() && _stillRunning.load(std::memory_order_relaxed)) {
                 _localRecursionDepth = 1;
-                log() << "thread " << threadGroupId << " do task";
+                MONGO_LOG(1) << "thread " << threadGroupId << " do task";
                 _localWorkQueue.front()();
-                log() << "thread " << threadGroupId << " do task done";
+                MONGO_LOG(1) << "thread " << threadGroupId << " do task done";
                 _localWorkQueue.pop_front();
             }
 
@@ -273,7 +273,7 @@ Status ServiceExecutorReserved::schedule(Task task,
                                          ScheduleFlags flags,
                                          ServiceExecutorTaskName taskName,
                                          uint16_t thd_group_id) {
-    MONGO_LOG(0) << "schedule with group id: " << thd_group_id;
+    MONGO_LOG(1) << "schedule with group id: " << thd_group_id;
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }

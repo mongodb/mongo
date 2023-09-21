@@ -139,8 +139,8 @@ public:
     };
 
     /**
-    * The destructor should only be called if we are tearing down but not exiting the process.
-    */
+     * The destructor should only be called if we are tearing down but not exiting the process.
+     */
     virtual ~StorageEngine() {}
 
     /**
@@ -422,6 +422,18 @@ public:
      * implementation.
      */
     virtual Timestamp getAllCommittedTimestamp() const = 0;
+
+    void setUseNoopLockImpl(bool v) {
+        useNoopLockImpl = v;
+    }
+
+    bool getUseNoopLockImpl() {
+        return useNoopLockImpl;
+    }
+
+private:
+    // set true in monograph
+    bool useNoopLockImpl{false};
 };
 
 }  // namespace mongo

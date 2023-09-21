@@ -131,8 +131,8 @@ std::string escapeDbName(StringData dbname) {
 
 }  // namespace
 
-using std::unique_ptr;
 using std::string;
+using std::unique_ptr;
 
 class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
 public:
@@ -338,6 +338,18 @@ bool KVCatalog::_hasEntryCollidingWithRand() const {
     return false;
 }
 
+std::string KVCatalog::newUniqueIdent(StringData ns, const char* kind) {
+    // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
+    StringBuilder buf;
+    if (_directoryPerDb) {
+        buf << escapeDbName(nsToDatabaseSubstring(ns)) << '/';
+    }
+    buf << kind;
+    buf << (_directoryForIndexes ? '/' : '-');
+    buf << _next.fetchAndAdd(1) << '-' << _rand;
+    return buf.str();
+}
+
 std::string KVCatalog::_newUniqueIdent(StringData ns, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
     StringBuilder buf;
@@ -389,6 +401,44 @@ void KVCatalog::getAllCollections(std::vector<std::string>* out) const {
     for (NSToIdentMap::const_iterator it = _idents.begin(); it != _idents.end(); ++it) {
         out->push_back(it->first);
     }
+}
+
+Status KVCatalog::newCollection(OperationContext* opCtx,
+                     StringData ns,
+                     const std::string& ident,
+                     const CollectionOptions& options,
+                     KVPrefix prefix) {
+    invariant(opCtx->lockState()->isDbLockedForMode(nsToDatabaseSubstring(ns), MODE_X));
+
+    Entry& old = _idents[ns.toString()];
+    if (!old.ident.empty()) {
+        return Status(ErrorCodes::NamespaceExists, "collection already exists");
+    }
+
+    opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
+
+    BSONObj obj;
+    {
+        BSONObjBuilder b;
+        b.append("ns", ns);
+        b.append("ident", ident);
+        BSONCollectionCatalogEntry::MetaData md;
+        md.ns = ns.toString();
+        md.options = options;
+        md.prefix = prefix;
+        b.append("md", md.toBSON());
+        obj = b.obj();
+    }
+    const bool enforceQuota = false;
+    // TODO SERVER-30638: using timestamp 0 for these inserts.
+    StatusWith<RecordId> res =
+        _rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), Timestamp(), enforceQuota);
+    if (!res.isOK())
+        return res.getStatus();
+
+    old = Entry(ident, res.getValue());
+    LOG(1) << "stored meta data for " << ns << " @ " << res.getValue();
+    return Status::OK();
 }
 
 Status KVCatalog::newCollection(OperationContext* opCtx,
@@ -675,4 +725,4 @@ StatusWith<std::string> KVCatalog::newOrphanedIdent(OperationContext* opCtx, std
     LOG(1) << "stored meta data for orphaned collection " << ns << " @ " << res.getValue();
     return StatusWith<std::string>(std::move(ns));
 }
-}
+}  // namespace mongo

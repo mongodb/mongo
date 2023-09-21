@@ -37,6 +37,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/monograph_locker_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
@@ -105,14 +106,12 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
                 getFactoryForStorageEngine(service, storageGlobalParams.engine);
             if (factory) {
                 uassert(28662,
-                        str::stream() << "Cannot start server. Detected data files in " << dbpath
-                                      << " created by"
-                                      << " the '"
-                                      << *existingStorageEngine
-                                      << "' storage engine, but the"
-                                      << " specified storage engine was '"
-                                      << factory->getCanonicalName()
-                                      << "'.",
+                        str::stream()
+                            << "Cannot start server. Detected data files in " << dbpath
+                            << " created by"
+                            << " the '" << *existingStorageEngine << "' storage engine, but the"
+                            << " specified storage engine was '" << factory->getCanonicalName()
+                            << "'.",
                         factory->getCanonicalName() == *existingStorageEngine);
             }
         } else {
@@ -161,8 +160,7 @@ void initializeStorageEngine(ServiceContext* service, const StorageEngineInitFla
         uassert(34368,
                 str::stream()
                     << "Server was started in read-only mode, but the configured storage engine, "
-                    << storageGlobalParams.engine
-                    << ", does not support read-only operation",
+                    << storageGlobalParams.engine << ", does not support read-only operation",
                 factory->supportsReadOnly());
     }
 
@@ -228,9 +226,7 @@ void createLockFile(ServiceContext* service) {
     } catch (const std::exception& ex) {
         uassert(28596,
                 str::stream() << "Unable to determine status of lock file in the data directory "
-                              << storageGlobalParams.dbpath
-                              << ": "
-                              << ex.what(),
+                              << storageGlobalParams.dbpath << ": " << ex.what(),
                 false);
     }
     const bool wasUnclean = lockFile->createdByUncleanShutdown();
@@ -352,7 +348,9 @@ public:
         if (!storageEngine) {
             return;
         }
-        if (storageEngine->isMmapV1()) {
+        if (storageEngine->getUseNoopLockImpl()) {
+            opCtx->setLockState(stdx::make_unique<MonographLockerNoop>());
+        } else if (storageEngine->isMmapV1()) {
             opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
         } else {
             opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());

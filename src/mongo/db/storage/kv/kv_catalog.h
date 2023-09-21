@@ -70,6 +70,11 @@ public:
                          StringData ns,
                          const CollectionOptions& options,
                          KVPrefix prefix);
+    Status newCollection(OperationContext* opCtx,
+                         StringData ns,
+                         const std::string& ident,
+                         const CollectionOptions& options,
+                         KVPrefix prefix);
 
     std::string getCollectionIdent(StringData ns) const;
 
@@ -110,6 +115,7 @@ public:
      * have access to index catalog.
      */
     StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx, std::string ident);
+    std::string newUniqueIdent(StringData ns, const char* kind);
 
 private:
     class AddIdentChange;
@@ -150,4 +156,4 @@ private:
     // guaranteed to be non-null after KVCatalog::init() is called.
     std::unique_ptr<FeatureTracker> _featureTracker;
 };
-}
+}  // namespace mongo

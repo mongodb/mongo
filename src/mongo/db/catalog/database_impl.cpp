@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/status.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
@@ -217,6 +218,10 @@ Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx
     }
 
     unique_ptr<CollectionCatalogEntry> cce(_dbEntry->getCollectionCatalogEntry(nss.ns()));
+    if (!cce) {
+        return nullptr;
+    }
+
     auto uuid = cce->getCollectionOptions(opCtx).uuid;
 
     unique_ptr<RecordStore> rs(_dbEntry->getRecordStore(nss.ns()));
@@ -315,8 +320,9 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) {
 
             wunit.commit();
         } catch (const WriteConflictException&) {
-            warning() << "could not drop temp collection '" << ns << "' due to "
-                                                                     "WriteConflictException";
+            warning() << "could not drop temp collection '" << ns
+                      << "' due to "
+                         "WriteConflictException";
             opCtx->recoveryUnit()->abandonSnapshot();
         }
     }
@@ -505,9 +511,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
     massert(40461,
             str::stream() << "cannot drop collection " << fullns.ns() << " (" << uuidString
-                          << ") when "
-                          << numIndexesInProgress
-                          << " index builds in progress.",
+                          << ") when " << numIndexesInProgress << " index builds in progress.",
             numIndexesInProgress == 0);
 
     audit::logDropCollection(&cc(), fullns.toString());
@@ -686,8 +690,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         if (!coll)
             return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
 
-        string clearCacheReason = str::stream() << "renamed collection '" << fromNS << "' to '"
-                                                << toNS << "'";
+        string clearCacheReason = str::stream()
+            << "renamed collection '" << fromNS << "' to '" << toNS << "'";
         IndexCatalog::IndexIterator ii = coll->getIndexCatalog()->getIndexIterator(opCtx, true);
 
         while (ii.more()) {
@@ -738,9 +742,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     // This check only applies for actual collections, not indexes or other types of ns.
     uassert(17381,
             str::stream() << "fully qualified namespace " << nss.ns() << " is too long "
-                          << "(max is "
-                          << NamespaceString::MaxNsCollectionLen
-                          << " bytes)",
+                          << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)",
             !nss.isNormal() || nss.size() <= NamespaceString::MaxNsCollectionLen);
 
     uassert(17316, "cannot create a blank collection", nss.coll() > 0);
@@ -792,8 +794,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     bool generatedUUID = false;
     if (!optionsWithUUID.uuid) {
         if (!canAcceptWrites) {
-            std::string msg = str::stream() << "Attempted to create a new collection " << nss.ns()
-                                            << " without a UUID";
+            std::string msg = str::stream()
+                << "Attempted to create a new collection " << nss.ns() << " without a UUID";
             severe() << msg;
             uasserted(ErrorCodes::InvalidOptions, msg);
         }
@@ -825,13 +827,32 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         log() << "createCollection: " << ns << " with no UUID.";
     }
 
-    massertStatusOK(
-        _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/));
+    // massertStatusOK(
+    //     _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/));
 
-    opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
+    Status status =
+        _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/);
+    MONGO_LOG(0) << "DatabaseImpl::createCollection"
+                 << ". code: " << status.codeString() << ". msg: " << status.reason();
+    if (status == Status::OK()) {
+        opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
+    } else {
+        MONGO_LOG(1) << "collection exist";
+    }
+
+
     Collection* collection = _getOrCreateCollectionInstance(opCtx, nss);
+    if (collection == nullptr) {
+        return nullptr;
+    }
     invariant(collection);
+
+    if (status != Status::OK()) {
+        return collection;
+    }
+
     _collections[ns] = collection;
+
 
     BSONObj fullIdIndexSpec;
 
@@ -848,8 +869,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
                 // autoIndexId: false is only allowed on unreplicated collections.
                 uassert(50001,
                         str::stream() << "autoIndexId:false is not allowed for collection "
-                                      << nss.ns()
-                                      << " because it can be replicated",
+                                      << nss.ns() << " because it can be replicated",
                         !nss.isReplicated());
             }
         }
@@ -868,7 +888,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     if (canAcceptWrites && createIdIndex && nss.isSystem()) {
         createSystemIndexes(opCtx, collection);
     }
-
+    MONGO_LOG(0) << "all done";
     return collection;
 }
 
@@ -920,8 +940,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                                        "model for collection name "
                                     << collectionNameModel
                                     << " must contain at least one percent sign within first "
-                                    << maxModelLength
-                                    << " characters.");
+                                    << maxModelLength << " characters.");
     }
 
     if (!_uniqueCollectionNamespacePseudoRandom) {
@@ -960,9 +979,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
     return Status(
         ErrorCodes::NamespaceExists,
         str::stream() << "Cannot generate collection name for temporary collection with model "
-                      << collectionNameModel
-                      << " after "
-                      << numGenerationAttempts
+                      << collectionNameModel << " after " << numGenerationAttempts
                       << " attempts due to namespace conflicts with existing collections.");
 }
 
@@ -1064,8 +1081,9 @@ MONGO_REGISTER_SHIM(Database::userCreateNS)
     if (collectionOptions.isView()) {
         uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
     } else {
-        invariant(
-            db->createCollection(opCtx, ns, collectionOptions, createDefaultIndexes, idIndex));
+        if (!db->createCollection(opCtx, ns, collectionOptions, createDefaultIndexes, idIndex)) {
+            throw WriteConflictException();
+        }
     }
 
     return Status::OK();

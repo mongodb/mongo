@@ -30,6 +30,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -99,5 +100,6 @@ protected:
 
     KVStorageEngine* const _engine;  // not owned here
     CollectionMap _collections;
+    std::mutex _collectionsMutex;
 };
 }  // namespace mongo

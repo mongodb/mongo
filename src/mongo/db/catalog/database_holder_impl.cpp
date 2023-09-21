@@ -146,9 +146,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     auto duplicates = _getNamesWithConflictingCasing_inlock(dbname);
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "db already exists with different case already have: ["
-                          << *duplicates.cbegin()
-                          << "] trying to create ["
-                          << dbname.toString()
+                          << *duplicates.cbegin() << "] trying to create [" << dbname.toString()
                           << "]",
             duplicates.empty());
 
@@ -173,8 +171,12 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     removeDbGuard.Dismiss();
     lk.lock();
     auto it = _dbs.find(dbname);
-    invariant(it != _dbs.end() && it->second == nullptr);
-    it->second = newDb.release();
+    // invariant(it != _dbs.end() && it->second == nullptr);
+    invariant(it != _dbs.end());
+    if (it->second == nullptr) {
+        it->second = newDb.release();
+    }
+    
     invariant(_getNamesWithConflictingCasing_inlock(dbname.toString()).empty());
 
     return it->second;

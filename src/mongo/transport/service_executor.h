@@ -84,7 +84,7 @@ public:
                             ScheduleFlags flags,
                             ServiceExecutorTaskName taskName,
                             uint16_t thd_group_id) {
-        return Status::OK();
+        return schedule(task, flags, taskName);
     }
 
     /*
@@ -105,7 +105,7 @@ public:
      */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
 
-    virtual std::function<void()> CoroutineResumeFunctor(uint16_t thd_group_id, Task task)  {
+    virtual std::function<void()> CoroutineResumeFunctor(uint16_t thd_group_id, Task task) {
         return {};
     }
 };
