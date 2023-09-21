@@ -953,7 +953,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         'multitenancy',
         'server_base',
         'storage/capped_snapshots',
@@ -1121,7 +1120,6 @@ env.Library(
         'commands/fsync_locked',
         'concurrency/lock_manager',
         'not_primary_error_tracker',
-        'query/query_stats/query_stats',
         'read_concern_d_impl',
         'rw_concern_d',
         's/sharding_runtime_d',
@@ -1364,7 +1362,6 @@ env.Library(
         'read_concern_mongod.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         'concurrency/exception_util',
         'repl/repl_coordinator_interface',
         'repl/speculative_majority_read_info',
@@ -1586,7 +1583,6 @@ execEnv.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth_checks',
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
@@ -2383,7 +2379,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         # NOTE: If you need to add a static or mongo initializer to mongod startup,
         # please add that library here, as a private library dependency.
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/rpc/rpc',
@@ -2807,7 +2802,6 @@ if wiredtiger:
             'ops/write_ops',
             'pipeline/change_stream_expired_pre_image_remover',
             'query/common_query_enums_and_helpers',
-            'query/query_stats/query_stats',
             'query/query_test_service_context',
             'query_exec',
             'read_write_concern_defaults_mock',
