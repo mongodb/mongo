@@ -158,9 +158,16 @@ function testPipelineLimits() {
         {$group: {_id: "$a"}},
         {$addFields: {c: {$add: ["$c", "$d"]}}},
         {$addFields: {a: 5}},
-        {$match: {a: 1}},
-        {$project: {a: 1}},
+        // TODO SERVER-78354: Uncomment this test and ensure it passes in the
+        // aggregation_disabled_optimization suite.
+        // {$match: {a: 1}}
     ];
+
+    if (!isBonsaiEnabled) {
+        // TODO: SERVER-78354 should move $project, $addFields, and $unwind to "stages" so $project
+        // runs with Bonsai. This is an issue with the reference tracker.
+        stages.push({$project: {a: 1}});
+    }
     for (const stage of stages) {
         const pipeline = range(pipelineLimit).map(_ => stage);
         jsTestLog(stage);

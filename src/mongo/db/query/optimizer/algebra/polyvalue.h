@@ -297,7 +297,6 @@ private:
     public:
         Reference() = default;
         Reference(ControlBlock<Ts...>* object) : _object(object) {}
-        using polyvalue_type = PolyValue;
 
         // Reference is implicitly convertible from PolyValue. This conversion is equivalent to the
         // caller using .ref() explicitly. Having this conversion makes it easier to call functions
