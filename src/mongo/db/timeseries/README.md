@@ -17,7 +17,8 @@ certain properties:
     * Querying the view implicitly unwinds the data in the underlying bucket collection to return
       documents in their original non-bucketed form.
         * The aggregation stage [$_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
-          unwind the bucket data for the view.
+          unwind the bucket data for the view. For more information about this stage and query rewrites for
+          time-series collections see [query/timeseries/README](../query/timeseries/README.md).
 * The system collection has the namespace `mydb.system.buckets.mytscoll` and is where the actual
   data is stored.
     * Each document in the bucket collection represents a set of time-series data within a period of time.

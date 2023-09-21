@@ -165,6 +165,11 @@ public:
         return _bucketUnpacker;
     }
 
+    /**
+     * See ../query/timeseries/README.md for a description of all the rewrites implemented in this
+     * function. The README.md should be maintained in sync with this function. Please update the
+     * README accordingly.
+     */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 

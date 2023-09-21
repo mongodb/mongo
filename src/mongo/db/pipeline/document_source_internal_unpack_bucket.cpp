@@ -1517,6 +1517,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
+    // See ../query/timeseries/README.md for a description of all the rewrites implemented in this
+    // function.
     if (std::next(itr) == container->end()) {
         return container->end();
     }
