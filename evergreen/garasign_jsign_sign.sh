@@ -1,8 +1,8 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
-export GRS_CONFIG_USER1_USERNAME=${garasign_jsign_username}
-export GRS_CONFIG_USER1_PASSWORD=${garasign_jsign_password}
+echo "GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}" >> "signing-envfile"
+echo "GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}" >> "signing-envfile"
 
 set -o errexit
 set -o verbose
@@ -28,7 +28,7 @@ sign $msi_filename
 EOF
 
 podman run \
-  --env-host \
+  --env-file=signing-envfile \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
   ${garasign_jsign_image} \
