@@ -571,6 +571,12 @@ tasks:
       - func: f_run_dsi_workload
         vars:
           test_control: short
+  - name: canaries_only
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: canaries
   - name: smoke_test_ssl
     priority: 5
     commands:
@@ -1873,6 +1879,7 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+      - name: canaries_only
 
   - name: linux-intel-standalone-sbe
     display_name: Linux Intel Standalone (SBE)
@@ -1916,6 +1923,7 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
       - name: snapshot_reads
+      - name: canaries_only
 
   - name: linux-intel-1-node-replSet-sbe
     display_name: Linux Intel 1-Node ReplSet (SBE)
@@ -2213,6 +2221,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: dsi_integ_test_run_command_simple
       - name: smoke_test
+      - name: canaries_only
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -2651,6 +2660,7 @@ buildvariants:
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
+      - name: canaries_only
       - name: non_sharded_workloads
       - name: bestbuy_agg
       - name: bestbuy_agg_merge_different_db
@@ -3019,6 +3029,7 @@ buildvariants:
       - name: misc_workloads
       - name: map_reduce_workloads
       - name: smoke_test
+      - name: canaries_only
       - name: mongos_workloads
         cron: *high-value-workload-cron
       - name: mongos_large_catalog_workloads
