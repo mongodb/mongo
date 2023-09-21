@@ -113,16 +113,6 @@
 namespace mongo {
 namespace {
 
-boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,
-                                                              const NamespaceString& nss) {
-    try {
-        return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is untracked or doesn't exist
-        return boost::none;
-    }
-}
-
 // TODO (SERVER-80704): Get rid of isCollectionSharded function once targetIsSharded field is
 // deprecated.
 bool isCollectionSharded(boost::optional<CollectionType> const& optCollectionType) {
@@ -681,13 +671,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     }
 
                     // Make sure the source collection exists
-                    const auto optSourceCollType = getCollectionFromConfigServer(opCtx, fromNss);
+                    const auto optSourceCollType =
+                        sharding_ddl_util::getCollectionFromConfigServer(opCtx, fromNss);
                     const auto sourceCollUuid =
                         getCollectionUUID(opCtx, fromNss, optSourceCollType);
                     _doc.setSourceUUID(sourceCollUuid);
                     _doc.setOptTrackedCollInfo(optSourceCollType);
 
-                    const auto optTargetCollType = getCollectionFromConfigServer(opCtx, toNss);
+                    const auto optTargetCollType =
+                        sharding_ddl_util::getCollectionFromConfigServer(opCtx, toNss);
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 

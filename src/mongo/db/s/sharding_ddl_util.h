@@ -319,5 +319,9 @@ void runTransactionOnShardingCatalog(
     const OperationSessionInfo& osi,
     bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& inputExecutor = nullptr);
+
+boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,
+                                                              const NamespaceString& nss);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo

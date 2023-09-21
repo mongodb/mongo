@@ -89,17 +89,6 @@ MONGO_FAIL_POINT_DEFINE(collModBeforeConfigServerUpdate);
 
 namespace {
 
-// This method requires callers to hold the DDL lock to ensure no concurrent DDL operations
-// interfere with the stability.
-bool isShardedCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    try {
-        auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-        return true;
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The collection is not sharded or doesn't exist.
-        return false;
-    }
-}
 
 bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
     if (!request.getTimeseries().has_value()) {
@@ -170,7 +159,9 @@ void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationCo
         info.timeSeriesOptions = timeseries::getTimeseriesOptions(opCtx, originalNss(), true);
         info.nsForTargeting =
             info.timeSeriesOptions ? originalNss().makeTimeseriesBucketsNamespace() : originalNss();
-        info.isSharded = isShardedCollection(opCtx, info.nsForTargeting);
+        const auto optColl =
+            sharding_ddl_util::getCollectionFromConfigServer(opCtx, info.nsForTargeting);
+        info.isTracked = (bool)optColl;
         _collInfo = std::move(info);
     }
 }
@@ -178,7 +169,7 @@ void CollModCoordinator::_saveCollectionInfoOnCoordinatorIfNecessary(OperationCo
 void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationContext* opCtx) {
     tassert(
         6522700, "Sharding information must be gathered after collection information", _collInfo);
-    if (!_shardingInfo && _collInfo->isSharded) {
+    if (!_shardingInfo && _collInfo->isTracked) {
         ShardingInfo info;
         info.isPrimaryOwningChunks = false;
         const auto [chunkManager, _] = uassertStatusOK(
@@ -299,7 +290,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                     _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
-                    if (_collInfo->isSharded) {
+                    if (_collInfo->isTracked) {
                         const auto& collUUID =
                             sharding_ddl_util::getCollectionUUID(opCtx, _collInfo->nsForTargeting);
                         _doc.setCollUUID(collUUID);
@@ -318,7 +309,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isSharded && hasTimeSeriesBucketingUpdate(_request)) {
+                if (_collInfo->isTracked && hasTimeSeriesBucketingUpdate(_request)) {
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
@@ -348,7 +339,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isSharded && _collInfo->timeSeriesOptions &&
+                if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
                     hasTimeSeriesBucketingUpdate(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     const auto cmdObj =
@@ -372,7 +363,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isSharded) {
+                if (_collInfo->isTracked) {
                     try {
                         if (!_firstExecution) {
                             bool allowMigrations = sharding_ddl_util::checkAllowMigrations(
@@ -389,14 +380,9 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             }
                         }
 
-                        ShardsvrCollModParticipant request(originalNss(), _request);
-                        bool needsUnblock =
-                            _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
-                        request.setNeedsUnblock(needsUnblock);
-
-                        // If trying to convert an index to unique, executes a dryRun first to find
-                        // any duplicates without actually changing the indexes to avoid
-                        // inconsistent index specs on different shards. Example:
+                        // If trying to convert an index to unique on a sharded collection, executes
+                        // a dryRun first to find any duplicates without actually changing the
+                        // indexes to avoid inconsistent index specs on different shards. Example:
                         //   Shard0: {_id: 0, a: 1}
                         //   Shard1: {_id: 1, a: 2}, {_id: 2, a: 2}
                         //   When trying to convert index {a: 1} to unique, the dry run will return
@@ -418,6 +404,11 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
                                 opCtx, optsDryRun, shards);
                         }
+
+                        ShardsvrCollModParticipant request(originalNss(), _request);
+                        bool needsUnblock =
+                            _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
+                        request.setNeedsUnblock(needsUnblock);
 
                         std::vector<AsyncRequestsSender::Response> responses;
 

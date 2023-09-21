@@ -782,5 +782,15 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     txn.run(newOpCtx, std::move(transactionChain));
 }
 
+boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,
+                                                              const NamespaceString& nss) {
+    try {
+        return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is not tracked by the config server or doesn't exist.
+        return boost::none;
+    }
+}
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
