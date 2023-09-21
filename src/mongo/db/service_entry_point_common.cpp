@@ -30,7 +30,6 @@
 
 #include "mongo/db/service_entry_point_common.h"
 
-#include "mongo/db/repl/replication_coordinator_impl.h"
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <boost/smart_ptr.hpp>
