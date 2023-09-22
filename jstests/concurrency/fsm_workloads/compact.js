@@ -68,8 +68,7 @@ export const $config = (function() {
         }
 
         function compact(db, collName) {
-            var res =
-                db.runCommand({compact: this.threadCollName, paddingFactor: 1.0, force: true});
+            var res = db.runCommand({compact: this.threadCollName, force: true});
             if (!isEphemeral(db)) {
                 assertAlways.commandWorked(res);
             } else {

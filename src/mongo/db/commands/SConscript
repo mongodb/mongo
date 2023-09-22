@@ -614,9 +614,10 @@ env.Library(
     target="mongod",
     source=[
         "apply_ops_cmd.cpp",
+        "change_stream_state_command.cpp",
         "collection_to_capped.cpp",
         "compact.cpp",
-        "change_stream_state_command.cpp",
+        "compact.idl",
         "dbcheck.cpp",
         "dbcommands_d.cpp",
         "dbhash.cpp",
