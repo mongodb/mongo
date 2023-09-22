@@ -76,7 +76,9 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
                     "expression"_attr = matchExpression->debugString());
     }
 
-    return {std::move(matchExpression), std::move(rewriteExpr._matchExprElemStorage)};
+    return {std::move(matchExpression),
+            std::move(rewriteExpr._matchExprElemStorage),
+            rewriteExpr._allSubExpressionsRewritten};
 }
 
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteExpression(
@@ -99,8 +101,11 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteAndExpression(
     auto andMatch = std::make_unique<AndMatchExpression>();
 
     for (auto&& child : currExprNode->getOperandList())
-        if (auto childMatch = _rewriteExpression(child))
+        if (auto childMatch = _rewriteExpression(child)) {
             andMatch->add(std::move(childMatch));
+        } else {
+            _allSubExpressionsRewritten = false;
+        }
 
     if (andMatch->numChildren() > 0)
         return andMatch;
@@ -115,10 +120,12 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteOrExpression(
     for (auto&& child : currExprNode->getOperandList())
         if (auto childExpr = _rewriteExpression(child))
             orMatch->add(std::move(childExpr));
-        else
+        else {
             // If any child cannot be rewritten to a MatchExpression then we must abandon adding
             // this $or clause.
+            _allSubExpressionsRewritten = false;
             return nullptr;
+        }
 
     if (orMatch->numChildren() > 0)
         return orMatch;

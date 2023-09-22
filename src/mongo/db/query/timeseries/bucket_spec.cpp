@@ -88,24 +88,35 @@ bool BucketSpec::fieldIsComputed(StringData field) const {
 }
 
 namespace {
-std::unique_ptr<MatchExpression> createTightExprComparisonPredicate(
+std::unique_ptr<MatchExpression> createTightExprTimeFieldPredicate(
     const ExprMatchExpression* matchExpr,
     const BucketLevelComparisonPredicateGeneratorBase::Params params) {
-    auto rewriteMatchExpr =
-        RewriteExpr::rewrite(matchExpr->getExpression(), params.pExpCtx->getCollator())
-            .releaseMatchExpression();
-    if (rewriteMatchExpr &&
-        ComparisonMatchExpressionBase::isInternalExprComparison(rewriteMatchExpr->matchType())) {
-        auto compareMatchExpr =
-            checked_cast<const ComparisonMatchExpressionBase*>(rewriteMatchExpr.get());
+    RewriteExpr::RewriteResult rewriteRes =
+        RewriteExpr::rewrite(matchExpr->getExpression(), params.pExpCtx->getCollator());
+    auto unownedExpr = rewriteRes.matchExpression();
+
+    // There might be children in the $and expression that cannot be rewritten to a match
+    // expression. If this is the case we cannot assume that the tight predicate or
+    // wholeBucketFilter produced by the rewritten $and expression is correct. Measurements in the
+    // bucket might fit the rewritten $and expression, but fail to fit the other children of the
+    // $and expression and will be returned incorrectly.
+
+    // It is an error to call 'createPredicate' on predicates on the meta field, and it only
+    // returns a value for predicates on the 'timeField'.
+    if (unownedExpr && rewriteRes.allSubExpressionsRewritten() &&
+        unownedExpr->path() == params.bucketSpec.timeField() &&
+        ComparisonMatchExpressionBase::isInternalExprComparison(unownedExpr->matchType())) {
+        const auto compareMatchExpr =
+            checked_cast<const ComparisonMatchExpressionBase*>(unownedExpr);
         return BucketLevelComparisonPredicateGenerator::createPredicate(
                    compareMatchExpr, params, true /* tight */)
             .matchExpr;
     }
 
-    return BucketSpec::handleIneligible(BucketSpec::IneligiblePredicatePolicy::kIgnore,
-                                        matchExpr,
-                                        "can't handle non-comparison $expr match expression")
+    return BucketSpec::handleIneligible(
+               BucketSpec::IneligiblePredicatePolicy::kIgnore,
+               matchExpr,
+               "can only handle comparison $expr match expressions on the timeField")
         .tightPredicate;
 }
 
@@ -304,8 +315,8 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             // the query planner. Since the classic planner doesn't handle the $expr expression, we
             // don't generate the loose predicate.
             nullptr,
-            createTightExprComparisonPredicate(checked_cast<const ExprMatchExpression*>(matchExpr),
-                                               bucketPredicateParams)};
+            createTightExprTimeFieldPredicate(checked_cast<const ExprMatchExpression*>(matchExpr),
+                                              bucketPredicateParams)};
     } else if (matchExpr->matchType() == MatchExpression::GEO) {
         auto& geoExpr = static_cast<const GeoMatchExpression*>(matchExpr)->getGeoExpression();
         if (geoExpr.getPred() == GeoExpression::WITHIN ||
