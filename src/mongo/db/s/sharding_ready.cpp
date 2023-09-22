@@ -59,36 +59,40 @@ ShardingReady* ShardingReady::get(OperationContext* opCtx) {
     return ShardingReady::get(opCtx->getServiceContext());
 }
 
-
 void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
     auto catalogManager = ShardingCatalogManager::get(opCtx);
     auto getShards = catalogManager->localCatalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     uassertStatusOK(getShards);
 
-    // Only transition to config shard if we have no existing data shards.
+    // Only transition to config shard if we have no existing data shards. Otherwise, we could end
+    // up transitioning back to config shard after the user called transition to dedicated config
+    // server.
     if (getShards.getValue().value.empty()) {
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
-        // TODO SERVER-79109: Expose readiness future via 'isReady' function. The caller will
-        // need to handle the error case.
-        auto f = AsyncTry([this, serviceContext = opCtx->getServiceContext()] {
-                     transitionToConfigShard(serviceContext);
-                 })
-                     .until([](Status status) {
-                         if (!status.isOK()) {
-                             LOGV2_WARNING(7910801,
-                                           "Failed to transition to config shard during "
-                                           "autobootstrap due to {error}. Retrying.",
-                                           "error"_attr = status);
-                         }
-                         // Keep retrying until the transition to config shard succeeds, the node is
-                         // shutting down, or is no longer primary.
-                         return status.isOK() || ErrorCodes::isShutdownError(status) ||
-                             ErrorCodes::isNotPrimaryError(status);
-                     })
-                     .withDelayBetweenIterations(Milliseconds(500))
-                     .on(executor, CancellationToken::uncancelable());
+
+        // The ShardingReady::_isReady promise will be indirectly set after the config server
+        // has transitioned into a config shard. This happens in the config_server_op_observer which
+        // sets the _isReady promise when it sees that a shard with _id "config" has been added to
+        // config.shards (which only occurs after transition to config shard has completed).
+        (void)AsyncTry([this, serviceContext = opCtx->getServiceContext()] {
+            transitionToConfigShard(serviceContext);
+        })
+            .until([](Status status) {
+                if (!status.isOK()) {
+                    LOGV2_WARNING(7910801,
+                                  "Failed to transition to config shard during "
+                                  "autobootstrap due to {error}. Retrying.",
+                                  "error"_attr = status);
+                }
+                // Keep retrying until the transition to config shard succeeds, the
+                // node is shutting down, or is no longer primary.
+                return status.isOK() || ErrorCodes::isShutdownError(status) ||
+                    ErrorCodes::isNotPrimaryError(status);
+            })
+            .withDelayBetweenIterations(Milliseconds(500))
+            .on(executor, CancellationToken::uncancelable());
     }
 }
 
@@ -100,6 +104,39 @@ void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
 
     ShardingCatalogManager::get(uniqueOpCtx.get())->addConfigShard(uniqueOpCtx.get());
     LOGV2(7910800, "Auto-bootstrap to config shard complete.");
+}
+
+void ShardingReady::waitUntilReady(OperationContext* opCtx) {
+    _isReady.getFuture().get(opCtx);
+}
+
+bool ShardingReady::isReady() {
+    return _isReady.getFuture().isReady();
+}
+
+void ShardingReady::setIsReady() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (!_isReady.getFuture().isReady()) {
+        _isReady.emplaceValue();
+    }
+}
+
+void ShardingReady::setIsReadyIfShardExists(OperationContext* opCtx) {
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+    auto configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
+    auto shardFindResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::Nearest},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            NamespaceString::kConfigsvrShardsNamespace,
+                                            BSONObj(), /* Find all shards */
+                                            BSONObj() /* No sorting */,
+                                            boost::none /* No limit */));
+
+    if (shardFindResponse.docs.size() > 0) {
+        setIsReady();
+    }
 }
 
 }  // namespace mongo

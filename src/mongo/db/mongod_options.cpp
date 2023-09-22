@@ -169,8 +169,9 @@ StatusWith<repl::ReplSettings> populateReplSettings(const moe::Environment& para
     } else if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
                serverGlobalParams.maintenanceMode != ServerGlobalParams::StandaloneMode) {
         replSettings.setShouldAutoInitiate();
-        // When autobootstrapping, we generate a UUID for the replica set name.
-        replSettings.setReplSetString(UUID::gen().toString());
+        // Empty `replSet` in replSettings means that the replica set name will be auto-generated
+        // in `processReplSetInitiate` after auto-initiation occurs or loaded from the
+        // local replica set configuration document if already part of a replica set.
     }
 
     if (params.count("replication.oplogSizeMB")) {

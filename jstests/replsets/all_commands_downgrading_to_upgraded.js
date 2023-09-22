@@ -1622,6 +1622,7 @@ const allCommands = {
     waitForFailPoint: {
         skip: isAnInternalCommand,
     },
+    getShardingReady: {skip: isAnInternalCommand},
     whatsmysni: {
         command: {whatsmysni: 1},
         isAdminCommand: true,

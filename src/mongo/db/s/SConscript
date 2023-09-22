@@ -545,6 +545,7 @@ env.Library(
         'shardsvr_validate_shard_key_candidate.cpp',
         'split_vector_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
+        'get_sharding_ready_command.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',

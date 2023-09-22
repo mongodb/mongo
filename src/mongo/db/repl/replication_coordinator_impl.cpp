@@ -664,7 +664,11 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
-    if (!_settings.isServerless() && localConfig.getReplSetName() != _settings.ourSetName()) {
+    // ourSetName can be empty if user didn't pass in --replSet. In that case, just use the local
+    // config.
+    if (!_settings.isServerless() && !_settings.shouldAutoInitiate() &&
+        localConfig.getReplSetName() != _settings.ourSetName()) {
+
         LOGV2_WARNING(21406,
                       "Local replica set configuration document reports set name of "
                       "{localConfigSetName}, but command line reports "
@@ -4435,8 +4439,13 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
         return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());
     }
 
+    if (_settings.shouldAutoInitiate() && newConfig.getReplSetName().empty()) {
+        auto overrideConfig = newConfig.getMutable();
+        overrideConfig.setReplSetName(UUID::gen().toString());
+        newConfig = ReplSetConfig(std::move(overrideConfig));
+    }
     // The setname is not provided as a command line argument in serverless mode.
-    if (!_settings.isServerless() && newConfig.getReplSetName() != _settings.ourSetName()) {
+    else if (!_settings.isServerless() && newConfig.getReplSetName() != _settings.ourSetName()) {
         static constexpr char errmsg[] =
             "Rejecting initiate with a set name that differs from command line set name";
         LOGV2_ERROR(21424,
@@ -5974,7 +5983,13 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
     stdx::lock_guard<Latch> lk(_mutex);
 
     std::string replSetName = [&]() {
-        if (!_settings.isServerless()) {
+        if (_settings.shouldAutoInitiate()) {
+            // ourSetName is empty if this was in auto initiate mode.
+            uassert(8001600,
+                    "Auto bootstrapped replica set not yet initialized",
+                    _rsConfig.isInitialized());
+            return _rsConfig.getReplSetName().toString();
+        } else if (!_settings.isServerless()) {
             return _settings.ourSetName();
         } else {
             if (_rsConfig.isInitialized()) {

@@ -138,7 +138,6 @@ structs:
                 type: string
                 description: "The name of the replica set. Once set, you cannot change the name of
                               a replica set"
-                validator: { callback: "validateReplSetNameNonEmpty"}
             version:
                 cpp_name: configVersion
                 type: smallExactInt64

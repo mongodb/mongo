@@ -287,14 +287,6 @@ TEST(ReplSetConfig, ParseFailsWithBadOrMissingIdField) {
                                             << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                      << "localhost:12345")))),
         DBException);
-
-    // Replica set name must be non-empty.
-    ASSERT_THROWS(ReplSetConfig::parse(BSON("_id"
-                                            << ""
-                                            << "version" << 1 << "protocolVersion" << 1 << "members"
-                                            << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                     << "localhost:12345")))),
-                  DBException);
 }
 
 TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {

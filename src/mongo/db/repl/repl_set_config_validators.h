@@ -67,15 +67,6 @@ inline Status validateDefaultWriteConcernHasMember(const WriteConcernOptions& de
     return Status::OK();
 }
 
-inline Status validateReplSetNameNonEmpty(StringData replSetName) {
-    if (replSetName.empty()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Replica set configuration must have non-empty _id field");
-    }
-    return Status::OK();
-}
-
-
 Status validateReplicaSetIdNotNull(OID replicaSetId);
 
 /**

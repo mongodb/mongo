@@ -43,7 +43,10 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/topology_time_ticker.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -129,6 +132,24 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
+    }
+
+    if (gFeatureFlagAllMongodsAreSharded.isEnabled(serverGlobalParams.featureCompatibility) &&
+        !ShardingReady::get(opCtx)->isReady()) {
+        for (auto it = begin; it != end; it++) {
+            const auto& insertedDoc = it->doc;
+            const auto idElem = insertedDoc["_id"];
+            if (idElem.str() == ShardId::kConfigServerId) {
+                /**
+                 * Signal that the config shard is ready when we are certain that the config shard
+                 * document inserted into config.shards is committed.
+                 */
+                opCtx->recoveryUnit()->onCommit(
+                    [&](OperationContext* opCtx, boost::optional<Timestamp>) {
+                        ShardingReady::get(opCtx)->setIsReady();
+                    });
+            }
+        }
     }
 
     if (!topology_time_ticker_utils::inRecoveryMode(opCtx)) {

@@ -175,6 +175,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/migration_util.h"
@@ -190,6 +191,7 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
@@ -815,6 +817,15 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
             // This function may take the global lock.
             initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
+
+            // Sharding is always ready when there is at least one shard at startup (either the
+            // config shard or a dedicated shard server).
+            ShardingReady::get(startupOpCtx.get())->setIsReadyIfShardExists(startupOpCtx.get());
+        } else {
+            // On a dedicated shard server, ShardingReady is always set because there is guaranteed
+            // to be at least one shard in the sharded cluster (either the config shard or a
+            // dedicated shard server).
+            ShardingReady::get(startupOpCtx.get())->setIsReady();
         }
 
         if (replSettings.isReplSet() &&

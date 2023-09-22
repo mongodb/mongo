@@ -439,6 +439,7 @@ const allCommands = {
     voteCommitImportCollection: {skip: isNotAUserDataRead},
     voteCommitIndexBuild: {skip: isNotAUserDataRead},
     waitForFailPoint: {skip: isNotAUserDataRead},
+    getShardingReady: {skip: isNotAUserDataRead},
     whatsmysni: {skip: isNotAUserDataRead},
     whatsmyuri: {skip: isNotAUserDataRead}
 };

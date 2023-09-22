@@ -783,6 +783,7 @@ let viewsCommandTests = {
     voteCommitTransaction: {skip: isUnrelated},
     voteAbortTransaction: {skip: isUnrelated},
     waitForFailPoint: {skip: isUnrelated},
+    getShardingReady: {skip: isAnInternalCommand},
     whatsmyuri: {skip: isUnrelated},
     whatsmysni: {skip: isUnrelated}
 };
