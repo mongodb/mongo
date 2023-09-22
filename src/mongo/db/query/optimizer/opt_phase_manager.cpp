@@ -45,6 +45,7 @@
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/rewrites/sampling_const_eval.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
@@ -382,6 +383,9 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
             ConstEval{env, {} /*canInlineEvalFn*/, erasedProjFn, renamedProjFn},
             env,
             planEntry._node);
+
+        runStructuralPhase<OptPhase::ConstEvalPost_ForSampling, SamplingConstEval>(
+            SamplingConstEval{}, env, planEntry._node);
 
         env.rebuild(planEntry._node);
         if (env.hasFreeVariables()) {
