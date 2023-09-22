@@ -35,6 +35,8 @@
 
 #include "mongo/s/cluster_commands_helpers.h"
 
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
@@ -46,6 +48,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -60,6 +63,11 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/scopeguard.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
+using mongo::repl::ReadConcernArgs;
+using mongo::repl::ReadConcernLevel;
 
 namespace mongo {
 
@@ -738,6 +746,13 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
         auto cmdNoVersion = applyReadWriteConcern(
             opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll()));
+
+        // force the read concern level to "local" as other values are not supported for listIndexes
+        BSONObjBuilder bob(cmdNoVersion.removeField(ReadConcernArgs::kReadConcernFieldName));
+        bob.append(ReadConcernArgs::kReadConcernFieldName,
+                   BSON(ReadConcernArgs::kLevelFieldName << repl::readConcernLevels::kLocalName));
+        cmdNoVersion = bob.obj();
+
         if (cm.isSharded()) {
             // For a sharded collection we must load indexes from a shard with chunks. For
             // consistency with cluster listIndexes, load from the shard that owns the minKey chunk.
