@@ -11869,16 +11869,12 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - centos6-perf
+  - rhel62-large
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
   tasks:
   - name: compile_benchmarks
-    distros:
-    - rhel62-large
   - name: .benchmarks
-    distros:
-    - centos6-perf
 
 - name: enterprise-rhel-70-64-bit-inmem
   display_name: Enterprise RHEL 7.0 (inMemory)
