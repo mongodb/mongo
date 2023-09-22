@@ -1,7 +1,10 @@
+cd src
+
+echo "GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_44}" >> "signing-envfile"
+echo "GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_44}" >> "signing-envfile"
+
 set -o errexit
 set -o verbose
-
-cd src
 
 if [ -z "$ext" ]; then
   ext="tgz"
@@ -62,8 +65,7 @@ sign mongodb-src-${src_suffix}.${long_ext}
 EOF
 
 podman run \
-  -e GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_44} \
-  -e GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_44} \
+  --env-file=signing-envfile \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
   ${garasign_gpg_image} \
