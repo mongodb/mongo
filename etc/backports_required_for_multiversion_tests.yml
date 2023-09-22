@@ -467,6 +467,8 @@ last-continuous:
     ticket: SERVER-78952
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_update_range.js
     ticket: SERVER-78952
+  - test_file: jstests/core/timeseries/timeseries_buckets_find_and_modify.js
+    ticket: SERVER-81323
   suites: null
 last-lts:
   all:
