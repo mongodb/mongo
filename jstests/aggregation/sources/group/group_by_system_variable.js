@@ -1,3 +1,8 @@
+const coll = db[jsTestName()];
+coll.drop();
+
+assert.commandWorked(coll.insert({_id: 1, x: 1}));
+
 /*
  * Tests that the server doesn't crash when you group by a system variable.
  * Reproduces SERVER-57164.
@@ -8,10 +13,10 @@ function testAggWithSystemVariable(varName, explain) {
         // and whether the variable is defined.
         if (explain) {
             // eslint-disable-next-line
-            call.explain().aggregate({$group: {_id: varName}});
+            coll.explain().aggregate({$group: {_id: varName}});
         } else {
             // eslint-disable-next-line
-            call.aggregate({$group: {_id: varName}});
+            coll.aggregate({$group: {_id: varName}});
         }
     } catch (e) {
     } finally {
