@@ -1,5 +1,4 @@
-Building MongoDB
-================
+# Building MongoDB
 
 Please note that prebuilt binaries are available on
 [mongodb.org](http://www.mongodb.org/downloads) and may be the easiest
@@ -28,8 +27,7 @@ MongoDB supports the following architectures: arm64, ppc64le, s390x,
 and x86-64.  More detailed platform instructions can be found below.
 
 
-MongoDB Tools
---------------
+## MongoDB Tools
 
 The MongoDB command line tools (`mongodump`, `mongorestore`,
 `mongoimport`, `mongoexport`, etc) have been rewritten in
@@ -40,8 +38,7 @@ The source for the tools is now available at
 [mongodb/mongo-tools](https://github.com/mongodb/mongo-tools).
 
 
-Python Prerequisites
----------------
+## Python Prerequisites
 
 In order to build MongoDB, Python 3.9+ is required, and several Python
 modules must be installed. Python 3 is included in macOS 10.15 and later.
@@ -70,8 +67,7 @@ Note: If you are seeing errors involving "Prompt dismissed.." you might need to 
 
     $ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
-SCons
----------------
+## SCons
 
 If you only want to build the database server `mongod`:
 
@@ -104,8 +100,7 @@ tests, etc):
     $ python3 buildscripts/scons.py install-all-meta
 
 
-SCons Targets
---------------
+## SCons Targets
 
 The following targets can be named on the scons command line to build and
 install a subset of components:
@@ -124,8 +119,7 @@ minimal set of "core" server components, while `install-servers` is intended
 for a functional end-user installation. If you are testing, you should use the
 `install-core` or `install-devcore` targets instead.
 
-Where to find Binaries
-----------------------
+## Where to find Binaries
 
 The build system will produce an installation tree into
 `$DESTDIR/$PREFIX`. `DESTDIR` by default is `build/install` while
@@ -133,8 +127,7 @@ The build system will produce an installation tree into
 targets all built binaries will be in `build/install/bin` by default.
 
 
-Windows
---------------
+## Windows
 
 Build requirements:
 * Visual Studio 2022 version 17.0 or newer
@@ -143,21 +136,18 @@ Build requirements:
 Or download a prebuilt binary for Windows at www.mongodb.org.
 
 
-Debian/Ubuntu
---------------
+## Debian/Ubuntu
 
 To install dependencies on Debian or Ubuntu systems:
 
     # apt-get install build-essential
 
 
-OS X
---------------
+## OS X
 
 Install Xcode 13.0 or newer.
 
-FreeBSD
---------------
+## FreeBSD
 
 Install the following ports:
 
@@ -168,8 +158,7 @@ Install the following ports:
 Add `CC=clang12 CXX=clang++12` to the `scons` options, when building.
 
 
-OpenBSD
---------------
+## OpenBSD
 Install the following ports:
 
   * `devel/libexecinfo`
