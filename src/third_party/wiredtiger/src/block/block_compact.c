@@ -624,6 +624,7 @@ __wt_block_compact_page_rewrite(
 
     WT_STAT_CONN_INCR(session, block_write);
     WT_STAT_CONN_INCRV(session, block_byte_write, size);
+    WT_STAT_CONN_INCRV(session, block_byte_write_compact, size);
 
     discard_block = false;
     __wt_verbose_level(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_4,

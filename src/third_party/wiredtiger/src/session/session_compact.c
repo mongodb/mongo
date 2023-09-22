@@ -265,6 +265,8 @@ __compact_checkpoint(WT_SESSION_IMPL *session)
 
     /* Checkpoints may take a lot of time, check if compaction has been interrupted. */
     WT_RET(__wt_session_compact_check_interrupted(session));
+
+    WT_STAT_CONN_INCR(session, checkpoints_compact);
     return (__wt_txn_checkpoint(session, checkpoint_cfg, true));
 }
 
@@ -316,8 +318,7 @@ __compact_worker(WT_SESSION_IMPL *session)
              */
             if (ret == 0) {
                 if (session->compact_state == WT_COMPACT_SUCCESS) {
-                    if (session == S2C(session)->background_compact.session)
-                        WT_STAT_CONN_INCR(session, background_compact_success);
+                    WT_STAT_CONN_INCR(session, session_table_compact_dhandle_success);
                     another_pass = true;
                 } else
                     session->op_handle[i]->compact_skip = true;

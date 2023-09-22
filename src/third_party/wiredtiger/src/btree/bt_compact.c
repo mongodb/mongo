@@ -334,9 +334,6 @@ __wt_compact(WT_SESSION_IMPL *session)
         WT_STAT_CONN_INCR(session, session_table_compact_skipped);
         WT_STAT_DATA_INCR(session, btree_compact_skipped);
 
-        if (session == S2C(session)->background_compact.session)
-            WT_STAT_CONN_INCR(session, background_compact_skipped);
-
         /*
          * Print the "skipping compaction" message only if this is the first time we are working on
          * this table.

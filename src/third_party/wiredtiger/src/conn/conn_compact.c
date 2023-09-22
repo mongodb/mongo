@@ -134,6 +134,7 @@ __background_compact_should_run(WT_SESSION_IMPL *session, const char *uri, int64
       compact_stat->bytes_rewritten < conn->background_compact.bytes_rewritten_ema) {
         compact_stat->skip_count++;
         conn->background_compact.files_skipped++;
+        WT_STAT_CONN_INCR(session, background_compact_skipped);
         return (false);
     }
 
@@ -217,6 +218,7 @@ __wt_background_compact_end(WT_SESSION_IMPL *session)
         compact_stat->consecutive_unsuccessful_attempts++;
         compact_stat->prev_compact_success = false;
     } else {
+        WT_STAT_CONN_INCRV(session, background_compact_bytes_recovered, bytes_recovered);
         compact_stat->consecutive_unsuccessful_attempts = 0;
         conn->background_compact.files_compacted++;
         compact_stat->prev_compact_success = true;
@@ -229,6 +231,8 @@ __wt_background_compact_end(WT_SESSION_IMPL *session)
         conn->background_compact.bytes_rewritten_ema =
           (uint64_t)(0.1 * bm->block->compact_bytes_rewritten +
             0.9 * conn->background_compact.bytes_rewritten_ema);
+        WT_STAT_CONN_SET(
+          session, background_compact_ema, conn->background_compact.bytes_rewritten_ema);
     }
 
     return (0);
@@ -455,7 +459,8 @@ __compact_server(void *arg)
                 }
             }
             WT_ERR(ret);
-        }
+        } else
+            WT_STAT_CONN_INCR(session, background_compact_success);
     }
 
     WT_STAT_CONN_SET(session, background_compact_running, 0);

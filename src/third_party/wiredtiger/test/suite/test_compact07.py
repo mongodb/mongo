@@ -168,7 +168,7 @@ class test_compact07(wttest.WiredTigerTestCase):
         # Check the background compaction server stats. We should have skipped at least once and 
         # been successful at least once.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
-        skipped = stat_cursor[stat.conn.background_compact_skipped][2]
+        skipped = stat_cursor[stat.conn.session_table_compact_skipped][2]
         success = stat_cursor[stat.conn.background_compact_success][2]
         self.assertGreater(skipped, 0)
         self.assertGreater(success, 0)

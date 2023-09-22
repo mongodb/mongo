@@ -1292,8 +1292,10 @@ static const char *const __stats_connection_desc[] = {
   "background-compact: background compact failed calls",
   "background-compact: background compact failed calls due to cache pressure",
   "background-compact: background compact interrupted",
+  "background-compact: background compact moving average of bytes rewritten",
+  "background-compact: background compact recovered bytes",
   "background-compact: background compact running",
-  "background-compact: background compact skipped as process would not reduce file size",
+  "background-compact: background compact skipped file as not meeting requirements for compaction",
   "background-compact: background compact successful calls",
   "background-compact: background compact timeout",
   "background-compact: number of files tracked by background compaction",
@@ -1326,6 +1328,7 @@ static const char *const __stats_connection_desc[] = {
   "block-manager: bytes read via memory map API",
   "block-manager: bytes read via system call API",
   "block-manager: bytes written",
+  "block-manager: bytes written by compaction",
   "block-manager: bytes written for checkpoint",
   "block-manager: bytes written via memory map API",
   "block-manager: bytes written via system call API",
@@ -1528,6 +1531,7 @@ static const char *const __stats_connection_desc[] = {
   "checkpoint: most recent handles walked",
   "checkpoint: most recent time (msecs)",
   "checkpoint: number of checkpoints started",
+  "checkpoint: number of checkpoints started by compaction",
   "checkpoint: number of files synced",
   "checkpoint: number of handles visited after writes complete",
   "checkpoint: number of history store pages caused to be reconciled",
@@ -1813,6 +1817,7 @@ static const char *const __stats_connection_desc[] = {
   "session: table alter successful calls",
   "session: table alter triggering checkpoint calls",
   "session: table alter unchanged and skipped",
+  "session: table compact dhandle successful calls",
   "session: table compact failed calls",
   "session: table compact failed calls due to cache pressure",
   "session: table compact running",
@@ -1970,6 +1975,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->background_compact_fail = 0;
     stats->background_compact_fail_cache_pressure = 0;
     stats->background_compact_interrupted = 0;
+    stats->background_compact_ema = 0;
+    stats->background_compact_bytes_recovered = 0;
     stats->background_compact_running = 0;
     stats->background_compact_skipped = 0;
     stats->background_compact_success = 0;
@@ -2004,6 +2011,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_byte_read_mmap = 0;
     stats->block_byte_read_syscall = 0;
     stats->block_byte_write = 0;
+    stats->block_byte_write_compact = 0;
     stats->block_byte_write_checkpoint = 0;
     stats->block_byte_write_mmap = 0;
     stats->block_byte_write_syscall = 0;
@@ -2188,6 +2196,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->checkpoint_handle_walked = 0;
     /* not clearing checkpoint_time_recent */
     stats->checkpoints = 0;
+    stats->checkpoints_compact = 0;
     stats->checkpoint_sync = 0;
     stats->checkpoint_presync = 0;
     stats->checkpoint_hs_pages_reconciled = 0;
@@ -2469,6 +2478,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing session_table_alter_success */
     /* not clearing session_table_alter_trigger_checkpoint */
     /* not clearing session_table_alter_skip */
+    stats->session_table_compact_dhandle_success = 0;
     /* not clearing session_table_compact_fail */
     /* not clearing session_table_compact_fail_cache_pressure */
     /* not clearing session_table_compact_running */
@@ -2598,6 +2608,9 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->background_compact_fail_cache_pressure +=
       WT_STAT_READ(from, background_compact_fail_cache_pressure);
     to->background_compact_interrupted += WT_STAT_READ(from, background_compact_interrupted);
+    to->background_compact_ema += WT_STAT_READ(from, background_compact_ema);
+    to->background_compact_bytes_recovered +=
+      WT_STAT_READ(from, background_compact_bytes_recovered);
     to->background_compact_running += WT_STAT_READ(from, background_compact_running);
     to->background_compact_skipped += WT_STAT_READ(from, background_compact_skipped);
     to->background_compact_success += WT_STAT_READ(from, background_compact_success);
@@ -2633,6 +2646,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_byte_read_mmap += WT_STAT_READ(from, block_byte_read_mmap);
     to->block_byte_read_syscall += WT_STAT_READ(from, block_byte_read_syscall);
     to->block_byte_write += WT_STAT_READ(from, block_byte_write);
+    to->block_byte_write_compact += WT_STAT_READ(from, block_byte_write_compact);
     to->block_byte_write_checkpoint += WT_STAT_READ(from, block_byte_write_checkpoint);
     to->block_byte_write_mmap += WT_STAT_READ(from, block_byte_write_mmap);
     to->block_byte_write_syscall += WT_STAT_READ(from, block_byte_write_syscall);
@@ -2854,6 +2868,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->checkpoint_handle_walked += WT_STAT_READ(from, checkpoint_handle_walked);
     to->checkpoint_time_recent += WT_STAT_READ(from, checkpoint_time_recent);
     to->checkpoints += WT_STAT_READ(from, checkpoints);
+    to->checkpoints_compact += WT_STAT_READ(from, checkpoints_compact);
     to->checkpoint_sync += WT_STAT_READ(from, checkpoint_sync);
     to->checkpoint_presync += WT_STAT_READ(from, checkpoint_presync);
     to->checkpoint_hs_pages_reconciled += WT_STAT_READ(from, checkpoint_hs_pages_reconciled);
@@ -3149,6 +3164,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->session_table_alter_trigger_checkpoint +=
       WT_STAT_READ(from, session_table_alter_trigger_checkpoint);
     to->session_table_alter_skip += WT_STAT_READ(from, session_table_alter_skip);
+    to->session_table_compact_dhandle_success +=
+      WT_STAT_READ(from, session_table_compact_dhandle_success);
     to->session_table_compact_fail += WT_STAT_READ(from, session_table_compact_fail);
     to->session_table_compact_fail_cache_pressure +=
       WT_STAT_READ(from, session_table_compact_fail_cache_pressure);
