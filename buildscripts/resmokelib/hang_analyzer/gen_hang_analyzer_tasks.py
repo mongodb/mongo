@@ -134,9 +134,8 @@ def generate(expansions_file: str = "../expansions.yml",
         # If the task is already in a display task add the new task to the current display task
         build_variant.display_task(display_task_name, sub_tasks, distros=[distro])
     else:
-        # If the task is not in a display task make a new display task with the original and generated tasks
-        build_variant.display_task(f"{current_task_name}_analysis", sub_tasks, distros=[distro],
-                                   execution_existing_tasks={ExistingTask(current_task_name)})
+        # If the task is not in a display task, just generate a new task
+        build_variant.add_tasks(sub_tasks, distros=[distro])
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
 
