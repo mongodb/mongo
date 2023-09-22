@@ -27,7 +27,6 @@ function listDatabases(options) {
 
 function assertDatabaseExists(dbName) {
     // Check that listDatabase return the db
-    // TODO SERVER-54377 listDatabases doesn't show shareded DBs without collections
     assert.gte(1, listDatabases({nameOnly: true, filter: {name: dbName}}).length);
     // Database entry exists
     assert.eq(1, configDB.databases.countDocuments({_id: dbName}));
