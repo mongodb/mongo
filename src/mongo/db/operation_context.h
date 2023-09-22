@@ -433,7 +433,8 @@ public:
         _coroResume = resume;
     }
 
-    std::pair<const std::function<void()>*, const std::function<void()>*> getCoroutineFunctors() {
+    std::pair<const std::function<void()>*, const std::function<void()>*> getCoroutineFunctors()
+        const {
         return {_coroYield, _coroResume};
     }
 

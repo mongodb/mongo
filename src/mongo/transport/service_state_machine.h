@@ -266,7 +266,7 @@ private:
         }
 
         void deallocate(boost::context::stack_context& sc) {
-            //
+            // no-op
         }
     };
 
@@ -274,6 +274,7 @@ private:
     boost::context::stack_context coroStackContext() {
         boost::context::stack_context sc;
         sc.size = kCoroStackSize;
+        // Because stack grows downwards from high address?
         sc.sp = _coroStack + kCoroStackSize;
         return sc;
     }

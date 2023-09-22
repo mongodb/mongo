@@ -236,6 +236,12 @@ public:
 
 private:
     /**
+     * Gets or creates collection instance from existing metadata
+     * it will yield here and resume later
+     */
+    Collection* _getCollectionYield(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
      * Gets or creates collection instance from existing metadata,
      * Returns NULL if invalid
      *

@@ -26,18 +26,14 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/database_impl.h"
 
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
 #include <memory>
 
 #include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection.h"
@@ -45,6 +41,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
@@ -72,6 +69,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/stdx/memory.h"
@@ -207,6 +205,24 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
 #endif
 
     return Status::OK();
+}
+
+Collection* DatabaseImpl::_getCollectionYield(OperationContext* opCtx, const NamespaceString& nss) {
+    // get from metadata
+    Collection* collection = getCollection(opCtx, nss);
+    if (collection != nullptr) {
+        return collection;
+    }
+
+    auto entry = _dbEntry->getCollectionCatalogEntry(nss.ns());
+    if (entry == nullptr) {
+        return nullptr;
+    }
+
+    // yield here
+    entry->getCollectionOptions(opCtx);
+
+    return nullptr;
 }
 
 Collection* DatabaseImpl::_getOrCreateCollectionInstance(OperationContext* opCtx,
@@ -832,27 +848,20 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     Status status =
         _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/);
-    MONGO_LOG(0) << "DatabaseImpl::createCollection"
+    MONGO_LOG(1) << "DatabaseImpl::createCollection"
                  << ". code: " << status.codeString() << ". msg: " << status.reason();
+
     if (status == Status::OK()) {
         opCtx->recoveryUnit()->registerChange(new AddCollectionChange(opCtx, this, ns));
     } else {
         MONGO_LOG(1) << "collection exist";
-    }
-
-
-    Collection* collection = _getOrCreateCollectionInstance(opCtx, nss);
-    if (collection == nullptr) {
-        return nullptr;
-    }
-    invariant(collection);
-
-    if (status != Status::OK()) {
+        // just retrieve
+        Collection* collection = _getCollectionYield(opCtx, nss);
+        MONGO_LOG(1) << "get collection is nullptr: " << (collection == nullptr);
         return collection;
     }
 
-    _collections[ns] = collection;
-
+    Collection* collection = _getOrCreateCollectionInstance(opCtx, nss);
 
     BSONObj fullIdIndexSpec;
 
@@ -888,7 +897,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     if (canAcceptWrites && createIdIndex && nss.isSystem()) {
         createSystemIndexes(opCtx, collection);
     }
-    MONGO_LOG(0) << "all done";
+
+    // the thread responsible for creating collection
+    _collections[ns] = collection;
+    MONGO_LOG(0) << "Create collection jobs is all done";
     return collection;
 }
 
