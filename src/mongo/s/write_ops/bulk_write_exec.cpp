@@ -191,29 +191,8 @@ void executeChildBatches(OperationContext* opCtx,
         if (!response.swResponse.getStatus().isOK()) {
             bulkWriteOp.processLocalChildBatchError(*writeBatch, response);
         } else {
-            auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("bulkWrite"),
-                                                        response.swResponse.getValue().data);
-
-            LOGV2_DEBUG(7279200,
-                        4,
-                        "Processing bulk write response from shard.",
-                        "shard"_attr = response.shardId,
-                        "response"_attr = bwReply);
-
-            if (bwReply.getWriteConcernError()) {
-                bulkWriteOp.saveWriteConcernError(response.shardId,
-                                                  bwReply.getWriteConcernError().value());
-            }
-
-            // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the
-            // first batch.
-            auto cursor = bwReply.getCursor();
-            const auto& replyItems = cursor.getFirstBatch();
-
-            // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
-            // they may be re-targeted if needed.
-            bulkWriteOp.noteChildBatchResponse(
-                *writeBatch, replyItems, bwReply.getRetriedStmtIds(), errorsPerNamespace);
+            bulkWriteOp.processChildBatchResponseFromRemote(
+                *writeBatch, response, errorsPerNamespace);
         }
     }
 }
@@ -822,6 +801,79 @@ void BulkWriteOp::noteErrorForRemainingWrites(const Status& status) {
     }
 
     dassert(isFinished());
+}
+
+/**
+ * Checks if an error reply has the TransientTransactionError label. We use this in cases where we
+ * want to defer to whether a shard attached the label to an error it gave us.
+ */
+bool hasTransientTransactionErrorLabel(const ErrorReply& reply) {
+    auto errorLabels = reply.getErrorLabels();
+    if (!errorLabels) {
+        return false;
+    }
+    for (auto& label : errorLabels.value()) {
+        if (label == ErrorLabel::kTransientTransaction) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void BulkWriteOp::processChildBatchResponseFromRemote(
+    const TargetedWriteBatch& writeBatch,
+    const AsyncRequestsSender::Response& response,
+    boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace) {
+    invariant(response.swResponse.getStatus().isOK(), "Response status was unexpectedly not OK");
+
+    auto childBatchResponse = response.swResponse.getValue();
+    LOGV2_DEBUG(7279200,
+                4,
+                "Processing bulk write response from shard.",
+                "shard"_attr = response.shardId,
+                "response"_attr = childBatchResponse.data);
+
+    auto childBatchStatus = getStatusFromCommandResult(childBatchResponse.data);
+    if (childBatchStatus.isOK()) {
+        auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("BulkWriteCommandReply"),
+                                                    childBatchResponse.data);
+        if (bwReply.getWriteConcernError()) {
+            saveWriteConcernError(response.shardId, bwReply.getWriteConcernError().value());
+        }
+
+        // TODO (SERVER-76958): Iterate through the cursor rather than looking only at the first
+        // batch.
+        const auto& replyItems = bwReply.getCursor().getFirstBatch();
+
+        // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
+        // they may be re-targeted if needed.
+        noteChildBatchResponse(
+            writeBatch, replyItems, bwReply.getRetriedStmtIds(), errorsPerNamespace);
+    } else {
+        noteChildBatchError(writeBatch, childBatchStatus);
+
+        // If we are in a transaction, we must abort execution on any error.
+        // TODO SERVER-72793: handle WouldChangeOwningShard errors.
+        if (TransactionRouter::get(_opCtx)) {
+            _aborted = true;
+
+            auto errorReply =
+                ErrorReply::parse(IDLParserContext("ErrorReply"), childBatchResponse.data);
+
+            // Transient transaction errors should be returned directly as top level errors to allow
+            // the client to retry.
+            if (hasTransientTransactionErrorLabel(errorReply)) {
+                const auto shardInfo = response.shardHostAndPort
+                    ? response.shardHostAndPort->toString()
+                    : writeBatch.getShardId();
+                auto newStatus = childBatchStatus.withContext(
+                    str::stream() << "Encountered error from " << shardInfo
+                                  << " during a transaction");
+
+                uassertStatusOK(newStatus);
+            }
+        }
+    }
 }
 
 void BulkWriteOp::noteChildBatchResponse(

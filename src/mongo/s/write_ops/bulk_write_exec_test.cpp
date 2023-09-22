@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/error_labels.h"
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -1575,9 +1576,11 @@ TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
     ASSERT_GTE(baseSizeEstimate, realSize);
 }
 
-class BulkWriteOpLocalErrorTest : public ServiceContextTest {
+// Used to test cases where we get an error for an entire batch (as opposed to errors for one or
+// more individual writes within the batch.)
+class BulkWriteOpChildBatchErrorTest : public ServiceContextTest {
 protected:
-    BulkWriteOpLocalErrorTest() {
+    BulkWriteOpChildBatchErrorTest() {
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
         targeters.push_back(initTargeterFullRange(kNss1, kEndpoint1));
@@ -1632,6 +1635,32 @@ protected:
                                           ErrorCodes::Interrupted, "simulating interruption"),
                                       boost::none};
 
+    static const inline AsyncRequestsSender::Response kRemoteInterruptedResponse =
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                ErrorReply(0, ErrorCodes::Interrupted, "Interrupted", "simulating interruption")
+                    .toBSON(),
+                Microseconds(0))),
+            boost::none};
+
+    // We use a custom non-transient error code to confirm that we do not try to determine if an
+    // error is transient based on the code and that we instead defer to whether or not a shard
+    // attached the label.
+    static const inline int kCustomErrorCode = 8017400;
+    static const inline AsyncRequestsSender::Response kCustomRemoteTransientErrorResponse =
+        AsyncRequestsSender::Response{
+            kShardId1,
+            StatusWith<executor::RemoteCommandResponse>(executor::RemoteCommandResponse(
+                [] {
+                    auto error = ErrorReply(
+                        0, kCustomErrorCode, "CustomError", "simulating custom error for test");
+                    error.setErrorLabels(std::vector{ErrorLabel::kTransientTransaction});
+                    return error.toBSON();
+                }(),
+                Microseconds(1))),
+            boost::none};
+
     TargetedBatchMap targetOp(BulkWriteOp& op, bool ordered) const {
         TargetedBatchMap targeted;
         ASSERT_OK(op.target(targeters, false, targeted));
@@ -1662,7 +1691,7 @@ protected:
 };
 
 // Test a local shutdown error (i.e. because mongos is shutting down.)
-TEST_F(BulkWriteOpLocalErrorTest, LocalShutdownError) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalShutdownError) {
     BulkWriteOp bulkWriteOp(_opCtx, request);
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
@@ -1690,7 +1719,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalShutdownError) {
 }
 
 // Test a local CallbackCanceled error that is received when not in shutdown.
-TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorNotInShutdown) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalCallbackCanceledErrorNotInShutdown) {
     BulkWriteOp bulkWriteOp(_opCtx, request);
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
@@ -1721,7 +1750,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorNotInShutdown) {
 // This isn't truly a death test but is written as one in order to isolate test execution in its
 // own process. This is needed because otherwise calling shutdownNoTerminate() would lead any
 // future tests run in the same process to also have the shutdown flag set.
-DEATH_TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorInShutdown, "12345") {
+DEATH_TEST_F(BulkWriteOpChildBatchErrorTest, LocalCallbackCanceledErrorInShutdown, "12345") {
     BulkWriteOp bulkWriteOp(_opCtx, request);
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
@@ -1756,7 +1785,7 @@ DEATH_TEST_F(BulkWriteOpLocalErrorTest, LocalCallbackCanceledErrorInShutdown, "1
 }
 
 // Ordered bulkWrite: test handling of a local network error.
-TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorOrdered) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorOrdered) {
     BulkWriteOp bulkWriteOp(_opCtx, request);
     auto targeted = targetOp(bulkWriteOp, true);
 
@@ -1784,7 +1813,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorOrdered) {
 }
 
 // Unordered bulkWrite: test handling of a local network error.
-TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorUnordered) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalNetworkErrorUnordered) {
     request.setOrdered(false);
     BulkWriteOp bulkWriteOp(_opCtx, request);
     auto targeted = targetOp(bulkWriteOp, request.getOrdered());
@@ -1827,7 +1856,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNetworkErrorUnordered) {
 }
 
 // Ordered bulkWrite: Test handling of a local TransientTransactionError in a transaction.
-TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnOrdered) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnOrdered) {
     // Set up lsid/txnNumber to simulate txn.
     _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
     _opCtx->setTxnNumber(TxnNumber(0));
@@ -1861,7 +1890,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnOrdered) {
 }
 
 // Ordered bulkWrite: Test handling of a local non-TransientTransactionError in a transaction.
-TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnOrdered) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnOrdered) {
     // Set up lsid/txnNumber to simulate txn.
     _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
     _opCtx->setTxnNumber(TxnNumber(0));
@@ -1895,17 +1924,17 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnOrdered)
 }
 
 // Unordered bulkWrite: Test handling of a local TransientTransactionError in a transaction.
-TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnUnordered) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnUnordered) {
     // Set up lsid/txnNumber to simulate txn.
     _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
     _opCtx->setTxnNumber(TxnNumber(0));
     // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
     // how we set _inTransaction for a BulkWriteOp.
     RouterOperationContextSession rocs(_opCtx);
+    request.setOrdered(false);
 
     // Case 1: we receive the failed batch response with other batches outstanding.
     {
-        request.setOrdered(false);
         BulkWriteOp bulkWriteOp(_opCtx, request);
         auto targeted = targetOp(bulkWriteOp, request.getOrdered());
 
@@ -1973,7 +2002,7 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalTransientTransactionErrorInTxnUnordered) 
 }
 
 // Unordered bulkWrite: Test handling of a local non-TransientTransactionError in a transaction.
-TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordered) {
+TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUnordered) {
     // Set up lsid/txnNumber to simulate txn.
     _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
     _opCtx->setTxnNumber(TxnNumber(0));
@@ -2054,6 +2083,319 @@ TEST_F(BulkWriteOpLocalErrorTest, LocalNonTransientTransactionErrorInTxnUnordere
         ASSERT_OK(replies[2].getStatus());
         ASSERT_OK(replies[3].getStatus());
         ASSERT_EQ(numErrors, 2);
+    }
+}
+
+// Ordered bulkWrite: Test handling of a remote top-level error.
+TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorOrdered) {
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, true);
+
+    // Simulate receiving an interrupted error from a shard.
+    bulkWriteOp.processChildBatchResponseFromRemote(
+        *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    // We never targeted these so they should still be ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    // Since we are ordered and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first op should be the interrupted error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+              ErrorCodes::Interrupted);
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_EQ(numErrors, 1);
+}
+
+// Unordered bulkWrite: Test handling of a remote top-level error.
+TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorUnordered) {
+    request.setOrdered(false);
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate receiving an interrupted error from a shard.
+    bulkWriteOp.processChildBatchResponseFromRemote(
+        *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+
+    // For unordered writes, we will treat the batch error as a failure of all the writes in the
+    // batch.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+    // These should still be pending.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+
+    // Since we are unordered and have outstanding responses, we should not be finished.
+    ASSERT(!bulkWriteOp.isFinished());
+
+    // Simulate successful response to the second batch.
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2],
+                                       {BulkWriteReplyItem(0), BulkWriteReplyItem(1)},
+                                       boost::none,
+                                       boost::none);
+
+    // We should now be finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first two ops should be the interrupted error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+              ErrorCodes::Interrupted);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus().code(),
+              ErrorCodes::Interrupted);
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 4);
+    ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_EQ(replies[1].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_OK(replies[2].getStatus());
+    ASSERT_OK(replies[3].getStatus());
+    ASSERT_EQ(numErrors, 2);
+}
+
+// Ordered bulkWrite: Test handling of a remote top-level error that is not a
+// TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnOrdered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate a remote interrupted error (which is not a transient txn error).
+    bulkWriteOp.processChildBatchResponseFromRemote(
+        *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+    // Since we are both ordered and in a txn and we saw an error, the command should be
+    // considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // The error for the first op should be the interruption error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+              ErrorCodes::Interrupted);
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_EQ(numErrors, 1);
+}
+
+// Ordered bulkWrite: Test handling of a remote top-level error that is a TransientTransactionError
+// in a transaction.
+TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorInTxnOrdered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate a custom remote error that has the TransientTransactionError label attached.
+    // We expect the error to be raised as a top-level error.
+    ASSERT_THROWS_CODE(bulkWriteOp.processChildBatchResponseFromRemote(
+                           *targeted[kShardId1], kCustomRemoteTransientErrorResponse, boost::none),
+                       DBException,
+                       kCustomErrorCode);
+
+    // In practice, we expect the thrown error to propagate up past the scope where the op is
+    // created. But to be thorough the assertions below check that our bookkeeping when
+    // encountering this error is correct.
+
+    // For ordered writes, we will treat the batch error as a failure of the first write in the
+    // batch. The other write in the batch should have been re-set to ready.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Ready);
+
+    // Since we are in a txn and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+}
+
+// Unordered bulkWrite: Test handling of a remote top-level error that is not a
+// TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUnordered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    // Case 1: we receive the failed batch response with other batches outstanding.
+    {
+        request.setOrdered(false);
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate a remote interrupted error (which is not a transient txn error).
+        bulkWriteOp.processChildBatchResponseFromRemote(
+            *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+
+        // For unordered writes, we will treat the error as a failure of all the writes in the
+        // batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        // We didn't receive responses for these yet.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+        // However, since we are in a txn and we saw an execution-aborting error, the command should
+        // be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+
+        // The error for the first two ops should be the interruption error.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+                  ErrorCodes::Interrupted);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus().code(),
+                  ErrorCodes::Interrupted);
+
+        auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
+        ASSERT_EQ(replies.size(), 2);
+        ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
+        ASSERT_EQ(replies[1].getStatus(), ErrorCodes::Interrupted);
+        ASSERT_EQ(numErrors, 2);
+    }
+
+    // Case 2: we receive the failed batch response after receiving successful response for other
+    // batch.
+    {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate successful response to second batch.
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2],
+                                           {
+                                               BulkWriteReplyItem(0),
+                                               BulkWriteReplyItem(1),
+                                           },
+                                           boost::none,
+                                           boost::none);
+
+        // Simulate a remote interrupted error (which is not a transient txn error).
+        bulkWriteOp.processChildBatchResponseFromRemote(
+            *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
+
+        // For unordered writes, we will treat the error as a failure of all the writes in the
+        // batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
+        // The command should be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+
+        // The error for the first two ops should be the interruption error.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+                  ErrorCodes::Interrupted);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
+                  ErrorCodes::Interrupted);
+
+        auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
+        ASSERT_EQ(replies.size(), 4);
+        ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
+        ASSERT_EQ(replies[1].getStatus().code(), ErrorCodes::Interrupted);
+        ASSERT_OK(replies[2].getStatus());
+        ASSERT_OK(replies[3].getStatus());
+        ASSERT_EQ(numErrors, 2);
+    }
+}
+
+// Unordered bulkWrite: Test handling of a remote top-level error that is a
+// TransientTransactionError in a transaction.
+TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorUnordered) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+    request.setOrdered(false);
+
+    // Case 1: we receive the failed batch response with other batches outstanding.
+    {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate a custom remote error that has the TransientTransactionError label attached.
+        // We expect the error to be raised as a top-level error.
+        ASSERT_THROWS_CODE(
+            bulkWriteOp.processChildBatchResponseFromRemote(
+                *targeted[kShardId1], kCustomRemoteTransientErrorResponse, boost::none),
+            DBException,
+            kCustomErrorCode);
+
+        // In practice, we expect the thrown error to propagate up past the scope where the op is
+        // created. But to be thorough the assertions below check that our bookkeeping when
+        // encountering this error is correct.
+
+        // For unordered writes, we will treat the batch error as a failure of all of the writes
+        // in the batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        // Since these were targeted but we didn't receive a response yet they should still be
+        // Pending.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
+
+        // Since we saw an execution-aborting error, the command should be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
+    }
+
+    // Case 2: we receive the failed batch response after receiving successful response for other
+    // batch.
+    {
+        BulkWriteOp bulkWriteOp(_opCtx, request);
+        auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+        // Simulate successful response to second batch.
+        bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2],
+                                           {
+                                               BulkWriteReplyItem(0),
+                                               BulkWriteReplyItem(1),
+                                           },
+                                           boost::none,
+                                           boost::none);
+
+        // Simulate a custom remote error that has the TransientTransactionError label attached.
+        // We expect the error to be raised as a top-level error.
+        ASSERT_THROWS_CODE(
+            bulkWriteOp.processChildBatchResponseFromRemote(
+                *targeted[kShardId1], kCustomRemoteTransientErrorResponse, boost::none),
+            DBException,
+            kCustomErrorCode);
+
+        // In practice, we expect the thrown error to propagate up past the scope where the op is
+        // created. But to be thorough the assertions below check that our bookkeeping when
+        // encountering this error is correct.
+
+        // For unordered writes, we will treat the batch error as a failure of all of the writes
+        // in the batch.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        // We already received successful responses for these writes.
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
+
+        // The command should be considered finished.
+        ASSERT(bulkWriteOp.isFinished());
     }
 }
 

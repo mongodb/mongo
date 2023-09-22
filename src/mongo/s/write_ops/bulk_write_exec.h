@@ -184,6 +184,11 @@ public:
         boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace);
 
 
+    void processChildBatchResponseFromRemote(
+        const TargetedWriteBatch& writeBatch,
+        const AsyncRequestsSender::Response& response,
+        boost::optional<stdx::unordered_map<NamespaceString, TrackedErrors>&> errorsPerNamespace);
+
     /**
      * Records the error contained in the given status for write(s) in the given targetedBatch.
      * This is used in cases where we get a top-level error in response to a batch sent to a shard
