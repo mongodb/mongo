@@ -77,7 +77,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/basic.h"
 #include "mongo/platform/compiler.h"

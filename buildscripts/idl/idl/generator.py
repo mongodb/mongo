@@ -1113,7 +1113,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         # Include serialization options only if there is a struct which is part of a query shape.
         if any(struct.query_shape_component for struct in spec.structs):
-            header_list.append('mongo/db/query/serialization_options.h')
+            header_list.append('mongo/db/query/query_shape/serialization_options.h')
 
         header_list.sort()
 

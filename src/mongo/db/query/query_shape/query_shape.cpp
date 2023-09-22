@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -48,15 +48,15 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/query/agg_cmd_shape.h"
-#include "mongo/db/query/find_cmd_shape.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_shape_gen.h"
-#include "mongo/db/query/shape_helpers.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/find_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape_gen.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"

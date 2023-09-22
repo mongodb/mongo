@@ -40,7 +40,7 @@
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_settings_manager.h"
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"

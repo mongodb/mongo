@@ -269,7 +269,7 @@ pipelineEnv.InjectThirdParty(libraries=['snappy'])
 pipelineEnv.Library(
     target='pipeline',
     source=[
-        '$BUILD_DIR/mongo/db/query/agg_cmd_shape.cpp',
+        '$BUILD_DIR/mongo/db/query/query_shape/agg_cmd_shape.cpp',
         '$BUILD_DIR/mongo/db/query/query_stats/agg_key_generator.cpp',
         'accumulator_internal_construct_stats.cpp',
         'document_source.cpp',
@@ -530,7 +530,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/query/query_shape',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats_parse',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

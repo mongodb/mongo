@@ -34,7 +34,7 @@ imports:
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/query_settings.idl"
-    - "mongo/db/query/query_shape_hash.idl"
+    - "mongo/db/query/query_shape/query_shape_hash.idl"
 
 structs:
   SetQuerySettingsCommandReply:

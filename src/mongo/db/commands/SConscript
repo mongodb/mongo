@@ -106,7 +106,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_settings_manager',
-        '$BUILD_DIR/mongo/db/query/query_shape',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ])
 
@@ -116,7 +116,7 @@ env.Library(
     ], LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_settings_manager',
-        '$BUILD_DIR/mongo/db/query/query_shape',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
     ])
 
 # Commands available in all mongodb server processes (mongod, mongos, etc.)
@@ -473,7 +473,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         '$BUILD_DIR/mongo/db/query/query_settings_manager',
-        '$BUILD_DIR/mongo/db/query/query_shape',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/query/stats/stats',
         '$BUILD_DIR/mongo/db/query/stats/stats_histograms',

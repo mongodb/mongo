@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/query_settings_gen.h"
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo::query_settings {

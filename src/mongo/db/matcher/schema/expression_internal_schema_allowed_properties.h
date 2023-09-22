@@ -48,7 +48,7 @@
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matchable.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/string_map.h"

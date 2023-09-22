@@ -29,7 +29,7 @@
 #include <functional>
 #include <string>
 
-#include "serialization_options.h"
+#include "query_shape/serialization_options.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

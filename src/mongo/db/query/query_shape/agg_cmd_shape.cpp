@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
 
-#include "mongo/db/query/shape_helpers.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
 

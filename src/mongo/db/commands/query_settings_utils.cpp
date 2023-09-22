@@ -29,9 +29,9 @@
 
 #include "mongo/db/commands/query_settings_utils.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
-#include "mongo/db/query/agg_cmd_shape.h"
-#include "mongo/db/query/find_cmd_shape.h"
 #include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
 
 namespace mongo::query_settings {

@@ -45,7 +45,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_gen.h"
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"

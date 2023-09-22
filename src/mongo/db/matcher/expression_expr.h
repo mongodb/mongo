@@ -55,7 +55,7 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"

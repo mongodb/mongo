@@ -1759,7 +1759,7 @@ env.Library(
         'pipeline/make_js_function.cpp',
         'pipeline/monotonic_expression.cpp',
         'pipeline/variables.cpp',
-        'query/cmd_with_let_shape.cpp',
+        'query/query_shape/cmd_with_let_shape.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
@@ -1786,7 +1786,7 @@ env.Library(
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
         'query/query_knobs',
-        'query_shape_common',
+        'query/query_shape/query_shape_common',
         'sbe_values',
         'stats/counters',
         'update/pattern_cmp',
@@ -1798,18 +1798,6 @@ env.Library(
         'vector_clock',
     ],
 )
-
-env.Library(
-    target='query_shape_common', source=[
-        'query/query_shape.idl',
-        'query/serialization_options.cpp',
-    ], LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/pipeline/field_path',
-    ], LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-    ])
 
 env.Library(
     target='startup_recovery',

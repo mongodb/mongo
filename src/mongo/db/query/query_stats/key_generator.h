@@ -50,10 +50,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/db/query/query_stats/transform_algorithm_gen.h"
-#include "mongo/db/query/serialization_options.h"
-#include "mongo/db/query/shape_helpers.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/decorable.h"
 

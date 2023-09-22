@@ -47,7 +47,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/memory_usage_tracker.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/platform/basic.h"

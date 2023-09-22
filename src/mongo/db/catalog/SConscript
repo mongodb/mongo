@@ -35,6 +35,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/common',

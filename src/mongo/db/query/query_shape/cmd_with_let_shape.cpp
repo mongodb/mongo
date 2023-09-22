@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
 
 namespace mongo::query_shape {
 

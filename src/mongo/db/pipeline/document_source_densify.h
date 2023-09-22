@@ -66,7 +66,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"

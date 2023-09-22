@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/find_cmd_shape.h"
+#include "mongo/db/query/query_shape/find_cmd_shape.h"
 
 #include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/shape_helpers.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
 namespace {

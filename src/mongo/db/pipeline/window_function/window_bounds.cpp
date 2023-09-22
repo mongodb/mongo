@@ -49,7 +49,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"

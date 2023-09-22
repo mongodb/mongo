@@ -46,8 +46,8 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/serialization_options.h"
-#include "mongo/db/query/shape_helpers.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
 

@@ -29,7 +29,7 @@
 
 #include "serialization_options.h"
 
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <absl/container/node_hash_map.h>
 #include <string>

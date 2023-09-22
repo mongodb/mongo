@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/query/cmd_with_let_shape.h"
-#include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/shape_helpers.h"
+#include "mongo/db/query/query_shape/cmd_with_let_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 
 namespace mongo::query_shape {
 

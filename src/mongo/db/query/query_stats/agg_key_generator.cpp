@@ -47,10 +47,10 @@
 #include "mongo/db/pipeline/exchange_spec_gen.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/agg_cmd_shape.h"
-#include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/serialization_options.h"
-#include "mongo/db/query/shape_helpers.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/db/query/query_shape/shape_helpers.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::query_stats {

@@ -32,8 +32,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo::query_shape {
 

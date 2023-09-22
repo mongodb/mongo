@@ -55,7 +55,7 @@
 #include "mongo/db/matcher/match_details.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/path.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/idl/idl_parser.h"
 
 namespace mongo {

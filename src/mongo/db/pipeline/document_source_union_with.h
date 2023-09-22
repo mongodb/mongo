@@ -61,7 +61,7 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
