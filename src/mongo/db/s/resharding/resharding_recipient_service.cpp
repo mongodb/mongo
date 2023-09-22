@@ -294,7 +294,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _cloneTimestamp{recipientDoc.getCloneTimestamp()},
       _externalState{std::move(externalState)},
       _startConfigTxnCloneAt{recipientDoc.getStartConfigTxnCloneTime()},
-      _indexBuildUUID(recipientDoc.getIndexBuildUUID()),
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "RecipientStateMachineCancelableOpCtxPool";
@@ -900,7 +899,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                        indexSpecs.push_back(*shardKeyIndexSpec);
                    }
                    // Build all the indexes.
-                   invariant(_indexBuildUUID);
+                   auto buildUUID = UUID::gen();
                    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
                        CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
                    auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
@@ -910,18 +909,15 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                        // collection UUID.
                        _metadata.getReshardingUUID(),
                        indexSpecs,
-                       *_indexBuildUUID,
+                       buildUUID,
                        IndexBuildProtocol::kTwoPhase,
                        indexBuildOptions);
                    if (indexBuildFuture.isOK()) {
                        return indexBuildFuture.getValue();
                    } else if (indexBuildFuture == ErrorCodes::IndexBuildAlreadyInProgress ||
-                              indexBuildFuture == ErrorCodes::IndexAlreadyExists ||
-                              indexBuildFuture == ErrorCodes::DuplicateKey) {
+                              indexBuildFuture == ErrorCodes::IndexAlreadyExists) {
                        // In case of failover, the index build could have been started by oplog
-                       // applier, so we just wait those finish. Since we use the same buildID
-                       // everytime, we can get DuplicateKey error when the index build has already
-                       // started once.
+                       // applier, so we just wait those finish.
                        indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
                            opCtx.get(), _metadata.getReshardingUUID());
                        return SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>(
@@ -1062,15 +1058,17 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
         }
 
         if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            _indexBuildUUID) {
+                serverGlobalParams.featureCompatibility)) {
             auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
             std::string abortReason(str::stream()
-                                    << "Index build aborted: " << *_indexBuildUUID << ": "
-                                    << "resharding aborted");
-            indexBuildsCoordinator->abortIndexBuildByBuildUUID(
-                opCtx.get(), *_indexBuildUUID, IndexBuildAction::kPrimaryAbort, abortReason);
-            // abortIndexBuildByBuildUUID can return on index commit/abort without waiting the index
+                                    << "Index builds on "
+                                    << _metadata.getTempReshardingNss().toStringForErrorMsg()
+                                    << " are aborted because resharding is aborted");
+            indexBuildsCoordinator->abortCollectionIndexBuilds(opCtx.get(),
+                                                               _metadata.getTempReshardingNss(),
+                                                               _metadata.getReshardingUUID(),
+                                                               abortReason);
+            // abortCollectionIndexBuilds can return on index commit/abort without waiting the index
             // build done, so we need to explicitly wait here to make sure there is no building
             // index after this point.
             indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
@@ -1095,14 +1093,13 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
 
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(newState);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, boost::none, factory);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientShardContext&& newRecipientCtx,
     boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
     boost::optional<mongo::Date_t> configStartTime,
-    boost::optional<UUID> indexBuildUUID,
     const CancelableOperationContextFactory& factory) {
     invariant(newRecipientCtx.getState() != RecipientStateEnum::kAwaitingFetchTimestamp);
 
@@ -1110,11 +1107,8 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     auto oldState = _recipientCtx.getState();
     auto newState = newRecipientCtx.getState();
 
-    _updateRecipientDocument(std::move(newRecipientCtx),
-                             std::move(cloneDetails),
-                             std::move(configStartTime),
-                             std::move(indexBuildUUID),
-                             factory);
+    _updateRecipientDocument(
+        std::move(newRecipientCtx), std::move(cloneDetails), std::move(configStartTime), factory);
 
     _metrics->onStateTransition(oldState, newState);
 
@@ -1136,7 +1130,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
     _transitionState(std::move(newRecipientCtx),
                      std::move(cloneDetails),
                      std::move(startConfigTxnCloneTime),
-                     boost::none,
                      factory);
 }
 
@@ -1144,29 +1137,28 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
     const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCloning);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, boost::none, factory);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToBuildingIndex(
     const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kBuildingIndex);
-    auto indexBuildUUID = UUID::gen();
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, indexBuildUUID, factory);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
     const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kApplying);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, boost::none, factory);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsistency(
     const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kStrictConsistency);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, boost::none, factory);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
@@ -1174,7 +1166,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kError);
     resharding::emplaceTruncatedAbortReasonIfExists(newRecipientCtx, abortReason);
-    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, boost::none, factory);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
 }
 
 /**
@@ -1296,7 +1288,6 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     RecipientShardContext&& newRecipientCtx,
     boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
     boost::optional<mongo::Date_t> configStartTime,
-    boost::optional<UUID> indexBuildUUID,
     const CancelableOperationContextFactory& factory) {
     auto opCtx = factory.makeOperationContext(&cc());
     PersistentTaskStore<ReshardingRecipientDocument> store(
@@ -1327,11 +1318,6 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                               *configStartTime);
         }
 
-        if (indexBuildUUID) {
-            indexBuildUUID->appendToBuilder(&setBuilder,
-                                            ReshardingRecipientDocument::kIndexBuildUUIDFieldName);
-        }
-
         buildStateDocumentMetricsForUpdate(
             setBuilder, _metrics.get(), newRecipientCtx.getState(), timestamp);
 
@@ -1357,10 +1343,6 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
 
     if (configStartTime) {
         _startConfigTxnCloneAt = *configStartTime;
-    }
-
-    if (indexBuildUUID) {
-        _indexBuildUUID = *indexBuildUUID;
     }
 }
 

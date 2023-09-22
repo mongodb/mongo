@@ -270,7 +270,6 @@ private:
     void _transitionState(RecipientShardContext&& newRecipientCtx,
                           boost::optional<CloneDetails>&& cloneDetails,
                           boost::optional<mongo::Date_t> configStartTime,
-                          boost::optional<UUID> indexBuildUUID,
                           const CancelableOperationContextFactory& factory);
 
     // The following functions transition the on-disk and in-memory state to the named state.
@@ -300,7 +299,6 @@ private:
     void _updateRecipientDocument(RecipientShardContext&& newRecipientCtx,
                                   boost::optional<CloneDetails>&& cloneDetails,
                                   boost::optional<mongo::Date_t> configStartTime,
-                                  boost::optional<UUID> indexBuildUUID,
                                   const CancelableOperationContextFactory& factory);
 
     // Removes the local recipient document from disk.
@@ -358,10 +356,6 @@ private:
     // Time at which the minimum operation duration threshold has been met, and
     // config.transactions cloning can begin.
     boost::optional<Date_t> _startConfigTxnCloneAt;
-
-    // The buildUUID for building index in building-index phase, this is used to abort index builds
-    // on abort.
-    boost::optional<UUID> _indexBuildUUID;
 
     // ThreadPool used by CancelableOperationContext.
     // CancelableOperationContext must have a thread that is always available to it to mark its
