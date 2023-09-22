@@ -345,6 +345,14 @@ public:
             sessionTagsToSet |= transport::Session::kKeepOpen;
         }
 
+        // Negotiate compressors before logging metadata so we can include the result in the log
+        // line.
+        auto result = replyBuilder->getBodyBuilder();
+        if (opCtx->getClient()->session()) {
+            MessageCompressorManager::forSession(opCtx->getClient()->session())
+                .serverNegotiate(cmd.getCompression(), &result);
+        }
+
         auto client = opCtx->getClient();
         if (ClientMetadata::tryFinalize(client)) {
             audit::logClientMetadata(client);
@@ -417,8 +425,6 @@ public:
                     !clientTopologyVersion && !maxAwaitTimeMS);
         }
 
-        auto result = replyBuilder->getBodyBuilder();
-
         // Try to parse the optional 'helloOk' field. This should be provided on the initial
         // handshake for an incoming connection if the client supports the hello command. Clients
         // that specify 'helloOk' do not rely on "not master" error message parsing, which means
@@ -477,11 +483,6 @@ public:
         if (auto iter = params.find(kAutomationServiceDescriptorFieldName);
             iter != params.end() && iter->second) {
             iter->second->append(opCtx, result, kAutomationServiceDescriptorFieldName);
-        }
-
-        if (opCtx->getClient()->session()) {
-            MessageCompressorManager::forSession(opCtx->getClient()->session())
-                .serverNegotiate(cmd.getCompression(), &result);
         }
 
         if (opCtx->isExhaust()) {
