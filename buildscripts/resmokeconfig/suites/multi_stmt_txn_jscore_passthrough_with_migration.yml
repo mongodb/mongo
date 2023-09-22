@@ -351,10 +351,7 @@ executor:
         enableTestCommands: 1
     mongod_options:
       set_parameters:
-        failpoint.overrideBalanceRoundInterval:
-          mode: alwaysOn
-          data:
-            intervalMs: 100
+        balancerMigrationsThrottlingMs: 100
         failpoint.balancerShouldReturnRandomMigrations:
           mode: alwaysOn
         logComponentVerbosity:

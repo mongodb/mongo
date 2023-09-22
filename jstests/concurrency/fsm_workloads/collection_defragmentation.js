@@ -245,18 +245,15 @@ export const $config = (function() {
     function teardown(db, collName, cluster) {
         const mongos = cluster.getDB('config').getMongo();
 
-        let defaultOverrideBalanceRoundInterval;
+        let defaultBalancerMigrationsThrottling;
         cluster.executeOnConfigNodes((db) => {
-            defaultOverrideBalanceRoundInterval = assert.commandWorked(db.adminCommand({
+            defaultBalancerMigrationsThrottling = assert.commandWorked(db.adminCommand({
                 getParameter: 1,
-                'failpoint.overrideBalanceRoundInterval': 1
-            }))['failpoint.overrideBalanceRoundInterval'];
+                'balancerMigrationsThrottlingMs': 1
+            }))['balancerMigrationsThrottlingMs'];
 
-            assert.commandWorked(db.adminCommand({
-                configureFailPoint: 'overrideBalanceRoundInterval',
-                mode: 'alwaysOn',
-                data: {intervalMs: 100}
-            }));
+            assert.commandWorked(
+                db.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 100}));
         });
 
         for (let i = 0; i < dbCount; i++) {
@@ -304,16 +301,10 @@ export const $config = (function() {
                         .was;
             }
 
-            if (defaultOverrideBalanceRoundInterval.mode === 0) {
-                assert.commandWorked(db.adminCommand(
-                    {configureFailPoint: 'overrideBalanceRoundInterval', mode: 'off'}));
-            } else if (defaultOverrideBalanceRoundInterval.mode === 1) {
-                assert.commandWorked(db.adminCommand({
-                    configureFailPoint: 'overrideBalanceRoundInterval',
-                    mode: 'alwaysOn',
-                    data: {intervalMs: defaultOverrideBalanceRoundInterval.data.intervalMs}
-                }));
-            }
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                balancerMigrationsThrottlingMs: defaultBalancerMigrationsThrottling
+            }));
         });
     }
 

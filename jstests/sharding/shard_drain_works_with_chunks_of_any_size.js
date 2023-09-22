@@ -6,18 +6,22 @@
  * Regression test for SERVER-76550.
  */
 
-import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
-const st = new ShardingTest({other: {enableBalancer: false, chunkSize: 1}});
+const st = new ShardingTest({
+    other: {
+        enableBalancer: false,
+        chunkSize: 1,
+        configOptions: {setParameter: {balancerMigrationsThrottlingMs: 100}}
+    }
+});
+
 const mongos = st.s0;
 const configDB = st.getDB('config');
 
 // Stop auto-merger because the test expects a specific number of chunks
 sh.stopAutoMerger(configDB);
-configureFailPointForRS(
-    st.configRS.nodes, "overrideBalanceRoundInterval", {intervalMs: 100}, "alwaysOn");
 
 const dbName = 'test';
 const collName = 'collToDrain';

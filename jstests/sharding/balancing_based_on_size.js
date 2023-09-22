@@ -3,7 +3,6 @@
  * for a collection on each node, converging when the size difference becomes small.
  */
 
-import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const maxChunkSizeMB = 1;
@@ -13,7 +12,12 @@ const st = new ShardingTest({
     other: {
         chunkSize: maxChunkSizeMB,
         enableBalancer: false,
-        configOptions: {setParameter: {logComponentVerbosity: tojson({sharding: {verbosity: 2}})}}
+        configOptions: {
+            setParameter: {
+                logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
+                balancerMigrationsThrottlingMs: 100
+            }
+        }
     }
 });
 
@@ -71,10 +75,6 @@ st.verifyCollectionIsBalanced(coll);
 
 jsTestLog("Printing sharding status after waiting for collection balance");
 st.printShardingStatus();
-
-// Wait for some more rounds and then check the balancer is not wrongly moving around data
-configureFailPointForRS(
-    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 100}, 'alwaysOn');
 
 st.awaitBalancerRound();
 st.awaitBalancerRound();

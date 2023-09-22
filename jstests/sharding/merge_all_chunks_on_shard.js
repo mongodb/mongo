@@ -69,34 +69,47 @@ function resetHistoryWindowInSecs(st) {
     configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {}, "off");
 }
 
+function updateBalancerParameter(st, paramName, valueInMS) {
+    let prevParamValue = null;
+    st.forEachConfigServer((conn) => {
+        const res = conn.adminCommand({setParameter: 1, [paramName]: valueInMS});
+        assert.commandWorked(res);
+        prevParamValue = res.was;
+    });
+    return prevParamValue;
+}
+
 let defaultAutoMergerThrottlingMS = null;
 function setBalancerMergeThrottling(st, valueInMS) {
-    st.forEachConfigServer((conn) => {
-        const res = conn.adminCommand({setParameter: 1, autoMergerThrottlingMS: valueInMS});
-        assert.commandWorked(res);
-        defaultAutoMergerThrottlingMS = res.was;
-    });
+    const prevValue = updateBalancerParameter(st, "autoMergerThrottlingMS", valueInMS);
+    // Cache only the initial [default] parameter value
+    if (!defaultAutoMergerThrottlingMS)
+        defaultAutoMergerThrottlingMS = prevValue;
 }
 
 function resetBalancerMergeThrottling(st) {
-    if (!defaultAutoMergerThrottlingMS) {
-        // Default throttling param was never changed, hence no need to reset it
+    // No need to reset if parameter at initial state
+    if (!defaultAutoMergerThrottlingMS)
         return;
-    }
-
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(conn.adminCommand(
-            {setParameter: 1, autoMergerThrottlingMS: defaultAutoMergerThrottlingMS}));
-    });
+    updateBalancerParameter(st, "autoMergerThrottlingMS", defaultAutoMergerThrottlingMS);
+    defaultAutoMergerThrottlingMS = null;
 }
 
-function setBalanceRoundInterval(st, valueInMs) {
-    configureFailPointForRS(
-        st.configRS.nodes, "overrideBalanceRoundInterval", {intervalMs: valueInMs}, "alwaysOn");
+let defaultBalancerMigrationsThrottlingMs = null;
+function setBalancerMigrationsThrottling(st, valueInMS) {
+    const prevValue = updateBalancerParameter(st, "balancerMigrationsThrottlingMs", valueInMS);
+    // Cache only the initial [default] parameter value
+    if (!defaultBalancerMigrationsThrottlingMs)
+        defaultBalancerMigrationsThrottlingMs = prevValue;
 }
 
-function resetBalanceRoundInterval(st) {
-    configureFailPointForRS(st.configRS.nodes, "overrideBalanceRoundInterval", {}, "off");
+function resetBalancerMigrationsThrottling(st) {
+    // No need to reset if parameter at initial state
+    if (!defaultBalancerMigrationsThrottlingMs)
+        return;
+    updateBalancerParameter(
+        st, "balancerMigrationsThrottlingMs", defaultBalancerMigrationsThrottlingMs);
+    defaultBalancerMigrationsThrottlingMs = null;
 }
 
 function assertExpectedChunksOnShard(configDB, coll, shardName, expectedChunks) {
@@ -357,8 +370,8 @@ function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
         setOnCurrentShardSince(st.s, coll, {}, now, -historyWindowInSeconds - 1000);
     });
 
-    // Override balancer round interval and merge throttling to speed up the test
-    setBalanceRoundInterval(st, 100 /* ms */);
+    // Update balancer migration/merge throttling to speed up the test
+    setBalancerMigrationsThrottling(st, 100);
     setBalancerMergeThrottling(st, 0);
 
     // Enable the AutoMerger
@@ -379,7 +392,7 @@ function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
 
 function testConfigurableAutoMergerIntervalSecs(st, testDB) {
     // Override default configuration to speed up the test
-    setBalanceRoundInterval(st, 100 /* ms */);
+    setBalancerMigrationsThrottling(st, 100);
     setBalancerMergeThrottling(st, 0);
     setHistoryWindowInSecs(st, 0 /* seconds */);
 
@@ -421,7 +434,7 @@ function executeTestCase(testFunc) {
     // Teardown: stop the balancer, reset configuration and drop db
     st.stopBalancer();
     resetHistoryWindowInSecs(st);
-    resetBalanceRoundInterval(st);
+    resetBalancerMigrationsThrottling(st);
     resetBalancerMergeThrottling(st);
 
     // The auto-merger considers all collections, drop db so that collections from previous test

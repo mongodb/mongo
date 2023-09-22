@@ -107,11 +107,11 @@
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/decorable.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
@@ -126,8 +126,6 @@ using std::string;
 using std::vector;
 
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(overrideBalanceRoundInterval);
 
 const Milliseconds kBalanceRoundDefaultInterval(10 * 1000);
 
@@ -788,14 +786,6 @@ void Balancer::_mainThread() {
                 _autoMergerPolicy->enable();
             }
 
-            boost::optional<Milliseconds> forcedBalancerRoundInterval(boost::none);
-            overrideBalanceRoundInterval.execute([&](const BSONObj& data) {
-                forcedBalancerRoundInterval = Milliseconds(data["intervalMs"].numberInt());
-                LOGV2(21864,
-                      "overrideBalanceRoundInterval: using customized balancing interval",
-                      "balancerInterval"_attr = *forcedBalancerRoundInterval);
-            });
-
             LOGV2_DEBUG(21860,
                         1,
                         "Start balancing round. waitForDelete: {waitForDelete}, "
@@ -863,16 +853,17 @@ void Balancer::_mainThread() {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
                     _balancedLastTime = 0;
                     LOGV2_DEBUG(21863, 1, "End balancing round");
+                    // Set to 100ms when executed in context of a test
                     _endRound(opCtx.get(),
-                              forcedBalancerRoundInterval ? *forcedBalancerRoundInterval
-                                                          : kBalanceRoundDefaultInterval);
+                              TestingProctor::instance().isEnabled()
+                                  ? Milliseconds(100)
+                                  : kBalanceRoundDefaultInterval);
                 } else {
 
                     // Sleep according to the migration throttling settings
                     const auto throttleTimeMillis = [&] {
-                        const auto& minRoundinterval = forcedBalancerRoundInterval
-                            ? *forcedBalancerRoundInterval
-                            : Milliseconds(balancerMigrationsThrottlingMs.load());
+                        const auto& minRoundinterval =
+                            Milliseconds(balancerMigrationsThrottlingMs.load());
 
                         const auto timeSinceLastMigration = Date_t::now() - lastMigrationTime;
                         if (timeSinceLastMigration < minRoundinterval) {

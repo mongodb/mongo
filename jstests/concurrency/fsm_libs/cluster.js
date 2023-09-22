@@ -228,11 +228,8 @@ export const Cluster = function(options) {
                         configureFailPoint: 'balancerShouldReturnRandomMigrations',
                         mode: 'alwaysOn'
                     });
-                    configDb.adminCommand({
-                        configureFailPoint: 'overrideBalanceRoundInterval',
-                        mode: 'alwaysOn',
-                        data: {intervalMs: 100}
-                    });
+
+                    configDb.adminCommand({setParameter: 1, balancerMigrationsThrottlingMs: 100});
                 });
             }
 

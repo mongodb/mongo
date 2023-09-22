@@ -29,7 +29,9 @@ const st = new ShardingTest({
             setParameter: {
                 logComponentVerbosity: tojson({sharding: {verbosity: 2}}),
                 chunkDefragmentationThrottlingMS: 0,
-                reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000 /* 1 day */
+                reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000, /* 1 day */
+                // Shorten time between balancer rounds for faster initial balancing
+                balancerMigrationsThrottlingMs: 200
             }
         },
         shardOptions: {
@@ -49,10 +51,6 @@ let collCounter = 0;
 function getNewColl() {
     return db[collNamePrefix + '_' + collCounter++];
 }
-
-// Shorten time between balancer rounds for faster initial balancing
-configureFailPointForRS(
-    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 200}, 'alwaysOn');
 
 const targetChunkSizeMB = 2;
 
