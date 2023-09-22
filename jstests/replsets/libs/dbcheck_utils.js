@@ -24,22 +24,27 @@ export const clearHealthLog = (replSet) => {
 };
 
 export const dbCheckCompleted = (db) => {
-    return db.getSiblingDB("admin").currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] ===
+    return db.getSiblingDB("admin").currentOp().inprog == undefined ||
+        db.getSiblingDB("admin").currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] ===
         undefined;
 };
 
 // Wait for dbCheck to complete (on both primaries and secondaries).
-export const awaitDbCheckCompletion = (replSet, db, withClearedHealthLog = true) => {
-    assert.soon(() => dbCheckCompleted(db), "dbCheck timed out");
+export const awaitDbCheckCompletion = (replSet, db, waitForHealthLogDbCheckStop = true) => {
+    assert.soon(() => dbCheckCompleted(db),
+                "dbCheck timed out for database: " + db.getName() + " for RS: " + replSet.getURL());
     replSet.awaitSecondaryNodes();
     replSet.awaitReplication();
 
-    if (withClearedHealthLog) {
+    if (waitForHealthLogDbCheckStop) {
         forEachNonArbiterNode(replSet, function(node) {
             const healthlog = node.getDB('local').system.healthlog;
-            assert.soon(function() {
-                return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
-            }, "dbCheck command didn't complete");
+            assert.soon(
+                function() {
+                    return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1);
+                },
+                "dbCheck command didn't complete for database: " + db.getName() +
+                    " for RS: " + replSet.getURL());
         });
     }
 };
@@ -60,16 +65,17 @@ export const runDbCheck = (replSet,
                            collName,
                            parameters = {},
                            awaitCompletion = false,
-                           withClearedHealthLog = true,
+                           waitForHealthLogDbCheckStop = true,
                            allowedErrorCodes = []) => {
     let dbCheckCommand = {dbCheck: collName};
     for (let parameter in parameters) {
         dbCheckCommand[parameter] = parameters[parameter];
     }
 
-    assert.commandWorkedOrFailedWithCode(db.runCommand(dbCheckCommand), allowedErrorCodes);
-    if (awaitCompletion) {
-        awaitDbCheckCompletion(replSet, db, withClearedHealthLog);
+    let res =
+        assert.commandWorkedOrFailedWithCode(db.runCommand(dbCheckCommand), allowedErrorCodes);
+    if (res.ok && awaitCompletion) {
+        awaitDbCheckCompletion(replSet, db, waitForHealthLogDbCheckStop);
     }
 };
 
@@ -117,32 +123,44 @@ export const injectInconsistencyOnSecondary = (replSet, dbName, cmd, noCleanData
 // Returns a list of all collections in a given database excluding views.
 function listCollectionsWithoutViews(database) {
     var failMsg = "'listCollections' command failed";
-    var res = assert.commandWorked(database.runCommand("listCollections"), failMsg);
-    return res.cursor.firstBatch.filter(c => c.type == "collection");
+    // Some tests adds an invalid view, resulting in a failure of the 'listCollections' operation
+    // with an 'InvalidViewDefinition' error.
+    let res = assert.commandWorkedOrFailedWithCode(
+        database.runCommand("listCollections"), ErrorCodes.InvalidViewDefinition, failMsg);
+    if (res.ok) {
+        return res.cursor.firstBatch.filter(c => c.type == "collection");
+    }
+    return [];
 }
 
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
 // completion.
 export const runDbCheckForDatabase = (replSet, db, awaitCompletion = false) => {
-    listCollectionsWithoutViews(db)
-        .map(c => c.name)
-        .forEach(collName => runDbCheck(
-                     replSet,
-                     db,
-                     collName,
-                     {} /* parameters */,
-                     false /* awaitCompletion */,
-                     false /* withClearedHealthLog */,
-                     [
-                         ErrorCodes.NamespaceNotFound /* collection got dropped. */,
-                         ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
-                                                                 got created with the same name. */
-                         ,
-                         40619 /* collection is not replicated error. */
-                     ] /* allowedErrorCodes */));
+    listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
+        jsTestLog("dbCheck is starting on ns: " + db.getName() + "." + collName +
+                  " for RS: " + replSet.getURL());
+        runDbCheck(replSet,
+                   db,
+                   collName,
+                   {} /* parameters */,
+                   false /* awaitCompletion */,
+                   false /* waitForHealthLogDbCheckStop */,
+                   [
+                       ErrorCodes.NamespaceNotFound /* collection got dropped. */,
+                       ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
+                                                               got created with the same name. */
+                       ,
+                       40619 /* collection is not replicated error. */,
+                       // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
+                       // operation with an 'InvalidViewDefinition' error.
+                       ErrorCodes.InvalidViewDefinition
+                   ] /* allowedErrorCodes */);
+        jsTestLog("dbCheck is done on ns: " + db.getName() + "." + collName +
+                  " for RS: " + replSet.getURL());
+    });
 
     if (awaitCompletion) {
-        awaitDbCheckCompletion(replSet, db, false /*withClearedHealthLog*/);
+        awaitDbCheckCompletion(replSet, db, false /*waitForHealthLogDbCheckStop*/);
     }
 };
 

@@ -9,6 +9,7 @@
 executor:
   archive:
     hooks:
+    - RunDBCheckInBackground
     - CheckReplDBHashInBackground
     - ValidateCollectionsInBackground
     - CheckReplDBHash
@@ -25,6 +26,7 @@ executor:
         enableTestCommands: 1
     num_nodes: 2
   hooks:
+  - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: ValidateCollectionsInBackground
   - class: CheckReplOplogs
@@ -40,6 +42,10 @@ selector:
   - jstests/core/txns/kill_op_on_txn_expiry.js
   - jstests/core/**/set_param1.js
   - jstests/core/**/or_to_in.js
+  - jstests/core/query/awaitdata_getmore_cmd.js
+  - jstests/core/administrative/current_op/currentop.js
+  - jstests/core/fsync.js
+  - jstests/core/txns/prepare_conflict.js
   - jstests/core/timeseries/timeseries_bucket_index.js
   - jstests/core/timeseries/timeseries_bucket_manual_removal.js
   - jstests/core/timeseries/timeseries_update_hint.js

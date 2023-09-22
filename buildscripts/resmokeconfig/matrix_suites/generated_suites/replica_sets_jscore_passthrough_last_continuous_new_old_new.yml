@@ -9,6 +9,7 @@
 executor:
   archive:
     hooks:
+    - RunDBCheckInBackground
     - CheckReplDBHashInBackground
     - ValidateCollectionsInBackground
     - CheckReplDBHash
@@ -26,6 +27,7 @@ executor:
     num_nodes: 3
     old_bin_version: last_continuous
   hooks:
+  - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: ValidateCollectionsInBackground
   - class: CheckReplOplogs
@@ -41,6 +43,10 @@ selector:
   - jstests/core/txns/kill_op_on_txn_expiry.js
   - jstests/core/**/set_param1.js
   - jstests/core/**/or_to_in.js
+  - jstests/core/query/awaitdata_getmore_cmd.js
+  - jstests/core/administrative/current_op/currentop.js
+  - jstests/core/fsync.js
+  - jstests/core/txns/prepare_conflict.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   roots:

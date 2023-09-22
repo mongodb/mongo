@@ -70,8 +70,9 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
         dbNames.delete('local');
 
         dbNames.forEach((dbName) => {
+            jsTestLog("dbCheck is starting on database " + dbName + " for RS: " + rst.getURL());
             runDbCheckForDatabase(rst, primary.getDB(dbName), true /*awaitCompletion*/);
-            jsTestLog("dbCheck done on database " + dbName);
+            jsTestLog("dbCheck is done on database " + dbName + " for RS: " + rst.getURL());
         });
 
         assertForDbCheckErrorsForAllNodes(

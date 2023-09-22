@@ -17,6 +17,26 @@ selector:
   - jstests/core/**/set_param1.js
   # Different explain format
   - jstests/core/**/or_to_in.js
+  # TODO(SERVER-81158): Enable these tests.
+  # These tests fails while DbCheck running in the background:
+  # The DBCheck process continuously populates the currentOp, causing this test to time out while
+  # waiting for empty 'getMore' requests.
+  - jstests/core/query/awaitdata_getmore_cmd.js
+  # These tests utilize 'fsyncLock' and subsequently wait for an insert operation to be blocked by
+  # checking the inprogress 'currentOp', leading to a deadlock with the dbCheck process:
+  # When the fsyncLock is activated, multiple threads acquire writeTickets and become stalled at the
+  # Flusher stage. Consequently, other threads are unable to obtain additional tickets.
+  # In this context, the behavior of the dbcheck process involves acquiring writeTickets in an
+  # attempt to write to the oplog, followed by becoming blocked at the flusher stage. Consequently,
+  # when an insertion is initiated from the test, it is unable to find available writeTickets and
+  # enters a wait state. Additionally, since the AquireCollection is not even obtained,
+  # the curOp (current operation) does not get logged.
+  - jstests/core/administrative/current_op/currentop.js
+  - jstests/core/fsync.js
+  # When a transaction is in a prepared state, as seen in that test, it prevents the document edited
+  # within it from being read by the dbcheck process. Therefore, if the test keeps the transaction
+  # in a prepared state for an extended period, it will result in a timeout for the dbcheck process.
+  - jstests/core/txns/prepare_conflict.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
@@ -24,6 +44,7 @@ selector:
 executor:
   archive:
     hooks:
+      - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - ValidateCollectionsInBackground
       - CheckReplDBHash
@@ -33,6 +54,7 @@ executor:
     shell_options:
       eval: "globalThis.testingReplication = true;"
   hooks:
+  - class: RunDBCheckInBackground
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
