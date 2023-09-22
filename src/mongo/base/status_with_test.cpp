@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/stringify.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -97,6 +98,13 @@ TEST(StatusWith, ignoreTest) {
     }()
         .getStatus()
         .ignore();
+}
+
+TEST(StatusWith, AssertionFormat) {
+    Status failed(ErrorCodes::CallbackCanceled, "foo");
+    ASSERT_EQ(unittest::stringify::invoke(StatusWith<StringData>(failed)),
+              unittest::stringify::invoke(failed));
+    ASSERT_EQ(unittest::stringify::invoke(StatusWith<StringData>("foo")), "foo");
 }
 
 }  // namespace
