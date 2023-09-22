@@ -487,74 +487,107 @@ functions:
         echo "Using smp_command '${smp_command}' for 'make check all'"
         $CTEST -L check ${smp_command|} --output-on-failure ${check_args|} 2>&1
 
+  # The following cppsuite tasks define a greater overall task.
+  "cppsuite test run": &cppsuite_test_run
+    command: shell.exec
+    params:
+      # The tests need to be executed in the cppsuite directory as some required libraries have
+      # their paths defined relative to this directory.
+      # The below script saves the exit code from the test to use it later in this function. By
+      # doing this we can define our own custom artifact upload task without it being cancelled by
+      # the test failing.
+      # Additionally if the test fails perf statistics won't be uploaded as they may be invalid
+      # due to the test failure.
+      working_dir: "wiredtiger/cmake_build/test/cppsuite"
+      shell: bash
+      script: |
+        set -o verbose
+        ${PREPARE_TEST_ENV}
+        ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
+        exit_code=$?
+        echo "$exit_code" > cppsuite_exit_code
+        if [ "$exit_code" != 0 ]; then
+          echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
+        fi
+        exit 0
+
+  # Delete unnecessary data from the upload.
+  "cppsuite test remove files": &cppsuite_remove_files
+    command: shell.exec
+    params:
+      shell: bash
+      script: |
+        rm -rf wiredtiger/cmake_build/examples
+        rm -rf wiredtiger/cmake_build/bench
+        mv wiredtiger/cmake_build/test/cppsuite wiredtiger/cmake_build/
+        rm -rf wiredtiger/cmake_build/test/
+        mkdir wiredtiger/cmake_build/test/
+        mv wiredtiger/cmake_build/cppsuite wiredtiger/cmake_build/test/cppsuite
+
+  # Custom cppsuite archive tasks.
+  "cppsuite archive": &cppsuite_archive
+    command: archive.targz_pack
+    params:
+      target: archive.tgz
+      source_dir: wiredtiger/cmake_build/
+      include:
+        - "./**"
+
+  # Custom cppsuite s3 artifact upload task.
+  "cppsuite s3 put": &cppsuite_s3_put
+    command: s3.put
+    params:
+      aws_secret: ${aws_secret}
+      aws_key: ${aws_key}
+      local_file: archive.tgz
+      bucket: build_external
+      permissions: public-read
+      content_type: application/tar
+      display_name: cppsuite-test
+      remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
+
+  # FIXME-WT-8538 This task prevents us from saving the same artifacts to evergreen twice. It can be
+  # removed when we implement a generalised approach in WT-8538
+  "cppsuite remove dir": &cppsuite_remove_dir
+    command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -o verbose
+        if [ -f wiredtiger/cmake_build/test/cppsuite/cppsuite_exit_code ]; then
+          exit_code=`cat wiredtiger/cmake_build/test/cppsuite/cppsuite_exit_code`
+        else
+          exit_code=0
+        fi
+        rm -rf wiredtiger
+        exit "$exit_code"
+
+  # The typical cppsuite test function. Doesn't upload perf statistics to evergreen.
   "cppsuite test":
-    - command: shell.exec
-      params:
-        # The tests need to be executed in the cppsuite directory as some required libraries have
-        # their paths defined relative to this directory.
-        # The below script saves the exit code from the test to use it later in this function. By
-        # doing this we can define our own custom artifact upload task without it being cancelled by
-        # the test failing.
-        # Additionally if the test fails perf statistics won't be uploaded as they may be invalid
-        # due to the test failure.
-        working_dir: "wiredtiger/cmake_build/test/cppsuite"
-        shell: bash
-        script: |
-          set -o verbose
-          ${PREPARE_TEST_ENV}
-          ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
-          exit_code=$?
-          echo "$exit_code" > cppsuite_exit_code
-          if [ "$exit_code" != 0 ]; then
-            echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
-          fi
-          exit 0
+    - *cppsuite_test_run
+    # Since we later remove the WiredTiger folder, we need to check for core dumps now.
+    - *dump_stacktraces
+    - *upload_stacktraces
+    # Cleanup tasks.
+    - *cppsuite_remove_files
+    - *cppsuite_archive
+    - *cppsuite_s3_put
+    - *cppsuite_remove_dir
+
+  # This cppsuite test function uploads perf statistics and should only be used on perf variants.
+  "cppsuite perf test":
+    - *cppsuite_test_run
     # Since we later remove the WiredTiger folder, we need to check for core dumps now.
     - *dump_stacktraces
     - *upload_stacktraces
     - command: perf.send
       params:
         file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
-    # Delete unnecessary data from the upload.
-    - command: shell.exec
-      params:
-        shell: bash
-        script: |
-          rm -rf wiredtiger/cmake_build/examples
-          rm -rf wiredtiger/cmake_build/bench
-          mv wiredtiger/cmake_build/test/cppsuite wiredtiger/cmake_build/
-          rm -rf wiredtiger/cmake_build/test/
-          mkdir wiredtiger/cmake_build/test/
-          mv wiredtiger/cmake_build/cppsuite wiredtiger/cmake_build/test/cppsuite
-    - command: archive.targz_pack
-      params:
-        target: archive.tgz
-        source_dir: wiredtiger/cmake_build/
-        include:
-          - "./**"
-    - command: s3.put
-      params:
-        aws_secret: ${aws_secret}
-        aws_key: ${aws_key}
-        local_file: archive.tgz
-        bucket: build_external
-        permissions: public-read
-        content_type: application/tar
-        display_name: cppsuite-test
-        remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
-    # We remove the wiredtiger directory here to avoid to getting archived again by post tasks.
-    - command: shell.exec
-      params:
-        shell: bash
-        script: |
-          set -o verbose
-          if [ -f wiredtiger/cmake_build/test/cppsuite/cppsuite_exit_code ]; then
-            exit_code=`cat wiredtiger/cmake_build/test/cppsuite/cppsuite_exit_code`
-          else
-            exit_code=0
-          fi
-          rm -rf wiredtiger
-          exit "$exit_code"
+    # Cleanup tasks.
+    - *cppsuite_remove_files
+    - *cppsuite_archive
+    - *cppsuite_s3_put
+    - *cppsuite_remove_dir
 
   "wt2853_perf test":
     command: shell.exec
@@ -1770,7 +1803,7 @@ tasks:
           test_config_filename: configs/bounded_cursor_prefix_stat_default.txt
           test_name: bounded_cursor_prefix_stat
 
-  - name: bounded-cursor-prefix-search-near-default
+  - name: cppsuite-bounded-cursor-prefix-search-near-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1782,7 +1815,7 @@ tasks:
           test_config_filename: configs/bounded_cursor_prefix_search_near_default.txt
           test_name: bounded_cursor_prefix_search_near
 
-  - name: bounded-cursor-prefix-indices-default
+  - name: cppsuite-bounded-cursor-prefix-indices-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1893,17 +1926,6 @@ tasks:
         vars:
           test_config_filename: configs/bounded_cursor_prefix_indices_stress.txt
           test_name: bounded_cursor_prefix_indices
-
-  # This is a perf test and as such doesn't run under the stress test tag.
-  - name: cppsuite-bounded-cursor-perf-stress
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/bounded_cursor_perf_stress.txt
-          test_name: bounded_cursor_perf
 
   - name: cppsuite-reverse-split-stress
     tags: ["cppsuite-stress-test"]
@@ -2032,6 +2054,64 @@ tasks:
         vars:
           test_config_filename: configs/reverse_split_stress.txt
           test_name: reverse_split
+
+# Cppsuite perf tests
+  - name: cppsuite-hs-cleanup-default-perf
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/hs_cleanup_default.txt
+          test_name: hs_cleanup
+
+  - name: cppsuite-hs-cleanup-stress-perf
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/hs_cleanup_stress.txt
+          test_name: hs_cleanup
+
+  - name: cppsuite-operations-test-default-perf
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/operations_test_default.txt
+          test_name: operations_test
+
+  - name: cppsuite-operations-test-stress-perf
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/operations_test_stress.txt
+          test_name: operations_test
+  # This is a perf test and as such doesn't run under the stress test tag. This name seems excessive
+  # but in order to have a consistent naming system is required, the issue here is that the test
+  # itself has the word "perf" in it.
+  - name: cppsuite-bounded-cursor-perf-stress-perf
+    depends_on:
+      - name: compile
+    tags: ["cppsuite-perf-test"]
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite perf test"
+        vars:
+          test_config_filename: configs/bounded_cursor_perf_stress.txt
+          test_name: bounded_cursor_perf
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks

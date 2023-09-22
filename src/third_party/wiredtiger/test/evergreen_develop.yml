@@ -73,7 +73,7 @@ buildvariants:
     - name: ".oplog-perf"
     - name: many-dhandle-stress
     - name: ".wt2853-perf"
-    - name: cppsuite-bounded-cursor-perf-stress
+    - name: ".cppsuite-perf-test"
 
 - <<: *perf-tasks-template
   name: ubuntu2004-perf-tests-arm64
@@ -97,7 +97,7 @@ buildvariants:
     - name: ".oplog-perf"
     - name: many-dhandle-stress
     - name: ".wt2853-perf"
-    - name: cppsuite-bounded-cursor-perf-stress
+    - name: ".cppsuite-perf-test"
     - name: many-collection-test
       distros: ubuntu2004-wt-large
 
