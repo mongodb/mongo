@@ -1915,8 +1915,10 @@ Status CollectionCatalog::_iterAllDbNamesHelper(
     const std::function<std::pair<DatabaseName, UUID>(const DatabaseName&)>& nextUpperBound) const {
     // _orderedCollections is sorted by <dbName, uuid>. upper_bound will return the iterator to the
     // first element in _orderedCollections greater than <firstDbName, maxUuid>.
-    auto iter = _orderedCollections.upper_bound(
-        std::make_pair(DatabaseNameUtil::deserialize(tenantId, ""), maxUuid));
+    auto iter = _orderedCollections.upper_bound(std::make_pair(
+        DatabaseNameUtil::deserialize(
+            tenantId, "", SerializationContext(SerializationContext::Source::Catalog)),
+        maxUuid));
     while (iter != _orderedCollections.end()) {
         auto dbName = iter->first.first;
         if (tenantId && dbName.tenantId() != tenantId) {
@@ -1962,7 +1964,10 @@ std::set<TenantId> CollectionCatalog::getAllTenants() const {
             return Status::OK();
         },
         [](const DatabaseName& dbName) {
-            return std::make_pair(DatabaseNameUtil::deserialize(dbName.tenantId(), "\xff"),
+            return std::make_pair(DatabaseNameUtil::deserialize(
+                                      dbName.tenantId(),
+                                      "\xff",
+                                      SerializationContext(SerializationContext::Source::Catalog)),
                                   maxUuid);
         });
     return ret;

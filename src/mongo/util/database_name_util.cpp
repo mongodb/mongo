@@ -60,8 +60,8 @@ std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
             return serializeForAuthPrevalidated(dbName, context);
         case SerializationContext::Source::Command:
             return serializeForCommands(dbName, context);
-        case SerializationContext::Source::Storage:
         case SerializationContext::Source::Catalog:
+        case SerializationContext::Source::Storage:
         case SerializationContext::Source::Default:
             // Use forStorage as the default serializing rule
             return serializeForStorage(dbName, context);
@@ -156,13 +156,14 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
     switch (context.getSource()) {
         case SerializationContext::Source::AuthPrevalidated:
             return deserializeForAuthPrevalidated(std::move(tenantId), db, context);
+        case SerializationContext::Source::Catalog:
+            return deserializeForCatalog(std::move(tenantId), db);
         case SerializationContext::Source::Command:
             if (context.getCallerType() == SerializationContext::CallerType::Request) {
                 return deserializeForCommands(std::move(tenantId), db, context);
             }
             [[fallthrough]];
         case SerializationContext::Source::Storage:
-        case SerializationContext::Source::Catalog:
         case SerializationContext::Source::Default:
             // Use forStorage as the default deserializing rule
             return deserializeForStorage(std::move(tenantId), db, context);
@@ -259,6 +260,13 @@ DatabaseName DatabaseNameUtil::deserializeForCatalog(StringData db,
     // multitenancy and will either return a DatabaseName with (tenantId, nonPrefixedDb) or
     // (none, prefixedDb).
     return DatabaseNameUtil::parseFromStringExpectTenantIdInMultitenancyMode(db);
+}
+
+DatabaseName DatabaseNameUtil::deserializeForCatalog(boost::optional<TenantId> tenantId,
+                                                     StringData db) {
+    // Internally, CollectionCatalog still keys against DatabaseName but needs to address all
+    // tenantIds when pattern matching by passing in boost::none.
+    return DatabaseName(tenantId, db);
 }
 
 DatabaseName DatabaseNameUtil::parseFailPointData(const BSONObj& data, StringData dbFieldName) {

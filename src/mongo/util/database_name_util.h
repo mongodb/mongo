@@ -139,6 +139,8 @@ private:
                                                StringData db,
                                                const SerializationContext& context);
 
+    static DatabaseName deserializeForCatalog(boost::optional<TenantId> tenantId, StringData db);
+
     static DatabaseName deserializeForAuthPrevalidated(boost::optional<TenantId> tenantId,
                                                        StringData db,
                                                        const SerializationContext& context);

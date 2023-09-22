@@ -592,6 +592,35 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
 }
 
+TEST_F(CollectionCatalogTest, GetAllDbNamesForTenantMultitenancyFalse) {
+    TenantId tid1 = TenantId(OID::gen());
+    TenantId tid2 = TenantId(OID::gen());
+    // This is extremely contrived as we shouldn't be able to create nss's with tenantIds in
+    // multitenancySupport=false mode, but the behavior of getAllDbNamesForTenant should be well
+    // defined even in the event of a rollback.
+    NamespaceString testDb = NamespaceString::createNamespaceString_forTest(boost::none, "testdb");
+    NamespaceString dbA = NamespaceString::createNamespaceString_forTest(tid1, "dbA.collA");
+    NamespaceString dbB = NamespaceString::createNamespaceString_forTest(tid1, "dbB.collA");
+    NamespaceString dbC = NamespaceString::createNamespaceString_forTest(tid1, "dbC.collA");
+    NamespaceString dbD = NamespaceString::createNamespaceString_forTest(tid2, "dbB.collA");
+
+    std::vector<NamespaceString> nsss = {testDb, dbA, dbB, dbC, dbD};
+    for (auto& nss : nsss) {
+        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
+        catalog.registerCollection(opCtx.get(), std::move(newColl), boost::none);
+    }
+
+    std::vector<DatabaseName> allDbNames = {
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdb"),
+        DatabaseName::createDatabaseName_forTest(tid1, "dbA"),
+        DatabaseName::createDatabaseName_forTest(tid1, "dbB"),
+        DatabaseName::createDatabaseName_forTest(tid1, "dbC"),
+        DatabaseName::createDatabaseName_forTest(tid2, "dbB")};
+    ASSERT_EQ(catalog.getAllDbNamesForTenant(boost::none), allDbNames);
+
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
+}
+
 TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     TenantId tid1 = TenantId(OID::gen());
@@ -611,17 +640,33 @@ TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
         DatabaseName::createDatabaseName_forTest(tid1, "dbA"),
         DatabaseName::createDatabaseName_forTest(tid1, "dbB"),
         DatabaseName::createDatabaseName_forTest(tid1, "dbC")};
-    ASSERT(catalog.getAllDbNamesForTenant(tid1) == dbNamesForTid1);
+    ASSERT_EQ(catalog.getAllDbNamesForTenant(tid1), dbNamesForTid1);
 
     std::vector<DatabaseName> dbNamesForTid2 = {
         DatabaseName::createDatabaseName_forTest(tid2, "dbB")};
-    ASSERT(catalog.getAllDbNamesForTenant(tid2) == dbNamesForTid2);
+    ASSERT_EQ(catalog.getAllDbNamesForTenant(tid2), dbNamesForTid2);
+
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
+}
+
+TEST_F(CollectionCatalogTest, GetAllTenantsMultitenancyFalse) {
+    std::vector<NamespaceString> nsss = {
+        NamespaceString::createNamespaceString_forTest(boost::none, "a"),
+        NamespaceString::createNamespaceString_forTest(boost::none, "c"),
+        NamespaceString::createNamespaceString_forTest(boost::none, "l")};
+
+    for (auto& nss : nsss) {
+        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
+        catalog.registerCollection(opCtx.get(), std::move(newColl), boost::none);
+    }
+
+    ASSERT_EQ(catalog.getAllTenants(), std::set<TenantId>());
 
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
 }
 
 TEST_F(CollectionCatalogTest, GetAllTenants) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     TenantId tid1 = TenantId(OID::gen());
     TenantId tid2 = TenantId(OID::gen());
     std::vector<NamespaceString> nsss = {
