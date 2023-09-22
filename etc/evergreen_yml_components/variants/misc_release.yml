@@ -191,8 +191,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -366,7 +364,7 @@ buildvariants:
   run_on:
   - amazon2023.0-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -481,7 +479,7 @@ buildvariants:
   run_on:
   - amazon2023.0-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2023
@@ -641,7 +639,7 @@ buildvariants:
   run_on:
   - amazon2023.0-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -759,7 +757,7 @@ buildvariants:
   run_on:
   - amazon2023.0-arm64-small
   expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=amazon2023
@@ -930,8 +928,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -1156,8 +1152,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -1345,8 +1339,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -1466,7 +1458,7 @@ buildvariants:
   run_on:
   - rhel90-small
   expansions: &enterprise-rhel-90-64-bit-expansions
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -1595,8 +1587,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -2020,8 +2010,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -2086,8 +2074,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -2412,8 +2398,6 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
       msi
-      archive-mh
-      archive-mh-debug
     content_type: application/zip
     compile_flags: >-
       --ssl
@@ -2596,8 +2580,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos
@@ -2639,8 +2621,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
     push_name: macos

@@ -192,8 +192,6 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
       msi
-      archive-mh
-      archive-mh-debug
     content_type: application/zip
     compile_flags: >-
       --ssl

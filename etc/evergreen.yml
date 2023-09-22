@@ -229,8 +229,6 @@ variables:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -1705,8 +1703,6 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-      archive-mh
-      archive-mh-debug
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=rhel80
