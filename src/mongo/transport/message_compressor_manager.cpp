@@ -335,6 +335,11 @@ void MessageCompressorManager::serverNegotiate(
     }
 }
 
+const std::vector<MessageCompressorBase*>& MessageCompressorManager::getNegotiatedCompressors()
+    const {
+    return _negotiated;
+}
+
 MessageCompressorManager& MessageCompressorManager::forSession(
     const std::shared_ptr<transport::Session>& session) {
     return getForSession(session.get());

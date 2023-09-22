@@ -5,42 +5,68 @@
  * ]
  */
 
-let checkLogForMetadata = function(conn) {
-    let coll = conn.getCollection("test.foo");
-    assert.commandWorked(coll.insert({_id: 1}));
+let checkLogForMetadata = function(mongo, options) {
+    const normalizedOptions = JSON.parse(JSON.stringify(options));
+    if (!normalizedOptions.networkMessageCompressors)
+        normalizedOptions.networkMessageCompressors = [];
+    let argv = ["mongo", "--eval", "tostrictjson(db.hello());", "--port", mongo.port];
+    if (normalizedOptions.networkMessageCompressors.length > 0)
+        argv.push(
+            `--networkMessageCompressors=${normalizedOptions.networkMessageCompressors.join(',')}`);
+    assert.eq(runMongoProgram(...argv), 0);
 
-    print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
-    let log = cat(conn.fullOptions.logFile);
+    print(`Checking ${mongo.fullOptions.logFile} for client metadata message`);
+    let log = cat(mongo.fullOptions.logFile);
 
     const predicate =
-        /"id":51800,.*"msg":"client metadata","attr":.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
+        /"id":51800,.*"msg":"client metadata","attr":.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/g;
 
-    assert(predicate.test(log),
+    const matches = log.match(predicate);
+    assert(matches,
            "'client metadata' log line missing in log file!\n" +
-               "Log file contents: " + conn.fullOptions.logFile +
+               "Log file contents: " + mongo.fullOptions.logFile +
                "\n************************************************************\n" + log +
                "\n************************************************************");
+    const negotiatedCompressorsMatches =
+        matches[matches.length - 1].match(/"negotiatedCompressors":(\[[^\]]*\])/);
+    assert(negotiatedCompressorsMatches,
+           "'client metadata' log line did not include negotiated compressors\n" +
+               "Log file contents: " + mongo.fullOptions.logFile +
+               "\n************************************************************\n" + log +
+               "\n************************************************************");
+    const negotiatedCompressors = JSON.parse(negotiatedCompressorsMatches[1]);
+    negotiatedCompressors.sort();
+    normalizedOptions.networkMessageCompressors.sort();
+    assert(JSON.stringify(negotiatedCompressors) ===
+               JSON.stringify(normalizedOptions.networkMessageCompressors),
+           "'client metadata' log line reports unexpected negotiated compressors:\n" +
+               `included [${negotiatedCompressors.join(', ')}]\n` +
+               `expected [${normalizedOptions.networkMessageCompressors.join(', ')}]`);
 };
 
 // Test MongoD
-let testMongoD = function() {
-    let conn = MongoRunner.runMongod({useLogFiles: true});
-    assert.neq(null, conn, 'mongod was unable to start up');
+let testMongoD = function(options) {
+    let runOptions = JSON.parse(JSON.stringify(options));
+    runOptions.useLogFiles = true;
+    let mongo = MongoRunner.runMongod(runOptions);
+    assert.neq(null, mongo, 'mongod was unable to start up');
 
-    checkLogForMetadata(conn);
+    checkLogForMetadata(mongo, options);
 
-    MongoRunner.stopMongod(conn);
+    MongoRunner.stopMongod(mongo);
 };
 
 // Test MongoS
-let testMongoS = function() {
-    let options = {
-        mongosOptions: {useLogFiles: true},
+let testMongoS = function(options) {
+    let runOptions = JSON.parse(JSON.stringify(options));
+    runOptions.useLogFiles = true;
+    let otherOptions = {
+        mongosOptions: runOptions,
     };
 
-    let st = new ShardingTest({shards: 1, mongos: 1, other: options});
+    let st = new ShardingTest({shards: 1, mongos: 1, other: otherOptions});
 
-    checkLogForMetadata(st.s0);
+    checkLogForMetadata(st.s0, options);
 
     // Validate db.currentOp() contains mongos information
     let curOp = st.s0.adminCommand({currentOp: 1});
@@ -62,5 +88,11 @@ let testMongoS = function() {
     st.stop();
 };
 
-testMongoD();
-testMongoS();
+const optionCases = [
+    {},
+    {networkMessageCompressors: ['snappy', 'zstd']},
+];
+for (const optionCase of optionCases) {
+    testMongoD(optionCase);
+    testMongoS(optionCase);
+}

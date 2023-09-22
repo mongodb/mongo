@@ -160,6 +160,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         '$BUILD_DIR/mongo/util/net/network',
