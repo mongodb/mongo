@@ -1308,12 +1308,13 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
             }
 
             try {
-                auto opCtx = client->getOperationContext();
-                mongo::ServiceContext::UniqueOperationContext uOpCtx;
-                if (!opCtx) {
-                    uOpCtx = client->makeOperationContext();
-                    opCtx = uOpCtx.get();
-                }
+                auto uniqueOpCtx = client->makeOperationContext();
+                auto opCtx = uniqueOpCtx.get();
+
+                // The TimestampMonitor is an important background cleanup task for the storage
+                // engine and needs to be able to make progress to free up resources.
+                ScopedAdmissionPriorityForLock immediatePriority(
+                    opCtx->lockState(), AdmissionContext::Priority::kImmediate);
 
                 Timestamp checkpoint;
                 Timestamp oldest;
