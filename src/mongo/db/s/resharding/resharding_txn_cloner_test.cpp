@@ -294,6 +294,22 @@ protected:
         });
     }
 
+    void onKillCursorsRequest(CursorId cursorId) {
+        // Handle the 'killCursors' command.
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT(request.cmdObj["killCursors"]);
+            auto cursors = request.cmdObj["cursors"];
+            ASSERT_EQ(cursors.type(), BSONType::Array);
+            auto cursorsArray = cursors.Array();
+            ASSERT_FALSE(cursorsArray.empty());
+            auto cursorId = cursorsArray[0].Long();
+            ASSERT(cursorId == cursorId);
+            // The AsyncResultsMerger doesn't actually inspect the response of the killCursors, so
+            // we don't have to put anything except {ok: true}.
+            return BSON("ok" << true);
+        });
+    }
+
     void seedTransactionOnRecipient(LogicalSessionId sessionId,
                                     TxnNumber txnNum,
                                     bool multiDocTxn) {
@@ -865,6 +881,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     auto status = future.getNoThrow();
     ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
 
+    onKillCursorsRequest(CursorId{123});
+
     // After the first batch, the progress document should contain the lsid of the last document in
     // that batch.
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
@@ -917,6 +935,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 
     auto status = future.getNoThrow();
     ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
+
+    onKillCursorsRequest(CursorId{123});
 
     // The stored progress should be unchanged.
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));

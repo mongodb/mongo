@@ -899,10 +899,10 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opC
 }
 
 bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {
-    return (remote.status.isOK() || remote.status == ErrorCodes::MaxTimeMSExpired ||
-            remote.status == ErrorCodes::Interrupted ||
-            ErrorCodes::isNotPrimaryError(remote.status.code())) &&
-        remote.cursorId && !remote.exhausted();
+    static const std::set<ErrorCodes::Error> kCursorAlreadyDeadCodes = {
+        ErrorCodes::QueryPlanKilled, ErrorCodes::CursorKilled, ErrorCodes::CursorNotFound};
+    return remote.cursorId && !remote.exhausted() &&
+        !kCursorAlreadyDeadCodes.count(remote.status.code());
 }
 
 stdx::shared_future<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
