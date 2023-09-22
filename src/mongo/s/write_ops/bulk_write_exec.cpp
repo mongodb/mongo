@@ -1117,10 +1117,16 @@ int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
     static const DatabaseVersion mockDBVersion = DatabaseVersion(UUID::gen(), Timestamp());
 
     auto nsInfo = _clientRequest.getNsInfo();
-    for (auto& ns : nsInfo) {
-        ns.setShardVersion(mockShardVersion);
-        ns.setDatabaseVersion(mockDBVersion);
-        // TODO (SERVER-81185): Account for timeseries collections.
+    for (auto& nsEntry : nsInfo) {
+        nsEntry.setShardVersion(mockShardVersion);
+        nsEntry.setDatabaseVersion(mockDBVersion);
+        if (!nsEntry.getNs().isTimeseriesBucketsCollection()) {
+            // This could be a timeseries view. To be conservative about the estimate, we
+            // speculatively account for the additional size needed for the timeseries bucket
+            // transalation and the 'isTimeseriesCollection' field.
+            nsEntry.setNs(nsEntry.getNs().makeTimeseriesBucketsNamespace());
+            nsEntry.setIsTimeseriesNamespace(true);
+        }
     }
     request.setNsInfo(nsInfo);
 

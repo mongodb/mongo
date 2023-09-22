@@ -1536,6 +1536,45 @@ TEST_F(BulkWriteOpTest, TestBulkWriteBatchSplittingLargeBaseCommandSize) {
     ASSERT_EQ(targetedSoFar + remainingTargeted, bigReq.getOps().size());
 }
 
+TEST_F(BulkWriteOpTest, TestGetBaseChildBatchCommandSizeEstimate) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+
+    // A trivial empty bulkWrite request with a namespace.
+    BulkWriteCommandRequest request({}, {NamespaceInfoEntry(nss)});
+    request.setDbName(DatabaseName::kAdmin);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    // Get a base size estimate.
+    auto baseSizeEstimate = bulkWriteOp.getBaseChildBatchCommandSizeEstimate();
+
+    // When mongos actually sends out child batches to the shards, it may attach shardVersion,
+    // databaseVersion, timeseries bucket namespace and the `isTimeseriesCollection` field to
+    // namespace entries. And it may also attach generic fields like lsid, txnNumber and
+    // writeConcern.
+    auto& nsEntry = request.getNsInfo()[0];
+    const ShardVersion shardVersion =
+        ShardVersionFactory::make(ChunkVersion::IGNORED(), CollectionIndexes());
+    const DatabaseVersion dbVersion = DatabaseVersion(UUID::gen(), Timestamp());
+    nsEntry.setShardVersion(shardVersion);
+    nsEntry.setDatabaseVersion(dbVersion);
+    nsEntry.setNs(nss.makeTimeseriesBucketsNamespace());
+    nsEntry.setIsTimeseriesNamespace(true);
+
+    BSONObjBuilder builder;
+    request.serialize(BSONObj(), &builder);
+    // Add writeConcern and lsid/txnNumber if applicable.
+    logical_session_id_helpers::serializeLsidAndTxnNumber(_opCtx, &builder);
+    builder.append(WriteConcernOptions::kWriteConcernField, _opCtx->getWriteConcern().toBSON());
+    auto realSize = builder.obj().objsize();
+
+    // Test that our initial base estimate is conservative enough to account for the above fields.
+    ASSERT_GTE(baseSizeEstimate, realSize);
+}
+
 class BulkWriteOpLocalErrorTest : public ServiceContextTest {
 protected:
     BulkWriteOpLocalErrorTest() {
