@@ -120,14 +120,16 @@ inline size_t estimate(const WindowStage::Window& window) {
     if (window.highBoundExpr) {
         size += size_estimator::estimate(window.highBoundExpr);
     }
-    if (window.initExpr) {
-        size += size_estimator::estimate(window.initExpr);
-    }
-    if (window.addExpr) {
-        size += size_estimator::estimate(window.addExpr);
-    }
-    if (window.removeExpr) {
-        size += size_estimator::estimate(window.removeExpr);
+    for (size_t i = 0; i < window.initExprs.size(); ++i) {
+        if (window.initExprs[i]) {
+            size += size_estimator::estimate(window.initExprs[i]);
+        }
+        if (window.addExprs[i]) {
+            size += size_estimator::estimate(window.addExprs[i]);
+        }
+        if (window.removeExprs[i]) {
+            size += size_estimator::estimate(window.removeExprs[i]);
+        }
     }
     return size;
 }

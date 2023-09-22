@@ -3709,6 +3709,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<boost::optional<size_t>> windowFrameFirstSlotIdx;
     std::vector<boost::optional<size_t>> windowFrameLastSlotIdx;
     for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
+        sbe::WindowStage::Window window{};
         auto& outputField = windowNode->outputFields[i];
         windowFields.push_back(outputField.fieldName);
 
@@ -3804,9 +3805,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }();
 
         // Create init/add/remove expressions.
-        std::vector<std::unique_ptr<sbe::EExpression>> initExprs;
-        std::vector<std::unique_ptr<sbe::EExpression>> addExprs;
-        std::vector<std::unique_ptr<sbe::EExpression>> removeExprs;
         auto argExprs = std::move(windowArgExprs[i]);
         auto cloneExprMap = [](const StringDataMap<std::unique_ptr<sbe::EExpression>>& exprMap) {
             StringDataMap<std::unique_ptr<sbe::EExpression>> exprMapClone;
@@ -3817,175 +3815,169 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         };
         if (removable) {
             if (initExprArgs.size() == 1) {
-                initExprs =
+                window.initExprs =
                     buildWindowInit(_state, outputField, std::move(initExprArgs.begin()->second));
             } else {
-                initExprs = buildWindowInit(_state, outputField, std::move(initExprArgs));
+                window.initExprs = buildWindowInit(_state, outputField, std::move(initExprArgs));
             }
             if (argExprs.size() == 1) {
-                addExprs = buildWindowAdd(_state, outputField, argExprs.begin()->second->clone());
-                removeExprs =
+                window.addExprs =
+                    buildWindowAdd(_state, outputField, argExprs.begin()->second->clone());
+                window.removeExprs =
                     buildWindowRemove(_state, outputField, argExprs.begin()->second->clone());
             } else {
-                addExprs = buildWindowAdd(_state, outputField, cloneExprMap(argExprs));
-                removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
+                window.addExprs = buildWindowAdd(_state, outputField, cloneExprMap(argExprs));
+                window.removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
             }
         } else {
             if (initExprArgs.size() == 1) {
-                initExprs = buildInitialize(
+                window.initExprs = buildInitialize(
                     accStmt, std::move(initExprArgs.begin()->second), _frameIdGenerator);
             } else {
-                initExprs = buildInitialize(accStmt, std::move(initExprArgs), _frameIdGenerator);
+                window.initExprs =
+                    buildInitialize(accStmt, std::move(initExprArgs), _frameIdGenerator);
             }
             if (argExprs.size() == 1) {
-                addExprs = buildAccumulator(
+                window.addExprs = buildAccumulator(
                     accStmt, argExprs.begin()->second->clone(), collatorSlot, _frameIdGenerator);
             } else {
-                addExprs = buildAccumulator(
+                window.addExprs = buildAccumulator(
                     accStmt, cloneExprMap(argExprs), collatorSlot, _frameIdGenerator);
             }
-            removeExprs = std::vector<std::unique_ptr<sbe::EExpression>>{addExprs.size()};
+            window.removeExprs =
+                std::vector<std::unique_ptr<sbe::EExpression>>{window.addExprs.size()};
         }
+
+        for (size_t i = 0; i < window.initExprs.size(); i++) {
+            window.windowExprSlots.push_back(_slotIdGenerator.generate());
+        }
+
         tassert(7914601,
                 "Init/add/remove expressions of a window function should be of the same size",
-                initExprs.size() == addExprs.size() && addExprs.size() == removeExprs.size());
+                window.initExprs.size() == window.addExprs.size() &&
+                    window.addExprs.size() == window.removeExprs.size() &&
+                    window.removeExprs.size() == window.windowExprSlots.size());
+
 
         // Build bound expressions and create window definitions.
-        auto componentSlots = sbe::makeSV();
         StringDataSet frameFirstLastAccumulators{"$derivative"};
-        for (size_t i = 0; i < initExprs.size(); i++) {
-            windows.emplace_back(sbe::WindowStage::Window());
-            sbe::WindowStage::Window& window = windows.back();
-            window.windowSlot = _slotIdGenerator.generate();
-            componentSlots.push_back(window.windowSlot);
 
-            // Create frame first and last slots if the window requires.
-            if (frameFirstLastAccumulators.count(outputField.expr->getOpName())) {
-                windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
-                windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
+        // Create frame first and last slots if the window requires.
+        if (frameFirstLastAccumulators.count(outputField.expr->getOpName())) {
+            windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
+            windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
+        } else {
+            windowFrameFirstSlotIdx.push_back(boost::none);
+            windowFrameLastSlotIdx.push_back(boost::none);
+        }
+
+        auto makeOffsetBoundExpr = [&](sbe::value::SlotId boundSlot,
+                                       std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
+                                           {sbe::value::TypeTags::Nothing, 0},
+                                       boost::optional<TimeUnit> unit = boost::none) {
+            if (offset.first == sbe::value::TypeTags::Nothing) {
+                return makeVariable(boundSlot);
+            }
+            if (unit) {
+                auto [unitTag, unitVal] = sbe::value::makeNewString(serializeTimeUnit(*unit));
+                sbe::value::ValueGuard unitGuard{unitTag, unitVal};
+                auto [timezoneTag, timezoneVal] = sbe::value::makeNewString("UTC");
+                sbe::value::ValueGuard timezoneGuard{timezoneTag, timezoneVal};
+                auto [longOffsetOwned, longOffsetTag, longOffsetVal] = genericNumConvert(
+                    offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
+                unitGuard.reset();
+                timezoneGuard.reset();
+                return makeFunction("dateAdd",
+                                    makeVariable(*_state.getTimeZoneDBSlot()),
+                                    makeVariable(boundSlot),
+                                    makeConstant(unitTag, unitVal),
+                                    makeConstant(longOffsetTag, longOffsetVal),
+                                    makeConstant(timezoneTag, timezoneVal));
             } else {
-                windowFrameFirstSlotIdx.push_back(boost::none);
-                windowFrameLastSlotIdx.push_back(boost::none);
+                return makeBinaryOp(sbe::EPrimBinary::add,
+                                    makeVariable(boundSlot),
+                                    makeConstant(offset.first, offset.second));
             }
-
-            window.initExpr = std::move(initExprs[i]);
-            window.addExpr = std::move(addExprs[i]);
-            window.removeExpr = std::move(removeExprs[i]);
-
-            auto makeOffsetBoundExpr = [&](sbe::value::SlotId boundSlot,
-                                           std::pair<sbe::value::TypeTags, sbe::value::Value>
-                                               offset = {sbe::value::TypeTags::Nothing, 0},
-                                           boost::optional<TimeUnit> unit = boost::none) {
-                if (offset.first == sbe::value::TypeTags::Nothing) {
-                    return makeVariable(boundSlot);
-                }
-                if (unit) {
-                    auto [unitTag, unitVal] = sbe::value::makeNewString(serializeTimeUnit(*unit));
-                    sbe::value::ValueGuard unitGuard{unitTag, unitVal};
-                    auto [timezoneTag, timezoneVal] = sbe::value::makeNewString("UTC");
-                    sbe::value::ValueGuard timezoneGuard{timezoneTag, timezoneVal};
-                    auto [longOffsetOwned, longOffsetTag, longOffsetVal] = genericNumConvert(
-                        offset.first, offset.second, sbe::value::TypeTags::NumberInt64);
-                    unitGuard.reset();
-                    timezoneGuard.reset();
-                    return makeFunction("dateAdd",
-                                        makeVariable(*_state.getTimeZoneDBSlot()),
-                                        makeVariable(boundSlot),
-                                        makeConstant(unitTag, unitVal),
-                                        makeConstant(longOffsetTag, longOffsetVal),
-                                        makeConstant(timezoneTag, timezoneVal));
-                } else {
-                    return makeBinaryOp(sbe::EPrimBinary::add,
-                                        makeVariable(boundSlot),
-                                        makeConstant(offset.first, offset.second));
-                }
-            };
-            auto makeLowBoundExpr = [&](sbe::value::SlotId boundSlot,
-                                        sbe::value::SlotId boundTestingSlot,
-                                        std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
-                                            {sbe::value::TypeTags::Nothing, 0},
-                                        boost::optional<TimeUnit> unit = boost::none) {
-                return makeBinaryOp(sbe::EPrimBinary::greaterEq,
-                                    makeVariable(boundTestingSlot),
-                                    makeOffsetBoundExpr(boundSlot, offset, unit));
-            };
-            auto makeHighBoundExpr = [&](sbe::value::SlotId boundSlot,
-                                         sbe::value::SlotId boundTestingSlot,
-                                         std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
-                                             {sbe::value::TypeTags::Nothing, 0},
-                                         boost::optional<TimeUnit> unit = boost::none) {
-                return makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                    makeVariable(boundTestingSlot),
-                                    makeOffsetBoundExpr(boundSlot, offset, unit));
-            };
-            auto makeLowUnboundedExpr = [&](const WindowBounds::Unbounded&) {
-                window.lowBoundExpr = nullptr;
-            };
-            auto makeHighUnboundedExpr = [&](const WindowBounds::Unbounded&) {
-                window.highBoundExpr = nullptr;
-            };
-            auto makeLowCurrentExpr = [&](const WindowBounds::Current&) {
+        };
+        auto makeLowBoundExpr = [&](sbe::value::SlotId boundSlot,
+                                    sbe::value::SlotId boundTestingSlot,
+                                    std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
+                                        {sbe::value::TypeTags::Nothing, 0},
+                                    boost::optional<TimeUnit> unit = boost::none) {
+            return makeBinaryOp(sbe::EPrimBinary::greaterEq,
+                                makeVariable(boundTestingSlot),
+                                makeOffsetBoundExpr(boundSlot, offset, unit));
+        };
+        auto makeHighBoundExpr = [&](sbe::value::SlotId boundSlot,
+                                     sbe::value::SlotId boundTestingSlot,
+                                     std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
+                                         {sbe::value::TypeTags::Nothing, 0},
+                                     boost::optional<TimeUnit> unit = boost::none) {
+            return makeBinaryOp(sbe::EPrimBinary::lessEq,
+                                makeVariable(boundTestingSlot),
+                                makeOffsetBoundExpr(boundSlot, offset, unit));
+        };
+        auto makeLowUnboundedExpr = [&](const WindowBounds::Unbounded&) {
+            window.lowBoundExpr = nullptr;
+        };
+        auto makeHighUnboundedExpr = [&](const WindowBounds::Unbounded&) {
+            window.highBoundExpr = nullptr;
+        };
+        auto makeLowCurrentExpr = [&](const WindowBounds::Current&) {
+            auto [lowBoundSlot, lowBoundTestingSlot] = getDocumentBoundSlot();
+            window.lowBoundExpr = makeLowBoundExpr(lowBoundSlot, lowBoundTestingSlot);
+        };
+        auto makeHighCurrentExpr = [&](const WindowBounds::Current&) {
+            auto [highBoundSlot, highBoundTestingSlot] = getDocumentBoundSlot();
+            window.highBoundExpr = makeHighBoundExpr(highBoundSlot, highBoundTestingSlot);
+        };
+        auto documentCase = [&](const WindowBounds::DocumentBased& document) {
+            auto makeLowValueExpr = [&](const int& v) {
                 auto [lowBoundSlot, lowBoundTestingSlot] = getDocumentBoundSlot();
-                window.lowBoundExpr = makeLowBoundExpr(lowBoundSlot, lowBoundTestingSlot);
+                window.lowBoundExpr = makeLowBoundExpr(
+                    lowBoundSlot,
+                    lowBoundTestingSlot,
+                    {sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(v)});
             };
-            auto makeHighCurrentExpr = [&](const WindowBounds::Current&) {
+            auto makeHighValueExpr = [&](const int& v) {
                 auto [highBoundSlot, highBoundTestingSlot] = getDocumentBoundSlot();
-                window.highBoundExpr = makeHighBoundExpr(highBoundSlot, highBoundTestingSlot);
+                window.highBoundExpr = makeHighBoundExpr(
+                    highBoundSlot,
+                    highBoundTestingSlot,
+                    {sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(v)});
             };
-            auto documentCase = [&](const WindowBounds::DocumentBased& document) {
-                auto makeLowValueExpr = [&](const int& v) {
-                    auto [lowBoundSlot, lowBoundTestingSlot] = getDocumentBoundSlot();
-                    window.lowBoundExpr = makeLowBoundExpr(
-                        lowBoundSlot,
-                        lowBoundTestingSlot,
-                        {sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(v)});
-                };
-                auto makeHighValueExpr = [&](const int& v) {
-                    auto [highBoundSlot, highBoundTestingSlot] = getDocumentBoundSlot();
-                    window.highBoundExpr = makeHighBoundExpr(
-                        highBoundSlot,
-                        highBoundTestingSlot,
-                        {sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int>(v)});
-                };
-                stdx::visit(
-                    OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
-                    document.lower);
-                stdx::visit(OverloadedVisitor{makeHighUnboundedExpr,
-                                              makeHighCurrentExpr,
-                                              makeHighValueExpr},
-                            document.upper);
+            stdx::visit(
+                OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
+                document.lower);
+            stdx::visit(
+                OverloadedVisitor{makeHighUnboundedExpr, makeHighCurrentExpr, makeHighValueExpr},
+                document.upper);
+        };
+        auto rangeCase = [&](const WindowBounds::RangeBased& range) {
+            auto rangeBoundSlot = getRangeBoundSlot(range.unit).first;
+            auto rangeBoundTestingSlot = getRangeBoundSlot(range.unit).second;
+            auto makeLowValueExpr = [&](const Value& v) {
+                window.lowBoundExpr = makeLowBoundExpr(
+                    rangeBoundSlot, rangeBoundTestingSlot, sbe::value::makeValue(v), range.unit);
             };
-            auto rangeCase = [&](const WindowBounds::RangeBased& range) {
-                auto rangeBoundSlot = getRangeBoundSlot(range.unit).first;
-                auto rangeBoundTestingSlot = getRangeBoundSlot(range.unit).second;
-                auto makeLowValueExpr = [&](const Value& v) {
-                    window.lowBoundExpr = makeLowBoundExpr(rangeBoundSlot,
-                                                           rangeBoundTestingSlot,
-                                                           sbe::value::makeValue(v),
-                                                           range.unit);
-                };
-                auto makeHighValueExpr = [&](const Value& v) {
-                    window.highBoundExpr = makeHighBoundExpr(rangeBoundSlot,
-                                                             rangeBoundTestingSlot,
-                                                             sbe::value::makeValue(v),
-                                                             range.unit);
-                };
-                stdx::visit(
-                    OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
-                    range.lower);
-                stdx::visit(OverloadedVisitor{makeHighUnboundedExpr,
-                                              makeHighCurrentExpr,
-                                              makeHighValueExpr},
-                            range.upper);
+            auto makeHighValueExpr = [&](const Value& v) {
+                window.highBoundExpr = makeHighBoundExpr(
+                    rangeBoundSlot, rangeBoundTestingSlot, sbe::value::makeValue(v), range.unit);
             };
+            stdx::visit(
+                OverloadedVisitor{makeLowUnboundedExpr, makeLowCurrentExpr, makeLowValueExpr},
+                range.lower);
+            stdx::visit(
+                OverloadedVisitor{makeHighUnboundedExpr, makeHighCurrentExpr, makeHighValueExpr},
+                range.upper);
+        };
 
-            stdx::visit(OverloadedVisitor{documentCase, rangeCase}, windowBounds.bounds);
+        stdx::visit(OverloadedVisitor{documentCase, rangeCase}, windowBounds.bounds);
 
-            if (outputField.expr->getOpName() == "$linearFill") {
-                tassert(7971215, "expected a single initExpr", initExprs.size() == 1);
-                window.highBoundExpr =
-                    makeFunction("aggLinearFillCanAdd", makeVariable(window.windowSlot));
-            }
+        if (outputField.expr->getOpName() == "$linearFill") {
+            tassert(7971215, "expected a single initExpr", window.initExprs.size() == 1);
+            window.highBoundExpr =
+                makeFunction("aggLinearFillCanAdd", makeVariable(window.windowExprSlots[0]));
         }
 
         // Build extra arguments for finalize expressions.
@@ -4016,10 +4008,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     it != argExprs.end());
             auto sortByExpr = it->second->clone();
 
-            auto& frameFirstSlots =
-                windowFrameFirstSlots[*windowFrameFirstSlotIdx[windows.size() - 1]];
-            auto& frameLastSlots =
-                windowFrameLastSlots[*windowFrameLastSlotIdx[windows.size() - 1]];
+            auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
+            auto& frameLastSlots = windowFrameLastSlots[*windowFrameLastSlotIdx.back()];
             auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
             auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
             auto frameFirstSortBy = getModifiedExpr(sortByExpr->clone(), frameFirstSlots);
@@ -4034,23 +4024,22 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
 
         // Build finalize expressions.
-        auto firstComponentSlot = componentSlots[0];
         std::unique_ptr<sbe::EExpression> finalExpr;
         if (removable) {
             finalExpr = finalArgExprs.size() > 0
                 ? buildWindowFinalize(
-                      _state, outputField, std::move(componentSlots), std::move(finalArgExprs))
-                : buildWindowFinalize(_state, outputField, std::move(componentSlots));
+                      _state, outputField, window.windowExprSlots, std::move(finalArgExprs))
+                : buildWindowFinalize(_state, outputField, window.windowExprSlots);
         } else {
             finalExpr = finalArgExprs.size() > 0
                 ? buildFinalize(_state,
                                 accStmt,
-                                std::move(componentSlots),
+                                window.windowExprSlots,
                                 std::move(finalArgExprs),
                                 boost::none,
                                 _frameIdGenerator)
                 : buildFinalize(
-                      _state, accStmt, std::move(componentSlots), boost::none, _frameIdGenerator);
+                      _state, accStmt, window.windowExprSlots, boost::none, _frameIdGenerator);
         }
 
         // Deal with empty window for finalize expressions.
@@ -4066,19 +4055,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 }
             }(outputField.expr->getOpName());
             if (finalExpr) {
-                finalExpr =
-                    sbe::makeE<sbe::EIf>(makeFunction("exists", makeVariable(firstComponentSlot)),
-                                         std::move(finalExpr),
-                                         std::move(emptyWindowExpr));
+                finalExpr = sbe::makeE<sbe::EIf>(
+                    makeFunction("exists", makeVariable(window.windowExprSlots[0])),
+                    std::move(finalExpr),
+                    std::move(emptyWindowExpr));
             } else {
                 finalExpr = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                                         makeVariable(firstComponentSlot),
+                                         makeVariable(window.windowExprSlots[0]),
                                          std::move(emptyWindowExpr));
             }
         }
         auto finalSlot = _slotIdGenerator.generate();
         windowFinalProjects.emplace_back(finalSlot, std::move(finalExpr));
         windowFinalSlots.push_back(finalSlot);
+        windows.emplace_back(std::move(window));
     }
 
     // Assign frame first/last slots to window definitions.

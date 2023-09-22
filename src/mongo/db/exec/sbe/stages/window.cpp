@@ -78,18 +78,21 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
     std::vector<Window> newWindows;
     newWindows.resize(_windows.size());
     for (size_t idx = 0; idx < _windows.size(); idx++) {
-        newWindows[idx].windowSlot = _windows[idx].windowSlot;
+        newWindows[idx].windowExprSlots = _windows[idx].windowExprSlots;
         newWindows[idx].frameFirstSlots = _windows[idx].frameFirstSlots;
         newWindows[idx].frameLastSlots = _windows[idx].frameLastSlots;
         newWindows[idx].lowBoundExpr =
             _windows[idx].lowBoundExpr ? _windows[idx].lowBoundExpr->clone() : nullptr;
         newWindows[idx].highBoundExpr =
             _windows[idx].highBoundExpr ? _windows[idx].highBoundExpr->clone() : nullptr;
-        newWindows[idx].initExpr =
-            _windows[idx].initExpr ? _windows[idx].initExpr->clone() : nullptr;
-        newWindows[idx].addExpr = _windows[idx].addExpr ? _windows[idx].addExpr->clone() : nullptr;
-        newWindows[idx].removeExpr =
-            _windows[idx].removeExpr ? _windows[idx].removeExpr->clone() : nullptr;
+        for (size_t i = 0; i < _windows[idx].initExprs.size(); ++i) {
+            newWindows[idx].initExprs.push_back(
+                _windows[idx].initExprs[i] ? _windows[idx].initExprs[i]->clone() : nullptr);
+            newWindows[idx].addExprs.push_back(
+                _windows[idx].addExprs[i] ? _windows[idx].addExprs[i]->clone() : nullptr);
+            newWindows[idx].removeExprs.push_back(
+                _windows[idx].removeExprs[i] ? _windows[idx].removeExprs[i]->clone() : nullptr);
+        }
     }
     return std::make_unique<WindowStage>(_children[0]->clone(),
                                          _currSlots,
@@ -263,20 +266,41 @@ void WindowStage::prepare(CompileCtx& ctx) {
             _outAccessorMap.emplace(slot, _outFrameLastAccessors[windowIdx].back().get());
         }
 
-        _outWindowAccessors.push_back(std::make_unique<value::OwnedValueAccessor>());
-        _outAccessorMap.emplace(window.windowSlot, _outWindowAccessors.back().get());
-
         ctx.root = this;
+
+        std::vector<std::unique_ptr<value::OwnedValueAccessor>> outAccessors;
+        std::vector<std::unique_ptr<vm::CodeFragment>> initCodes;
+        std::vector<std::unique_ptr<vm::CodeFragment>> addCodes;
+        std::vector<std::unique_ptr<vm::CodeFragment>> removeCodes;
+
+        auto initExprsSize = window.initExprs.size();
+        outAccessors.reserve(initExprsSize);
+        initCodes.reserve(initExprsSize);
+        addCodes.reserve(initExprsSize);
+        removeCodes.reserve(initExprsSize);
+
+        for (size_t i = 0; i < initExprsSize; ++i) {
+            outAccessors.push_back(std::make_unique<value::OwnedValueAccessor>());
+            _outAccessorMap.emplace(window.windowExprSlots[i], outAccessors.back().get());
+
+            initCodes.push_back(window.initExprs[i] ? window.initExprs[i]->compile(ctx) : nullptr);
+            ctx.aggExpression = true;
+            ctx.accumulator = outAccessors.back().get();
+            addCodes.push_back(window.addExprs[i] ? window.addExprs[i]->compile(ctx) : nullptr);
+            removeCodes.push_back(window.removeExprs[i] ? window.removeExprs[i]->compile(ctx)
+                                                        : nullptr);
+            ctx.aggExpression = false;
+        }
+
         _windowLowBoundCodes.push_back(window.lowBoundExpr ? window.lowBoundExpr->compile(ctx)
                                                            : nullptr);
         _windowHighBoundCodes.push_back(window.highBoundExpr ? window.highBoundExpr->compile(ctx)
                                                              : nullptr);
-        _windowInitCodes.push_back(window.initExpr ? window.initExpr->compile(ctx) : nullptr);
-        ctx.aggExpression = true;
-        ctx.accumulator = _outWindowAccessors.back().get();
-        _windowAddCodes.push_back(window.addExpr ? window.addExpr->compile(ctx) : nullptr);
-        _windowRemoveCodes.push_back(window.removeExpr ? window.removeExpr->compile(ctx) : nullptr);
-        ctx.aggExpression = false;
+
+        _outWindowAccessors.push_back(std::move(outAccessors));
+        _windowInitCodes.push_back(std::move(initCodes));
+        _windowAddCodes.push_back(std::move(addCodes));
+        _windowRemoveCodes.push_back(std::move(removeCodes));
     }
     _compiled = true;
 
@@ -305,11 +329,16 @@ void WindowStage::resetPartition(int startId) {
     _windowIdRanges.clear();
     _windowIdRanges.resize(_windows.size(), std::make_pair(startId, startId - 1));
     for (size_t idx = 0; idx < _windows.size(); idx++) {
-        if (_windows[idx].initExpr) {
-            auto [owned, tag, val] = _bytecode.run(_windowInitCodes[idx].get());
-            _outWindowAccessors[idx]->reset(owned, tag, val);
-        } else {
-            _outWindowAccessors[idx]->reset();
+        auto& windowAccessors = _outWindowAccessors[idx];
+        auto& windowInitCodes = _windowInitCodes[idx];
+
+        for (size_t i = 0; i < windowInitCodes.size(); ++i) {
+            if (windowInitCodes[i]) {
+                auto [owned, tag, val] = _bytecode.run(windowInitCodes[i].get());
+                windowAccessors[i]->reset(owned, tag, val);
+            } else {
+                windowAccessors[i]->reset();
+            }
         }
     }
 }
@@ -356,7 +385,8 @@ PlanState WindowStage::getNext() {
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         auto& window = _windows[windowIdx];
         auto& idRange = _windowIdRanges[windowIdx];
-        auto& windowAccessor = _outWindowAccessors[windowIdx];
+        auto& windowAccessors = _outWindowAccessors[windowIdx];
+        auto& windowAddCodes = _windowAddCodes[windowIdx];
 
         for (size_t id = idRange.second + 1;; id++) {
             // Fetch document if not already in cache.
@@ -383,10 +413,12 @@ PlanState WindowStage::getNext() {
 
             // Run aggregation if this document is inside the desired range.
             if (inBound) {
-                if (_windowAddCodes[windowIdx]) {
-                    setCurrAccessors(id);
-                    auto [owned, tag, val] = _bytecode.run(_windowAddCodes[windowIdx].get());
-                    windowAccessor->reset(owned, tag, val);
+                setCurrAccessors(id);
+                for (size_t i = 0; i < windowAddCodes.size(); ++i) {
+                    if (windowAddCodes[i]) {
+                        auto [owned, tag, val] = _bytecode.run(windowAddCodes[i].get());
+                        windowAccessors[i]->reset(owned, tag, val);
+                    }
                 }
                 idRange.second = id;
             } else {
@@ -399,7 +431,8 @@ PlanState WindowStage::getNext() {
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         auto& window = _windows[windowIdx];
         auto& idRange = _windowIdRanges[windowIdx];
-        auto& windowAccessor = _outWindowAccessors[windowIdx];
+        auto& windowAccessors = _outWindowAccessors[windowIdx];
+        auto& windowRemoveCodes = _windowRemoveCodes[windowIdx];
 
         if (window.lowBoundExpr) {
             for (size_t id = idRange.first; idRange.first <= idRange.second; id++) {
@@ -411,10 +444,12 @@ PlanState WindowStage::getNext() {
 
                 // Undo the aggregation if this document is being removed from the updated range.
                 if (!inBound) {
-                    if (_windowRemoveCodes[windowIdx]) {
-                        setCurrAccessors(id);
-                        auto [owned, tag, val] = _bytecode.run(_windowRemoveCodes[windowIdx].get());
-                        windowAccessor->reset(owned, tag, val);
+                    setCurrAccessors(id);
+                    for (size_t i = 0; i < windowRemoveCodes.size(); ++i) {
+                        if (windowRemoveCodes[i]) {
+                            auto [owned, tag, val] = _bytecode.run(windowRemoveCodes[i].get());
+                            windowAccessors[i]->reset(owned, tag, val);
+                        }
                     }
                     idRange.first = id + 1;
                 } else {
@@ -488,17 +523,14 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
-    ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t windowIdx = 0; windowIdx < _windows.size(); ++windowIdx) {
         const auto& window = _windows[windowIdx];
         if (windowIdx) {
             DebugPrinter::addNewLine(ret);
             ret.emplace_back(DebugPrinter::Block("`,"));
         }
-        DebugPrinter::addIdentifier(ret, window.windowSlot);
-        ret.emplace_back("=");
 
-        ret.emplace_back("frameFirst[`");
+        ret.emplace_back("[frameFirst[`");
         for (size_t slotIdx = 0; slotIdx < window.frameFirstSlots.size(); slotIdx++) {
             if (slotIdx) {
                 ret.emplace_back(DebugPrinter::Block("`,"));
@@ -525,24 +557,33 @@ std::vector<DebugPrinter::Block> WindowStage::debugPrint() const {
         if (window.highBoundExpr) {
             DebugPrinter::addBlocks(ret, window.highBoundExpr->debugPrint());
         }
-        ret.emplace_back("`},");
-        ret.emplace_back("init{`");
-        if (window.initExpr) {
-            DebugPrinter::addBlocks(ret, window.initExpr->debugPrint());
+        ret.emplace_back("`}]");
+
+        ret.emplace_back(DebugPrinter::Block("[`"));
+        for (size_t i = 0; i < window.initExprs.size(); ++i) {
+            if (i) {
+                ret.emplace_back(DebugPrinter::Block("`,"));
+            }
+            DebugPrinter::addIdentifier(ret, window.windowExprSlots[i]);
+            ret.emplace_back("=");
+            ret.emplace_back("{init{`");
+            if (window.initExprs[i]) {
+                DebugPrinter::addBlocks(ret, window.initExprs[i]->debugPrint());
+            }
+            ret.emplace_back("`},");
+            ret.emplace_back("add{`");
+            if (window.addExprs[i]) {
+                DebugPrinter::addBlocks(ret, window.addExprs[i]->debugPrint());
+            }
+            ret.emplace_back("`},");
+            ret.emplace_back("remove{`");
+            if (window.removeExprs[i]) {
+                DebugPrinter::addBlocks(ret, window.removeExprs[i]->debugPrint());
+            }
+            ret.emplace_back("`}}");
         }
-        ret.emplace_back("`},");
-        ret.emplace_back("add{`");
-        if (window.addExpr) {
-            DebugPrinter::addBlocks(ret, window.addExpr->debugPrint());
-        }
-        ret.emplace_back("`},");
-        ret.emplace_back("remove{`");
-        if (window.removeExpr) {
-            DebugPrinter::addBlocks(ret, window.removeExpr->debugPrint());
-        }
-        ret.emplace_back("`}");
+        ret.emplace_back("`]");
     }
-    ret.emplace_back("`]");
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());

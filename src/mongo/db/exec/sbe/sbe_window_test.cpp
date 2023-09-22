@@ -81,7 +81,7 @@ public:
             windowSlots.push_back(windowSlot);
 
             WindowStage::Window window;
-            window.windowSlot = windowSlot;
+            window.windowExprSlots.push_back(windowSlot);
             window.lowBoundExpr = nullptr;
             if (lowerOffset) {
                 window.lowBoundExpr = makeBinaryOp(EPrimBinary::greaterEq,
@@ -98,10 +98,10 @@ public:
                                                                  makeVariable(highBoundSlot),
                                                                  makeInt32Constant(*higherOffset)));
             }
-            window.initExpr = nullptr;
-            window.addExpr = makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot));
-            window.removeExpr = makeFunction(
-                "aggDoubleDoubleSum", makeUnaryOp(EPrimUnary::negate, makeVariable(valueSlot)));
+            window.initExprs.push_back(nullptr);
+            window.addExprs.push_back(makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot)));
+            window.removeExprs.push_back(makeFunction(
+                "aggDoubleDoubleSum", makeUnaryOp(EPrimUnary::negate, makeVariable(valueSlot))));
 
             windows.emplace_back(std::move(window));
         }

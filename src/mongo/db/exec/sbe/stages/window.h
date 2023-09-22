@@ -42,8 +42,10 @@ namespace mongo::sbe {
  * where the first `partitionSlotCount` slots are used to separate partitions.
  *
  * The list of sliding window aggregator definitions are in the 'windows' vector. Each aggregator
- * has a slot 'windowSlot' to keep the accumulator state, a expression triplet 'initExpr', 'addExpr'
- * and 'removeExpr' to update the accumulator state, all expressions are optional.
+ * tracks a set of accumulators that are used to compute its final value. To keep the state of the
+ * accumulators, the aggregator has a vector of slots 'windowExprSlots'. The state of each
+ * accumulator is updated using an expression triplet {'initExpr', 'addExpr', 'removeExpr'}, all
+ * expressions are optional.
  *
  * The sliding window bound is determined by two boolean valued expressions 'lowBoundExpr' and
  * 'highBoundExpr', where both can be optional to indicated unbounded window. If any document is
@@ -58,23 +60,22 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- *  window  [<current slots>]  [<window slot 1> = lowBound{<expr>},
- *                                                highBound{<expr>},
- *                                                init{<expr>},
- *                                                add{<expr>},
- *                                                remove{<expr>},
- *                              ...]
+ *  window  [<current slots>]
+ *          [frameFirst[<frame first slots>], frameLast[<frame last slots>],
+ *              lowBound{<expr>}, highBound{<expr>}]
+ *          [<window slot 1> = {init{<expr>}, add{<expr>}, remove{<expr>}},
+ *          ...]
  *  childStage
  */
 class WindowStage final : public PlanStage {
 public:
     struct Window {
-        value::SlotId windowSlot;
+        value::SlotVector windowExprSlots;
         value::SlotVector frameFirstSlots;
         value::SlotVector frameLastSlots;
-        std::unique_ptr<EExpression> initExpr;
-        std::unique_ptr<EExpression> addExpr;
-        std::unique_ptr<EExpression> removeExpr;
+        std::vector<std::unique_ptr<EExpression>> initExprs;
+        std::vector<std::unique_ptr<EExpression>> addExprs;
+        std::vector<std::unique_ptr<EExpression>> removeExprs;
         std::unique_ptr<EExpression> lowBoundExpr;
         std::unique_ptr<EExpression> highBoundExpr;
     };
@@ -146,7 +147,7 @@ private:
     // An always empty accessor holding Nothing.
     std::unique_ptr<value::OwnedValueAccessor> _emptyAccessor;
     // The out accessors for the window states.
-    std::vector<std::unique_ptr<value::OwnedValueAccessor>> _outWindowAccessors;
+    std::vector<std::vector<std::unique_ptr<value::OwnedValueAccessor>>> _outWindowAccessors;
 
     value::SlotMap<value::SlotAccessor*> _boundTestingAccessorMap;
     value::SlotMap<value::SlotAccessor*> _outAccessorMap;
@@ -159,9 +160,9 @@ private:
     vm::ByteCode _bytecode;
     std::vector<std::unique_ptr<vm::CodeFragment>> _windowLowBoundCodes;
     std::vector<std::unique_ptr<vm::CodeFragment>> _windowHighBoundCodes;
-    std::vector<std::unique_ptr<vm::CodeFragment>> _windowInitCodes;
-    std::vector<std::unique_ptr<vm::CodeFragment>> _windowAddCodes;
-    std::vector<std::unique_ptr<vm::CodeFragment>> _windowRemoveCodes;
+    std::vector<std::vector<std::unique_ptr<vm::CodeFragment>>> _windowInitCodes;
+    std::vector<std::vector<std::unique_ptr<vm::CodeFragment>>> _windowAddCodes;
+    std::vector<std::vector<std::unique_ptr<vm::CodeFragment>>> _windowRemoveCodes;
 
     // The id of the current document, starting from 1.
     // We use 1-based id since we want to use the id for spilling as the key in the
