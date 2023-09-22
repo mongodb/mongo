@@ -151,6 +151,12 @@ public:
         // "hello" is exempt from error code rewrites.
         rpc::RewriteStateChangeErrors::setEnabled(opCtx, false);
 
+        // Negotiate compressors before logging metadata so we can include the result in the log
+        // line.
+        auto result = replyBuilder->getBodyBuilder();
+        MessageCompressorManager::forSession(opCtx->getClient()->session())
+            .serverNegotiate(cmd.getCompression(), &result);
+
         auto client = opCtx->getClient();
         if (ClientMetadata::tryFinalize(client)) {
             audit::logClientMetadata(client);
@@ -184,7 +190,6 @@ public:
                     !clientTopologyVersion && !maxAwaitTimeMS);
         }
 
-        auto result = replyBuilder->getBodyBuilder();
         const auto* mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
 
         auto mongosHelloResponse =
@@ -236,9 +241,6 @@ public:
                 kAutomationServiceDescriptorFieldName)) {
             sp->append(opCtx, &result, kAutomationServiceDescriptorFieldName, boost::none);
         }
-
-        MessageCompressorManager::forSession(opCtx->getClient()->session())
-            .serverNegotiate(cmd.getCompression(), &result);
 
         if (opCtx->isExhaust()) {
             LOGV2_DEBUG(23872, 3, "Using exhaust for hello protocol");

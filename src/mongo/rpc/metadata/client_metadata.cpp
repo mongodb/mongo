@@ -42,6 +42,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/transport/message_compressor_base.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
@@ -386,11 +388,20 @@ void ClientMetadata::logClientMetadata(Client* client) const {
         return;
     }
 
+    auto negotiatedCompressors =
+        MessageCompressorManager::forSession(client->session()).getNegotiatedCompressors();
+    std::vector<StringData> negotiatedCompressorNames(negotiatedCompressors.size(), nullptr);
+    std::transform(
+        negotiatedCompressors.begin(),
+        negotiatedCompressors.end(),
+        negotiatedCompressorNames.begin(),
+        [](auto& messageCompressor) { return StringData(messageCompressor->getName()); });
+
     LOGV2(51800,
-          "received client metadata from {remote} {client}: {doc}",
           "client metadata",
           "remote"_attr = client->getRemote(),
           "client"_attr = client->desc(),
+          "negotiatedCompressors"_attr = negotiatedCompressorNames,
           "doc"_attr = getDocument());
 }
 
