@@ -31,7 +31,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"

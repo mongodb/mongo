@@ -42,7 +42,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"

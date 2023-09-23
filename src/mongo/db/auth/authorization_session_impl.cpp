@@ -33,7 +33,6 @@
 #include <algorithm>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <mutex>
 #include <string>

@@ -29,7 +29,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/query/plan_explainer_factory.h"

@@ -30,7 +30,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cmath>

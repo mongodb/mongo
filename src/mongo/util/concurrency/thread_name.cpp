@@ -48,7 +48,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/config.h"     // IWYU pragma: keep

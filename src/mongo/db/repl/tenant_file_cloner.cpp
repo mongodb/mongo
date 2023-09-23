@@ -29,7 +29,6 @@
 
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <fstream>  // IWYU pragma: keep
 #include <memory>

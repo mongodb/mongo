@@ -28,7 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <js/CallArgs.h>
 #include <js/Object.h>

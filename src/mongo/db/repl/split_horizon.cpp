@@ -38,7 +38,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"

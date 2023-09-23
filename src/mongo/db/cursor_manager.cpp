@@ -35,7 +35,6 @@
 // IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 #include <type_traits>
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <functional>
 #include <memory>

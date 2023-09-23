@@ -37,7 +37,6 @@
 #include <memory>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

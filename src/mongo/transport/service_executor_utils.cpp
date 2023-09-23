@@ -29,7 +29,6 @@
 
 #include "mongo/transport/service_executor_utils.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <exception>
 #include <fmt/format.h>

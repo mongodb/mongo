@@ -37,7 +37,6 @@
 #include <boost/cstdint.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <fmt/format.h>
 #include <limits>

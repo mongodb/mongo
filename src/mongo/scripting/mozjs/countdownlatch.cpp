@@ -29,7 +29,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <js/CallArgs.h>
 #include <js/PropertySpec.h>
 #include <js/RootingAPI.h>

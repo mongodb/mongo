@@ -29,7 +29,6 @@
 
 #include "mongo/db/views/util.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

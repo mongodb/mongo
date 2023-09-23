@@ -29,7 +29,6 @@
 
 #include "mongo/db/repl/rollback_test_fixture.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <string>
 #include <vector>

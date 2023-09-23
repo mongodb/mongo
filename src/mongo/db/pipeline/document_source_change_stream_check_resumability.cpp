@@ -28,7 +28,6 @@
  */
 
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

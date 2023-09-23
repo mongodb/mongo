@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/index_bounds.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <iterator>

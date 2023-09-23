@@ -32,7 +32,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/server_options.h"

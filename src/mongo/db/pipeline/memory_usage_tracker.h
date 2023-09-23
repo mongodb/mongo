@@ -33,7 +33,6 @@
 #include <absl/meta/type_traits.h>
 #include <absl/strings/string_view.h>
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <memory>
 #include <string>

@@ -31,7 +31,6 @@
 
 #include <absl/container/inlined_vector.h>
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>

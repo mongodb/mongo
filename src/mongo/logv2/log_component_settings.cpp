@@ -29,7 +29,6 @@
 
 #include <mutex>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/util/assert_util.h"

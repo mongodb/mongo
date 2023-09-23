@@ -34,7 +34,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/and_common.h"
 #include "mongo/util/assert_util.h"

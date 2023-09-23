@@ -30,7 +30,6 @@
 
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <utility>
 #include <vector>
 

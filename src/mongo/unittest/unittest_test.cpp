@@ -49,7 +49,6 @@
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"

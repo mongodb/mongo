@@ -31,7 +31,6 @@
 #include <type_traits>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"

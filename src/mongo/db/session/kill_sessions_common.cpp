@@ -28,7 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 
 #include <boost/optional/optional.hpp>

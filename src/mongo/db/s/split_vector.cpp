@@ -30,7 +30,6 @@
 #include "mongo/db/s/split_vector.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <memory>
 #include <set>

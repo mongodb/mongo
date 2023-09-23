@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
 #include <utility>

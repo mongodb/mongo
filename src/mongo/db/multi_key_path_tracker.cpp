@@ -36,7 +36,6 @@
 // IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <iterator>
 #include <sstream>

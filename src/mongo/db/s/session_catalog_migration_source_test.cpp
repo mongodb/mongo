@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>

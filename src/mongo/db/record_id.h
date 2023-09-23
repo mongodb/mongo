@@ -33,7 +33,6 @@
 #include <boost/container_hash/extensions.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <climits>
 #include <cstddef>
 #include <cstdint>

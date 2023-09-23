@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iosfwd>
 #include <string>
 #include <type_traits>

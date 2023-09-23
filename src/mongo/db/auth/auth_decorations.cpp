@@ -33,7 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"

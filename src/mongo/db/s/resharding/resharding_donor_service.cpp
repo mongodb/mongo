@@ -33,7 +33,6 @@
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
 #include <mutex>

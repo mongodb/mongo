@@ -34,7 +34,6 @@
 #include <boost/version.hpp>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/fts/unicode/byte_vector.h"

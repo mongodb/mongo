@@ -30,7 +30,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/shard_filterer_impl.h"

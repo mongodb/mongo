@@ -32,7 +32,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"

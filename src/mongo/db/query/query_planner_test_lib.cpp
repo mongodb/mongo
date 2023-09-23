@@ -41,7 +41,6 @@
 #include <vector>
 
 #include <absl/container/flat_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"

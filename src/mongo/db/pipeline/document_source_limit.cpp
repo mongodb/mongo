@@ -28,7 +28,6 @@
  */
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <list>
 

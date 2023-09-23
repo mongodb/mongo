@@ -30,7 +30,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/service_context.h"

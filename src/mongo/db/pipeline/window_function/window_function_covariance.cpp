@@ -32,7 +32,6 @@
 #include <limits>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/expression.h"

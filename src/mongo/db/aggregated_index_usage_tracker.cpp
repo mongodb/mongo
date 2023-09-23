@@ -31,7 +31,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

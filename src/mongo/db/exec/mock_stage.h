@@ -33,7 +33,6 @@
 #include <queue>
 #include <variant>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"

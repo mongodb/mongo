@@ -31,7 +31,6 @@
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/static_assert.hpp>
 #include <cfloat>
 #include <cinttypes>

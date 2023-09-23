@@ -31,7 +31,6 @@
 // IWYU pragma: no_include <bits/types/clockid_t.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <string>
 #include <sys/types.h>

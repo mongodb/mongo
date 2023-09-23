@@ -31,7 +31,6 @@
 #include <memory>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/client/connection_string.h"
 #include "mongo/s/client/shard_factory.h"

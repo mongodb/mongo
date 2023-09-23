@@ -34,7 +34,6 @@
 #include <absl/container/node_hash_set.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>

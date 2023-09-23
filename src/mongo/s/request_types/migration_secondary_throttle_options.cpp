@@ -28,7 +28,6 @@
  */
 
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <utility>
 #include <variant>

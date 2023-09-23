@@ -29,7 +29,6 @@
 
 #include "mongo/s/shard_version_factory.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/optional/optional.hpp>
 

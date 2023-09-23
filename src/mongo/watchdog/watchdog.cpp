@@ -42,7 +42,6 @@
 // IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32

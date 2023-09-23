@@ -32,7 +32,6 @@
 #include <mutex>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"

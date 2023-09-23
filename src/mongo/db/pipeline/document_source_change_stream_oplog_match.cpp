@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <list>
 #include <memory>

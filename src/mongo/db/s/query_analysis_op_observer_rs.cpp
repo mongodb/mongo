@@ -30,7 +30,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/query_analysis_op_observer_rs.h"

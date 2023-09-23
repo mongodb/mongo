@@ -34,7 +34,6 @@
 #include <set>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/database_name.h"

@@ -29,7 +29,6 @@
 
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstring>
 #include <memory>
 #include <string>

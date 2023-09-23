@@ -31,7 +31,6 @@
 #include "mongo/db/index/skipped_record_tracker.h"
 
 #include <boost/container/flat_set.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 
 #include <boost/container/small_vector.hpp>

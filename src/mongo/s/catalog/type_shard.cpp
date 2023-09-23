@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <type_traits>
 #include <utility>
 

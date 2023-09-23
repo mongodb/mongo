@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <iterator>
 #include <list>

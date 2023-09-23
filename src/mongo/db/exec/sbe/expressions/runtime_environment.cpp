@@ -31,7 +31,6 @@
 
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iosfwd>
 #include <string_view>
 

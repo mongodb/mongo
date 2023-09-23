@@ -33,7 +33,6 @@
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep

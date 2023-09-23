@@ -49,7 +49,6 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"

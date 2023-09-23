@@ -40,7 +40,6 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <exception>

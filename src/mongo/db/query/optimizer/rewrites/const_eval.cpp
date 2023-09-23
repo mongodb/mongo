@@ -30,7 +30,6 @@
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <memory>
 #include <string>

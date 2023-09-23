@@ -70,7 +70,6 @@
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <valgrind/valgrind.h>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"

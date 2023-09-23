@@ -30,7 +30,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/collection.h"

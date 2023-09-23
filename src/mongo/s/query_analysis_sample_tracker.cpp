@@ -30,7 +30,6 @@
 #include "mongo/s/query_analysis_sample_tracker.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 #include <utility>
 

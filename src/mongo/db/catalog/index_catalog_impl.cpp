@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <initializer_list>

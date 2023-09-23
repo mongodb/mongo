@@ -52,7 +52,6 @@
 #include <wiredtiger.h>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"

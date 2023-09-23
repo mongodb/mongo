@@ -31,7 +31,6 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/iterator/iterator_traits.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <deque>
 #include <memory>

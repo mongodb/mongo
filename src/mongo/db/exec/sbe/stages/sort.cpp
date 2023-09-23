@@ -30,7 +30,6 @@
 #include <absl/container/inlined_vector.h>
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <deque>
 #include <exception>

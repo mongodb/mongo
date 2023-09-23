@@ -33,7 +33,6 @@
 #include <string>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/feature_compatibility_version_documentation.h"

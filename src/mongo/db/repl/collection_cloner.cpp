@@ -31,7 +31,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <list>
 #include <mutex>

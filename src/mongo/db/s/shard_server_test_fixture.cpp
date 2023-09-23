@@ -30,7 +30,6 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"

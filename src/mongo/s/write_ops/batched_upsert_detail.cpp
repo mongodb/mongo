@@ -29,7 +29,6 @@
 
 #include "mongo/s/write_ops/batched_upsert_detail.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"

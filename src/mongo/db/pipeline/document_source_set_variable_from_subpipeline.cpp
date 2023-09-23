@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 
 #include <boost/optional/optional.hpp>

@@ -30,7 +30,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <cstddef>
 #include <iterator>

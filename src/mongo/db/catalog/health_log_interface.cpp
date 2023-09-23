@@ -31,7 +31,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util_core.h"

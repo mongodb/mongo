@@ -34,7 +34,6 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <fmt/format.h>

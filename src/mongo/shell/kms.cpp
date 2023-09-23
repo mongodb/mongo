@@ -32,7 +32,6 @@
 #include <utility>
 
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms_gen.h"

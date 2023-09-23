@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/stats/array_histogram.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <functional>
 #include <ostream>

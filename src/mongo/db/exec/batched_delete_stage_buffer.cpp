@@ -31,7 +31,6 @@
 #include <algorithm>
 #include <fmt/format.h>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/batched_delete_stage_buffer.h"
 #include "mongo/util/assert_util.h"

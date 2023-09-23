@@ -32,7 +32,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"

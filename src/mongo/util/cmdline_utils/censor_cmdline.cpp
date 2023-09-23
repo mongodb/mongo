@@ -29,7 +29,6 @@
 
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstring>

@@ -32,7 +32,6 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/range/adaptor/argument_fwd.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <boost/range/begin.hpp>

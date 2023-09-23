@@ -31,7 +31,6 @@
 
 #include "mongo/idl/mutable_observer_registry.h"
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <map>
 #include <mutex>
 

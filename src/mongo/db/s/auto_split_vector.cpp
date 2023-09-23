@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/auto_split_vector.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <memory>
 #include <set>

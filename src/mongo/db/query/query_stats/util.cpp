@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/query_stats/util.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <climits>
 #include <utility>
 

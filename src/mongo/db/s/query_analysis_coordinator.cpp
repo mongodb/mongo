@@ -31,7 +31,6 @@
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <type_traits>
 #include <utility>

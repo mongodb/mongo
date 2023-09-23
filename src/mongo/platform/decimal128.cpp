@@ -35,7 +35,6 @@
 #include <iostream>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 // The Intel C library typedefs wchar_t, but it is a distinct fundamental type
 // in C++, so we #define _WCHAR_T here to prevent the library from trying to typedef.

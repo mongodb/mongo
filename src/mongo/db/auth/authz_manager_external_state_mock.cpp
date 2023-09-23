@@ -32,7 +32,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 

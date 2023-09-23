@@ -45,7 +45,6 @@
 #include <boost/iostreams/imbue.hpp>
 #include <boost/log/core/core.hpp>
 // IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/exceptions.hpp>

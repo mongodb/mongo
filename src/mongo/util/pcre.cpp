@@ -37,7 +37,6 @@
 #include <new>
 #include <pcre2.h>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"

@@ -30,7 +30,6 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>

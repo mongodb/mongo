@@ -29,7 +29,6 @@
 
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

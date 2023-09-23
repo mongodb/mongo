@@ -29,7 +29,6 @@
 
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <mutex>

@@ -31,7 +31,6 @@
 #include <absl/container/node_hash_set.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <functional>

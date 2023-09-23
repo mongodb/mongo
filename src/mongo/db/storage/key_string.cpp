@@ -40,7 +40,6 @@
 #include <type_traits>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"

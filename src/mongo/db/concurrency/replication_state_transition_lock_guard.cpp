@@ -28,8 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
-
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util_core.h"

@@ -29,7 +29,6 @@
 
 #include "mongo/util/clock_source.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <memory>
 #include <mutex>

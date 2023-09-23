@@ -35,7 +35,6 @@
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <functional>
 #include <iterator>

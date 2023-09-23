@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <typeinfo>
 
 #include <boost/move/utility_core.hpp>

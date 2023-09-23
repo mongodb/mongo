@@ -30,7 +30,6 @@
 #include <memory>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/executor/pinned_connection_task_executor.h"
 #include "mongo/executor/pinned_connection_task_executor_factory.h"

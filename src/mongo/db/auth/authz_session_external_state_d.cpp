@@ -30,7 +30,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/shim.h"
 #include "mongo/db/auth/authz_session_external_state.h"

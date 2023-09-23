@@ -44,7 +44,6 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <r1interval.h>
 #include <s1angle.h>
 #include <s2.h>

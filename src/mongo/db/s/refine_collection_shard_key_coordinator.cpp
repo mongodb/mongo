@@ -31,7 +31,6 @@
 #include "mongo/db/s/refine_collection_shard_key_coordinator.h"
 
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <string>
 #include <tuple>

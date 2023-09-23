@@ -32,7 +32,6 @@
 
 #include <absl/container/node_hash_map.h>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/query/query_knobs_gen.h"

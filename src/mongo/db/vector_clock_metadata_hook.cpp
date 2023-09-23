@@ -29,7 +29,6 @@
 
 #include <memory>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"

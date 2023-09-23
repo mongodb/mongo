@@ -31,7 +31,6 @@
 #include <exception>
 #include <ostream>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/status.h"

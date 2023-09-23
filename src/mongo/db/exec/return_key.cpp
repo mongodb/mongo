@@ -28,14 +28,12 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
-
+#include "mongo/db/exec/return_key.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/return_key.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util_core.h"

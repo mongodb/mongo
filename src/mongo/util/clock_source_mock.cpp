@@ -33,7 +33,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source_mock.h"

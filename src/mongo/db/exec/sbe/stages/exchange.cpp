@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <absl/container/inlined_vector.h>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <functional>
 #include <mutex>

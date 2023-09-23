@@ -34,7 +34,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/db/client.h"

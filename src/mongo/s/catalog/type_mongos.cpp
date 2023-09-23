@@ -28,7 +28,6 @@
  */
 #include "mongo/s/catalog/type_mongos.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

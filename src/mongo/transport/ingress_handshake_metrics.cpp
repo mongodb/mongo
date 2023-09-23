@@ -28,7 +28,6 @@
  */
 #include "mongo/transport/ingress_handshake_metrics.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <utility>
 

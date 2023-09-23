@@ -34,7 +34,6 @@
 #include <unicode/sortkey.h>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <unicode/stringpiece.h>
 #include <unicode/ucol.h>
 #include <unicode/unistr.h>

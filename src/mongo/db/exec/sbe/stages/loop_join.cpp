@@ -32,7 +32,6 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/inlined_vector.h>
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"

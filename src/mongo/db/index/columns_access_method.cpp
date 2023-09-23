@@ -33,7 +33,6 @@
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <set>
 #include <type_traits>
 #include <utility>

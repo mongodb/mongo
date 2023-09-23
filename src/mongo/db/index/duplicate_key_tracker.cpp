@@ -31,7 +31,6 @@
 #include <mutex>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"

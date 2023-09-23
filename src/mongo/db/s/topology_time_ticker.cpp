@@ -32,7 +32,6 @@
 #include <iterator>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"

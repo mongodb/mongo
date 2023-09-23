@@ -31,7 +31,6 @@
 #include <fmt/format.h>
 #include <memory>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

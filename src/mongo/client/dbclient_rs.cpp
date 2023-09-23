@@ -30,7 +30,6 @@
 #include "mongo/client/dbclient_rs.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
 #include <memory>

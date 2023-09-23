@@ -30,7 +30,6 @@
 #include <functional>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/logv2/log.h"

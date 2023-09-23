@@ -29,7 +29,6 @@
 
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"

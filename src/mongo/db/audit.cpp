@@ -31,7 +31,6 @@
 
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/service_context.h"
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/optional/optional.hpp>
 

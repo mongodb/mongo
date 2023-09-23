@@ -30,7 +30,6 @@
 #include "mongo/db/query/parsed_find_command.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 
 #include <boost/optional/optional.hpp>

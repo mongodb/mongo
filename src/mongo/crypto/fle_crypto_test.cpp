@@ -34,7 +34,6 @@
 #include <boost/multiprecision/number.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <climits>
 #include <cstdint>
 #include <initializer_list>

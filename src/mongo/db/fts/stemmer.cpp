@@ -33,7 +33,6 @@
 #include <libstemmer.h>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/util/assert_util.h"
 

@@ -32,7 +32,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
 #include "mongo/base/counter.h"

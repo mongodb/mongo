@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace for_debuggers {

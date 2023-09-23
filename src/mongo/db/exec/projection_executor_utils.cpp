@@ -34,7 +34,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"

@@ -31,7 +31,6 @@
 #include <algorithm>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <limits>
 #include <mutex>

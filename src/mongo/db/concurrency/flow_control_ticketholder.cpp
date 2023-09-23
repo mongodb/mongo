@@ -31,7 +31,6 @@
 #include <mutex>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"

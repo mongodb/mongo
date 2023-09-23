@@ -28,7 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 
 #include <boost/move/utility_core.hpp>

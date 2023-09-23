@@ -51,7 +51,6 @@
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/exceptions.hpp>
 

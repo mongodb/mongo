@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/platform/compiler.h"

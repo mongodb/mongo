@@ -31,7 +31,6 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <map>
 #include <memory>

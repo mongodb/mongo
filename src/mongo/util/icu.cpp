@@ -36,7 +36,6 @@
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <unicode/umachine.h>
 
 #include "mongo/base/error_codes.h"

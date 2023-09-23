@@ -33,7 +33,6 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/type_traits/decay.hpp>
 #include <mutex>
 #include <new>

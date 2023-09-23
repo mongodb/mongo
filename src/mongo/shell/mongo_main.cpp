@@ -57,7 +57,6 @@
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"

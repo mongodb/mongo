@@ -29,7 +29,6 @@
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/compile.h>
 #include <fmt/format.h>
 #include <sys/types.h>

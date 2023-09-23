@@ -31,7 +31,6 @@
 #include <absl/meta/type_traits.h>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <string>
 #include <utility>

@@ -30,7 +30,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <memory>
 #include <ratio>

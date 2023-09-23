@@ -30,7 +30,6 @@
 
 #include "mongo/transport/proxy_protocol_header_parser.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <cstring>
 #include <fmt/format.h>

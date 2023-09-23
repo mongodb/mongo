@@ -28,7 +28,6 @@
  */
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <memory>
 #include <mutex>

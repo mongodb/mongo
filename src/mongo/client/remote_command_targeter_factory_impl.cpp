@@ -30,7 +30,6 @@
 #include <memory>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"

@@ -30,7 +30,6 @@
 #include "mongo/db/s/single_transaction_coordinator_stats.h"
 
 #include "mongo/db/s/transaction_coordinator.h"
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/net/socket_utils.h"

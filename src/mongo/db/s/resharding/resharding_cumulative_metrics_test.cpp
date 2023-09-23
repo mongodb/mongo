@@ -38,7 +38,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"

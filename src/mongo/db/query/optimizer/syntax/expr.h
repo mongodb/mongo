@@ -30,7 +30,6 @@
 #pragma once
 
 #include <absl/container/flat_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <ostream>
 #include <string>

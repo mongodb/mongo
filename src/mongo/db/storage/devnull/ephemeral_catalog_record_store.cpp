@@ -40,7 +40,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/shared_array.hpp>
 
 #include "mongo/base/error_codes.h"

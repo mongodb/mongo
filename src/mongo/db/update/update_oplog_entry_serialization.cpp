@@ -30,7 +30,6 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <string>
 

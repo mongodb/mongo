@@ -31,7 +31,6 @@
 
 #include <absl/meta/type_traits.h>
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <list>
 #include <mutex>

@@ -31,7 +31,6 @@
 #include <mutex>
 #include <valarray>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

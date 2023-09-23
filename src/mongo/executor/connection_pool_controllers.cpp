@@ -30,7 +30,6 @@
 #include <algorithm>
 
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
 #include "mongo/executor/connection_pool_controllers.h"

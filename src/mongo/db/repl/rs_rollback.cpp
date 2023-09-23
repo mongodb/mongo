@@ -36,7 +36,6 @@
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <algorithm>
 #include <boost/filesystem/path.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <ctime>
 #include <list>
 #include <memory>

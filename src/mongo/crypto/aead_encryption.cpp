@@ -34,7 +34,6 @@
 #include <vector>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_endian.h"

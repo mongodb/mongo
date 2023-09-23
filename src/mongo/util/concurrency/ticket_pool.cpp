@@ -36,7 +36,6 @@
 #include <string>
 // IWYU pragma: no_include "syscall.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #ifndef _WIN32
 // TODO SERVER-72616: Remove futex usage from this class in favour of atomic waits.

@@ -29,7 +29,6 @@
 
 #include "mongo/s/shard_key_pattern.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

@@ -28,8 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
-
 #include <boost/optional/optional.hpp>
 
 #include "mongo/client/remote_command_targeter.h"

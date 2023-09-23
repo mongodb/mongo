@@ -31,7 +31,6 @@
 #include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <iterator>
 #include <memory>

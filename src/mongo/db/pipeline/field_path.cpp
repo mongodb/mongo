@@ -29,7 +29,6 @@
 
 #include <absl/container/node_hash_map.h>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"

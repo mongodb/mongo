@@ -37,7 +37,6 @@
 #include <memory>
 
 #include <boost/filesystem/path.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"

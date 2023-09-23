@@ -33,7 +33,6 @@
 #include <memory>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"

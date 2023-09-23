@@ -31,7 +31,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_util.h"

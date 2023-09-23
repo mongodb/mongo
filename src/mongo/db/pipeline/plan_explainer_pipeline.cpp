@@ -31,7 +31,6 @@
 #include <list>
 #include <memory>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/pipeline/document_source.h"

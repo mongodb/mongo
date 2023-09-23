@@ -28,7 +28,6 @@
  */
 
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 // IWYU pragma: no_include "ext/alloc_traits.h"

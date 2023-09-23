@@ -28,7 +28,6 @@
  */
 
 #include <absl/container/inlined_vector.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 #include <utility>
 

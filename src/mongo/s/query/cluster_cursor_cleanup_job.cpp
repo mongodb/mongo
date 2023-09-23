@@ -30,7 +30,6 @@
 #include <memory>
 #include <mutex>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"

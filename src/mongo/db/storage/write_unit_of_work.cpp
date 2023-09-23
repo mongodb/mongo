@@ -33,7 +33,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/locker.h"

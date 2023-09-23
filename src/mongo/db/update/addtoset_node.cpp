@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <set>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

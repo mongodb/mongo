@@ -38,7 +38,6 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"

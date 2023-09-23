@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <utility>
 #include <vector>

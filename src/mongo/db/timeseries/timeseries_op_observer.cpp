@@ -36,7 +36,6 @@
 
 #include <absl/container/node_hash_set.h>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/oid.h"

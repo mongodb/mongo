@@ -28,7 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/base/error_codes.h"

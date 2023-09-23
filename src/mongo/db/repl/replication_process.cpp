@@ -31,7 +31,6 @@
 #include <mutex>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/client.h"

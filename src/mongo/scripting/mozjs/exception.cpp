@@ -29,7 +29,6 @@
 
 #include "mongo/scripting/mozjs/exception.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <js/Exception.h>
 #include <js/RootingAPI.h>
 #include <js/friend/ErrorMessages.h>

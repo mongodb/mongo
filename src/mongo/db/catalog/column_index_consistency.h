@@ -32,7 +32,6 @@
 #include <absl/hash/hash.h>
 #include <algorithm>
 #include <boost/container_hash/extensions.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>

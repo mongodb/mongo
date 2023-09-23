@@ -41,7 +41,6 @@
 #include <boost/container/vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"

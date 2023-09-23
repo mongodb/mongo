@@ -72,7 +72,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"

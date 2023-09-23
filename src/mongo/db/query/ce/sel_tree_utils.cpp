@@ -34,7 +34,6 @@
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"

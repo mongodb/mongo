@@ -30,7 +30,6 @@
 #include <mutex>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/platform/mutex.h"

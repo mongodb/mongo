@@ -32,7 +32,6 @@
 #include <ostream>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/base/status.h"

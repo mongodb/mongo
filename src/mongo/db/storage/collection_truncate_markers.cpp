@@ -30,7 +30,6 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <string>
 #include <vector>

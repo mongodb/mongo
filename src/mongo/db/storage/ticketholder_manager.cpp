@@ -31,7 +31,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"

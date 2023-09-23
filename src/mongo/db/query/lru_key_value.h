@@ -28,7 +28,6 @@
  */
 
 #pragma once
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <fmt/format.h>
 #include <functional>

@@ -33,7 +33,6 @@
 
 
 #include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <limits>
 #include <ostream>
 #include <utility>

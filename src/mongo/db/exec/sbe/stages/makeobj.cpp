@@ -30,7 +30,6 @@
 #include <absl/container/inlined_vector.h>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <cstring>
 #include <map>

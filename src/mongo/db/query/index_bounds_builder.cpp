@@ -30,7 +30,6 @@
 
 #include "mongo/db/query/index_bounds_builder.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <s2cellid.h>
 #include <s2region.h>

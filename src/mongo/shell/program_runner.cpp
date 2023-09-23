@@ -53,7 +53,6 @@
 // IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
 // IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
 #include <boost/iostreams/imbue.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
 #ifdef _WIN32

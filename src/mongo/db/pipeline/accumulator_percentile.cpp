@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/accumulator_percentile.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <type_traits>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

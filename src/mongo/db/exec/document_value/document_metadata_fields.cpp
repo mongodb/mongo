@@ -30,7 +30,6 @@
 #include <ostream>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/bson/bsonmisc.h"

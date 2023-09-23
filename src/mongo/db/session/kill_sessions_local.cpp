@@ -34,7 +34,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/cursor_manager.h"

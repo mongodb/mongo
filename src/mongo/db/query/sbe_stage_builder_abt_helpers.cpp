@@ -31,7 +31,6 @@
 
 #include <algorithm>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>

@@ -36,7 +36,6 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"

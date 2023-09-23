@@ -32,7 +32,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

@@ -35,7 +35,6 @@
 #include <cstddef>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range.h"
 #include "mongo/bson/bsonelement.h"

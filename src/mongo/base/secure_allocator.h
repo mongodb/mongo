@@ -30,7 +30,6 @@
 #pragma once
 
 #include <array>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <limits>

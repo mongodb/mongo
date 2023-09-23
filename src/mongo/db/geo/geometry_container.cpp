@@ -30,7 +30,6 @@
 
 #include "mongo/db/geo/geometry_container.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <s1angle.h>
 #include <s2.h>

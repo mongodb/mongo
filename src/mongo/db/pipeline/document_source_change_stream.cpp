@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <vector>
 
 #include <boost/move/utility_core.hpp>

@@ -31,7 +31,6 @@
 
 #include <algorithm>
 #include <array>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>  // strlen

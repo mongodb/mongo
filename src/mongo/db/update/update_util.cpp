@@ -30,7 +30,6 @@
 #include "mongo/db/update/update_util.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <map>
 #include <memory>

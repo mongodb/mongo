@@ -31,7 +31,6 @@
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <compare>
 #include <cstddef>
 #include <cstdint>

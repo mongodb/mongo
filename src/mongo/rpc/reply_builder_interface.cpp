@@ -29,7 +29,6 @@
 
 #include "mongo/rpc/reply_builder_interface.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <utility>
 

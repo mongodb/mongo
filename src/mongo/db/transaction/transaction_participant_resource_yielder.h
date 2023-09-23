@@ -32,7 +32,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"

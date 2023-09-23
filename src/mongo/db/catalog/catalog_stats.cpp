@@ -34,7 +34,6 @@
 
 #include <absl/container/flat_hash_set.h>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

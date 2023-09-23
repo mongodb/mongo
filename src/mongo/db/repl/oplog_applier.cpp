@@ -37,7 +37,6 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"

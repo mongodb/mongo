@@ -38,7 +38,6 @@
 #include <utility>
 
 #include <boost/filesystem/path.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range_cursor.h"

@@ -31,7 +31,6 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
 #include <vector>

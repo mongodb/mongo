@@ -32,7 +32,6 @@
 #include <thread>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

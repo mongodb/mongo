@@ -29,7 +29,6 @@
 
 #include "mongo/db/feature_flag.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/optional/optional.hpp>
 

@@ -29,7 +29,6 @@
 
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <fmt/format.h>

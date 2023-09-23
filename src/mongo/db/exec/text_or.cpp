@@ -36,7 +36,6 @@
 #include <vector>
 
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

@@ -29,7 +29,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/pipeline/sequential_document_cache.h"
 #include "mongo/util/assert_util_core.h"

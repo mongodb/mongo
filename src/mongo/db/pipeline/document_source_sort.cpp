@@ -29,7 +29,6 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <iterator>
 #include <list>

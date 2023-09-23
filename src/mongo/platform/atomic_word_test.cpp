@@ -34,7 +34,6 @@
 #include <iostream>
 #include <memory>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"

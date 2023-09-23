@@ -30,7 +30,6 @@
 #include "mongo/db/concurrency/deferred_writer.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <compare>
 #include <functional>
 #include <mutex>

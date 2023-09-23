@@ -35,7 +35,6 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"

@@ -32,7 +32,6 @@
 #include <limits>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"

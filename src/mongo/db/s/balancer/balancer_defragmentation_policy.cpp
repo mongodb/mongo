@@ -35,7 +35,6 @@
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <compare>
 #include <cstddef>
 #include <fmt/format.h>

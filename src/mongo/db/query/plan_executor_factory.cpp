@@ -28,7 +28,6 @@
  */
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <variant>
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>

@@ -31,7 +31,6 @@
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cerrno>
 #include <csignal>
 #include <cstring>

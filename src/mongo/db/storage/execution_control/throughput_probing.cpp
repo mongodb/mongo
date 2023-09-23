@@ -30,7 +30,6 @@
 #include "mongo/db/storage/execution_control/throughput_probing.h"
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <utility>
 

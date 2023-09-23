@@ -29,7 +29,6 @@
 
 #include "mongo/db/commands/server_status.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"

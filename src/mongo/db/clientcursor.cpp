@@ -30,7 +30,6 @@
 #include "mongo/db/clientcursor.h"
 
 #include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iosfwd>
 #include <mutex>
 #include <ratio>

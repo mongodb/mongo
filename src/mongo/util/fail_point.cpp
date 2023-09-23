@@ -37,7 +37,6 @@
 #include <random>
 #include <thread>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"

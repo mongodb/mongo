@@ -29,7 +29,6 @@
 
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <utility>
 
 #include "mongo/base/error_codes.h"

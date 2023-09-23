@@ -32,7 +32,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"

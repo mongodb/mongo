@@ -33,7 +33,6 @@
 #include <array>
 #include <boost/cstdint.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <string_view>
 

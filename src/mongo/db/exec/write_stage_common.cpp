@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/write_stage_common.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/cluster_role.h"

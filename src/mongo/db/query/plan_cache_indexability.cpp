@@ -28,7 +28,6 @@
  */
 
 #include <absl/container/flat_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonelement.h"

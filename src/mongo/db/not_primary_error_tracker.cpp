@@ -29,7 +29,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/not_primary_error_tracker.h"

@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>

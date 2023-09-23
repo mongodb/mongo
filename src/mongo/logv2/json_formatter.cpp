@@ -43,7 +43,6 @@
 #include <boost/log/core/record_view.hpp>
 #include <boost/log/utility/formatting_ostream_fwd.hpp>
 #include <boost/log/utility/value_ref.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"

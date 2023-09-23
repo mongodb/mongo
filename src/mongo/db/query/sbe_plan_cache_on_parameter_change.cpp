@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

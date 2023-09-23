@@ -29,7 +29,6 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 
 #include <boost/move/utility_core.hpp>

@@ -29,7 +29,6 @@
 
 #include "mongo/transport/service_executor_synchronous.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <deque>
 #include <mutex>

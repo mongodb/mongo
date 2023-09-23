@@ -29,7 +29,6 @@
 
 #include <memory>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"

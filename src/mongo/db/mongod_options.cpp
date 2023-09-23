@@ -34,7 +34,6 @@
 #include <boost/filesystem.hpp>  // IWYU pragma: keep
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <initializer_list>
 #include <iostream>

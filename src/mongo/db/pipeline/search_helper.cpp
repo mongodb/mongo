@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/search_helper.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <list>
 #include <set>
 #include <string>

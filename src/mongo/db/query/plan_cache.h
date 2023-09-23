@@ -31,7 +31,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 // IWYU pragma: no_include "ext/alloc_traits.h"

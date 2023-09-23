@@ -37,7 +37,6 @@
 #include <utility>
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/status_with.h"

@@ -34,7 +34,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <immer/detail/hamts/champ_iterator.hpp>
 #include <immer/detail/iterator_facade.hpp>
 #include <immer/detail/rbts/rrbtree_iterator.hpp>

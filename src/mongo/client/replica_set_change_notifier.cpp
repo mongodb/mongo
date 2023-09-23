@@ -31,7 +31,6 @@
 #include <mutex>
 
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/logv2/log.h"

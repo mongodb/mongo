@@ -29,7 +29,6 @@
 
 #include "mongo/db/geo/shapes.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdlib>
 #include <r1interval.h>
 #include <s1angle.h>

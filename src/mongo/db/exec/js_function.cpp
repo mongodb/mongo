@@ -31,7 +31,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"

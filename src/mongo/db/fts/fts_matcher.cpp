@@ -31,7 +31,6 @@
 #include <set>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_element_iterator.h"

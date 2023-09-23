@@ -31,7 +31,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/or.h"

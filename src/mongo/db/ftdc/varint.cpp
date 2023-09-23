@@ -32,7 +32,6 @@
 #include <util/coding/varint.h>
 
 #include <base/integral_types.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/util/assert_util.h"
 

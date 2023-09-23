@@ -31,7 +31,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"

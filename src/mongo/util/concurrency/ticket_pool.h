@@ -34,7 +34,6 @@
 #include <queue>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"

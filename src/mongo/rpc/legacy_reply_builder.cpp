@@ -29,7 +29,6 @@
 
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/rpc/legacy_reply_builder.h"

@@ -31,7 +31,6 @@
 #include <memory>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"

@@ -30,7 +30,6 @@
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 #include <string>
 #include <utility>

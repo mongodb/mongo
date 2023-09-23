@@ -30,7 +30,6 @@
 
 #include "mongo/db/exec/plan_stage.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_context.h"
 

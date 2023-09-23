@@ -31,7 +31,6 @@
 
 #include "mongo/db/record_id.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"

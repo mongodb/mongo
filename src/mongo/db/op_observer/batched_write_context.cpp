@@ -32,7 +32,6 @@
 #include <utility>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/repl/oplog_entry.h"

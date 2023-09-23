@@ -30,7 +30,6 @@
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <map>
 #include <string>
 

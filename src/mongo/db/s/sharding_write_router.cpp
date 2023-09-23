@@ -30,7 +30,6 @@
 #include "mongo/db/s/sharding_write_router.h"
 
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

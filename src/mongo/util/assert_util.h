@@ -30,7 +30,6 @@
 #pragma once
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/facilities/overload.hpp>
 #include <cstdlib>
 #include <exception>

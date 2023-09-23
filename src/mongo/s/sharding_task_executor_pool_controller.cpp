@@ -33,7 +33,6 @@
 #include <absl/meta/type_traits.h>
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <set>
 
 #include <boost/optional/optional.hpp>

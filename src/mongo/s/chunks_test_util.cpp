@@ -30,7 +30,6 @@
 
 #include "mongo/s/chunks_test_util.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstdlib>

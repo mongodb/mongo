@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <list>
 #include <utility>

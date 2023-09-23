@@ -33,7 +33,6 @@
 #include <boost/log/attributes/attribute_value_impl.hpp>
 #include <boost/log/attributes/attribute_value_set.hpp>
 #include <boost/log/core/record.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <cerrno>
 #include <cstddef>

@@ -30,7 +30,6 @@
 
 #include "mongo/db/repl/bgsync.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 // IWYU pragma: no_include "cxxabi.h"
 #include <chrono>

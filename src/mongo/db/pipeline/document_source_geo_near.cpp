@@ -29,7 +29,6 @@
 
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <iterator>
 #include <s2cellid.h>

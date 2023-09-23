@@ -31,7 +31,6 @@
 
 #include <algorithm>
 #include <boost/align/aligned_allocator.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdlib>
 #include <iterator>
 #include <memory>

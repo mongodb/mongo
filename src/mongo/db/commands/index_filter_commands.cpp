@@ -37,7 +37,6 @@
 #include <vector>
 
 #include <absl/container/node_hash_set.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"

@@ -28,7 +28,6 @@
  */
 
 
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <cstdint>
 #include <exception>

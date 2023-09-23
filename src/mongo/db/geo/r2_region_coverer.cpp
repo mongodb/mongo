@@ -31,7 +31,6 @@
 #include <boost/core/checked_delete.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/std_fwd.hpp"
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <functional>
 #include <ostream>

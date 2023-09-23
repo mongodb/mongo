@@ -30,7 +30,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <limits>
 #include <memory>

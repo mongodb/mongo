@@ -37,7 +37,6 @@
 #include <absl/meta/type_traits.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"

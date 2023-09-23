@@ -33,7 +33,6 @@
 #include <absl/container/inlined_vector.h>
 #include <absl/hash/hash.h>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>

@@ -31,7 +31,6 @@
 #include "mongo/db/auth/authentication_session.h"
 
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <ratio>
 #include <vector>
 

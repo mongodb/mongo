@@ -33,7 +33,6 @@
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <algorithm>
 #include <array>
-#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 
 #include <boost/move/utility_core.hpp>

@@ -32,7 +32,6 @@
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 
 #include <absl/container/node_hash_map.h>

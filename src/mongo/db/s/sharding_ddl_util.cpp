@@ -33,7 +33,6 @@
 #include <algorithm>
 #include <array>
 #include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <iterator>

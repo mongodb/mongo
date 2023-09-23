@@ -30,7 +30,6 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
 #include <utility>

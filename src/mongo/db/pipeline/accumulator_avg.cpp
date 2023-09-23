@@ -30,7 +30,6 @@
 #include <cstdint>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonmisc.h"

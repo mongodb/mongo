@@ -32,7 +32,6 @@
 #include <ostream>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"

@@ -31,7 +31,6 @@
 #include <vector>
 
 #include <absl/meta/type_traits.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/containers.h"

@@ -28,7 +28,6 @@
  */
 #include "mongo/s/client/config_shard_wrapper.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <utility>
 
 #include <boost/optional/optional.hpp>

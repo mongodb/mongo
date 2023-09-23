@@ -30,7 +30,6 @@
 
 #include "mongo/db/process_health/health_observer_base.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <mutex>
 #include <type_traits>

@@ -30,7 +30,6 @@
 #include <cstddef>
 #include <map>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

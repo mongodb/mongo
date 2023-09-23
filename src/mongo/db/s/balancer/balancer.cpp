@@ -36,7 +36,6 @@
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>

@@ -30,7 +30,6 @@
 
 #include <algorithm>
 #include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <mutex>
 #include <string>

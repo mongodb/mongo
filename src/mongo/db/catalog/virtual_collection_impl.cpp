@@ -29,7 +29,6 @@
 
 #include "mongo/db/catalog/virtual_collection_impl.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"

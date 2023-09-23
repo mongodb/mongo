@@ -29,7 +29,6 @@
 
 #include "mongo/s/collection_routing_info_targeter.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 #include <memory>
 #include <string>

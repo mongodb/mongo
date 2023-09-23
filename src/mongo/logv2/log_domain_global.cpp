@@ -49,7 +49,6 @@
 #include <boost/log/sinks/text_ostream_backend.hpp>
 #include <boost/log/sinks/unlocked_frontend.hpp>
 #include <boost/parameter/keyword.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/make_shared_object.hpp>
 #include <boost/smart_ptr/shared_ptr.hpp>
 #include <boost/thread/exceptions.hpp>

@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/shared_array.hpp>
 #include <boost/smart_ptr/shared_array.hpp>
 #include <cstddef>

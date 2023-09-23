@@ -32,7 +32,6 @@
 #include <absl/hash/hash.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <cstring>
 #include <functional>

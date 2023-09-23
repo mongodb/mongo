@@ -30,7 +30,6 @@
 #include "mongo/util/indexed_string_vector.h"
 
 #include <absl/container/flat_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

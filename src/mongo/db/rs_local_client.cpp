@@ -28,7 +28,6 @@
  */
 
 #include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <memory>
 #include <mutex>

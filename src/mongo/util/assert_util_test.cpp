@@ -31,7 +31,6 @@
 #include <ostream>
 #include <type_traits>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"  // IWYU pragma: keep

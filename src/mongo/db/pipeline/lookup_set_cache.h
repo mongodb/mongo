@@ -41,7 +41,6 @@
 #include <boost/multi_index/indexed_by.hpp>
 #include <boost/multi_index_container_fwd.hpp>
 #include <boost/operators.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <cstddef>
 #include <functional>

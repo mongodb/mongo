@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <utility>
 #include <vector>
 

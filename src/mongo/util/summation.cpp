@@ -32,7 +32,6 @@
 #include <limits>
 
 #include "summation.h"
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"

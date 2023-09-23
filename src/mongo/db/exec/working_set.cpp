@@ -32,7 +32,6 @@
 #include <cstdint>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/db/bson/dotted_path_support.h"

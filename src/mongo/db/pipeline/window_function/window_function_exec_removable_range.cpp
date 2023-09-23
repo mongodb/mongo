@@ -28,7 +28,6 @@
  */
 
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

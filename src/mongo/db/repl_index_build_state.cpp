@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>

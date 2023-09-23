@@ -31,7 +31,6 @@
 #include "mongo/db/client_out_of_line_executor.h"
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 #include <utility>
 

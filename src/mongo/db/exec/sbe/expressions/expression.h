@@ -32,7 +32,6 @@
 #include <absl/container/inlined_vector.h>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>

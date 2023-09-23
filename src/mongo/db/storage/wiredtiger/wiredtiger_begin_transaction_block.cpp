@@ -31,7 +31,6 @@
 #include <fmt/format.h>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/db/repl/repl_settings.h"

@@ -32,7 +32,6 @@
 #include <cstddef>
 
 #include <absl/container/inlined_vector.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/plan_stats_visitor.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"

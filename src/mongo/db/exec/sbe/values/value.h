@@ -35,7 +35,6 @@
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 // IWYU pragma: no_include "boost/predef/hardware/simd/x86.h"
 // IWYU pragma: no_include "boost/predef/hardware/simd/x86/versions.h"
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 // IWYU pragma: no_include "emmintrin.h"
 #include <algorithm>

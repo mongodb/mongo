@@ -30,7 +30,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <iterator>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"

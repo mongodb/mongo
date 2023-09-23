@@ -29,7 +29,6 @@
 
 
 #include <absl/container/node_hash_set.h>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_helpers.h"

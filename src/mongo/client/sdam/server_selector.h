@@ -34,7 +34,6 @@
 #include <vector>
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"

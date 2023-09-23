@@ -30,7 +30,6 @@
 #pragma once
 
 #include <absl/container/node_hash_map.h>
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <stack>
 #include <utility>

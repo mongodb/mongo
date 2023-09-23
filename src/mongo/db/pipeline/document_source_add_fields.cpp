@@ -31,7 +31,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"

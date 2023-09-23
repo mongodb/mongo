@@ -33,7 +33,6 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <fmt/format.h>

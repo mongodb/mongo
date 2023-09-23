@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <utility>
 

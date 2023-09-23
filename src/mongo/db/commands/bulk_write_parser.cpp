@@ -30,7 +30,6 @@
 #include "mongo/db/commands/bulk_write_parser.h"
 
 #include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
 

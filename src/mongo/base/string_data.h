@@ -30,7 +30,6 @@
 #pragma once
 
 #include <algorithm>  // for min
-#include <boost/preprocessor/control/iif.hpp>
 #include <cstring>
 #include <fmt/format.h>
 #include <iosfwd>

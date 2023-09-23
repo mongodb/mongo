@@ -31,7 +31,6 @@
 
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"

@@ -29,7 +29,6 @@
 
 #include "mongo/db/server_parameter.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
 #include <boost/move/utility_core.hpp>

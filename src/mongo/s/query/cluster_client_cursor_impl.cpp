@@ -29,7 +29,6 @@
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
-#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <utility>
 

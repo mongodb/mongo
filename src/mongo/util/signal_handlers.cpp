@@ -31,7 +31,6 @@
 #include "mongo/util/signal_handlers.h"
 
 #include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "bits/types/siginfo_t.h"
 #include <cerrno>
 #include <csignal>
