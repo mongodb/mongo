@@ -693,7 +693,6 @@ env.CppUnitTest(
         'metrics/phase_duration_test.cpp',
         'metrics/sharding_data_transform_cumulative_metrics_test.cpp',
         'metrics/sharding_data_transform_instance_metrics_test.cpp',
-        'metrics/sharding_data_transform_metrics_macros_test.cpp',
         'migration_batch_fetcher_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',

@@ -109,10 +109,10 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationContract::_mutex");
 
     // Set of access checks performed
-    std::bitset<kNumAccessCheckEnum> _checks;
+    std::bitset<idlEnumCount<AccessCheckEnum>> _checks;
 
     // Set of privileges performed per resource pattern type
-    std::array<ActionSet, kNumMatchTypeEnum> _privilegeChecks;
+    std::array<ActionSet, idlEnumCount<MatchTypeEnum>> _privilegeChecks;
 
     // If false accounting and mutex guards are disabled
     bool _isTestModeEnabled{true};

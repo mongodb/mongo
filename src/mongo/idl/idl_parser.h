@@ -522,4 +522,10 @@ BSONObj parseOwnedBSON(BSONElement element);
  */
 bool parseBoolean(BSONElement element);
 
+/**
+ * Generated enums specialize this with their element count.
+ */
+template <typename E>
+constexpr inline size_t idlEnumCount = 0;
+
 }  // namespace mongo

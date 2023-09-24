@@ -774,9 +774,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     common.template_args('${name}${value},', name=enum_value.name,
                                          value=enum_type_info.get_cpp_value_assignment(enum_value)))
 
-        self._writer.write_line("static constexpr uint32_t kNum%s = %d;" %
-                                (enum_type_info.get_cpp_type_name(), len(idl_enum.values)))
-
     def gen_op_msg_request_methods(self, command):
         # type: (ast.Command) -> None
         """Generate the methods for a command."""
@@ -1253,6 +1250,16 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             for command in spec.commands:
                 if command.api_version:
                     self.generate_versioned_command_base_class(command)
+
+        # Specialize `mongo::idlEnumCount<E>` for each enum `E``.
+        with self.gen_namespace_block("mongo"):
+            for idl_enum in spec.enums:
+                enum_type_info = enum_types.get_type_info(idl_enum)
+                cpp_namespace = idl_enum.cpp_namespace
+                cpp_name = enum_type_info.get_cpp_type_name()
+                full_cpp_name = "::{}::{}".format(cpp_namespace, cpp_name)
+                self._writer.write_line("template<> constexpr inline size_t idlEnumCount<%s> = %d;"
+                                        % (full_cpp_name, len(idl_enum.values)))
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):

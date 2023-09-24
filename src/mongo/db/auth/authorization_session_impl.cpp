@@ -128,7 +128,7 @@ ServerlessPermissionMap kServerlessPrivilegesPermitted;
 MONGO_INITIALIZER(ServerlessPrivilegePermittedMap)(InitializerContext*) try {
     ServerlessPermissionMap ret;
 
-    for (std::size_t i = 0; i < kNumMatchTypeEnum; ++i) {
+    for (std::size_t i = 0; i < idlEnumCount<MatchTypeEnum>; ++i) {
         auto matchType = static_cast<MatchTypeEnum>(i);
         auto matchTypeName = MatchType_serializer(matchType);
         auto dataObj = MatchType_get_extra_data(matchType);

@@ -413,7 +413,7 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) 
     memset(blob.keyUUID, 0, sizeof(blob.keyUUID));
     blob.originalBsonType = BSONType::String;
 
-    for (uint8_t i = 0; i < kNumEncryptedBinDataType; i++) {
+    for (uint8_t i = 0; i < idlEnumCount<EncryptedBinDataType>; i++) {
         blob.fleBlobSubtype = i;
         auto binData = BSONBinData(
             reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);

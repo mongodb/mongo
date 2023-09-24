@@ -49,7 +49,7 @@ namespace mongo {
  * also may change between versions.
  */
 using ActionType = ActionTypeEnum;
-static constexpr uint32_t kNumActionTypes = kNumActionTypeEnum;
+constexpr inline size_t kNumActionTypes = idlEnumCount<ActionTypeEnum>;
 
 StatusWith<ActionType> parseActionFromString(StringData action);
 StringData toStringData(ActionType a);

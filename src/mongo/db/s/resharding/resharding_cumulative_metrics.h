@@ -30,23 +30,11 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/arithmetic/limits/dec_256.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-#include <boost/preprocessor/logical/limits/bool_256.hpp>
-// IWYU pragma: no_include "boost/preprocessor/repetition/detail/limits/for_256.hpp"
-#include <boost/preprocessor/repetition/for.hpp>
-#include <boost/preprocessor/seq/limits/elem_256.hpp>
-#include <boost/preprocessor/seq/limits/size_256.hpp>
-#include <boost/preprocessor/tuple/elem.hpp>
-#include <boost/preprocessor/tuple/limits/to_seq_64.hpp>
-#include <boost/preprocessor/tuple/to_seq.hpp>
-#include <boost/preprocessor/variadic/limits/elem_64.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_metrics_macros.h"
 #include "mongo/db/s/metrics/with_oplog_application_count_metrics.h"
 #include "mongo/db/s/metrics/with_oplog_application_latency_metrics.h"
 #include "mongo/db/s/metrics/with_state_management_for_cumulative_metrics.h"
@@ -56,13 +44,8 @@
 namespace mongo {
 
 namespace resharding_cumulative_metrics {
-DEFINE_IDL_ENUM_SIZE_TEMPLATE_HELPER(ReshardingMetrics,
-                                     CoordinatorStateEnum,
-                                     DonorStateEnum,
-                                     RecipientStateEnum)
 using Base = WithOplogApplicationLatencyMetrics<WithOplogApplicationCountMetrics<
     WithStateManagementForCumulativeMetrics<ShardingDataTransformCumulativeMetrics,
-                                            ReshardingMetricsEnumSizeTemplateHelper,
                                             CoordinatorStateEnum,
                                             DonorStateEnum,
                                             RecipientStateEnum>>>;

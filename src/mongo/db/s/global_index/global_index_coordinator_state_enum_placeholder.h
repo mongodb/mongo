@@ -31,6 +31,8 @@
 
 #include <cstdint>
 
+#include "mongo/idl/idl_parser.h"
+
 namespace mongo {
 
 // TODO: Replace with actual Global Index state enums by role
@@ -45,6 +47,7 @@ enum class GlobalIndexCoordinatorStateEnumPlaceholder : int32_t {
     kCommitting,
     kDone
 };
-static constexpr uint32_t kNumGlobalIndexCoordinatorStateEnumPlaceholder = 9;
+template <>
+constexpr inline size_t idlEnumCount<GlobalIndexCoordinatorStateEnumPlaceholder> = 9;
 
 }  // namespace mongo

@@ -31,27 +31,17 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/cumulative_metrics_state_holder.h"
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 
-namespace detail {
-template <typename StateEnum, template <typename> typename SizeHelper>
-using StateEnumToHolderType =
-    CumulativeMetricsStateHolder<StateEnum, SizeHelper<StateEnum>::getSize()>;
-}
-
-template <typename Base, template <typename> typename SizeHelper, typename... StateEnums>
+template <typename Base, typename... StateEnums>
 class WithStateManagementForCumulativeMetrics : public Base {
 public:
     using AnyState = stdx::variant<StateEnums...>;
     using StateFieldNameMap = stdx::unordered_map<AnyState, StringData>;
 
-    template <typename... Args>
-    WithStateManagementForCumulativeMetrics(Args&&... args) : Base{std::forward<Args>(args)...} {}
-
-    WithStateManagementForCumulativeMetrics(
-        const WithStateManagementForCumulativeMetrics<Base, SizeHelper, StateEnums...>& other) =
-        default;
+    using Base::Base;
 
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after) {
@@ -79,27 +69,29 @@ protected:
 
 private:
     template <typename StateEnum>
+    using HolderType = CumulativeMetricsStateHolder<StateEnum, idlEnumCount<StateEnum>>;
+
+    template <typename StateEnum>
     auto& getHolderFor() const {
-        return std::get<detail::StateEnumToHolderType<StateEnum, SizeHelper>>(_holders);
+        return std::get<HolderType<StateEnum>>(_holders);
     }
 
     template <typename StateEnum>
     auto& getHolderFor() {
-        return std::get<detail::StateEnumToHolderType<StateEnum, SizeHelper>>(_holders);
+        return std::get<HolderType<StateEnum>>(_holders);
     }
 
     template <typename StateEnum>
     void reportCountsForStatesIn(const StateFieldNameMap& names, BSONObjBuilder* bob) const {
-        using IntType = std::underlying_type_t<StateEnum>;
-        for (IntType i = 0; i < static_cast<IntType>(SizeHelper<StateEnum>::getSize()); i++) {
-            StateEnum state{i};
+        for (size_t i = 0; i < idlEnumCount<StateEnum>; ++i) {
+            auto state = static_cast<StateEnum>(i);
             if (auto name = getNameFor(state, names); name.has_value()) {
                 bob->append(*name, getCountInState(state));
             }
         }
     }
 
-    std::tuple<detail::StateEnumToHolderType<StateEnums, SizeHelper>...> _holders;
+    std::tuple<HolderType<StateEnums>...> _holders;
 };
 
 }  // namespace mongo
