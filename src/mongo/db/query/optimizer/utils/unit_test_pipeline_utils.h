@@ -52,21 +52,11 @@
 namespace mongo::optimizer {
 
 ABT translatePipeline(const Metadata& metadata,
-                      StringData pipelineStr,
+                      const std::string& pipelineStr,
                       ProjectionName scanProjName,
                       std::string scanDefName,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
-
-void formatGoldenTestHeader(StringData variationName,
-                            StringData pipelineStr,
-                            StringData findCmd,
-                            std::string scanDefName,
-                            opt::unordered_set<OptPhase> phaseSet,
-                            Metadata metadata,
-                            std::ostream& stream);
-
-std::string formatGoldenTestExplain(ABT translated, std::ostream& stream);
 
 /**
  * Fixture for ABT tests which use the golden testing infrastructure.
@@ -87,20 +77,14 @@ protected:
      * the explained optimized plan.
      **/
     std::string testABTTranslationAndOptimization(
-        StringData variationName,
-        StringData pipelineStr,
+        const std::string& variationName,
+        const std::string& pipelineStr,
         std::string scanDefName = "collection",
         opt::unordered_set<OptPhase> phaseSet = {},
         Metadata metadata = {{{"collection", createScanDef({}, {})}}},
         PathToIntervalFn pathToInterval = {},
         bool phaseManagerDisableScan = false,
         const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
-
-    std::string testParameterizedABTTranslation(StringData variationName,
-                                                StringData findCmd,
-                                                std::string scanDefName = "collection",
-                                                Metadata metadata = {
-                                                    {{"collection", createScanDef({}, {})}}});
 
 private:
     unittest::GoldenTestConfig _config;

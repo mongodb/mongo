@@ -72,10 +72,6 @@ TEST_F(ABTTranslationTest, EqTranslation) {
                                       "[{$match: {$expr: {$eq: ['$a', 1]}}}]");
 }
 
-TEST_F(ABTTranslationTest, SizeTranslation) {
-    testABTTranslationAndOptimization("$match with $size", "[{$match: {'a': {$size: 1}}}]");
-}
-
 TEST_F(ABTTranslationTest, InequalityTranslation) {
     testABTTranslationAndOptimization("$match with range", "[{$match: {'a': {$gt: 70}}}]");
 
@@ -229,7 +225,7 @@ TEST_F(ABTTranslationTest, SortTranslation) {
     testABTTranslationAndOptimization("$match sort", "[{$match: {'a': 10}}, {$sort: {'a': 1}}]");
 }
 
-TEST_F(ServiceContextTest, BasicCanonicalQueryTranslation) {
+TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
     Metadata metadata({{"collection", createScanDef({}, {})}});
 
     auto opCtx = makeOperationContext();
@@ -238,8 +234,6 @@ TEST_F(ServiceContextTest, BasicCanonicalQueryTranslation) {
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
     auto prefixId = PrefixId::createForTests();
-
-    MatchExpression::unparameterize(statusWithCQ.getValue()->getPrimaryMatchExpression());
 
     auto translation = translateCanonicalQueryToABT(metadata,
                                                     *(statusWithCQ.getValue()),
@@ -320,49 +314,6 @@ TEST_F(ServiceContextTest, NonDescriptiveNames) {
         "|   PathIdentity []\n"
         "Scan [collection, {p0}]\n",
         translated);
-}
-
-TEST_F(ABTTranslationTest, ParameterizedEqTranslation) {
-    testParameterizedABTTranslation("$match basic",
-                                    "{find: 'collection', '$db': 'test', filter: {a: 1}}");
-}
-
-TEST_F(ABTTranslationTest, ParameterizedInequalityTranslation) {
-    testParameterizedABTTranslation("$match with range",
-                                    "{find: 'collection', '$db': 'test', filter: {a: {$gte: 70}}}");
-
-    testParameterizedABTTranslation(
-        "$match with range conjunction",
-        "{find: 'collection', '$db': 'test', filter: {a: {$gt: 70, $lt: 90}}}");
-
-    testParameterizedABTTranslation(
-        "$match with range conjunction on string data",
-        "{find: 'collection', '$db': 'test', filter: {a: {$gt: 'a', $lt: 'd'}}}");
-
-    testParameterizedABTTranslation(
-        "$match with range on double",
-        "{find: 'collection', '$db': 'test', filter: {a: {$gte: 4.5}}}");
-}
-
-TEST_F(ABTTranslationTest, ParameterizedInTranslation) {
-    testParameterizedABTTranslation("$match with $in, empty list",
-                                    "{find: 'collection', '$db': 'test', filter: {a: {$in: []}}}");
-
-    testParameterizedABTTranslation("$match with $in, singleton list",
-                                    "{find: 'collection', '$db': 'test', filter: {a: {$in: [1]}}}");
-
-    testParameterizedABTTranslation(
-        "$match with $in and a list of equalities becomes a comparison to an EqMember list",
-        "{find: 'collection', '$db': 'test', filter: {a: {$in: [1, 2, 3]}}}");
-
-    testParameterizedABTTranslation(
-        "$match with $in over an array, duplicated equalities removed",
-        "{find: 'collection', '$db': 'test', filter: {a: {$in: ['abc', 'def', 'ghi', 'def']}}}");
-}
-
-TEST_F(ABTTranslationTest, ParameterizedSizeTranslation) {
-    testParameterizedABTTranslation("$match with $size",
-                                    "{find: 'collection', '$db': 'test', filter: {a: {$size: 2}}}");
 }
 
 }  // namespace

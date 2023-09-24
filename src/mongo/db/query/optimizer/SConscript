@@ -122,9 +122,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/pipeline/abt_translation",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        '$BUILD_DIR/mongo/db/query/canonical_query',
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         "unit_test_utils",
     ],
 )

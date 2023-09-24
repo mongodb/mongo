@@ -140,11 +140,6 @@ std::vector<const MatchExpression*> MatchExpression::parameterize(
     return std::move(context.inputParamIdToExpressionMap);
 }
 
-// static
-std::vector<const MatchExpression*> MatchExpression::unparameterize(MatchExpression* tree) {
-    return MatchExpression::parameterize(tree, 0);
-}
-
 std::string MatchExpression::toString() const {
     return serialize().toString();
 }

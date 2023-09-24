@@ -867,9 +867,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     if (pipeline) {
         abt = translatePipelineToABT(metadata, *pipeline, scanProjName, std::move(abt), prefixId);
     } else {
-        // Clear match expression auto-parameterization by setting max param count to zero before
-        // CQ to ABT translation
-        MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
         abt = translateCanonicalQueryToABT(
             metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId);
     }
