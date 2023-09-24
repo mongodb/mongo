@@ -84,9 +84,7 @@ using namespace cascades;
      * nodes and expressions to an SBE plan. */                                                    \
     F(PathLower)                                                                                   \
     /* Final round of constant folding, identical to the first ConstEval stage. */                 \
-    F(ConstEvalPost)                                                                               \
-    /* Simplified constant folding for sampling estimator. */                                      \
-    F(ConstEvalPost_ForSampling)
+    F(ConstEvalPost)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(OptPhase, OPT_PHASE);
 #undef OPT_PHASE
