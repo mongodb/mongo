@@ -277,6 +277,10 @@ Status repairCollection(OperationContext* opCtx,
 
     ValidateResults validateResults;
     BSONObjBuilder output;
+    // Serialize valdiate result for logging in which tenant prefix is expected.
+    const SerializationContext serializaionCtx(SerializationContext::Source::Command,
+                                               SerializationContext::CallerType::Reply,
+                                               SerializationContext::Prefix::IncludePrefix);
 
     // Exclude full record store validation because we have already validated the underlying
     // record store in the call to repairRecordStore above.
@@ -288,7 +292,8 @@ Status repairCollection(OperationContext* opCtx,
                                        /*additionalOptions=*/{},
                                        &validateResults,
                                        &output,
-                                       /*logDiagnostics=*/false);
+                                       /*logDiagnostics=*/false,
+                                       serializaionCtx);
     if (!status.isOK()) {
         return status;
     }

@@ -237,6 +237,13 @@ public:
             return true;
         }
 
+        SerializationContext reqSerializationCtx = SerializationContext::stateCommandRequest();
+        if (auto const expectPrefix = cmdObj.getField("expectPrefix")) {
+            reqSerializationCtx.setPrefixState(expectPrefix.boolean());
+        }
+        if (auto vts = auth::ValidatedTenancyScope::get(opCtx)) {
+            reqSerializationCtx.setTenantIdSource(vts->hasTenantId());
+        }
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         bool background = cmdObj["background"].trueValue();
         bool logDiagnostics = cmdObj["logDiagnostics"].trueValue();
@@ -395,14 +402,16 @@ public:
             cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue();
 
         ValidateResults validateResults;
-        Status status = CollectionValidation::validate(opCtx,
-                                                       nss,
-                                                       mode,
-                                                       repairMode,
-                                                       additionalOptions,
-                                                       &validateResults,
-                                                       &result,
-                                                       logDiagnostics);
+        Status status = CollectionValidation::validate(
+            opCtx,
+            nss,
+            mode,
+            repairMode,
+            additionalOptions,
+            &validateResults,
+            &result,
+            logDiagnostics,
+            SerializationContext::stateCommandReply(reqSerializationCtx));
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }
