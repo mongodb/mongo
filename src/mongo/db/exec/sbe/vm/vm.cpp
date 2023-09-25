@@ -8828,6 +8828,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinCellFoldValues_F(arity);
         case Builtin::cellFoldValues_P:
             return builtinCellFoldValues_P(arity);
+        case Builtin::cellBlockGetFlatValuesBlock:
+            return builtinCellBlockGetFlatValuesBlock(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -9252,6 +9254,8 @@ std::string builtinToString(Builtin b) {
             return "cellFoldValues_F";
         case Builtin::cellFoldValues_P:
             return "cellFoldValues_P";
+        case Builtin::cellBlockGetFlatValuesBlock:
+            return "cellBlockGetFlatValuesBlock";
         default:
             MONGO_UNREACHABLE;
     }

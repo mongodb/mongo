@@ -261,4 +261,21 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P(ArityType arity) {
     MONGO_UNREACHABLE;
 }
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellBlockGetFlatValuesBlock(
+    ArityType arity) {
+    invariant(arity == 1);
+    auto [cellOwn, cellTag, cellVal] = getFromStack(0);
+
+    if (cellTag != value::TypeTags::cellBlock) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    tassert(7946600, "Cannot process temporary cell values", !cellOwn);
+
+    auto* cell = value::getCellBlock(cellVal);
+    return {false,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(&cell->getValueBlock())};
+}
+
 }  // namespace mongo::sbe::vm

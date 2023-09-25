@@ -100,6 +100,8 @@ public:
 
     Tree operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op);
 
+    Tree operator()(const optimizer::ABT& n, const optimizer::FunctionCall& op);
+
 private:
     // Ensure that the generated tree is representing a block of measures (i.e.
     // if it's a block expanded from a cell, fold it).

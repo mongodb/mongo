@@ -58,7 +58,7 @@ TEST(VectorizerTest, ConvertGt) {
     auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
 
     ASSERT_EXPLAIN_V2_AUTO(
-        "FunctionCall [valueBlockGt]\n"
+        "FunctionCall [valueBlockGtScalar]\n"
         "|   Const [9]\n"
         "Variable [inputVar]\n",
         *processed.expr);
@@ -77,7 +77,7 @@ TEST(VectorizerTest, ConvertGtOnCell) {
     ASSERT_EXPLAIN_V2_AUTO(
         "FunctionCall [cellFoldValues_F]\n"
         "|   Variable [inputVar]\n"
-        "FunctionCall [valueBlockGt]\n"
+        "FunctionCall [valueBlockGtScalar]\n"
         "|   Const [9]\n"
         "FunctionCall [cellBlockGetFlatValuesBlock]\n"
         "Variable [inputVar]\n",
@@ -102,19 +102,56 @@ TEST(VectorizerTest, ConvertBooleanOpOnCell) {
         "|   FunctionCall [valueBlockLogicalAnd]\n"
         "|   |   FunctionCall [cellFoldValues_F]\n"
         "|   |   |   Variable [inputVar]\n"
-        "|   |   FunctionCall [valueBlockGt]\n"
+        "|   |   FunctionCall [valueBlockGtScalar]\n"
         "|   |   |   Const [9]\n"
         "|   |   FunctionCall [cellBlockGetFlatValuesBlock]\n"
         "|   |   Variable [inputVar]\n"
         "|   Variable [__l1_0]\n"
         "FunctionCall [cellFoldValues_F]\n"
         "|   Variable [inputVar]\n"
-        "FunctionCall [valueBlockLte]\n"
+        "FunctionCall [valueBlockLteScalar]\n"
         "|   Const [59]\n"
         "FunctionCall [cellBlockGetFlatValuesBlock]\n"
         "Variable [inputVar]\n",
         *processed.expr);
 }
+
+TEST(VectorizerTest, ConvertFilter) {
+    auto tmpVar = getABTLocalVariableName(7, 0);
+    auto tree1 = make<FunctionCall>(
+        "traverseF",
+        makeSeq(make<Variable>("inputVar"),
+                make<LambdaAbstraction>(
+                    tmpVar,
+                    make<BinaryOp>(
+                        Operations::FillEmpty,
+                        make<BinaryOp>(Operations::Gt, make<Variable>(tmpVar), Constant::int32(9)),
+                        Constant::boolean(false))),
+                Constant::boolean(false)));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     TypeSignature::kCellType.include(TypeSignature::kAnyScalarType));
+
+    // Use Project to highlight that traverseF always translates to a cellFoldValue_F.
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree1, bindings);
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Let [__l7_0]\n"
+        "|   FunctionCall [cellFoldValues_F]\n"
+        "|   |   Variable [inputVar]\n"
+        "|   FunctionCall [valueBlockFillEmpty]\n"
+        "|   |   Const [false]\n"
+        "|   FunctionCall [valueBlockGtScalar]\n"
+        "|   |   Const [9]\n"
+        "|   Variable [__l7_0]\n"
+        "FunctionCall [cellBlockGetFlatValuesBlock]\n"
+        "Variable [inputVar]\n",
+        *processed.expr);
+}
+
 
 }  // namespace
 }  // namespace mongo::stage_builder

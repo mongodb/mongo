@@ -870,6 +870,7 @@ enum class Builtin : uint16_t {
 
     cellFoldValues_F,
     cellFoldValues_P,
+    cellBlockGetFlatValuesBlock,
 };
 
 std::string builtinToString(Builtin b);
@@ -2027,7 +2028,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalOr(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_F(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
-
+    FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(
+        ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,

@@ -117,7 +117,7 @@ optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));
 }
 
-TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state) {
+TypeSignature constantFold(optimizer::ABT& abt, StageBuilderState& state) {
     auto& runtimeEnv = *state.env;
 
     auto env = optimizer::VariableEnvironment::build(abt);
@@ -155,6 +155,16 @@ TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state) {
             env.rebuild(abt);
         }
     } while (modified);
+
+    return signature;
+}
+
+TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state) {
+    TypeSignature signature = constantFold(abt, state);
+
+    auto& runtimeEnv = *state.env;
+
+    auto env = optimizer::VariableEnvironment::build(abt);
 
     auto varResolver = optimizer::VarResolver([](const optimizer::ProjectionName& var) {
         if (auto slotId = getSbeVariableInfo(var)) {

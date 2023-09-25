@@ -68,6 +68,11 @@ struct TypedExpression {
     TypeSignature typeSignature;
 };
 
+// Run constant folding on the provided ABT tree and return its type signature.
+TypeSignature constantFold(optimizer::ABT& abt, StageBuilderState& state);
+
+// Optimize and convert the provided ABT tree into an equivalent EExpression tree,
+// returning its type signature.
 TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state);
 
 /**
