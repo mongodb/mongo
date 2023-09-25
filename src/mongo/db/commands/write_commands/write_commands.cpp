@@ -383,6 +383,10 @@ private:
                 !shardVersion.eoo()) {
                 bob->append(shardVersion);
             }
+            if (const auto& databaseVersion = _commandObj.getField("databaseVersion");
+                !databaseVersion.eoo()) {
+                bob->append(databaseVersion);
+            }
 
             bob->append("find", _commandObj["update"].String());
             extractQueryDetails(_updateOpObj, bob);
