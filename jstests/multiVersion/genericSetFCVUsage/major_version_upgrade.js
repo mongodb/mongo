@@ -28,6 +28,7 @@ const defaultOptions = {
 
 // This lists all supported releases and needs to be kept up to date as versions are added and
 // dropped.
+// TODO SERVER-76166: Programmatically generate list of LTS versions.
 const versions = [
     {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
     {binVersion: '5.0', featureCompatibilityVersion: '5.0', testCollection: 'five_zero'},

@@ -27,8 +27,10 @@ const defaultOptions = {
 };
 
 // This lists all binary versions older than the last-lts version.
+// TODO SERVER-76166: Programmatically generate list of LTS versions.
 const versions = [
     {binVersion: '5.0', testCollection: 'five_zero'},
+    {binVersion: '6.0', testCollection: 'six_zero'},
 ];
 
 // Iterate through versions specified in the versions list, and follow the steps outlined at
