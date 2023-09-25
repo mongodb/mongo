@@ -70,12 +70,54 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
 
-/*
- * TODO: Comment.
+namespace {
+struct FillEmptyFunctor {
+    FillEmptyFunctor(value::TypeTags fillTag, value::Value fillVal)
+        : _fillTag(fillTag), _fillVal(fillVal) {}
+
+    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
+                                                        value::Value val) const {
+        if (tag == value::TypeTags::Nothing) {
+            return value::copyValue(_fillTag, _fillVal);
+        }
+        return value::copyValue(tag, val);
+    }
+
+    value::TypeTags _fillTag;
+    value::Value _fillVal;
+};
+
+// Currently have an invariant that prevents the fill value being Nothing, need to change this flag
+// if that invariant gets removed.
+static constexpr auto fillEmptyOpType = ColumnOpType{ColumnOpType::kOutputNonNothingOnMissingInput,
+                                                     value::TypeTags::Nothing,
+                                                     value::TypeTags::Nothing,
+                                                     ColumnOpType::ReturnNonNothingOnMissing{}};
+
+static const auto fillEmptyOp = value::makeColumnOpWithParams<fillEmptyOpType, FillEmptyFunctor>();
+}  // namespace
+
+/**
+ * Implementation of the valueBlockFillEmpty builtin. This instruction takes a block and an
+ * SBE value, and produces a new block where all missing values in the block have been replaced
+ * with the SBE value.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEmpty(
     ArityType arity) {
-    MONGO_UNREACHABLE;
+    invariant(arity == 2);
+    auto [fillOwned, fillTag, fillVal] = getFromStack(1);
+    if (fillTag == value::TypeTags::Nothing) {
+        return moveFromStack(0);
+    }
+
+    auto [blockOwned, blockTag, blockVal] = getFromStack(0);
+    invariant(blockTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
+
+    auto out = valueBlockIn->map(fillEmptyOp.bindParams(fillTag, fillVal));
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
 
 /*

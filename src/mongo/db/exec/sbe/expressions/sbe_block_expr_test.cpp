@@ -106,6 +106,100 @@ TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
     assertBlockOfBool(runTag, runVal, std::vector{true, true, true, false, true});
 }
 
+TEST_F(SBEBlockExpressionTest, BlockFillEmptyShallowTest) {
+    value::OwnedValueAccessor fillAccessor;
+    auto fillSlot = bindAccessor(&fillAccessor);
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockFillEmpty",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
+    auto compiledExpr = compileExpression(*fillEmptyExpr);
+
+    auto [fillTag, fillVal] = makeInt32(45);
+    fillAccessor.reset(fillTag, fillVal);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(46));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(
+        runTag,
+        runVal,
+        std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeInt32(45), makeInt32(46)});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockFillEmptyDeepTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    value::OwnedValueAccessor fillAccessor;
+    auto fillSlot = bindAccessor(&fillAccessor);
+    auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockFillEmpty",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
+    auto compiledExpr = compileExpression(*fillEmptyExpr);
+
+    auto [fillTag, fillVal] = value::makeNewString("Replacement for missing value"_sd);
+    fillAccessor.reset(true, fillTag, fillVal);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("First string"_sd));
+    block.push_back(makeNothing());
+    block.push_back(value::makeNewString("Second string"_sd));
+    block.push_back(value::makeNewString("Third string"_sd));
+    block.push_back(value::makeNewString("tinystr"_sd));  // Stored as shallow StringSmall type
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    auto extracted = block.extract();
+    assertBlockEq(
+        runTag,
+        runVal,
+        std::vector{extracted[0], {fillTag, fillVal}, extracted[2], extracted[3], extracted[4]});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockFillEmptyNothingTest) {
+    value::OwnedValueAccessor fillAccessor;
+    auto fillSlot = bindAccessor(&fillAccessor);
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto fillEmptyExpr = sbe::makeE<sbe::EFunction>(
+        "valueBlockFillEmpty",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(fillSlot)));
+    auto compiledExpr = compileExpression(*fillEmptyExpr);
+
+    auto [fillTag, fillVal] = makeNothing();
+    fillAccessor.reset(fillTag, fillVal);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(46));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(
+        runTag,
+        runVal,
+        std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeNothing(), makeInt32(46)});
+}
+
 TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
