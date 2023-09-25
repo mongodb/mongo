@@ -78,6 +78,10 @@ public:
                 << extracted;
         }
     }
+
+    void testFoldF(std::vector<bool> vals,
+                   std::vector<char> filterPosInfo,
+                   std::vector<bool> expectedResult);
 };
 
 TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
@@ -172,6 +176,86 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
 
         assertBlockOfBool(runTag, runVal, {true, true, true, false});
     }
+}
+
+void SBEBlockExpressionTest::testFoldF(std::vector<bool> vals,
+                                       std::vector<char> filterPosInfo,
+                                       std::vector<bool> expectedResult) {
+
+    value::ViewOfValueAccessor valBlockAccessor;
+    value::ViewOfValueAccessor cellBlockAccessor;
+    auto valBlockSlot = bindAccessor(&valBlockAccessor);
+    auto cellBlockSlot = bindAccessor(&cellBlockAccessor);
+
+    auto materializedCellBlock = std::make_unique<value::MaterializedCellBlock>();
+    materializedCellBlock->_deblocked = nullptr;  // This is never read by the test.
+    materializedCellBlock->_filterPosInfo = filterPosInfo;
+
+    auto valBlock = makeBoolBlock(vals);
+    valBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                           value::bitcastFrom<value::ValueBlock*>(valBlock.get()));
+    cellBlockAccessor.reset(sbe::value::TypeTags::cellBlock,
+                            value::bitcastFrom<value::CellBlock*>(materializedCellBlock.get()));
+
+    {
+        auto expr = makeE<sbe::EFunction>(
+            "cellFoldValues_F",
+            sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(cellBlockSlot)));
+        auto compiledExpr = compileExpression(*expr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        assertBlockOfBool(runTag, runVal, expectedResult);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
+    // For empty position info, FoldF() should act as an identity function.
+    testFoldF({true, true, false, false, true},  // Values.
+              {},                                // Position info.
+              {true, true, false, false, true}   // Expected result.
+    );
+
+    testFoldF({true, true, false, false, true},  // Values.
+              {1, 1, 1, 0, 1},                   // Position info.
+              {true, true, false, true}          // Expected result.
+    );
+
+    //
+    // Non-empty position info edge case tests.
+    //
+
+    testFoldF({false},  // Values.
+              {1},      // Position info.
+              {false}   // Expected result.
+    );
+
+    testFoldF({true},  // Values.
+              {1},     // Position info.
+              {true}   // Expected result.
+    );
+
+    testFoldF({true, true, false, false, true},  // Values.
+              {1, 0, 0, 0, 0},                   // Position info.
+              {true}                             // Expected result.
+    );
+    testFoldF({true, true, false, false, true},  // Values.
+              {1, 1, 1, 1, 0},                   // Position info.
+              {true, true, false, true}          // Expected result.
+    );
+    testFoldF({false, false, false, false, false},  // Values.
+              {1, 0, 0, 0, 0},                      // Position info.
+              {false}                               // Expected result.
+    );
+    testFoldF({false, false, false, false, false},  // Values.
+              {1, 0, 1, 0, 0},                      // Position info.
+              {false, false}                        // Expected result.
+    );
+    testFoldF({false, false, false, true},  // Values.
+              {1, 0, 0, 1},                 // Position info.
+              {false, true}                 // Expected result.
+    );
 }
 
 }  // namespace mongo::sbe

@@ -188,6 +188,17 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
               value::bitcastFrom<value::ValueBlock*>(outBlock.release()));
 }
 
+namespace {
+bool allBools(const value::TypeTags* tag, size_t sz) {
+    for (size_t i = 0; i < sz; ++i) {
+        if (tag[i] != value::TypeTags::Boolean) {
+            return false;
+        }
+    }
+    return true;
+}
+}  // namespace
+
 template <class Op>
 std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
                                                   value::ValueBlock* rightBlock,
@@ -197,13 +208,7 @@ std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
 
     tassert(7953531, "Mismatch on size", left.count == right.count);
     // Check that both contain all booleans.
-    bool allBool = true;
-    for (size_t i = 0; i < left.count; ++i) {
-        allBool = allBool && (left.tags[i] == value::TypeTags::Boolean);
-    }
-    for (size_t i = 0; i < right.count; ++i) {
-        allBool = allBool && (right.tags[i] == value::TypeTags::Boolean);
-    }
+    bool allBool = allBools(left.tags, left.count) && allBools(right.tags, right.count);
     tassert(7953532, "Expected all bool inputs", allBool);
 
     std::vector<value::Value> boolOut(left.count);
@@ -255,7 +260,55 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F(ArityType arity) {
-    MONGO_UNREACHABLE;
+    auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
+    invariant(valBlockTag == value::TypeTags::valueBlock);
+    auto* valueBlock = value::bitcastTo<value::ValueBlock*>(valBlockVal);
+
+    auto [cellOwned, cellTag, cellVal] = getFromStack(1);
+    invariant(cellTag == value::TypeTags::cellBlock);
+    auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
+
+    auto valsExtracted = valueBlock->extract();
+    tassert(7953533, "Expected all bool inputs", allBools(valsExtracted.tags, valsExtracted.count));
+
+    const auto& positionInfo = cellBlock->filterPositionInfo();
+    if (positionInfo.empty()) {
+        // Return the input unchanged.
+        return moveFromStack(0);
+    }
+
+    tassert(7953534,
+            "Expected position info count to be same as value size",
+            valsExtracted.count == positionInfo.size());
+    tassert(7953535, "Unsupported empty block", valsExtracted.count > 0);
+    tassert(7953536, "First position info element should always be true", positionInfo[0]);
+
+    // Note: if this code ends up being a bottleneck, we can make some changes. foldCounts()
+    // can be initialized based on the number of 1 bits in filterPosInfo. We can also try to
+    // make 'folded' and 'foldCounts' use one buffer, rather than two.
+
+    // Represents number of true values in each run.
+    std::vector<int> foldCounts(valsExtracted.count, 0);
+    int runsSeen = -1;
+    for (size_t i = 0; i < valsExtracted.count; ++i) {
+        dassert(positionInfo[i] == 1 || positionInfo[i] == 0);
+        runsSeen += positionInfo[i];
+        foldCounts[runsSeen] += static_cast<int>(value::bitcastTo<bool>(valsExtracted[i].second));
+    }
+
+    // The last run is implicitly ended.
+    ++runsSeen;
+
+    std::vector<value::Value> folded(runsSeen);
+    for (size_t i = 0; i < folded.size(); ++i) {
+        folded[i] = value::bitcastFrom<bool>(static_cast<bool>(foldCounts[i]));
+    }
+
+    auto blockOut = std::make_unique<value::HeterogeneousBlock>(
+        std::vector<value::TypeTags>(folded.size(), value::TypeTags::Boolean), std::move(folded));
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P(ArityType arity) {
