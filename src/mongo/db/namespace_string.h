@@ -542,6 +542,16 @@ public:
     }
 
     /**
+     * foo = true
+     * foo. = false
+     * foo.a = false
+     */
+    bool isDbOnly() const {
+        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        return offset + _dbNameOffsetEnd() == _data.size();
+    }
+
+    /**
      * Returns whether the specified namespace is never tracked in the sharding catalog.
      *
      * These class of namespaces are used for internal purposes only and they are only registered in
@@ -1115,18 +1125,6 @@ inline bool nsIsFull(StringData ns) {
     if (i == ns.size() - 1)
         return false;
     return true;
-}
-
-/**
- * foo = true
- * foo. = false
- * foo.a = false
- */
-inline bool nsIsDbOnly(StringData ns) {
-    size_t i = ns.find('.');
-    if (i == std::string::npos)
-        return true;
-    return false;
 }
 
 inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior behavior) {

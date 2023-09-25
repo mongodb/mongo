@@ -563,7 +563,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
     // When starting up after a clean shutdown and resumable index builds are supported, find the
     // internal idents that contain the relevant information to resume each index build and recover
     // the state.
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString(), ident, CollectionOptions());
+    auto rs = _engine->getRecordStore(opCtx, NamespaceString::kEmpty, ident, CollectionOptions());
 
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
@@ -1082,7 +1082,7 @@ StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationConte
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
     OperationContext* opCtx, StringData ident) {
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString(), ident, CollectionOptions());
+    auto rs = _engine->getRecordStore(opCtx, NamespaceString::kEmpty, ident, CollectionOptions());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 

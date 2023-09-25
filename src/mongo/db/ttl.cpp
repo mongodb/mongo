@@ -453,8 +453,9 @@ void TTLMonitor::run() {
 
         try {
             const auto opCtxPtr = cc().makeOperationContext();
-            writeConflictRetry(
-                opCtxPtr.get(), "TTL pass", NamespaceString(), [&] { _doTTLPass(opCtxPtr.get()); });
+            writeConflictRetry(opCtxPtr.get(), "TTL pass", NamespaceString::kEmpty, [&] {
+                _doTTLPass(opCtxPtr.get());
+            });
         } catch (const DBException& ex) {
             LOGV2_WARNING(22537,
                           "TTLMonitor was interrupted, waiting before doing another pass",

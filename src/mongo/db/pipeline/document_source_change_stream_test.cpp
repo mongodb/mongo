@@ -3371,7 +3371,7 @@ TEST_F(ChangeStreamStageDBTest, RenameFromUserToSystemCollectionShouldIncludeNot
 
 TEST_F(ChangeStreamStageDBTest, MatchFiltersNoOp) {
     OplogEntry noOp = makeOplogEntry(OpTypeEnum::kNoop,
-                                     NamespaceString(),
+                                     NamespaceString::kEmpty,
                                      BSON(repl::ReplicationCoordinator::newPrimaryMsgField
                                           << repl::ReplicationCoordinator::newPrimaryMsg));
     checkTransformation(noOp, boost::none);

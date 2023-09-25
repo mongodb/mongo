@@ -74,7 +74,7 @@ ColumnKeyGenerator::ColumnKeyGenerator(BSONObj keyPattern, BSONObj pathProjectio
 
 ColumnStoreProjection ColumnKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
                                                                    BSONObj pathProjection) {
-    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString());
+    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString::kEmpty);
     auto projection = getASTProjection(keyPattern, pathProjection);
     auto policies = ProjectionPolicies::columnStoreIndexSpecProjectionPolicies();
     return ColumnStoreProjection{projection_executor::buildProjectionExecutor(
@@ -111,7 +111,7 @@ projection_ast::Projection ColumnKeyGenerator::getASTProjection(BSONObj keyPatte
     // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' and the namespace
     // string to '' here; since we ban computed fields from the projection, the ExpressionContext
     // will never be used.
-    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString());
+    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString::kEmpty);
     auto policies = ProjectionPolicies::columnStoreIndexSpecProjectionPolicies();
     auto projection = projection_ast::parseAndAnalyze(expCtx, projSpec, policies);
     return projection;

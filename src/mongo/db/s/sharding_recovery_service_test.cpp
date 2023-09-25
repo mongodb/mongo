@@ -155,7 +155,7 @@ public:
     }
 
     void assertCriticalSectionCatchUpEnteredInMemory(const NamespaceString& nss) {
-        if (nsIsDbOnly(nss.ns_forTest())) {
+        if (nss.isDbOnly()) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
@@ -173,7 +173,7 @@ public:
     }
 
     void assertCriticalSectionCommitEnteredInMemory(const NamespaceString& nss) {
-        if (nsIsDbOnly(nss.ns_forTest())) {
+        if (nss.isDbOnly()) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());
@@ -190,7 +190,7 @@ public:
     }
 
     void assertCriticalSectionLeftInMemory(const NamespaceString& nss) {
-        if (nsIsDbOnly(nss.ns_forTest())) {
+        if (nss.isDbOnly()) {
             AutoGetDb db(opCtx(), nss.dbName(), MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx(), nss.dbName());

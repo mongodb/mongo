@@ -265,7 +265,7 @@ public:
      */
     virtual void logCreateView(Client* client,
                                const NamespaceString& nsname,
-                               StringData viewOn,
+                               const NamespaceString& viewOn,
                                BSONArray pipeline,
                                ErrorCodes::Error code) const = 0;
 
@@ -297,7 +297,7 @@ public:
      */
     virtual void logDropView(Client* client,
                              const NamespaceString& nsname,
-                             StringData viewOn,
+                             const NamespaceString& viewOn,
                              const std::vector<BSONObj>& pipeline,
                              ErrorCodes::Error code) const = 0;
 
@@ -332,7 +332,7 @@ public:
      * Logs the result of a shardCollection command.
      */
     virtual void logShardCollection(Client* client,
-                                    StringData ns,
+                                    const NamespaceString& ns,
                                     const BSONObj& keyPattern,
                                     bool unique) const = 0;
 
@@ -340,7 +340,7 @@ public:
      * Logs the result of a refineCollectionShardKey event.
      */
     virtual void logRefineCollectionShardKey(Client* client,
-                                             StringData ns,
+                                             const NamespaceString& ns,
                                              const BSONObj& keyPattern) const = 0;
 
     /**
@@ -572,7 +572,7 @@ public:
 
     void logCreateView(Client* client,
                        const NamespaceString& nsname,
-                       StringData viewOn,
+                       const NamespaceString& viewOn,
                        BSONArray pipeline,
                        ErrorCodes::Error code) const {};
 
@@ -587,7 +587,7 @@ public:
 
     void logDropView(Client* client,
                      const NamespaceString& nsname,
-                     StringData viewOn,
+                     const NamespaceString& viewOn,
                      const std::vector<BSONObj>& pipeline,
                      ErrorCodes::Error code) const {};
 
@@ -604,12 +604,12 @@ public:
     void logRemoveShard(Client* client, StringData shardname) const {};
 
     void logShardCollection(Client* client,
-                            StringData ns,
+                            const NamespaceString& ns,
                             const BSONObj& keyPattern,
                             bool unique) const {};
 
     void logRefineCollectionShardKey(Client* client,
-                                     StringData ns,
+                                     const NamespaceString& ns,
                                      const BSONObj& keyPattern) const {};
 
     void logInsertOperation(Client* client,

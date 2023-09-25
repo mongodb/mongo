@@ -1546,7 +1546,7 @@ void syncFixUp(OperationContext* opCtx,
         boost::optional<NamespaceString> nss =
             CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
         if (!nss) {
-            nss = NamespaceString();
+            nss = NamespaceString::kEmpty;
         }
 
         if (RollbackImpl::shouldCreateDataFiles()) {

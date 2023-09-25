@@ -172,8 +172,11 @@ Status _dropView(OperationContext* opCtx,
     auto view =
         CollectionCatalog::get(opCtx)->lookupViewWithoutValidatingDurable(opCtx, collectionName);
     if (!view) {
-        audit::logDropView(
-            opCtx->getClient(), collectionName, "", {}, ErrorCodes::NamespaceNotFound);
+        audit::logDropView(opCtx->getClient(),
+                           collectionName,
+                           NamespaceString::kEmpty,
+                           {},
+                           ErrorCodes::NamespaceNotFound);
         return Status::OK();
     }
 
@@ -207,11 +210,7 @@ Status _dropView(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
 
     audit::logDropView(
-        opCtx->getClient(),
-        collectionName,
-        NamespaceStringUtil::serialize(view->viewOn(), SerializationContext::stateDefault()),
-        view->pipeline(),
-        ErrorCodes::OK);
+        opCtx->getClient(), collectionName, view->viewOn(), view->pipeline(), ErrorCodes::OK);
 
     Status status = db->dropView(opCtx, collectionName);
     if (!status.isOK()) {
@@ -523,8 +522,11 @@ Status _dropCollection(OperationContext* opCtx,
                     return ex.toStatus();
                 }
 
-                audit::logDropView(
-                    opCtx->getClient(), collectionName, "", {}, ErrorCodes::NamespaceNotFound);
+                audit::logDropView(opCtx->getClient(),
+                                   collectionName,
+                                   NamespaceString::kEmpty,
+                                   {},
+                                   ErrorCodes::NamespaceNotFound);
                 return Status::OK();
             }
             if (view->timeseries() &&

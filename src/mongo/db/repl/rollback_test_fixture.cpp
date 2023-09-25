@@ -195,7 +195,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
 
 std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
                                                          const boost::optional<UUID>& uuid,
-                                                         StringData nss,
+                                                         const NamespaceString& nss,
                                                          BSONObj cmdObj,
                                                          int recordId,
                                                          boost::optional<BSONObj> o2,
@@ -209,7 +209,7 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
     }
     if (tid)
         tid->serializeToBSON("tid", &bob);
-    bob.append("ns", nss);
+    bob.append("ns", NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
     bob.append("o", cmdObj);
     if (o2) {
         bob.append("o2", *o2);
@@ -320,7 +320,7 @@ BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& f
 std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const DatabaseName& db,
                                                                       UUID uuid,
                                                                       const BSONObj& filter) const {
-    return {BSONObj(), NamespaceString()};
+    return {BSONObj(), NamespaceString::kEmpty};
 }
 
 StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {

@@ -125,7 +125,7 @@ public:
      */
     static std::pair<BSONObj, RecordId> makeCommandOp(Timestamp ts,
                                                       const boost::optional<UUID>& uuid,
-                                                      StringData nss,
+                                                      const NamespaceString& nss,
                                                       BSONObj cmdObj,
                                                       int recordId,
                                                       boost::optional<BSONObj> o2 = boost::none,

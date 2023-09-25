@@ -144,7 +144,7 @@ void FetcherTest::tearDown() {
 void FetcherTest::clear() {
     status = getDetectableErrorStatus();
     cursorId = -1;
-    nss = NamespaceString();
+    nss = NamespaceString::kEmpty;
     documents.clear();
     elapsedMillis = Milliseconds(0);
     first = false;

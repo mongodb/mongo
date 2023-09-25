@@ -2033,7 +2033,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                        coll,
                                        policy,
                                        defaultPlannerOptions,
-                                       NamespaceString(),
+                                       NamespaceString::kEmpty,
                                        std::move(querySolution));
 }
 
@@ -2232,7 +2232,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                        coll,
                                        policy,
                                        defaultPlannerOptions,
-                                       NamespaceString(),
+                                       NamespaceString::kEmpty,
                                        std::move(querySolution));
 }
 
@@ -2589,7 +2589,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
                                        coll,
                                        yieldPolicy,
                                        plannerOptions,
-                                       NamespaceString(),
+                                       NamespaceString::kEmpty,
                                        std::move(querySolution));
 }
 
@@ -2908,7 +2908,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
                                             coll,
                                             yieldPolicy,
                                             plannerParams.options,
-                                            NamespaceString(),
+                                            NamespaceString::kEmpty,
                                             std::move(soln));
     if (exec.isOK()) {
         LOGV2_DEBUG(20931,
@@ -2961,7 +2961,7 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
                                                     coll,
                                                     yieldPolicy,
                                                     plannerOptions,
-                                                    NamespaceString(),
+                                                    NamespaceString::kEmpty,
                                                     std::move(currentSolution));
             if (exec.isOK()) {
                 LOGV2_DEBUG(

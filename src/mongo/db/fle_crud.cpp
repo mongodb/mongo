@@ -794,7 +794,7 @@ std::shared_ptr<ReplyType> constructDefaultReply() {
 
 template <>
 std::shared_ptr<write_ops::FindAndModifyCommandRequest> constructDefaultReply() {
-    return std::make_shared<write_ops::FindAndModifyCommandRequest>(NamespaceString());
+    return std::make_shared<write_ops::FindAndModifyCommandRequest>(NamespaceString::kEmpty);
 }
 
 /**

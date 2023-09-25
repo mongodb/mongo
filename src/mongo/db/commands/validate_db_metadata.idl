@@ -41,7 +41,7 @@ structs:
             shard:
                 type: string
                 optional: true
-            ns: string
+            ns: namespacestring
             code: int
             codeName: string
             errmsg: string

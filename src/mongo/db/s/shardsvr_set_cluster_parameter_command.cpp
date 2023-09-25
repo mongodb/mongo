@@ -120,7 +120,7 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString();
+            return NamespaceString::kEmpty;
         }
 
         bool supportsWriteConcern() const override {

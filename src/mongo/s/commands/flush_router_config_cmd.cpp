@@ -115,7 +115,7 @@ public:
             const auto ns = argumentElem.checkAndGetStringData();
             const auto nss = NamespaceStringUtil::deserialize(
                 boost::none, ns, SerializationContext::stateCommandRequest());
-            if (nsIsDbOnly(ns)) {
+            if (nss.isDbOnly()) {
                 LOGV2(22762,
                       "Routing metadata flushed for database",
                       "db"_attr = toStringForLogging(nss));

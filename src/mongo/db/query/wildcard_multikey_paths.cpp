@@ -173,7 +173,10 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(OperationContext* opC
     const WildcardAccessMethod* wam =
         static_cast<const WildcardAccessMethod*>(entry->accessMethod());
     return writeConflictRetry(
-        opCtx, "wildcard multikey path retrieval", NamespaceString(), [&]() -> std::set<FieldRef> {
+        opCtx,
+        "wildcard multikey path retrieval",
+        NamespaceString::kEmpty,
+        [&]() -> std::set<FieldRef> {
             stats->numSeeks = 0;
             stats->keysExamined = 0;
             auto cursor = wam->newCursor(opCtx);
@@ -387,41 +390,42 @@ static std::pair<BSONObj, BSONObj> buildMetadataKeyRange(const BSONObj& keyPatte
 std::set<FieldRef> getWildcardMultikeyPathSet(OperationContext* opCtx,
                                               const IndexCatalogEntry* entry,
                                               MultikeyMetadataAccessStats* stats) {
-    return writeConflictRetry(opCtx, "wildcard multikey path retrieval", NamespaceString(), [&]() {
-        tassert(7354611, "stats must be non-null", stats);
-        stats->numSeeks = 0;
-        stats->keysExamined = 0;
+    return writeConflictRetry(
+        opCtx, "wildcard multikey path retrieval", NamespaceString::kEmpty, [&]() {
+            tassert(7354611, "stats must be non-null", stats);
+            stats->numSeeks = 0;
+            stats->keysExamined = 0;
 
-        const WildcardAccessMethod* wam =
-            static_cast<const WildcardAccessMethod*>(entry->accessMethod());
-        auto cursor = wam->newCursor(opCtx);
+            const WildcardAccessMethod* wam =
+                static_cast<const WildcardAccessMethod*>(entry->accessMethod());
+            auto cursor = wam->newCursor(opCtx);
 
-        const auto [metadataKeyRangeBegin, metadataKeyRangeEnd] =
-            buildMetadataKeyRange(entry->descriptor()->keyPattern());
+            const auto [metadataKeyRangeBegin, metadataKeyRangeEnd] =
+                buildMetadataKeyRange(entry->descriptor()->keyPattern());
 
-        constexpr bool inclusive = true;
-        cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
+            constexpr bool inclusive = true;
+            cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
 
-        auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-            metadataKeyRangeBegin,
-            wam->getSortedDataInterface()->getKeyStringVersion(),
-            wam->getSortedDataInterface()->getOrdering(),
-            true, /* forward */
-            inclusive);
-        auto entry = cursor->seek(keyStringForSeek);
-        ++stats->numSeeks;
+            auto keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+                metadataKeyRangeBegin,
+                wam->getSortedDataInterface()->getKeyStringVersion(),
+                wam->getSortedDataInterface()->getOrdering(),
+                true, /* forward */
+                inclusive);
+            auto entry = cursor->seek(keyStringForSeek);
+            ++stats->numSeeks;
 
-        // Iterate the cursor, copying the multikey paths into an in-memory set.
-        std::set<FieldRef> multikeyPaths{};
-        while (entry) {
-            ++stats->keysExamined;
-            multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
+            // Iterate the cursor, copying the multikey paths into an in-memory set.
+            std::set<FieldRef> multikeyPaths{};
+            while (entry) {
+                ++stats->keysExamined;
+                multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
 
-            entry = cursor->next();
-        }
+                entry = cursor->next();
+            }
 
-        return multikeyPaths;
-    });
+            return multikeyPaths;
+        });
 }
 
 }  // namespace mongo

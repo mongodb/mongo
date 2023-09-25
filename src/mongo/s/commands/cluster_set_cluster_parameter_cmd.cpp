@@ -114,7 +114,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString();
+            return NamespaceString::kEmpty;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

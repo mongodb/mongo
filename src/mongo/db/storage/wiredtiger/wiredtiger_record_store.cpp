@@ -706,7 +706,7 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
 NamespaceString WiredTigerRecordStore::ns(OperationContext* opCtx) const {
     auto nss = namespaceForUUID(opCtx, _uuid);
 
-    return nss ? *nss : NamespaceString();
+    return nss ? *nss : NamespaceString::kEmpty;
 }
 
 void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {

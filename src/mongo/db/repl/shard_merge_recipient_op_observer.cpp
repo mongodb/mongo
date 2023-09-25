@@ -166,7 +166,7 @@ void deleteTenantDataWhenMergeAborts(const ShardMergeRecipientDocument& doc) {
 
         UnreplicatedWritesBlock writeBlock{opCtx};
 
-        writeConflictRetry(opCtx, "dropShardMergeDonorTenantColls", NamespaceString(), [&] {
+        writeConflictRetry(opCtx, "dropShardMergeDonorTenantColls", NamespaceString::kEmpty, [&] {
             WriteUnitOfWork wuow(opCtx);
 
             for (const auto& tenantId : doc.getTenantIds()) {

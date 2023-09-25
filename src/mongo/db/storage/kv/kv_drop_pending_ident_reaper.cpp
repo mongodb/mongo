@@ -205,7 +205,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     for (auto& timestampAndIdentInfo : toDrop) {
         // Guards against catalog changes while dropping idents using KVEngine::dropIdent(). Yields
         // after dropping each ident.
-        writeConflictRetry(opCtx, "dropIdentsOlderThan", NamespaceString(), [&] {
+        writeConflictRetry(opCtx, "dropIdentsOlderThan", NamespaceString::kEmpty, [&] {
             // No need to hold the RSTL lock nor acquire a flow control ticket. This doesn't care
             // about the replica state of the node and the operations aren't replicated.
             Lock::GlobalLock globalLock(

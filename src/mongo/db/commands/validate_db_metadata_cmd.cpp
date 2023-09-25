@@ -191,8 +191,7 @@ public:
         bool _validateView(OperationContext* opCtx, const ViewDefinition& view) {
             auto pipelineStatus = view_catalog_helpers::validatePipeline(opCtx, view);
             if (!pipelineStatus.isOK()) {
-                ErrorReplyElement error(NamespaceStringUtil::serialize(
-                                            view.name(), SerializationContext::stateDefault()),
+                ErrorReplyElement error(view.name(),
                                         ErrorCodes::APIStrictError,
                                         ErrorCodes::errorString(ErrorCodes::APIStrictError),
                                         pipelineStatus.getStatus().reason());
@@ -229,11 +228,10 @@ public:
             }
             const auto status = collection->checkValidatorAPIVersionCompatability(opCtx);
             if (!status.isOK()) {
-                ErrorReplyElement error(
-                    NamespaceStringUtil::serialize(coll, SerializationContext::stateDefault()),
-                    ErrorCodes::APIStrictError,
-                    ErrorCodes::errorString(ErrorCodes::APIStrictError),
-                    status.reason());
+                ErrorReplyElement error(coll,
+                                        ErrorCodes::APIStrictError,
+                                        ErrorCodes::errorString(ErrorCodes::APIStrictError),
+                                        status.reason());
 
                 if (!_sizeTracker.incrementAndCheckOverflow(error)) {
                     _reply.setHasMoreErrors(true);
@@ -253,12 +251,12 @@ public:
                 const IndexDescriptor* desc = ii->next()->descriptor();
                 if (apiStrict && apiVersion == "1" &&
                     !index_key_validate::isIndexAllowedInAPIVersion1(*desc)) {
-                    ErrorReplyElement error(
-                        NamespaceStringUtil::serialize(coll, SerializationContext::stateDefault()),
-                        ErrorCodes::APIStrictError,
-                        ErrorCodes::errorString(ErrorCodes::APIStrictError),
-                        str::stream() << "The index with name " << desc->indexName()
-                                      << " is not allowed in API version 1.");
+                    ErrorReplyElement error(coll,
+                                            ErrorCodes::APIStrictError,
+                                            ErrorCodes::errorString(ErrorCodes::APIStrictError),
+                                            str::stream()
+                                                << "The index with name " << desc->indexName()
+                                                << " is not allowed in API version 1.");
                     if (!_sizeTracker.incrementAndCheckOverflow(error)) {
                         _reply.setHasMoreErrors(true);
                         return false;

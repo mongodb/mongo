@@ -120,7 +120,7 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
           "TenantCollectionCloner"_sd, sharedData, source, client, storageInterface, dbPool),
       _sourceNss(sourceNss),
       _collectionOptions(collectionOptions),
-      _sourceDbAndUuid(NamespaceString()),
+      _sourceDbAndUuid(NamespaceString::kEmpty),
       _collectionClonerBatchSize(collectionClonerBatchSize),
       _countStage("count", this, &TenantCollectionCloner::countStage),
       _checkIfDonorCollectionIsEmptyStage(

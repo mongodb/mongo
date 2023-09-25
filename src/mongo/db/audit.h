@@ -346,7 +346,7 @@ void logCreateCollection(Client* client, const NamespaceString& nsname);
  */
 void logCreateView(Client* client,
                    const NamespaceString& nsname,
-                   StringData viewOn,
+                   const NamespaceString& viewOn,
                    BSONArray pipeline,
                    ErrorCodes::Error code);
 
@@ -376,7 +376,7 @@ void logDropCollection(Client* client, const NamespaceString& nsname);
  */
 void logDropView(Client* client,
                  const NamespaceString& nsname,
-                 StringData viewOn,
+                 const NamespaceString& viewOn,
                  const std::vector<BSONObj>& pipeline,
                  ErrorCodes::Error code);
 
@@ -410,12 +410,17 @@ void logRemoveShard(Client* client, StringData shardname);
 /**
  * Logs the result of a shardCollection command.
  */
-void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique);
+void logShardCollection(Client* client,
+                        const NamespaceString& ns,
+                        const BSONObj& keyPattern,
+                        bool unique);
 
 /**
  * Logs the result of a refineCollectionShardKey event.
  */
-void logRefineCollectionShardKey(Client* client, StringData ns, const BSONObj& keyPattern);
+void logRefineCollectionShardKey(Client* client,
+                                 const NamespaceString& ns,
+                                 const BSONObj& keyPattern);
 
 /**
  * Logs an insert of a potentially security sensitive record.

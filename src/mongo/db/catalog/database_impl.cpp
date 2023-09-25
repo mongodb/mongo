@@ -688,12 +688,7 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
                                                            options.collation);
     }
 
-    audit::logCreateView(
-        opCtx->getClient(),
-        viewName,
-        NamespaceStringUtil::serialize(viewOnNss, SerializationContext::stateDefault()),
-        pipeline,
-        status.code());
+    audit::logCreateView(opCtx->getClient(), viewName, viewOnNss, pipeline, status.code());
     return status;
 }
 

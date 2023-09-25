@@ -496,7 +496,7 @@ UUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
  */
 NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& uuid) {
     const Collection* source = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
-    return source ? source->ns() : NamespaceString();
+    return source ? source->ns() : NamespaceString::kEmpty;
 }
 
 /**

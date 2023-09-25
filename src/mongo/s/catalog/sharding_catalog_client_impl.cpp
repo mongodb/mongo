@@ -1433,7 +1433,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getShardsThatOwnDataAtClusterTime
         return getHistoricalPlacement(opCtx, clusterTime, boost::none);
     }
 
-    ConfigsvrGetHistoricalPlacement request(NamespaceString(), clusterTime);
+    ConfigsvrGetHistoricalPlacement request(NamespaceString::kEmpty, clusterTime);
     request.setTargetWholeCluster(true);
     return _fetchPlacementMetadata(opCtx, std::move(request));
 }

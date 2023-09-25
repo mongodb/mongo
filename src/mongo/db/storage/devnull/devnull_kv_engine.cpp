@@ -329,8 +329,11 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                        StringData ident,
                                                                        KeyFormat keyFormat) {
-    return std::make_unique<DevNullRecordStore>(
-        NamespaceString() /* ns */, boost::none /* uuid */, ident, CollectionOptions(), keyFormat);
+    return std::make_unique<DevNullRecordStore>(NamespaceString::kEmpty /* ns */,
+                                                boost::none /* uuid */,
+                                                ident,
+                                                CollectionOptions(),
+                                                keyFormat);
 }
 
 std::unique_ptr<SortedDataInterface> DevNullKVEngine::getSortedDataInterface(

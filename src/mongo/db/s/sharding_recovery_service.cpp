@@ -205,7 +205,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         Lock::GlobalLock lk(opCtx, MODE_IX);
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))) {
+        if (nss.isDbOnly()) {
             tassert(8096300,
                     "Cannot acquire critical section on the config database",
                     !nss.isConfigDB());
@@ -324,7 +324,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))) {
+        if (nss.isDbOnly()) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
             collLock.emplace(opCtx,
@@ -451,7 +451,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     {
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
-        if (nsIsDbOnly(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))) {
+        if (nss.isDbOnly()) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
             collLock.emplace(opCtx,
@@ -582,8 +582,7 @@ void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContex
     store.forEach(opCtx, BSONObj{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
         const auto& nss = doc.getNss();
         {
-            if (nsIsDbOnly(
-                    NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))) {
+            if (nss.isDbOnly()) {
                 AutoGetDb dbLock(opCtx, nss.dbName(), MODE_X);
                 auto scopedDss =
                     DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, nss.dbName());

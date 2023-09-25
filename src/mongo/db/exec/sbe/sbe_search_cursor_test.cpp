@@ -142,7 +142,7 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     expCtx->uuid = UUID::gen();
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeS<SearchCursorStage>(NamespaceString(),
+    auto searchCursor = makeS<SearchCursorStage>(NamespaceString::kEmpty,
                                                  expCtx->uuid,
                                                  resultSlot,
                                                  metadataNames,
@@ -234,7 +234,7 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
 
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeS<SearchCursorStage>(NamespaceString(),
+    auto searchCursor = makeS<SearchCursorStage>(NamespaceString::kEmpty,
                                                  expCtx->uuid,
                                                  resultSlot,
                                                  metadataNames,
@@ -304,7 +304,7 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     expCtx->uuid = UUID::gen();
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeS<SearchCursorStage>(NamespaceString(),
+    auto searchCursor = makeS<SearchCursorStage>(NamespaceString::kEmpty,
                                                  expCtx->uuid,
                                                  resultSlot,
                                                  metadataNames,

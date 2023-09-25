@@ -434,7 +434,7 @@ private:
     const StringData _commandName;
 
     std::shared_ptr<CommandInvocation> _invocation;
-    boost::optional<std::string> _ns;
+    boost::optional<NamespaceString> _ns;
     OperationSessionInfoFromClient _osi;
     boost::optional<WriteConcernOptions> _wc;
     boost::optional<bool> _isHello;
@@ -590,9 +590,8 @@ void ParseAndRunCommand::_parseCommand() {
     // Set the logical optype, command object and namespace as soon as we identify the command. If
     // the command does not define a fully-qualified namespace, set CurOp to the generic command
     // namespace db.$cmd.
-    _ns.emplace(
-        NamespaceStringUtil::serialize(_invocation->ns(), SerializationContext::stateDefault()));
-    const auto nss = (request.getDatabase() == *_ns
+    _ns.emplace(_invocation->ns());
+    const auto nss = (NamespaceString(request.getDbName()) == *_ns
                           ? NamespaceString::makeCommandNamespace(_invocation->ns().dbName())
                           : _invocation->ns());
 
@@ -647,9 +646,10 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     if (MONGO_unlikely(
             hangBeforeCheckingMongosShutdownInterrupt.shouldFail([&](const BSONObj& data) {
                 if (data.hasField("cmdName") && data.hasField("ns")) {
-                    std::string cmdNS = _parc->_ns.value();
-                    return ((data.getStringField("cmdName") == _parc->_commandName) &&
-                            (data.getStringField("ns") == cmdNS));
+                    const auto cmdNss = _parc->_ns.value();
+                    const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                    return (data.getStringField("cmdName") == _parc->_commandName &&
+                            fpNss == cmdNss);
                 }
                 return false;
             }))) {
@@ -936,8 +936,7 @@ void ParseAndRunCommand::RunAndRetry::_setup() {
         // Re-parse before retrying in case the process of run()-ning the invocation could
         // affect the parsed result.
         _parc->_invocation = command->parse(opCtx, request);
-        invariant(NamespaceStringUtil::serialize(
-                      _parc->_invocation->ns(), SerializationContext::stateDefault()) == _parc->_ns,
+        invariant(_parc->_invocation->ns() == _parc->_ns,
                   "unexpected change of namespace when retrying");
     }
 

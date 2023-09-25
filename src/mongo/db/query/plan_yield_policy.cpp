@@ -186,7 +186,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
                 _callbacks->handledWriteConflict(opCtx);
             }
             logWriteConflictAndBackoff(
-                attempt, "query yield", e.reason(), NamespaceStringOrUUID(NamespaceString()));
+                attempt, "query yield", e.reason(), NamespaceStringOrUUID(NamespaceString::kEmpty));
             // Retry the yielding process.
         } catch (...) {
             // Errors other than write conflicts don't get retried, and should instead result in

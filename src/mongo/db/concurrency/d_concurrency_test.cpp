@@ -211,7 +211,7 @@ public:
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryInstantiatesOK) {
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    writeConflictRetry(opCtx.get(), "", NamespaceString(), [] {});
+    writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [] {});
 }
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflictException) {
@@ -219,7 +219,7 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflict
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     auto&& opDebug = CurOp::get(opCtx.get())->debug();
     ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
-    ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", NamespaceString(), [&opDebug] {
+    ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opDebug] {
                       if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
                           throwWriteConflictException(
                               str::stream()
@@ -236,7 +236,7 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictExce
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     ASSERT_THROWS_CODE(writeConflictRetry(opCtx.get(),
                                           "",
-                                          NamespaceString(),
+                                          NamespaceString::kEmpty,
                                           [] {
                                               uassert(ErrorCodes::OperationFailed, "", false);
                                               MONGO_UNREACHABLE;
@@ -254,7 +254,7 @@ TEST_F(DConcurrencyTestFixture,
     ASSERT_THROWS(writeConflictRetry(
                       opCtx.get(),
                       "",
-                      NamespaceString(),
+                      NamespaceString::kEmpty,
                       [] {
                           throwWriteConflictException(
                               str::stream() << "Verify that WriteConflictExceptions are propogated "

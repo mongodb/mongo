@@ -150,7 +150,7 @@ public:
 
         _metrics = ReshardingMetrics::makeInstance(_reshardingUUID,
                                                    BSON("y" << 1),
-                                                   NamespaceString(),
+                                                   NamespaceString::kEmpty,
                                                    ReshardingMetrics::Role::kRecipient,
                                                    getServiceContext()->getFastClockSource()->now(),
                                                    getServiceContext());

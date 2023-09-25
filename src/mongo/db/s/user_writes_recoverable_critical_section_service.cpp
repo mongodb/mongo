@@ -182,7 +182,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
 }  // namespace
 
 const NamespaceString UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace =
-    NamespaceString();
+    NamespaceString::kEmpty;
 
 UserWritesRecoverableCriticalSectionService* UserWritesRecoverableCriticalSectionService::get(
     ServiceContext* serviceContext) {

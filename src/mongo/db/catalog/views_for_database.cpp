@@ -395,11 +395,7 @@ void ViewsForDatabase::remove(OperationContext* opCtx,
 void ViewsForDatabase::clear(OperationContext* opCtx) {
     for (auto&& [name, view] : _viewMap) {
         audit::logDropView(
-            opCtx->getClient(),
-            view->name(),
-            NamespaceStringUtil::serialize(view->viewOn(), SerializationContext::stateDefault()),
-            view->pipeline(),
-            ErrorCodes::OK);
+            opCtx->getClient(), view->name(), view->viewOn(), view->pipeline(), ErrorCodes::OK);
     }
 
     _viewMap.clear();
