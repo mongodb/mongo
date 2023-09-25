@@ -615,7 +615,6 @@ void ExpressionKeysPrivate::getFTSKeys(SharedBufferFragmentBuilder& pooledBuffer
 void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                                         const BSONObj& obj,
                                         const BSONObj& keyPattern,
-                                        HashSeed seed,
                                         int hashVersion,
                                         bool isSparse,
                                         const CollatorInterface* collator,
@@ -670,7 +669,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
         if (indexEntry.isNumber()) {
             keyString.appendBSONElement(fieldVal);
         } else {
-            keyString.appendNumberLong(makeSingleHashKey(fieldVal, seed, hashVersion));
+            keyString.appendNumberLong(makeSingleHashKey(fieldVal, hashVersion));
         }
     }
     if (isSparse && !hasFieldValue) {
@@ -683,9 +682,11 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
 }
 
 // static
-long long int ExpressionKeysPrivate::makeSingleHashKey(const BSONElement& e, HashSeed seed, int v) {
+long long int ExpressionKeysPrivate::makeSingleHashKey(const BSONElement& e, int v) {
+    // *** WARNING ***
+    // Changing the seed default will break existing indexes and sharded collections
     massert(16767, "Only HashVersion 0 has been defined", v == 0);
-    return BSONElementHasher::hash64(e, seed);
+    return BSONElementHasher::hash64(e, BSONElementHasher::DEFAULT_HASH_SEED);
 }
 
 void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferBuilder,

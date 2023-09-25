@@ -80,21 +80,8 @@ void ExpressionParams::parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParam
 }
 
 void ExpressionParams::parseHashParams(const BSONObj& infoObj,
-                                       HashSeed* seedOut,
                                        int* versionOut,
                                        BSONObj* keyPattern) {
-    // Default _seed to DEFAULT_HASH_SEED if "seed" is not included in the index spec
-    // or if the value of "seed" is not a number
-
-    // *** WARNING ***
-    // Choosing non-default seeds will invalidate hashed sharding
-    // Changing the seed default will break existing indexes and sharded collections
-    if (infoObj["seed"].eoo()) {
-        *seedOut = BSONElementHasher::DEFAULT_HASH_SEED;
-    } else {
-        *seedOut = infoObj["seed"].numberInt();
-    }
-
     // In case we have hashed indexes based on other hash functions in the future, we store
     // a hashVersion number. If hashVersion changes, "makeSingleHashKey" will need to change
     // accordingly.  Defaults to 0 if "hashVersion" is not included in the index spec or if

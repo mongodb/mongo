@@ -46,10 +46,7 @@ namespace ExpressionParams {
 
 void parseTwoDParams(const BSONObj& infoObj, TwoDIndexingParams* out);
 
-void parseHashParams(const BSONObj& infoObj,
-                     HashSeed* seedOut,
-                     int* versionOut,
-                     BSONObj* keyPattern);
+void parseHashParams(const BSONObj& infoObj, int* versionOut, BSONObj* keyPattern);
 
 void parseHaystackParams(const BSONObj& infoObj,
                          std::string* geoFieldOut,

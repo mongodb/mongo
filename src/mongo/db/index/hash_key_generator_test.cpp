@@ -64,7 +64,6 @@ using namespace mongo;
 
 namespace {
 
-const HashSeed kHashSeed = 0;
 const int kHashVersion = 0;
 
 std::string dumpKeyset(const KeyStringSet& keyStrings) {
@@ -100,9 +99,10 @@ bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& ac
 }
 
 key_string::Value makeHashKey(BSONElement elt) {
-    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
-                                      BSON("" << BSONElementHasher::hash64(elt, kHashSeed)),
-                                      Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion,
+        BSON("" << BSONElementHasher::hash64(elt, BSONElementHasher::DEFAULT_HASH_SEED)),
+        Ordering::make(BSONObj()));
     return keyString.release();
 }
 
@@ -118,7 +118,6 @@ TEST_F(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        false,
                                        &collator,
@@ -143,7 +142,6 @@ TEST_F(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        false,
                                        &collator,
@@ -168,7 +166,6 @@ TEST_F(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        false,
                                        &collator,
@@ -193,7 +190,6 @@ TEST_F(HashKeyGeneratorTest, CollationAppliedforAllIndexFields) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        true,
                                        &collator,
@@ -206,7 +202,8 @@ TEST_F(HashKeyGeneratorTest, CollationAppliedforAllIndexFields) {
     key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
                                       Ordering::make(BSONObj()));
     keyString.appendBSONElement(backwardsObj["a"]["c"]);
-    keyString.appendNumberLong(BSONElementHasher::hash64(backwardsObj["a"], kHashSeed));
+    keyString.appendNumberLong(
+        BSONElementHasher::hash64(backwardsObj["a"], BSONElementHasher::DEFAULT_HASH_SEED));
     expectedKeys.insert(keyString.release());
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
 }
@@ -218,7 +215,6 @@ TEST_F(HashKeyGeneratorTest, NoCollation) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        false,
                                        nullptr,
@@ -240,7 +236,6 @@ TEST_F(HashKeyGeneratorTest, CompoundIndexEmptyObject) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        false,
                                        nullptr,
@@ -255,7 +250,8 @@ TEST_F(HashKeyGeneratorTest, CompoundIndexEmptyObject) {
                                       Ordering::make(BSONObj()));
     auto nullBSON = BSON("" << BSONNULL);
     auto nullElement = nullBSON.firstElement();
-    keyString.appendNumberLong(BSONElementHasher::hash64(nullElement, kHashSeed));
+    keyString.appendNumberLong(
+        BSONElementHasher::hash64(nullElement, BSONElementHasher::DEFAULT_HASH_SEED));
     keyString.appendBSONElement(nullElement);
     keyString.appendBSONElement(nullElement);
     expectedKeys.insert(keyString.release());
@@ -269,7 +265,6 @@ TEST_F(HashKeyGeneratorTest, SparseIndex) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        true,  // isSparse
                                        nullptr,
@@ -288,7 +283,6 @@ TEST_F(HashKeyGeneratorTest, SparseIndexWithAFieldPresent) {
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        true,  // isSparse
                                        nullptr,
@@ -303,7 +297,8 @@ TEST_F(HashKeyGeneratorTest, SparseIndexWithAFieldPresent) {
                                       Ordering::make(BSONObj()));
     auto nullBSON = BSON("" << BSONNULL);
     auto nullElement = nullBSON.firstElement();
-    keyString.appendNumberLong(BSONElementHasher::hash64(obj["a"], kHashSeed));
+    keyString.appendNumberLong(
+        BSONElementHasher::hash64(obj["a"], BSONElementHasher::DEFAULT_HASH_SEED));
     keyString.appendBSONElement(nullElement);
     keyString.appendBSONElement(nullElement);
     expectedKeys.insert(keyString.release());
@@ -317,7 +312,6 @@ TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathFails) {
     ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(allocator,
                                                           obj,
                                                           indexSpec,
-                                                          kHashSeed,
                                                           kHashVersion,
                                                           false,
                                                           nullptr,
@@ -336,7 +330,6 @@ TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIs
     ExpressionKeysPrivate::getHashKeys(allocator,
                                        obj,
                                        indexSpec,
-                                       kHashSeed,
                                        kHashVersion,
                                        false,
                                        nullptr,
@@ -358,7 +351,6 @@ TEST_F(HashKeyGeneratorTest, ArrayAtTerminalPathAlwaysFails) {
     ASSERT_THROWS_CODE(ExpressionKeysPrivate::getHashKeys(allocator,
                                                           obj,
                                                           indexSpec,
-                                                          kHashSeed,
                                                           kHashVersion,
                                                           true,  // isSparse
                                                           nullptr,

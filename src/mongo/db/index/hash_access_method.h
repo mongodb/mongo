@@ -83,9 +83,6 @@ private:
 
     BSONObj _keyPattern;
 
-    // _seed defaults to zero.
-    HashSeed _seed;
-
     // _hashVersion defaults to zero.
     int _hashVersion;
 

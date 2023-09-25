@@ -201,11 +201,9 @@ private:
      * Generates the key strings for the 'hashed' index type and adds them to the 'keyStrings'.
      */
     void _generateHashedIndexKeys(KeyStringSet* keyStrings) const {
-        HashSeed seed;
         int hashVersion;
         BSONObj keyPattern;
-        ExpressionParams::parseHashParams(
-            _indexDescriptor->infoObj(), &seed, &hashVersion, &keyPattern);
+        ExpressionParams::parseHashParams(_indexDescriptor->infoObj(), &hashVersion, &keyPattern);
 
         constexpr auto ignoreArraysAlongPath = false;
         const boost::optional<RecordId> recordId = boost::none;
@@ -214,7 +212,6 @@ private:
         ExpressionKeysPrivate::getHashKeys(pooledBufferBuilder,
                                            _docObj,
                                            keyPattern,
-                                           seed,
                                            hashVersion,
                                            _indexDescriptor->isSparse(),
                                            _collatorInterface.get(),

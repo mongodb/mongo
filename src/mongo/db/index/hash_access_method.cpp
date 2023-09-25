@@ -49,7 +49,7 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState,
     uassert(16764,
             "Currently hashed indexes cannot guarantee uniqueness. Use a regular index.",
             !descriptor->unique());
-    ExpressionParams::parseHashParams(descriptor->infoObj(), &_seed, &_hashVersion, &_keyPattern);
+    ExpressionParams::parseHashParams(descriptor->infoObj(), &_hashVersion, &_keyPattern);
 
     _collator = btreeState->getCollator();
 }
@@ -73,7 +73,6 @@ void HashAccessMethod::doGetKeys(OperationContext* opCtx,
     ExpressionKeysPrivate::getHashKeys(pooledBufferBuilder,
                                        obj,
                                        _keyPattern,
-                                       _seed,
                                        _hashVersion,
                                        entry->descriptor()->isSparse(),
                                        _collator,

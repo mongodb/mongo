@@ -109,7 +109,6 @@ public:
     static void getHashKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                             const BSONObj& obj,
                             const BSONObj& keyPattern,
-                            HashSeed seed,
                             int hashVersion,
                             bool isSparse,
                             const CollatorInterface* collator,
@@ -124,7 +123,7 @@ public:
      * Exposed for testing in dbtests/namespacetests.cpp and
      * so mongo/db/index_legacy.cpp can use it.
      */
-    static long long int makeSingleHashKey(const BSONElement& e, HashSeed seed, int v);
+    static long long int makeSingleHashKey(const BSONElement& e, int v);
 
     //
     // S2
