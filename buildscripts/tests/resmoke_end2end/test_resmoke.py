@@ -4,6 +4,7 @@ import logging
 import json
 import os
 import os.path
+import subprocess
 import sys
 import time
 import unittest
@@ -427,3 +428,21 @@ class TestSetParameters(_ResmokeSelftest):
                     """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}""",
                     """--mongodSetParameter={"mirrorReads": {samplingRate: 1.0}}"""
                 ]).wait())
+
+
+class TestMultiversionConfig(unittest.TestCase):
+    def test_valid_yaml(self):
+        file_name = "multiversion-config.yml"
+        subprocess.run([
+            sys.executable, "buildscripts/resmoke.py", "multiversion-config",
+            "--config-file-output", file_name
+        ], check=True)
+        with open(file_name, "r") as file:
+            file_contents = file.read()
+
+        try:
+            yaml.safe_load(file_contents)
+        except Exception:  # pylint: disable=broad-except
+            self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
+
+        os.remove(file_name)
