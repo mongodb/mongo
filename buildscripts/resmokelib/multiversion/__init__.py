@@ -1,4 +1,5 @@
 """Subcommand for multiversion config."""
+import argparse
 from typing import List, Optional
 
 import yaml
@@ -36,10 +37,18 @@ class MultiversionConfig(BaseModel):
 class MultiversionConfigSubcommand(Subcommand):
     """Subcommand for discovering multiversion configuration."""
 
+    def __init__(self, options: argparse.Namespace) -> None:
+        self.config_file_output = options.config_file_output
+
     def execute(self):
         """Execute the subcommand."""
         mv_config = self.determine_multiversion_config()
-        print(yaml.safe_dump(mv_config.dict()))
+        yaml_output = yaml.safe_dump(mv_config.dict())
+        print(yaml_output)
+
+        if self.config_file_output:
+            with open(self.config_file_output, "w") as file:
+                file.write(yaml_output)
 
     @staticmethod
     def determine_multiversion_config() -> MultiversionConfig:
@@ -63,16 +72,20 @@ class MultiversionConfigSubcommand(Subcommand):
 class MultiversionPlugin(PluginInterface):
     """Multiversion plugin."""
 
-    def add_subcommand(self, subparsers) -> None:
+    def add_subcommand(self, subparsers: argparse._SubParsersAction) -> None:
         """
         Add parser options for this plugin.
 
         :param subparsers: argparse subparsers
         """
-        subparsers.add_parser(MULTIVERSION_SUBCOMMAND,
-                              help="Display configuration for multiversion testing")
+        parser = subparsers.add_parser(MULTIVERSION_SUBCOMMAND,
+                                       help="Display configuration for multiversion testing")
 
-    def parse(self, subcommand, parser, parsed_args, **kwargs) -> Optional[Subcommand]:
+        parser.add_argument("--config-file-output", '-f', action="store", type=str, default=None,
+                            help="File to write the multiversion config to.")
+
+    def parse(self, subcommand: str, parser: argparse.ArgumentParser,
+              parsed_args: argparse.Namespace, **kwargs) -> Optional[Subcommand]:
         """
         Resolve command-line options to a Subcommand or None.
 
@@ -84,5 +97,5 @@ class MultiversionPlugin(PluginInterface):
         """
         configure_resmoke.validate_and_update_config(parser, parsed_args)
         if subcommand == MULTIVERSION_SUBCOMMAND:
-            return MultiversionConfigSubcommand()
+            return MultiversionConfigSubcommand(parsed_args)
         return None

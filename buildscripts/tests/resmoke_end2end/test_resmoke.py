@@ -658,11 +658,17 @@ class TestEvergreenYML(unittest.TestCase):
 
 class TestMultiversionConfig(unittest.TestCase):
     def test_valid_yaml(self):
-        process = subprocess.run([sys.executable, "buildscripts/resmoke.py", "multiversion-config"],
-                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        self.assertEqual(process.returncode, 0)
-        output = process.stdout
+        file_name = "multiversion-config.yml"
+        subprocess.run([
+            sys.executable, "buildscripts/resmoke.py", "multiversion-config",
+            "--config-file-output", file_name
+        ], check=True)
+        with open(file_name, "r") as file:
+            file_contents = file.read()
+
         try:
-            yaml.safe_load(output)
+            yaml.safe_load(file_contents)
         except Exception:
             self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
+
+        os.remove(file_name)
