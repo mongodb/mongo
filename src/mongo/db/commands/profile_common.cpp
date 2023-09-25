@@ -60,7 +60,11 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
                                              const BSONObj& cmdObj) const {
     AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
 
-    auto request = ProfileCmdRequest::parse(IDLParserContext("profile"), cmdObj);
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+
+    auto request = ProfileCmdRequest::parse(
+        IDLParserContext("profile", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
     if (profilingLevel < 0 && !request.getSlowms() && !request.getSampleRate()) {
@@ -84,7 +88,11 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          const BSONObj& cmdObj,
                          BSONObjBuilder& result) {
-    auto request = ProfileCmdRequest::parse(IDLParserContext("profile"), cmdObj);
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+
+    auto request = ProfileCmdRequest::parse(
+        IDLParserContext("profile", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
     // Validate arguments before making changes.

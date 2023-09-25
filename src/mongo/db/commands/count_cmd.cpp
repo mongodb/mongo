@@ -304,8 +304,11 @@ public:
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
+        auto sc = SerializationContext::stateCommandRequest();
+        sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+
         auto request = CountCommandRequest::parse(
-            IDLParserContext("count", false /* apiStrict */, dbName.tenantId()), cmdObj);
+            IDLParserContext("count", false /* apiStrict */, dbName.tenantId(), sc), cmdObj);
         auto curOp = CurOp::get(opCtx);
         curOp->beginQueryPlanningTimer();
         if (shouldDoFLERewrite(request)) {

@@ -404,7 +404,11 @@ public:
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-        auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
+        auto sc = SerializationContext::stateCommandRequest();
+        sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+
+        auto cmd = HelloCommand::parse(IDLParserContext("hello", apiStrict, dbName.tenantId(), sc),
+                                       cmdObj);
 
         waitInHello.execute(
             [&](const BSONObj& customArgs) { _handleHelloFailPoint(customArgs, opCtx, cmdObj); });
