@@ -3,6 +3,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
 cd src
 
+echo "GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}" >> "signing-envfile"
+echo "GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}" >> "signing-envfile"
+
 set -o errexit
 set -o verbose
 
@@ -23,8 +26,7 @@ gpg --yes -v --armor -o $crypt_file_name.sig --detach-sign $crypt_file_name
 EOF
 
 podman run \
-  -e GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70} \
-  -e GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70} \
+  --env-file=signing-envfile \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
   ${garasign_gpg_image} \

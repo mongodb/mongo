@@ -7697,7 +7697,7 @@ tasks:
       shell: bash
       script: |
         set -oe
-        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
+        echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
   - command: subprocess.exec
     params:
       binary: bash
@@ -7776,7 +7776,7 @@ tasks:
       shell: bash
       script: |
         set -oe
-        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
+        echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
 
   # signing windows artifacts
   - command: subprocess.exec
@@ -8332,7 +8332,7 @@ tasks:
       shell: bash
       script: |
         set -oe
-        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
+        echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
   - command: subprocess.exec
     params:
       binary: bash
