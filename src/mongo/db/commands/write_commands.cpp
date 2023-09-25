@@ -1260,6 +1260,10 @@ public:
                 !shardVersion.eoo()) {
                 bob->append(shardVersion);
             }
+            if (const auto& databaseVersion = _commandObj.getField("databaseVersion");
+                !databaseVersion.eoo()) {
+                bob->append(databaseVersion);
+            }
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {

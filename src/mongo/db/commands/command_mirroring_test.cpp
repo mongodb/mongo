@@ -108,6 +108,7 @@ public:
     void setUp() override {
         CommandMirroringTest::setUp();
         shardVersion = boost::none;
+        databaseVersion = boost::none;
     }
 
     std::string commandName() override {
@@ -119,6 +120,10 @@ public:
         if (shardVersion) {
             args.push_back(shardVersion.get());
         }
+        if (databaseVersion) {
+            args.push_back(databaseVersion.value());
+        }
+
         auto request = CommandMirroringTest::makeCommand(coll, args);
 
         // Directly add `updates` to `OpMsg::sequences` to emulate `OpMsg::parse()` behavior.
@@ -134,6 +139,7 @@ public:
     }
 
     boost::optional<BSONObj> shardVersion;
+    boost::optional<BSONObj> databaseVersion;
 };
 
 TEST_F(UpdateCommandTest, NoQuery) {
@@ -192,21 +198,26 @@ TEST_F(UpdateCommandTest, MultipleQueries) {
     ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
 }
 
-TEST_F(UpdateCommandTest, ValidateShardVersion) {
+TEST_F(UpdateCommandTest, ValidateShardVersionAndDatabaseVersion) {
     auto update = BSON("q" << BSONObj() << "u" << BSON("$set" << BSON("_id" << 1)));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
 
         ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+        ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
     }
 
     const auto kShardVersion = 123;
+    const auto kDatabaseVersion = 456;
     shardVersion = BSON("shardVersion" << kShardVersion);
+    databaseVersion = BSON("databaseVersion" << kDatabaseVersion);
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, {update});
 
         ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
+        ASSERT_TRUE(mirroredObj.hasField("databaseVersion"));
         ASSERT_EQ(mirroredObj["shardVersion"].Int(), kShardVersion);
+        ASSERT_EQ(mirroredObj["databaseVersion"].Int(), kDatabaseVersion);
     }
 }
 
@@ -228,7 +239,8 @@ public:
                 "max",
                 "batchSize",
                 "singleBatch",
-                "shardVersion"};
+                "shardVersion",
+                "databaseVersion"};
     }
 
     void checkFieldNamesAreAllowed(BSONObj& mirroredObj) {
@@ -263,7 +275,8 @@ TEST_F(FindCommandTest, MirrorableKeys) {
                      BSON("awaitData" << true),
                      BSON("allowPartialResults" << true),
                      BSON("collation" << BSONObj()),
-                     BSON("shardVersion" << BSONObj())};
+                     BSON("shardVersion" << BSONObj()),
+                     BSON("databaseVersion" << BSONObj())};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -291,7 +304,8 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
     const auto min = BSONObj();
     const auto max = BSONObj();
 
-    const auto shardVersion = BSONObj();
+    const auto shardVersion = BSON("v" << 123);
+    const auto databaseVersion = BSON("v" << 456);
 
     auto findArgs = {BSON("filter" << filter),
                      BSON("skip" << skip),
@@ -301,7 +315,8 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
                      BSON("collation" << collation),
                      BSON("min" << min),
                      BSON("max" << max),
-                     BSON("shardVersion" << shardVersion)};
+                     BSON("shardVersion" << shardVersion),
+                     BSON("databaseVersion" << databaseVersion)};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
 
@@ -315,21 +330,27 @@ TEST_F(FindCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["min"].Obj(), min));
     ASSERT(compareBSONObjs(mirroredObj["max"].Obj(), max));
     ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), shardVersion));
+    ASSERT(compareBSONObjs(mirroredObj["databaseVersion"].Obj(), databaseVersion));
 }
 
-TEST_F(FindCommandTest, ValidateShardVersion) {
+TEST_F(FindCommandTest, ValidateShardVersionAndDatabaseVersion) {
     std::vector<BSONObj> findArgs = {BSON("filter" << BSONObj())};
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
         ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+        ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
     }
 
     const auto kShardVersion = 123;
+    const auto kDatabaseVersion = 456;
     findArgs.push_back(BSON("shardVersion" << kShardVersion));
+    findArgs.push_back(BSON("databaseVersion" << kDatabaseVersion));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, findArgs);
         ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
+        ASSERT_TRUE(mirroredObj.hasField("databaseVersion"));
         ASSERT_EQ(mirroredObj["shardVersion"].Int(), kShardVersion);
+        ASSERT_EQ(mirroredObj["databaseVersion"].Int(), kDatabaseVersion);
     }
 }
 
@@ -340,7 +361,14 @@ public:
     }
 
     std::vector<std::string> getAllowedKeys() const override {
-        return {"sort", "collation", "find", "filter", "batchSize", "singleBatch", "shardVersion"};
+        return {"sort",
+                "collation",
+                "find",
+                "filter",
+                "batchSize",
+                "singleBatch",
+                "shardVersion",
+                "databaseVersion"};
     }
 };
 
@@ -356,7 +384,9 @@ TEST_F(FindAndModifyCommandTest, MirrorableKeys) {
                               BSON("writeConcern" << BSONObj()),
                               BSON("maxTimeMS" << 100),
                               BSON("collation" << BSONObj()),
-                              BSON("arrayFilters" << BSONArray())};
+                              BSON("arrayFilters" << BSONArray()),
+                              BSON("shardVersion" << 123),
+                              BSON("databaseVersion" << 456)};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findAndModifyArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -381,12 +411,16 @@ TEST_F(FindAndModifyCommandTest, ValidateMirroredQuery) {
     constexpr auto upsert = true;
     const auto collation = BSON("locale"
                                 << "\"fr\"");
+    const auto shardVersion = BSON("v" << 123);
+    const auto databaseVersion = BSON("v" << 456);
 
     auto findAndModifyArgs = {BSON("query" << query),
                               BSON("sort" << sortObj),
                               BSON("update" << update),
                               BSON("upsert" << upsert),
-                              BSON("collation" << collation)};
+                              BSON("collation" << collation),
+                              BSON("shardVersion" << shardVersion),
+                              BSON("databaseVersion" << databaseVersion)};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, findAndModifyArgs);
 
@@ -395,9 +429,11 @@ TEST_F(FindAndModifyCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["filter"].Obj(), query));
     ASSERT(compareBSONObjs(mirroredObj["sort"].Obj(), sortObj));
     ASSERT(compareBSONObjs(mirroredObj["collation"].Obj(), collation));
+    ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), shardVersion));
+    ASSERT(compareBSONObjs(mirroredObj["databaseVersion"].Obj(), databaseVersion));
 }
 
-TEST_F(FindAndModifyCommandTest, ValidateShardVersion) {
+TEST_F(FindAndModifyCommandTest, ValidateShardVersionAndDatabaseVersion) {
     std::vector<BSONObj> findAndModifyArgs = {BSON("query" << BSON("name"
                                                                    << "Andy")),
                                               BSON("update" << BSON("$inc" << BSON("score" << 1)))};
@@ -405,14 +441,19 @@ TEST_F(FindAndModifyCommandTest, ValidateShardVersion) {
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, findAndModifyArgs);
         ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+        ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
     }
 
     const auto kShardVersion = 123;
+    const auto kDatabaseVersion = 456;
     findAndModifyArgs.push_back(BSON("shardVersion" << kShardVersion));
+    findAndModifyArgs.push_back(BSON("databaseVersion" << kDatabaseVersion));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, findAndModifyArgs);
         ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
+        ASSERT_TRUE(mirroredObj.hasField("databaseVersion"));
         ASSERT_EQ(mirroredObj["shardVersion"].Int(), kShardVersion);
+        ASSERT_EQ(mirroredObj["databaseVersion"].Int(), kDatabaseVersion);
     }
 }
 
@@ -423,7 +464,7 @@ public:
     }
 
     std::vector<std::string> getAllowedKeys() const override {
-        return {"distinct", "key", "query", "collation", "shardVersion"};
+        return {"distinct", "key", "query", "collation", "shardVersion", "databaseVersion"};
     }
 };
 
@@ -433,7 +474,8 @@ TEST_F(DistinctCommandTest, MirrorableKeys) {
                          BSON("query" << BSONObj()),
                          BSON("readConcern" << BSONObj()),
                          BSON("collation" << BSONObj()),
-                         BSON("shardVersion" << BSONObj())};
+                         BSON("shardVersion" << BSONObj()),
+                         BSON("databaseVersion" << BSONObj())};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, distinctArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -446,13 +488,15 @@ TEST_F(DistinctCommandTest, ValidateMirroredQuery) {
     const auto readConcern = BSON("level"
                                   << "majority");
     const auto collation = BSON("strength" << 1);
-    const auto shardVersion = BSONObj();
+    const auto shardVersion = BSON("v" << 123);
+    const auto databaseVersion = BSON("v" << 456);
 
     auto distinctArgs = {BSON("key" << key),
                          BSON("query" << query),
                          BSON("readConcern" << readConcern),
                          BSON("collation" << collation),
-                         BSON("shardVersion" << shardVersion)};
+                         BSON("shardVersion" << shardVersion),
+                         BSON("databaseVersion" << databaseVersion)};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, distinctArgs);
 
@@ -462,23 +506,27 @@ TEST_F(DistinctCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["query"].Obj(), query));
     ASSERT(compareBSONObjs(mirroredObj["collation"].Obj(), collation));
     ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), shardVersion));
+    ASSERT(compareBSONObjs(mirroredObj["databaseVersion"].Obj(), databaseVersion));
 }
 
-TEST_F(DistinctCommandTest, ValidateShardVersion) {
-    const auto kCollection = "test";
-
+TEST_F(DistinctCommandTest, ValidateShardVersionAndDatabaseVersion) {
     std::vector<BSONObj> distinctArgs = {BSON("distinct" << BSONObj())};
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, distinctArgs);
         ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+        ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
     }
 
     const auto kShardVersion = 123;
+    const auto kDatabaseVersion = 456;
     distinctArgs.push_back(BSON("shardVersion" << kShardVersion));
+    distinctArgs.push_back(BSON("databaseVersion" << kDatabaseVersion));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, distinctArgs);
         ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
+        ASSERT_TRUE(mirroredObj.hasField("databaseVersion"));
         ASSERT_EQ(mirroredObj["shardVersion"].Int(), kShardVersion);
+        ASSERT_EQ(mirroredObj["databaseVersion"].Int(), kDatabaseVersion);
     }
 }
 
@@ -489,7 +537,14 @@ public:
     }
 
     std::vector<std::string> getAllowedKeys() const override {
-        return {"count", "query", "skip", "limit", "hint", "collation", "shardVersion"};
+        return {"count",
+                "query",
+                "skip",
+                "limit",
+                "hint",
+                "collation",
+                "shardVersion",
+                "databaseVersion"};
     }
 };
 
@@ -500,7 +555,8 @@ TEST_F(CountCommandTest, MirrorableKeys) {
                       BSON("hint" << BSONObj()),
                       BSON("readConcern" << BSONObj()),
                       BSON("collation" << BSONObj()),
-                      BSON("shardVersion" << BSONObj())};
+                      BSON("shardVersion" << BSONObj()),
+                      BSON("databaseVersion" << BSONObj())};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -511,12 +567,14 @@ TEST_F(CountCommandTest, ValidateMirroredQuery) {
                             << "Delivered");
     const auto hint = BSON("status" << 1);
     constexpr auto limit = 1000;
-    const auto shardVersion = BSONObj();
+    const auto shardVersion = BSON("v" << 123);
+    const auto databaseVersion = BSON("v" << 456);
 
     auto countArgs = {BSON("query" << query),
                       BSON("hint" << hint),
                       BSON("limit" << limit),
-                      BSON("shardVersion" << shardVersion)};
+                      BSON("shardVersion" << shardVersion),
+                      BSON("databaseVersion" << databaseVersion)};
     auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
 
     ASSERT_EQ(mirroredObj["count"].String(), kCollection);
@@ -526,21 +584,27 @@ TEST_F(CountCommandTest, ValidateMirroredQuery) {
     ASSERT(compareBSONObjs(mirroredObj["hint"].Obj(), hint));
     ASSERT_EQ(mirroredObj["limit"].Int(), limit);
     ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), shardVersion));
+    ASSERT(compareBSONObjs(mirroredObj["databaseVersion"].Obj(), databaseVersion));
 }
 
-TEST_F(CountCommandTest, ValidateShardVersion) {
+TEST_F(CountCommandTest, ValidateShardVersionAndDatabaseVersion) {
     std::vector<BSONObj> countArgs = {BSON("count" << BSONObj())};
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
         ASSERT_FALSE(mirroredObj.hasField("shardVersion"));
+        ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
     }
 
     const auto kShardVersion = 123;
+    const auto kDatabaseVersion = 456;
     countArgs.push_back(BSON("shardVersion" << kShardVersion));
+    countArgs.push_back(BSON("databaseVersion" << kDatabaseVersion));
     {
         auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
         ASSERT_TRUE(mirroredObj.hasField("shardVersion"));
+        ASSERT_TRUE(mirroredObj.hasField("databaseVersion"));
         ASSERT_EQ(mirroredObj["shardVersion"].Int(), kShardVersion);
+        ASSERT_EQ(mirroredObj["databaseVersion"].Int(), kDatabaseVersion);
     }
 }
 
