@@ -123,7 +123,8 @@ public:
     }
 
     DatabaseName getDatabaseName() const {
-        return DatabaseNameUtil::deserialize(_tenant, _db, SerializationContext::stateDefault());
+        return DatabaseNameUtil::deserialize(
+            _tenant, _db, SerializationContext::stateAuthPrevalidated());
     }
 
     /**

@@ -134,7 +134,7 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
 
     return OpMsgRequest::fromDBAndBody(
         DatabaseNameUtil::deserialize(
-            boost::none, db.getValue(), SerializationContext::stateDefault()),
+            boost::none, db.getValue(), SerializationContext::stateAuthPrevalidated()),
         BSON("authenticate" << 1 << "mechanism"
                             << "MONGODB-X509"
                             << "user" << username));
