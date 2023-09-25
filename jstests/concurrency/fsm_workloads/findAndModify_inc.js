@@ -41,7 +41,9 @@ export const $config = (function() {
                 // is retried internally. We never expect to see a null value returned by the
                 // "findAndModify" command when it is known that a matching document exists in the
                 // collection.
-                assertWhenOwnColl(res.value !== null, 'query spec should have matched a document');
+                assertWhenOwnColl(
+                    res.value !== null,
+                    'query spec should have matched a document, returned ' + tojson(res));
             }
 
             if (res.value !== null) {

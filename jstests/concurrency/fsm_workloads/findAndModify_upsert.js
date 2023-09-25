@@ -84,7 +84,8 @@ export const $config = (function() {
             assertAlways.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             var doc = res.value;
-            assertWhenOwnColl(doc !== null, 'query spec should have matched a document');
+            assertWhenOwnColl(doc !== null,
+                              'query spec should have matched a document, returned ' + tojson(res));
 
             if (doc !== null) {
                 assertAlways.eq(this.tid, doc.tid);
