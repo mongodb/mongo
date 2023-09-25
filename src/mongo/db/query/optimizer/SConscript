@@ -76,6 +76,7 @@ env.Library(
         "rewrites/const_eval.cpp",
         "rewrites/path.cpp",
         "rewrites/path_lower.cpp",
+        "rewrites/sampling_const_eval.cpp",
     ],
     LIBDEPS=[
         "optimizer_base",

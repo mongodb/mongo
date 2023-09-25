@@ -742,8 +742,13 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                 entry.second.shardingMetadata().setMayContainOrphans(false);
             }
 
-            // TODO: consider a limited rewrite set.
-            OptPhaseManager phaseManagerForSampling{OptPhaseManager::getAllRewritesSet(),
+            // For sampling estimator, we do not run constant folding, path fusion and exploration
+            // phases.
+            OptPhaseManager::PhaseSet rewritesSetForSampling{OptPhase::MemoSubstitutionPhase,
+                                                             OptPhase::MemoImplementationPhase,
+                                                             OptPhase::PathLower,
+                                                             OptPhase::ConstEvalPost_ForSampling};
+            OptPhaseManager phaseManagerForSampling{std::move(rewritesSetForSampling),
                                                     prefixId,
                                                     false /*requireRID*/,
                                                     std::move(metadataForSampling),
