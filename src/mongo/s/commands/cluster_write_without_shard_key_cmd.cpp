@@ -395,10 +395,11 @@ public:
             const auto writeCmd = request().getWriteCmd();
             const auto shardId = ShardId(request().getShardId().toString());
             const auto targetDocId = request().getTargetDocId();
-            LOGV2(6962400,
-                  "Running write phase for a write without a shard key.",
-                  "clientWriteRequest"_attr = writeCmd,
-                  "shardId"_attr = shardId);
+            LOGV2_DEBUG(6962400,
+                        2,
+                        "Running write phase for a write without a shard key.",
+                        "clientWriteRequest"_attr = redact(writeCmd),
+                        "shardId"_attr = redact(shardId));
 
             const auto [requestDbName, cmdObj] =
                 makeTargetWriteRequest(opCtx, shardId, ns().dbName(), writeCmd, targetDocId);
