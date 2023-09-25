@@ -1,0 +1,4 @@
+this is the simple enviorment variable adding instead of downloading perfectly all the mongodb stuff
+sometimes we cannot run commands like mongod --version or mongoimport/export on windows this can be solved using 
+Go to "System Properties" > "Advanced" > "Environment Variables."
+1->C:\Program Files\MongoDB\Server\7.0\bin  , 2->C:\Program Files\MongoDB\Tools\100\bin   (solution for windows 10/above  users)
