@@ -15,8 +15,6 @@ import yaml
 
 from buildscripts.resmokelib import core
 
-# pylint: disable=unsupported-membership-test
-
 
 class _ResmokeSelftest(unittest.TestCase):
     @classmethod
@@ -541,3 +539,21 @@ class TestSetShellSeed(unittest.TestCase):
 
         self.assertTrue(
             len(random_seeds) > 1, msg="Resmoke generated the same random seed 10 times in a row.")
+
+
+class TestMultiversionConfig(unittest.TestCase):
+    def test_valid_yaml(self):
+        file_name = "multiversion-config.yml"
+        subprocess.run([
+            sys.executable, "buildscripts/resmoke.py", "multiversion-config",
+            "--config-file-output", file_name
+        ], check=True)
+        with open(file_name, "r") as file:
+            file_contents = file.read()
+
+        try:
+            yaml.safe_load(file_contents)
+        except Exception:
+            self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
+
+        os.remove(file_name)
