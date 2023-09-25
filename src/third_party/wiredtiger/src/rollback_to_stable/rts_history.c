@@ -124,6 +124,10 @@ __wt_rts_history_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_id)
         goto done;
     }
 
+    __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
+      WT_RTS_VERB_TAG_HS_TRUNCATING "truncating history store entries for tree with id=%u",
+      btree_id);
+
     /* Open a history store stop cursor. */
     WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_stop));
     F_SET(hs_cursor_stop, WT_CURSTD_HS_READ_COMMITTED | WT_CURSTD_HS_READ_ACROSS_BTREE);

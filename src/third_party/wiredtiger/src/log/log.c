@@ -2830,8 +2830,8 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
         WT_RET(__wt_log_flush_lsn(session, &lsn, false));
     }
 
-    __wt_verbose(session, WT_VERB_LOG, "log_flush: flags %#" PRIx32 " LSN %" PRIu32 "/%" PRIu32,
-      flags, lsn.l.file, lsn.l.offset);
+    __wt_verbose_debug2(session, WT_VERB_LOG,
+      "log_flush: flags %#" PRIx32 " LSN %" PRIu32 "/%" PRIu32, flags, lsn.l.file, lsn.l.offset);
     /*
      * If the user wants write-no-sync, there is nothing more to do. If the user wants background
      * sync, set the LSN and we're done. If the user wants sync, force it now.
