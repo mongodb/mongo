@@ -358,7 +358,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddFirstN(
     const WindowFunctionStatement& stmt,
     std::unique_ptr<sbe::EExpression> arg) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggRemovableFirstNAdd", std::move(arg)));
+    exprs.push_back(makeFunction("aggRemovableFirstNAdd", makeFillEmptyNull(std::move(arg))));
     return exprs;
 }
 
@@ -367,7 +367,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveFirstN(
     const WindowFunctionStatement& stmt,
     std::unique_ptr<sbe::EExpression> arg) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggRemovableFirstNRemove", std::move(arg)));
+    exprs.push_back(makeFunction("aggRemovableFirstNRemove", makeFillEmptyNull(std::move(arg))));
     return exprs;
 }
 
@@ -398,7 +398,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddLastN(
     const WindowFunctionStatement& stmt,
     std::unique_ptr<sbe::EExpression> arg) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggRemovableLastNAdd", std::move(arg)));
+    exprs.push_back(makeFunction("aggRemovableLastNAdd", makeFillEmptyNull(std::move(arg))));
     return exprs;
 }
 
@@ -407,7 +407,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveLastN(
     const WindowFunctionStatement& stmt,
     std::unique_ptr<sbe::EExpression> arg) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggRemovableLastNRemove", std::move(arg)));
+    exprs.push_back(makeFunction("aggRemovableLastNRemove", makeFillEmptyNull(std::move(arg))));
     return exprs;
 }
 
