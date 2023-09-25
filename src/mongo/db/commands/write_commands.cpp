@@ -461,6 +461,10 @@ public:
                 !shardVersion.eoo()) {
                 bob->append(shardVersion);
             }
+            if (const auto& databaseVersion = _commandObj.getField("databaseVersion");
+                !databaseVersion.eoo()) {
+                bob->append(databaseVersion);
+            }
             if (const auto& encryptionInfo = _commandObj.getField("encryptionInformation");
                 !encryptionInfo.eoo()) {
                 bob->append(encryptionInfo);

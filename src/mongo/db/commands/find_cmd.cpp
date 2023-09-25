@@ -941,6 +941,7 @@ public:
                 keyBob.append("min", 1);
                 keyBob.append("max", 1);
                 keyBob.append("shardVersion", 1);
+                keyBob.append("databaseVersion", 1);
                 keyBob.append("encryptionInformation", 1);
                 return keyBob.obj();
             }();

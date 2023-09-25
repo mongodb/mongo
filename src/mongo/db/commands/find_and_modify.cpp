@@ -655,6 +655,9 @@ void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) 
     if (const auto& shardVersion = rawCmd.getField("shardVersion"); !shardVersion.eoo()) {
         bob->append(shardVersion);
     }
+    if (const auto& databaseVersion = rawCmd.getField("databaseVersion"); !databaseVersion.eoo()) {
+        bob->append(databaseVersion);
+    }
 
     // Prevent the find from returning multiple documents since we can
     bob->append("batchSize", 1);
