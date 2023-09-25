@@ -270,7 +270,7 @@ private:
         }
     };
 
-    static constexpr size_t kCoroStackSize = 32 * 1024;
+    static constexpr size_t kCoroStackSize = 320 * 1024;
     boost::context::stack_context coroStackContext() {
         boost::context::stack_context sc;
         sc.size = kCoroStackSize;

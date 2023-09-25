@@ -231,6 +231,7 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
         stdx::lock_guard<stdx::mutex> lk(service->_mutex);
         invariant(service->_clients.erase(client));
     }
+    MONGO_LOG(0)<<"ServiceContext::ClientDeleter::operator()(Client* client)";
     onDestroy(client, service->_clientObservers);
     delete client;
 }
@@ -401,6 +402,7 @@ ServiceContext::UniqueServiceContext ServiceContext::make() {
 }
 
 void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* service) const {
+    MONGO_LOG(0)<<"ServiceContext::ServiceContextDeleter::operator()(ServiceContext* service)";
     onDestroy(service, registeredConstructorActions());
     delete service;
 }
