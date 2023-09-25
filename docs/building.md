@@ -53,7 +53,7 @@ dedicated to building MongoDB is optional but recommended.
 
     $ python3 -m venv <venv_path> --prompt mongo # Optional (venv_path can be a path of your choice)
     $ source <venv_path>/bin/activate # Optional (might be slightly different based on the your shell)
-    $ python3 -m pip install poetry
+    $ python3 -m pip install 'poetry==1.5.1'
     $ python3 -m poetry install --no-root --sync
 
 Note: In order to compile C-based Python modules, you'll also need the

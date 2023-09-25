@@ -3825,6 +3825,25 @@ tasks:
     vars:
       targets: lint-errorcodes
 
+# Confirm that the poetry.lock file is up to date with pyproject.toml
+- name: lint_poetry_lock
+  tags: ["lint"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/functions/poetry_lock_check.py"
+
 - name: test_api_version_compatibility
   tags: []
   depends_on:
