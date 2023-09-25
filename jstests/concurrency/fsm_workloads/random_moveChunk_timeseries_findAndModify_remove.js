@@ -18,7 +18,9 @@ import {
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.doFindAndRemove = function doFindAndRemove(db, collName, connCache) {
-        const filterFieldName = "f.tid" + this.tid;
+        const fieldNameF = "f";
+        const fieldNameTid = `tid${this.tid}`;
+        const filterFieldName = `${fieldNameF}.${fieldNameTid}`;
         const filterFieldVal = Random.randInt($config.data.numMetaCount);
         const filter = {
             [filterFieldName]: {
@@ -31,14 +33,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const res2 = assertAlways.commandWorked(
             db.runCommand({findAndModify: this.nonShardCollName, query: filter, remove: true}));
         if (res1 && res1.lastErrorObject.n) {
-            assert(res1.value[filterFieldName] >= filterFieldVal,
-                   `Deleted measurement ${res1.value} should match the query predicate ${
-                       tojson(filter)}}`);
+            assert(res1.value[fieldNameF][fieldNameTid] >= filterFieldVal,
+                   `Deleted measurement ${tojson(res1.value)} should match the query predicate ${
+                       tojson(filter)}} for the sharded collection`);
         }
         if (res2 && res2.lastErrorObject.n) {
-            assert(res2.value[filterFieldName] >= filterFieldVal,
-                   `Deleted measurement ${res2.value} should match the query predicate ${
-                       tojson(filter)}}`);
+            assert(res2.value[fieldNameF][fieldNameTid] >= filterFieldVal,
+                   `Deleted measurement ${tojson(res2.value)} should match the query predicate ${
+                       tojson(filter)}} for the non-sharded collection`);
         }
     };
 
@@ -48,9 +50,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         doFindAndRemove: {insert: 1, doFindAndRemove: 3, moveChunk: 1},
         moveChunk: {insert: 1, doFindAndRemove: 1, moveChunk: 0},
     };
-
-    // TODO(SERVER-81239): Remove next line after resolving build failure
-    $config.iterations = 0;
 
     return $config;
 });
