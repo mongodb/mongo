@@ -88,8 +88,6 @@ DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,
   "checkpoint every rate operations during the populate phase in the populate thread(s), 0 to "
   "disable")
 DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
-DEF_OPT_AS_CONFIG_STRING(
-  chunk_cache_config, "", "extra configuration options for chunk cache. Applied only after restart")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create,statistics=(fast),statistics_log=(json,wait=1)",
   "connection configuration string")
 DEF_OPT_AS_BOOL(close_conn, 1,
@@ -203,6 +201,7 @@ DEF_OPT_AS_STRING(threads, "",
  */
 DEF_OPT_AS_STRING(
   tiered, "none", "tiered extension.  Allowed configuration values are: 'none', 'dir_store', 's3'")
+DEF_OPT_AS_STRING(tiered_bucket, "none", "Create this bucket directory before beginning the test.")
 DEF_OPT_AS_UINT32(tiered_flush_interval, 0,
   "Call flush_tier every interval seconds during the workload phase. "
   "We recommend this value be larger than the checkpoint_interval. 0 to disable. The "

@@ -94,10 +94,10 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.uri)
         for i in range(1, self.rows):
             cursor[ds.key(i)] = str(i) * self.rows
-        
+
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
-        
+
         # Reopen wiredtiger to migrate all data to disk.
         self.reopen_conn()
 

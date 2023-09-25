@@ -1683,7 +1683,7 @@ execute_populate(WTPERF *wtperf)
 static bool
 need_reopen(CONFIG_OPTS *opts)
 {
-    return opts->readonly || opts->reopen_connection || (strlen(opts->chunk_cache_config) != 0);
+    return opts->readonly || opts->reopen_connection;
 }
 
 static int
@@ -2190,6 +2190,37 @@ config_tiered(WTPERF *wtperf)
     return (ret);
 }
 
+/*
+ * create_tiered_bucket --
+ *     Create the bucket directory required for tiered storage to work.
+ */
+static int
+create_tiered_bucket(WTPERF *wtperf)
+{
+    CONFIG_OPTS *opts;
+    char buf[1024];
+    size_t home_len, bucket_len;
+
+    opts = wtperf->opts;
+    home_len = strlen(wtperf->home);
+    bucket_len = strlen(opts->tiered_bucket);
+
+    /* Check that we can fit the paths, separator, and null byte. */
+    if ((home_len + bucket_len + 2) > 1024) {
+        fprintf(stderr, "home and bucket directory names too long\n");
+        return (-1);
+    }
+
+    if (bucket_len != 0) {
+        strcpy(buf, wtperf->home);
+        strcat(buf, "/");
+        strcat(buf, opts->tiered_bucket);
+        testutil_mkdir(buf);
+    }
+
+    return (0);
+}
+
 static int
 start_all_runs(WTPERF *wtperf)
 {
@@ -2657,9 +2688,11 @@ main(int argc, char *argv[])
     if ((ret = config_sanity(wtperf)) != 0)
         goto err;
 
-    /* If creating, remove and re-create the home directory. */
-    if (opts->create != 0)
+    /* If creating, remove and re-create the home and tiered bucket directories. */
+    if (opts->create != 0) {
         testutil_recreate_dir(wtperf->home);
+        testutil_check(create_tiered_bucket(wtperf));
+    }
 
     /* Write a copy of the config. */
     req_len = strlen(wtperf->home) + strlen("/CONFIG.wtperf") + 1;

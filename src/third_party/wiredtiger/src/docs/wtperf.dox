@@ -136,8 +136,6 @@ checkpoint every interval seconds during the workload phase.
 checkpoint every rate operations during the populate phase in the populate thread(s), 0 to  disable
 @par checkpoint_threads (unsigned int, default=0)
 number of checkpoint threads
-@par chunk_cache_config (string, default="")
-extra configuration options for chunk cache. Applied only after restart
 @par conn_config (string, default="create,statistics=(fast),statistics_log=(json,wait=1)")
 connection configuration string
 @par close_conn (boolean, default=true)
@@ -234,6 +232,8 @@ number of tables to create, that won't be populated. Default 0.
 workload configuration: each 'count' entry is the total number of threads, and the 'insert',  'modify', 'read' and 'update' entries are the ratios of insert, modify, read and update  operations done by each worker thread; If a throttle value is provided each thread will do a  maximum of that number of operations per second; multiple workload configurations may be  specified per threads configuration; for example, a more complex threads configuration might be  'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' which would create 2 threads  doing nothing but reads and 8 threads each doing 50% inserts and 25% reads and updates.   Allowed configuration values are 'count', 'throttle', 'inserts', 'reads', 'read_range',  'modify', 'modify_delta', 'modify_distribute', 'modify_force_update', 'updates',  'update_delta', 'truncate', 'truncate_pct' and 'truncate_count'. There are also behavior  modifiers, supported modifiers are 'ops_per_txn'
 @par tiered (string, default="none")
 tiered extension.  Allowed configuration values are: 'none', 'dir_store', 's3'
+@par tiered_bucket (string, default="none")
+Create this bucket directory before beginning the test.
 @par tiered_flush_interval (unsigned int, default=0)
 Call flush_tier every interval seconds during the workload phase.  We recommend this value be larger than the checkpoint_interval. 0 to disable. The  'tiered_extension' must be set to something other than 'none'.
 @par transaction_config (string, default="")

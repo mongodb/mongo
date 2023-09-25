@@ -68,7 +68,7 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
         val = stat_cursor[stat][2]
         stat_cursor.close()
         return val
-    
+
     def insert(self, uri, ds):
         cursor = self.session.open_cursor(uri)
         for i in range(1, self.rows):
@@ -84,15 +84,15 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
     def test_chunkcache03(self):
         uris = ["table:chunkcache01", "table:chunkcache02", "table:chunkcache03", "table:chunkcache04"]
         ds = [SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format) for uri in uris]
-            
+
         # Insert data in four tables.
         for i, dataset in enumerate(ds):
             dataset.populate()
             self.insert(uris[i], dataset)
-        
+
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
-        
+
         # Reopen wiredtiger to migrate all data to disk.
         self.reopen_conn()
 

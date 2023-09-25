@@ -543,6 +543,7 @@ __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid
     retries = 0;
     sleep_usec = WT_THOUSAND;
     object_name = NULL;
+    *cache_hit = false;
 
     if (!F_ISSET(chunkcache, WT_CHUNKCACHE_CONFIGURED))
         return (ENOTSUP);
