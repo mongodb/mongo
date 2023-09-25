@@ -35,9 +35,9 @@ function runTest(targetFCV) {
     let res = assert.commandFailedWithCode(
         db.adminCommand({setFeatureCompatibilityVersion: targetFCV}), ErrorCodes.CannotDowngrade);
 
-    assert(client.getDB().fle2.basic.ecoc.drop());
-    assert(client.getDB().fle2.basic.ecc.drop());
-    assert(client.getDB().fle2.basic.esc.drop());
+    assert(client.getDB().enxcol_.basic.ecoc.drop());
+    assert(client.getDB().enxcol_.basic.ecc.drop());
+    assert(client.getDB().enxcol_.basic.esc.drop());
     assert(client.getDB().basic.drop());
 
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: targetFCV}));
