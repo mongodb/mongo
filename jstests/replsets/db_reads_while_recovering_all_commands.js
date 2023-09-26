@@ -128,6 +128,7 @@ const allCommands = {
     _shardsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
     _shardsvrUnregisterIndex: {skip: isPrimaryOnly},
     _shardsvrValidateShardKeyCandidate: {skip: isPrimaryOnly},
+    _shardsvrCoordinateMultiUpdate: {skip: isAnInternalCommand},
     _shardsvrCollMod: {skip: isPrimaryOnly},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},

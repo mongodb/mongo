@@ -110,6 +110,7 @@ const allCommands = {
     _shardsvrDropIndexCatalogEntryParticipant: {skip: isAnInternalCommand},
     _shardsvrDropIndexes: {skip: isAnInternalCommand},
     _shardsvrCreateCollectionParticipant: {skip: isAnInternalCommand},
+    _shardsvrCoordinateMultiUpdate: {skip: isAnInternalCommand},
     _shardsvrGetStatsForBalancing: {skip: isAnInternalCommand},
     _shardsvrInsertGlobalIndexKey: {skip: isAnInternalCommand},
     _shardsvrDeleteGlobalIndexKey: {skip: isAnInternalCommand},

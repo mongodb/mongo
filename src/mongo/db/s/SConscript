@@ -474,6 +474,7 @@ env.Library(
         'flush_routing_table_cache_updates_command.cpp',
         'get_database_version_command.cpp',
         'get_shard_version_command.cpp',
+        'migration_blocking_operation/shardsvr_coordinate_multi_update_command.cpp',
         'migration_chunk_cloner_source_legacy_commands.cpp',
         'migration_destination_manager_commands.cpp',
         'move_primary_coordinator_document.idl',

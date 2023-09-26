@@ -161,6 +161,7 @@ let viewsCommandTests = {
     _shardsvrCleanupStructuredEncryptionData: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrCompactStructuredEncryptionData: {skip: isAnInternalCommand},
+    _shardsvrCoordinateMultiUpdate: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isAnInternalCommand},
     _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern: {skip: isUnrelated},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
