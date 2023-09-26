@@ -319,7 +319,7 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
     std::move(streamFut)
         .then([req, this]() { return _runSingleCommand(req.first, req.second); })
         .thenRunOn(makeGuaranteedExecutor(req.second->baton, _cancellationExecutor))
-        .getAsync([req, this, self = shared_from_this()](StatusWith<RemoteCommandResponse> result) {
+        .getAsync([req, this](StatusWith<RemoteCommandResponse> result) {
             stdx::unique_lock<Latch> lk{_mutex};
             _inProgressRequest.reset();
             // If we used the _stream, update it accordingly.
