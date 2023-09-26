@@ -158,7 +158,8 @@ bool shouldSkipOplogEntry(const BSONObj& oplogEntry) {
     // The oplog entry might be a single delete command on a change collection, avoid
     // inserting such oplog entries back to the change collection.
     if (opTypeFieldElem == repl::OpType_serializer(repl::OpTypeEnum::kDelete) &&
-        NamespaceStringUtil::deserialize(tid, nss).isChangeCollection()) {
+        NamespaceStringUtil::deserialize(tid, nss, SerializationContext::stateDefault())
+            .isChangeCollection()) {
         return true;
     }
 

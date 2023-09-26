@@ -2459,7 +2459,8 @@ void _processUsers(OperationContext* opCtx,
 
     uassertStatusOK(queryAuthzDocument(
         opCtx,
-        NamespaceStringUtil::deserialize(tenantId, usersCollName),
+        NamespaceStringUtil::deserialize(
+            tenantId, usersCollName, SerializationContext::stateDefault()),
         db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
         BSONObj(),
         [&](const BSONObj& userObj) {
@@ -2588,7 +2589,8 @@ void _processRoles(OperationContext* opCtx,
 
     uassertStatusOK(queryAuthzDocument(
         opCtx,
-        NamespaceStringUtil::deserialize(tenantId, rolesCollName),
+        NamespaceStringUtil::deserialize(
+            tenantId, rolesCollName, SerializationContext::stateDefault()),
         db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
         BSONObj(),
         [&](const BSONObj& roleObj) {

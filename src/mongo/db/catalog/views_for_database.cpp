@@ -141,7 +141,8 @@ Status ViewsForDatabase::reload(OperationContext* opCtx, const CollectionPtr& sy
         }
 
         auto viewName = NamespaceStringUtil::deserialize(systemViews->ns().tenantId(),
-                                                         view.getStringField("_id"));
+                                                         view.getStringField("_id"),
+                                                         SerializationContext::stateDefault());
 
         if (auto status = _upsertIntoMap(
                 opCtx,

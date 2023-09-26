@@ -219,7 +219,8 @@ public:
             return false;
         }
 
-        const NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, ns);
+        const NamespaceString nss =
+            NamespaceStringUtil::deserialize(boost::none, ns, SerializationContext::stateDefault());
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());

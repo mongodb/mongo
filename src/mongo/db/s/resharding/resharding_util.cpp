@@ -153,7 +153,8 @@ NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourc
         boost::none,
         db,
         fmt::format(
-            "{}{}", NamespaceString::kTemporaryReshardingCollectionPrefix, sourceUuid.toString()));
+            "{}{}", NamespaceString::kTemporaryReshardingCollectionPrefix, sourceUuid.toString()),
+        SerializationContext::stateDefault());
 }
 
 std::set<ShardId> getRecipientShards(OperationContext* opCtx,

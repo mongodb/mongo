@@ -95,8 +95,10 @@ Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest&
     auto status = ex->toStatus();
     auto outOptions = parsedMr.getOutOptions();
     const auto outNss = outOptions.getDatabaseName()
-        ? NamespaceStringUtil::deserialize(
-              parsedMr.getDollarTenant(), *outOptions.getDatabaseName(), ""_sd)
+        ? NamespaceStringUtil::deserialize(parsedMr.getDollarTenant(),
+                                           *outOptions.getDatabaseName(),
+                                           ""_sd,
+                                           SerializationContext::stateDefault())
         : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
                                            outOptions.getCollectionName());
     std::string error;
@@ -337,8 +339,10 @@ OutputOptions parseOutputOptions(const DatabaseName& dbName, const BSONObj& cmdO
             outputOptions.outDB = o["db"].String();
             uassert(ErrorCodes::CommandNotSupported,
                     "cannot target internal database as output",
-                    !(NamespaceStringUtil::deserialize(
-                          boost::none, outputOptions.outDB, outputOptions.collectionName)
+                    !(NamespaceStringUtil::deserialize(boost::none,
+                                                       outputOptions.outDB,
+                                                       outputOptions.collectionName,
+                                                       SerializationContext::stateDefault())
                           .isOnInternalDb()));
         }
         if (o.hasElement("nonAtomic")) {
@@ -356,8 +360,10 @@ OutputOptions parseOutputOptions(const DatabaseName& dbName, const BSONObj& cmdO
     if (outputOptions.outType != OutputType::InMemory) {
         const auto nss = outputOptions.outDB.empty()
             ? NamespaceStringUtil::deserialize(dbName, outputOptions.collectionName)
-            : NamespaceStringUtil::deserialize(
-                  boost::none, outputOptions.outDB, outputOptions.collectionName);
+            : NamespaceStringUtil::deserialize(boost::none,
+                                               outputOptions.outDB,
+                                               outputOptions.collectionName,
+                                               SerializationContext::stateDefault());
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid 'out' namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
@@ -435,7 +441,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     const auto outNss = parsedMr.getOutOptions().getDatabaseName()
         ? (NamespaceStringUtil::deserialize(parsedMr.getDollarTenant(),
                                             *parsedMr.getOutOptions().getDatabaseName(),
-                                            parsedMr.getOutOptions().getCollectionName()))
+                                            parsedMr.getOutOptions().getCollectionName(),
+                                            SerializationContext::stateDefault()))
         : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
                                            parsedMr.getOutOptions().getCollectionName());
 

@@ -324,8 +324,9 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const Timestamp& timestamp) {
+    const auto sc = SerializationContext::stateDefault();
     const auto chunksNss = NamespaceStringUtil::deserialize(
-        nss.tenantId(), ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss));
+        nss.tenantId(), ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss, sc), sc);
 
     try {
         DBDirectClient client(opCtx);
@@ -365,9 +366,9 @@ Status updateShardChunks(OperationContext* opCtx,
                          const std::vector<ChunkType>& chunks,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
-
+    const auto sc = SerializationContext::stateDefault();
     const auto chunksNss = NamespaceStringUtil::deserialize(
-        nss.tenantId(), ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss));
+        nss.tenantId(), ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss, sc), sc);
 
     try {
         DBDirectClient client(opCtx);
@@ -493,9 +494,12 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
 
     // Drop the 'config.cache.chunks.<ns>' collection.
     BSONObj result;
+    const auto sc = SerializationContext::stateDefault();
     if (!client.dropCollection(
-            NamespaceStringUtil::deserialize(
-                boost::none, ChunkType::ShardNSPrefix + NamespaceStringUtil::serialize(nss)),
+            NamespaceStringUtil::deserialize(boost::none,
+                                             ChunkType::ShardNSPrefix +
+                                                 NamespaceStringUtil::serialize(nss, sc),
+                                             sc),
             kLocalWriteConcern,
             &result)) {
         auto status = getStatusFromCommandResult(result);

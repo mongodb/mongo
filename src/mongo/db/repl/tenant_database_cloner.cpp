@@ -175,8 +175,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
                     .withContext(str::stream() << "Collection info could not be parsed : " << info)
                     .reason());
         }
-        const auto collectionNamespace =
-            NamespaceStringUtil::deserialize(boost::none, _dbName, result.getName());
+        const auto collectionNamespace = NamespaceStringUtil::deserialize(
+            boost::none, _dbName, result.getName(), SerializationContext::stateDefault());
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(4881602,
                         1,
@@ -242,8 +242,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
                     .withContext(str::stream() << "Collection info could not be parsed : " << info)
                     .reason());
         }
-        const auto collectionNamespace =
-            NamespaceStringUtil::deserialize(boost::none, _dbName, result.getName());
+        const auto collectionNamespace = NamespaceStringUtil::deserialize(
+            boost::none, _dbName, result.getName(), SerializationContext::stateDefault());
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(5271600,
                         1,

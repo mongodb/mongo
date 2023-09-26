@@ -332,8 +332,10 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
 
         while (cursor->more()) {
             const auto doc = cursor->nextSafe();
-            const auto nss = NamespaceStringUtil::deserialize(
-                boost::none, doc.getStringField(CollectionType::kNssFieldName));
+            const auto nss =
+                NamespaceStringUtil::deserialize(boost::none,
+                                                 doc.getStringField(CollectionType::kNssFieldName),
+                                                 SerializationContext::stateDefault());
             collectionsToMerge[shard].push_back(nss);
         }
     }

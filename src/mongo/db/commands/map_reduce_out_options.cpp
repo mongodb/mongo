@@ -116,8 +116,10 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
                         db.type() == BSONType::String);
                 uassert(ErrorCodes::CommandNotSupported,
                         "cannot target internal database as output",
-                        !(NamespaceStringUtil::deserialize(
-                              boost::none, db.valueStringData(), collectionName)
+                        !(NamespaceStringUtil::deserialize(boost::none,
+                                                           db.valueStringData(),
+                                                           collectionName,
+                                                           SerializationContext::stateDefault())
                               .isOnInternalDb()));
                 return boost::make_optional(db.str());
             } else {

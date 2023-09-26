@@ -114,7 +114,8 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
         if (!status.isOK())
             return status;
         // TODO SERVER-80466 changeLogNs comes from BSON Extract.
-        changeLog._ns = NamespaceStringUtil::deserialize(boost::none, changeLogNs);
+        changeLog._ns = NamespaceStringUtil::deserialize(
+            boost::none, changeLogNs, SerializationContext::stateDefault());
     }
 
     {

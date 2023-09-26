@@ -275,8 +275,8 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
 
     // The namespace of the collection that was dropped is the same namespace
     // that we are trying to rename the collection to.
-    NamespaceString droppedNs =
-        NamespaceStringUtil::deserialize(tenantId, obj.getStringField("to"));
+    NamespaceString droppedNs = NamespaceStringUtil::deserialize(
+        tenantId, obj.getStringField("to"), SerializationContext::stateDefault());
 
     // Records the information necessary for undoing the dropTarget.
     recordRollingBackDrop(droppedNs, opTime, dropTargetUUID);
@@ -415,8 +415,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //        }
                 //     ...
                 // }
-                const auto collectionNamespace = NamespaceStringUtil::deserialize(
-                    nss.tenantId(), nss.getSisterNS(first.valueStringDataSafe()));
+                const auto collectionNamespace =
+                    NamespaceStringUtil::deserialize(nss.tenantId(),
+                                                     nss.getSisterNS(first.valueStringDataSafe()),
+                                                     SerializationContext::stateDefault());
 
                 // Registers the collection to be removed from the drop pending collection
                 // reaper and to be renamed from its drop pending namespace to original namespace.
@@ -674,9 +676,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 }
 
                 RenameCollectionInfo info;
-                info.renameTo = NamespaceStringUtil::deserialize(oplogEntry.getTid(), ns);
-                info.renameFrom =
-                    NamespaceStringUtil::deserialize(oplogEntry.getTid(), obj.getStringField("to"));
+                const auto sc = SerializationContext::stateDefault();
+                info.renameTo = NamespaceStringUtil::deserialize(oplogEntry.getTid(), ns, sc);
+                info.renameFrom = NamespaceStringUtil::deserialize(
+                    oplogEntry.getTid(), obj.getStringField("to"), sc);
 
                 // Checks if this collection has been renamed before within the same database.
                 // If it has been, update the renameFrom field of the RenameCollectionInfo
@@ -1664,8 +1667,8 @@ void syncFixUp(OperationContext* opCtx,
             try {
 
                 // TODO: Lots of overhead in context. This can be faster.
-                const NamespaceString docNss =
-                    NamespaceStringUtil::deserialize((*nss).tenantId(), doc.ns);
+                const NamespaceString docNss = NamespaceStringUtil::deserialize(
+                    (*nss).tenantId(), doc.ns, SerializationContext::stateDefault());
                 Lock::DBLock docDbLock(opCtx, docNss.dbName(), MODE_X);
                 OldClientContext ctx(opCtx, docNss);
                 auto collection = acquireCollection(opCtx,

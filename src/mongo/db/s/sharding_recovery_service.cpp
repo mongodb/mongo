@@ -650,8 +650,10 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
 
     while (cursor->more()) {
         auto doc = cursor->nextSafe();
-        const auto nss = NamespaceStringUtil::deserialize(
-            boost::none, doc[CollectionType::kNssFieldName].String());
+        const auto nss =
+            NamespaceStringUtil::deserialize(boost::none,
+                                             doc[CollectionType::kNssFieldName].String(),
+                                             SerializationContext::stateDefault());
         auto indexVersion = doc[CollectionType::kIndexVersionFieldName].timestamp();
         for (const auto& idx : doc[kShardingIndexCatalogEntriesFieldName].Array()) {
             auto indexEntry = IndexCatalogType::parse(

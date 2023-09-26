@@ -826,7 +826,8 @@ InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
     // Passing boost::none since this is legacy code and should not be running in serverless.
-    InsertCommandRequest op(NamespaceStringUtil::deserialize(boost::none, msg.getns()));
+    InsertCommandRequest op(NamespaceStringUtil::deserialize(
+        boost::none, msg.getns(), SerializationContext::stateDefault()));
 
     {
         WriteCommandRequestBase writeCommandBase;

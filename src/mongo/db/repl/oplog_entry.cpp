@@ -566,7 +566,9 @@ bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {
                 ? boost::none
                 : boost::make_optional<TenantId>(TenantId::parseFromBSON(tid));
 
-            if (NamespaceStringUtil::deserialize(tenantId, ns.String()).isCommand()) {
+            if (NamespaceStringUtil::deserialize(
+                    tenantId, ns.String(), SerializationContext::stateDefault())
+                    .isCommand()) {
                 return true;
             }
         }

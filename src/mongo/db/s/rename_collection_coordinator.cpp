@@ -524,9 +524,8 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
             str::stream() << logMsg << ": dropped target collection and renamed source collection",
-            NamespaceStringUtil::deserialize(boost::none,
-                                             "renameCollection.metadata",
-                                             SerializationContext::stateCommandRequest()),
+            NamespaceStringUtil::deserialize(
+                boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
             BSON("newCollMetadata" << optFromCollType->toBSON()),
             ShardingCatalogClient::kMajorityWriteConcern,
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),
@@ -578,9 +577,8 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
             str::stream() << logMsg << " : dropped target collection.",
-            NamespaceStringUtil::deserialize(boost::none,
-                                             "renameCollection.metadata",
-                                             SerializationContext::stateCommandRequest()),
+            NamespaceStringUtil::deserialize(
+                boost::none, "renameCollection.metadata", SerializationContext::stateDefault()),
             BSONObj(),
             ShardingCatalogClient::kMajorityWriteConcern,
             Grid::get(opCtx)->shardRegistry()->getConfigShard(),

@@ -477,10 +477,14 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
         switch (oplogEntry.getCommandType()) {
             case OplogEntry::CommandType::kRenameCollection: {
                 // Add both the 'from' and 'to' namespaces.
-                namespaces.insert(NamespaceStringUtil::deserialize(
-                    opNss.tenantId(), firstElem.valueStringDataSafe()));
                 namespaces.insert(
-                    NamespaceStringUtil::deserialize(opNss.tenantId(), obj.getStringField("to")));
+                    NamespaceStringUtil::deserialize(opNss.tenantId(),
+                                                     firstElem.valueStringDataSafe(),
+                                                     SerializationContext::stateDefault()));
+                namespaces.insert(
+                    NamespaceStringUtil::deserialize(opNss.tenantId(),
+                                                     obj.getStringField("to"),
+                                                     SerializationContext::stateDefault()));
                 break;
             }
             case OplogEntry::CommandType::kDropDatabase: {
@@ -1115,8 +1119,10 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;
-                info.nss = NamespaceStringUtil::deserialize(
-                    opNss.tenantId(), oplogEntry.getObject()[kToFieldName].String());
+                info.nss =
+                    NamespaceStringUtil::deserialize(opNss.tenantId(),
+                                                     oplogEntry.getObject()[kToFieldName].String(),
+                                                     SerializationContext::stateDefault());
                 _pendingDrops[dropTargetUUID] = info;
                 _newCounts[dropTargetUUID] = info.count;
             } else {

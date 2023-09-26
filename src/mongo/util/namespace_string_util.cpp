@@ -307,7 +307,7 @@ NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,
     const auto tenantId = tenantField.ok()
         ? boost::optional<TenantId>(TenantId::parseFromBSON(tenantField))
         : boost::none;
-    return NamespaceStringUtil::deserialize(tenantId, ns);
+    return NamespaceStringUtil::deserialize(tenantId, ns, SerializationContext::stateDefault());
 }
 
 NamespaceString NamespaceStringUtil::deserializeForErrorMsg(StringData nsInErrMsg) {

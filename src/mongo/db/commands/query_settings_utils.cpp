@@ -149,7 +149,8 @@ NamespaceString getHintNamespace(const mongo::query_settings::IndexHintSpec& hin
     tassert(7746607, "involved namespaces cannot be empty!", !namespacesSet.empty());
     const auto& ns = hint.getNs();
     if (ns) {
-        return NamespaceStringUtil::deserialize(tenantId, ns->getDb(), ns->getColl());
+        return NamespaceStringUtil::deserialize(
+            tenantId, ns->getDb(), ns->getColl(), SerializationContext::stateDefault());
     }
     uassert(7746602,
             str::stream() << "Hint: '" << hint.toBSON().toString()

@@ -91,8 +91,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     boost::optional<TenantId> tid = oplogEntry.hasElement("tid")
         ? boost::make_optional<TenantId>(TenantId::parseFromBSON(oplogEntry["tid"]))
         : boost::none;
-    NamespaceString nss =
-        NamespaceStringUtil::deserialize(tid, oplogEntry["ns"].checkAndGetStringData());
+    NamespaceString nss = NamespaceStringUtil::deserialize(
+        tid, oplogEntry["ns"].checkAndGetStringData(), SerializationContext::stateDefault());
 
     if (oplogEntry.hasField("ui"_sd)) {
         // ns by UUID overrides the ns specified if they are different.

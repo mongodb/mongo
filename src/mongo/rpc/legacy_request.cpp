@@ -43,7 +43,8 @@ namespace rpc {
 OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
     DbMessage dbm(message);
     QueryMessage qm(dbm);
-    const auto ns = NamespaceStringUtil::deserialize(boost::none, qm.ns);
+    const auto ns =
+        NamespaceStringUtil::deserialize(boost::none, qm.ns, SerializationContext::stateDefault());
 
     if (qm.queryOptions & QueryOption_Exhaust) {
         uasserted(18527,

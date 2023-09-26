@@ -57,7 +57,8 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     auto viewNameElem = viewDefinition["_id"];
     valid &= viewNameElem && viewNameElem.type() == BSONType::String;
 
-    auto viewName = NamespaceStringUtil::deserialize(dbName.tenantId(), viewNameElem.str());
+    auto viewName = NamespaceStringUtil::deserialize(
+        dbName.tenantId(), viewNameElem.str(), SerializationContext::stateDefault());
 
     bool viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
         NamespaceString::validDBName(viewName.dbName());

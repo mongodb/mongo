@@ -121,9 +121,8 @@ Status parseCursorResponse(const BSONObj& obj,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName
                                     << "' field must be a string: " << obj);
     }
-    // Since this is client code we are passing boost::none as the tenantId.
-    const NamespaceString tempNss =
-        NamespaceStringUtil::deserialize(boost::none, namespaceElement.valueStringData());
+    const NamespaceString tempNss = NamespaceStringUtil::deserialize(
+        boost::none, namespaceElement.valueStringData(), SerializationContext::stateDefault());
     if (!tempNss.isValid()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName

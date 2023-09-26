@@ -114,14 +114,13 @@ auto makeExpressionContext(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        auto outNss = NamespaceString();
-        if (auto hasOutDB = parsedMr.getOutOptions().getDatabaseName()) {
-            outNss = NamespaceStringUtil::deserialize(
-                boost::none, *hasOutDB, parsedMr.getOutOptions().getCollectionName());
-        } else {
-            outNss = NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
-                                                      parsedMr.getOutOptions().getCollectionName());
-        }
+        auto outNss = parsedMr.getOutOptions().getDatabaseName()
+            ? NamespaceStringUtil::deserialize(boost::none,
+                                               *(parsedMr.getOutOptions().getDatabaseName()),
+                                               parsedMr.getOutOptions().getCollectionName(),
+                                               SerializationContext::stateDefault())
+            : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
+                                               parsedMr.getOutOptions().getCollectionName());
         resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
     }
     auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
@@ -192,15 +191,13 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto parsedMr = MapReduceCommandRequest::parse(
         IDLParserContext("mapReduce", false /* apiStrict */, dbName.tenantId()), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
-    auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
-    auto resolvedOutNss = NamespaceString();
-    if (auto hasOutDB = parsedMr.getOutOptions().getDatabaseName()) {
-        resolvedOutNss = NamespaceStringUtil::deserialize(
-            boost::none, *hasOutDB, parsedMr.getOutOptions().getCollectionName());
-    } else {
-        resolvedOutNss = NamespaceStringUtil::deserialize(
-            parsedMr.getNamespace().dbName(), parsedMr.getOutOptions().getCollectionName());
-    }
+    auto resolvedOutNss = parsedMr.getOutOptions().getDatabaseName()
+        ? NamespaceStringUtil::deserialize(boost::none,
+                                           *(parsedMr.getOutOptions().getDatabaseName()),
+                                           parsedMr.getOutOptions().getCollectionName(),
+                                           SerializationContext::stateDefault())
+        : NamespaceStringUtil::deserialize(parsedMr.getNamespace().dbName(),
+                                           parsedMr.getOutOptions().getCollectionName());
 
     if (_sampler.tick()) {
         LOGV2_WARNING(5725800,

@@ -320,8 +320,10 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
             while (auto record = cursor->next()) {
                 BSONObj obj = record->data.releaseToBson();
 
-                NamespaceString ns(NamespaceStringUtil::deserialize(svns.nss().tenantId(),
-                                                                    obj.getStringField("_id")));
+                NamespaceString ns(
+                    NamespaceStringUtil::deserialize(svns.nss().tenantId(),
+                                                     obj.getStringField("_id"),
+                                                     SerializationContext::stateDefault()));
                 NamespaceString viewOnNs(
                     NamespaceStringUtil::deserialize(ns.dbName(), obj.getStringField("viewOn")));
 

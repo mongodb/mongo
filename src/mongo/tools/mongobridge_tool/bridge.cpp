@@ -361,7 +361,9 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
 
     boost::optional<OpMsgRequest> cmdRequest;
     if ((request.operation() == dbQuery &&
-         NamespaceStringUtil::deserialize(boost::none, DbMessage(request).getns()).isCommand()) ||
+         NamespaceStringUtil::deserialize(
+             boost::none, DbMessage(request).getns(), SerializationContext::stateDefault())
+             .isCommand()) ||
         request.operation() == dbMsg) {
         cmdRequest = rpc::opMsgRequestFromAnyProtocol(request, opCtx->getClient());
 

@@ -34,7 +34,9 @@
 namespace mongo {
 
 ResourcePattern::ResourcePattern(MatchTypeEnum type, const boost::optional<TenantId>& tenantId)
-    : ResourcePattern(type, NamespaceStringUtil::deserialize(tenantId, "")) {}
+    : ResourcePattern(
+          type,
+          NamespaceStringUtil::deserialize(tenantId, "", SerializationContext::stateDefault())) {}
 
 std::string ResourcePattern::serialize(const SerializationContext& context) const {
     switch (_matchType) {

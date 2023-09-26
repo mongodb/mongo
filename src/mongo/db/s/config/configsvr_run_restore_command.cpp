@@ -153,8 +153,8 @@ std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
             continue;
         }
 
-        NamespaceString nss =
-            NamespaceStringUtil::deserialize(boost::none, doc.getStringField("ns"));
+        NamespaceString nss = NamespaceStringUtil::deserialize(
+            boost::none, doc.getStringField("ns"), SerializationContext::stateDefault());
         databasesToRestore.emplace(nss.db_forSharding());
     }
 
@@ -284,10 +284,14 @@ public:
                         // "config.system.sharding_ddl_coordinators".
                         const auto obj = doc.getField(nssFieldName->substr(0, dotPosition)).Obj();
                         docNss = NamespaceStringUtil::deserialize(
-                            boost::none, obj.getStringField(nssFieldName->substr(dotPosition + 1)));
+                            boost::none,
+                            obj.getStringField(nssFieldName->substr(dotPosition + 1)),
+                            SerializationContext::stateDefault());
                     } else {
-                        docNss = NamespaceStringUtil::deserialize(
-                            boost::none, doc.getStringField(*nssFieldName));
+                        docNss =
+                            NamespaceStringUtil::deserialize(boost::none,
+                                                             doc.getStringField(*nssFieldName),
+                                                             SerializationContext::stateDefault());
                     }
                 }
 
@@ -358,7 +362,9 @@ public:
                     auto doc = cursor->next();
 
                     const NamespaceString dbNss =
-                        NamespaceStringUtil::deserialize(boost::none, doc.getStringField("_id"));
+                        NamespaceStringUtil::deserialize(boost::none,
+                                                         doc.getStringField("_id"),
+                                                         SerializationContext::stateDefault());
                     if (!dbNss.coll().empty()) {
                         // We want to handle database only namespaces.
                         continue;

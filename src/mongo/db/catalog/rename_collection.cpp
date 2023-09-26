@@ -989,8 +989,10 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     const auto sourceNsElt = cmd["renameCollection"];
     const auto targetNsElt = cmd["to"];
 
-    NamespaceString sourceNss{NamespaceStringUtil::deserialize(tid, sourceNsElt.valueStringData())};
-    NamespaceString targetNss{NamespaceStringUtil::deserialize(tid, targetNsElt.valueStringData())};
+    NamespaceString sourceNss{NamespaceStringUtil::deserialize(
+        tid, sourceNsElt.valueStringData(), SerializationContext::stateDefault())};
+    NamespaceString targetNss{NamespaceStringUtil::deserialize(
+        tid, targetNsElt.valueStringData(), SerializationContext::stateDefault())};
 
     // TODO: not needed once we are no longer parsing for prefixed tenantIds
     uassert(ErrorCodes::IllegalOperation,

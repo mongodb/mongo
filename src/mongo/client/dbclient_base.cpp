@@ -508,8 +508,8 @@ list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName, const
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
-            const NamespaceString nss =
-                NamespaceStringUtil::deserialize(dbName.tenantId(), cursorObj["ns"].String());
+            const NamespaceString nss = NamespaceStringUtil::deserialize(
+                dbName.tenantId(), cursorObj["ns"].String(), SerializationContext::stateDefault());
             unique_ptr<DBClientCursor> cursor = getMore(nss, id);
             while (cursor->more()) {
                 infos.push_back(cursor->nextSafe().getOwned());
@@ -790,8 +790,8 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 
         const long long id = cursorObj["id"].Long();
         if (id != 0) {
-            const auto cursorNs =
-                NamespaceStringUtil::deserialize(dbName.tenantId(), cursorObj["ns"].String());
+            const auto cursorNs = NamespaceStringUtil::deserialize(
+                dbName.tenantId(), cursorObj["ns"].String(), SerializationContext::stateDefault());
             if (nsOrUuid.isNamespaceString()) {
                 invariant(nsOrUuid.nss() == cursorNs);
             }

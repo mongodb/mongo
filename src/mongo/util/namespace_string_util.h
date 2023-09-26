@@ -112,10 +112,9 @@ public:
      * and NamespaceString is constructor without the tenantID.
      * eg. deserialize(boost::none, "foo.bar") -> NamespaceString(boost::none, "foo.bar")
      */
-    static NamespaceString deserialize(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static NamespaceString deserialize(boost::optional<TenantId> tenantId,
+                                       StringData ns,
+                                       const SerializationContext& context);
 
     /**
      * Deserializes dbname and coll to a NamespaceString object.
@@ -124,11 +123,10 @@ public:
      */
     static NamespaceString deserialize(const DatabaseName& dbName, StringData coll);
 
-    static NamespaceString deserialize(
-        const boost::optional<TenantId>& tenantId,
-        StringData db,
-        StringData coll,
-        const SerializationContext& context = SerializationContext::stateDefault());
+    static NamespaceString deserialize(const boost::optional<TenantId>& tenantId,
+                                       StringData db,
+                                       StringData coll,
+                                       const SerializationContext& context);
 
     /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a

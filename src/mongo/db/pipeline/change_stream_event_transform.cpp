@@ -109,7 +109,7 @@ void setResumeTokenForEvent(const ResumeTokenData& resumeTokenData, MutableDocum
 
 NamespaceString createNamespaceStringFromOplogEntry(Value tid, StringData ns) {
     auto tenantId = tid.missing() ? boost::none : boost::optional<TenantId>{tid.getOid()};
-    return NamespaceStringUtil::deserialize(tenantId, ns);
+    return NamespaceStringUtil::deserialize(tenantId, ns, SerializationContext::stateDefault());
 }
 
 void addTransactionIdFieldsIfPresent(const Document& input, MutableDocument& output) {

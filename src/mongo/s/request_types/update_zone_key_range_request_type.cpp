@@ -85,7 +85,8 @@ StatusWith<UpdateZoneKeyRangeRequest> UpdateZoneKeyRangeRequest::_parseFromComma
         return parseNamespaceStatus;
     }
 
-    const auto ns = NamespaceStringUtil::deserialize(boost::none, rawNS);
+    const auto ns =
+        NamespaceStringUtil::deserialize(boost::none, rawNS, SerializationContext::stateDefault());
 
     if (!ns.isValid()) {
         return {ErrorCodes::InvalidNamespace,

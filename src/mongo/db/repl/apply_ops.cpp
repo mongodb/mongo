@@ -104,8 +104,9 @@ Status _applyOps(OperationContext* opCtx,
         if (*opType == 'n')
             continue;
 
-        const NamespaceString nss(
-            NamespaceStringUtil::deserialize(dbName.tenantId(), opObj["ns"].String()));
+        // opObj["ns"] contains a tenantId prefixed namespace if there is tenancy.
+        const NamespaceString nss(NamespaceStringUtil::deserialize(
+            dbName.tenantId(), opObj["ns"].String(), SerializationContext::stateDefault()));
 
         // Need to check this here, or OldClientContext may fail an invariant.
         if (*opType != 'c' && !nss.isValid())
