@@ -1254,14 +1254,17 @@ ostream& operator<<(ostream& out, const Value& val) {
     verify(false);
 }
 
-void Value::fillCache() const {
+Value Value::shred() const {
     if (isObject()) {
-        getDocument().fillCache();
+        return Value(getDocument().shred());
     } else if (isArray()) {
+        std::vector<Value> values;
         for (auto&& val : getArray()) {
-            val.fillCache();
+            values.push_back(val.shred());
         }
+        return Value(values);
     }
+    return Value(*this);
 }
 
 void Value::serializeForSorter(BufBuilder& buf) const {

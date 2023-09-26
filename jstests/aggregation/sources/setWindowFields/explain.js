@@ -16,9 +16,8 @@ coll.drop();
 const bigStr = Array(1025).toString();  // 1KB of ','
 const nDocs = 1000;
 const nPartitions = 50;
-// Initial docSize is 1292, after fields are loaded into Document's cache they are 2332.
-// Not const because post-cache doc size changes based on the number of fields accessed.
-let docSize = 2332;
+// Initial docSize is 1292, after the doc is shredded to be a constant size it is 1397.
+let docSize = 1397;
 
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 1; i <= nDocs; i++) {

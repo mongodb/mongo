@@ -304,9 +304,9 @@ public:
     void reset(const BSONObj& bson, bool stripMetadata);
 
     /**
-     * Populates the cache by recursively walking the underlying BSON.
+     * Returns a cache-only copy of the document with no backing bson.
      */
-    void fillCache() const;
+    Document shred() const;
 
     static const DocumentStorage& emptyDoc() {
         return kEmptyDoc;

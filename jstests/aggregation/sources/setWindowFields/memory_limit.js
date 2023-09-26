@@ -58,6 +58,9 @@ assert.commandWorked(coll.runCommand({
     cursor: {}
 }));
 
+setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
+                       "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+                       (perDocSize * docsPerPartition) + 1024);
 // Test that the query fails with a window function that stores documents.
 assert.commandFailedWithCode(coll.runCommand({
     aggregate: coll.getName(),
@@ -70,7 +73,7 @@ assert.commandFailedWithCode(coll.runCommand({
     }],
     cursor: {}
 }),
-                             5414201);
+                             [5643011, 5414201]);
 // Reset limit for other tests.
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
