@@ -103,7 +103,8 @@ public:
                           const UUID& migrationId,
                           const UUID& collectionId,
                           std::shared_ptr<MigrationCloningProgressSharedState> migrationInfo,
-                          bool parallelFetchingSupported);
+                          bool parallelFetchingSupported,
+                          int maxBufferedSizeBytesPerThread);
 
     ~MigrationBatchFetcher();
 
@@ -117,6 +118,34 @@ public:
     }
 
 private:
+    /**
+     * Keeps track of memory usage and makes sure it won't exceed the limit.
+     */
+    class BufferSizeTracker {
+    public:
+        const static int kUnlimited{0};
+
+        BufferSizeTracker(int maxSizeBytes) : _maxSizeBytes(maxSizeBytes) {}
+
+        /**
+         * If adding the given amount of bytes will go over the limit, wait until there's
+         * enough space then add.
+         */
+        void waitUntilSpaceAvailableAndAdd(OperationContext* opCtx, int sizeBytes);
+
+        /**
+         * Subtracts the tracked bytes by the given amount.
+         */
+        void remove(int sizeBytes);
+
+    private:
+        Mutex _mutex = MONGO_MAKE_LATCH("MigrationBatchFetcher::BufferSizeTracker::_mutex");
+        stdx::condition_variable _hasAvailableSpace;
+
+        const int _maxSizeBytes;
+        int _currentSize{0};
+    };
+
     NamespaceString _nss;
 
     // Size of thread pools.
@@ -151,6 +180,8 @@ private:
     bool _isParallelFetchingSupported;
 
     SemaphoreTicketHolder _secondaryThrottleTicket;
+
+    BufferSizeTracker _bufferSizeTracker;
 
     // Given session id and namespace, create migrateCloneRequest.
     // Only should be created once for the lifetime of the object.

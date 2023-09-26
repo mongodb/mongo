@@ -23,6 +23,22 @@ assert.commandFailed(mongos.adminCommand({moveChunk: 'a.b', find: {_id: 1}, to: 
 assert.commandFailed(
     mongos.adminCommand({moveChunk: kDbName + '.xxx', find: {_id: 1}, to: shard1}));
 
+assert.commandFailedWithCode(
+    st.rs0.getPrimary().adminCommand(
+        {setParameter: 1, chunkMigrationFetcherMaxBufferedSizeBytesPerThread: -5}),
+    ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(
+    st.rs0.getPrimary().adminCommand(
+        {setParameter: 1, chunkMigrationFetcherMaxBufferedSizeBytesPerThread: 1000}),
+    ErrorCodes.InvalidOptions);
+
+assert.commandWorked(st.rs0.getPrimary().adminCommand(
+    {setParameter: 1, chunkMigrationFetcherMaxBufferedSizeBytesPerThread: 20 * 1024 * 1024}));
+
+assert.commandWorked(st.rs0.getPrimary().adminCommand(
+    {setParameter: 1, chunkMigrationFetcherMaxBufferedSizeBytesPerThread: 0}));
+
 function testHashed() {
     var ns = kDbName + '.fooHashed';
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 'hashed'}}));

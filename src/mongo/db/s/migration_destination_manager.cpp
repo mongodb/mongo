@@ -1437,17 +1437,19 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             {
                 // Destructor of MigrationBatchFetcher is non-trivial. Therefore,
                 // this scope has semantic significance.
-                MigrationBatchFetcher<MigrationBatchInserter> fetcher{outerOpCtx,
-                                                                      opCtx,
-                                                                      _nss,
-                                                                      *_sessionId,
-                                                                      _writeConcern,
-                                                                      _fromShard,
-                                                                      range,
-                                                                      *_migrationId,
-                                                                      *_collectionUuid,
-                                                                      _migrationCloningProgress,
-                                                                      _parallelFetchersSupported};
+                MigrationBatchFetcher<MigrationBatchInserter> fetcher{
+                    outerOpCtx,
+                    opCtx,
+                    _nss,
+                    *_sessionId,
+                    _writeConcern,
+                    _fromShard,
+                    range,
+                    *_migrationId,
+                    *_collectionUuid,
+                    _migrationCloningProgress,
+                    _parallelFetchersSupported,
+                    chunkMigrationFetcherMaxBufferedSizeBytesPerThread.load()};
                 fetcher.fetchAndScheduleInsertion();
             }
             opCtx->checkForInterrupt();

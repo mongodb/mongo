@@ -42,6 +42,19 @@ server_parameters:
           callback: validateChunkMigrationConcurrency
         default: 1
 
+    chunkMigrationFetcherMaxBufferedSizeBytesPerThread:
+        description: >-
+          Maximum size of buffered documents that the chunk migration cloner will keep per
+          thread. A value of 0 means there will be no limit. The minimum size is the maximum
+          BSON size limit.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: chunkMigrationFetcherMaxBufferedSizeBytesPerThread
+        validator:
+          callback: validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread
+        default:
+          expr: 4 * BSONObjMaxInternalSize
+
     rangeDeleterBatchSize:
         description: >-
           The maximum number of documents in each batch to delete during the cleanup stage of chunk
