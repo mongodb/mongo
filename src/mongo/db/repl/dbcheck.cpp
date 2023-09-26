@@ -225,6 +225,7 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
  * Get a HealthLogEntry for a dbCheck batch.
  */
 std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
+    const boost::optional<UUID>& batchId,
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     int64_t count,
@@ -239,6 +240,10 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     auto hashes = expectedFound(expectedHash, foundHash);
 
     BSONObjBuilder builder;
+    if (batchId) {
+        batchId->appendToBuilder(&builder, "batchId");
+    }
+
     builder.append("success", true);
     builder.append("count", count);
     builder.append("bytes", bytes);
@@ -550,6 +555,7 @@ namespace {
 
 // Cumulative number of batches processed. Can wrap around; it's not guaranteed to be in lockstep
 // with other replica set members.
+// TODO(SERVER-78399): Remove 'batchesProcessed'.
 unsigned int batchesProcessed = 0;
 
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
@@ -589,7 +595,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         std::string expected = entry.getMd5().toString();
         std::string found = hasher->total();
 
-        auto logEntry = dbCheckBatchEntry(entry.getNss(),
+        auto logEntry = dbCheckBatchEntry(entry.getBatchId(),
+                                          entry.getNss(),
                                           collection->uuid(),
                                           hasher->docsSeen(),
                                           hasher->bytesSeen(),
@@ -601,11 +608,17 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                           optime,
                                           collection->getCollectionOptions());
 
+        // TODO(SERVER-78399): Remove 'batchesProcessed' logic and expect that
+        // 'getLogBatchToHealthLog' from the enry always exists.
         batchesProcessed++;
-        if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info ||
-            (batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
+        bool shouldLog = (batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0);
+        if (entry.getLogBatchToHealthLog()) {
+            shouldLog = entry.getLogBatchToHealthLog().value();
+        }
+
+        if (kDebugBuild || logEntry->getSeverity() != SeverityEnum::Info || shouldLog) {
             // On debug builds, health-log every batch result; on release builds, health-log
-            // every N batches.
+            // every N batches according to the primary.
             HealthLogInterface::get(opCtx)->log(*logEntry);
         }
     } catch (const DBException& exception) {

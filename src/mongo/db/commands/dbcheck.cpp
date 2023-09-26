@@ -483,11 +483,13 @@ private:
      * For organizing the results of batches for collection-level db check.
      */
     struct DbCheckCollectionBatchStats {
+        boost::optional<UUID> batchId;
         int64_t nDocs;
         int64_t nBytes;
         BSONKey lastKey;
         std::string md5;
         repl::OpTime time;
+        bool logToHealthLog;
         boost::optional<Timestamp> readTimestamp;
     };
 
@@ -1148,8 +1150,8 @@ private:
 
             const auto stats = result.getValue();
 
-            _batchesProcessed++;
-            auto entry = dbCheckBatchEntry(info.nss,
+            auto entry = dbCheckBatchEntry(stats.batchId,
+                                           info.nss,
                                            info.uuid,
                                            stats.nDocs,
                                            stats.nBytes,
@@ -1159,8 +1161,7 @@ private:
                                            stats.lastKey,
                                            stats.readTimestamp,
                                            stats.time);
-            if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info ||
-                (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0)) {
+            if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info || stats.logToHealthLog) {
                 // On debug builds, health-log every batch result; on release builds, health-log
                 // every N batches.
                 HealthLogInterface::get(opCtx)->log(*entry);
@@ -1285,6 +1286,8 @@ private:
 
         // Send information on this batch over the oplog.
         DbCheckCollectionBatchStats result;
+        result.logToHealthLog = _shouldLogBatch(batch);
+        result.batchId = batch.getBatchId();
         result.time = _logOp(opCtx, info.nss, collection->uuid(), batch.toBSON());
         result.readTimestamp = readTimestamp;
 
@@ -1312,6 +1315,19 @@ private:
         }
 
         return false;
+    }
+
+    bool _shouldLogBatch(DbCheckOplogBatch& batch) {
+        _batchesProcessed++;
+        bool shouldLog = (_batchesProcessed % gDbCheckHealthLogEveryNBatches.load() == 0);
+        // TODO(SERVER-78399): Remove the check and always set the parameters of the batch.
+        // Check 'gSecondaryIndexChecksInDbCheck' feature flag is enabled.
+        if (batch.getSecondaryIndexCheckParameters()) {
+            batch.setLogBatchToHealthLog(shouldLog);
+            batch.setBatchId(UUID::gen());
+        }
+
+        return shouldLog;
     }
 
     Service* _service;
