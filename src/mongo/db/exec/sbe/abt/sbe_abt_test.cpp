@@ -91,8 +91,10 @@ TEST_F(ABTSBE, Lower1) {
     auto tree = Constant::int64(100);
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
 
@@ -108,11 +110,12 @@ TEST_F(ABTSBE, Lower2) {
         make<Let>("x",
                   Constant::int64(100),
                   make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(100)));
-
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
 
@@ -127,8 +130,10 @@ TEST_F(ABTSBE, Lower3) {
     auto tree = make<FunctionCall>("isNumber", makeSeq(Constant::int64(10)));
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
 
@@ -158,8 +163,10 @@ TEST_F(ABTSBE, Lower4) {
                 Constant::nothing()));
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
 
@@ -173,11 +180,12 @@ TEST_F(ABTSBE, Lower4) {
 TEST_F(ABTSBE, Lower5) {
     auto tree = make<FunctionCall>(
         "setField", makeSeq(Constant::nothing(), Constant::str("fieldA"), Constant::int64(10)));
-
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
 
@@ -228,7 +236,10 @@ TEST_F(ABTSBE, Lower6) {
         }
     } while (changed);
 
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
 
@@ -278,7 +289,10 @@ TEST_F(ABTSBE, Lower7) {
         }
     } while (changed);
 
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
 
     ASSERT(expr);
     auto compiledExpr = compileExpression(*expr);
@@ -296,8 +310,10 @@ TEST_F(ABTSBE, LowerFunctionCallFail) {
                                    Constant::str(errorMessage)));
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -326,8 +342,10 @@ TEST_F(ABTSBE, LowerFunctionCallConvert) {
         makeSeq(make<Variable>("inputVar"),
                 Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
     auto env = VariableEnvironment::build(tree);
-
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -364,9 +382,12 @@ TEST_F(ABTSBE, LowerFunctionCallTypeMatch) {
                                 getBSONTypeMask(sbe::value::TypeTags::NumberInt64) |
                                 getBSONTypeMask(sbe::value::TypeTags::NumberDouble) |
                                 getBSONTypeMask(sbe::value::TypeTags::NumberDecimal))));
-    auto env = VariableEnvironment::build(tree);
 
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    auto env = VariableEnvironment::build(tree);
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -395,6 +416,8 @@ TEST_F(ABTSBE, LowerComparisonCollation) {
     map["lhs"] = lhsSlotId;
     map["rhs"] = rhsSlotId;
 
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
     registerSlot("collator"_sd,
                  sbe::value::TypeTags::collator,
@@ -402,9 +425,11 @@ TEST_F(ABTSBE, LowerComparisonCollation) {
                  false);
 
     auto tree = make<BinaryOp>(Operations::Cmp3w, make<Variable>("lhs"), make<Variable>("rhs"));
-
     auto env = VariableEnvironment::build(tree);
-    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
+
     ASSERT(expr);
     auto compiledExpr = compileExpression(*expr);
 
@@ -476,9 +501,15 @@ TEST_F(NodeSBE, Lower1) {
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
+    sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{
-        env, *runtimeEnv, ids, phaseManager.getMetadata(), planAndProps._map, ScanOrder::Forward};
+    SBENodeLowering g{env,
+                      *runtimeEnv,
+                      ids,
+                      inputParamToSlotMap,
+                      phaseManager.getMetadata(),
+                      planAndProps._map,
+                      ScanOrder::Forward};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
@@ -636,9 +667,15 @@ TEST_F(NodeSBE, RequireRID) {
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
+    sbe::InputParamToSlotMap inputParamToSlotMap;
 
-    SBENodeLowering g{
-        env, *runtimeEnv, ids, phaseManager.getMetadata(), planAndProps._map, ScanOrder::Forward};
+    SBENodeLowering g{env,
+                      *runtimeEnv,
+                      ids,
+                      inputParamToSlotMap,
+                      phaseManager.getMetadata(),
+                      planAndProps._map,
+                      ScanOrder::Forward};
     auto sbePlan = g.optimize(planAndProps._node, map, ridSlot);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
@@ -769,7 +806,9 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
-    SBENodeLowering g{env, *runtimeEnv, ids, metadata, props, ScanOrder::Forward};
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    SBENodeLowering g{
+        env, *runtimeEnv, ids, inputParamToSlotMap, metadata, props, ScanOrder::Forward};
     auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
 

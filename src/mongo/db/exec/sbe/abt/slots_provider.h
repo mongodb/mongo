@@ -29,15 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/abt/named_slots.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 
 namespace mongo::optimizer {
 
-class MockEmptyNamedSlotsProvider final : public NamedSlotsProvider {
+class SlotsProvider {
 public:
-    boost::optional<sbe::value::SlotId> getSlotIfExists(StringData name) const final {
-        return boost::none;
-    }
+    virtual sbe::value::SlotId getSlot(StringData name) const = 0;
+    virtual boost::optional<sbe::value::SlotId> getSlotIfExists(StringData name) const = 0;
+    virtual sbe::value::SlotId registerSlot(sbe::value::TypeTags tag,
+                                            sbe::value::Value val,
+                                            bool owned,
+                                            sbe::value::SlotIdGenerator* slotIdGenerator) = 0;
 };
 
 }  // namespace mongo::optimizer

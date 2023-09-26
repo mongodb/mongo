@@ -104,10 +104,11 @@ protected:
             sbe::RuntimeEnvironment runtimeEnv;
             boost::optional<sbe::value::SlotId> ridSlot;
             sbe::value::SlotIdGenerator ids;
+            sbe::InputParamToSlotMap inputParamToSlotMap;
 
-            benchmark::DoNotOptimize(
-                SBENodeLowering{env, runtimeEnv, ids, m, _nodeMap, ScanOrder::Forward}.optimize(
-                    n, map, ridSlot));
+            benchmark::DoNotOptimize(SBENodeLowering{
+                env, runtimeEnv, ids, inputParamToSlotMap, m, _nodeMap, ScanOrder::Forward}
+                                         .optimize(n, map, ridSlot));
             benchmark::ClobberMemory();
         }
     }
@@ -279,7 +280,10 @@ void BM_LowerABTLetExpr(benchmark::State& state) {
         auto env = VariableEnvironment::build(n);
         SlotVarMap map;
         sbe::RuntimeEnvironment runtimeEnv;
-        benchmark::DoNotOptimize(SBEExpressionLowering{env, map, runtimeEnv}.optimize(n));
+        sbe::value::SlotIdGenerator ids;
+        sbe::InputParamToSlotMap inputParamToSlotMap;
+        benchmark::DoNotOptimize(
+            SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}.optimize(n));
         benchmark::ClobberMemory();
     }
 }

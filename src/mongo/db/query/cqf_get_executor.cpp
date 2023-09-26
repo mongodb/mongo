@@ -421,9 +421,12 @@ static ExecParams createExecutor(
 
     // Construct the ShardFilterer and bind it to the correct slot.
     setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+
     SBENodeLowering g{env,
                       *runtimeEnvironment,
                       ids,
+                      staticData->inputParamToSlotMap,
                       phaseManager.getMetadata(),
                       planAndProps._map,
                       scanOrder,
@@ -439,7 +442,6 @@ static ExecParams createExecutor(
         OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
     }
 
-    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     staticData->resultSlot = slotMap.begin()->second;
     if (requireRID) {
         staticData->recordIdSlot = ridSlot;

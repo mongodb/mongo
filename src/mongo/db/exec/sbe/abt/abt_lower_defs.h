@@ -35,7 +35,7 @@
 
 namespace mongo::optimizer {
 
-class NamedSlotsProvider;
+class SlotsProvider;
 using SlotVarMap = stdx::unordered_map<ProjectionName, sbe::value::SlotId, ProjectionName::Hasher>;
 
 }  // namespace mongo::optimizer

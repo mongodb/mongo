@@ -75,8 +75,12 @@ protected:
         return slot;
     }
 
-    const RuntimeEnvironment* runtimeEnv() const {
+    RuntimeEnvironment* runtimeEnv() const {
         return _runtimeEnv;
+    }
+
+    value::SlotIdGenerator& slotIdGenerator() {
+        return _slotIdGenerator;
     }
 
     sbe::value::SlotId registerSlot(StringData name,

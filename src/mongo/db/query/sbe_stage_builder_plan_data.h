@@ -79,7 +79,6 @@ struct ParameterizedClusteredScanSlots {
     boost::optional<sbe::value::SlotId> maxRecord;
 };
 
-using InputParamToSlotMap = stdx::unordered_map<MatchExpression::InputParamId, sbe::value::SlotId>;
 using VariableIdToSlotMap = stdx::unordered_map<Variables::Id, sbe::value::SlotId>;
 
 /**
@@ -177,7 +176,7 @@ struct PlanStageStaticData {
     //    p2 -> s4
     //
     // A new query {a: 5, b: 6} runs. Using this mapping, we set a value of 5 in s3 and 6 in s4.
-    InputParamToSlotMap inputParamToSlotMap;
+    sbe::InputParamToSlotMap inputParamToSlotMap;
 
     // This Variable-to-SlotId map stores all Variables that were translated into corresponding
     // SBE Slots. The slots are registered in the 'RuntimeEnvironment'.

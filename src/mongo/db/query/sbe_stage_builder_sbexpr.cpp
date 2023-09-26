@@ -180,7 +180,10 @@ TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state) {
     });
 
     // And finally convert to the SBE expression.
-    optimizer::SBEExpressionLowering exprLower{env, std::move(varResolver), runtimeEnv};
+    sbe::value::SlotIdGenerator ids;
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+    optimizer::SBEExpressionLowering exprLower{
+        env, std::move(varResolver), runtimeEnv, ids, staticData->inputParamToSlotMap};
     return {exprLower.optimize(abt), signature};
 }
 

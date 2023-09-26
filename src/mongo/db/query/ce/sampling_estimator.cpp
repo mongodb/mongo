@@ -65,6 +65,7 @@
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -390,9 +391,12 @@ private:
         auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO Use factory
         boost::optional<sbe::value::SlotId> ridSlot;
         sbe::value::SlotIdGenerator ids;
+        sbe::InputParamToSlotMap inputParamToSlotMap;
+
         SBENodeLowering g{env,
                           *runtimeEnvironment,
                           ids,
+                          inputParamToSlotMap,
                           _phaseManager.getMetadata(),
                           planAndProps._map,
                           internalCascadesOptimizerSamplingCEScanStartOfColl.load()
