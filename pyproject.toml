@@ -147,7 +147,7 @@ mongomock = "4.1.2"
 pyjwt = "<=2.3.0"
 selenium = "^4.9.1"
 geckodriver-autoinstaller = "^0.1.0"
-pigz-python = "*"
+retry = "^0.9.2"
 opentelemetry-api = "*"
 opentelemetry-sdk = "*"
 # TODO: EVG-20576

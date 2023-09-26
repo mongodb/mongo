@@ -2184,7 +2184,6 @@ functions:
       - "-p=./**.core"
       - "-p=./**.mdmp" # Windows: minidumps
       - "-n=Core Dump"
-      - "-t=720" # 12 minutes
 
   "archive mongo coredumps": &archive_mongo_coredumps
     command: attach.artifacts

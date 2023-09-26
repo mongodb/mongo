@@ -4,7 +4,6 @@ import glob
 import gzip
 from logging import Logger
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
@@ -14,13 +13,15 @@ import time
 from typing import Callable, Optional
 import urllib.request
 
+from retry import retry
+
 from buildscripts.resmokelib.setup_multiversion.download import DownloadError
 from buildscripts.resmokelib.run import compare_start_time
 from buildscripts.resmokelib.setup_multiversion.setup_multiversion import _DownloadOptions, SetupMultiversion
 from buildscripts.resmokelib.utils import evergreen_conn
 from buildscripts.resmokelib.utils.filesystem import build_hygienic_bin_path
 from buildscripts.resmokelib.symbolizer import Symbolizer
-from evergreen.task import Task
+from evergreen.task import Task, Artifact
 
 _DEBUG_FILE_BASE_NAMES = ['mongo', 'mongod', 'mongos']
 TOOLCHAIN_ROOT = "/opt/mongodbtoolchain/v4"
@@ -53,28 +54,37 @@ def download_core_dumps(root_logger: Logger, task: Task, download_dir: str) -> b
     core_dumps_found = False
     core_dumps_dir = os.path.join(download_dir, "core-dumps")
     os.makedirs(core_dumps_dir, exist_ok=True)
-    try:
-        for artifact in artifacts:
-            if not artifact.name.startswith("Core Dump"):
-                continue
+    for artifact in artifacts:
+        if not artifact.name.startswith("Core Dump"):
+            continue
 
-            file_name = artifact.url.split("/")[-1]
-            extracted_name, _ = os.path.splitext(file_name)
-            root_logger.info(f"Downloading core dump: {file_name}")
-            urllib.request.urlretrieve(artifact.url, file_name)
-            root_logger.info(f"Extracting core dump: {file_name}")
-            with gzip.open(file_name, 'rb') as f_in:
-                extract_path = os.path.join(core_dumps_dir, extracted_name)
-                with open(extract_path, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-            root_logger.info(f"Done extracting core dump {extracted_name} to {extract_path}")
+        file_name = artifact.url.split("/")[-1]
+        extracted_name, _ = os.path.splitext(file_name)
+        extract_path = os.path.join(core_dumps_dir, extracted_name)
+        try:
+
+            @retry(tries=3, delay=5)
+            def download_core_dump(artifact: Artifact):
+                root_logger.info(f"Downloading core dump: {file_name}")
+                if os.path.exists(file_name):
+                    os.remove(file_name)
+                urllib.request.urlretrieve(artifact.url, file_name)
+                root_logger.info(f"Extracting core dump: {file_name}")
+                if os.path.exists(extract_path):
+                    os.remove(extract_path)
+                with gzip.open(file_name, 'rb') as f_in:
+                    with open(extract_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                root_logger.info(f"Done extracting core dump {extracted_name} to {extract_path}")
+                os.remove(file_name)
+
+            download_core_dump(artifact)
             core_dumps_found = True
-            os.remove(file_name)
 
-    except Exception as ex:
-        root_logger.error("An error occured while trying to download core dumps")
-        root_logger.error(ex)
-        return False
+        except Exception as ex:
+            root_logger.error("An error occured while trying to download and extract core dump %s",
+                              extracted_name)
+            root_logger.error(ex)
 
     if not core_dumps_found:
         root_logger.error("No core dumps found")
@@ -191,32 +201,26 @@ def post_install_gdb_optimization(download_dir: str, root_looger: Logger):
         root_looger.debug("Finished recalculating the debuglink for %s", file_path)
 
     install_dir = os.path.join(download_dir, "install")
-    bin_dir = os.path.join(install_dir, "dist-test", "bin")
     lib_dir = os.path.join(install_dir, "dist-test", "lib")
-    binary_files = [os.path.join(bin_dir, file_path) for file_path in os.listdir(bin_dir)]
-    all_files = binary_files + [
-        os.path.join(lib_dir, file_path) for file_path in os.listdir(lib_dir)
-    ]
-    binary_files = set(binary_files)
+    if not os.path.exists(lib_dir):
+        return
+    lib_files = [os.path.join(lib_dir, file_path) for file_path in os.listdir(lib_dir)]
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = []
-        for file_path in all_files:
-
+        for file_path in lib_files:
             # When we add the .gdb_index section to binaries being ran with gdb
             # it makes gdb not longer recognize them as the binary that generated
             # the core dumps
-            if file_path in binary_files:
-                continue
             futures.append(executor.submit(add_index, file_path=file_path))
 
         concurrent.futures.wait(futures)
         futures = []
-        for file_path in all_files:
+        for file_path in lib_files:
             # There will be no debuglinks in the separate debug files
             # We do not want to edit any of the binary files that gdb might directly run
             # so we skip the bin directory
-            if file_path.endswith(".debug") or file_path in binary_files:
+            if file_path.endswith(".debug"):
                 continue
             futures.append(executor.submit(recalc_debuglink, file_path=file_path))
         concurrent.futures.wait(futures)
