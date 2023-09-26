@@ -302,8 +302,7 @@ protected:
             ASSERT_EQ(cursors.type(), BSONType::Array);
             auto cursorsArray = cursors.Array();
             ASSERT_FALSE(cursorsArray.empty());
-            auto cursorId = cursorsArray[0].Long();
-            ASSERT(cursorId == cursorId);
+            ASSERT_EQ(cursorsArray[0].Long(), cursorId);
             // The AsyncResultsMerger doesn't actually inspect the response of the killCursors, so
             // we don't have to put anything except {ok: true}.
             return BSON("ok" << true);
