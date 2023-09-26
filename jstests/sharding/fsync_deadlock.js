@@ -16,6 +16,7 @@ const st = new ShardingTest({
     config: 1,
 });
 const shard0Primary = st.rs0.getPrimary();
+const shard1Primary = st.rs1.getPrimary();
 
 // Set up a sharded collection with two chunks
 const dbName = "testDb";
@@ -27,6 +28,17 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(
     st.s.adminCommand({moveChunk: ns, find: {x: MinKey}, to: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));
+
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+
+if (isMultiversion) {
+    // Force the recipient shard to refresh its routing table for the collection since the recipient
+    // refresh during chunk migration (in 5.0 and previous versions) is only best-effort, and mongos
+    // would only retry a transaction on a StaleConfig error if the error is thrown by the first
+    // participant shard.
+    assert.commandWorked(shard1Primary.adminCommand({_flushRoutingTableCacheUpdates: ns}));
+}
 
 function waitForFsyncLockToWaitForLock(st, numThreads) {
     assert.soon(() => {
