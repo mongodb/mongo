@@ -214,15 +214,14 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                          boost::optional<std::vector<BSONObj>> pipeline,
                                          std::set<FieldPath> mergeOnFields,
                                          boost::optional<ChunkVersion> collectionPlacementVersion)
-    : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx) {
-    _mergeProcessor.emplace(MergeProcessor(std::move(outputNs),
-                                           expCtx,
-                                           whenMatched,
-                                           whenNotMatched,
-                                           std::move(letVariables),
-                                           std::move(pipeline),
-                                           std::move(mergeOnFields),
-                                           std::move(collectionPlacementVersion)));
+    : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx), _outputNs(std::move(outputNs)) {
+    _mergeProcessor.emplace(expCtx,
+                            whenMatched,
+                            whenNotMatched,
+                            std::move(letVariables),
+                            std::move(pipeline),
+                            std::move(mergeOnFields),
+                            std::move(collectionPlacementVersion));
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
@@ -410,7 +409,7 @@ std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchO
 void DocumentSourceMerge::flush(BatchedCommandRequest bcr, BatchedObjects batch) {
     try {
         DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
-        _mergeProcessor->flush(std::move(bcr), std::move(batch));
+        _mergeProcessor->flush(getOutputNs(), std::move(bcr), std::move(batch));
     } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
         uassertStatusOKWithContext(ex.toStatus(),
                                    "$merge failed to update the matching document, did you "

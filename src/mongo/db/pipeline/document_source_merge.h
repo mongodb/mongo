@@ -142,7 +142,7 @@ public:
     }
 
     const NamespaceString& getOutputNs() const override {
-        return _mergeProcessor->getOutputNs();
+        return _outputNs;
     }
 
     MergeProcessor* getMergeProcessor() {
@@ -226,6 +226,7 @@ private:
 
     void waitWhileFailPointEnabled() override;
 
+    const NamespaceString _outputNs;
     boost::optional<MergeProcessor> _mergeProcessor;
 };
 

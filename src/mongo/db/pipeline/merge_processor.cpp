@@ -308,8 +308,7 @@ const MergeStrategyDescriptorsMap& getMergeStrategyDescriptors() {
     return mergeStrategyDescriptors;
 }
 
-MergeProcessor::MergeProcessor(NamespaceString outputNs,
-                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
+MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                MergeStrategyDescriptor::WhenMatched whenMatched,
                                MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                                boost::optional<BSONObj> letVariables,
@@ -317,7 +316,6 @@ MergeProcessor::MergeProcessor(NamespaceString outputNs,
                                std::set<FieldPath> mergeOnFields,
                                boost::optional<ChunkVersion> collectionPlacementVersion)
     : _expCtx(expCtx),
-      _outputNs(std::move(outputNs)),
       _writeConcern(expCtx->opCtx->getWriteConcern()),
       _descriptor(getMergeStrategyDescriptors().at({whenMatched, whenNotMatched})),
       _pipeline(std::move(pipeline)),
@@ -358,13 +356,14 @@ MongoProcessInterface::BatchObject MergeProcessor::makeBatchObject(Document doc)
     return batchObject;
 }
 
-void MergeProcessor::flush(BatchedCommandRequest bcr,
+void MergeProcessor::flush(const NamespaceString& outputNs,
+                           BatchedCommandRequest bcr,
                            MongoProcessInterface::BatchedObjects batch) const {
     auto targetEpoch = _collectionPlacementVersion
         ? boost::optional<OID>(_collectionPlacementVersion->epoch())
         : boost::none;
     _descriptor.strategy(_expCtx,
-                         _outputNs,
+                         outputNs,
                          _writeConcern,
                          targetEpoch,
                          std::move(batch),

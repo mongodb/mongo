@@ -115,18 +115,13 @@ public:
      * collection's epoch changes during the course of execution. This is used as a mechanism to
      * prevent the shard key from changing.
      */
-    MergeProcessor(NamespaceString outputNs,
-                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                    MergeStrategyDescriptor::WhenMatched whenMatched,
                    MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                    boost::optional<BSONObj> letVariables,
                    boost::optional<std::vector<BSONObj>> pipeline,
                    std::set<FieldPath> mergeOnFields,
                    boost::optional<ChunkVersion> collectionPlacementVersion);
-
-    const NamespaceString& getOutputNs() const {
-        return _outputNs;
-    }
 
     const MergeStrategyDescriptor& getMergeStrategyDescriptor() const {
         return _descriptor;
@@ -150,7 +145,9 @@ public:
 
     MongoProcessInterface::BatchObject makeBatchObject(Document doc) const;
 
-    void flush(BatchedCommandRequest bcr, MongoProcessInterface::BatchedObjects batch) const;
+    void flush(const NamespaceString& outputNs,
+               BatchedCommandRequest bcr,
+               MongoProcessInterface::BatchedObjects batch) const;
 
 private:
     /**
@@ -183,9 +180,6 @@ private:
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-
-    // The namespace where the output will be written to.
-    const NamespaceString _outputNs;
 
     WriteConcernOptions _writeConcern;
 
