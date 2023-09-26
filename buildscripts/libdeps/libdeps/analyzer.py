@@ -435,6 +435,32 @@ class DirectDependents(Analyzer):
         report[DependsReportTypes.DIRECT_DEPENDS.name][self._node] = self.run()
 
 
+class TransitiveProgramDependents(Analyzer):
+    """Finds all program dependents for a given dependency node."""
+
+    def __init__(self, dependency_graph, node):
+        """Store graph and strip the node."""
+
+        super().__init__(dependency_graph)
+        self._node = node
+
+    @schema_check(schema_version=1)
+    def run(self):
+        """For given node, report what nodes depend directly or transitively on that node."""
+        all_reachable_nodes = networkx.single_source_shortest_path_length(
+            self._dependents_graph, self._node).keys()
+        return sorted([
+            node for node in all_reachable_nodes
+            if self._dependents_graph.nodes[node].get(NodeProps.bin_type.name) == 'Program'
+        ])
+
+    def report(self, report):
+        """Add the direct or transitive depends list for this node."""
+        if DependsReportTypes.PROGRAM_DEPENDS.name not in report:
+            report[DependsReportTypes.PROGRAM_DEPENDS.name] = {}
+        report[DependsReportTypes.PROGRAM_DEPENDS.name][self._node] = self.run()
+
+
 class ExcludeDependents(Analyzer):
     """Finds dependents which depend on the first input node, but exclude the other input nodes."""
 
@@ -984,6 +1010,12 @@ class GaPrettyPrinter(GaPrinter):
             for node in results[DependsReportTypes.DIRECT_DEPENDS.name]:
                 self._print_results_node_list(f'=>depends on {node}:',
                                               results[DependsReportTypes.DIRECT_DEPENDS.name][node])
+
+        if DependsReportTypes.PROGRAM_DEPENDS.name in results:
+            print("\nPrograms that depend on:")
+            for node in results[DependsReportTypes.PROGRAM_DEPENDS.name]:
+                self._print_results_node_list(
+                    f'=>depends on {node}:', results[DependsReportTypes.PROGRAM_DEPENDS.name][node])
 
         if DependsReportTypes.COMMON_DEPENDS.name in results:
             print("\nNodes that commonly depend on:")

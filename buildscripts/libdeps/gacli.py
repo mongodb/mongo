@@ -142,6 +142,10 @@ def setup_args_parser():
     parser.add_argument('--direct-depends', action='append', default=[],
                         help="Print the nodes which depends on a given node.")
 
+    parser.add_argument(
+        '--program-depends', action='append', default=[],
+        help="Print the programs which depend (transitively or directly) on a given node.")
+
     parser.add_argument('--common-depends', nargs='+', action='append', default=[],
                         help="Print the nodes which have a common dependency on all N nodes.")
 
@@ -247,6 +251,11 @@ def main():
         analysis.append(
             libdeps_analyzer.DirectDependents(libdeps_graph,
                                               strip_build_dir(build_dir, analyzer_args)))
+
+    for analyzer_args in args.program_depends:
+        analysis.append(
+            libdeps_analyzer.TransitiveProgramDependents(libdeps_graph,
+                                                         strip_build_dir(build_dir, analyzer_args)))
 
     for analyzer_args in args.common_depends:
         analysis.append(
