@@ -1,15 +1,12 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor;
 
-#include "mongo/transport/service_executor_reserved.h"
+#include "mongo/transport/service_executor_coroutine.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/platform/basic.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
-#include "mongo/util/processinfo.h"
 
 namespace mongo {
 namespace transport {
@@ -84,15 +81,15 @@ void ThreadGroup::Terminate() {
 }
 
 
-thread_local std::deque<ServiceExecutor::Task> ServiceExecutorReserved::_localWorkQueue = {};
-thread_local int ServiceExecutorReserved::_localRecursionDepth = 0;
-thread_local int64_t ServiceExecutorReserved::_localThreadIdleCounter = 0;
+thread_local std::deque<ServiceExecutor::Task> ServiceExecutorCoroutine::_localWorkQueue = {};
+thread_local int ServiceExecutorCoroutine::_localRecursionDepth = 0;
+thread_local int64_t ServiceExecutorCoroutine::_localThreadIdleCounter = 0;
 
-ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx, size_t reservedThreads)
+ServiceExecutorCoroutine::ServiceExecutorCoroutine(ServiceContext* ctx, size_t reservedThreads)
     : _name{"coroutine"}, _reservedThreads(reservedThreads), _threadGroups(reservedThreads) {}
 
-Status ServiceExecutorReserved::start() {
-    MONGO_LOG(0) << "ServiceExecutorReserved::start";
+Status ServiceExecutorCoroutine::start() {
+    MONGO_LOG(0) << "ServiceExecutorCoroutine::start";
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _stillRunning.store(true, std::memory_order_relaxed);
@@ -109,7 +106,7 @@ Status ServiceExecutorReserved::start() {
     return Status::OK();
 }
 
-Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
+Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
     MONGO_LOG(0) << "Starting new worker thread for " << _name << " service executor. "
                  << " group id: " << groupId;
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
@@ -123,11 +120,8 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
             _shutdownCondition.notify_one();
         });
         lk.unlock();
-        // _numStartingThreads--;
-        // _numReadyThreads++;
 
         while (_stillRunning.load()) {
-
 
             if (!_stillRunning.load(std::memory_order_relaxed)) {
                 break;
@@ -168,24 +162,6 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                 continue;
             }
 
-            // _numReadyThreads -= 1;
-
-            // bool launchReplacement = false;
-            // if (_numReadyThreads + _numStartingThreads < _reservedThreads) {
-            //     _numStartingThreads++;
-            //     launchReplacement = true;
-            // }
-
-            // lk.unlock();
-
-            // if (launchReplacement) {
-            //     auto threadStartStatus = _startWorker(threadGroupId);
-            //     if (!threadStartStatus.isOK()) {
-            //         warning() << "Could not start new reserve worker thread: " <<
-            //         threadStartStatus;
-            //     }
-            // }
-
             while (!_localWorkQueue.empty() && _stillRunning.load(std::memory_order_relaxed)) {
                 _localRecursionDepth = 1;
                 MONGO_LOG(1) << "thread " << threadGroupId << " do task";
@@ -193,13 +169,6 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
                 MONGO_LOG(1) << "thread " << threadGroupId << " do task done";
                 _localWorkQueue.pop_front();
             }
-
-            // lk.lock();
-            // if (_numReadyThreads + 1 > _reservedThreads) {
-            //     break;
-            // } else {
-            //     _numReadyThreads += 1;
-            // }
         }
 
         LOG(3) << "Exiting worker thread in " << _name << " service executor";
@@ -207,8 +176,8 @@ Status ServiceExecutorReserved::_startWorker(uint16_t groupId) {
 }
 
 
-Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
-    LOG(3) << "Shutting down reserved executor";
+Status ServiceExecutorCoroutine::shutdown(Milliseconds timeout) {
+    LOG(3) << "Shutting down coroutine executor";
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _stillRunning.store(false, std::memory_order_relaxed);
@@ -225,54 +194,19 @@ Status ServiceExecutorReserved::shutdown(Milliseconds timeout) {
     return result
         ? Status::OK()
         : Status(ErrorCodes::Error::ExceededTimeLimit,
-                 "reserved executor couldn't shutdown all worker threads within time limit.");
+                 "coroutine executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorReserved::schedule(Task task,
-                                         ScheduleFlags flags,
-                                         ServiceExecutorTaskName taskName) {
+Status ServiceExecutorCoroutine::schedule(Task task,
+                                          ScheduleFlags flags,
+                                          ServiceExecutorTaskName taskName) {
     return schedule(task, flags, taskName, 0);
-    if (!_stillRunning.load()) {
-        return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
-    }
-
-    if (!_localWorkQueue.empty()) {
-        /*
-         * In perf testing we found that yielding after running a each request produced
-         * at 5% performance boost in microbenchmarks if the number of worker threads
-         * was greater than the number of available cores.
-         */
-        if (flags & ScheduleFlags::kMayYieldBeforeSchedule) {
-            if ((_localThreadIdleCounter++ & 0xf) == 0) {
-                markThreadIdle();
-            }
-        }
-
-        // Execute task directly (recurse) if allowed by the caller as it produced better
-        // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking network
-        // I/O.
-        if ((flags & ScheduleFlags::kMayRecurse) &&
-            (_localRecursionDepth < reservedServiceExecutorRecursionLimit.loadRelaxed())) {
-            ++_localRecursionDepth;
-            task();
-        } else {
-            _localWorkQueue.emplace_back(std::move(task));
-        }
-        return Status::OK();
-    }
-
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _readyTasks.push_back(std::move(task));
-    _threadWakeup.notify_one();
-
-    return Status::OK();
 }
 
-Status ServiceExecutorReserved::schedule(Task task,
-                                         ScheduleFlags flags,
-                                         ServiceExecutorTaskName taskName,
-                                         uint16_t thd_group_id) {
+Status ServiceExecutorCoroutine::schedule(Task task,
+                                          ScheduleFlags flags,
+                                          ServiceExecutorTaskName taskName,
+                                          uint16_t thd_group_id) {
     MONGO_LOG(1) << "schedule with group id: " << thd_group_id;
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
@@ -309,15 +243,15 @@ Status ServiceExecutorReserved::schedule(Task task,
     return Status::OK();
 }
 
-std::function<void()> ServiceExecutorReserved::CoroutineResumeFunctor(uint16_t thd_group_id,
-                                                                      Task task) {
+std::function<void()> ServiceExecutorCoroutine::CoroutineResumeFunctor(uint16_t thd_group_id,
+                                                                       Task task) {
     assert(thd_group_id < _threadGroups.size());
     return [thd_group = &_threadGroups[thd_group_id], tsk = std::move(task)]() {
         thd_group->ResumeTask(std::move(tsk));
     };
 }
 
-void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
+void ServiceExecutorCoroutine::appendStats(BSONObjBuilder* bob) const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     *bob << kExecutorLabel << kExecutorName << kThreadsRunning
          << static_cast<int>(_numRunningWorkerThreads.loadRelaxed()) << kReadyThreads;

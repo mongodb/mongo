@@ -113,7 +113,7 @@ tlEnv.Library(
     target='service_executor',
     source=[
         'service_executor_adaptive.cpp',
-        'service_executor_reserved.cpp',
+        'service_executor_coroutine.cpp',
         'service_executor_synchronous.cpp',
         'thread_idle_callback.cpp',
     ],

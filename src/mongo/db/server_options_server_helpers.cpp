@@ -130,6 +130,8 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .setDefault(moe::Value("synchronous"));
 
     // register options in config file
+    options->addOptionChaining(
+        "net.enableCoroutine", "enableCoroutine", moe::Bool, "whether to enable coroutine");
     options->addOptionChaining("net.reservedThreadNum",
                                "reservedThreadNum",
                                moe::Unsigned,
@@ -555,6 +557,15 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.serviceExecutor = value;
     } else {
         serverGlobalParams.serviceExecutor = "synchronous";
+    }
+
+    if (params.count("net.enableCoroutine")) {
+        serverGlobalParams.enableCoroutine = params["net.enableCoroutine"].as<bool>();
+        if (serverGlobalParams.enableCoroutine &&
+            serverGlobalParams.serviceExecutor != "adaptive") {
+            return Status(ErrorCodes::BadValue,
+                          "Coroutine mode can only work with adaptive ServiceExecutor");
+        }
     }
 
     if (params.count("net.reservedThreadNum")) {

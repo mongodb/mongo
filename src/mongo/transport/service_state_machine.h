@@ -80,6 +80,7 @@ public:
                         transport::SessionHandle session,
                         transport::Mode transportMode,
                         uint16_t group_id = 0);
+
     void Reset(ServiceContext* svcContext,
                transport::SessionHandle session,
                transport::Mode transportMode,
@@ -232,11 +233,11 @@ private:
     AtomicWord<State> _state{State::Created};
 
     ServiceEntryPoint* _sep;
-    // ThreadGuard* _guard;
     transport::Mode _transportMode;
 
-    // remove const ???
+    // responsible for scheduling network tasks
     ServiceContext* _serviceContext;
+    // responsible for scheduling DBRequest tasks
     transport::ServiceExecutor* _serviceExecutor;
 
     transport::SessionHandle _sessionHandle;

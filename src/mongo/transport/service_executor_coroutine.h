@@ -50,7 +50,7 @@ private:
     std::condition_variable _sleep_cv;
     std::atomic<bool> _is_terminated{false};
 
-    friend class ServiceExecutorReserved;
+    friend class ServiceExecutorCoroutine;
 };
 
 /**
@@ -63,9 +63,9 @@ private:
  * accept work. When threads exit, they will go back to waiting for work if there are fewer
  * than reservedThreads available.
  */
-class ServiceExecutorReserved : public ServiceExecutor {
+class ServiceExecutorCoroutine : public ServiceExecutor {
 public:
-    explicit ServiceExecutorReserved(ServiceContext* ctx, size_t reservedThreads = 1);
+    explicit ServiceExecutorCoroutine(ServiceContext* ctx, size_t reservedThreads = 1);
 
     Status start() override;
 
@@ -98,11 +98,7 @@ private:
     stdx::condition_variable _threadWakeup;
     stdx::condition_variable _shutdownCondition;
 
-    std::deque<Task> _readyTasks;
-
     AtomicUInt32 _numRunningWorkerThreads{0};
-    // size_t _numReadyThreads{0};
-    // size_t _numStartingThreads{0};
 
     const std::string _name;
     const size_t _reservedThreads;

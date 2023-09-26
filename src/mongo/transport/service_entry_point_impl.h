@@ -35,7 +35,7 @@
 #include "mongo/stdx/list.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/service_executor_reserved.h"
+#include "mongo/transport/service_executor_coroutine.h"
 #include "mongo/transport/service_state_machine.h"
 
 namespace mongo {
@@ -86,7 +86,7 @@ private:
     AtomicWord<size_t> _currentConnections{0};
     AtomicWord<size_t> _createdConnections{0};
 
-    std::unique_ptr<transport::ServiceExecutorReserved> _adminInternalPool;
+    std::unique_ptr<transport::ServiceExecutorCoroutine> _coroutineExecutor;
 };
 
 }  // namespace mongo

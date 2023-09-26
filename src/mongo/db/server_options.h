@@ -79,8 +79,9 @@ struct ServerGlobalParams {
     std::string serviceExecutor;
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.
+    bool enableCoroutine{false};
     size_t reservedThreadNum = 8;
-    
+
     int unixSocketPermissions = DEFAULT_UNIX_PERMS;  // permissions for the UNIX domain socket
 
     std::string keyFile;           // Path to keyfile, or empty if none.

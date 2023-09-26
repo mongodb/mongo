@@ -72,16 +72,16 @@ ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx) : _svcCtx(s
 
     _maxNumConnections = supportedMax;
 
-    if (serverGlobalParams.reservedThreadNum) {
-        _adminInternalPool = std::make_unique<transport::ServiceExecutorReserved>(
+    if (serverGlobalParams.enableCoroutine && serverGlobalParams.reservedThreadNum) {
+        _coroutineExecutor = std::make_unique<transport::ServiceExecutorCoroutine>(
             _svcCtx, serverGlobalParams.reservedThreadNum);
     }
 }
 
 Status ServiceEntryPointImpl::start() {
-    if (_adminInternalPool)
-        return _adminInternalPool->start();
-    else
+    if (_coroutineExecutor) {
+        return _coroutineExecutor->start();
+    } else
         return Status::OK();
 }
 
@@ -111,23 +111,27 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         }
     }
 
-    // work balance
-    size_t targetThreadGroupId = connectionCount % serverGlobalParams.reservedThreadNum;
-    ssm->setThreadGroupId(targetThreadGroupId);
-    MONGO_LOG(0) << "Current ssm is assigned to thread group " << targetThreadGroupId;
+    if (serverGlobalParams.enableCoroutine) {
+        MONGO_LOG(0) << "use coroutine service executor";
+        ssm->setServiceExecutor(_coroutineExecutor.get());
+
+        // work balance
+        size_t targetThreadGroupId = connectionCount % serverGlobalParams.reservedThreadNum;
+        ssm->setThreadGroupId(targetThreadGroupId);
+        MONGO_LOG(0) << "Current ssm is assigned to thread group " << targetThreadGroupId;
+    }
 
     // Checking if we successfully added a connection above. Separated from the lock so we don't log
     // while holding it.
     if (connectionCount > _maxNumConnections) {
         if (!quiet) {
-            log() << "connection refused because too many open connections: " << connectionCount;
+            // log() << "connection refused because too many open connections: " << connectionCount;
+            log() << "too many open connections: " << connectionCount;
         }
 
         // return;
     }
 
-    ssm->setServiceExecutor(_adminInternalPool.get());
-    MONGO_LOG(0) << "use reserved service executor";
 
     if (!quiet) {
         const auto word = (connectionCount == 1 ? " connection"_sd : " connections"_sd);

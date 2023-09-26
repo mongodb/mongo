@@ -8,7 +8,7 @@
             "name": "(gdb) Launch monograph",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/debug/mongo/mongod",
+            "program": "${workspaceFolder}/build/Debug/mongo/mongod",
             "args": [
                 "--config",
                 "src/mongo/db/modules/monograph/test_folder/config/monograph/debug_coroutine.conf"

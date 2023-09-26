@@ -26,9 +26,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/server_options.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
-#include "mongo/transport/service_state_machine.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
@@ -40,6 +40,7 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_task_names.h"
+#include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -220,7 +221,8 @@ std::shared_ptr<ServiceStateMachine> ServiceStateMachine::create(ServiceContext*
                                                                  transport::SessionHandle session,
                                                                  transport::Mode transportMode,
                                                                  uint16_t group_id) {
-    // return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), transportMode, 0);
+    // return std::make_shared<ServiceStateMachine>(svcContext, std::move(session), transportMode,
+    // 0);
     ServiceStateMachine* ssm{nullptr};
     std::unique_ptr<ServiceStateMachine> ssmUptr{nullptr};
     bool success = ssmPool.try_dequeue(ssmUptr);
@@ -414,7 +416,10 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
 
     // Pass sourced Message to handler to generate response.
     auto opCtx = Client::getCurrent()->makeOperationContext();
-    opCtx->setCoroutineFunctors(&_coroYield, &_coroResume);
+
+    if (serverGlobalParams.enableCoroutine) {
+        opCtx->setCoroutineFunctors(&_coroYield, &_coroResume);
+    }
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
@@ -482,51 +487,51 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
                 _sourceMessage(std::move(guard));
                 break;
             case State::Process: {
-                // _processMessage(std::move(guard));
-                if (_coroStatus == CoroStatus::Empty) {
-                    MONGO_LOG(1) << "coroutine begin";
-                    _coroStatus = CoroStatus::OnGoing;
-                    auto func = [this, ssm = shared_from_this()] {
-                        // std::stringstream ss;
-                        // ss << std::this_thread::get_id();
-                        // uint64_t id = std::stoull(ss.str());
-                        // MONGO_LOG(1) << "thread id after resume: " << id;
-                        Client::setCurrent(std::move(ssm->_dbClient));
-                        _runResumeProcess();
-                    };
+                if (!serverGlobalParams.enableCoroutine) {
+                    _processMessage(std::move(guard));
+                } else {
+                    if (_coroStatus == CoroStatus::Empty) {
+                        MONGO_LOG(1) << "coroutine begin";
+                        _coroStatus = CoroStatus::OnGoing;
+                        auto func = [this, ssm = shared_from_this()] {
+                            Client::setCurrent(std::move(ssm->_dbClient));
+                            _runResumeProcess();
+                        };
 
-                    _coroResume = _serviceExecutor->CoroutineResumeFunctor(_threadGroupId, func);
+                        _coroResume =
+                            _serviceExecutor->CoroutineResumeFunctor(_threadGroupId, func);
 
-                    boost::context::stack_context sc = coroStackContext();
-                    boost::context::preallocated prealloc(sc.sp, sc.size, sc);
-                    _source =
-                        boost::context::callcc(std::allocator_arg,
-                                               prealloc,
-                                               NoopAllocator(),
-                                               [this, &guard](boost::context::continuation&&
-                                               sink) {
-                                                   _coroYield = [this, &sink]() {
-                                                       MONGO_LOG(1) << "call yield";
-                                                       _dbClient = Client::releaseCurrent();
-                                                       sink = sink.resume();
-                                                   };
-                                                   _processMessage(std::move(guard));
-                                                   return std::move(sink);
-                                               });
+                        boost::context::stack_context sc = coroStackContext();
+                        boost::context::preallocated prealloc(sc.sp, sc.size, sc);
+                        _source = boost::context::callcc(
+                            std::allocator_arg,
+                            prealloc,
+                            NoopAllocator(),
+                            [this, &guard](boost::context::continuation&& sink) {
+                                _coroYield = [this, &sink]() {
+                                    MONGO_LOG(1) << "call yield";
+                                    _dbClient = Client::releaseCurrent();
+                                    sink = sink.resume();
+                                };
+                                _processMessage(std::move(guard));
+                                return std::move(sink);
+                            });
 
-                    // _source =
-                    //     boost::context::callcc([this, &guard](boost::context::continuation&& sink) {
-                    //         _coroYield = [this, &sink]() {
-                    //             MONGO_LOG(1) << "call yield";
-                    //             _dbClient = Client::releaseCurrent();
-                    //             sink = sink.resume();
-                    //         };
-                    //         _processMessage(std::move(guard));
-                    //         return std::move(sink);
-                    //     });
-                } else if (_coroStatus == CoroStatus::OnGoing) {
-                    MONGO_LOG(1) << "coroutine ongoing";
-                    _source = _source.resume();
+                        // _source =
+                        //     boost::context::callcc([this, &guard](boost::context::continuation&&
+                        //     sink) {
+                        //         _coroYield = [this, &sink]() {
+                        //             MONGO_LOG(1) << "call yield";
+                        //             _dbClient = Client::releaseCurrent();
+                        //             sink = sink.resume();
+                        //         };
+                        //         _processMessage(std::move(guard));
+                        //         return std::move(sink);
+                        //     });
+                    } else if (_coroStatus == CoroStatus::OnGoing) {
+                        MONGO_LOG(1) << "coroutine ongoing";
+                        _source = _source.resume();
+                    }
                 }
             } break;
             case State::EndSession:
@@ -583,7 +588,7 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
     guard.release();
     Status status = Status::OK();
     if (taskName == transport::ServiceExecutorTaskName::kSSMProcessMessage) {
-        // reserved mode in actually
+        // coroutine mode in actually
         status = _serviceExecutor->schedule(std::move(func), flags, taskName, _threadGroupId);
     } else {
         // use adaptive mode to handle network task
