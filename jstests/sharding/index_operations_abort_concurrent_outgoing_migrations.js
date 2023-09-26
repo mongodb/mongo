@@ -170,6 +170,8 @@ stepNames.forEach((stepName) => {
 
 // TODO: Remove feature flag check once project is backported.
 if (FeatureFlagUtil.isPresentAndEnabled(st.shard0.getDB('admin'),
+                                        "ShardKeyIndexOptionalHashedSharding") &&
+    FeatureFlagUtil.isPresentAndEnabled(st.shard1.getDB('admin'),
                                         "ShardKeyIndexOptionalHashedSharding")) {
     stepNames.forEach((stepName) => {
         jsTest.log(
