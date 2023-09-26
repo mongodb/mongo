@@ -125,6 +125,7 @@ buildvariants:
     - name: coverage-report
     - name: coverage-report-catch2
     - name: cyclomatic-complexity
+    - name: code-change-report
 
 - name: compatibility-tests-less-frequent
   display_name: Compatibility tests (less frequent)
