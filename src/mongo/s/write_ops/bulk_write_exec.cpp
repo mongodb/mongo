@@ -252,14 +252,13 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                 replyInfo.replyItems.push_back(reply);
             }
             replyInfo.numErrors += errDetails.size();
-        } else if (response.isWriteConcernErrorSet()) {
-            // TODO SERVER-80918 handle write concern errors, use getWriteConcernError.
         } else {
-            // response.toStatus() is not OK but there is no errDetails or writeConcernError, so the
+            // response.toStatus() is not OK but there is no errDetails so the
             // top level status should be not OK instead. Raising an exception.
             uassertStatusOK(response.getTopLevelStatus());
             MONGO_UNREACHABLE;
         }
+        // TODO (SERVER-81280): Handle write concern errors.
     }
     return replyInfo;
 }
@@ -384,19 +383,8 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
 
                            return SemiFuture<void>::makeReady();
                        });
-    Status responseStatus = Status::OK();
-    if (!swResult.isOK()) {
-        responseStatus = swResult.getStatus();
-    } else {
-        if (!swResult.getValue().cmdStatus.isOK()) {
-            responseStatus = swResult.getValue().cmdStatus;
-        }
-        if (auto wcError = swResult.getValue().wcError; !wcError.toStatus().isOK()) {
-            // TODO (SERVER-80918): Handle write concern errors.
-        }
-    }
-    // TODO (SERVER-81006): Handle local error correctly.
-    uassertStatusOK(responseStatus);
+
+    bulkWriteOp.handleErrorsForRetryableTimeseriesUpdate(swResult, childBatches.begin()->first);
 
     // We should get back just one reply item for the single update we are running.
     const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
@@ -498,6 +486,22 @@ void executeWriteWithoutShardKey(
     }
 }
 
+void BulkWriteOp::handleErrorsForRetryableTimeseriesUpdate(
+    StatusWith<mongo::txn_api::CommitResult>& swResult, const ShardId& shardId) {
+    Status responseStatus = Status::OK();
+    if (!swResult.isOK()) {
+        responseStatus = swResult.getStatus();
+    } else {
+        if (!swResult.getValue().cmdStatus.isOK()) {
+            responseStatus = swResult.getValue().cmdStatus;
+        }
+        if (auto wcError = swResult.getValue().wcError; !wcError.toStatus().isOK()) {
+            saveWriteConcernError(shardId, wcError);
+        }
+    }
+    // TODO (SERVER-81006): Handle local error correctly.
+    uassertStatusOK(responseStatus);
+}
 
 BulkWriteReplyInfo execute(OperationContext* opCtx,
                            const std::vector<std::unique_ptr<NSTargeter>>& targeters,
@@ -1100,6 +1104,10 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
 void BulkWriteOp::saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError) {
     WriteConcernErrorDetail wce;
     wce.setStatus(Status(ErrorCodes::Error(wcError.getCode()), wcError.getErrmsg()));
+    _wcErrors.push_back(ShardWCError(shardId, wce));
+}
+
+void BulkWriteOp::saveWriteConcernError(ShardId shardId, WriteConcernErrorDetail wce) {
     _wcErrors.push_back(ShardWCError(shardId, wce));
 }
 

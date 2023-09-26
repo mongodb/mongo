@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/rpc/write_concern_error_detail.h"
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -2713,6 +2714,19 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
         return reply.toBSON();
     });
     future.default_timed_get();
+}
+
+// Tests that WriteConcernErrors are captured properly when using retryable timeseries updates.
+TEST_F(BulkWriteOpTest, BulkWriteWriteConcernErrorRetryableTimeseriesUpdate) {
+    BulkWriteOp bulkWriteOp(_opCtx, BulkWriteCommandRequest());
+    WriteConcernErrorDetail wce;
+    wce.setStatus(Status(ErrorCodes::UnsatisfiableWriteConcern, "Dummy WCE!"));
+    StatusWith<mongo::txn_api::CommitResult> swResult({Status::OK(), wce});
+    bulkWriteOp.handleErrorsForRetryableTimeseriesUpdate(swResult, ShardId("dummy-shard"));
+
+    ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors().size(), 1);
+    ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors()[0].error.toStatus().code(),
+                  ErrorCodes::UnsatisfiableWriteConcern);
 }
 
 TEST(BulkWriteTest, getApproximateSize) {

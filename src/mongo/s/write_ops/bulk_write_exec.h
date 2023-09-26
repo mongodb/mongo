@@ -166,12 +166,22 @@ public:
      * be concatenated into a single error when mongos responds to the client.
      */
     void saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError);
+    void saveWriteConcernError(ShardId shardId, WriteConcernErrorDetail wce);
+    std::vector<ShardWCError> getWriteConcernErrors() const {
+        return _wcErrors;
+    }
 
     /**
      * Marks any further writes for this BulkWriteOp as failed with the provided error status. There
      * must be no pending ops awaiting results when this method is called.
      */
     void noteErrorForRemainingWrites(const Status& status);
+
+    /*
+     * Handles errors for the response from a retryable timeseries update child batch.
+     */
+    void handleErrorsForRetryableTimeseriesUpdate(
+        StatusWith<mongo::txn_api::CommitResult>& swResult, const ShardId& shardId);
 
     /**
      * Processes the response to a TargetedWriteBatch. Sharding related errors are then grouped
