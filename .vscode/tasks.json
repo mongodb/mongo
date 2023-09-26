@@ -1,0 +1,10 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "./src/mongo/db/modules/monograph/scripts/clean.sh"
+        }
+    ]
+}

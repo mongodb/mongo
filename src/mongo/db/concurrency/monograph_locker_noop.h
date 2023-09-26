@@ -28,8 +28,9 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/lock_manager_defs.h"
+
 #include "mongo/db/concurrency/locker.h"
+#include <utility>
 
 namespace mongo {
 
@@ -196,14 +197,25 @@ public:
 
     bool saveLockStateAndUnlock(LockSnapshot* stateOut) override {
         // MONGO_UNREACHABLE;
+        stateOut->locks.clear();
+        stateOut->globalMode = LockMode::MODE_NONE;
+
+        OneLock info{ResourceId(), _lockMode};
+        stateOut->locks.emplace_back(std::move(info));
+        _lockMode = LockMode::MODE_NONE;
+        return true;
     }
 
     void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) override {
         // MONGO_UNREACHABLE;
+        for (const auto& info : stateToRestore.locks) {
+            _lockMode = info.mode;
+        }
     }
 
     void restoreLockState(const LockSnapshot& stateToRestore) override {
         // MONGO_UNREACHABLE;
+        restoreLockState(nullptr, stateToRestore);
     }
 
     void releaseTicket() override {

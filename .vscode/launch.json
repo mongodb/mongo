@@ -51,6 +51,53 @@
             ]
         },
         {
+            "name": "(gdb) Launch monograph RelWithDebInfo",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/RelWithDebInfo/mongo/mongod",
+            "args": [
+                "--config",
+                "src/mongo/db/modules/monograph/test_folder/config/monograph/release_coroutine.conf"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    // path to libtxservice.so, liblogservice.so
+                    "name": "LD_LIBRARY_PATH",
+                    "value": "${workspaceFolder}/src/mongo/db/modules/monograph/build"
+                },
+                {
+                    // preload asan library and libbraft.so(libbrpc.so)
+                    // for more information, please refer to `src/mongo/db/modules/monograph/issues.md`
+                    "name": "LD_PRELOAD",
+                    "value": "/usr/lib/libbrpc.so"
+                },
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                },
+            ],
+            "preLaunchTask": "clean",
+            "postRemoteConnectCommands": [
+                {
+                    "description": "privided by mongodb",
+                    "text": "source .gdbinit",
+                    "ignoreFailures": false
+                }
+            ]
+        },
+        {
             "name": "(gdb) Launch wiredtiger",
             "type": "cppdbg",
             "request": "launch",
