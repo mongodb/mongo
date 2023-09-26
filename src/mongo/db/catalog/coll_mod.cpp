@@ -375,11 +375,12 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                     try {
                         auto shardedColl = catalogClient->getCollection(opCtx, nss);
 
-                        if (isLastNonHiddenShardKeyIndex(opCtx,
-                                                         coll,
-                                                         coll->getIndexCatalog(),
-                                                         cmrIndex->idx->indexName(),
-                                                         shardedColl.getKeyPattern().toBSON())) {
+                        if (isLastNonHiddenRangedShardKeyIndex(
+                                opCtx,
+                                coll,
+                                coll->getIndexCatalog(),
+                                cmrIndex->idx->indexName(),
+                                shardedColl.getKeyPattern().toBSON())) {
                             return {ErrorCodes::InvalidOptions,
                                     "Can't hide the only compatible index for this collection's "
                                     "shard key"};

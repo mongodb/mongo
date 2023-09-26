@@ -207,7 +207,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithSingleCandidate) {
                            << "xy"
                            << "v" << kIndexVersion << "hidden" << true));
 
-    ASSERT_TRUE(isLastNonHiddenShardKeyIndex(
+    ASSERT_TRUE(isLastNonHiddenRangedShardKeyIndex(
         opCtx(), coll(), coll()->getIndexCatalog(), "x", BSON("x" << 1)));
 }
 
@@ -222,7 +222,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithMultipleCandidates) {
                            << "xy"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(
         opCtx(), coll(), coll()->getIndexCatalog(), "x", BSON("x" << 1)));
 }
 
@@ -234,7 +234,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithIncompatibleIndex) {
                            << "x"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(
         opCtx(), coll(), coll()->getIndexCatalog(), "y", BSON("x" << 1)));
 }
 
@@ -243,8 +243,39 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithNonExistingIndex) {
                            << "x"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(
         opCtx(), coll(), coll()->getIndexCatalog(), "y", BSON("x" << 1)));
+}
+
+TEST_F(ShardKeyIndexUtilTest, LastShardIndexExcludesHashedIndex) {
+    createIndex(BSON("key" << BSON("x"
+                                   << "hashed")
+                           << "name"
+                           << "xhashed"
+                           << "v" << kIndexVersion));
+
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(opCtx(),
+                                                    coll(),
+                                                    coll()->getIndexCatalog(),
+                                                    "y",
+                                                    BSON("x"
+                                                         << "hashed")));
+}
+
+TEST_F(ShardKeyIndexUtilTest, LastShardIndexExcludesCompoundHashedIndex) {
+    createIndex(BSON("key" << BSON("x"
+                                   << "hashed"
+                                   << "y" << 1)
+                           << "name"
+                           << "xhashed"
+                           << "v" << kIndexVersion));
+
+    ASSERT_FALSE(isLastNonHiddenRangedShardKeyIndex(opCtx(),
+                                                    coll(),
+                                                    coll()->getIndexCatalog(),
+                                                    "y",
+                                                    BSON("x"
+                                                         << "hashed")));
 }
 
 }  // namespace

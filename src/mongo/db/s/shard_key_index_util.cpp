@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 
 namespace mongo {
 
@@ -133,15 +134,22 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
     return false;
 }
 
-bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
-                                  const IndexCatalog* indexCatalog,
-                                  const std::string& indexName,
-                                  const BSONObj& shardKey) {
+bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
+                                        const CollectionPtr& collection,
+                                        const IndexCatalog* indexCatalog,
+                                        const std::string& indexName,
+                                        const BSONObj& shardKey) {
     const auto index = indexCatalog->findIndexByName(opCtx, indexName);
     if (!index ||
         !isCompatibleWithShardKey(
             opCtx, collection, index->getEntry(), shardKey, false /* requireSingleKey */)) {
+        return false;
+    }
+
+    // Users are allowed to drop hashed shard key indexes.
+    if (gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        ShardKeyPattern(shardKey).isHashedPattern()) {
         return false;
     }
 
