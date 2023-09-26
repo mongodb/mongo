@@ -8,7 +8,7 @@
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
+import {findMatchingLogLines} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
@@ -40,13 +40,15 @@ for (let rs of replSets) {
     const primary = rs.getPrimary();
     const secondary = rs.getSecondary();
     assert.commandWorked(primary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(primary.adminCommand(
-        {setParameter: 1, logComponentVerbosity: {replication: {heartbeats: 0}}}));
-    enableLocalReadLogs(primary);
+    assert.commandWorked(primary.adminCommand({
+        setParameter: 1,
+        logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
+    }));
     assert.commandWorked(secondary.getDB(dbName).setProfilingLevel(2, -1));
-    assert.commandWorked(secondary.adminCommand(
-        {setParameter: 1, logComponentVerbosity: {replication: {heartbeats: 0}}}));
-    enableLocalReadLogs(secondary);
+    assert.commandWorked(secondary.adminCommand({
+        setParameter: 1,
+        logComponentVerbosity: {query: {verbosity: 3}, replication: {heartbeats: 0}}
+    }));
 }
 
 // Clear the logs on the primary nodes before starting a test to isolate relevant log lines.
@@ -58,13 +60,38 @@ function clearLogs() {
     }
 }
 
-function getPossibleViewLocalReadCount(node, foreignNs, comment) {
+// Returns true if the number of log lines on any primary exceeded the internal log buffer size.
+function logLinesExceededBufferSize() {
+    for (let i = 0; i < replSets.length; i++) {
+        for (let node of [replSets[i].getPrimary(), replSets[i].getSecondary()]) {
+            const log = assert.commandWorked(node.adminCommand({getLog: "global"}));
+            if (log.totalLinesWritten > 1024) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function getLocalReadCount(node, foreignNs, comment) {
+    if (logLinesExceededBufferSize()) {
+        jsTestLog('Warning: total log lines written since start of test is more than internal ' +
+                  'buffer size. Some local read log lines may be missing!');
+    }
+
+    const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
+
+    const countMatchingLogs =
+        namespace => [...findMatchingLogLines(
+                          log, {id: 5837600, namespace, comment: {comment: comment}})]
+                         .length;
+
     // Query the logs for local reads against the namespace specified in the top-level stage and the
     // 'foreign' namespace. The latter case catches reads when the original namespace was a view.
     const fullNs = dbName + '.' + foreignNs;
-    let countFound = getLocalReadCount(node, fullNs, comment);
+    let countFound = countMatchingLogs(fullNs);
     if (fullNs !== foreign.getFullName()) {
-        countFound += getLocalReadCount(node, foreign.getFullName(), comment);
+        countFound += countMatchingLogs(foreign.getFullName());
     }
     return countFound;
 }
@@ -114,7 +141,7 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
                    tojson({[node.name]: node.getDB(dbName).system.profile.find().toArray()}));
 
         if (expected.subPipelineLocal) {
-            const localReadCount = getPossibleViewLocalReadCount(node, foreignNs, comment);
+            const localReadCount = getLocalReadCount(node, foreignNs, comment);
             let expectedLocalCountList = expected.subPipelineLocal[i];
             if (!Array.isArray(expectedLocalCountList)) {
                 expectedLocalCountList = [expectedLocalCountList];
@@ -318,7 +345,7 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_foreign_
     // results in 3 remote reads. If the non-primary shard sends a subpipeline to execute on the
     // primary shard first, then the primary does a coll refresh before it attempts to run one of
     // its own subpipelines and does not need to target shards. This results in 2 remote reads.
-    subPipelineLocal: [[1, 2], 0],
+    subPipelineLocal: [1, 0],
     subPipelineRemote: [[2, 3], 0]
 });
 
@@ -374,28 +401,6 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_sh
     // foreign collection.
     subPipelineLocal: [0, 0],
     subPipelineRemote: [4, 4]
-});
-
-// Test $lookup when both collection are sharded, but each shard only needs local data to perform
-// the lookup.
-st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
-st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
-const idLookupPipeline =
-    [{$lookup: {from: foreign.getName(), as: 'bs', localField: '_id', foreignField: '_id'}}];
-const idLookupExpectedRes = [
-    {_id: -2, a: -2, bs: []},
-    {_id: -1, a: 1, bs: [{_id: -1, b: 2}]},
-    {_id: 1, a: 2, bs: [{_id: 1, b: 1}]},
-    {_id: 2, a: 3, bs: []}
-];
-
-assertAggResultAndRouting(idLookupPipeline, idLookupExpectedRes, {comment: "lookup_on_shard_key"}, {
-    // The $lookup is executed on each shard.
-    toplevelExec: [1, 1],
-    // Because $lookup is done on shard key, shards must be able to determine that data is needed
-    // only from the same shard and perform reads locally.
-    subPipelineLocal: [2, 2],
-    subPipelineRemote: [0, 0]
 });
 
 // Test $lookup when the foreign namespace is a view of an unsharded collection.
