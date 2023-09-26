@@ -39,9 +39,13 @@ const runParallelMoveChunk = (numThreads) => {
     const kInitialLoadFinalKey = shardKeyVal;
 
     print(`Running tests with chunkMigrationConcurrency == ${kThreadCount}`);
+    const kMaxBufferBytes = 17 * 1024 * 1024;
     st._rs.forEach((replSet) => {
-        assert.commandWorked(replSet.test.getPrimary().adminCommand(
-            {setParameter: 1, chunkMigrationConcurrency: kThreadCount}));
+        assert.commandWorked(replSet.test.getPrimary().adminCommand({
+            setParameter: 1,
+            chunkMigrationConcurrency: kThreadCount,
+            chunkMigrationFetcherMaxBufferedSizeBytesPerThread: kMaxBufferBytes
+        }));
     });
 
     const configCollEntry =

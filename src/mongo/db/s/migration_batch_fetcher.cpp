@@ -61,6 +61,39 @@
 namespace mongo {
 
 template <typename Inserter>
+void MigrationBatchFetcher<Inserter>::BufferSizeTracker::waitUntilSpaceAvailableAndAdd(
+    OperationContext* opCtx, int sizeBytes) {
+    if (_maxSizeBytes == MigrationBatchFetcher<Inserter>::BufferSizeTracker::kUnlimited) {
+        return;
+    }
+
+    uassert(8120100,
+            str::stream() << "chunkMigrationFetcherMaxBufferedSizeBytesPerThread setting of "
+                          << _maxSizeBytes << " is too small for received batch size of "
+                          << sizeBytes,
+            sizeBytes <= _maxSizeBytes);
+
+    stdx::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(_hasAvailableSpace, lk, [this, sizeBytes] {
+        return (_currentSize + sizeBytes) <= _maxSizeBytes;
+    });
+    _currentSize += sizeBytes;
+}
+
+template <typename Inserter>
+void MigrationBatchFetcher<Inserter>::BufferSizeTracker::remove(int sizeBytes) {
+    if (_maxSizeBytes == MigrationBatchFetcher<Inserter>::BufferSizeTracker::kUnlimited) {
+        return;
+    }
+
+    stdx::unique_lock lk(_mutex);
+    invariant(_currentSize >= sizeBytes);
+
+    _currentSize -= sizeBytes;
+    _hasAvailableSpace.notify_one();
+}
+
+template <typename Inserter>
 MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
     OperationContext* outerOpCtx,
     OperationContext* innerOpCtx,
@@ -72,7 +105,8 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
     const UUID& migrationId,
     const UUID& collectionId,
     std::shared_ptr<MigrationCloningProgressSharedState> migrationProgress,
-    bool parallelFetchingSupported)
+    bool parallelFetchingSupported,
+    int maxBufferedSizeBytesPerThread)
     : _nss{std::move(nss)},
       _chunkMigrationConcurrency{
           // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
@@ -99,7 +133,8 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
       _migrationId{migrationId},
       _writeConcern{writeConcern},
       _isParallelFetchingSupported{parallelFetchingSupported},
-      _secondaryThrottleTicket(1, outerOpCtx->getServiceContext()) {
+      _secondaryThrottleTicket(1, outerOpCtx->getServiceContext()),
+      _bufferSizeTracker(maxBufferedSizeBytesPerThread) {
     _inserterWorkers->startup();
 }
 
@@ -180,6 +215,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                     "batchSize"_attr = batchSize,
                     "fetch"_attr = duration_cast<Milliseconds>(fetchTime));
 
+        _bufferSizeTracker.waitUntilSpaceAvailableAndAdd(opCtx, batchSize);
 
         Inserter inserter{_outerOpCtx,
                           _innerOpCtx,
@@ -193,12 +229,14 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                           _chunkMigrationConcurrency,
                           &_secondaryThrottleTicket};
 
-        _inserterWorkers->schedule([batchSize,
+        _inserterWorkers->schedule([this,
+                                    batchSize,
                                     fetchTime,
                                     totalTimer = std::move(totalTimer),
                                     insertTimer = Timer(),
                                     migrationId = _migrationId,
                                     inserter = std::move(inserter)](Status status) {
+            ON_BLOCK_EXIT([&] { _bufferSizeTracker.remove(batchSize); });
             inserter.run(status);
 
             const auto checkDivByZero = [](auto divisor, auto expression) {
