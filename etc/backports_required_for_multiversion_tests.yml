@@ -80,7 +80,7 @@ last-continuous:
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
-    ticket: SERVER-68648
+    ticket: SERVER-81201
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
@@ -119,6 +119,8 @@ last-continuous:
     ticket: SERVER-80947
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
     ticket: SERVER-80947
+  - test_file: jstests/sharding/move_chunk_basic.js
+    ticket: SERVER-81201
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -265,7 +267,7 @@ last-lts:
   - test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
-    ticket: SERVER-68648
+    ticket: SERVER-81201
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
@@ -300,6 +302,8 @@ last-lts:
     ticket: SERVER-80947
   - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
     ticket: SERVER-80947
+  - test_file: jstests/sharding/move_chunk_basic.js
+    ticket: SERVER-81201
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

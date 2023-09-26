@@ -59,6 +59,7 @@ namespace mongo {
 namespace {
 
 using unittest::assertGet;
+using namespace std::chrono_literals;
 
 const ConnectionString kDonorConnStr =
     ConnectionString::forReplicaSet("Donor",
@@ -203,7 +204,8 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicEmptyFetchingTest) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        true);
+        true,
+        0 /* maxBytesPerThread */);
 
     // Start asynchronous task for responding to _migrateClone requests.
     // Must name the return of value std::async.  The destructor of std::future joins the
@@ -251,7 +253,8 @@ TEST_F(MigrationBatchFetcherTestFixture, BasicFetching) {
         UUID::gen(),
         UUID::gen(),
         nullptr,
-        true);
+        true,
+        0 /* maxBytesPerThread */);
 
     auto fut = stdx::async(stdx::launch::async, [&]() {
         for (int i = 0; i < 8; ++i) {
