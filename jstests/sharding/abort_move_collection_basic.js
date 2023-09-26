@@ -68,11 +68,10 @@ awaitResult();
 
 const metrics = st.config0.getDB('admin').serverStatus({}).shardingStatistics.moveCollection;
 
-// TODO(SERVER-81282): Fix these metrics so we check countStarted instead of countKeyStarted.
-assert.eq(metrics.countSameKeyStarted, 1);
-assert.eq(metrics.countSameKeySucceeded, 0);
-assert.eq(metrics.countSameKeyFailed, 0);
-assert.eq(metrics.countSameKeyCanceled, 1);
+assert.eq(metrics.countStarted, 1);
+assert.eq(metrics.countSucceeded, 0);
+assert.eq(metrics.countFailed, 0);
+assert.eq(metrics.countCanceled, 1);
 
 assert.eq(0, st.rs1.getPrimary().getCollection(ns).countDocuments({}));
 assert.eq(10, st.rs0.getPrimary().getCollection(ns).countDocuments({}));

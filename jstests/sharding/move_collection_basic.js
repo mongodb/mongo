@@ -73,11 +73,11 @@ assert.eq(0, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocument
 
 const metrics = st.config0.getDB('admin').serverStatus({}).shardingStatistics.moveCollection;
 
-// TODO(SERVER-81282): Fix these metrics so we check countStarted instead of countKeyStarted.
-assert.eq(metrics.countSameKeyStarted, 1);
-assert.eq(metrics.countSameKeySucceeded, 1);
-assert.eq(metrics.countSameKeyFailed, 0);
-assert.eq(metrics.countSameKeyCanceled, 0);
+assert.eq(metrics.countStarted, 1);
+assert.eq(metrics.countSameKeyStarted, undefined);
+assert.eq(metrics.countSucceeded, 1);
+assert.eq(metrics.countFailed, 0);
+assert.eq(metrics.countCanceled, 0);
 
 // move to primary shard.
 assert.commandWorked(mongos.adminCommand({moveCollection: unsplittableCollNs, toShard: shard0}));

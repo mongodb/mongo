@@ -114,7 +114,8 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
     }
 
     BSONObjBuilder root(bob->subobjStart(_rootSectionName));
-    if (resharding::gFeatureFlagReshardingImprovements.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+    if (_rootSectionName == kResharding &&
+        resharding::gFeatureFlagReshardingImprovements.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         root.append(_fieldNames->getForCountSameKeyStarted(), _countSameKeyStarted.load());
         root.append(_fieldNames->getForCountSameKeySucceeded(), _countSameKeySucceeded.load());
         root.append(_fieldNames->getForCountSameKeyFailed(), _countSameKeyFailed.load());
@@ -128,28 +129,28 @@ void ReshardingCumulativeMetrics::reportForServerStatus(BSONObjBuilder* bob) con
 }
 
 void ReshardingCumulativeMetrics::onStarted(bool isSameKeyResharding) {
-    if (isSameKeyResharding) {
+    if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeyStarted.fetchAndAdd(1);
     }
     Base::onStarted();
 }
 
 void ReshardingCumulativeMetrics::onSuccess(bool isSameKeyResharding) {
-    if (isSameKeyResharding) {
+    if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeySucceeded.fetchAndAdd(1);
     }
     Base::onSuccess();
 }
 
 void ReshardingCumulativeMetrics::onFailure(bool isSameKeyResharding) {
-    if (isSameKeyResharding) {
+    if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeyFailed.fetchAndAdd(1);
     }
     Base::onFailure();
 }
 
 void ReshardingCumulativeMetrics::onCanceled(bool isSameKeyResharding) {
-    if (isSameKeyResharding) {
+    if (_rootSectionName == kResharding && isSameKeyResharding) {
         _countSameKeyCancelled.fetchAndAdd(1);
     }
     Base::onCanceled();
