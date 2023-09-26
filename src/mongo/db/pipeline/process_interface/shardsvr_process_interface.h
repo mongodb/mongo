@@ -138,6 +138,17 @@ public:
         const boost::optional<DatabaseVersion>& dbVersion) override;
 
     void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
+
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final;
+
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) final;
 };
 
 }  // namespace mongo

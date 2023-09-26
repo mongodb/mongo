@@ -74,6 +74,7 @@ selector:
 
   # TODO Undenylist (SERVER-38852).
   - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
 
   # serverStatus does not include transaction metrics on mongos.
   - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js

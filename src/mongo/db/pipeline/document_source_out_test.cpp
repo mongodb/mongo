@@ -92,7 +92,7 @@ TEST_F(DocumentSourceOutTest, FailsToParseIncorrectType) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
 
     spec = BSON("$out" << BSONObj());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16994);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 40414);
 }
 
 TEST_F(DocumentSourceOutTest, AcceptsStringArgument) {
@@ -115,25 +115,29 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
     ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
-TEST_F(DocumentSourceOutTest, Redaction) {
-    // TODO SERVER-75110 test support for redaction with timeseries options
-    auto spec = fromjson(R"({
-            $out: {
-                db: "foo",
-                coll: "bar"
-            }
-        })");
-    auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
+TEST_F(DocumentSourceOutTest, SerializeToStringWithTimeseries) {
+    BSONObj spec = BSON("$out" << BSON("db"
+                                       << "some_db"
+                                       << "coll"
+                                       << "some_coll"
+                                       << "timeseries"
+                                       << BSON("timeField"
+                                               << "t")));
+    auto outStage = createOutStage(spec);
+    auto serialized = outStage->serialize().getDocument();
+    auto expectedDoc = Document{{"$out",
+                                 Document{{"coll", "some_coll"_sd},
+                                          {"db", "some_db"_sd},
+                                          {"timeseries", Document{{"timeField", "t"_sd}}}}}};
+    ASSERT_DOCUMENT_EQ(serialized, expectedDoc);
 
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            $out: {
-                db: "HASH<foo>",
-                coll: "HASH<bar>"
-            }
-        })",
-        redact(*docSource));
+    // Make sure we can reparse the serialized BSON.
+    auto reparsedOutStage = createOutStage(serialized.toBson());
+    auto reSerialized = reparsedOutStage->serialize().getDocument();
+    ASSERT_DOCUMENT_EQ(reSerialized, expectedDoc);
 }
+
+// TODO SERVER-75110 add test support for redaction with and without timeseries options.
 
 using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
 
@@ -186,7 +190,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
 
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
-    auto expectedDoc = Document{{"db", expCtx->ns.dbName().db()}, {"coll", targetColl}};
+    auto expectedDoc = Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().db()}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
@@ -202,7 +206,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
 
     // Assert the tenantId is not included in the serialized namespace.
     serialized = outSource->serialize().getDocument();
-    expectedDoc = Document{{"db", targetDb}, {"coll", targetColl}};
+    expectedDoc = Document{{"coll", targetColl}, {"db", targetDb}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 }
 

@@ -20,13 +20,14 @@ var TimeseriesAggTests = class {
      * @returns An array of a time-series collection and a non time-series collection,
      *     respectively in this order.
      */
-    static prepareInputCollections(numHosts, numIterations, includeIdleMeasurements = true) {
+    static prepareInputCollections(numHosts,
+                                   numIterations,
+                                   includeIdleMeasurements = true,
+                                   testDB = TimeseriesAggTests.getTestDb()) {
         const timeseriesCollOption = {timeseries: {timeField: "time", metaField: "tags"}};
 
         Random.setRandomSeed();
         const hosts = TimeseriesTest.generateHosts(numHosts);
-
-        const testDB = TimeseriesAggTests.getTestDb();
 
         // Creates a time-series input collection.
         const inColl = testDB.getCollection("in");
@@ -78,11 +79,11 @@ var TimeseriesAggTests = class {
     /**
      * Gets an output collection object with the name 'outCollname'.
      */
-    static getOutputCollection(outCollName) {
-        const testDB = TimeseriesAggTests.getTestDb();
-
+    static getOutputCollection(outCollName, shouldDrop, testDB = TimeseriesAggTests.getTestDb()) {
         let outColl = testDB.getCollection(outCollName);
-        outColl.drop();
+        if (shouldDrop) {
+            outColl.drop();
+        }
 
         return outColl;
     }
@@ -96,21 +97,35 @@ var TimeseriesAggTests = class {
      * Executes 'prepareAction' before executing 'pipeline'. 'prepareAction' takes a collection
      * parameter and returns nothing.
      *
+     * If 'shouldDrop' is set to false, the output collection will not be dropped before executing
+     * 'pipeline'.
+     *
+     * If 'testDB' is set, that database will be used in the aggregation pipeline.
+     *
      * Returns sorted data by "time" field. The sorted result data will help simplify comparison
      * logic.
      */
-    static getOutputAggregateResults(inColl, pipeline, prepareAction = null) {
+    static getOutputAggregateResults(inColl,
+                                     pipeline,
+                                     prepareAction = null,
+                                     shouldDrop = true,
+                                     testDB = TimeseriesAggTests.getTestDb()) {
         // Figures out the output collection name from the last pipeline stage.
         var outCollName = "out";
         if (pipeline[pipeline.length - 1]["$out"] != undefined) {
-            // If the last stage is "$out", gets the output collection name from it.
-            outCollName = pipeline[pipeline.length - 1]["$out"];
+            // If the last stage is "$out", gets the output collection name from the string or
+            // object input.
+            if (typeof pipeline[pipeline.length - 1]["$out"] == 'string') {
+                outCollName = pipeline[pipeline.length - 1]["$out"];
+            } else {
+                outCollName = pipeline[pipeline.length - 1]["$out"]["coll"];
+            }
         } else if (pipeline[pipeline.length - 1]["$merge"] != undefined) {
             // If the last stage is "$merge", gets the output collection name from it.
             outCollName = pipeline[pipeline.length - 1]["$merge"].into;
         }
 
-        let outColl = TimeseriesAggTests.getOutputCollection(outCollName);
+        let outColl = TimeseriesAggTests.getOutputCollection(outCollName, shouldDrop, testDB);
         if (prepareAction != null) {
             prepareAction(outColl);
         }
@@ -121,5 +136,23 @@ var TimeseriesAggTests = class {
         return outColl.find({}, {"_id": 0, "time": 1, "hostid": 1, "cpu": 1, "idle": 1})
             .sort({"time": 1})
             .toArray();
+    }
+
+    static verifyResults(actualResults, expectedResults) {
+        // Verifies that the number of measurements is same as expected.
+        assert.eq(actualResults.length, expectedResults.length, actualResults);
+
+        // Verifies that every measurement is same as expected.
+        for (var i = 0; i < expectedResults.length; ++i) {
+            assert.eq(actualResults[i], expectedResults[i], actualResults);
+        }
+    }
+
+    static generateOutPipeline(collName, dbName, options, aggStage = null) {
+        let outStage = {$out: {db: dbName, coll: collName, timeseries: options}};
+        if (aggStage) {
+            return [aggStage, outStage];
+        }
+        return [outStage];
     }
 };

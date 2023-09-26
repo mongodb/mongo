@@ -189,6 +189,11 @@ public:
                           const WriteConcernOptions& wc,
                           boost::optional<OID> targetEpoch) = 0;
 
+    virtual Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                    const NamespaceString& ns,
+                                    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                                    const WriteConcernOptions& wc,
+                                    boost::optional<OID> targetEpoch) = 0;
     /**
      * Executes the updates described by 'updateCommand'. Returns an error Status if any of the
      * updates fail, otherwise returns an 'UpdateResult' objects with the details of the update
@@ -296,6 +301,13 @@ public:
     virtual void createCollection(OperationContext* opCtx,
                                   const DatabaseName& dbName,
                                   const BSONObj& cmdObj) = 0;
+    /**
+     * Creates the view backing a time-series collection.
+     */
+    virtual void createTimeseriesView(OperationContext* opCtx,
+                                      const NamespaceString& ns,
+                                      const BSONObj& cmdObj,
+                                      const TimeseriesOptions& userOpts) = 0;
 
     /**
      * Runs createIndexes on the given database for the given index specs. If running on a shardsvr

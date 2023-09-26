@@ -29,6 +29,7 @@ var $config = extendWorkload($config, function($config, $super) {
                                               // because it is assumed to be unique.
 
     $config.data.indexSpecs = [{rand: -1, randInt: 1}, {randInt: -1}, {flag: 1}, {padding: 'text'}];
+    $config.data.shardKey = {_id: 'hashed'};
 
     // We'll use document validation so that we can change the collection options in the middle of
     // an $out, to test that the $out stage will notice this and error. This validator is not very
@@ -144,7 +145,7 @@ var $config = extendWorkload($config, function($config, $super) {
         if (isMongos(db) && this.tid === 0) {
             assertWhenOwnDB.commandWorked(db.adminCommand({enableSharding: db.getName()}));
             assertWhenOwnDB.commandWorked(db.adminCommand(
-                {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}}));
+                {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}));
         }
     };
 

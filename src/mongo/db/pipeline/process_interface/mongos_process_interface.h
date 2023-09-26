@@ -78,6 +78,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) final {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
                                     std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
@@ -154,6 +162,14 @@ public:
     void createCollection(OperationContext* opCtx,
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) final {
+        MONGO_UNREACHABLE;
+    }
+
+
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) final {
         MONGO_UNREACHABLE;
     }
 

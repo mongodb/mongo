@@ -127,3 +127,9 @@ feature_flags:
       cpp_varname: gFeatureFlagVectorSearchPublicPreview
       default: true
       version: 7.0
+
+    featureFlagAggOutTimeseries:
+      description: "Feature flag for enabling support for $out to write to time-series collections"
+      cpp_varname: gFeatureFlagAggOutTimeseries
+      default: true
+      version: 7.0

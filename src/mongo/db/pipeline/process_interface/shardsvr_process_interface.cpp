@@ -387,6 +387,27 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
                                    << "write concern failed while running command " << cmdObj);
 }
 
+void ShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
+                                                       const NamespaceString& ns,
+                                                       const BSONObj& cmdObj,
+                                                       const TimeseriesOptions& userOpts) {
+    try {
+        ShardServerProcessInterface::createCollection(opCtx, ns.dbName(), cmdObj);
+    } catch (const DBException& ex) {
+        _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
+    }
+}
+
+Status ShardServerProcessInterface::insertTimeseries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    return ShardServerProcessInterface::insert(
+        expCtx, ns, std::move(insertCommand), wc, targetEpoch);
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter>
 ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipeline,
                                                           ShardTargetingPolicy shardTargetingPolicy,

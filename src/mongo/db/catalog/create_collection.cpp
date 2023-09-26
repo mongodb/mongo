@@ -488,8 +488,10 @@ Status _createTimeseries(OperationContext* opCtx,
             return Status::OK();
         });
 
-    // If compatible bucket collection already exists then proceed with creating view definition.
-    if (!ret.isOK() && !existingBucketCollectionIsCompatible)
+    // If compatible bucket collection already exists then proceed with creating view defintion.
+    // If the 'temp' flag is true, we are in the $out stage, and should return without creating the
+    // view defintion.
+    if ((!ret.isOK() && !existingBucketCollectionIsCompatible) || options.temp)
         return ret;
 
     ret = writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
@@ -732,6 +734,18 @@ Status createCollection(OperationContext* opCtx,
     return createCollection(opCtx, nss, collectionOptions, idIndex);
 }
 }  // namespace
+
+Status createTimeseries(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const BSONObj& options) {
+    StatusWith<CollectionOptions> statusWith =
+        CollectionOptions::parse(options, CollectionOptions::parseForCommand);
+    if (!statusWith.isOK()) {
+        return statusWith.getStatus();
+    }
+    auto collectionOptions = statusWith.getValue();
+    return _createTimeseries(opCtx, ns, collectionOptions);
+}
 
 Status createCollection(OperationContext* opCtx,
                         const DatabaseName& dbName,

@@ -95,6 +95,12 @@ public:
                   const WriteConcernOptions& wc,
                   boost::optional<OID> targetEpoch) override;
 
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) override;
+
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
                                     std::unique_ptr<write_ops::UpdateCommandRequest> updateCommand,
@@ -115,6 +121,11 @@ public:
     void createCollection(OperationContext* opCtx,
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) override;
+
+    void createTimeseriesView(OperationContext* opCtx,
+                              const NamespaceString& ns,
+                              const BSONObj& cmdObj,
+                              const TimeseriesOptions& userOpts) override;
 
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
 

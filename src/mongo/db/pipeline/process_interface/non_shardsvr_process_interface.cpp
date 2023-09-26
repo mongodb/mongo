@@ -29,10 +29,12 @@
 
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
@@ -123,6 +125,23 @@ Status NonShardServerProcessInterface::insert(
     return Status::OK();
 }
 
+Status NonShardServerProcessInterface::insertTimeseries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    try {
+        auto insertReply = write_ops_exec::performTimeseriesWrites(expCtx->opCtx, *insertCommand);
+
+        checkWriteErrors(insertReply.getWriteCommandReplyBase());
+    } catch (DBException& ex) {
+        ex.addContext(str::stream() << "time-series insert failed: " << ns.ns());
+        throw;
+    }
+    return Status::OK();
+}
+
 StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
@@ -198,6 +217,17 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     // skip sharding validation on non sharded servers
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(
         opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);
+}
+
+void NonShardServerProcessInterface::createTimeseriesView(OperationContext* opCtx,
+                                                          const NamespaceString& ns,
+                                                          const BSONObj& cmdObj,
+                                                          const TimeseriesOptions& userOpts) {
+    try {
+        uassertStatusOK(mongo::createTimeseries(opCtx, ns, cmdObj));
+    } catch (DBException& ex) {
+        _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
+    }
 }
 
 void NonShardServerProcessInterface::createCollection(OperationContext* opCtx,

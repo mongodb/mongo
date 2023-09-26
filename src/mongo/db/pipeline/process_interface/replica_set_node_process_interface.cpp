@@ -125,6 +125,36 @@ void ReplicaSetNodeProcessInterface::createIndexesOnEmptyCollection(
     uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmd.obj()));
 }
 
+void ReplicaSetNodeProcessInterface::createTimeseriesView(OperationContext* opCtx,
+                                                          const NamespaceString& ns,
+                                                          const BSONObj& cmdObj,
+                                                          const TimeseriesOptions& userOpts) {
+    if (_canWriteLocally(opCtx, ns)) {
+        return NonShardServerProcessInterface::createTimeseriesView(opCtx, ns, cmdObj, userOpts);
+    }
+
+    try {
+        uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmdObj));
+    } catch (const DBException& ex) {
+        _handleTimeseriesCreateError(ex, opCtx, ns, userOpts);
+    }
+}
+
+Status ReplicaSetNodeProcessInterface::insertTimeseries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    if (_canWriteLocally(expCtx->opCtx, ns)) {
+        return NonShardServerProcessInterface::insertTimeseries(
+            expCtx, ns, std::move(insertCommand), wc, targetEpoch);
+    } else {
+        return ReplicaSetNodeProcessInterface::insert(
+            expCtx, ns, std::move(insertCommand), wc, targetEpoch);
+    }
+}
+
 void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const NamespaceString& sourceNs,
