@@ -891,21 +891,21 @@ This will allow us to avoid a situation where the transaction only commits on so
 aborts on others. Once a node puts a transaction in the prepared state, it *must* be able to commit
 the transaction if we decide to commit the overall cross-shard transaction.
 
-Another key piece of the Two Phase Commit Protocol is the **`TransactionCoordinator`**, which is
+Another key piece of the Two Phase Commit Protocol is the [**`TransactionCoordinator`**](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.h#L70), which is
 the first shard to receive an operation for a particular transaction. The `TransactionCoordinator`
 will coordinate between all participating shards to ultimately commit or abort the transaction.
 
-When the `TransactionCoordinator` is told to commit a transaction, it must first make sure that all
+When the `TransactionCoordinator` is [told to commit a transaction](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/transaction_coordinator_service.cpp#L175-L176), it must first make sure that all
 participating shards successfully prepare the transaction before telling them to commit the
-transaction. As a result, the coordinator will issue the `prepareTransaction` command, an internal
+transaction. As a result, the coordinator will [issue the `prepareTransaction` command](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L286-L317), an internal
 command, on each shard participating in the transaction.
 
 Each participating shard must majority commit the `prepareTransaction` command (thus making sure
-that the prepare operation cannot be rolled back) before the `TransactionCoordinator` will send out
-the `commitTransaction` command. This will help ensure that once a node prepares a transaction, it
+that the prepare operation cannot be rolled back) before the `TransactionCoordinator` will [send out
+the `commitTransaction` command](https://github.com/10gen/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L396-L402). This will help ensure that once a node prepares a transaction, it
 will remain in the prepared state until the transaction is committed or aborted by the
 `TransactionCoordinator`. If one of the shards fails to prepare the transaction, the
-`TransactionCoordinator` will tell all participating shards to abort the transaction via the
+`TransactionCoordinator` will [tell all participating shards to abort the transaction](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/s/transaction_coordinator.cpp#L405-L410) via the
 `abortTransaction` command regardless of whether they have prepared it or not.
 
 The durability of the prepared state is managed by the replication system, while the Two Phase
@@ -925,23 +925,23 @@ oplog entry(s) cannot fall off the back of the oplog.
 
 ### Preparing a Transaction on the Primary
 
-When a primary receives a `prepareTransaction` command, it will transition the associated
-transaction's `txnState` to `kPrepared`. Next it will reserve an **oplog slot** (which is a unique
+When a primary receives a `prepareTransaction` command, it will [transition the associated
+transaction's `txnState` to `kPrepared`](https://github.com/10gen/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1727). Next it will [reserve an **oplog slot**](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1739-L1754) (which is a unique
 `OpTime`) for the `prepareTransaction` oplog entry. The `prepareTransaction` oplog entry will
 contain all the operations from the transaction, which means that if the transaction is larger than
 16MB (and thus requires multiple oplog entries), the node will reserve multiple oplog slots. The
 `OpTime` for the `prepareTransaction` oplog entry will be used for the
 [**`prepareTimestamp`**](#replication-timestamp-glossary).
 
-The node will then set the `prepareTimestamp` on the `RecoveryUnit` and mark the storage engine's
+The node will then [set the `prepareTimestamp`](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1779) on the `RecoveryUnit` and mark the storage engine's
 transaction as prepared so that the storage engine can
 [block conflicting reads and writes](#prepare-conflicts) until the transaction is committed or
 aborted.
 
-Next, the node will create the `prepareTransaction` oplog entry and write it to the oplog. This will
+Next, the node will [create the `prepareTransaction` oplog entry](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_operations.cpp#L230) and [write it to the oplog](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1785-L1798). This will
 involve taking all the operations from the transaction and storing them as an `applyOps` oplog
-entry (or multiple `applyOps` entries for larger transactions). The node will also make a couple
-updates to the transactions table. It will update the starting `OpTime` of the transaction, which
+entry (or multiple `applyOps` entries for larger transactions). The node will also [make a couple updates to the transactions table](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/op_observer/op_observer_impl.cpp#L1495-L1505).
+It will update the starting `OpTime` of the transaction, which
 will either be the `OpTime` of the prepare oplog entry or, in the case of larger transactions, the
 `OpTime` of the first oplog entry of the transaction. It will also update that the state of the
 transaction is `kPrepared`. This information will be useful if the node ever needs to recover the
@@ -953,7 +953,7 @@ transaction failed to prepare. This will cause the `TransactionCoordinator` to t
 participating shards to abort the transaction, thus preserving the atomicity of the transaction. If
 this happens, it is safe to retry the entire transaction.
 
-Finally, the node will record metrics, release the [RSTL](#replication-state-transition-lock) (while
+Finally, the node will record metrics, [release](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1826-L1829) the [RSTL](#replication-state-transition-lock) (while
 still holding the global lock) to allow prepared transactions to survive state transitions, and
 respond with the `prepareTimestamp` to the `TransactionCoordinator`.
 
@@ -973,6 +973,8 @@ until the transaction is committed or aborted to serve the read.
 If a write attempts to modify a document that was also modified by a prepared transaction, it will
 block and wait for the transaction to be committed or aborted before proceeding.
 
+This is handled in [wiredTigerPrepareConflictRetry](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h#L74).
+
 ### Committing a Prepared Transaction
 
 Committing a prepared transaction is very similar to
@@ -988,20 +990,23 @@ transaction at the same timestamp. This will be the timestamp at which the effec
 transaction are visible.
 
 When a node receives the `commitTransaction` command and the transaction is in the prepared state,
-it will first re-acquire the [RSTL](#replication-state-transition-lock) to prevent any state
-transitions from happening while the commit is in progress. It will then reserve an oplog slot,
-commit the storage transaction at the `commitTimestamp`, write the `commitTransaction` oplog entry
-into the oplog, update the transactions table, transition the `txnState` to `kCommitted`, record
-metrics, and clean up the transaction resources.
+it will first [re-acquire](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1962) the [RSTL](#replication-state-transition-lock) to prevent any state
+transitions from happening while the commit is in progress. It will then [reserve an oplog slot](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2021-L2030),
+[commit the storage transaction at the `commitTimestamp`](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2057-L2059), 
+[write the `commitTransaction` oplog entry](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2065-L2069)
+into the oplog, [update the transactions table](https://github.com/mongodb/mongo/blob/master/src/mongo/db/op_observer/op_observer_impl.cpp#L201), transition the `txnState` to `kCommitted`, record
+metrics, and [clean up the transaction resources](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2073-L2075).
 
 ### Aborting a Prepared Transaction
 
 Aborting a prepared transaction is very similar to
 [aborting a non-prepared transaction](#aborting-a-single-replica-set-transaction). The only
-difference is that before aborting a prepared transaction, the node must re-acquire the
+difference is that before aborting a prepared transaction, the node must [re-acquire](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2251) the
 [RSTL](#replication-state-transition-lock) to prevent any state transitions from happening while
 the abort is in progress. Non-prepared transactions don't have to do this because the node will
-still have the RSTL at this point.
+still have the RSTL at this point. We then [reserve an oplog slot](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2290-L2293),
+[abort the storage transaction](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2303),
+and [write the abortTransaction oplog entry](https://github.com/10gen/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L2312).
 
 ## State Transitions and Failovers with Transactions
 
@@ -1029,16 +1034,16 @@ If a node goes through a shut down, it will not recover any unprepared transacti
 
 Unlike unprepared transactions, which get aborted during a stepdown, prepared transactions need to
 survive stepdown because shards are relying on the `prepareTransaction` command being (and
-remaining) majority committed. As a result, after preparing a transaction, the node will release the
+remaining) majority committed. As a result, after preparing a transaction, the node will [release](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/transaction_participant.cpp#L1826-L1829) the
 [RSTL](#replication-state-transition-lock) so that it does not end up conflicting with state
 transitions. When [stepdown](#step-down) is aborting transactions before acquiring the RSTL, it will
-only abort unprepared transactions. Once stepdown finishes, the node will yield locks from all
-prepared transactions since secondaries don't hold locks for their transactions.
+only abort unprepared transactions. Once stepdown finishes, the node will [yield locks from all prepared transactions](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/repl/replication_coordinator_impl.cpp#L3006)
+since secondaries don't hold locks for their transactions.
 
 ### Step Up with a Prepared Transaction
 
-If a secondary has a prepared transaction when it [steps up](#step-up), it will have to re-acquire
-all the locks for the prepared transaction (other than the RSTL), since the primary relies on
+If a secondary has a prepared transaction when it [steps up](#step-up), it will have to [re-acquire all the locks](https://github.com/mongodb/mongo/blob/be38579dc72a40988cada1f43ab6695dcff8cc36/src/mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.cpp#L106)
+for the prepared transaction (other than the RSTL), since the primary relies on
 holding these locks to prevent conflicting operations.
 
 ### Recovering Prepared Transactions
