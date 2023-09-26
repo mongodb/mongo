@@ -830,6 +830,29 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
         """
         return i
 
+@contextmanager
+def open_cursor(session, uri: str, **kwargs):
+    """
+    Open a cursor instance on a session.
+
+    Supports 'with' statements.
+
+    Args:
+        uri (str): URI.
+
+    Keyword Args:
+        config (str): Configuration.
+    """
+
+    config = None if "config" not in kwargs else str(kwargs["config"])
+
+    cursor = session.open_cursor(uri, None, config)
+    try:
+        yield cursor
+    finally:
+        cursor.close()
+
+
 def zstdtest(description):
     """
     Used as a function decorator, for example, @wttest.zstdtest("description").
