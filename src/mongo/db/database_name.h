@@ -160,6 +160,9 @@ public:
     bool isExternalDB() const {
         return db() == DatabaseName::kExternal.db();
     }
+    bool isInternalDb() {
+        return isAdminDB() || isConfigDB() || isLocalDB();
+    }
 
     /**
      * Returns a db name string without tenant id.  Only to be used when a tenant id cannot be

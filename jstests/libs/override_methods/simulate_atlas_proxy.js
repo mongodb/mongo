@@ -343,7 +343,7 @@ function recordRerouteDueToTenantMigration(conn, migrationStateDoc) {
  * recipient for the migration. 'dbNameWithTenantId' is only used for logging.
  */
 function runCommandRetryOnTenantMigrationErrors(
-    conn, dbNameWithTenantId, cmdObjWithTenantId, options) {
+    conn, securityToken, dbNameWithTenantId, cmdObjWithTenantId, options) {
     let numAttempts = 0;
 
     // Keep track of the write operations that were applied.
@@ -377,6 +377,10 @@ function runCommandRetryOnTenantMigrationErrors(
     while (true) {
         numAttempts++;
         const newConn = getRoutingConnection(conn);
+        if (securityToken) {
+            newConn._setSecurityToken(securityToken);
+        }
+
         let resObj =
             originalRunCommand.apply(newConn, [dbNameWithTenantId, cmdObjWithTenantId, options]);
 
@@ -568,35 +572,39 @@ function runCommandRetryOnTenantMigrationErrors(
 
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const useDollarTenant = !!TestData.useDollarTenant;
+    const useSecurityToken = !!TestData.useSecurityToken;
     const useExpectPrefix = !!TestData.useExpectPrefix;
     const useResponsePrefixChecking = !!TestData.useResponsePrefixChecking;
 
     const tenantId = getTenantIdForDatabase(dbName);
     const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName, tenantId);
+    const securityToken = useSecurityToken ? _createTenantToken(ObjectId(tenantId)) : undefined;
 
     // If the command is already prefixed, just run it
     if (isCmdObjWithTenantId(cmdObj)) {
-        return runCommandRetryOnTenantMigrationErrors(this, dbNameWithTenantId, cmdObj, options);
+        return runCommandRetryOnTenantMigrationErrors(
+            this, securityToken, dbNameWithTenantId, cmdObj, options);
     }
 
     // Prepend a tenant prefix to all database names and namespaces, where applicable.
     const cmdObjWithTenantId = (function() {
         const cmdWithTenantPrefix = createCmdObjWithTenantId(cmdObj, tenantId);
-        if (!useDollarTenant || isDenylistedDb(dbName)) {
+        if (!useDollarTenant && !useSecurityToken) {
             return cmdWithTenantPrefix;
         }
 
-        const cmdWithDollarTenant =
+        if (useDollarTenant) {
             Object.assign(cmdWithTenantPrefix, {$tenant: ObjectId(tenantId)});
+        }
         if (useExpectPrefix) {
-            Object.assign(cmdWithDollarTenant, {expectPrefix: true});
+            Object.assign(cmdWithTenantPrefix, {expectPrefix: true});
         }
 
-        return cmdWithDollarTenant;
+        return cmdWithTenantPrefix;
     })();
 
     const resObj = runCommandRetryOnTenantMigrationErrors(
-        this, dbNameWithTenantId, cmdObjWithTenantId, options);
+        this, securityToken, dbNameWithTenantId, cmdObjWithTenantId, options);
 
     // Remove the tenant prefix from all database names and namespaces in the result since tests
     // assume the command was run against the original database.

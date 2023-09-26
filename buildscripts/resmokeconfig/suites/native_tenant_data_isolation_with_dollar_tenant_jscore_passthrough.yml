@@ -8,13 +8,14 @@ config_variables:
   username: __system
 
 test_kind: js_test
+description: |
+  Run test suites with a replica set and multitenancy enabled. Simulate the mongoq behavior
+  by overriding and injecting "$tenant".
 
 selector:
   roots:
   - jstests/core/**/*.js
   exclude_with_any_tags:
-  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
-  - simulate_atlas_proxy_incompatible
   # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
   # Theses tests expect replication is not enabled.
@@ -142,7 +143,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         multitenancySupport: true
-        featureFlagSecurityToken: true
+        # The mongoq only works with a replica set which has featureFlagRequireTenantID enabled.
         featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2

@@ -1,7 +1,7 @@
 test_kind: js_test
 description: |
   Run test suites with a replica set and multitenancy enabled. Simulate Atlas Proxy behavior
-  by overriding and injecting "$tenant" and tenant prefix.
+  by overriding and injecting unsigned security token and tenant prefix.
 
 selector:
   roots:
@@ -10,6 +10,32 @@ selector:
   exclude_files:
   # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
   - jstests/core/query/explain/explain_agg_write_concern.js
+
+  # TODO(SERVER-80569): Remove the test exclusion when $listCatalog in response has expected prefix.
+  - jstests/core/catalog/list_catalog.js
+
+  # TODO(SERVER-80641): Remove the test exclusion when the reponses of `validate` have expected prefix.
+  - jstests/core/compound_wildcard_index_validation.js
+  - jstests/core/write/delete/remove2.js
+  - jstests/core/index/wildcard/wildcard_index_update.js
+  - jstests/core/query/basic2.js
+  - jstests/core/index/index4.js
+  - jstests/core/query/js/js2.js
+  - jstests/core/query/sort/sort1.js
+  - jstests/core/query/sort/sort2.js
+  - jstests/core/query/sort/sort5.js
+  - jstests/core/index/index_partial_validate.js
+  - jstests/core/timeseries/timeseries_bucket_index.js
+  - jstests/core/index/index_partial_create_drop.js
+  - jstests/core/query/sort/sort_numeric.js
+  - jstests/core/index/index_partial_write_ops.js
+  - jstests/core/query/basic1.js
+  - jstests/core/index/index1.js
+  - jstests/core/index/index_bigkeys.js
+  - jstests/core/index/geo/geo_s2sparse.js
+  - jstests/core/write/update/update_numeric_field_name.js
+  - jstests/core/write/delete/remove.js
+  - jstests/core/doc_validation/doc_validation_encrypt_keywords.js
 
   # `rolesInfo` is returning unprefixed database names
   - jstests/core/administrative/builtin_roles_external.js
@@ -49,7 +75,7 @@ executor:
         TestData: &TestData
           tenantId: "636d957b2646ddfaf9b5e13f"
           hashTestNamesForMultitenancy: true
-          useDollarTenant: true
+          useSecurityToken: true
           useExpectPrefix: true
   hooks:
   - class: CheckReplOplogs

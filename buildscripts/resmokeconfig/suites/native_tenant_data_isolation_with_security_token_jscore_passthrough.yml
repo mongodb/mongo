@@ -1,11 +1,12 @@
 test_kind: js_test
+description: |
+  Run test suites with a replica set and multitenancy enabled. Simulate the mongoq behavior
+  by overriding and injecting signed security token.
 
 selector:
   roots:
   - jstests/core/**/*.js
   exclude_with_any_tags:
-  # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
-  - simulate_atlas_proxy_incompatible
   # Exclude tests which use commands that aren't supported in Serverless.
   - command_not_supported_in_serverless
   # Exclude tests which we know use commands that don't support a security token.
@@ -72,6 +73,11 @@ selector:
   # Queryable encryption test performs implicit encryption which issues commands that don't
   # include the security token.
   - jstests/core/queryable_encryption/**/*.js
+  # These following tests use benchRun which does not use runCommand (required by the inject_security_token.js override).
+  - jstests/core/**/bench_test1.js
+  - jstests/core/**/bench_test2.js
+  - jstests/core/**/benchrun_cmd_param_error.js
+  - jstests/core/**/benchrun_pipeline_updates.js
 
 executor:
   archive:
@@ -107,6 +113,7 @@ executor:
         multitenancySupport: true
         featureFlagSecurityToken: true
         testOnlyValidatedTenancyScopeKey: secret
+        # The mongoq only works with a replica set which has featureFlagRequireTenantID enabled.
         featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2
