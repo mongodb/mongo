@@ -55,4 +55,18 @@ inline Status validateChunkMigrationConcurrency(const int& chunkMigrationConcurr
     return Status::OK();
 }
 
+inline Status validateChunkMigrationFetcherMaxBufferedSizeBytesPerThread(const int& maxSize) {
+    if (maxSize == 0) {
+        return Status::OK();
+    }
+
+    if (maxSize < BSONObjMaxInternalSize) {
+        return Status{ErrorCodes::InvalidOptions,
+                      fmt::format("Chunk migration concurrency level must be 0 (no limit) or "
+                                  "greater than or equal to {}.",
+                                  BSONObjMaxInternalSize)};
+    }
+    return Status::OK();
+}
+
 }  // namespace mongo
