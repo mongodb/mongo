@@ -87,6 +87,10 @@ selector:
   # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade)
   - jstests/core/queryable_encryption/**/*.js
 
+  # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
+  # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
+  - jstests/core/top.js
+
 executor:
   archive:
     hooks:

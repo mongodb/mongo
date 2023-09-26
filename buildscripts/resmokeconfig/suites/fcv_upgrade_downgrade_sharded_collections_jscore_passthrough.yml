@@ -149,6 +149,10 @@ selector:
   - jstests/core/query/push/push2.js
   - jstests/core/write/update/update_addToSet2.js
 
+  # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
+  # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
+  - jstests/core/top.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

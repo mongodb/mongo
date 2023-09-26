@@ -105,6 +105,10 @@ selector:
   # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
   - jstests/aggregation/spill_to_disk.js
 
+  # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
+  # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
+  - jstests/core/top.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
