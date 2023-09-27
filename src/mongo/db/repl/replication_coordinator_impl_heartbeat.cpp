@@ -395,10 +395,10 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             const auto mem = _rsConfig.findMemberByHostAndPort(target);
             if (mem && mem->isNewlyAdded()) {
                 const auto memId = mem->getId();
+                const auto configVersion = _rsConfig.getConfigVersionAndTerm();
                 auto status = _replExecutor->scheduleWork(
                     [=, this](const executor::TaskExecutor::CallbackArgs& cbData) {
-                        _reconfigToRemoveNewlyAddedField(
-                            cbData, memId, _rsConfig.getConfigVersionAndTerm());
+                        _reconfigToRemoveNewlyAddedField(cbData, memId, configVersion);
                     });
 
                 if (!status.isOK()) {
