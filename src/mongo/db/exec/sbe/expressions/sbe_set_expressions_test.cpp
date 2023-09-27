@@ -269,4 +269,78 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetEquals) {
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(189));
     runAndAssertNothing(compiledExpr.get());
 }
+
+TEST_F(SBEBuiltinSetOpTest, ComputesSetIsSubset) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setIsSubsetExpr = stage_builder::makeFunction("setIsSubset",
+                                                       stage_builder::makeVariable(arrSlot1),
+                                                       stage_builder::makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setIsSubsetExpr);
+
+    // all elements are the same
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(3 << 2 << 1));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), true);
+
+    // first array has the same elements multiple times
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3 << 1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), true);
+
+    // first array is subset of the second array
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(1 << 2 << 3 << 4 << 5));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), true);
+
+    // first array is not subset of the second array
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(1 << 2 << 4 << 5));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), false);
+
+    // second array is empty
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = value::makeNewArray();
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), false);
+
+    // first array is empty
+    std::tie(arrTag1, arrVal1) = value::makeNewArray();
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertBoolean(compiledExpr.get(), true);
+}
+
+TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIsSubset) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setIsSubsetExpr = stage_builder::makeFunction("setIsSubset",
+                                                       stage_builder::makeVariable(arrSlot1),
+                                                       stage_builder::makeVariable(arrSlot2));
+    auto compiledExpr = compileExpression(*setIsSubsetExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(125));
+    runAndAssertNothing(compiledExpr.get());
+
+    slotAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(125));
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(1 << 2));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertNothing(compiledExpr.get());
+}
 }  // namespace mongo::sbe

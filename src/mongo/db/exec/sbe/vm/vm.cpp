@@ -4476,6 +4476,28 @@ FastTuple<bool, value::TypeTags, value::Value> setEquals(
 
     return {false, value::TypeTags::Boolean, true};
 }
+
+FastTuple<bool, value::TypeTags, value::Value> setIsSubset(
+    value::TypeTags lhsTag,
+    value::Value lhsVal,
+    value::TypeTags rhsTag,
+    value::Value rhsVal,
+    const CollatorInterface* collator = nullptr) {
+
+    if (!value::isArray(lhsTag) || !value::isArray(rhsTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto setValuesSecondArg = valueToSetHelper(rhsTag, rhsVal, collator);
+
+    bool isSubset = true;
+    value::arrayAny(lhsTag, lhsVal, [&](value::TypeTags elTag, value::Value elVal) {
+        isSubset = (setValuesSecondArg.count({elTag, elVal}) > 0);
+        return !isSubset;
+    });
+
+    return {false, value::TypeTags::Boolean, isSubset};
+}
 }  // namespace
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnion(ArityType arity) {
@@ -4794,6 +4816,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetEquals(Ar
     return setEquals(argTags, argVals, value::getCollatorView(collVal));
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetIsSubset(ArityType arity) {
+    tassert(5154701, "$setIsSubset expects two sets and a collator", arity == 3);
+
+    auto [_, collTag, collVal] = getFromStack(0);
+    if (collTag != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(1);
+    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(2);
+
+    return setIsSubset(lhsTag, lhsVal, rhsTag, rhsVal, value::getCollatorView(collVal));
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(ArityType arity) {
     invariant(arity == 2);
 
@@ -4824,6 +4860,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetEquals(ArityT
     }
 
     return setEquals(argTags, argVals);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIsSubset(ArityType arity) {
+    tassert(5154702, "$setIsSubset expects two sets", arity == 2);
+
+    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(1);
+
+    return setIsSubset(lhsTag, lhsVal, rhsTag, rhsVal);
 }
 
 namespace {
@@ -8599,6 +8644,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinSetDifference(arity);
         case Builtin::setEquals:
             return builtinSetEquals(arity);
+        case Builtin::setIsSubset:
+            return builtinSetIsSubset(arity);
         case Builtin::collSetUnion:
             return builtinCollSetUnion(arity);
         case Builtin::collSetIntersection:
@@ -8607,6 +8654,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinCollSetDifference(arity);
         case Builtin::collSetEquals:
             return builtinCollSetEquals(arity);
+        case Builtin::collSetIsSubset:
+            return builtinCollSetIsSubset(arity);
         case Builtin::runJsPredicate:
             return builtinRunJsPredicate(arity);
         case Builtin::regexCompile:

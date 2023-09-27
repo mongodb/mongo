@@ -748,10 +748,12 @@ enum class Builtin : uint16_t {
     setIntersection,
     setDifference,
     setEquals,
+    setIsSubset,
     collSetUnion,
     collSetIntersection,
     collSetDifference,
     collSetEquals,
+    collSetIsSubset,
     runJsPredicate,
     regexCompile,  // compile <pattern, options> into value::pcreRegex
     regexFind,
@@ -1875,10 +1877,12 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetEquals(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSetIsSubset(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollSetUnion(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollSetIntersection(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollSetDifference(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollSetEquals(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollSetIsSubset(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);

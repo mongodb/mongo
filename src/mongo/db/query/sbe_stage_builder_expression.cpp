@@ -665,6 +665,7 @@ public:
         Intersection,
         Union,
         Equals,
+        IsSubset,
     };
 
     void visit(const ExpressionConstant* expr) final {
@@ -2885,9 +2886,12 @@ public:
 
         generateSetExpression(expr, SetOperation::Intersection);
     }
-
     void visit(const ExpressionSetIsSubset* expr) final {
-        unsupportedExpression(expr->getOpName());
+        tassert(5154700,
+                "$setIsSubset expects two expressions in the input",
+                expr->getChildren().size() == 2);
+
+        generateSetExpression(expr, SetOperation::IsSubset);
     }
     void visit(const ExpressionSetUnion* expr) final {
         if (expr->getChildren().size() == 0) {
@@ -3994,6 +3998,9 @@ private:
             case SetOperation::Equals:
                 return std::make_pair("setEquals"_sd,
                                       hasCollator ? "collSetEquals"_sd : "setEquals"_sd);
+            case SetOperation::IsSubset:
+                return std::make_pair("setIsSubset"_sd,
+                                      hasCollator ? "collSetIsSubset"_sd : "setIsSubset"_sd);
         }
         MONGO_UNREACHABLE;
     }
