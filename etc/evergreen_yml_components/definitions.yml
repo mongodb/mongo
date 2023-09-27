@@ -236,7 +236,6 @@ variables:
   - func: "attach artifacts"
   - func: "attach local resmoke invocation"
   - func: "kill processes"
-  - func: "save code coverage data"
   - func: "save mongo coredumps"
   - func: "generate hang analyzer tasks"
   - func: "save failed unittests"
@@ -2002,43 +2001,6 @@ functions:
       args:
       - "./src/evergreen/functions/fuse_watchdog_cleanup.sh"
 
-  ### Process & archive Code Coverage artifacts ###
-  "process code coverage data": &process_code_coverage_data
-    command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/functions/code_coverage_data_process.sh"
-      env:
-        GCOV_TOOL: ${gcov_tool}
-
-  "tar code coverage data": &tar_code_coverage_data
-    command: archive.targz_pack
-    params:
-      target: "src/gcov-intermediate-files.tgz"
-      source_dir: "src"
-      include:
-      - "*.gcda.gcov"
-
-  "archive code coverage data": &archive_code_coverage_data
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: "src/gcov-intermediate-files.tgz"
-      remote_file: ${project}/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: gcov intermediate files - Execution ${execution}
-      optional: true
-
-  "save code coverage data":
-  - *f_expansions_write
-  - *process_code_coverage_data
-  - *tar_code_coverage_data
-  - *archive_code_coverage_data
-
   "tar jepsen logs": &tar_jepsen_logs
     command: archive.targz_pack
     params:
@@ -2677,7 +2639,6 @@ post:
 - func: "upload jstestfuzz minimized output"
 - func: "kill processes"
 - func: "save local client logs"
-- func: "save code coverage data"
 - func: "save jepsen artifacts"
 - func: "save blackduck artifacts"
 - func: "save mongo coredumps"
