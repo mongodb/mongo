@@ -368,27 +368,6 @@ variables:
   - enterprise-windows-inmem
   - enterprise-windows-wtdevelop
 
-
-# List of all variants that make mh artifacts.
-# If a variant is listed here and has a push task, the mh artifacts are pushed
-- mh_variants: &mh_variants
-  - enterprise-macos
-  - enterprise-macos-arm64
-  - enterprise-rhel-80-64-bit
-  - enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
-  - enterprise-rhel-70-64-bit
-  - enterprise-rhel-82-arm64
-  - enterprise-rhel-90-64-bit
-  - enterprise-rhel-90-arm64
-  - enterprise-amazon2-arm64
-  - enterprise-amazon2023
-  - enterprise-amazon2023-lto
-  - enterprise-amazon2023-arm64
-  - enterprise-amazon2023-arm64-lto
-  - enterprise-ubuntu2004-64
-  - enterprise-ubuntu2204-64
-  - enterprise-windows
-
 # List of all variants that use the packages.tgz
 - package_variants: &package_variants
   - amazon
@@ -815,10 +794,6 @@ functions:
         value: ${project}/${compile_variant}/${version_id}/binaries/mongo-cryptd-${revision_order_id}.${ext|tgz}
       - key: mongo_cryptd_debugsymbols
         value: ${project}/${compile_variant}/${version_id}/binaries/mongo-cryptd-debugsymbols-${revision_order_id}.${ext|tgz}
-      - key: mh_archive
-        value: ${project}/${compile_variant}/${version_id}/binaries/mh-${revision_order_id}.${ext|tgz}
-      - key: mh_debugsymbols
-        value: ${project}/${compile_variant}/${version_id}/debugsymbols/mh-debugsymbols-${revision_order_id}.${ext|tgz}
       - key: mongo_debugsymbols
         value: ${project}/${compile_variant}/${version_id}/debugsymbols/debugsymbols-${revision_order_id}.${ext|tgz}
       - key: mongo_jstestshell
@@ -7894,28 +7869,6 @@ tasks:
       permissions: public-read
       content_type: ${content_type|application/gzip}
       display_name: CryptD Debugsymbols
-  - command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/mh-binaries.${ext|tgz}
-      remote_file: ${mh_archive}
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      display_name: MH Binaries
-  - command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/mh-debugsymbols.${ext|tgz}
-      remote_file: ${mh_debugsymbols}
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      display_name: MH Debugsymbols
   - func: "run packager.py"
   - command: archive.targz_pack
     params:
@@ -8015,15 +7968,6 @@ tasks:
       bucket: mciuploads
       local_file: src/mongo-cryptd.tgz
       build_variants: *mongocryptd_variants
-  # Fetch the mongohouse binaries
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${mh_archive}
-      bucket: mciuploads
-      local_file: src/mh.tgz
-      build_variants: *mh_variants
   # Fetch the sources (on relevant variants only)
   - command: s3.get
     params:
@@ -8088,17 +8032,6 @@ tasks:
       content_type: ${content_type|application/gzip}
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
       build_variants: *mongocryptd_variants
-  # Put the mh tarball/zipfile
-  - command: s3.put
-    params:
-      aws_secret: ${aws_secret}
-      local_file: src/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-      aws_key: ${aws_key}
-      bucket: build-push-testing
-      permissions: public-read
-      content_type: ${content_type|application/gzip}
-      remote_file: ${push_path}-STAGE/${push_name}/mh-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
-      build_variants: *mh_variants
   # Put the source tarball
   - command: s3.put
     params:
@@ -8384,8 +8317,6 @@ tasks:
         SERVER_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
         CRYPTD_TARBALL_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
         CRYPTD_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-        MONGOHOUSE_TARBALL_PATH: src/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-        MONGOHOUSE_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
         SOURCE_TARBALL_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}
         SOURCE_TARBALL_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}
         DEBUG_SYMBOLS_TARBALL_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
@@ -8452,11 +8383,6 @@ tasks:
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
          'build_variants': *mongocryptd_variants}
-
-      # MH
-      - {'source': {'path': '${push_path}-STAGE/${push_name}/mh-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-         'destination': {'path': '${push_path}/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
-         'build_variants': *mh_variants}
 
       #Source tarball
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
