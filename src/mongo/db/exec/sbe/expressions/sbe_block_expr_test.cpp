@@ -82,6 +82,10 @@ public:
     void testFoldF(std::vector<bool> vals,
                    std::vector<char> filterPosInfo,
                    std::vector<bool> expectedResult);
+
+    void testCmpScalar(const std::vector<std::pair<value::TypeTags, value::Value>>& testValues,
+                       EPrimBinary::Op,
+                       StringData cmpFunctionName);
 };
 
 TEST_F(SBEBlockExpressionTest, BlockExistsTest) {
@@ -505,6 +509,96 @@ TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
               {1, 0, 0, 1},                 // Position info.
               {false, true}                 // Expected result.
     );
+}
+
+void SBEBlockExpressionTest::testCmpScalar(
+    const std::vector<std::pair<value::TypeTags, value::Value>>& testValues,
+    EPrimBinary::Op scalarOp,
+    StringData cmpFunctionName) {
+
+    value::ViewOfValueAccessor valBlockAccessor;
+    value::ViewOfValueAccessor scalarAccessorLhs;
+    value::ViewOfValueAccessor scalarAccessorRhs;
+    auto valBlockSlot = bindAccessor(&valBlockAccessor);
+    auto scalarSlotLhs = bindAccessor(&scalarAccessorLhs);
+    auto scalarSlotRhs = bindAccessor(&scalarAccessorRhs);
+
+    auto valBlock = std::make_unique<value::HeterogeneousBlock>();
+    for (auto [t, v] : testValues) {
+        auto [cpyT, cpyV] = value::copyValue(t, v);
+        valBlock->push_back(cpyT, cpyV);
+    }
+
+    valBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                           value::bitcastFrom<value::ValueBlock*>(valBlock.get()));
+
+    auto expr = makeE<sbe::EFunction>(
+        cmpFunctionName,
+        sbe::makeEs(makeE<EVariable>(valBlockSlot), makeE<EVariable>(scalarSlotRhs)));
+    auto compiledExpr = compileExpression(*expr);
+
+    auto scalarExpr = makeE<sbe::EPrimBinary>(
+        scalarOp, makeE<EVariable>(scalarSlotLhs), makeE<EVariable>(scalarSlotRhs));
+    auto compiledScalarExpr = compileExpression(*scalarExpr);
+
+    for (auto [t, v] : testValues) {
+        scalarAccessorRhs.reset(t, v);
+
+        // Run the block expression and get the result.
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::valueBlock);
+        auto* resultValBlock = value::getValueBlock(runVal);
+        auto resultExtracted = resultValBlock->extract();
+
+        ASSERT_EQ(resultExtracted.count, testValues.size());
+
+        for (size_t i = 0; i < resultExtracted.count; ++i) {
+            // Determine the expected result.
+            scalarAccessorLhs.reset(testValues[i].first, testValues[i].second);
+            auto [expectedTag, expectedVal] = runCompiledExpression(compiledScalarExpr.get());
+            value::ValueGuard guard(expectedTag, expectedVal);
+
+
+            auto [gotTag, gotVal] = resultExtracted[i];
+
+            auto [cmpTag, cmpVal] = value::compareValue(gotTag, gotVal, expectedTag, expectedVal);
+            ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32) << gotTag << " " << expectedTag;
+            ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0)
+                << "Comparing " << std::pair(t, v) << " " << testValues[i] << " and got "
+                << std::pair(gotTag, gotVal) << " expected " << std::pair(expectedTag, expectedVal);
+        }
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarTest) {
+    auto testValues = std::vector<std::pair<value::TypeTags, value::Value>>{
+        makeNothing(),
+        makeInt32(123),
+        makeInt32(456),
+        makeInt64(std::numeric_limits<int32_t>::min()),
+        makeInt64(std::numeric_limits<int32_t>::max()),
+        makeInt64(std::numeric_limits<int64_t>::min()),
+        makeInt64(std::numeric_limits<int64_t>::max()),
+        value::makeBigString("foobar"),
+        value::makeBigString("baz"),
+        makeDouble(999.0),
+        makeDouble(111.0),
+    };
+
+    ON_BLOCK_EXIT([&]() {
+        for (auto [t, v] : testValues) {
+            value::releaseValue(t, v);
+        }
+    });
+
+    testCmpScalar(testValues, EPrimBinary::greater, "valueBlockGtScalar");
+    testCmpScalar(testValues, EPrimBinary::greaterEq, "valueBlockGteScalar");
+    testCmpScalar(testValues, EPrimBinary::less, "valueBlockLtScalar");
+    testCmpScalar(testValues, EPrimBinary::lessEq, "valueBlockLteScalar");
+    testCmpScalar(testValues, EPrimBinary::eq, "valueBlockEqScalar");
+    testCmpScalar(testValues, EPrimBinary::neq, "valueBlockNeqScalar");
 }
 
 }  // namespace mongo::sbe

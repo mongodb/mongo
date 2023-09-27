@@ -88,9 +88,7 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
     invariant(!data.eoo());
     invariant(data.type() == BSONType::Object);
 
-    std::vector<BSONElement> idxToTopLevelField(_pathReqs.size());
-
-    std::vector<std::unique_ptr<CellBlock>> out(_pathReqs.size());
+    StringMap<BSONElement> topLevelFieldToBsonElt;
     for (auto elt : data.embeddedObject()) {
         auto it = _topLevelFieldToIdxes.find(elt.fieldNameStringData());
         if (it != _topLevelFieldToIdxes.end()) {
@@ -99,45 +97,74 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
                     "Unsupported type for timeseries bucket data",
                     blockTag == value::TypeTags::bsonObject ||
                         blockTag == value::TypeTags::bsonBinData);
-
-            for (auto idx : it->second) {
-                out[idx] = std::make_unique<value::TsCellBlock>(
-                    noOfMeasurements, /*owned*/ false, blockTag, blockVal);
-
-                idxToTopLevelField[idx] = elt;
-            }
+            topLevelFieldToBsonElt[elt.fieldName()] = elt;
         }
     }
 
-    // For the non-top fields we materialize everything. Eventually this code should not be
-    // necessary once PM-3402 allows us to read subfields directly.
-    // TODO: In the short term we may want to optimize this to avoid repeated allocations and
-    // that kind of thing.
     std::vector<BSONObjBuilder> bsonBuilders(noOfMeasurements);
     std::vector<BSONObj> bsons(noOfMeasurements);
-    for (size_t i = 0; i < _nonTopLevelPathReqs.size(); ++i) {
-        auto bucketElt = idxToTopLevelField[_nonTopLevelPathIdxes[i]];
 
-        {
-            BSONColumn column(bucketElt);
+    std::vector<std::unique_ptr<CellBlock>> out(_pathReqs.size());
+
+    for (auto& [topLevelField, elt] : topLevelFieldToBsonElt) {
+        const auto& indexes = _topLevelFieldToIdxes[topLevelField];
+        auto [blockTag, blockVal] = bson::convertFrom<true>(elt);
+
+        std::vector<size_t> nonTopLevelIdxes;
+        for (auto idx : indexes) {
+            bool isTopLevelOnly =
+                std::find(_nonTopLevelPathIdxes.begin(), _nonTopLevelPathIdxes.end(), idx) ==
+                _nonTopLevelPathIdxes.end();
+
+            if (isTopLevelOnly) {
+                out[idx] = std::make_unique<value::TsCellBlock>(
+                    noOfMeasurements, /*owned*/ false, blockTag, blockVal);
+            } else {
+                nonTopLevelIdxes.push_back(idx);
+            }
+        }
+
+        if (nonTopLevelIdxes.empty()) {
+            continue;
+        }
+
+        // Otherwise we'll shred this one
+        if (elt.type() == BSONType::BinData) {
+            BSONColumn column(elt);
             size_t columnIdx = 0;
             for (auto columnElt : column) {
                 if (columnElt) {
-                    bsonBuilders[columnIdx].appendAs(columnElt, bucketElt.fieldNameStringData());
+                    bsonBuilders[columnIdx].appendAs(columnElt, elt.fieldNameStringData());
                 }
 
                 ++columnIdx;
             }
+        } else {
+            size_t idx = 0;
+            for (auto columnElt : elt.embeddedObject()) {
+                while (ItoA(idx) != columnElt.fieldNameStringData()) {
+                    ++idx;
+                }
+
+                bsonBuilders[idx].appendAs(columnElt, elt.fieldNameStringData());
+            }
+
+            // Final gap between idx and noOfMeasurements can be left empty.
         }
 
         for (size_t i = 0; i < bsons.size(); ++i) {
             bsons[i] = bsonBuilders[i].asTempObj();
         }
 
-        auto cellsForNestedFields = value::extractCellBlocksFromBsons(
-            std::vector<CellBlock::PathRequest>{_nonTopLevelPathReqs[i]}, bsons);
+        std::vector<CellBlock::PathRequest> reqs;
+        for (auto idx : nonTopLevelIdxes) {
+            reqs.push_back(_pathReqs[idx]);
+        }
+        auto cellsForNestedFields = value::extractCellBlocksFromBsons(reqs, bsons);
 
-        out[_nonTopLevelPathIdxes[i]] = std::move(cellsForNestedFields[0]);
+        for (size_t i = 0; i < cellsForNestedFields.size(); ++i) {
+            out[nonTopLevelIdxes[i]] = std::move(cellsForNestedFields[i]);
+        }
 
         for (auto& bob : bsonBuilders) {
             bob.resetToEmpty();

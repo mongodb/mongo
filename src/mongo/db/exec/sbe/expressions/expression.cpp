@@ -888,6 +888,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockGteScalar, false}},
     {"valueBlockEqScalar",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockEqScalar, false}},
+    {"valueBlockNeqScalar",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockNeqScalar, false}},
     {"valueBlockLtScalar",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::valueBlockLtScalar, false}},
     {"valueBlockLteScalar",
