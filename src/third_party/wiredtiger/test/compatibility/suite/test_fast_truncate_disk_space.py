@@ -38,6 +38,9 @@ class test_fast_truncate_disk_space(compatibility_test.CompatibilityTestCase):
     # Use a standalone build.
     build_config = {'standalone': True}
 
+    # FIXME-WT-11716 Explain why we have to restrict the older branch to 6.0.
+    older = ['mongodb-6.0']
+
     # Use a small page size and lots of keys because we want to create lots
     # of individual pages in the file.
     config = 'allocation_size=512,leaf_page_max=512'

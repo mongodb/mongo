@@ -200,22 +200,47 @@ def run_tests(suites):
         print("[pid:{}]: ERROR: running test: {}".format(os.getpid(), e))
         raise e
 
-def add_branch_pair_scenarios(suite):
+def make_branch_scenarios(older, newer):
     '''
-    Add branch names to the test scenarios.
+    Create scenarios with the specified older and newer branches.
     '''
     older_branches = []
-    newer_branches = []
-    for branch in compatibility_common.BRANCHES:
+    for branch in older:
         older_branches.append(('older=%s' % branch, { 'older_branch': branch }))
+    newer_branches = []
+    for branch in newer:
         newer_branches.append(('newer=%s' % branch, { 'newer_branch': branch }))
-    branch_scenarios = list(filter(
+
+    return list(filter(
         lambda scenario: compatibility_common.is_branch_order_asc(scenario[1]['older_branch'],
                                                                   scenario[1]['newer_branch']),
         wtscenario.make_scenarios(older_branches, newer_branches)))
 
-    # Combine the branch scenarios with the scenarios specified by the test, if any.
+def add_branch_pair_scenarios(suite):
+    '''
+    Add branch names to the test scenarios.
+    '''
     for test in testtools.iterate_tests(suite):
+        # Get the older and newer branches, allowing tests to specify their own.
+        older = getattr(test, 'older', compatibility_common.BRANCHES)
+        newer = getattr(test, 'newer', compatibility_common.BRANCHES)
+        if type(older) is not list:
+            older = [older]
+        if type(newer) is not list:
+            newer = [newer]
+
+        # Validate that the test is using only supported branches. Otherwise they may not be ready.
+        unsupported_branches = list(filter(lambda b: b not in compatibility_common.BRANCHES,
+                                           older + list(set(newer) - set(older))))
+        if len(unsupported_branches) > 0:
+            unsupported_branches.sort()
+            raise Exception('Test \'%s\' specifies unsupported branches: %s'
+                            % (test, ', '.join(unsupported_branches)))
+
+        # Make the scenarios from the older and newer branches.
+        branch_scenarios = make_branch_scenarios(older, newer)
+
+        # Combine the branch scenarios with the scenarios specified by the test, if any.
         scenarios = getattr(test, 'scenarios', None)
         if scenarios is None:
             setattr(test, 'scenarios', wtscenario.make_scenarios(branch_scenarios))
