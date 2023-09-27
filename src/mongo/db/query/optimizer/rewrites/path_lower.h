@@ -153,6 +153,8 @@ public:
     void transport(ABT& n, const EvalPath&, ABT&, ABT&);
     void transport(ABT& n, const EvalFilter&, ABT&, ABT&);
 
+    // Returns true if the tree changed. Does not rebuild the VariableEnvironment and hence might
+    // leave it in an invalid state. The caller is responsible rebuilding the VariableEnvironment.
     bool optimize(ABT& n);
 
 private:

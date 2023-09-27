@@ -442,14 +442,6 @@ bool PathLowering::optimize(ABT& n) {
 
     algebra::transport<true>(n, *this);
 
-    // During PathLowering we may call EvalPathLowering or EvalFilterLowering. These each may call
-    // rebuild on a subset of the ABT, which will produce invalid references for refs that point to
-    // definitions outside of that subset. Rebuild the tree to avoid leaving those free variables
-    // for the caller.
-    if (_changed) {
-        _env.rebuild(n);
-    }
-
     return _changed;
 }
 

@@ -116,11 +116,16 @@ void OptPhaseManager::runStructuralPhase(C instance, VariableEnvironment& env, A
         return;
     }
 
-    for (int iterationCount = 0; instance.optimize(input); iterationCount++) {
+    int optimizeIterations = 0;
+    for (; instance.optimize(input); optimizeIterations++) {
         tassert(6808708,
                 str::stream() << "Iteration limit exceeded while running the following phase: "
                               << toStringData(phase) << ".",
-                !_debugInfo.exceedsIterationLimit(iterationCount));
+                !_debugInfo.exceedsIterationLimit(optimizeIterations));
+    }
+
+    if (optimizeIterations > 0) {
+        env.rebuild(input);
     }
 
     if (env.hasFreeVariables()) {
@@ -385,11 +390,6 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
 
         runStructuralPhase<OptPhase::ConstEvalPost_ForSampling, SamplingConstEval>(
             SamplingConstEval{}, env, planEntry._node);
-
-        env.rebuild(planEntry._node);
-        if (env.hasFreeVariables()) {
-            tasserted(6808710, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
-        }
     }
 
     tassert(6624174,
