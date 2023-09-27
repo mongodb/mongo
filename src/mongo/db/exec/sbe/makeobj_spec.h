@@ -38,7 +38,7 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/util/indexed_string_vector.h"
+#include "mongo/util/string_listset.h"
 
 namespace mongo::sbe {
 /**
@@ -124,7 +124,7 @@ struct MakeObjSpec {
           nonObjInputBehavior(nonObjInputBehavior),
           traversalDepth(traversalDepth),
           fieldInfos(std::move(fieldInfos)),
-          fields(buildIndexedFieldVector(std::move(fields))) {}
+          fields(buildFieldDict(std::move(fields))) {}
 
     MakeObjSpec(const MakeObjSpec& other)
         : numKeepOrDrops(other.numKeepOrDrops),
@@ -221,7 +221,7 @@ struct MakeObjSpec {
         return builder.str();
     }
 
-    IndexedStringVector buildIndexedFieldVector(std::vector<std::string> names);
+    StringListSet buildFieldDict(std::vector<std::string> names);
 
     size_t getApproximateSize() const;
 
@@ -263,6 +263,6 @@ struct MakeObjSpec {
     std::vector<FieldInfo> fieldInfos;
 
     // Searchable vector of fields of interest.
-    IndexedStringVector fields;
+    StringListSet fields;
 };
 }  // namespace mongo::sbe

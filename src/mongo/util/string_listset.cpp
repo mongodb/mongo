@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/util/indexed_string_vector.h"
+#include "mongo/util/string_listset.h"
 
 #include <absl/container/flat_hash_map.h>
 
@@ -38,7 +38,7 @@ namespace mongo {
 // This method returns an array to be stored in  '_fastHt'. This method also has the side-effect
 // of initializing _stringToIndexMap. (This method assumes the default ctor for '_stringToIndexMap'
 // has already executed.)
-std::array<uint8_t, 128> IndexedStringVector::buildFastHash() {
+std::array<uint8_t, 128> StringListSet::buildFastHash() {
     _stringToIndexMap.clear();
 
     // Initialize 'bf' to all zeros.
@@ -73,18 +73,17 @@ std::array<uint8_t, 128> IndexedStringVector::buildFastHash() {
         }
 
         auto [_, inserted] = _stringToIndexMap.emplace(StringData(p), idx);
-        tassert(
-            7582300,
-            str::stream()
-                << "Input vector to IndexedStringVector contained multiple occurrences of string: "
-                << p,
-            inserted);
+        tassert(7582300,
+                str::stream()
+                    << "Input vector to StringListSet contained multiple occurrences of string: "
+                    << p,
+                inserted);
     }
 
     return fastHt;
 }
 
-size_t IndexedStringVector::findInMapImpl(StringData str) const {
+size_t StringListSet::findInMapImpl(StringData str) const {
     auto it = _stringToIndexMap.find(str);
     return it != _stringToIndexMap.end() ? it->second : npos;
 }

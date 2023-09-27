@@ -44,7 +44,7 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-class IndexedStringVector {
+class StringListSet {
 public:
     static constexpr size_t npos = std::numeric_limits<size_t>::max();
 
@@ -76,16 +76,16 @@ private:
     }
 
 public:
-    explicit IndexedStringVector(std::vector<std::string> strings)
+    explicit StringListSet(std::vector<std::string> strings)
         : _strings(std::move(strings)), _stringToIndexMap(), _fastHt(buildFastHash()) {}
 
-    IndexedStringVector(const IndexedStringVector& other)
+    StringListSet(const StringListSet& other)
         : _strings(other._strings), _stringToIndexMap(), _fastHt(buildFastHash()) {}
 
-    IndexedStringVector(IndexedStringVector&& other)
+    StringListSet(StringListSet&& other)
         : _strings(std::move(other._strings)), _stringToIndexMap(), _fastHt(buildFastHash()) {}
 
-    IndexedStringVector& operator=(const IndexedStringVector& other) {
+    StringListSet& operator=(const StringListSet& other) {
         if (&other != this) {
             _strings = other._strings;
             _fastHt = buildFastHash();
@@ -93,7 +93,7 @@ public:
         return *this;
     }
 
-    IndexedStringVector& operator=(IndexedStringVector&& other) {
+    StringListSet& operator=(StringListSet&& other) {
         if (&other != this) {
             _strings = std::move(other._strings);
             _fastHt = buildFastHash();

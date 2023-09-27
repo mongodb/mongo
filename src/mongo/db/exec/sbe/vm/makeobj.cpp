@@ -233,7 +233,7 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
             StringData fieldName = cursor.fieldName();
             size_t fieldIdx = fields.findPos(fieldName);
 
-            if (fieldIdx == IndexedStringVector::npos) {
+            if (fieldIdx == StringListSet::npos) {
                 if (!isClosed) {
                     cursor.appendTo(bob);
                 }

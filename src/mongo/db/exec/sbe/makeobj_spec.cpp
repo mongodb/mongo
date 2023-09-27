@@ -35,7 +35,7 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo::sbe {
-IndexedStringVector MakeObjSpec::buildIndexedFieldVector(std::vector<std::string> names) {
+StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     if (fieldInfos.empty()) {
         numKeepOrDrops = names.size();
         numValueArgs = 0;
@@ -46,7 +46,7 @@ IndexedStringVector MakeObjSpec::buildIndexedFieldVector(std::vector<std::string
         fieldInfos = std::vector<FieldInfo>{};
         fieldInfos.resize(numKeepOrDrops);
 
-        return IndexedStringVector(std::move(names));
+        return StringListSet(std::move(names));
     }
 
     tassert(7103500,
@@ -106,7 +106,7 @@ IndexedStringVector MakeObjSpec::buildIndexedFieldVector(std::vector<std::string
     std::vector<std::string> newNames = std::move(keepOrDrops);
     std::move(names.begin(), names.end(), std::back_inserter(newNames));
 
-    return IndexedStringVector(std::move(newNames));
+    return StringListSet(std::move(newNames));
 }
 
 size_t MakeObjSpec::getApproximateSize() const {

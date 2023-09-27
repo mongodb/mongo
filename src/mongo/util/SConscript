@@ -641,9 +641,9 @@ env.Library(
 )
 
 env.Library(
-    target='indexed_string_vector',
+    target='string_listset',
     source=[
-        'indexed_string_vector.cpp',
+        'string_listset.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

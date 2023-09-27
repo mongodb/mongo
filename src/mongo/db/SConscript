@@ -1699,8 +1699,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_column',
-        '$BUILD_DIR/mongo/util/indexed_string_vector',
         '$BUILD_DIR/mongo/util/pcre_util',
+        '$BUILD_DIR/mongo/util/string_listset',
         '$BUILD_DIR/mongo/util/summation',
         'exec/js_function',
         'query/collation/collator_interface',

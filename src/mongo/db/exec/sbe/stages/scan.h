@@ -61,7 +61,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/indexed_string_vector.h"
+#include "mongo/util/string_listset.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -202,7 +202,7 @@ private:
 
     // '_scanFieldNames' - names of the fields being scanned from the doc
     // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
-    const IndexedStringVector _scanFieldNames;
+    const StringListSet _scanFieldNames;
     const value::SlotVector _scanFieldSlots;
 
     const boost::optional<value::SlotId> _seekRecordIdSlot;
@@ -383,7 +383,7 @@ private:
 
     // '_scanFieldNames' - names of the fields being scanned from the doc
     // '_scanFieldSlots' - slot IDs corresponding, by index, to _scanFieldAccessors
-    const IndexedStringVector _scanFieldNames;
+    const StringListSet _scanFieldNames;
     const value::SlotVector _scanFieldSlots;
 
     const UUID _collUuid;

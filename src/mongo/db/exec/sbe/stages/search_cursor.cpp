@@ -96,7 +96,7 @@ namespace {
 // Initialize the slot accessors and name to accessor mapping given the slots and names vector.
 void initializeAccessorsVector(absl::InlinedVector<value::OwnedValueAccessor, 3>& accessors,
                                value::SlotAccessorMap& accessorsMap,
-                               const IndexedStringVector& names,
+                               const StringListSet& names,
                                const value::SlotVector& slotVec) {
     accessors.resize(names.size());
     for (size_t idx = 0; idx < names.size(); ++idx) {
@@ -277,12 +277,12 @@ PlanState SearchCursorStage::getNext() {
     for (auto& elem : *_response) {
 
         auto elemName = elem.fieldNameStringData();
-        if (size_t pos = _metadataNames.findPos(elemName); pos != IndexedStringVector::npos) {
+        if (size_t pos = _metadataNames.findPos(elemName); pos != StringListSet::npos) {
             auto [tag, val] = bson::convertFrom<true>(elem);
             _metadataAccessors[pos].reset(false, tag, val);
         }
         if (!_isStoredSource) {
-            if (size_t pos = _fieldNames.findPos(elemName); pos != IndexedStringVector::npos) {
+            if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
                 auto [tag, val] = bson::convertFrom<true>(elem);
                 _fieldAccessors[pos].reset(false, tag, val);
             }
@@ -300,7 +300,7 @@ PlanState SearchCursorStage::getNext() {
 
             for (auto& elem : *_resultObj) {
                 auto elemName = elem.fieldNameStringData();
-                if (size_t pos = _fieldNames.findPos(elemName); pos != IndexedStringVector::npos) {
+                if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
                     auto [tag, val] = bson::convertFrom<true>(elem);
                     _fieldAccessors[pos].reset(false, tag, val);
                 }

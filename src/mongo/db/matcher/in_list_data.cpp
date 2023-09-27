@@ -31,7 +31,7 @@
 
 #include "mongo/db/matcher/in_list_data.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/indexed_string_vector.h"
+#include "mongo/util/string_listset.h"
 
 #include <algorithm>
 #include <functional>

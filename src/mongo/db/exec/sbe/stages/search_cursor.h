@@ -105,9 +105,9 @@ private:
     const boost::optional<UUID> _collUuid;
     // Output slots.
     const boost::optional<value::SlotId> _resultSlot;
-    const IndexedStringVector _metadataNames;
+    const StringListSet _metadataNames;
     const value::SlotVector _metadataSlots;
-    const IndexedStringVector _fieldNames;
+    const StringListSet _fieldNames;
     const value::SlotVector _fieldSlots;
 
     // Input search query info.

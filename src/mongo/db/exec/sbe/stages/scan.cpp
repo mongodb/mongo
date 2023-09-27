@@ -430,7 +430,7 @@ void ScanStage::open(bool reOpen) {
 }
 
 value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name) {
-    if (size_t pos = _scanFieldNames.findPos(name); pos != IndexedStringVector::npos) {
+    if (size_t pos = _scanFieldNames.findPos(name); pos != StringListSet::npos) {
         return &_scanFieldAccessors[pos];
     }
     return nullptr;
@@ -1080,7 +1080,7 @@ boost::optional<Record> ParallelScanStage::nextRange() {
 }
 
 value::OwnedValueAccessor* ParallelScanStage::getFieldAccessor(StringData name) {
-    if (size_t pos = _scanFieldNames.findPos(name); pos != IndexedStringVector::npos) {
+    if (size_t pos = _scanFieldNames.findPos(name); pos != StringListSet::npos) {
         return &_scanFieldAccessors[pos];
     }
     return nullptr;

@@ -49,7 +49,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/util/indexed_string_vector.h"
+#include "mongo/util/string_listset.h"
 
 namespace mongo::sbe {
 enum class MakeObjFieldBehavior { drop, keep };
@@ -148,7 +148,7 @@ private:
     std::pair<bool, size_t> lookupField(StringData sv) const {
         auto pos = _fieldNames.findPos(sv);
 
-        if (pos == IndexedStringVector::npos) {
+        if (pos == StringListSet::npos) {
             return {false, pos};
         } else if (pos < _fields.size()) {
             return {true, std::numeric_limits<size_t>::max()};
@@ -157,11 +157,11 @@ private:
         }
     }
 
-    IndexedStringVector buildFieldNames(const std::vector<std::string>& fields,
-                                        const std::vector<std::string>& projectFields) {
+    StringListSet buildFieldNames(const std::vector<std::string>& fields,
+                                  const std::vector<std::string>& projectFields) {
         auto names = fields;
         names.insert(names.end(), projectFields.begin(), projectFields.end());
-        return IndexedStringVector(std::move(names));
+        return StringListSet(std::move(names));
     }
 
     void produceObject();
@@ -171,7 +171,7 @@ private:
     const boost::optional<FieldBehavior> _fieldBehavior;
     const std::vector<std::string> _fields;
     const std::vector<std::string> _projectFields;
-    const IndexedStringVector _fieldNames;
+    const StringListSet _fieldNames;
     const value::SlotVector _projectVars;
     const bool _forceNewObject;
     const bool _returnOldObject;
