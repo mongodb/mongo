@@ -38,7 +38,15 @@ class test_fast_truncate_disk_space(compatibility_test.CompatibilityTestCase):
     # Use a standalone build.
     build_config = {'standalone': True}
 
-    # FIXME-WT-11716 Explain why we have to restrict the older branch to 6.0.
+    # For this test specifically, the older branch needs to be restricted to 6.0. The purpose
+    # of this test is to ensure version 6.0 is able to clean up pages containing fast-truncate
+    # information because that particular version does not logically consider fast-truncate
+    # information when operating.
+    #
+    # Newer versions will consider the fast-truncate information when operating, and so we may
+    # not be able to immediately clean up pages containing this information. Hence, this test
+    # should not be run as there is no guarantee of using less disk space and the assert
+    # comparing disk space usage may fail.
     older = ['mongodb-6.0']
 
     # Use a small page size and lots of keys because we want to create lots
@@ -72,6 +80,7 @@ class test_fast_truncate_disk_space(compatibility_test.CompatibilityTestCase):
 
         conn = wiredtiger.wiredtiger_open('.', 'create,')
         session = conn.open_session()
+        session.begin_transaction()
 
         self.pr(f'Running on {wiredtiger.wiredtiger_version()[0]}')
         session.create(self.uri, self.config + ',key_format=i,value_format=S')
@@ -80,6 +89,8 @@ class test_fast_truncate_disk_space(compatibility_test.CompatibilityTestCase):
         for i in range(1, self.nentries):
             c[i] = 'i' + str(i)
         c.close()
+
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         session.checkpoint()
 
@@ -150,17 +161,21 @@ class test_fast_truncate_disk_space(compatibility_test.CompatibilityTestCase):
         # Update some records in the truncate range to dirty the tree.
         # Additionally, do multiple checkpoints.
         session = new_conn.open_session()
+        session.begin_transaction()
         c = session.open_cursor(self.uri)
         c.set_key(50)
         c.set_value("cleanup")
         c.update()
         c.reset()
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(350))
         session.checkpoint()
 
+        session.begin_transaction()
         c.set_key(5000)
         c.set_value("cleanup")
         c.update()
         c.reset()
+        session.commit_transaction('commit_timestamp=' + self.timestamp_str(350))
         session.checkpoint()
 
         # Check that we are using less space than before after the pages
