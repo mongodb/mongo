@@ -64,7 +64,30 @@ Note:
 
 ## Phase 2: The report
 
+The Code Change Report displays a list of all changed files, followed by details of changes to files in the src
+directory.
 
-To come (in WT-11659).
+The Code Change Details section contains the lines code in the git diff:
+* the 'Count' column shows the number of times code in this line were covered by coverage tests. 
+  * the value will be 0 for uncovered code
+  * the value will be blank for lines with no coverage data (eg blank lines of code, or deleted code)
+* The 'Branches' column displays branch information for any lines of code with branch information 
+  (ie where there is more than one branch in the line of code):
+  * A small triangle: clicking the small triangle will toggle the display of per-branch coverage information
+  * Text: _n_ of _m_ means that n out of m branches were covered. Note that uncovered branches are common in macros.
+  * A scale: this shows branch coverage graphically. 
+    The colour of the scale will be green for 100% branch coverage, red otherwise. 
+* The +-= column:
+  * **+** means an added line
+  * **-** means a deleted line
+  * **=** means an unchanged line
+  * Note, a changed line shows as a pair of an added line and a deleted line.
+* The code column:
+  * Deleted lines are displayed in ~~strikethrough~~
+  * Lines of code are coloured based on the line and branch coverage:
+    * Green means 100% branch coverage
+    * Red means no coverage at all
+    * Amber means partial branch coverage (ie some branches are covered, but not others)
+    * White means there is no code coverage data. This is typically for blank lines, comments, or statements
+      that continue from another line.
 
-FIXME: WT-11659

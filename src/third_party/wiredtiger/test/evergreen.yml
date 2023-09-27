@@ -3922,6 +3922,9 @@ tasks:
             
             # Log the contents of the change info file
             cat coverage_report/code_change_info.json
+            
+            # Generate the Code Change Report
+            ${python_binary|python3} test/evergreen/code_change_report/code_change_report.py -v -c coverage_report/code_change_info.json -o coverage_report/code_change_report.html
       - func: "code coverage publish report"
 
   - name: s3-tiered-storage-extensions-test
