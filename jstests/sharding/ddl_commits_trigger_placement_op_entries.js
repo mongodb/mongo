@@ -76,7 +76,7 @@ function testShardCollection() {
     const topology = DiscoverTopology.findConnectedNodes(st.s);
     const numInitialChunks = Object.values(topology.shards).length + 1;
     assert.commandWorked(st.s.adminCommand(
-        {shardCollection: nss, key: {_id: "hashed"}, numInitialChunks: numInitialChunks}));
+        {shardCollection: nss, key: {_id: 'hashed'}, numInitialChunks: numInitialChunks}));
 
     // Verify that the op entries for the creation of the parent DB have been generated on each
     // shard of the cluster.
@@ -123,6 +123,75 @@ function testShardCollection() {
     ];
 
     verifyOpEntriesOnNodes(expectedEntriesForCollSharded, [primaryShardPrimaryNode]);
+
+    jsTest.log('Testing placement entries added by shardCollection() of a timeseries collection');
+
+    const timeseriesCollName = 'timeseriesColl';
+    const timeseriesNss = dbName + '.' + timeseriesCollName;
+    const bucketsNss = dbName + '.system.buckets.' + timeseriesCollName;
+
+    // Create and shard a timeseries collection. The timeField is also used as shard key to verify
+    // that its value gets correctly encoded within the 'o2' field of the oplog.
+    const timeField = 'timestamp';
+    const encodedTimeField = 'control.min.' + timeField;
+    const metaField = 'metadata';
+    const granularity = 'hours';
+    const maxSpan = 2592000;
+    assert.commandWorked(st.s.adminCommand({
+        shardCollection: timeseriesNss,
+        key: {[timeField]: 1},
+        timeseries: {
+            timeField: timeField,
+            metaField: metaField,
+            granularity: granularity,
+            bucketMaxSpanSeconds: maxSpan
+        }
+    }));
+
+    const expectedEntriesForTimeseriesCollSharded = [
+        // One entry emitted before the DDL is committed on the sharding catalog
+        {
+            op: 'n',
+            ns: bucketsNss,
+            o: {msg: {shardCollectionPrepare: bucketsNss}},
+            o2: {
+                shardCollectionPrepare: bucketsNss,
+                shards: [primaryShard],
+                shardKey: {[encodedTimeField]: 1},
+                unique: false,
+                numInitialChunks: 0,
+                presplitHashedZones: false,
+                timeseries: {
+                    timeField: timeField,
+                    metaField: metaField,
+                    granularity: granularity,
+                    bucketMaxSpanSeconds: maxSpan
+                }
+
+            }
+        },
+        // One entry emitted once the DDL is committed on the sharding catalog
+        {
+            op: 'n',
+            ns: bucketsNss,
+            o: {msg: {shardCollection: bucketsNss}},
+            o2: {
+                shardCollection: bucketsNss,
+                shardKey: {[encodedTimeField]: 1},
+                unique: false,
+                numInitialChunks: 0,
+                presplitHashedZones: false,
+                timeseries: {
+                    timeField: timeField,
+                    metaField: metaField,
+                    granularity: granularity,
+                    bucketMaxSpanSeconds: maxSpan
+                }
+            }
+        }
+    ];
+
+    verifyOpEntriesOnNodes(expectedEntriesForTimeseriesCollSharded, [primaryShardPrimaryNode]);
 }
 
 function testAddShard() {
@@ -134,7 +203,7 @@ function testAddShard() {
     const newReplicaSet = new ReplSetTest({name: 'addedShard', nodes: 1});
     const newShardName = 'addedShard';
     const preExistingCollName = 'preExistingColl';
-    newReplicaSet.startSet({shardsvr: ""});
+    newReplicaSet.startSet({shardsvr: ''});
     newReplicaSet.initiate();
     const dbsOnNewReplicaSet = ['addShardTestDB1', 'addShardTestDB2'];
     for (const dbName of dbsOnNewReplicaSet) {
@@ -188,8 +257,6 @@ function testMovePrimary() {
 
     verifyOpEntriesOnNodes(expectedEntriesForPrimaryMoved, [fromReplicaSet.getPrimary()]);
 }
-
-jsTest.log(`TROLL! ${tojson(DiscoverTopology.findConnectedNodes(st.s))}`);
 
 testCreateDatabase();
 
