@@ -217,6 +217,14 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Start up a single node replica set then reconfigure to the correct size (if the config
         # contains more than 1 node), so the primary is elected more quickly.
         repl_config["members"] = [members[0]]
+
+        # When this is True, we are running in Antithesis & modify the config to surface more bugs
+        if self.config.NOOP_MONGO_D_S_PROCESSES:
+            repl_config["settings"]["electionTimeoutMillis"] = 2000
+            repl_config["settings"]["chainingAllowed"] = False
+            repl_config["settings"]["heartbeatTimeoutSecs"] = 1
+            repl_config["settings"]["catchUpTimeoutMillis"] = 0
+
         if self.use_auto_bootstrap_procedure:
             # Auto-bootstrap already initiates automatically on the first node, but we still need
             # to apply the requested repl_config settings using reconfig.
