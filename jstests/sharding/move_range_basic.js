@@ -5,6 +5,7 @@
  *    assumes_balancer_off
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -82,11 +83,11 @@ function testMoveRangeWithBigChunk(mongos, ns, skPattern, minBound) {
 
 function test(collName, skPattern) {
     const ns = kDbName + '.' + collName;
+
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: skPattern}));
 
     let aChunk = findChunksUtil.findOneChunkByNs(mongos.getDB('config'), ns, {shard: shard0});
     assert(aChunk);
-
     jsTest.log("Testing invalid commands");
     // Fail if one of the bounds is not a valid shard key
     assert.commandFailed(mongos.adminCommand(
@@ -137,6 +138,19 @@ function test(collName, skPattern) {
     // Test moving large chunk with only max bound
     jsTest.log("Testing moveChunk with only max bound and large chunk");
     testMoveRangeWithBigChunk(mongos, ns, skPattern, false /* maxBound */);
+}
+
+// Test running running moveRange on an unsplittable collection will fail
+if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsOnShardingCatalog")) {
+    const collName = "unsplittable_collection"
+    const ns = kDbName + '.' + collName;
+
+    jsTest.log("Testing on unsplittable namespace");
+    assert.commandWorked(
+        mongos.getDB(kDbName).runCommand({createUnsplittableCollection: collName}));
+    assert.commandFailedWithCode(
+        mongos.adminCommand({moveRange: ns, min: {_id: 0}, toShard: shard0}),
+        ErrorCodes.NamespaceNotSharded);
 }
 
 test('nonHashedShardKey', {a: 1});

@@ -448,6 +448,12 @@ Status Balancer::moveRange(OperationContext* opCtx,
     const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     auto coll =
         catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+
+    if (coll.getUnsplittable())
+        return {ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Can't execute moveRange on unsharded collection "
+                              << nss.toStringForErrorMsg()};
+
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     const auto fromShardId = [&]() {

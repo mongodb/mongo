@@ -135,6 +135,11 @@ public:
                         ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, ns()))
                     .cm;
 
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Can't execute " << Request::kCommandName
+                                  << " on unsharded collection " << ns().toStringForErrorMsg(),
+                    chunkManager.isSharded());
+
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",
                     !request().getBounds() || request().getBounds()->size() == 2);

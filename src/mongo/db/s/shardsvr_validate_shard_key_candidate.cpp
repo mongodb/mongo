@@ -92,8 +92,9 @@ public:
                                       MODE_IS);
 
                 uassert(ErrorCodes::NamespaceNotSharded,
-                        str::stream() << "Collection " << redact(ns().toStringForErrorMsg())
-                                      << " is not sharded",
+                        str::stream()
+                            << "Can't execute " << Request::kCommandName
+                            << "on unsharded collection " << redact(ns().toStringForErrorMsg()),
                         coll.getShardingDescription().isSharded());
 
                 shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(

@@ -159,6 +159,12 @@ public:
         auto const [cm, _] =
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
 
+        if (cm.isUnsplittable()) {
+            uasserted(ErrorCodes::NamespaceNotSharded,
+                      str::stream() << "Can't execute mergeChunks on unsharded collection "
+                                    << nss.toStringForErrorMsg());
+        }
+
         if (!cm.getShardKeyPattern().isShardKey(minKey) ||
             !cm.getShardKeyPattern().isShardKey(maxKey)) {
             errmsg = str::stream()

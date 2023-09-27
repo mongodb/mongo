@@ -200,8 +200,9 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                                                                                           nss());
                     auto metadata = scopedCsr->getCurrentMetadataIfKnown();
                     uassert(ErrorCodes::NamespaceNotSharded,
-                            str::stream() << "refineCollectionShardKey namespace "
-                                          << nss().toStringForErrorMsg() << " is not sharded",
+                            str::stream()
+                                << "Can't execute refineCollectionShardKey on unsharded collection "
+                                << nss().toStringForErrorMsg(),
                             metadata && metadata->isSharded());
                     _doc.setOldKey(
                         metadata->getChunkManager()->getShardKeyPattern().getKeyPattern());
@@ -483,6 +484,11 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinatorPre71Compatible::_runImp
                     Grid::get(opCtx)
                         ->catalogCache()
                         ->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss()));
+
+                uassert(ErrorCodes::NamespaceNotSharded,
+                        str::stream() << "refineCollectionShardKey namespace "
+                                      << nss().toStringForErrorMsg() << " is not sharded",
+                        cm.isSharded());
 
                 _oldShardKey = cm.getShardKeyPattern().getKeyPattern();
                 _collectionUUID = cm.getUUID();

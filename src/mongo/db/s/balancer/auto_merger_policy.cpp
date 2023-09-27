@@ -262,12 +262,14 @@ AutoMergerPolicy::_getNamespacesWithMergeableChunksPerShard(OperationContext* op
         // {
         //     $match : {
         //         enableAutoMerge : { $ne : false },
-        //         defragmentCollection : { $ne : true }
+        //         defragmentCollection : { $ne : true },
+        //         unsplittable : { $ne : true }
         //     }
         // }
         stages.emplace_back(DocumentSourceMatch::create(
             BSON(CollectionType::kEnableAutoMergeFieldName
                  << BSON("$ne" << false) << CollectionType::kDefragmentCollectionFieldName
+                 << BSON("$ne" << true) << CollectionType::kUnsplittableFieldName
                  << BSON("$ne" << true)),
             expCtx));
 

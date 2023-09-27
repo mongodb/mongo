@@ -12,6 +12,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const st = new ShardingTest({
     mongos: 2,
@@ -804,7 +805,21 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     compareBoundaries(st.s, shardedNs, refinedNs);
 })();
 
-// For a shard key with nested fields.
+// Make sure split  is correctly disabled for unsplittable collection
+(() => {
+    if (FeatureFlagUtil.isPresentAndEnabled(mongos, "TrackUnshardedCollectionsOnShardingCatalog")) {
+        jsTest.log("Make sure refine shard key for unsplittable collection is correctly disabled");
+        const kCollNameUnsplittable = "unsplittable_bar";
+        const kNsNameUnsplittable = kDbName + "." + kCollNameUnsplittable;
+        assert.commandWorked(mongos.getDB(kDbName).runCommand(
+            {createUnsplittableCollection: kCollNameUnsplittable}));
+        assert.commandFailedWithCode(
+            mongos.adminCommand({refineCollectionShardKey: kNsNameUnsplittable, key: {a: 1, b: 1}}),
+            ErrorCodes.NamespaceNotSharded);
+    }
+})();
+
+// For a shard key with nested fields .
 (() => {
     const dbName = "compareDBNested";
     const shardedNs = dbName + ".shardedColl";

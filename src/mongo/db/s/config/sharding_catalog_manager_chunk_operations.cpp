@@ -781,6 +781,14 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     const auto [coll, version] = std::move(swCollAndVersion.getValue());
     auto collPlacementVersion = version;
 
+    if (coll.getUnsplittable()) {
+        return {
+            ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Can't execute splitChunk on unsharded collection "
+                          << nss.toStringForErrorMsg(),
+        };
+    }
+
     // Return an error if collection epoch does not match epoch of request.
     if (coll.getEpoch() != requestEpoch ||
         (requestTimestamp && coll.getTimestamp() != requestTimestamp)) {
@@ -1130,6 +1138,12 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
         // 1. Retrieve the collection entry and the initial version.
         const auto [coll, originalVersion] =
             uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
+
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Can't execute mergeChunks on unsharded collection "
+                              << nss.toStringForErrorMsg(),
+                !coll.getUnsplittable());
+
         const auto& collUuid = coll.getUuid();
         const auto& keyPattern = coll.getKeyPattern();
         auto newVersion = originalVersion;
@@ -1383,6 +1397,13 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
             "Collection is undergoing changes and chunks cannot be moved",
             coll.getAllowMigrations() && coll.getPermitMigrations());
 
+    if (coll.getUnsplittable()) {
+        return {
+            ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Can't execute moveChunk on the unsharded collection "
+                          << coll.getNss().toStringForErrorMsg(),
+        };
+    }
     const auto findChunkQuery = BSON(ChunkType::collectionUUID() << coll.getUuid());
 
     auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(

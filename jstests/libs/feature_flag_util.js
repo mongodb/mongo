@@ -92,7 +92,7 @@ export var FeatureFlagUtil = (function() {
      *
      * This wrapper checks for 'kEnabled' but raises an error for 'kNotFound' - if the flag is not
      * known. This can be useful if you want to gate an entire test on a feature flag like so:
-     *   if (!FeatureFlagUtils.isEnabled(db, "myFlag")) {
+     *   if (!FeatureFlagUtil.isEnabled(db, "myFlag")) {
      *       jsTestLog("Skipping test because my flag is not enabled");
      *       return;
      *   }
@@ -125,7 +125,7 @@ export var FeatureFlagUtil = (function() {
      * conditionally change the assertion being made, like so:
      *
      *   // TODO SERVER-XYZ remove 'featureFlagMyFlag'.
-     *   if (FeatureFlagUtils.isPresentAndEnabled(db, "MyFlag")) {
+     *   if (FeatureFlagUtil.isPresentAndEnabled(db, "MyFlag")) {
      *       // I expect to see some new return value.
      *   } else {
      *       // I expect *not* to see some return value.
@@ -135,7 +135,7 @@ export var FeatureFlagUtil = (function() {
      * example above. This is because it is all too easy to have a test like so which will silently
      * stop testing anything if we remove the feature flag without updating the test:
      *
-     *   if (FeatureFlagUtils.isPresentAndEnabled(db, "MyFlag")) {
+     *   if (FeatureFlagUtil.isPresentAndEnabled(db, "MyFlag")) {
      *       // Assert on something new.
      *   }
      *   // No else clause.
