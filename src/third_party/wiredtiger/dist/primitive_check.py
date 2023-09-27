@@ -24,6 +24,7 @@ primitives = [
     "WT_PAGE_ALLOC_AND_SWAP",
     "WT_PUBLISH",
     "WT_READ_BARRIER",
+    "WT_READ_ONCE",
     "WT_REF_CAS_STATE",
     "WT_REF_LOCK",
     "WT_REF_UNLOCK",
