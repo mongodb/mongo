@@ -8863,8 +8863,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockGteScalar(arity);
         case Builtin::valueBlockEqScalar:
             return builtinValueBlockEqScalar(arity);
-        case Builtin::valueBlockNeqScalar:
-            return builtinValueBlockNeqScalar(arity);
         case Builtin::valueBlockLtScalar:
             return builtinValueBlockLtScalar(arity);
         case Builtin::valueBlockLteScalar:
@@ -9291,8 +9289,6 @@ std::string builtinToString(Builtin b) {
             return "valueBlockGteScalar";
         case Builtin::valueBlockEqScalar:
             return "valueBlockEqScalar";
-        case Builtin::valueBlockNeqScalar:
-            return "valueBlockNeqScalar";
         case Builtin::valueBlockLtScalar:
             return "valueBlockLtScalar";
         case Builtin::valueBlockLteScalar:

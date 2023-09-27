@@ -118,7 +118,7 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
     for (size_t i = 0; i < _nonTopLevelPathReqs.size(); ++i) {
         auto bucketElt = idxToTopLevelField[_nonTopLevelPathIdxes[i]];
 
-        if (bucketElt) {
+        {
             BSONColumn column(bucketElt);
             size_t columnIdx = 0;
             for (auto columnElt : column) {

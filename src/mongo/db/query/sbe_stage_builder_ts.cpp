@@ -54,33 +54,21 @@
 namespace mongo::stage_builder {
 namespace sv = sbe::value;
 
-struct CellPathReqsRet {
-    std::vector<sv::CellBlock::PathRequest> topLevelPaths;
-    std::vector<sv::CellBlock::PathRequest> traversePaths;
-};
-
-CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
+std::vector<sv::CellBlock::PathRequest> getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
     auto&& fieldSet = unpackNode->bucketSpec.fieldSet();
     auto&& computedMetaProjFields = unpackNode->bucketSpec.computedMetaProjFields();
 
-    CellPathReqsRet ret;
+    std::vector<sv::CellBlock::PathRequest> pathReqs;
+    pathReqs.reserve(fieldSet.size() - computedMetaProjFields.size());
     for (auto&& field : fieldSet) {
         // The computed meta fields must not be included in cell path requests.
         if (computedMetaProjFields.find(field) != computedMetaProjFields.end()) {
             continue;
         }
-
-        // For each path we generated a "traversed" version, which, when accessed, has array
-        // elements flattened. We also generate a 'topLevelPath' version, which is just the value
-        // of the top level field, with no traversal.
-
-        ret.traversePaths.emplace_back(sv::CellBlock::PathRequest{
-            {sv::CellBlock::Get{field}, sv::CellBlock::Traverse{}, sv::CellBlock::Id{}}});
-
-        ret.topLevelPaths.emplace_back(
+        pathReqs.emplace_back(
             sv::CellBlock::PathRequest{{sv::CellBlock::Get{field}, sv::CellBlock::Id{}}});
     }
-    return ret;
+    return pathReqs;
 }
 
 const std::string& getTopLevelField(const sv::CellBlock::PathRequest& pathReq) {
@@ -152,25 +140,13 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             return boost::none;
         }
     }();
-
-    // topLevelReqs are used for outputing to above stages. traverseReqs are used for applying the
-    // event filter.
-    auto [topLevelReqs, traverseReqs] = getCellPathReqs(unpackNode);
-    invariant(topLevelReqs.size() == traverseReqs.size());
-    auto allReqs = topLevelReqs;
-    allReqs.insert(allReqs.end(), traverseReqs.begin(), traverseReqs.end());
-
-    auto allCellSlots = _slotIdGenerator.generateMultiple(allReqs.size());
-    auto topLevelSlots = sbe::value::SlotVector(allCellSlots.begin(),
-                                                allCellSlots.begin() + allCellSlots.size() / 2);
-    auto traversedCellSlots =
-        sbe::value::SlotVector(allCellSlots.begin() + allCellSlots.size() / 2, allCellSlots.end());
-
+    auto pathReqs = getCellPathReqs(unpackNode);
+    auto blockSlots = _slotIdGenerator.generateMultiple(pathReqs.size());
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(childStage),
                                                         bucketSlot.slotId,
-                                                        allReqs,
-                                                        allCellSlots,
+                                                        pathReqs,
+                                                        blockSlots,
                                                         optMetaSlot,
                                                         unpackNode->bucketSpec.timeField(),
                                                         unpackNode->nodeId());
@@ -178,17 +154,16 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
     // Begins populating our output map.
     PlanStageSlots outputs;
-    // Adds slots from CellBlocks, but only the traversed ones. Later we're going to reset the
-    // outputs to scalar slots anyway.
-    for (size_t i = 0; i < topLevelReqs.size(); ++i) {
-        auto field = getTopLevelField(topLevelReqs[i]);
+    // Adds slots from CellBlocks.
+    for (size_t i = 0; i < pathReqs.size(); ++i) {
+        auto field = getTopLevelField(pathReqs[i]);
         if (field == unpackNode->bucketSpec.timeField()) {
             outputs.set(std::make_pair(PlanStageSlots::kField, field),
-                        TypedSlot{traversedCellSlots[i],
+                        TypedSlot{blockSlots[i],
                                   TypeSignature::kCellType.include(TypeSignature::kDateTimeType)});
         } else {
             outputs.set(std::make_pair(PlanStageSlots::kField, field),
-                        TypedSlot{traversedCellSlots[i],
+                        TypedSlot{blockSlots[i],
                                   TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
         }
     }
@@ -211,46 +186,49 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     boost::optional<sbe::value::SlotId> bitmapSlotId;
     MatchExpression* eventFilter = unpackNode->eventFilter.get();
     if (eventFilter) {
-        auto eventFilterSbExpr =
-            generateFilter(_state, eventFilter, /*rootSlot*/ boost::none, &outputs);
-        if (eventFilterSbExpr.hasABT()) {
-            auto abt = abt::unwrap(eventFilterSbExpr.extractABT());
-            constantFold(abt, _state);
+        // TODO: enable when the functions used by the code generated by the vectorizer
+        // have been implemented (valueBlockXXXScalar, valueBlockFillEmpty, cellFoldValues_XXX)
+        if (false) {
+            auto eventFilterSbExpr =
+                generateFilter(_state, eventFilter, /*rootSlot*/ boost::none, &outputs);
+            if (eventFilterSbExpr.hasABT()) {
+                auto abt = abt::unwrap(eventFilterSbExpr.extractABT());
+                constantFold(abt, _state);
 
-            Vectorizer vectorizer(_state.frameIdGenerator, Vectorizer::Purpose::Filter);
-            Vectorizer::VariableTypes bindings;
-            outputs.forEachSlot([&bindings](const TypedSlot& slot) {
-                bindings.emplace(getABTVariableName(slot.slotId), slot.typeSignature);
-            });
-            Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings);
+                Vectorizer vectorizer(_state.frameIdGenerator, Vectorizer::Purpose::Filter);
+                Vectorizer::VariableTypes bindings;
+                outputs.forEachSlot([&bindings](const TypedSlot& slot) {
+                    bindings.emplace(getABTVariableName(slot.slotId), slot.typeSignature);
+                });
+                Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings);
 
-            if (blockABT.expr.has_value()) {
-                // We successfully created an expression working on the block values and
-                // returning a block of boolean values; attach it to a project stage and use
-                // the result as the bitmap for the BlockToRow stage.
-                auto projExpr = abtToExpr(*blockABT.expr, _state);
+                if (blockABT.expr.has_value()) {
+                    // We successfully created an expression working on the block values and
+                    // returning a block of boolean values; attach it to a project stage and use
+                    // the result as the bitmap for the BlockToRow stage.
+                    auto projExpr = abtToExpr(*blockABT.expr, _state);
 
-                bitmapSlotId = _state.slotId();
-                sbe::SlotExprPairVector projects;
-                projects.emplace_back(*bitmapSlotId, std::move(projExpr.expr));
+                    bitmapSlotId = _state.slotId();
+                    sbe::SlotExprPairVector projects;
+                    projects.emplace_back(*bitmapSlotId, std::move(projExpr.expr));
 
-                stage = sbe::makeS<sbe::ProjectStage>(
-                    std::move(stage), std::move(projects), unpackNode->nodeId());
-                printPlan(*stage);
+                    stage = sbe::makeS<sbe::ProjectStage>(
+                        std::move(stage), std::move(projects), unpackNode->nodeId());
+                    printPlan(*stage);
 
-                // Reset the variable so that the filter is not generated as a stage in the
-                // scalar section of the pipeline.
-                eventFilter = nullptr;
+                    // Reset the variable so that the filter is not generated as a stage in the
+                    // scalar section of the pipeline.
+                    eventFilter = nullptr;
+                }
             }
         }
     }
 
-    auto unpackedSlots = _slotIdGenerator.generateMultiple(topLevelReqs.size());
+    auto unpackedSlots = _slotIdGenerator.generateMultiple(blockSlots.size());
 
     // Adds the BlockToRowStage.
-    // For this stage we output the 'topLevelSlots' and NOT the 'traversedSlots'.
     stage = std::make_unique<sbe::BlockToRowStage>(std::move(stage),
-                                                   topLevelSlots,
+                                                   blockSlots,
                                                    unpackedSlots,
                                                    bitmapSlotId,
                                                    unpackNode->nodeId(),
@@ -258,8 +236,8 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     printPlan(*stage);
 
     // After the BlockToRow stage, the fields are now scalar values, in a different slot.
-    for (size_t i = 0; i < topLevelReqs.size(); ++i) {
-        auto field = getTopLevelField(topLevelReqs[i]);
+    for (size_t i = 0; i < pathReqs.size(); ++i) {
+        auto field = getTopLevelField(pathReqs[i]);
         if (field == unpackNode->bucketSpec.timeField()) {
             outputs.set(std::make_pair(PlanStageSlots::kField, field),
                         TypedSlot{unpackedSlots[i], TypeSignature::kDateTimeType});
@@ -313,8 +291,8 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         std::vector<std::string> objFields;
         sbe::value::SlotVector objSlots;
         // Includes 'cellPaths' in the result object.
-        for (size_t i = 0; i < topLevelReqs.size(); ++i) {
-            objFields.push_back(getTopLevelField(topLevelReqs[i]));
+        for (size_t i = 0; i < pathReqs.size(); ++i) {
+            objFields.push_back(getTopLevelField(pathReqs[i]));
             objSlots.push_back(unpackedSlots[i]);
         }
         // Includes the computed meta fields in the result object.

@@ -864,7 +864,6 @@ enum class Builtin : uint16_t {
     valueBlockGtScalar,
     valueBlockGteScalar,
     valueBlockEqScalar,
-    valueBlockNeqScalar,
     valueBlockLtScalar,
     valueBlockLteScalar,
     valueBlockCombine,
@@ -2023,14 +2022,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
-
-    template <class Cmp>
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmpScalar(ArityType arity);
-
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGtScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockGteScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockEqScalar(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNeqScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLtScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLteScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCombine(ArityType arity);
