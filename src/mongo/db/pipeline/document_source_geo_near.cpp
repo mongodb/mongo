@@ -89,23 +89,25 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
         result.setField(kKeyFieldName, Value(opts.serializeFieldPath(*keyFieldPath)));
     }
 
-    auto nearValue = [&]() -> Value {
-        if (auto constGeometry = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
-            constGeometry) {
-            return opts.serializeLiteral(constGeometry->getValue());
+
+    // Serialize the expression as a literal if possible
+    auto serializeExpr = [&](boost::intrusive_ptr<Expression> expr) -> Value {
+        if (auto constExpr = dynamic_cast<ExpressionConstant*>(expr.get()); constExpr) {
+            return opts.serializeLiteral(constExpr->getValue());
         } else {
-            return _nearGeometry->serialize(opts);
+            return expr->serialize(opts);
         }
-    }();
-    result.setField("near", nearValue);
+    };
+
+    result.setField("near", serializeExpr(_nearGeometry));
     result.setField("distanceField", Value(opts.serializeFieldPath(*distanceField)));
 
     if (maxDistance) {
-        result.setField("maxDistance", opts.serializeLiteral(*maxDistance));
+        result.setField("maxDistance", serializeExpr(maxDistance));
     }
 
     if (minDistance) {
-        result.setField("minDistance", opts.serializeLiteral(*minDistance));
+        result.setField("minDistance", serializeExpr(minDistance));
     }
 
     if (opts.transformIdentifiers || opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
@@ -127,6 +129,12 @@ Value DocumentSourceGeoNear::serialize(const SerializationOptions& opts) const {
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceGeoNear::optimize() {
     _nearGeometry = _nearGeometry->optimize();
+    if (minDistance) {
+        minDistance = minDistance->optimize();
+    }
+    if (maxDistance) {
+        maxDistance = maxDistance->optimize();
+    }
     return this;
 }
 
@@ -155,6 +163,21 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     auto nearConst = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
     if (!nearConst)
         return std::next(itr);
+
+
+    if (minDistance) {
+        minDistance = minDistance->optimize();
+        auto minConst = dynamic_cast<ExpressionConstant*>(minDistance.get());
+        if (!minConst)
+            return std::next(itr);
+    }
+
+    if (maxDistance) {
+        maxDistance = maxDistance->optimize();
+        auto maxConst = dynamic_cast<ExpressionConstant*>(maxDistance.get());
+        if (!maxConst)
+            return std::next(itr);
+    }
 
     // If the user didn't specify a field name to query, do nothing.
     // Normally when we use a DocumentSourceGeoNearCursor we infer this from the presence of an
@@ -303,15 +326,17 @@ Pipeline::SourceContainer::iterator DocumentSourceGeoNear::splitForTimeseries(
     if (minDistance) {
         // 'minDistance' does not take 'distanceMultiplier' into account.
         replacement.push_back(DocumentSourceMatch::create(
-            BSON(distanceField->fullPath() << BSON(
-                     "$gte" << *minDistance * (distanceMultiplier ? *distanceMultiplier : 1.0))),
+            BSON(distanceField->fullPath()
+                 << BSON("$gte" << nearExpr.minDistance *
+                             (distanceMultiplier ? *distanceMultiplier : 1.0))),
             pExpCtx));
     }
     if (maxDistance) {
         // 'maxDistance' does not take 'distanceMultiplier' into account.
         replacement.push_back(DocumentSourceMatch::create(
-            BSON(distanceField->fullPath() << BSON(
-                     "$lte" << *maxDistance * (distanceMultiplier ? *distanceMultiplier : 1.0))),
+            BSON(distanceField->fullPath()
+                 << BSON("$lte" << nearExpr.maxDistance *
+                             (distanceMultiplier ? *distanceMultiplier : 1.0))),
             pExpCtx));
     }
 
@@ -392,17 +417,9 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options,
                     argument.type() == String);
             distanceField.reset(new FieldPath(argument.str()));
         } else if (argName == "maxDistance") {
-            uassert(ErrorCodes::TypeMismatch,
-                    "maxDistance must be a number",
-                    isNumericBSONType(argument.type()));
-            maxDistance = argument.numberDouble();
-            uassert(ErrorCodes::BadValue, "maxDistance must be nonnegative", *maxDistance >= 0);
+            maxDistance = Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
         } else if (argName == "minDistance") {
-            uassert(ErrorCodes::TypeMismatch,
-                    "minDistance must be a number",
-                    isNumericBSONType(argument.type()));
-            minDistance = argument.numberDouble();
-            uassert(ErrorCodes::BadValue, "minDistance must be nonnegative", *minDistance >= 0);
+            minDistance = Expression::parseOperand(pCtx.get(), argument, pCtx->variablesParseState);
         } else if (argName == "distanceMultiplier") {
             uassert(ErrorCodes::TypeMismatch,
                     "distanceMultiplier must be a number",
@@ -465,10 +482,34 @@ BSONObj DocumentSourceGeoNear::asNearQuery(StringData nearFieldName) {
     }
 
     if (minDistance) {
-        nearBuilder.append("$minDistance", *minDistance);
+        if (auto constMinDistance = dynamic_cast<ExpressionConstant*>(minDistance.get());
+            constMinDistance) {
+            auto minDistanceVal = constMinDistance->getValue();
+            uassert(ErrorCodes::TypeMismatch,
+                    "$geoNear requires $minDistance to evaluate to a number",
+                    minDistanceVal.numeric());
+            uassert(ErrorCodes::BadValue,
+                    "minDistance must be nonnegative",
+                    minDistanceVal.getDouble() >= 0);
+            nearBuilder.append("$minDistance", minDistanceVal.getDouble());
+        } else {
+            uasserted(7555701, "$geoNear requires $minDistance to evaluate to a constant number");
+        }
     }
     if (maxDistance) {
-        nearBuilder.append("$maxDistance", *maxDistance);
+        if (auto constMaxDistance = dynamic_cast<ExpressionConstant*>(maxDistance.get());
+            constMaxDistance) {
+            auto maxDistanceVal = constMaxDistance->getValue();
+            uassert(ErrorCodes::TypeMismatch,
+                    "$geoNear requires $maxDistance to evaluate to a number",
+                    maxDistanceVal.numeric());
+            uassert(ErrorCodes::BadValue,
+                    "maxDistance must be nonnegative",
+                    maxDistanceVal.getDouble() >= 0);
+            nearBuilder.append("$maxDistance", maxDistanceVal.getDouble());
+        } else {
+            uasserted(7555702, "$geoNear requires $maxDistance to evaluate to a constant number");
+        }
     }
     nearBuilder.doneFast();
     return queryBuilder.obj();
@@ -480,6 +521,10 @@ bool DocumentSourceGeoNear::needsGeoNearPoint() const {
 
 DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) const {
     expression::addDependencies(_nearGeometry.get(), deps);
+    if (minDistance)
+        expression::addDependencies(minDistance.get(), deps);
+    if (maxDistance)
+        expression::addDependencies(maxDistance.get(), deps);
     // TODO (SERVER-35424): Implement better dependency tracking. For example, 'distanceField' is
     // produced by this stage, and we could inform the query system that it need not include it in
     // its response. For now, assume that we require the entire document as well as the appropriate
@@ -493,6 +538,10 @@ DepsTracker::State DocumentSourceGeoNear::getDependencies(DepsTracker* deps) con
 
 void DocumentSourceGeoNear::addVariableRefs(std::set<Variables::Id>* refs) const {
     expression::addVariableRefs(_nearGeometry.get(), refs);
+    if (minDistance)
+        expression::addVariableRefs(minDistance.get(), refs);
+    if (maxDistance)
+        expression::addVariableRefs(maxDistance.get(), refs);
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)

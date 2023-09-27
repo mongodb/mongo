@@ -55,8 +55,9 @@ const far = {
     //
 
     // Negative values and non-numeric values are illegal.
-    assert.throws(() => assertGeoNearResults({minDistance: -1.1}));
-    assert.throws(() => assertGeoNearResults({minDistance: "3.2"}));
+    assert.throwsWithCode(() => assertGeoNearResults({minDistance: -1.1}), ErrorCodes.BadValue);
+    assert.throwsWithCode(() => assertGeoNearResults({minDistance: "3.2"}),
+                          ErrorCodes.TypeMismatch);
 
     // A minimum distance of 0 returns all points.
     assertGeoNearResults({minDistance: -0.0}, [origin, near, far]);
@@ -72,8 +73,9 @@ const far = {
     //
 
     // Negative values and non-numeric values are illegal.
-    assert.throws(() => assertGeoNearResults({maxDistance: -1.1}));
-    assert.throws(() => assertGeoNearResults({maxDistance: "3.2"}));
+    assert.throwsWithCode(() => assertGeoNearResults({maxDistance: -1.1}), ErrorCodes.BadValue);
+    assert.throwsWithCode(() => assertGeoNearResults({maxDistance: "3.2"}),
+                          ErrorCodes.TypeMismatch);
 
     // A maximum distance of 0 returns only the origin.
     assertGeoNearResults({maxDistance: 0.0}, [origin]);
