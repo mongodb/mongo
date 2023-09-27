@@ -6,7 +6,7 @@ import sys
 def run_command(command):  # noqa: D406
     """
     Execute a shell command and return its standard output (`stdout`).
-    
+
     Args:
         command (str): The shell command to be executed.
 
@@ -18,7 +18,8 @@ def run_command(command):  # noqa: D406
 
     """
     try:
-        return subprocess.run(command, shell=True, check=True, text=True).stdout
+        return subprocess.run(command, shell=True, check=True, text=True,
+                              capture_output=True).stdout
     except subprocess.CalledProcessError as e:
         print(f"Error while executing: '{command}'.\n{e}\nStandard Error: {e.stderr}")
         raise
@@ -64,7 +65,12 @@ def main():
         "-e COPYBARA_OPTIONS='-v'", "copybara copybara"
     ]
 
-    run_command(" ".join(docker_cmd))
+    try:
+        run_command(" ".join(docker_cmd))
+    except subprocess.CalledProcessError as e:
+        # Handle the specific error case for "No new changes..." between two repos
+        if "No new changes to import for resolved ref" not in str(e.stderr):
+            raise
 
 
 if __name__ == "__main__":
