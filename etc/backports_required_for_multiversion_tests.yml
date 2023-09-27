@@ -1010,6 +1010,8 @@ last-lts:
     ticket: SERVER-78952
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/txn_update_range.js
     ticket: SERVER-78952
+  - test_file: jstests/sharding/timeseries_buckets_modification_with_id.js
+    ticket: SERVER-80195
   - test_file: jstests/sharding/ddl_commits_trigger_placement_op_entries.js
     ticket: SERVER-80885
   - test_file: jstests/core/query/plan_cache/plan_cache_stats_shard_and_host.js

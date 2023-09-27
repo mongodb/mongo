@@ -1,11 +1,5 @@
 /**
  * Tests deleteOne and updateOne works correctly on time-series buckets collections.
- * @tags: [
- *   # TODO (SERVER-80195): Remove the tag.
- *   requires_fcv_71,
- *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
- * ]
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -18,23 +12,24 @@ const collName = "ts";
 const bucketsCollName = "system.buckets." + collName;
 const timeFieldName = "time";
 const metaFieldName = "tag";
-const bucketDoc = {
-    "_id": ObjectId("64dd4adcac4fd7e3ebbd9af3"),
-    "control": {
-        "version": 1,
-        "min":
-            {"_id": ObjectId("64dd4ae9a2c44e75d1151285"), "time": ISODate("2023-08-16T22:17:00Z")},
-        "max": {
-            "_id": ObjectId("64dd4ae9a2c44e75d1151285"),
-            "time": ISODate("2023-08-16T22:17:13.749Z")
-        }
-    },
-    "meta": 1,
-    "data": {
-        "_id": {"0": ObjectId("64dd4ae9a2c44e75d1151285")},
-        "time": {"0": ISODate("2023-08-16T22:17:13.749Z")}
-    }
-};
+// {
+//     "_id": ObjectId("64dd4adcac4fd7e3ebbd9af3"),
+//     "control": {
+//         "version": 1,
+//         "min":
+//             {"_id": ObjectId("64dd4ae9a2c44e75d1151285"), "time":
+//             ISODate("2023-08-16T22:17:00Z")},
+//         "max": {
+//             "_id": ObjectId("64dd4ae9a2c44e75d1151285"),
+//             "time": ISODate("2023-08-16T22:17:13.749Z")
+//         }
+//     },
+//     "meta": 1,
+//     "data": {
+//         "_id": {"0": ObjectId("64dd4ae9a2c44e75d1151285")},
+//         "time": {"0": ISODate("2023-08-16T22:17:13.749Z")}
+//     }
+// };
 const compressedBucketDoc = {
     "_id": ObjectId("64dd4adcac4fd7e3ebbd9af3"),
     "control": {
@@ -73,9 +68,7 @@ function runTest(cmd, validateFn) {
     }));
 
     // Tests the command works for the unsharded collection.
-    assert.commandWorked(bucketsColl.insert(
-        TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB) ? compressedBucketDoc
-                                                                           : bucketDoc));
+    assert.commandWorked(bucketsColl.insert(compressedBucketDoc));
     assert.commandWorked(testDB.runCommand(cmd));
     validateFn(bucketsColl);
 }
