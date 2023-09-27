@@ -2663,13 +2663,13 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     locker1.lockGlobal(opCtx.get(), MODE_IX);
 
     {
-        locker1.lock(resId, MODE_X);
+        locker1.lock(opCtx.get(), resId, MODE_X);
 
         // MODE_S attempt.
         stdx::thread t2([&]() {
             UninterruptibleLockGuard noInterrupt(&locker2);  // NOLINT.
             locker2.lockGlobal(opCtx.get(), MODE_IS);
-            locker2.lock(resId, MODE_S);
+            locker2.lock(opCtx.get(), resId, MODE_S);
         });
 
         // Wait for the thread to attempt to acquire the collection lock in MODE_S.
@@ -2682,13 +2682,13 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     }
 
     {
-        locker1.lock(resId, MODE_X);
+        locker1.lock(opCtx.get(), resId, MODE_X);
 
         // MODE_X attempt.
         stdx::thread t3([&]() {
             UninterruptibleLockGuard noInterrupt(&locker3);  // NOLINT.
             locker3.lockGlobal(opCtx.get(), MODE_IX);
-            locker3.lock(resId, MODE_X);
+            locker3.lock(opCtx.get(), resId, MODE_X);
         });
 
         // Wait for the thread to attempt to acquire the collection lock in MODE_X.

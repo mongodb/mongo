@@ -190,10 +190,6 @@ public:
                       LockMode mode,
                       Date_t deadline = Date_t::max());
 
-    virtual void lock(ResourceId resId, LockMode mode, Date_t deadline = Date_t::max()) {
-        lock(nullptr, resId, mode, deadline);
-    }
-
     virtual void downgrade(ResourceId resId, LockMode newMode);
 
     virtual bool unlock(ResourceId resId);

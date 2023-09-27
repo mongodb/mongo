@@ -65,7 +65,7 @@ TEST_F(LockStatsTest, NoWait) {
     LockerImpl locker(getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
     ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     locker.unlock(resId);
 
     // Make sure that the waits/blocks are zero
@@ -88,7 +88,7 @@ TEST_F(LockStatsTest, Wait) {
     LockerImpl locker(getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
     ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
 
     {
         // This will block
@@ -128,7 +128,7 @@ TEST_F(LockStatsTest, Reporting) {
     LockerImpl locker(getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
     ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     locker.unlock(resId);
 
     // Make sure that the waits/blocks are zero
@@ -150,7 +150,7 @@ TEST_F(LockStatsTest, Subtraction) {
     LockerImpl locker(getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
     ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
 
     {
         LockerImpl lockerConflict(getServiceContext());
@@ -207,7 +207,7 @@ void assertGlobalAcquisitionStats(OperationContext* opCtx, ResourceId rid) {
     if (rid == resourceIdGlobal) {
         locker.lockGlobal(opCtx, LockMode::MODE_IX);
     } else {
-        locker.lock(rid, LockMode::MODE_IX);
+        locker.lock(opCtx, rid, LockMode::MODE_IX);
     }
 
     reportGlobalLockingStats(&stats);
@@ -245,7 +245,7 @@ TEST_F(LockStatsTest, ServerStatus) {
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), LockMode::MODE_IX);
-    locker.lock(resourceIdReplicationStateTransitionLock, LockMode::MODE_IX);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, LockMode::MODE_IX);
 
     locker.unlock(resourceIdReplicationStateTransitionLock);
     locker.unlockGlobal();

@@ -59,10 +59,11 @@ stdx::condition_variable shutdownTasksComplete;
 boost::optional<ExitCode> shutdownExitCode;
 bool shutdownTasksInProgress = false;
 AtomicWord<unsigned> shutdownFlag;
-std::stack<unique_function<void(const ShutdownTaskArgs&)>> shutdownTasks;
+std::stack<ShutdownTask> shutdownTasks;
 stdx::thread::id shutdownTasksThreadId;
 
-void runTasks(decltype(shutdownTasks) tasks, const ShutdownTaskArgs& shutdownArgs) noexcept {
+void runRegisteredShutdownTasks(decltype(shutdownTasks) tasks,
+                                const ShutdownTaskArgs& shutdownArgs) noexcept {
     while (!tasks.empty()) {
         const auto& task = tasks.top();
         task(shutdownArgs);
@@ -99,7 +100,7 @@ ExitCode waitForShutdown() {
     return shutdownExitCode.value();
 }
 
-void registerShutdownTask(unique_function<void(const ShutdownTaskArgs&)> task) {
+void registerShutdownTask(ShutdownTask task) {
     stdx::lock_guard<Latch> lock(shutdownMutex);
     invariant(!globalInShutdownDeprecated());
     shutdownTasks.emplace(std::move(task));
@@ -145,7 +146,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
         localTasks.swap(shutdownTasks);
     }
 
-    runTasks(std::move(localTasks), shutdownArgs);
+    runRegisteredShutdownTasks(std::move(localTasks), shutdownArgs);
 
     {
         stdx::lock_guard<Latch> lock(shutdownMutex);
@@ -173,7 +174,7 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
         localTasks.swap(shutdownTasks);
     }
 
-    runTasks(std::move(localTasks), shutdownArgs);
+    runRegisteredShutdownTasks(std::move(localTasks), shutdownArgs);
 
     {
         stdx::lock_guard<Latch> lock(shutdownMutex);
@@ -183,5 +184,4 @@ void shutdownNoTerminate(const ShutdownTaskArgs& shutdownArgs) {
 
     shutdownTasksComplete.notify_all();
 }
-
 }  // namespace mongo

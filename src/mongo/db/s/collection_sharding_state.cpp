@@ -161,7 +161,7 @@ CollectionShardingState::ScopedCollectionShardingState::acquireScopedCollectionS
         // First lock the RESOURCE_MUTEX associated to this nss to guarantee stability of the
         // CollectionShardingState* . After that, it is safe to get and store the
         // CollectionShadingState*, as long as the RESOURCE_MUTEX is kept locked.
-        Lock::ResourceLock lock(opCtx->lockState(), cssAndLock->cssMutex.getRid(), mode);
+        Lock::ResourceLock lock(opCtx, cssAndLock->cssMutex.getRid(), mode);
         return ScopedCollectionShardingState(std::move(lock), cssAndLock->css.get());
     } else {
         // No need to lock the CSSLock on non-shardsvrs. For performance, skip doing it.

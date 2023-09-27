@@ -53,6 +53,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -70,7 +71,13 @@
 
 namespace mongo {
 
-class LockerImplTest : public ServiceContextTest {};
+class LockerImplTest : public ServiceContextTest {
+public:
+    ServiceContext::UniqueOperationContext makeOperationContext() {
+        auto opCtx = ServiceContextTest::makeOperationContext();
+        return opCtx;
+    }
+};
 
 TEST_F(LockerImplTest, LockNoConflict) {
     auto opCtx = makeOperationContext();
@@ -82,7 +89,7 @@ TEST_F(LockerImplTest, LockNoConflict) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
 
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
 
     ASSERT(locker.isLockHeldForMode(resId, MODE_X));
     ASSERT(locker.isLockHeldForMode(resId, MODE_S));
@@ -104,8 +111,8 @@ TEST_F(LockerImplTest, ReLockNoConflict) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
 
-    locker.lock(resId, MODE_X);
-    locker.lock(resId, MODE_S);
+    locker.lock(opCtx.get(), resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_S);
 
     ASSERT(!locker.unlock(resId));
     ASSERT(locker.isLockHeldForMode(resId, MODE_X));
@@ -125,7 +132,7 @@ TEST_F(LockerImplTest, ConflictWithTimeout) {
 
     LockerImpl locker1(opCtx->getServiceContext());
     locker1.lockGlobal(opCtx.get(), MODE_IX);
-    locker1.lock(resId, MODE_X);
+    locker1.lock(opCtx.get(), resId, MODE_X);
 
     LockerImpl locker2(opCtx->getServiceContext());
     locker2.lockGlobal(opCtx.get(), MODE_IX);
@@ -151,11 +158,11 @@ TEST_F(LockerImplTest, ConflictUpgradeWithTimeout) {
 
     LockerImpl locker1(opCtx->getServiceContext());
     locker1.lockGlobal(opCtx.get(), MODE_IS);
-    locker1.lock(resId, MODE_S);
+    locker1.lock(opCtx.get(), resId, MODE_S);
 
     LockerImpl locker2(opCtx->getServiceContext());
     locker2.lockGlobal(opCtx.get(), MODE_IS);
-    locker2.lock(resId, MODE_S);
+    locker2.lock(opCtx.get(), resId, MODE_S);
 
     // Try upgrading locker 1, which should block and timeout
     ASSERT_THROWS_CODE(locker1.lock(opCtx.get(), resId, MODE_X, Date_t::now() + Milliseconds(1)),
@@ -300,9 +307,9 @@ TEST_F(LockerImplTest, saveAndRestoreRSTL) {
                                    DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
 
     // Acquire locks.
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IX);
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resIdDatabase, MODE_IX);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
 
     // Save the lock state.
     locker.saveLockStateAndUnlock(&lockInfo);
@@ -369,8 +376,8 @@ TEST_F(LockerImplTest, saveAndRestoreDBAndCollection) {
 
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_IX);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
+    locker.lock(opCtx.get(), resIdCollection, MODE_IX);
     locker.saveLockStateAndUnlock(&lockInfo);
 
     // Things shouldn't be locked anymore.
@@ -403,8 +410,8 @@ TEST_F(LockerImplTest, releaseWriteUnitOfWork) {
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_IX);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
+    locker.lock(opCtx.get(), resIdCollection, MODE_IX);
     // Unlock them so that they will be pending to unlock.
     ASSERT_FALSE(locker.unlock(resIdCollection));
     ASSERT_FALSE(locker.unlock(resIdDatabase));
@@ -436,8 +443,8 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_IX);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
+    locker.lock(opCtx.get(), resIdCollection, MODE_IX);
     // Unlock them so that they will be pending to unlock.
     ASSERT_FALSE(locker.unlock(resIdCollection));
     ASSERT_FALSE(locker.unlock(resIdDatabase));
@@ -484,8 +491,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_X);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
+    locker.lock(opCtx.get(), resIdCollection, MODE_X);
 
     // Recursive global lock.
     locker.lockGlobal(opCtx.get(), MODE_IX);
@@ -526,8 +533,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
 
         // Grab new locks inside the new WUOW.
         locker.lockGlobal(opCtx.get(), MODE_IX);
-        locker.lock(resIdDatabase, MODE_IX);
-        locker.lock(resIdCollection2, MODE_IX);
+        locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
+        locker.lock(opCtx.get(), resIdCollection2, MODE_IX);
 
         ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
         ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdCollection2));
@@ -605,8 +612,8 @@ TEST_F(LockerImplTest, releaseAndRestoreReadOnlyWriteUnitOfWork) {
     locker.beginWriteUnitOfWork();
     // Lock some stuff in IS mode.
     locker.lockGlobal(opCtx.get(), MODE_IS);
-    locker.lock(resIdDatabase, MODE_IS);
-    locker.lock(resIdCollection, MODE_IS);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IS);
+    locker.lock(opCtx.get(), resIdCollection, MODE_IS);
     // Unlock them.
     ASSERT_FALSE(locker.unlock(resIdCollection));
     ASSERT_FALSE(locker.unlock(resIdDatabase));
@@ -667,12 +674,12 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
     locker.beginWriteUnitOfWork();
     // Lock some stuff.
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resIdDatabase, MODE_IX);
-    locker.lock(resIdCollection, MODE_IX);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IX);
+    locker.lock(opCtx.get(), resIdCollection, MODE_IX);
     // Recursively lock them again with a weaker mode.
     locker.lockGlobal(opCtx.get(), MODE_IS);
-    locker.lock(resIdDatabase, MODE_IS);
-    locker.lock(resIdCollection, MODE_IS);
+    locker.lock(opCtx.get(), resIdDatabase, MODE_IS);
+    locker.lock(opCtx.get(), resIdCollection, MODE_IS);
 
     // Make sure locks are converted.
     ASSERT_EQUALS(MODE_IX, locker.getLockMode(resIdDatabase));
@@ -747,7 +754,7 @@ TEST_F(LockerImplTest, DefaultLocker) {
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
 
     // Make sure only Global and TestDB resources are locked.
     Locker::LockerInfo info;
@@ -784,13 +791,13 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
     locker.lockGlobal(opCtx.get(), MODE_IS);
     ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_IS);
 
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IS);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
 
-    locker.lock(resId1, MODE_IS);
-    locker.lock(resId2, MODE_IX);
-    locker.lock(resId3, MODE_S);
-    locker.lock(resId4, MODE_X);
+    locker.lock(opCtx.get(), resId1, MODE_IS);
+    locker.lock(opCtx.get(), resId2, MODE_IX);
+    locker.lock(opCtx.get(), resId3, MODE_S);
+    locker.lock(opCtx.get(), resId4, MODE_X);
     ASSERT_EQ(locker.getLockMode(resId1), MODE_IS);
     ASSERT_EQ(locker.getLockMode(resId2), MODE_IX);
     ASSERT_EQ(locker.getLockMode(resId3), MODE_S);
@@ -845,13 +852,13 @@ TEST_F(LockerImplTest, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
     locker.lockGlobal(opCtx.get(), MODE_IX);
     ASSERT_EQ(locker.getLockMode(resourceIdGlobal), MODE_IX);
 
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IX);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
-    locker.lock(resId1, MODE_IS);
-    locker.lock(resId2, MODE_IX);
-    locker.lock(resId3, MODE_S);
-    locker.lock(resId4, MODE_X);
+    locker.lock(opCtx.get(), resId1, MODE_IS);
+    locker.lock(opCtx.get(), resId2, MODE_IX);
+    locker.lock(opCtx.get(), resId3, MODE_S);
+    locker.lock(opCtx.get(), resId4, MODE_X);
     ASSERT_EQ(locker.getLockMode(resId1), MODE_IS);
     ASSERT_EQ(locker.getLockMode(resId2), MODE_IX);
     ASSERT_EQ(locker.getLockMode(resId3), MODE_S);
@@ -886,13 +893,13 @@ TEST_F(LockerImplTest, RSTLUnlocksWithNestedLock) {
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
 
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IX);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     locker.beginWriteUnitOfWork();
 
     // Do a nested lock acquisition.
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IX);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     ASSERT(locker.unlockRSTLforPrepare());
@@ -912,7 +919,7 @@ TEST_F(LockerImplTest, RSTLModeIXWithTwoPhaseLockingCanBeUnlockedWhenPrepared) {
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
 
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IX);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IX);
 
     locker.beginWriteUnitOfWork();
@@ -937,7 +944,7 @@ TEST_F(LockerImplTest, RSTLModeISWithTwoPhaseLockingCanBeUnlockedWhenPrepared) {
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
 
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IS);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
 
     locker.beginWriteUnitOfWork();
@@ -959,7 +966,7 @@ TEST_F(LockerImplTest, RSTLTwoPhaseLockingBehaviorModeIS) {
     auto opCtx = makeOperationContext();
     LockerImpl locker(opCtx->getServiceContext());
 
-    locker.lock(resourceIdReplicationStateTransitionLock, MODE_IS);
+    locker.lock(opCtx.get(), resourceIdReplicationStateTransitionLock, MODE_IS);
     ASSERT_EQ(locker.getLockMode(resourceIdReplicationStateTransitionLock), MODE_IS);
 
     locker.beginWriteUnitOfWork();
@@ -995,7 +1002,7 @@ TEST_F(LockerImplTest, OverrideLockRequestTimeout) {
     locker2.lockGlobal(opCtx.get(), MODE_IX);
 
     // locker1 acquires FirstDB under an exclusive lock.
-    locker1.lock(resIdFirstDB, MODE_X);
+    locker1.lock(opCtx.get(), resIdFirstDB, MODE_X);
     ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_X));
 
     // locker2's attempt to acquire FirstDB with unlimited wait time should timeout after 1000
@@ -1005,7 +1012,7 @@ TEST_F(LockerImplTest, OverrideLockRequestTimeout) {
                        ErrorCodes::LockTimeout);
 
     // locker2's attempt to acquire an uncontested lock should still succeed normally.
-    locker2.lock(resIdSecondDB, MODE_X);
+    locker2.lock(opCtx.get(), resIdSecondDB, MODE_X);
 
     ASSERT_TRUE(locker1.unlock(resIdFirstDB));
     ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_NONE));
@@ -1035,7 +1042,7 @@ TEST_F(LockerImplTest, DoNotWaitForLockAcquisition) {
     locker2.lockGlobal(opCtx.get(), MODE_IX);
 
     // locker1 acquires FirstDB under an exclusive lock.
-    locker1.lock(resIdFirstDB, MODE_X);
+    locker1.lock(opCtx.get(), resIdFirstDB, MODE_X);
     ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_X));
 
     // locker2's attempt to acquire FirstDB with unlimited wait time should fail immediately and
@@ -1045,7 +1052,7 @@ TEST_F(LockerImplTest, DoNotWaitForLockAcquisition) {
                        ErrorCodes::LockTimeout);
 
     // locker2's attempt to acquire an uncontested lock should still succeed normally.
-    locker2.lock(resIdSecondDB, MODE_X);
+    locker2.lock(opCtx.get(), resIdSecondDB, MODE_X);
 
     ASSERT_TRUE(locker1.unlock(resIdFirstDB));
     ASSERT_TRUE(locker1.isLockHeldForMode(resIdFirstDB, MODE_NONE));
@@ -1085,8 +1092,8 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
     // Take an exclusive lock on the collection.
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(dbId, MODE_IX);
-    locker.lock(collectionId, MODE_X);
+    locker.lock(opCtx.get(), dbId, MODE_IX);
+    locker.lock(opCtx.get(), collectionId, MODE_X);
 
     // Assert it shows up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
@@ -1114,15 +1121,14 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     // Take an exclusive lock on the collection.
     LockerImpl successfulLocker(opCtx->getServiceContext());
     successfulLocker.lockGlobal(opCtx.get(), MODE_IX);
-    successfulLocker.lock(dbId, MODE_IX);
-    successfulLocker.lock(collectionId, MODE_X);
+    successfulLocker.lock(opCtx.get(), dbId, MODE_IX);
+    successfulLocker.lock(opCtx.get(), collectionId, MODE_X);
 
     // Now attempt to get conflicting locks.
     LockerImpl conflictingLocker(opCtx->getServiceContext());
     conflictingLocker.lockGlobal(opCtx.get(), MODE_IS);
-    conflictingLocker.lock(dbId, MODE_IS);
-    ASSERT_EQ(LOCK_WAITING,
-              conflictingLocker.lockBeginForTest(nullptr /* opCtx */, collectionId, MODE_IS));
+    conflictingLocker.lock(opCtx.get(), dbId, MODE_IS);
+    ASSERT_EQ(LOCK_WAITING, conflictingLocker.lockBeginForTest(opCtx.get(), collectionId, MODE_IS));
 
     // Assert the held locks show up in the output of getLockerInfo().
     Locker::LockerInfo lockerInfo;
@@ -1140,8 +1146,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     ASSERT(successfulLocker.unlock(dbId));
     ASSERT(successfulLocker.unlockGlobal());
 
-    conflictingLocker.lockCompleteForTest(
-        nullptr /* opCtx */, collectionId, MODE_IS, Date_t::now());
+    conflictingLocker.lockCompleteForTest(opCtx.get(), collectionId, MODE_IS, Date_t::now());
 
     conflictingLocker.getLockerInfo(&lockerInfo, boost::none);
     ASSERT_FALSE(lockerInfo.waitingResource.isValid());
@@ -1169,7 +1174,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldSubtractBase) {
     locker->lockGlobal(opCtx.get(), MODE_IX);
 
     // Obtain a lock before any other ops have been pushed to the stack.
-    locker->lock(dbId, MODE_IX);
+    locker->lock(opCtx.get(), dbId, MODE_IX);
     locker->unlock(dbId);
 
     ASSERT_EQUALS(numAcquisitions(getBaseStats()), 1) << "The acquisition should be reported";
@@ -1177,7 +1182,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldSubtractBase) {
     // Push another op to the stack and obtain a lock.
     CurOp superOp;
     superOp.push(opCtx.get());
-    locker->lock(dbId, MODE_IX);
+    locker->lock(opCtx.get(), dbId, MODE_IX);
     locker->unlock(dbId);
 
     ASSERT_EQUALS(numAcquisitions(getBaseStats()), 1)
@@ -1186,7 +1191,7 @@ TEST_F(LockerImplTest, GetLockerInfoShouldSubtractBase) {
     // Then push another op to the stack and obtain another lock.
     CurOp subOp;
     subOp.push(opCtx.get());
-    locker->lock(dbId, MODE_IX);
+    locker->lock(opCtx.get(), dbId, MODE_IX);
     locker->unlock(dbId);
 
     ASSERT_EQUALS(numAcquisitions(getBaseStats()), 1)
@@ -1208,7 +1213,7 @@ TEST_F(LockerImplTest, ReaquireLockPendingUnlock) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
 
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_X));
 
     locker.beginWriteUnitOfWork();
@@ -1219,7 +1224,7 @@ TEST_F(LockerImplTest, ReaquireLockPendingUnlock) {
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
 
     // Reacquire lock pending unlock.
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 0);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 0);
 
@@ -1240,7 +1245,7 @@ TEST_F(LockerImplTest, AcquireLockPendingUnlockWithCoveredMode) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
 
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_X));
 
     locker.beginWriteUnitOfWork();
@@ -1251,7 +1256,7 @@ TEST_F(LockerImplTest, AcquireLockPendingUnlockWithCoveredMode) {
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
 
     // Attempt to lock the resource with a mode that is covered by the existing mode.
-    locker.lock(resId, MODE_IX);
+    locker.lock(opCtx.get(), resId, MODE_IX);
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 0);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 0);
 
@@ -1272,7 +1277,7 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlock) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
 
-    locker.lock(resId, MODE_IX);
+    locker.lock(opCtx.get(), resId, MODE_IX);
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
 
     locker.beginWriteUnitOfWork();
@@ -1284,7 +1289,7 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlock) {
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
 
     // Convert lock pending unlock.
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 2);
@@ -1308,7 +1313,7 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IS);
 
-    locker.lock(resId, MODE_IX);
+    locker.lock(opCtx.get(), resId, MODE_IX);
     ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IX));
 
     locker.beginWriteUnitOfWork();
@@ -1320,7 +1325,7 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 1);
 
     // Convert lock pending unlock.
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
     ASSERT(locker.numResourcesToUnlockAtEndUnitOfWorkForTest() == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->unlockPending == 1);
     ASSERT(locker.getRequestsForTest().find(resId).objAddr()->recursiveCount == 2);
@@ -1381,7 +1386,7 @@ DEATH_TEST_F(LockerImplTest,
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
-    locker.lock(resId, MODE_X);
+    locker.lock(opCtx.get(), resId, MODE_X);
 
     ASSERT(locker.isLockHeldForMode(resId, MODE_X));
     ASSERT(locker.isLockHeldForMode(resId, MODE_S));

@@ -98,7 +98,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -1423,21 +1422,19 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 }
 #endif
 
+struct ShutdownContext {
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext opCtx;
+};
+
+// Stash the ShutdownContext as a ServiceContext decoration. The main purpose of this is to keep the
+// OperationContext alive until the process calls exit, to avoid releasing the global lock.
+ServiceContext::Decoration<ShutdownContext> getShutdownContext =
+    ServiceContext::declareDecoration<ShutdownContext>();
+
 // NOTE: This function may be called at any time after registerShutdownTask is called below. It
 // must not depend on the prior execution of mongo initializers or the existence of threads.
 void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
-    // This client initiation pattern is only to be used here, with plans to eliminate this pattern
-    // down the line.
-    if (!haveClient()) {
-        Client::initThread(getThreadName());
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
-    auto const client = Client::getCurrent();
-    auto const serviceContext = client->getServiceContext();
-
     Milliseconds shutdownTimeout;
     if (shutdownArgs.quiesceTime) {
         shutdownTimeout = *shutdownArgs.quiesceTime;
@@ -1459,20 +1456,53 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         }
     }
 
+    auto const serviceContext = getGlobalServiceContext();
+
     // If we don't have shutdownArgs, we're shutting down from a signal, or other clean shutdown
     // path.
     //
     // In that case, do a default step down, still shutting down if stepDown fails.
-    if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
-        replCoord && !shutdownArgs.isUserInitiated) {
-        replCoord->enterTerminalShutdown();
-        ServiceContext::UniqueOperationContext uniqueOpCtx;
-        OperationContext* opCtx = client->getOperationContext();
-        if (!opCtx) {
-            uniqueOpCtx = client->makeOperationContext();
-            opCtx = uniqueOpCtx.get();
-        }
+    auto const replCoord = repl::ReplicationCoordinator::get(serviceContext);
+    bool const defaultStepdownRequired = replCoord && !shutdownArgs.isUserInitiated;
 
+    // The operation context used for shutdown must be created after starting terminal shutdown on
+    // the replication coordinator. This is because terminal shutdown might involve waiting for all
+    // opCtx's to be destroyed if FCBIS is swapping the storage engine.
+    if (defaultStepdownRequired) {
+        replCoord->enterTerminalShutdown();
+    }
+
+    // Store previous client, to be restored when function scope ends.
+    ServiceContext::UniqueClient oldClient;
+    if (Client::getCurrent()) {
+        oldClient = Client::releaseCurrent();
+    }
+    Client::setCurrent(serviceContext->makeClient("shutdownTask"));
+    const auto client = Client::getCurrent();
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationUnkillableByStepdown(lk);
+    }
+    // The new client and opCtx are stashed in the ServiceContext, will survive past this
+    // function and are never destructed. This is required to avoid releasing the global lock until
+    // the process calls exit().
+    ServiceContext::UniqueOperationContext uniqueOpCtx = client->makeOperationContext();
+    auto const opCtx = uniqueOpCtx.get();
+
+    ON_BLOCK_EXIT([&]() {
+        auto& shutdownContext = getShutdownContext(client->getServiceContext());
+        invariant(!shutdownContext.client.get());
+        invariant(!shutdownContext.opCtx.get());
+
+        shutdownContext.client = Client::releaseCurrent();
+        shutdownContext.opCtx = std::move(uniqueOpCtx);
+
+        if (oldClient) {
+            Client::setCurrent(std::move(oldClient));
+        }
+    });
+
+    if (defaultStepdownRequired) {
         const auto forceShutdown = true;
         auto stepDownStartTime = opCtx->getServiceContext()->getPreciseClockSource()->now();
         // stepDown should never return an error during force shutdown.
@@ -1489,12 +1519,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     if (auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
         replCoord && replCoord->enterQuiesceModeIfSecondary(shutdownTimeout)) {
-        ServiceContext::UniqueOperationContext uniqueOpCtx;
-        OperationContext* opCtx = client->getOperationContext();
-        if (!opCtx) {
-            uniqueOpCtx = client->makeOperationContext();
-            opCtx = uniqueOpCtx.get();
-        }
         if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {
             LOGV2_OPTIONS(
                 4695101, {LogComponent::kReplication}, "hangDuringQuiesceMode failpoint enabled");
@@ -1562,12 +1586,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             PeriodicThreadToAbortExpiredTransactions::get(serviceContext)->stop();
         }
 
-        ServiceContext::UniqueOperationContext uniqueOpCtx;
-        OperationContext* opCtx = client->getOperationContext();
-        if (!opCtx) {
-            uniqueOpCtx = client->makeOperationContext();
-            opCtx = uniqueOpCtx.get();
-        }
         {
             stdx::lock_guard lg(*client);
             opCtx->setIsExecutingShutdown();
@@ -1717,15 +1735,12 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     shutdownChangeCollectionExpiredDocumentsRemover(serviceContext);
 
     // We should always be able to acquire the global lock at shutdown.
-    // An OperationContext is not necessary to call lockGlobal() during shutdown, as it's only used
-    // to check that lockGlobal() is not called after a transaction timestamp has been set.
     //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
     // of this function to prevent any operations from running that need a lock.
     //
     LOGV2(4784929, "Acquiring the global lock for shutdown");
-    LockerImpl* globalLocker = new LockerImpl(serviceContext);
-    globalLocker->lockGlobal(nullptr, MODE_X);
+    opCtx->lockState()->lockGlobal(opCtx, MODE_X);
 
     // Global storage engine may not be started in all cases before we exit
     if (serviceContext->getStorageEngine()) {
