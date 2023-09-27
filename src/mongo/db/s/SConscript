@@ -615,6 +615,16 @@ env.Library(
 )
 
 env.Library(
+    target='replica_set_endpoint_feature_flag',
+    source=[
+        'replica_set_endpoint_feature_flag.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='sharding_logging',
     source=[
         'sharding_logging.cpp',
