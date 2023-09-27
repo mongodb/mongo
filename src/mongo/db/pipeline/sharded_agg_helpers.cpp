@@ -1859,6 +1859,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                 } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
                     // The current node may be trying to run a pipeline on a namespace which is an
                     // unresolved view, proceed with shard targeting,
+                } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedShardVersion>&) {
+                } catch (ExceptionFor<ErrorCodes::IllegalChangeToExpectedDatabaseVersion>&) {
+                    // The current node's shard or database version of target namespace was updated
+                    // mid-operation. Proceed with remote request to re-initialize operation
+                    // context.
                 }
 
                 // The local read failed. Recreate 'pipelineToTarget' if it was released above.

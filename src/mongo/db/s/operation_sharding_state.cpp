@@ -87,10 +87,10 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
             oss._shardVersions.try_emplace(NamespaceStringUtil::serialize(nss), *shardVersion);
         auto& tracker = emplaceResult.first->second;
         if (!emplaceResult.second) {
-            uassert(640570,
+            uassert(ErrorCodes::IllegalChangeToExpectedShardVersion,
                     str::stream() << "Illegal attempt to change the expected shard version for "
                                   << nss.toStringForErrorMsg() << " from " << tracker.v << " to "
-                                  << *shardVersion,
+                                  << *shardVersion << " at recursion level " << tracker.recursion,
                     tracker.v == *shardVersion);
         }
         invariant(++tracker.recursion > 0);
@@ -100,10 +100,11 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
         auto emplaceResult = oss._databaseVersions.try_emplace(nss.dbName(), *databaseVersion);
         auto& tracker = emplaceResult.first->second;
         if (!emplaceResult.second) {
-            uassert(640571,
+            uassert(ErrorCodes::IllegalChangeToExpectedDatabaseVersion,
                     str::stream() << "Illegal attempt to change the expected database version for "
                                   << nss.dbName().toStringForErrorMsg() << " from " << tracker.v
-                                  << " to " << *databaseVersion,
+                                  << " to " << *databaseVersion << " at recursion level "
+                                  << tracker.recursion,
                     tracker.v == *databaseVersion);
         }
         invariant(++tracker.recursion > 0);

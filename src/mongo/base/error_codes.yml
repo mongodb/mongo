@@ -566,3 +566,5 @@ error_codes:
     - {code: 50915,name: BackupCursorOpenConflictWithCheckpoint, categories: [RetriableError]}
     - {code: 56846,name: ConfigServerUnreachable}
     - {code: 57986,name: RetryableInternalTransactionNotSupported}
+    - {code: 640570,name: IllegalChangeToExpectedShardVersion}
+    - {code: 640571,name: IllegalChangeToExpectedDatabaseVersion}
