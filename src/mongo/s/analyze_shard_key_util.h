@@ -95,6 +95,11 @@ Status validateIndexKey(const BSONObj& indexKey);
 void uassertShardKeyValueNotContainArrays(const BSONObj& value);
 
 /**
+ * Returns the collection uuid for the collection if it exists.
+ */
+boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
  * If the operation has a readConcern, returns a BSON object of the following form:
  * { level: "...",
  *   afterClusterTime: Timestamp(...) }

@@ -955,7 +955,7 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const UUID& collUuid,
                                                   const KeyPattern& shardKey) {
-    auto origCollUuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
+    auto origCollUuid = getCollectionUUID(opCtx, nss);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Cannot analyze a shard key for a non-existing collection",
             origCollUuid);

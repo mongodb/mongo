@@ -110,6 +110,13 @@ void uassertShardKeyValueNotContainArrays(const BSONObj& value) {
     }
 }
 
+boost::optional<UUID> getCollectionUUID(OperationContext* opCtx, const NamespaceString& nss) {
+    auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));
+    return collection.exists() ? boost::make_optional(collection.uuid()) : boost::none;
+}
+
 BSONObj extractReadConcern(OperationContext* opCtx) {
     return repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
         ReadWriteConcernProvenanceBase::kSourceFieldName);
