@@ -560,7 +560,7 @@ buildvariants:
   tasks:
   - name: compile_test_serial_TG
     distros:
-    - windows-vsCurrent-xlarge
+    - windows-vsCurrent-xxlarge
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
