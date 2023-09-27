@@ -301,13 +301,13 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
                                                                          {},
                                                                          1,
                                                                          true,
-                                                                         false /*unsplittable*/,
+                                                                         false /* unsplittable */,
                                                                          ShardId("shard1")),
                        DBException,
                        ErrorCodes::InvalidOptions);
 
     auto singleChunksOnShardPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
-        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /*unsplittable*/, kShardId0);
+        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /* unsplittable */, kShardId0);
 
     auto config = singleChunksOnShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
@@ -316,7 +316,7 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
     ASSERT_EQ(config.chunks[0].getShard(), kShardId0);
 
     auto singleChunksOnNonPrimaryShardPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
-        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /*unsplittable*/, kShardId1);
+        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /* unsplittable */, kShardId1);
 
     auto nonPrimaryConfig = singleChunksOnNonPrimaryShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});

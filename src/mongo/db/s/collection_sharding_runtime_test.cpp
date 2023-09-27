@@ -122,7 +122,7 @@ protected:
                             RoutingTableHistory::makeNew(kTestNss,
                                                          uuid,
                                                          kShardKeyPattern,
-                                                         false, /*unsplittable*/
+                                                         false, /* unsplittable */
                                                          nullptr,
                                                          false,
                                                          epoch,

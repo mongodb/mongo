@@ -586,7 +586,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     auto oldRoutingTable = RoutingTableHistory::makeNew(kNss,
                                                         uuid,
                                                         BSON("x" << 1),
-                                                        false, /*unsplittable*/
+                                                        false, /* unsplittable */
                                                         nullptr,
                                                         false,
                                                         epoch,
@@ -611,6 +611,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                                   oldRoutingTable.makeUpdated(boost::none /* timeseriesFields */,
                                                               boost::none /* reshardingFields */,
                                                               true,
+                                                              false, /* unsplittable */
                                                               {chunk1})),
                               Timestamp(5, 0));
 

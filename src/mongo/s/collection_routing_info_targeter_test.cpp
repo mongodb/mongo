@@ -289,7 +289,7 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
     auto routingTableHistory = RoutingTableHistory::makeNew(kNss,
                                                             uuid,
                                                             shardKeyPattern.getKeyPattern(),
-                                                            false,  /*unsplittable*/
+                                                            false,  /* unsplittable */
                                                             {},     // collator
                                                             false,  // unique
                                                             OID::gen(),

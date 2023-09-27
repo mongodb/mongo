@@ -910,6 +910,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     bool allowMigrations,
+    bool unsplittable,
     const std::vector<ChunkType>& changedChunks) const {
 
     auto changedChunkInfos = flatten(changedChunks);
@@ -921,7 +922,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
     return RoutingTableHistory(_nss,
                                _uuid,
                                getShardKeyPattern().getKeyPattern(),
-                               _unsplittable,
+                               unsplittable,
                                CollatorInterface::cloneCollator(getDefaultCollator()),
                                isUnique(),
                                std::move(timeseriesFields),

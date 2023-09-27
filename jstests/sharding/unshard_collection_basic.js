@@ -73,10 +73,9 @@ assert.eq(0, st.rs0.getPrimary().getCollection(ns).countDocuments({}));
 let unshardedChunk = configDb.chunks.find({uuid: unshardedColl.uuid}).toArray();
 assert.eq(1, unshardedChunk.length);
 
-// TODO (SEVER-81296): Enable after fix
 // Fail since collection is unsharded now
-// assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}),
-//                              ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}),
+                             ErrorCodes.NamespaceNotSharded);
 
 const newCollName = "foo1"
 const newCollNs = dbName + '.' + newCollName

@@ -700,7 +700,7 @@ protected:
                 kNss,
                 uuid,
                 kShardKeyPattern,
-                false, /*unsplittable*/
+                false, /* unsplittable */
                 nullptr,
                 false,
                 epoch,

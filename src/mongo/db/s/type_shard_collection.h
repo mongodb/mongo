@@ -80,6 +80,7 @@ public:
     using ShardCollectionTypeBase::setRefreshing;
     using ShardCollectionTypeBase::setReshardingFields;
     using ShardCollectionTypeBase::setTimeseriesFields;
+    using ShardCollectionTypeBase::setUnsplittable;
 
     ShardCollectionType(NamespaceString nss,
                         OID epoch,

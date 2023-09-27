@@ -154,6 +154,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     update.setTimeseriesFields(collAndChunks.timeseriesFields);
     update.setReshardingFields(collAndChunks.reshardingFields);
     update.setAllowMigrations(collAndChunks.allowMigrations);
+    update.setUnsplittable(collAndChunks.unsplittable);
     update.setRefreshing(true);  // Mark as refreshing so secondaries are aware of it.
 
     Status status = updateShardCollectionsEntry(
@@ -995,6 +996,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_getLoader
         persisted.timeseriesFields = std::move(enqueued.timeseriesFields);
         persisted.reshardingFields = std::move(enqueued.reshardingFields);
         persisted.allowMigrations = enqueued.allowMigrations;
+        persisted.unsplittable = enqueued.unsplittable;
 
         return persisted;
     }
@@ -1589,6 +1591,7 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
                 task.collectionAndChangedChunks->changedChunks.end());
 
             // Keep the most recent version of these fields
+            collAndChunks.unsplittable = task.collectionAndChangedChunks->unsplittable;
             collAndChunks.allowMigrations = task.collectionAndChangedChunks->allowMigrations;
             collAndChunks.reshardingFields = task.collectionAndChangedChunks->reshardingFields;
             collAndChunks.timeseriesFields = task.collectionAndChangedChunks->timeseriesFields;

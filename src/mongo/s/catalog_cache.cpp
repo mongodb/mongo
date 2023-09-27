@@ -153,6 +153,7 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
             return existingHistory->optRt->makeUpdated(collectionAndChunks.timeseriesFields,
                                                        collectionAndChunks.reshardingFields,
                                                        collectionAndChunks.allowMigrations,
+                                                       collectionAndChunks.unsplittable,
                                                        collectionAndChunks.changedChunks);
         }
 

@@ -212,7 +212,7 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
     auto routingTableHistory = RoutingTableHistory::makeNew(nss,
                                                             collUuid,
                                                             shardKey,
-                                                            false, /*unsplittable*/
+                                                            false, /* unsplittable */
                                                             getDefaultCollator(opCtx, nss),
                                                             false /* unique */,
                                                             OID::gen(),

@@ -64,9 +64,8 @@ function testReadWriteSucceeds() {
 checkIsUnsplittableSet();
 testReadWriteSucceeds();
 
-// TODO (SEVER-81296): Enable after fix
-// assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns, toShard: shard0}),
-//                              ErrorCodes.NamespaceNotSharded);
+assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns, toShard: shard0}),
+                             ErrorCodes.NamespaceNotSharded);
 
 jsTest.log('Move the unsharded collection to the primary shard.');
 assert.commandWorked(mongos.adminCommand({moveCollection: ns, toShard: shard0}));

@@ -302,7 +302,7 @@ public:
         auto rt = RoutingTableHistory::makeNew(kCrudNs,
                                                kCrudUUID,
                                                kOriginalShardKeyPattern,
-                                               false, /*unsplittable*/
+                                               false, /* unsplittable */
                                                nullptr,
                                                false,
                                                epoch,

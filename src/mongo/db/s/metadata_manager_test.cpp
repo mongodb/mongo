@@ -99,7 +99,7 @@ protected:
             kNss,
             uuid,
             shardKeyPattern,
-            false, /*unsplittable*/
+            false, /* unsplittable */
             nullptr,
             false,
             epoch,
@@ -163,6 +163,7 @@ protected:
             cm->getRoutingTableHistory_ForTest().makeUpdated(boost::none /* timeseriesFields */,
                                                              boost::none /* reshardingFields */,
                                                              true,
+                                                             false, /* unsplittable */
                                                              splitChunks);
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(),
@@ -191,6 +192,7 @@ protected:
             boost::none /* timeseriesFields */,
             boost::none /* reshardingFields */,
             true,
+            false, /* unsplittable */
             {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(),

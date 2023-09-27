@@ -140,7 +140,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
             {}, /* tags */
             3 /* numShards */,
             false /* collectionIsEmpty */,
-            false /*unsplittable*/,
+            false /* unsplittable */,
             boost::none /* dataShard */);
         return optimization->createFirstChunks(
             opCtx.get(), kShardKeyPattern, {uuid, ShardId("shard1")});
@@ -175,7 +175,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
                                                           zones,
                                                           3 /* numShards */,
                                                           collectionIsEmpty,
-                                                          false /*unsplittable*/,
+                                                          false /* unsplittable */,
                                                           boost::none /* dataShard */);
 
     const auto firstChunks = optimization->createFirstChunks(
@@ -265,7 +265,7 @@ TEST_F(CreateFirstChunksTest, Unsplittable_OneChunkToPrimary) {
             zones,
             3 /* numShards */,
             true /*collectionIsEmpty*/,
-            true /*unsplittable*/,
+            true /* unsplittable */,
             boost::none /* dataShard */);
 
         return optimization->createFirstChunks(
@@ -300,7 +300,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
                                                           zones,
                                                           3 /* numShards */,
                                                           collectionIsEmpty,
-                                                          false /*unsplittable*/,
+                                                          false /* unsplittable */,
                                                           boost::none /* dataShard */);
 
     const auto firstChunks = optimization->createFirstChunks(

@@ -211,7 +211,7 @@ protected:
         auto rt = RoutingTableHistory::makeNew(_sourceNss,
                                                _sourceUUID,
                                                shardKeyPattern.getKeyPattern(),
-                                               false, /*unsplittable*/
+                                               false, /* unsplittable */
                                                nullptr,
                                                false,
                                                epoch,

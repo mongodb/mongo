@@ -116,7 +116,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     auto rt = RoutingTableHistory::makeNew(kNss,
                                            collUuid,
                                            shardKeyPattern,
-                                           false, /*unsplittable*/
+                                           false, /* unsplittable */
                                            nullptr,
                                            true,
                                            collEpoch,
@@ -155,7 +155,11 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(
-        boost::none /* timeseriesFields */, boost::none /* reshardingFields */, true, newChunks);
+        boost::none /* timeseriesFields */,
+        boost::none /* reshardingFields */,
+        true /* allowMigration */,
+        false /* unsplittable */,
+        newChunks);
     return CollectionMetadata(ChunkManager(getShardId(0),
                                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
@@ -307,7 +311,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
         auto rt = RoutingTableHistory::makeNew(kNss,
                                                collUuid,
                                                shardKeyPattern,
-                                               false, /*unsplittable*/
+                                               false, /* unsplittable */
                                                nullptr,
                                                true,
                                                collEpoch,

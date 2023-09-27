@@ -98,6 +98,17 @@ const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("Tes
  * chunk boundaries to be inserted. As an example, if you want to split the range [0, 2] into chunks
  * [0, 1] and [1, 2], newChunkBoundaryPoints should be [0, 1, 2].
  */
+
+RoutingTableHistory makeUpdatedRoutingTable(const RoutingTableHistory& rt,
+                                            std::vector<ChunkType> chunks) {
+    return rt.makeUpdated(boost::none /* timeseriesFields */,
+                          boost::none /* reshardingFields */,
+                          true,
+                          false, /* unsplittable */
+                          {std::move(chunks)});
+}
+
+
 RoutingTableHistory splitChunk(const RoutingTableHistory& rt,
                                const std::vector<BSONObj>& newChunkBoundaryPoints) {
 
@@ -119,8 +130,7 @@ RoutingTableHistory splitChunk(const RoutingTableHistory& rt,
         newChunks.emplace_back(rt.getUUID(), range, curVersion, kThisShard);
     }
 
-    return rt.makeUpdated(
-        boost::none /* timeseriesFields */, boost::none /* reshardingFields */, true, newChunks);
+    return makeUpdatedRoutingTable(rt, std::move(newChunks));
 }
 
 /**
@@ -190,7 +200,7 @@ public:
         return RoutingTableHistory::makeNew(kNss,
                                             _collUUID,
                                             _shardKeyPattern,
-                                            false, /*unsplittable*/
+                                            false, /* unsplittable */
                                             nullptr,
                                             false,
                                             _epoch,
@@ -363,10 +373,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
     collVersion.incMajor();
     shrinkedChunk.setVersion(collVersion);
 
-    ASSERT_THROWS_CODE(rt.makeUpdated(boost::none /* timeseriesFields */,
-                                      boost::none /* reshardingFields */,
-                                      true,
-                                      {std::move(shrinkedChunk)}),
+    ASSERT_THROWS_CODE(makeUpdatedRoutingTable(rt, {shrinkedChunk}),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
 }
@@ -443,10 +450,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
     collVersion.incMajor();
     chunkToExtendIt->setVersion(collVersion);
 
-    ASSERT_THROWS_CODE(rt.makeUpdated(boost::none /* timeseriesFields */,
-                                      boost::none /* reshardingFields */,
-                                      true,
-                                      {*chunkToExtendIt}),
+    ASSERT_THROWS_CODE(makeUpdatedRoutingTable(rt, {*chunkToExtendIt}),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
 }
@@ -511,10 +515,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateMismatchingTimestampFail) {
                             {oldVersion.majorVersion(), oldVersion.minorVersion()}};
     chunkIt->setVersion(newVersion);
 
-    ASSERT_THROWS_CODE(rt.makeUpdated(boost::none /* timeseriesFields */,
-                                      boost::none /* reshardingFields */,
-                                      true,
-                                      {*chunkIt}),
+    ASSERT_THROWS_CODE(makeUpdatedRoutingTable(rt, {*chunkIt}),
                        AssertionException,
                        ErrorCodes::ConflictingOperationInProgress);
 }
@@ -548,10 +549,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
     const auto expectedShardVersions = calculateShardVersions(chunks);
     const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
 
-    auto rt = initialRt.makeUpdated(boost::none /* timeseriesFields */,
-                                    boost::none /* reshardingFields */,
-                                    true,
-                                    updatedChunks);
+    auto rt = makeUpdatedRoutingTable(initialRt, updatedChunks);
 
     // Checks basic getter of routing table return correct values
     ASSERT_EQ(kNss, rt.nss());
@@ -613,7 +611,7 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
         auto rt = RoutingTableHistory::makeNew(kNss,
                                                collUUID(),
                                                getShardKeyPattern(),
-                                               false, /*unsplittable*/
+                                               false, /* unsplittable */
                                                nullptr,
                                                false,
                                                collEpoch(),
@@ -629,6 +627,7 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
         rt = rt.makeUpdated(boost::none /* timeseriesFields */,
                             boost::none /* reshardingFields */,
                             allowMigrationsValue,
+                            false, /* unsplittable */
                             {makeUpdatedChunk(rt.getVersion())});
         ASSERT_EQ(allowMigrationsValue, rt.allowMigrations());
 
@@ -637,6 +636,7 @@ TEST_F(RoutingTableHistoryTest, AllowMigrationFlag) {
         rt = rt.makeUpdated(boost::none /* timeseriesFields */,
                             boost::none /* reshardingFields */,
                             allowMigrationsValue,
+                            false, /* unsplittable */
                             {makeUpdatedChunk(rt.getVersion())});
         ASSERT_EQ(allowMigrationsValue, rt.allowMigrations());
     }
@@ -663,7 +663,7 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                   ChunkVersion{{collEpoch(), collTimestamp()}, {2, 2}},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none /* timeseriesFields */, boost::none, true, chunks1);
+    auto rt1 = makeUpdatedRoutingTable(rt, std::move(chunks1));
     auto v1 = ChunkVersion{{collEpoch(), collTimestamp()}, {2, 2}};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
 
@@ -681,8 +681,8 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                   ChunkVersion({collEpoch(), collTimestamp()}, {3, 2}),
                   kThisShard}};
 
-    auto rt2 = rt1.makeUpdated(
-        boost::none /* timeseriesFields */, boost::none /* reshardingFields */, true, chunks2);
+    auto rt2 = makeUpdatedRoutingTable(rt, std::move(chunks2));
+
     auto v2 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 2});
     ASSERT_EQ(v2, rt2.getVersion(kThisShard));
 }
@@ -707,10 +707,8 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
                   ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none /* timeseriesFields */,
-                              boost::none /* reshardingFields */,
-                              true,
-                              changedChunks);
+    auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
+
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {2, 2});
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -753,10 +751,8 @@ TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
                   ChunkVersion({collEpoch(), collTimestamp()}, {2, 2}),
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none /* timeseriesFields */,
-                              boost::none /* reshardingFields */,
-                              true,
-                              changedChunks);
+    auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
+
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {2, 2});
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -786,10 +782,8 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
                   ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none /* timeseriesFields */,
-                              boost::none /* reshardingFields */,
-                              true,
-                              changedChunks);
+    auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
+
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 1});
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -830,10 +824,8 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
                   ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none /* timeseriesFields */,
-                              boost::none /* reshardingFields */,
-                              true,
-                              changedChunks);
+    auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
+
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 1});
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -868,10 +860,8 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
                   ChunkVersion({collEpoch(), collTimestamp()}, {3, 1}),
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none /* timeseriesFields */,
-                              boost::none /* reshardingFields */,
-                              true,
-                              changedChunks);
+    auto rt1 = makeUpdatedRoutingTable(rt, std::move(changedChunks));
+
     auto v1 = ChunkVersion({collEpoch(), collTimestamp()}, {3, 1});
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);

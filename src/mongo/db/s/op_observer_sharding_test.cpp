@@ -141,7 +141,7 @@ protected:
         auto rt = RoutingTableHistory::makeNew(kTestNss,
                                                uuid,
                                                KeyPattern(keyPattern),
-                                               false, /*unsplittable*/
+                                               false, /* unsplittable */
                                                nullptr,
                                                false,
                                                epoch,

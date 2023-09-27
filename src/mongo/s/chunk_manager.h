@@ -327,6 +327,7 @@ public:
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         bool allowMigrations,
+        bool unsplittable,
         const std::vector<ChunkType>& changedChunks) const;
 
     const NamespaceString& nss() const {

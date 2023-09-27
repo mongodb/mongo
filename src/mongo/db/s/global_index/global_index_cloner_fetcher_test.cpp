@@ -97,7 +97,7 @@ public:
         auto rt = RoutingTableHistory::makeNew(_ns,
                                                _collUUID,
                                                shardKeyPattern.getKeyPattern(),
-                                               false, /*unsplittable*/
+                                               false, /* unsplittable */
                                                nullptr,
                                                false,
                                                epoch,
