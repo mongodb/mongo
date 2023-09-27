@@ -48,15 +48,12 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -143,7 +140,8 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* se
       _forwardableOpMetadata(
           extractShardingDDLCoordinatorMetadata(coorDoc).getForwardableOpMetadata()),
       _databaseVersion(extractShardingDDLCoordinatorMetadata(coorDoc).getDatabaseVersion()),
-      _firstExecution(!_recoveredFromDisk) {}
+      _firstExecution(!_recoveredFromDisk),
+      _externalState(_service->createExternalState()) {}
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
     invariant(_constructionCompletionPromise.getFuture().isReady());
@@ -172,7 +170,7 @@ ExecutorFuture<bool> ShardingDDLCoordinator::_removeDocumentUntillSuccessOrStepd
 
 bool ShardingDDLCoordinator::_removeDocument(OperationContext* opCtx) {
     // Checkpoint configTime and topologyTime to guarantee causality with respect to DDL operations
-    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
+    _getExternalState()->waitForVectorClockDurable(opCtx);
 
     DBDirectClient dbClient(opCtx);
     auto commandResponse = dbClient.runCommand([&] {
@@ -216,19 +214,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_translateTimeseriesNss(
 
                const auto bucketNss = originalNss().makeTimeseriesBucketsNamespace();
 
-               const auto isShardedTimeseries = [&] {
-                   try {
-                       const auto bucketColl = Grid::get(opCtx)->catalogClient()->getCollection(
-                           opCtx, bucketNss, repl::ReadConcernLevel::kMajorityReadConcern);
-                       return bucketColl.getTimeseriesFields().has_value();
-                   } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                       // if we don't find the bucket nss it means the collection is not
-                       // sharded.
-                       return false;
-                   }
-               }();
-
-               if (isShardedTimeseries) {
+               if (_getExternalState()->isShardedTimeseries(opCtx, bucketNss)) {
                    auto coordMetadata = metadata();
                    coordMetadata.setBucketNss(bucketNss);
                    setMetadata(std::move(coordMetadata));
@@ -348,8 +334,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             // Coordinators that do not affect user data are allowed to start even when user writes
             // are blocked.
             if (_firstExecution && !canAlwaysStartWhenUserWritesAreDisabled()) {
-                GlobalUserWriteBlockState::get(opCtx)->checkShardedDDLAllowedToStart(opCtx,
-                                                                                     originalNss());
+                _getExternalState()->checkShardedDDLAllowedToStart(opCtx, originalNss());
             }
         })
         .then([this, executor, token, anchor = shared_from_this()] {
@@ -369,11 +354,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     boost::none /* shardVersion */,
                     metadata().getDatabaseVersion() /* databaseVersion */);
 
-                // Check under the dbLock if this is still the primary shard for the database
-                Lock::DBLock dbLock(opCtx, originalNss().dbName(), MODE_IS);
-                const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(
-                    opCtx, originalNss().dbName());
-                scopedDss->assertIsPrimaryShardForDb(opCtx);
+                _getExternalState()->assertIsPrimaryShardForDb(opCtx, originalNss().dbName());
             };
         })
         .then([this, executor, token, anchor = shared_from_this()] {
@@ -561,6 +542,10 @@ bool ShardingDDLCoordinator::_isRetriableErrorForDDLCoordinator(const Status& st
         status.isA<ErrorCategory::WriteConcernError>() ||
         status == ErrorCodes::FailedToSatisfyReadPreference || status == ErrorCodes::Interrupted ||
         status == ErrorCodes::LockBusy || status == ErrorCodes::CommandNotFound;
+}
+
+ShardingDDLCoordinatorExternalState* ShardingDDLCoordinator::_getExternalState() {
+    return _externalState.get();
 }
 
 }  // namespace mongo

@@ -175,6 +175,8 @@ protected:
      */
     bool _isRetriableErrorForDDLCoordinator(const Status& status);
 
+    ShardingDDLCoordinatorExternalState* _getExternalState();
+
     ShardingDDLCoordinatorService* _service;
     const ShardingDDLCoordinatorId _coordId;
 
@@ -233,6 +235,7 @@ private:
     std::unique_ptr<Locker> _locker;
 
     std::stack<DDLLockManager::ScopedBaseDDLLock> _scopedLocks;
+    std::unique_ptr<ShardingDDLCoordinatorExternalState> _externalState;
 
     friend class ShardingDDLCoordinatorTest;
 };

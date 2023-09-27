@@ -59,6 +59,7 @@ enums:
             # Note: the V3 refers to the coordinator version, not the FLE2 protocol version
             kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
             kCleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
+            kMigrationBlockingOperation: "migrationBlockingOperation"
 
 types:
     ForwardableOperationMetadata:

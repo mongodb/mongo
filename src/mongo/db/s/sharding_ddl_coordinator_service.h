@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/sharding_ddl_coordinator_external_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -59,8 +60,12 @@ class ShardingDDLCoordinatorService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ShardingDDLCoordinator"_sd;
 
-    explicit ShardingDDLCoordinatorService(ServiceContext* serviceContext)
-        : PrimaryOnlyService(serviceContext) {}
+    explicit ShardingDDLCoordinatorService(
+        ServiceContext* serviceContext,
+        std::unique_ptr<ShardingDDLCoordinatorExternalStateFactory> externalStateFactory =
+            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryImpl>())
+        : PrimaryOnlyService(serviceContext),
+          _externalStateFactory(std::move(externalStateFactory)) {}
 
     ~ShardingDDLCoordinatorService() = default;
 
@@ -87,6 +92,8 @@ public:
         const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) override{};
 
     std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
+
+    std::unique_ptr<ShardingDDLCoordinatorExternalState> createExternalState() const;
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
 
@@ -140,6 +147,8 @@ private:
     size_t _numCoordinatorsToWait{0};
 
     stdx::unordered_map<DDLCoordinatorTypeEnum, size_t> _numActiveCoordinatorsPerType;
+
+    std::unique_ptr<ShardingDDLCoordinatorExternalStateFactory> _externalStateFactory;
 };
 
 }  // namespace mongo

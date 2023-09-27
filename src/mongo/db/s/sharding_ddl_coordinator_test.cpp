@@ -31,6 +31,7 @@
 
 #include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
 namespace mongo {
@@ -52,12 +53,16 @@ public:
         _executor->startup();
 
         _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(_executor);
+        _service = std::make_unique<ShardingDDLCoordinatorService>(
+            getServiceContext(),
+            std::make_unique<ShardingDDLCoordinatorExternalStateFactoryForTest>());
     }
 
 protected:
     executor::NetworkInterfaceMock* _network;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
+    std::unique_ptr<ShardingDDLCoordinatorService> _service;
 
     class TestShardingDDLCoordinator : public ShardingDDLCoordinator {
     public:
@@ -115,7 +120,7 @@ TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
             ShardingDDLCoordinatorId(mainNss, DDLCoordinatorTypeEnum::kDropCollection));
 
         auto coordinator = std::make_shared<TestShardingDDLCoordinator>(
-            nullptr, coordinatorMetadata, std::set<NamespaceString>({additionalNss}));
+            _service.get(), coordinatorMetadata, std::set<NamespaceString>({additionalNss}));
         coordinator->fulfillPromises();
         CancellationSource cancellationSource;
 
