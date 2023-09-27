@@ -605,8 +605,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto collUuid =
-                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledReadCmd.nss);
+            auto collUuid = getCollectionUUID(opCtx, sampledReadCmd.nss);
             if (!shouldPersistSample(opCtx, sampledReadCmd.nss, collUuid)) {
                 return;
             }
@@ -650,8 +649,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto collUuid =
-                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledUpdateCmd.nss);
+            auto collUuid = getCollectionUUID(opCtx, sampledUpdateCmd.nss);
             if (!shouldPersistSample(opCtx, sampledUpdateCmd.nss, collUuid)) {
                 return;
             }
@@ -704,8 +702,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto collUuid =
-                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledDeleteCmd.nss);
+            auto collUuid = getCollectionUUID(opCtx, sampledDeleteCmd.nss);
             if (!shouldPersistSample(opCtx, sampledDeleteCmd.nss, collUuid)) {
                 return;
             }
@@ -759,8 +756,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto collUuid =
-                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledFindAndModifyCmd.nss);
+            auto collUuid = getCollectionUUID(opCtx, sampledFindAndModifyCmd.nss);
             if (!shouldPersistSample(opCtx, sampledFindAndModifyCmd.nss, collUuid)) {
                 return;
             }
@@ -824,7 +820,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
                 return;
             }
 
-            if (collUuid != CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss)) {
+            if (collUuid != getCollectionUUID(opCtx, nss)) {
                 return;
             }
 
