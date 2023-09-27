@@ -1226,29 +1226,16 @@ void BalancerDefragmentationPolicyImpl::startCollectionDefragmentations(Operatio
 
 void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(OperationContext* opCtx,
                                                                        const NamespaceString& nss) {
-    bool abortRequestPersisted = false;
-    {
-        stdx::lock_guard<Latch> lk(_stateMutex);
-        auto coll =
-            ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, nss, {});
-        if (coll.getDefragmentCollection()) {
-            if (_defragmentationStates.contains(coll.getUuid())) {
-                // Notify phase to abort current phase
-                _defragmentationStates.at(coll.getUuid())->userAbort();
-                _onStateUpdated();
-            }
-            _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kFinished, coll.getUuid());
-            abortRequestPersisted = true;
+    stdx::lock_guard<Latch> lk(_stateMutex);
+    auto coll =
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, nss, {});
+    if (coll.getDefragmentCollection()) {
+        if (_defragmentationStates.contains(coll.getUuid())) {
+            // Notify phase to abort current phase
+            _defragmentationStates.at(coll.getUuid())->userAbort();
+            _onStateUpdated();
         }
-    }
-
-    if (abortRequestPersisted) {
-        WriteConcernResult ignoreResult;
-        const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-        uassertStatusOK(waitForWriteConcern(opCtx,
-                                            latestOpTime,
-                                            WriteConcerns::kMajorityWriteConcernShardingTimeout,
-                                            &ignoreResult));
+        _persistPhaseUpdate(opCtx, DefragmentationPhaseEnum::kFinished, coll.getUuid());
     }
 }
 
@@ -1545,6 +1532,10 @@ void BalancerDefragmentationPolicyImpl::_persistPhaseUpdate(OperationContext* op
     uassert(ErrorCodes::NoMatchingDocument,
             "Collection {} not found while persisting phase change"_format(uuid.toString()),
             response.getN() > 0);
+    WriteConcernResult ignoreResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
 }
 
 void BalancerDefragmentationPolicyImpl::_clearDefragmentationState(OperationContext* opCtx,
@@ -1572,6 +1563,11 @@ void BalancerDefragmentationPolicyImpl::_clearDefragmentationState(OperationCont
                                  << "" << CollectionType::kDefragmentationPhaseFieldName << ""))));
             return entry;
         }()})));
+
+    WriteConcernResult ignoreResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(
+        opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernShardingTimeout, &ignoreResult));
 }
 
 }  // namespace mongo
