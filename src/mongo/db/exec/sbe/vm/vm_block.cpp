@@ -141,44 +141,89 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCount(
     MONGO_UNREACHABLE;
 }
 
+namespace {
+template <class Cmp>
+FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueBlock* blockView,
+                                                                   value::TypeTags rhsTag,
+                                                                   value::Value rhsVal) {
+
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+        return genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
+    });
+
+    auto res = blockView->map(cmpOp);
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
+}  // namespace
+
+template <class Cmp>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmpScalar(
+    ArityType arity) {
+    invariant(arity == 2);
+    auto [blockOwned, blockTag, blockVal] = getFromStack(0);
+    invariant(blockTag == value::TypeTags::valueBlock);
+    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+
+    auto blockView = value::getValueBlock(blockVal);
+    return blockCompareGeneric<Cmp>(blockView, valueTag, valueVal);
+}
+
 /*
- * TODO: Comment.
+ * Comparison against scalar functions.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockGtScalar(
     ArityType arity) {
-    MONGO_UNREACHABLE;
+    return builtinValueBlockCmpScalar<std::greater<>>(arity);
 }
 
-/*
- * TODO: Comment.
- */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockGteScalar(
     ArityType arity) {
-    MONGO_UNREACHABLE;
+    return builtinValueBlockCmpScalar<std::greater_equal<>>(arity);
 }
 
-/*
- * TODO: Comment.
- */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockEqScalar(
     ArityType arity) {
-    MONGO_UNREACHABLE;
+    return builtinValueBlockCmpScalar<std::equal_to<>>(arity);
 }
 
-/*
- * TODO: Comment.
- */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNeqScalar(
+    ArityType arity) {
+    auto [blockOwned, blockTag, blockVal] = builtinValueBlockCmpScalar<std::equal_to<>>(arity);
+    value::ValueGuard guard(blockTag, blockVal);
+
+    // For neq we apply equal_to and then use genericNot() to negate it, just like the scalar
+    // variation in the VM.
+    static constexpr auto notOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto notOp = value::makeColumnOp<notOpType>(
+        [&](value::TypeTags tag, value::Value val) { return genericNot(tag, val); });
+
+    invariant(blockTag == value::TypeTags::valueBlock);
+
+    auto res = value::getValueBlock(blockVal)->map(notOp);
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLtScalar(
     ArityType arity) {
-    MONGO_UNREACHABLE;
+    return builtinValueBlockCmpScalar<std::less<>>(arity);
 }
 
-/*
- * TODO: Comment.
- */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLteScalar(
     ArityType arity) {
-    MONGO_UNREACHABLE;
+    return builtinValueBlockCmpScalar<std::less_equal<>>(arity);
 }
 
 /*
@@ -348,6 +393,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 
     auto blockOut = std::make_unique<value::HeterogeneousBlock>(
         std::vector<value::TypeTags>(folded.size(), value::TypeTags::Boolean), std::move(folded));
+
     return {true,
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
@@ -368,6 +414,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellBlockGetFlat
     tassert(7946600, "Cannot process temporary cell values", !cellOwn);
 
     auto* cell = value::getCellBlock(cellVal);
+
     return {false,
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(&cell->getValueBlock())};
