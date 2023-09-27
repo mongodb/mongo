@@ -80,16 +80,21 @@ assert.commandFailedWithCode(mongos.adminCommand({unshardCollection: ns}),
 const newCollName = "foo1"
 const newCollNs = dbName + '.' + newCollName
 assert.commandWorked(mongos.adminCommand({shardCollection: newCollNs, key: {oldKey: 1}}));
+
+assert.commandWorked(mongos.adminCommand({split: newCollNs, middle: {oldKey: 0}}));
+assert.commandWorked(mongos.adminCommand({moveChunk: newCollNs, find: {oldKey: -1}, to: shard0}));
+assert.commandWorked(mongos.adminCommand({moveChunk: newCollNs, find: {oldKey: 10}, to: shard1}));
+
 coll = mongos.getDB(dbName)[newCollName];
-for (let i = 0; i < 150; ++i) {
+for (let i = -30; i < 30; ++i) {
     assert.commandWorked(coll.insert({oldKey: i}));
 }
 
 // Unshard collection should succeed without toShard option.
 assert.commandWorked(mongos.adminCommand({unshardCollection: newCollNs}));
 
-assert.eq(150, st.rs1.getPrimary().getCollection(newCollNs).countDocuments({}));
-assert.eq(0, st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}));
+assert(st.rs1.getPrimary().getCollection(newCollNs).countDocuments({}) == 60 ||
+       st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 60);
 
 // Fail if command called on shard.
 assert.commandFailedWithCode(st.shard0.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
