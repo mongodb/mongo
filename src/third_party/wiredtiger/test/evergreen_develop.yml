@@ -14,38 +14,23 @@ variables:
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     database: WTPerformanceDataDB
-  display_tasks:
-    - name: Wiredtiger-perf-btree-jobs
-      execution_tasks:
-      - ".btree-perf"
+  tasks:
+    - name: compile
+    - ".btree-perf"
     # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
-    # - name: Wiredtiger-perf-lsm-jobs
-    #   execution_tasks:
-    #   - ".lsm-perf"
-    - name: Wiredtiger-perf-stress-jobs
-      execution_tasks:
-      - ".stress-perf"
-    - name: Wiredtiger-perf-checkpoint-jobs
-      execution_tasks:
-      - ".checkpoint-perf"
-    - name: Wiredtiger-perf-evict-jobs
-      execution_tasks:
-      - ".evict-perf"
-    - name: Wiredtiger-perf-log-jobs
-      execution_tasks:
-      - ".log-perf"
-    - name: Wiredtiger-perf-chunk-cache-jobs
-      execution_tasks:
-      - ".chunk-cache-perf"
-    - name: Wiredtiger-perf-long-jobs
-      execution_tasks:
-      - ".long-perf"
-    - name: Wiredtiger-perf-oplog-jobs
-      execution_tasks:
-      - ".oplog-perf"
-    - name: WiredTiger-wt2853-perf
-      execution_tasks:
-      - ".wt2853-perf"
+    # - ".lsm-perf"
+    - ".stress-perf"
+    - ".checkpoint-perf"
+    - ".evict-perf"
+    - ".log-perf"
+    - ".chunk-cache-perf"
+    - ".long-perf"
+    - ".oplog-perf"
+    - ".wt2853-perf"
+    - name: many-collection-test
+      distros: ubuntu2004-wt-large
+    - name: ".cppsuite-perf-test"
+    - name: many-dhandle-stress
 
 # Build variants that need to be run only on the develop branch.
 buildvariants:
@@ -57,21 +42,6 @@ buildvariants:
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTests
-  tasks:
-    - name: compile
-    - name: ".btree-perf"
-    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
-    # - name: ".lsm-perf"
-    - name: ".stress-perf"
-    - name: ".checkpoint-perf"
-    - name: ".evict-perf"
-    - name: ".log-perf"
-    - name: ".chunk-cache-perf"
-    - name: ".long-perf"
-    - name: ".oplog-perf"
-    - name: many-dhandle-stress
-    - name: ".wt2853-perf"
-    - name: ".cppsuite-perf-test"
 
 - <<: *perf-tasks-template
   name: ubuntu2004-perf-tests-arm64
@@ -81,23 +51,6 @@ buildvariants:
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTestsARM64
-  tasks:
-    - name: compile
-    - name: ".btree-perf"
-    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
-    # - name: ".lsm-perf"
-    - name: ".stress-perf"
-    - name: ".checkpoint-perf"
-    - name: ".evict-perf"
-    - name: ".log-perf"
-    - name: ".chunk-cache-perf"
-    - name: ".long-perf"
-    - name: ".oplog-perf"
-    - name: many-dhandle-stress
-    - name: ".wt2853-perf"
-    - name: ".cppsuite-perf-test"
-    - name: many-collection-test
-      distros: ubuntu2004-wt-large
 
 - name: documentation-update
   display_name: "~ Documentation update"
