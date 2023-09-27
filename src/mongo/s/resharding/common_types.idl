@@ -231,6 +231,18 @@ structs:
                 type: long
                 description: "Number of oplog entries applied on this recipient shard."
                 optional: true
+            totalNumDocuments:
+                type: long
+                description: "Number of documents on this recipient shard for the resharded collection."
+                optional: true
+            totalDocumentSize:
+                type: long
+                description: "Total size of all documents on this recipient shard for the resharded collection."
+                optional: true
+            numOfIndexes:
+                type: long
+                description: "Number of indexes on this recipient shard for the resharded collection."
+                optional: true
 
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."

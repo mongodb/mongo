@@ -2806,7 +2806,7 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
         statsBuilder.append("endTime", endTime);
 
         auto elapsedMillis = (endTime - startTime).count();
-        statsBuilder.append("totalElapsedMillis", elapsedMillis);
+        statsBuilder.append("operationDuration", elapsedMillis);
     } else {
         statsBuilder.append("endTime", getCurrentTime());
     }
@@ -2826,6 +2826,23 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
         shardBuilder.append("oplogApplied", shard.getMutableState().getOplogApplied().value_or(0));
         statsBuilder.append(shard.getId(), shardBuilder.obj());
     }
+
+    int64_t totalDocuments = 0;
+    int64_t docSize = 0;
+    int64_t totalIndexes = 0;
+    for (auto shard : _coordinatorDoc.getRecipientShards()) {
+        totalDocuments += shard.getMutableState().getTotalNumDocuments().value_or(0);
+        docSize += shard.getMutableState().getTotalDocumentSize().value_or(0);
+        totalIndexes += shard.getMutableState().getNumOfIndexes().value_or(0);
+    }
+    statsBuilder.append("numberOfTotalDocuments", totalDocuments);
+    statsBuilder.append("averageDocSize", totalDocuments > 0 ? (docSize / totalDocuments) : 0);
+    statsBuilder.append("numberOfIndexes", totalIndexes);
+
+    statsBuilder.append("numberOfSourceShards", (int64_t)(_coordinatorDoc.getDonorShards().size()));
+    statsBuilder.append("numberOfDestinationShards",
+                        (int64_t)(_coordinatorDoc.getRecipientShards().size()));
+
     builder.append("statistics", statsBuilder.obj());
     LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
 }

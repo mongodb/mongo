@@ -414,6 +414,14 @@ ReshardingRecipientService::RecipientStateMachine::_notifyCoordinatorAndAwaitDec
             auto opCtx = factory.makeOperationContext(&cc());
             if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
+                {
+                    AutoGetCollection coll(opCtx.get(), _metadata.getTempReshardingNss(), MODE_IS);
+                    if (coll) {
+                        _recipientCtx.setTotalNumDocuments(coll->numRecords(opCtx.get()));
+                        _recipientCtx.setTotalDocumentSize(coll->dataSize(opCtx.get()));
+                        _recipientCtx.setNumOfIndexes(coll->getIndexCatalog()->numIndexesTotal());
+                    }
+                }
                 _metrics->fillRecipientCtxOnCompletion(_recipientCtx);
             }
             return _updateCoordinator(opCtx.get(), executor, factory);
