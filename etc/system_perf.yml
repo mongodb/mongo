@@ -1790,6 +1790,7 @@ buildvariants:
     cron: "0 0 * * *"  # Everyday at 00:00
     expansions:
       <<: *compile-expansions
+      compile_variant: -stream-x86_64
       compile_flags: >-
         --ssl
         --separate-debug
@@ -2299,6 +2300,7 @@ buildvariants:
     cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
     modules: *modules
     expansions:
+      compile_variant: -stream-x86_64
       mongodb_setup_release: 2022-11
       mongodb_setup: standalone-streams
       infrastructure_provisioning_release: 2022-11
