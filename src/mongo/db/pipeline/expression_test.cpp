@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/pipeline/name_expression.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
@@ -155,6 +156,10 @@ static BSONObj toBson(const Document& document) {
 /** Create a Document from a BSONObj. */
 Document fromBson(BSONObj obj) {
     return Document(obj);
+}
+
+Document fromJson(const std::string& json) {
+    return Document(fromjson(json));
 }
 
 /** Create a Value from a BSONObj. */
@@ -4788,5 +4793,64 @@ TEST(ExpressionConvert, StringToDouble) {
     }
 }
 
+TEST(NameExpression, Literal) {
+    auto expCtx = ExpressionContextForTest{};
+    auto nameExprObj = fromjson(R"({db: "abc"})");
+    auto nameExpr = NameExpression::parseFromBSON(nameExprObj["db"]);
+    ASSERT_TRUE(nameExpr.isLiteral());
+    ASSERT_EQ("abc", nameExpr.getLiteral());
+
+    auto serializedStr = nameExpr.toString();
+    ASSERT_EQ(nameExprObj.toString(), serializedStr);
+}
+
+TEST(NameExpression, SimplePath) {
+    auto expCtx = ExpressionContextForTest{};
+    auto nameExprObj = fromjson(R"({coll: "$apath"})");
+    auto nameExpr = NameExpression::parseFromBSON(nameExprObj["coll"]);
+    ASSERT_FALSE(nameExpr.isLiteral());
+    ASSERT_EQ("ljk", nameExpr.evaluate(&expCtx, fromJson(R"({apath: "ljk"})")));
+
+    auto serializedStr = nameExpr.toString();
+    ASSERT_EQ(nameExprObj.toString(), serializedStr);
+}
+
+TEST(NameExpression, Expression) {
+    auto expCtx = ExpressionContextForTest{};
+    auto nameExprObj =
+        fromjson(R"({fullName: {$concat: ["$customer.firstname", " ", "$customer.surname"]}})");
+    auto nameExpr = NameExpression::parseFromBSON(nameExprObj["fullName"]);
+    ASSERT_FALSE(nameExpr.isLiteral());
+    ASSERT_EQ("Firstname Lastname", nameExpr.evaluate(&expCtx, fromJson(R"(
+                                    {
+                                        customer: {
+                                            firstname: "Firstname",
+                                            surname: "Lastname"
+                                        }
+                                    }
+                                )")));
+
+    auto serializedStr = nameExpr.toString();
+    ASSERT_EQ(nameExprObj.toString(), serializedStr);
+}
+
+TEST(NameExpression, NonStringValue) {
+    auto expCtx = ExpressionContextForTest{};
+    auto nameExprObj = fromjson(R"({fullName: {$add: ["$customer.id", 10]}})");
+    auto nameExpr = NameExpression::parseFromBSON(nameExprObj["fullName"]);
+    ASSERT_FALSE(nameExpr.isLiteral());
+    ASSERT_THROWS_CODE(
+        nameExpr.evaluate(&expCtx, fromJson(R"({customer: {id: 10}})")), DBException, 8117101);
+}
+
+TEST(NameExpression, InvalidInput) {
+    auto expCtx = ExpressionContextForTest{};
+    auto nameExprObj =
+        fromjson(R"({fullName: {$concat: ["$customer.firstname", " ", "$customer.surname"]}})");
+    auto nameExpr = NameExpression::parseFromBSON(nameExprObj["fullName"]);
+    ASSERT_FALSE(nameExpr.isLiteral());
+    ASSERT_THROWS_CODE(
+        nameExpr.evaluate(&expCtx, fromJson(R"({customer: {id: 10}})")), DBException, 8117101);
+}
 }  // namespace ExpressionTests
 }  // namespace mongo

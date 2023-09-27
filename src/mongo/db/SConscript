@@ -1758,6 +1758,7 @@ env.Library(
         'pipeline/javascript_execution.cpp',
         'pipeline/make_js_function.cpp',
         'pipeline/monotonic_expression.cpp',
+        'pipeline/name_expression.cpp',
         'pipeline/variables.cpp',
         'query/query_shape/cmd_with_let_shape.cpp',
     ],
