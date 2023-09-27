@@ -641,7 +641,6 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
         }
     }
 
-    keyOutPair.first.fillCache();
     const auto memUsage = keyOutPair.first.getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
     _map->emplace(keyOutPair.first,
