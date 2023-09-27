@@ -4216,9 +4216,23 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                   false /* owned */,
                                                   &_slotIdGenerator);
 
+    bool isStoredSource =
+        sn->searchQuery.getBoolField(sbe::SearchCursorStage::kReturnStoredSourceArg);
+
+    auto topLevelFields = getTopLevelFields(reqs.getFields());
+    auto topLevelFieldSlots = _slotIdGenerator.generateMultiple(topLevelFields.size());
+
     PlanStageSlots outputs;
+
+    for (size_t i = 0; i < topLevelFields.size(); ++i) {
+        outputs.set(std::make_pair(PlanStageSlots::kField, std::move(topLevelFields[i])),
+                    topLevelFieldSlots[i]);
+    }
+
     // Search cursor stage output slots
-    auto searchResultSlot = _slotIdGenerator.generate();
+    auto searchResultSlot = isStoredSource && reqs.has(kResult)
+        ? boost::make_optional(_slotIdGenerator.generate())
+        : boost::none;
     auto searchMetaSlot = _slotIdGenerator.generate();
 
     std::vector<std::string> metadataNames = {Document::metaFieldSearchScore.toString(),
@@ -4231,8 +4245,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     outputs.set(kMetadataSearchDetails, metadataSlots[2]);
     outputs.set(kMetadataSortValues, metadataSlots[3]);
 
-    std::vector<std::string> fieldNames = {"_id"};
-    auto fieldSlots = _slotIdGenerator.generateMultiple(fieldNames.size());
+    std::vector<std::string> fieldNames =
+        isStoredSource ? topLevelFields : std::vector<std::string>{"_id"};
+    auto fieldSlots =
+        isStoredSource ? topLevelFieldSlots : _slotIdGenerator.generateMultiple(fieldNames.size());
 
     auto searchCursorStage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
                                                                 expCtx->uuid,
@@ -4251,6 +4267,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                                 expCtx->explain,
                                                                 _yieldPolicy,
                                                                 sn->nodeId());
+    if (isStoredSource) {
+        if (searchResultSlot) {
+            outputs.set(kResult, searchResultSlot.value());
+        }
+        outputs.clearNonRequiredSlots(reqs);
+        return {std::move(searchCursorStage), std::move(outputs)};
+    }
+
     auto searchCursorStagePtr = dynamic_cast<sbe::SearchCursorStage*>(searchCursorStage.get());
 
     // Make a project stage to convert '_id' field value into keystring.
@@ -4306,8 +4330,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto fetchStage = makeLoopJoinForFetch(std::move(idxScanStage),
                                            outputDocSlot,
                                            ridSlot,
-                                           std::vector<std::string>() /* fields */,
-                                           sbe::makeSV() /* fieldSlots */,
+                                           topLevelFields,
+                                           topLevelFieldSlots,
                                            idxOutputs.get(kRecordId).slotId,
                                            idxOutputs.get(kSnapshotId).slotId,
                                            idxOutputs.get(kIndexIdent).slotId,

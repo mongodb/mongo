@@ -95,12 +95,6 @@ public:
      */
     boost::optional<long long> calcDocsNeeded();
 
-    auto isStoredSource() const {
-        return _searchQuery.hasField(kReturnStoredSourceArg)
-            ? _searchQuery[kReturnStoredSourceArg].Bool()
-            : false;
-    }
-
     void setDocsReturnedStats(const CommonStats* docsReturnedStats) {
         _docsReturnedStats = docsReturnedStats;
     }
@@ -146,6 +140,7 @@ private:
 
     // Variables to save the value from input slots.
     boost::optional<BSONObj> _response;
+    boost::optional<BSONObj> _resultObj;
     BSONObj _searchQuery;
     uint64_t _limit{0};
 
@@ -158,5 +153,6 @@ private:
     // skip the docs that been filtered out.
     // TODO: SERVER-80648 to have a better way to track count of idx scan stage.
     const CommonStats* _docsReturnedStats;
+    bool _isStoredSource{false};
 };
 }  // namespace mongo::sbe
