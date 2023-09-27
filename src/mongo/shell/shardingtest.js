@@ -1666,6 +1666,20 @@ var ShardingTest = function ShardingTest(params) {
         this.configRS.awaitNodesAgreeOnPrimary();
         var csrsPrimary = this.configRS.getPrimary();
 
+        // TODO: SERVER-80100 Remove assert.soon.
+        if (useAutoBootstrapProcedure) {
+            assert.soonNoExcept(() => {
+                let getConfigShardDoc = function() {
+                    return csrsPrimary.getDB('config').shards.findOne({_id: 'config'});
+                };
+
+                let configShardDoc = this.keyFile
+                    ? authutil.asCluster(csrsPrimary, this.keyFile, getConfigShardDoc)
+                    : getConfigShardDoc();
+                return configShardDoc != null;
+            });
+        }
+
         print("ShardingTest startup and initiation for all nodes took " + (new Date() - startTime) +
               "ms with " + this.configRS.nodeList().length + " config server nodes and " +
               totalNumShardNodes(this) + " total shard nodes.");
@@ -1826,26 +1840,27 @@ var ShardingTest = function ShardingTest(params) {
                     var n = z.name || z.host || z;
 
                     var name;
-                    // TODO: SERVER-80010 Don't transition when auto-bootstrapping.
                     if (isConfigShardMode && idx == 0) {
                         name = "config";
 
-                        print("ShardingTest " + testName + " transitioning to config shard");
+                        if (!useAutoBootstrapProcedure) {
+                            print("ShardingTest " + testName + " transitioning to config shard");
 
-                        function transitionFromDedicatedConfigServer() {
-                            return assert.commandWorked(
-                                admin.runCommand({transitionFromDedicatedConfigServer: 1}));
-                        }
+                            function transitionFromDedicatedConfigServer() {
+                                return assert.commandWorked(
+                                    admin.runCommand({transitionFromDedicatedConfigServer: 1}));
+                            }
 
-                        if (keyFile) {
-                            authutil.asCluster(
-                                admin.getMongo(), keyFile, transitionFromDedicatedConfigServer);
-                        } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
-                            authutil.asCluster(admin.getMongo(),
-                                               mongosOptions[0].keyFile,
-                                               transitionFromDedicatedConfigServer);
-                        } else {
-                            transitionFromDedicatedConfigServer();
+                            if (keyFile) {
+                                authutil.asCluster(
+                                    admin.getMongo(), keyFile, transitionFromDedicatedConfigServer);
+                            } else if (mongosOptions[0] && mongosOptions[0].keyFile) {
+                                authutil.asCluster(admin.getMongo(),
+                                                   mongosOptions[0].keyFile,
+                                                   transitionFromDedicatedConfigServer);
+                            } else {
+                                transitionFromDedicatedConfigServer();
+                            }
                         }
 
                         z.shardName = name;

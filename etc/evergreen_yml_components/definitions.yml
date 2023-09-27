@@ -7048,7 +7048,7 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: sharding_config_shard_gen
+  name: sharding_auto_bootstrap_gen
   tags: ["sharding", "common"]
   commands:
   - func: "generate resmoke tasks"

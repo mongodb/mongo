@@ -17,4 +17,5 @@ executor:
       global_vars:
         TestData:
           configShard: true
+          useAutoBootstrapProcedure: true
       nodb: ''
