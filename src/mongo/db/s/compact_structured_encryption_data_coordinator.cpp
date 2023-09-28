@@ -225,8 +225,10 @@ bool doRenameOperation(const CompactionState& state,
         // Create the new ECOC collection
         CreateCommand createCmd(ecocNss);
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
-        createCmd.setClusteredIndex(
+        CreateCollectionRequest request;
+        request.setClusteredIndex(
             stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
+        createCmd.setCreateCollectionRequest(std::move(request));
         auto status = doRunCommand(opCtx.get(), ecocNss.dbName(), createCmd);
         if (!status.isOK()) {
             if (status != ErrorCodes::NamespaceExists) {

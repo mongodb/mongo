@@ -169,7 +169,7 @@ TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
     tsOptions.setBucketRoundingSeconds(100);
     tsOptions.setBucketMaxSpanSeconds(100);
     CreateCommand cmd = CreateCommand(curNss);
-    cmd.setTimeseries(std::move(tsOptions));
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     // Run collMod without changing the bucket span and validate that the
@@ -214,7 +214,7 @@ TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
     tsOptions.setBucketRoundingSeconds(100);
     tsOptions.setBucketMaxSpanSeconds(100);
     CreateCommand cmd = CreateCommand(curNss);
-    cmd.setTimeseries(std::move(tsOptions));
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     uassertStatusOK(writeConflictRetry(

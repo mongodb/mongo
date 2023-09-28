@@ -472,7 +472,7 @@ public:
                               "'idIndex' must have the same collation as the collection.");
                 }
 
-                cmd.setIdIndex(idIndexSpec);
+                cmd.getCreateCollectionRequest().setIdIndex(idIndexSpec);
             }
 
             if (cmd.getValidator() || cmd.getValidationLevel() || cmd.getValidationAction()) {
@@ -491,7 +491,8 @@ public:
                 if (!cmd.getViewOn() &&
                     validateChangeStreamPreAndPostImagesOptionIsPermitted(cmd.getNamespace())
                         .isOK()) {
-                    cmd.setChangeStreamPreAndPostImages(ChangeStreamPreAndPostImagesOptions{true});
+                    cmd.getCreateCollectionRequest().setChangeStreamPreAndPostImages(
+                        ChangeStreamPreAndPostImagesOptions{true});
                 }
             });
 
