@@ -1116,6 +1116,11 @@ StatusWithMatchExpression parseInternalBucketGeoWithinMatchExpression(
                 str::stream() << InternalBucketGeoWithinMatchExpression::kName
                               << " must be an object"};
     }
+    if (currentLevel == DocumentParseLevel::kUserSubDocument) {
+        return {ErrorCodes::QueryFeatureNotAllowed,
+                str::stream() << InternalBucketGeoWithinMatchExpression::kName
+                              << " can only be applied to the top-level document"};
+    }
 
     auto subobj = elem.embeddedObject();
 

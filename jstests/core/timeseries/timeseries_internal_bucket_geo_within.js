@@ -11,10 +11,10 @@
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
- *   # Error-handling behavior updated in 6.2, will cause issues for multiversion testing
- *   requires_fcv_62,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # Versions before 7.2 incorrectly allow $_internalBucketGeoWithin within $elemMatch.
+ *   requires_fcv_72,
  * ]
  */
 
@@ -310,4 +310,27 @@ assert.sameMembers(results, [
     pipeline = [{$match: {loc: {$geoWithin: {$centerSphere: [[0, 80], 1], $center: [[0, 0], 5]}}}}];
     err = assert.throws(() => coll.explain().aggregate(pipeline));
     assert.eq(err.code, ErrorCodes.BadValue, err);
+
+    // $_internalBucketGeoWithin is not allowed in $elemMatch.
+    pipeline = [{
+        $match: {
+            abc: {
+                $elemMatch: {
+                    "$_internalBucketGeoWithin": {
+                        "withinRegion": {
+                            "$geometry": {
+                                "type": "Polygon",
+                                "coordinates": [[[0, 0], [3, 6], [6, 1], [0, 0]]]
+                            }
+                        },
+                        "field": "loc"
+                    }
+                }
+            }
+        }
+    }];
+    err = assert.throws(() => coll.explain().aggregate(pipeline));
+    assert.eq(err.code,
+              ErrorCodes.QueryFeatureNotAllowed,
+              {expectedCode: ErrorCodes.QueryFeatureNotAllowed, actualCode: err.code, err});
 }
