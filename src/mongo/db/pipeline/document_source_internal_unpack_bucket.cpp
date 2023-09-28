@@ -277,7 +277,12 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
             expCtx.get(), field.firstElement(), expCtx->variablesParseState));
     };
 
-    return DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
+    auto newGroup = DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
+
+    // The $first accumulator is compatible with SBE.
+    newGroup->setSbeCompatibility(SbeCompatibility::fullyCompatible);
+
+    return newGroup;
 }
 
 // Optimize the section of the pipeline before the $_internalUnpackBucket stage.
@@ -1346,6 +1351,9 @@ tryRewriteGroupAsSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
         expCtx.get(), maybeAcc->firstElement(), expCtx->variablesParseState);
     auto newGroupStage =
         DocumentSourceGroup::create(expCtx, groupStage->getIdExpression(), {newAccState});
+    // We are running the same accumulators as were present in the original group but at the bucket
+    // level, so the group compatibility with SBE should be the same.
+    newGroupStage->setSbeCompatibility(groupStage->sbeCompatibility());
     return {newSortStage, newGroupStage};
 }
 
@@ -1487,8 +1495,17 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         return true;
     };
 
-    return tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kFirstDocument) ||
+    const bool optimized =
+        tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kFirstDocument) ||
         tryInsertBucketLevelSortAndGroup(AccumulatorDocumentsNeeded::kLastDocument);
+
+    // If we lower the group at the bucket collection level to SBE we won't be able to unpack in
+    // SBE due to the current limitations of 'TsBucketToCellBlockStage', but we don't want to
+    // run this pipeline in hybrid mode because of the potential perf impact.
+    if (optimized) {
+        pExpCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+    }
+    return optimized;
 }
 
 

@@ -1650,6 +1650,22 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
     QueryPlannerParams plannerOpts;
     if (timeseriesBoundedSortOptimization) {
         plannerOpts.traversalPreference = createTimeSeriesTraversalPreference(unpack, sort);
+
+        // Whether to use bounded sort or not is determined _after_ the executor is created, based
+        // on whether the chosen collection access stage would support it. Because bounded sort and
+        // streaming group aren't implemented in SBE yet we have to block the whole pipeline from
+        // lowering to SBE so that it has the chance of doing the optimization. To allow as many
+        // sort + group pipelines over time-series to lower to SBE we'll only block those that sort
+        // on time as these are the only ones that _might_ end up using bounded sort.
+        // Note: This check (sort on time after unpacking) also disables the streaming group
+        // optimization, that might happen w/o bounded sort.
+        for (const auto& sortKey : sort->getSortKeyPattern()) {
+            if (sortKey.fieldPath &&
+                *(sortKey.fieldPath) == unpack->bucketUnpacker().getTimeField()) {
+                expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+                break;
+            }
+        }
     }
 
     // Create the PlanExecutor.

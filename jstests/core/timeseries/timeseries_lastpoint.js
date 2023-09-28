@@ -48,8 +48,6 @@ function getGroupStage(time, extraFields = []) {
     testAllTimeMetaDirections(
         tsColl, observerColl, ({time, canUseDistinct, canSortOnTimeUseDistinct, index}) => {
             const groupStage = getGroupStage(time);
-            const expectCollscanNoSort = ({explain}) =>
-                expectCollScan({explain, noSortInCursor: true});
             const getTestWithMatch = (matchStage, precedingFilter) => {
                 return {
                     precedingFilter,
@@ -81,8 +79,8 @@ function getGroupStage(time, extraFields = []) {
                         {$sort: index},
                         getGroupStage(time, ["abc"]),
                     ],
-                    expectStageWithIndex: expectCollscanNoSort,
-                    expectStageNoIndex: expectCollscanNoSort,
+                    expectStageWithIndex: expectCollScan,
+                    expectStageNoIndex: expectCollScan,
                 },
 
                 // Test pipeline with an equality $match stage.

@@ -55,9 +55,6 @@ function getGroupStage({time, sortBy, n, extraFields = []}) {
     const [tsColl, observerColl] = createBoringCollections();
     testAllTimeMetaDirections(
         tsColl, observerColl, ({time, index, canUseDistinct, canSortOnTimeUseDistinct}) => {
-            const expectCollscanNoSort = ({explain}) =>
-                expectCollScan({explain, noSortInCursor: true});
-
             // Try both $top/$bottom and $topN/$bottomN variations of the rewrite.
             return [1, undefined].flatMap(n => {
                 const groupStage = getGroupStage({time, sortBy: index, n});
@@ -92,8 +89,8 @@ function getGroupStage({time, sortBy, n, extraFields = []}) {
                             {$set: {abc: {$add: [1, "$tags.hostid"]}}},
                             getGroupStage({time, sortBy: index, n, extraFields: ["abc"]}),
                         ],
-                        expectStageWithIndex: expectCollscanNoSort,
-                        expectStageNoIndex: expectCollscanNoSort,
+                        expectStageWithIndex: expectCollScan,
+                        expectStageNoIndex: expectCollScan,
                     },
 
                     // Test pipeline with an equality $match stage.
