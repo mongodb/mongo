@@ -2,8 +2,7 @@
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
-//   tenant_migration_incompatible,
-//   command_not_supported_in_serverless,
+//   simulate_atlas_proxy_incompatible
 // ]
 //
 

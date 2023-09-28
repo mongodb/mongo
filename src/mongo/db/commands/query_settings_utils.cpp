@@ -33,8 +33,19 @@
 #include "mongo/db/query/query_shape/agg_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {
+
+namespace {
+// Explicitly defines the `SerializationContext` to be used in `RepresentativeQueryInfo` factory
+// methods. This was done as part of SERVER-79909 to ensure that inner query commands correctly
+// infer the `tenantId`.
+auto const kSerializationContext = SerializationContext{SerializationContext::Source::Command,
+                                                        SerializationContext::CallerType::Request,
+                                                        SerializationContext::Prefix::Default,
+                                                        true /* nonPrefixedTenantId */};
+}  // namespace
 
 /*
  * Creates the corresponding RepresentativeQueryInfo for Find query representatives.
@@ -44,7 +55,9 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<TenantId>& tenantId) {
     auto findCommandRequest = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
-        IDLParserContext("findCommandRequest", false /* apiStrict */, tenantId), queryInstance));
+        IDLParserContext(
+            "findCommandRequest", false /* apiStrict */, tenantId, kSerializationContext),
+        queryInstance));
 
     // Populate encryption information.
     auto& encryptionInformation = findCommandRequest->getEncryptionInformation();
@@ -81,7 +94,8 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const boost::optional<TenantId>& tenantId) {
     auto aggregateCommandRequest = AggregateCommandRequest::parse(
-        IDLParserContext("aggregateCommandRequest", false /* apiStrict */, tenantId),
+        IDLParserContext(
+            "aggregateCommandRequest", false /* apiStrict */, tenantId, kSerializationContext),
         queryInstance);
     // Add the aggregate command request to the expression context for the parsed pipeline
     // to be able to get the involved namespaces.

@@ -4,8 +4,7 @@
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
 //   does_not_support_stepdowns,
-//   tenant_migration_incompatible,
-//   command_not_supported_in_serverless,
+//   simulate_atlas_proxy_incompatible
 // ]
 //
 
