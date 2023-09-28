@@ -179,13 +179,6 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         str::stream()
                             << "MoveCollection can only be called on an unsharded collection.",
                         !cmOld.isSharded() && cmOld.hasRoutingTable());
-
-                std::set<ShardId> shardIdsSet;
-                cmOld.getAllShardIds(&shardIdsSet);
-                uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "Collection is already on the specified shard.",
-                        shardIdsSet.find(_doc.getShardDistribution().get().front().getShard()) ==
-                            shardIdsSet.end());
             } else {
                 uassert(ErrorCodes::NamespaceNotSharded,
                         "Collection has to be a sharded collection.",

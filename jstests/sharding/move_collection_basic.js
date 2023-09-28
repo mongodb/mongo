@@ -56,10 +56,6 @@ assert.eq(50, st.rs0.getPrimary().getCollection(unsplittableCollNs).countDocumen
 
 // move to non-primary shard.
 assert.commandWorked(mongos.adminCommand({moveCollection: unsplittableCollNs, toShard: shard1}));
-// Fail to move to the same shard again.
-assert.commandFailedWithCode(
-    mongos.adminCommand({moveCollection: unsplittableCollNs, toShard: shard1}),
-    ErrorCodes.InvalidOptions);
 
 // Should have unsplittable set to true
 let configDb = mongos.getDB('config');

@@ -1825,31 +1825,20 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     return _isReshardingOpRedundant(executor)
         .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this(), executor](
-                          StatusWith<bool> shardKeyMatchesSW) -> ExecutorFuture<void> {
-            if (shardKeyMatchesSW.isOK() && shardKeyMatchesSW.getValue()) {
-                // If forceRedistribution is true, still do resharding.
-                if (_coordinatorDoc.getForceRedistribution() &&
-                    *_coordinatorDoc.getForceRedistribution()) {
-                    return _runReshardingOp(executor);
-                }
-
-                this->_coordinatorService->releaseInstance(this->_id,
-                                                           shardKeyMatchesSW.getStatus());
+                          StatusWith<bool> isOpRedundantSW) -> ExecutorFuture<void> {
+            if (isOpRedundantSW.isOK() && isOpRedundantSW.getValue()) {
+                this->_coordinatorService->releaseInstance(this->_id, isOpRedundantSW.getStatus());
                 _coordinatorDocWrittenPromise.emplaceValue();
                 _completionPromise.emplaceValue();
                 _reshardingCoordinatorObserver->fulfillPromisesBeforePersistingStateDoc();
-                return ExecutorFuture<void>(**executor, shardKeyMatchesSW.getStatus());
-            } else if (!shardKeyMatchesSW.isOK()) {
-                this->_coordinatorService->releaseInstance(this->_id,
-                                                           shardKeyMatchesSW.getStatus());
-                _coordinatorDocWrittenPromise.setError(shardKeyMatchesSW.getStatus());
-                _completionPromise.setError(shardKeyMatchesSW.getStatus());
-                _reshardingCoordinatorObserver->interrupt(shardKeyMatchesSW.getStatus());
-                return ExecutorFuture<void>(**executor, shardKeyMatchesSW.getStatus());
+                return ExecutorFuture<void>(**executor, isOpRedundantSW.getStatus());
+            } else if (!isOpRedundantSW.isOK()) {
+                this->_coordinatorService->releaseInstance(this->_id, isOpRedundantSW.getStatus());
+                _coordinatorDocWrittenPromise.setError(isOpRedundantSW.getStatus());
+                _completionPromise.setError(isOpRedundantSW.getStatus());
+                _reshardingCoordinatorObserver->interrupt(isOpRedundantSW.getStatus());
+                return ExecutorFuture<void>(**executor, isOpRedundantSW.getStatus());
             }
-            // If this is not forced same-key resharding, set forceRedistribution to false so we can
-            // identify forced same-key resharding by this field later.
-            _coordinatorDoc.setForceRedistribution(false);
             return _runReshardingOp(executor);
         })
         .onCompletion([this, self = shared_from_this(), executor](Status status) {
@@ -2147,11 +2136,32 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                    cm.emplace(cri.cm);
                }
 
+               if (_metadata.getProvenance() == ProvenanceEnum::kMoveCollection) {
+                   // Verify if the moveCollection is redundant by checking if the operation is
+                   // attempting to move to the same shard.
+                   std::set<ShardId> shardIdsSet;
+                   cm->getAllShardIds(&shardIdsSet);
+                   const auto currentShard =
+                       _coordinatorDoc.getShardDistribution().get().front().getShard();
+                   return shardIdsSet.find(currentShard) != shardIdsSet.end();
+               }
+
                const auto currentShardKey = cm->getShardKeyPattern().getKeyPattern();
                // Verify if there is any work to be done by the resharding operation by checking
                // if the existing shard key matches the desired new shard key.
-               return SimpleBSONObjComparator::kInstance.evaluate(
+               bool isOpRedundant = SimpleBSONObjComparator::kInstance.evaluate(
                    currentShardKey.toBSON() == _coordinatorDoc.getReshardingKey().toBSON());
+
+               // If forceRedistribution is true, still do resharding.
+               if (isOpRedundant && _coordinatorDoc.getForceRedistribution() &&
+                   *_coordinatorDoc.getForceRedistribution()) {
+                   return false;
+               }
+
+               // If this is not forced same-key resharding, set forceRedistribution to false so
+               // we can identify forced same-key resharding by this field later.
+               _coordinatorDoc.setForceRedistribution(false);
+               return isOpRedundant;
            })
         .onTransientError([](const StatusWith<bool>& status) {
             LOGV2(7074600,
