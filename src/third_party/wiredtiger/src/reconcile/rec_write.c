@@ -1139,10 +1139,6 @@ __wt_rec_split_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page, ui
         r->split_size = r->salvage != NULL ? 0 : btree->maxleafpage;
         r->space_avail = primary_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
         r->aux_space_avail = auxiliary_size - WT_COL_FIX_AUXHEADER_RESERVATION;
-
-        /* min_space_avail and min_split_size aren't used for FLCS. Initialize them to zero. */
-        r->min_split_size = 0;
-        r->min_space_avail = 0;
     } else if (r->salvage != NULL) {
         r->split_size = 0;
         r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
@@ -1465,7 +1461,7 @@ __wt_rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r, size_t next_len)
      * contain the current item if we don't have enough items to split an internal page.
      */
     inuse = WT_PTRDIFF(r->first_free, r->cur_ptr->image.mem);
-    if (inuse < r->min_split_size && !__wt_rec_need_split(r, 0)) {
+    if (inuse < r->split_size / 2 && !__wt_rec_need_split(r, 0)) {
         WT_ASSERT(session, r->page->type != WT_PAGE_COL_FIX);
         goto done;
     }
