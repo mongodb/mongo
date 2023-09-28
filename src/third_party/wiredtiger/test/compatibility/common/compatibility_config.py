@@ -31,9 +31,10 @@
 # The branches we use for the testing. We support special branch name 'this' that refers to the
 # current branch. This is useful when debugging a compatibility issue on the current branch, but it
 # should not be enabled when testing on Evergreen.
-#BRANCHES = ['develop', 'mongodb-7.0', 'mongodb-6.3', 'mongodb-6.0']
-#BRANCHES = ['this', 'mongodb-6.0']
-BRANCHES = ['mongodb-7.0', 'mongodb-6.0']
+BRANCHES = ['develop', 'mongodb-7.1', 'mongodb-7.0', 'mongodb-6.3', 'mongodb-6.0']
+
+# Example use of the 'this' branch (useful for debugging):
+# BRANCHES = ['this', 'mongodb-6.0']
 
 # The default directory to which the test will check out other branches, relative to the project's
 # top-level directory.
