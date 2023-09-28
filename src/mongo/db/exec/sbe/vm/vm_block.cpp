@@ -130,18 +130,72 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
 
-/*
- * TODO: Comment.
- */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMin(ArityType arity) {
-    MONGO_UNREACHABLE;
+template <bool less>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
+    value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock) {
+    auto block = inputBlock->extract();
+    auto bitset = bitsetBlock->extract();
+
+    ValueCompare<less> comp{nullptr /* collator */};
+
+    tassert(8137400, "Expected block and bitset to be the same size", block.count == bitset.count);
+    tassert(8137401, "Expected bitset to be all bools", allBools(bitset.tags, bitset.count));
+
+    value::TypeTags accTag = value::TypeTags::Nothing;
+    value::Value accVal = 0;
+    for (size_t i = 0; i < block.count; ++i) {
+        if (value::bitcastTo<bool>(bitset[i].second) && accTag == value::TypeTags::Nothing &&
+            block.tags[i] != value::TypeTags::Nothing) {
+            accTag = block.tags[i];
+            accVal = block.vals[i];
+        } else if (value::bitcastTo<bool>(bitset[i].second) &&
+                   block.tags[i] != value::TypeTags::Nothing) {
+            if (comp({block.tags[i], block.vals[i]}, {accTag, accVal})) {
+                accTag = block.tags[i], accVal = block.vals[i];
+            }
+        }
+    }
+
+    auto [retTag, retVal] = value::copyValue(accTag, accVal);
+    return {true, retTag, retVal};
 }
 
 /*
- * TODO: Comment.
+ * Given a ValueBlock and bitset as input, returns a tag, value pair that contains the minimum value
+ * in the block based on compareValue. Values whose corresponding bit is set to false get ignored.
+ * This function will return a non-Nothing value if the block contains any non-Nothing values.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMin(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    invariant(inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    invariant(bitsetTag == value::TypeTags::valueBlock);
+    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+
+    return valueBlockMinMaxImpl<true /* less */>(valueBlockIn, bitsetBlock);
+}
+
+/*
+ * Given a ValueBlock and bitset as input, returns a tag, value pair that contains the maximum value
+ * in the block based on compareValue. Values whose corresponding bit is set to false get ignored.
+ * This function will return a non-Nothing value if the block contains any non-Nothing values.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMax(ArityType arity) {
-    MONGO_UNREACHABLE;
+    invariant(arity == 2);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    invariant(inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    invariant(bitsetTag == value::TypeTags::valueBlock);
+    auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+
+    return valueBlockMinMaxImpl<false /* less */>(valueBlockIn, bitsetBlock);
 }
 
 /*

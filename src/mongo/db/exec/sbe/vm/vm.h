@@ -2019,6 +2019,9 @@ private:
     // Block builtins
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
+    template <bool less>
+    FastTuple<bool, value::TypeTags, value::Value> valueBlockMinMaxImpl(
+        value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);

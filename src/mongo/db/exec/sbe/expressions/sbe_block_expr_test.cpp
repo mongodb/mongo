@@ -200,6 +200,119 @@ TEST_F(SBEBlockExpressionTest, BlockFillEmptyNothingTest) {
         std::vector{makeInt32(42), makeInt32(43), makeInt32(44), makeNothing(), makeInt32(46)});
 }
 
+TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor bitsetAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(40));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(41));
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto bitset = makeBoolBlock({true, true, false, false, true, true});
+    bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
+                         value::bitcastFrom<value::ValueBlock*>(bitset.get()));
+
+    {
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(
+            "valueBlockMin",
+            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        auto expectedMin = makeInt32(41);
+        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+
+        ASSERT_EQ(t, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
+    }
+
+    {
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(
+            "valueBlockMax",
+            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        auto expectedMax = makeInt32(42);
+        auto [t, v] = value::compareValue(runTag, runVal, expectedMax.first, expectedMax.second);
+
+        ASSERT_EQ(t, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor bitsetAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("zoom"_sd));  // TypeTags::StringSmall
+    block.push_back(makeInt32(42));
+    block.push_back(makeInt32(41));
+    block.push_back(makeInt32(40));
+    block.push_back(value::makeNewString("abcdefg"_sd));    // TypeTags::StringSmall
+    block.push_back(value::makeNewString("abcdefgh"_sd));   // TypeTags::StringBig
+    block.push_back(value::makeNewString("abcdefghi"_sd));  // TypeTags::StringBig
+    block.push_back(makeNothing());
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto bitset = makeBoolBlock({false, true, true, false, true, true, false, true});
+    bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
+                         value::bitcastFrom<value::ValueBlock*>(bitset.get()));
+
+    {
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(
+            "valueBlockMin",
+            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::NumberInt32);
+        auto expectedMin = makeInt32(41);
+        auto [t, v] = value::compareValue(runTag, runVal, expectedMin.first, expectedMin.second);
+
+        ASSERT_EQ(t, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
+    }
+
+    {
+        auto compiledExpr = sbe::makeE<sbe::EFunction>(
+            "valueBlockMax",
+            sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
+        auto compiledMinExpr = compileExpression(*compiledExpr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledMinExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        ASSERT_EQ(runTag, value::TypeTags::StringBig);
+        auto [maxTag, maxVal] = value::makeNewString("abcdefgh"_sd);
+        value::ValueGuard maxGuard(maxTag, maxVal);
+        auto [t, v] = value::compareValue(runTag, runVal, maxTag, maxVal);
+
+        ASSERT_EQ(t, value::TypeTags::NumberInt32);
+        ASSERT_EQ(value::bitcastTo<int32_t>(v), 0);
+    }
+}
+
 TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
     value::ViewOfValueAccessor blockAccessor;
     auto blockSlot = bindAccessor(&blockAccessor);
