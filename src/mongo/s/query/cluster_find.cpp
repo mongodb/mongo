@@ -235,6 +235,20 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         ? boost::make_optional(analyze_shard_key::getRandomShardId(shardIds))
         : boost::none;
 
+    // Replace the letParams expressions with their values.
+    if (auto letParams = findCommandToForward->getLet()) {
+        BSONObjBuilder result;
+
+        const auto& vars = query.getExpCtx()->variables;
+        const auto& vps = query.getExpCtx()->variablesParseState;
+        for (BSONElement elem : *letParams) {
+            StringData name = elem.fieldNameStringData();
+            result << name << vars.getUserDefinedValue(vps.getVariable(name));
+        }
+
+        findCommandToForward->setLet(result.obj());
+    }
+
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     std::vector<std::pair<ShardId, BSONObj>> requests;
     for (const auto& shardId : shardIds) {
@@ -624,6 +638,12 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // since it is incorrect to generate multiple sample ids for a single query.
     const auto sampleId = analyze_shard_key::tryGenerateSampleId(
         opCtx, query.nss(), analyze_shard_key::SampledCommandNameEnum::kFind);
+
+    // Evaluate let params once: not per shard, and not per retry.
+    if (auto letParams = findCommand.getLet()) {
+        auto* expCtx = query.getExpCtx().get();
+        expCtx->variables.seedVariablesWithLetParameters(expCtx, *letParams);
+    }
 
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
