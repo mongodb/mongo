@@ -407,6 +407,8 @@ last-continuous:
     ticket: SERVER-80947
   - test_file: jstests/noPassthrough/read_preference_metrics.js
     ticket: SERVER-66018
+  - test_file: jstests/core/timeseries/timeseries_match_pushdown.js
+    ticket: SERVER-79585
   suites: null
 last-lts:
   all:
@@ -862,4 +864,6 @@ last-lts:
     ticket: SERVER-80947
   - test_file: jstests/noPassthrough/read_preference_metrics.js
     ticket: SERVER-66018
+  - test_file: jstests/core/timeseries/timeseries_match_pushdown.js
+    ticket: SERVER-79585
   suites: null
