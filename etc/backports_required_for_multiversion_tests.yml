@@ -477,6 +477,8 @@ last-continuous:
     ticket: SERVER-81492
   - test_file: jstests/sharding/timeseries_insert_targeting_normalize_metadata.js
     ticket: SERVER-80203
+  - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
+    ticket: SERVER-79446
   suites: null
 last-lts:
   all:
@@ -1020,4 +1022,6 @@ last-lts:
     ticket: SERVER-81492
   - test_file: jstests/sharding/timeseries_insert_targeting_normalize_metadata.js
     ticket: SERVER-80203
+  - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
+    ticket: SERVER-79446
   suites: null

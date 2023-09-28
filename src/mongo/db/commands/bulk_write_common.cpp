@@ -171,6 +171,7 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     requestBase.setEncryptionInformation(nsInfoEntry.getEncryptionInformation());
     requestBase.setOrdered(req.getOrdered());
     requestBase.setBypassDocumentValidation(req.getBypassDocumentValidation());
+    requestBase.setCollectionUUID(nsInfoEntry.getCollectionUUID());
 
     return request;
 }

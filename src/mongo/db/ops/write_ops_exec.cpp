@@ -63,6 +63,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -2912,6 +2913,10 @@ write_ops::InsertCommandReply performTimeseriesWrites(
 
 write_ops::InsertCommandReply performTimeseriesWrites(
     OperationContext* opCtx, const write_ops::InsertCommandRequest& request, CurOp* curOp) {
+    // If an expected collection UUID is provided, always fail because the user-facing time-series
+    // namespace does not have a UUID.
+    checkCollectionUUIDMismatch(
+        opCtx, request.getNamespace(), nullptr, request.getCollectionUUID());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot insert into a time-series collection in a multi-document "
