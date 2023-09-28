@@ -26,17 +26,16 @@
  *    it in the license file.
  */
 
-#include "mongo/db/server_options.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/platform/basic.h"
 #include "mongo/rpc/message.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_task_names.h"
@@ -414,21 +413,30 @@ void ServiceStateMachine::_processMessage(ThreadGuard guard) {
 
     networkCounter.hitLogicalIn(_inMessage.size());
 
+
     // Pass sourced Message to handler to generate response.
-    auto opCtx = Client::getCurrent()->makeOperationContext();
+    // auto opCtx = Client::getCurrent()->makeOperationContext();
 
-    if (serverGlobalParams.enableCoroutine) {
-        opCtx->setCoroutineFunctors(&_coroYield, &_coroResume);
+    DbResponse dbresponse;
+    {
+        OperationContext opCtx(Client::getCurrent(), _serviceContext->nextOpId());
+        _serviceContext->initOperationContext(&opCtx);
+
+
+        if (serverGlobalParams.enableCoroutine) {
+            opCtx.setCoroutineFunctors(&_coroYield, &_coroResume);
+        }
+
+        // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
+        // database work for this request.
+        dbresponse = _sep->handleRequest(&opCtx, _inMessage);
+
+        _coroStatus = CoroStatus::Empty;
+        // opCtx must be destroyed here so that the operation cannot show
+        // up in currentOp results after the response reaches the client
+        // opCtx.reset();
+        _serviceContext->destoryOperationContext(&opCtx);
     }
-
-    // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
-    // database work for this request.
-    DbResponse dbresponse = _sep->handleRequest(opCtx.get(), _inMessage);
-
-    _coroStatus = CoroStatus::Empty;
-    // opCtx must be destroyed here so that the operation cannot show
-    // up in currentOp results after the response reaches the client
-    opCtx.reset();
 
     // Format our response, if we have one
     Message& toSink = dbresponse.response;
@@ -586,14 +594,16 @@ void ServiceStateMachine::_scheduleNextWithGuard(ThreadGuard guard,
     };
 
     guard.release();
-    Status status = Status::OK();
-    if (taskName == transport::ServiceExecutorTaskName::kSSMProcessMessage) {
-        // coroutine mode in actually
-        status = _serviceExecutor->schedule(std::move(func), flags, taskName, _threadGroupId);
-    } else {
-        // use adaptive mode to handle network task
-        status = _serviceContext->getServiceExecutor()->schedule(std::move(func), flags, taskName);
-    }
+    // Status status = Status::OK();
+    Status status = _serviceExecutor->schedule(std::move(func), flags, taskName, _threadGroupId);
+    // if (taskName == transport::ServiceExecutorTaskName::kSSMProcessMessage) {
+    //     // coroutine mode in actually
+    //     status = _serviceExecutor->schedule(std::move(func), flags, taskName, _threadGroupId);
+    // } else {
+    //     // use adaptive mode to handle network task
+    //     status = _serviceContext->getServiceExecutor()->schedule(std::move(func), flags,
+    //     taskName);
+    // }
 
     if (status.isOK()) {
         return;

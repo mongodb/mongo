@@ -169,3 +169,5 @@ compile_commands.json
 .cache/
 build*/
 src/mongo/installer/compass/install_compass
+out.perf
+perf.txt

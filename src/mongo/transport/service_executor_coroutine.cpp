@@ -4,7 +4,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
-#include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 
@@ -66,12 +65,11 @@ void ThreadGroup::TrySleep() {
         _is_sleep.store(false, std::memory_order_relaxed);
         return;
     }
-    MONGO_LOG(1) << "thread sleep";
+    
     _sleep_cv.wait(lk, [this] { return !IsIdle(); });
 
     // Woken up from sleep.
     _is_sleep.store(false, std::memory_order_relaxed);
-    MONGO_LOG(1) << "thread wake up";
 }
 
 void ThreadGroup::Terminate() {
@@ -93,7 +91,6 @@ Status ServiceExecutorCoroutine::start() {
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _stillRunning.store(true, std::memory_order_relaxed);
-        // _numStartingThreads = _reservedThreads;
     }
 
     for (size_t i = 0; i < _reservedThreads; i++) {
@@ -121,16 +118,14 @@ Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
         });
         lk.unlock();
 
+        ThreadGroup& threadGroup = _threadGroups[threadGroupId];
         while (_stillRunning.load()) {
 
             if (!_stillRunning.load(std::memory_order_relaxed)) {
                 break;
             }
 
-            ThreadGroup& threadGroup = _threadGroups[threadGroupId];
-
             threadGroup.TrySleep();
-
 
             size_t cnt = 0;
             if (threadGroup.resume_queue_size_.load(std::memory_order_relaxed) > 0) {
@@ -141,9 +136,9 @@ Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
                 }
-                if (cnt > 0) {
-                    MONGO_LOG(1) << "get resume task";
-                }
+                // if (cnt > 0) {
+                //     MONGO_LOG(1) << "get resume task";
+                // }
             }
 
             if (cnt == 0 && threadGroup.task_queue_size_.load(std::memory_order_relaxed) > 0) {
@@ -153,9 +148,9 @@ Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     _localWorkQueue.emplace_back(std::move(task_bulk[idx]));
                 }
-                if (cnt > 0) {
-                    MONGO_LOG(1) << "get normal task";
-                }
+                // if (cnt > 0) {
+                //     MONGO_LOG(1) << "get normal task";
+                // }
             }
 
             if (cnt == 0) {
@@ -163,10 +158,10 @@ Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
             }
 
             while (!_localWorkQueue.empty() && _stillRunning.load(std::memory_order_relaxed)) {
-                _localRecursionDepth = 1;
-                MONGO_LOG(1) << "thread " << threadGroupId << " do task";
+                // _localRecursionDepth = 1;
+                // MONGO_LOG(1) << "thread " << threadGroupId << " do task";
                 _localWorkQueue.front()();
-                MONGO_LOG(1) << "thread " << threadGroupId << " do task done";
+                // MONGO_LOG(1) << "thread " << threadGroupId << " do task done";
                 _localWorkQueue.pop_front();
             }
         }
@@ -212,31 +207,32 @@ Status ServiceExecutorCoroutine::schedule(Task task,
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
 
-    if (!_localWorkQueue.empty()) {
-        /*
-         * In perf testing we found that yielding after running a each request produced
-         * at 5% performance boost in microbenchmarks if the number of worker threads
-         * was greater than the number of available cores.
-         */
-        if (flags & ScheduleFlags::kMayYieldBeforeSchedule) {
-            if ((_localThreadIdleCounter++ & 0xf) == 0) {
-                markThreadIdle();
-            }
-        }
+    // if (!_localWorkQueue.empty()) {
+    //     MONGO_LOG(0) << "here?";
+    //     /*
+    //      * In perf testing we found that yielding after running a each request produced
+    //      * at 5% performance boost in microbenchmarks if the number of worker threads
+    //      * was greater than the number of available cores.
+    //      */
+    //     if (flags & ScheduleFlags::kMayYieldBeforeSchedule) {
+    //         if ((_localThreadIdleCounter++ & 0xf) == 0) {
+    //             markThreadIdle();
+    //         }
+    //     }
 
-        // Execute task directly (recurse) if allowed by the caller as it produced better
-        // performance in testing. Try to limit the amount of recursion so we don't blow up the
-        // stack, even though this shouldn't happen with this executor that uses blocking network
-        // I/O.
-        if ((flags & ScheduleFlags::kMayRecurse) &&
-            (_localRecursionDepth < reservedServiceExecutorRecursionLimit.loadRelaxed())) {
-            ++_localRecursionDepth;
-            task();
-        } else {
-            _localWorkQueue.emplace_back(std::move(task));
-        }
-        return Status::OK();
-    }
+    //     // Execute task directly (recurse) if allowed by the caller as it produced better
+    //     // performance in testing. Try to limit the amount of recursion so we don't blow up the
+    //     // stack, even though this shouldn't happen with this executor that uses blocking network
+    //     // I/O.
+    //     if ((flags & ScheduleFlags::kMayRecurse) &&
+    //         (_localRecursionDepth < reservedServiceExecutorRecursionLimit.loadRelaxed())) {
+    //         ++_localRecursionDepth;
+    //         task();
+    //     } else {
+    //         _localWorkQueue.emplace_back(std::move(task));
+    //     }
+    //     return Status::OK();
+    // }
 
     _threadGroups[thd_group_id].EnqueueTask(std::move(task));
 

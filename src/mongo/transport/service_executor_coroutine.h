@@ -21,7 +21,6 @@ class ThreadGroup {
 
 public:
     void EnqueueTask(Task task);
-
     void ResumeTask(Task task);
 
     void NotifyIfAsleep();

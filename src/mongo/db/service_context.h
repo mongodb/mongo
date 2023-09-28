@@ -215,7 +215,7 @@ public:
      * below, to cause the function to be executed on ServiceContext instances before they
      * are destroyed.
      */
-    using DestructorAction = stdx::function<void(ServiceContext*) >;
+    using DestructorAction = stdx::function<void(ServiceContext*)>;
 
     /**
      * Representation of a paired ConstructorAction and DestructorAction.
@@ -310,7 +310,8 @@ public:
      *
      */
     UniqueOperationContext makeOperationContext(Client* client);
-
+    void initOperationContext(OperationContext* opCtx);
+    void destoryOperationContext(OperationContext* opCtx);
     //
     // Storage
     //
@@ -500,6 +501,10 @@ public:
      * Binds the service executor to the service context
      */
     void setServiceExecutor(std::unique_ptr<transport::ServiceExecutor> exec);
+
+    unsigned int nextOpId() {
+        return _nextOpId.fetchAndAdd(1);
+    }
 
 private:
     class ClientObserverHolder {
