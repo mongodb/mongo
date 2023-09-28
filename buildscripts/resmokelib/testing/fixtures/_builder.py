@@ -15,7 +15,7 @@ from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.testing.fixtures.replicaset import \
     ReplicaSetFixture
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import \
-    ShardedClusterFixture
+    ShardedClusterFixture, _RouterView
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
 from buildscripts.resmokelib.utils import autoloader, default_if_none, pick_catalog_shard_node
 
@@ -369,14 +369,15 @@ class ShardedClusterBuilder(FixtureBuilder):
         """
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
+        is_multiversion = mixed_bin_versions is not None
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
+        self._validate_embedded_router_mode_options(kwargs, is_multiversion)
+
         mongos_class, mongos_executables = self._get_mongos_assets(kwargs, mixed_bin_versions,
                                                                    old_bin_version)
 
         sharded_cluster = _FIXTURES[self.REGISTERED_NAME](logger, job_num, fixturelib, *args,
                                                           **kwargs)
-
-        is_multiversion = mixed_bin_versions is not None
 
         for rs_shard_index in range(kwargs["num_shards"]):
             rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
@@ -391,10 +392,21 @@ class ShardedClusterBuilder(FixtureBuilder):
             config_svr = sharded_cluster.shards[config_shard]
         sharded_cluster.install_configsvr(config_svr)
 
-        for mongos_index in range(kwargs["num_mongos"]):
-            mongos = self._new_mongos(sharded_cluster, mongos_executables, mongos_class,
-                                      mongos_index, kwargs["num_mongos"], is_multiversion)
-            sharded_cluster.install_mongos(mongos)
+        num_routers = kwargs["num_mongos"]
+        shardsvrs = sharded_cluster.get_shardsvrs()
+
+        def install_router():
+            if not kwargs.get("embedded_router", None):
+                mongos = self._new_mongos(sharded_cluster, mongos_executables, mongos_class,
+                                          mongos_index, num_routers, is_multiversion)
+                sharded_cluster.install_mongos(mongos)
+            else:
+                router_view = self._new_router_view(sharded_cluster, mongos_index, num_routers,
+                                                    shardsvrs.pop())
+                sharded_cluster.install_mongos(router_view)
+
+        for mongos_index in range(num_routers):
+            install_router()
 
         return sharded_cluster
 
@@ -445,6 +457,27 @@ class ShardedClusterBuilder(FixtureBuilder):
                        " nodes in the sharded cluster: {}.").format(len_versions, num_mongods)
                 raise errors.ServerFailure(msg)
 
+    @staticmethod
+    def _validate_embedded_router_mode_options(kwargs: Dict[str, Any],
+                                               is_multiversion: bool) -> None:
+        """Raise an exception if the configuration for the sharded cluster can't support embedded_router_mode.
+
+        :param kwargs: sharded cluster fixture kwargs.
+        :param is_multiversion: True if this is a multiversion test. 
+        """
+        # TODO SERVER-81458: Support multiversion testing with embedded routers.
+        # TODO SERVER-81459: Support testing a cluster with a combination of dedicated and embedded routers.
+        embedded_router_mode = kwargs.get("embedded_router", None)
+        num_routers = kwargs["num_mongos"]
+        num_shardsvrs = kwargs["num_shards"] * kwargs["num_rs_nodes_per_shard"]
+        if embedded_router_mode:
+            if num_routers > num_shardsvrs:
+                raise ValueError(
+                    "When running in embedded router mode, num_mongos must be <= the total number of shardsvrs in the cluster."
+                )
+            if is_multiversion:
+                raise ValueError("Embedded router mode does not support multiversion testing.")
+
     @classmethod
     def _get_mongos_assets(cls, kwargs: Dict[str, Any], mixed_bin_versions: Optional[List[str]],
                            old_bin_version: Optional[str]) -> Tuple[Dict[str, str], Dict[str, str]]:
@@ -456,7 +489,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         :return: tuple with dicts that contain mongos new/old class and executable names
         """
 
-        executables = {BinVersionEnum.NEW: kwargs["mongos_executable"]}
+        executables = {BinVersionEnum.NEW: kwargs.pop("mongos_executable")}
         _class = cls.LATEST_MONGOS_CLASS
 
         if mixed_bin_versions is not None:
@@ -560,3 +593,15 @@ class ShardedClusterBuilder(FixtureBuilder):
         # Always spin up an old mongos if in multiversion mode given mongos is the last thing in the update path.
         return FixtureContainer(new_fixture, old_fixture,
                                 BinVersionEnum.OLD if is_multiversion else BinVersionEnum.NEW)
+
+    @staticmethod
+    def _new_router_view(sharded_cluster: ShardedClusterFixture, mongos_index: int, total: int,
+                         mongod: MongoDFixture) -> _RouterView:
+        """Make a fixture that allows ShardedClusterFixture to treat a shardsvr as a router."""
+
+        router_logger = sharded_cluster.get_mongos_logger(mongos_index, total)
+        router_kwargs = {}
+        router_kwargs["mongod"] = mongod
+
+        fix = make_fixture("_RouterView", router_logger, sharded_cluster.job_num, **router_kwargs)
+        return fix

@@ -425,9 +425,13 @@ def create_fixture_table(fixture):
         longest[key] = len(key)
         columns[key] = []
         for node in info:
-            value = str(getattr(node, key))
-            columns[key].append(value)
-            longest[key] = max(longest[key], len(value))
+            attr = getattr(node, key)
+            str_value = str(attr) if attr is not None else '-'
+            columns[key].append(str_value)
+            longest[key] = max(longest[key], len(str_value))
+
+    # Filter out columns where no row has a value
+    columns = {k: v for k, v in columns.items() if not all(x == '-' for x in v)}
 
     def horizontal_separator():
         row = ""
@@ -473,4 +477,4 @@ def build_client(node, auth_options=None, read_preference=pymongo.ReadPreference
 
 
 # Represents a row in a node info table.
-NodeInfo = namedtuple('NodeInfo', ['full_name', 'name', 'port', 'pid'])
+NodeInfo = namedtuple('NodeInfo', ['full_name', 'name', 'port', 'pid', 'router_port'])

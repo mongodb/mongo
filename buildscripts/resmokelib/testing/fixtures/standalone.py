@@ -55,6 +55,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongod = None
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
+        self.router_port = mongod_options.get("routerPort", None)
 
         # Always log backtraces to a file in the dbpath in our testing.
         backtrace_log_file_name = os.path.join(self.get_dbpath_prefix(),
@@ -77,9 +78,11 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                                                    mongod_options=self.mongod_options)
 
         try:
-            self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())
+            msg = f"Starting mongod on port { self.port }{(' with embedded router on port ' + str(self.router_port)) if self.router_port else ''}...\n{ mongod.as_command() }"
+            self.logger.info(msg)
             mongod.start()
-            self.logger.info("mongod started on port %d with pid %d.", self.port, mongod.pid)
+            msg = f"mongod started on port { self.port }{(' with embedded router on port ' + str(self.router_port)) if self.router_port else ''} with pid { mongod.pid }"
+            self.logger.info(msg)
         except Exception as err:
             msg = "Failed to start mongod on port {:d}: {}".format(self.port, err)
             self.logger.exception(msg)
@@ -183,7 +186,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             return []
 
         info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
-                                  port=self.port, pid=self.mongod.pid)
+                                  port=self.port, pid=self.mongod.pid, router_port=self.router_port)
         return [info]
 
     def get_internal_connection_string(self):
