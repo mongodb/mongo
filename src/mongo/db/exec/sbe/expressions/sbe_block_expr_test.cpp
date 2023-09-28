@@ -208,7 +208,8 @@ TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
     // Multiply each value by two.
     auto expr = makeE<sbe::EFunction>(
         "valueBlockApplyLambda",
-        sbe::makeEs(makeE<EVariable>(blockSlot),
+        sbe::makeEs(makeC(makeNothing()),
+                    makeE<EVariable>(blockSlot),
                     makeE<ELocalLambda>(frame,
                                         makeE<EPrimBinary>(EPrimBinary::Op::mul,
                                                            makeE<EVariable>(frame, 0),
@@ -231,6 +232,47 @@ TEST_F(SBEBlockExpressionTest, BlockApplyLambdaTest) {
                   runVal,
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeInt32(84), makeInt32(86), makeInt32(88), makeNothing(), makeInt32(92)});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    value::ViewOfValueAccessor maskAccessor;
+    auto maskSlot = bindAccessor(&maskAccessor);
+
+    FrameId frame = 10;
+    // Multiply each value by two.
+    auto expr = makeE<sbe::EFunction>(
+        "valueBlockApplyLambda",
+        sbe::makeEs(makeE<EVariable>(maskSlot),
+                    makeE<EVariable>(blockSlot),
+                    makeE<ELocalLambda>(frame,
+                                        makeE<EPrimBinary>(EPrimBinary::Op::mul,
+                                                           makeE<EVariable>(frame, 0),
+                                                           makeC(makeInt32(2))))));
+    auto compiledExpr = compileExpression(*expr);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(42));
+    block.push_back(makeInt32(43));
+    block.push_back(makeInt32(44));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(46));
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto mask = makeBoolBlock({true, false, true, true, false});
+    maskAccessor.reset(sbe::value::TypeTags::valueBlock,
+                       value::bitcastFrom<value::ValueBlock*>(mask.get()));
+
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeInt32(84), makeNothing(), makeInt32(88), makeNothing(), makeNothing()});
 }
 
 TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {

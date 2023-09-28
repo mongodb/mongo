@@ -107,6 +107,9 @@ private:
     // if it's a block expanded from a cell, fold it).
     void foldIfNecessary(Tree& tree);
 
+    // Return an expression combining all the active bitmap masks currently in scope.
+    optimizer::ABT generateMaskArg();
+
     // The purpose of the operations being vectorized.
     Purpose _purpose;
 

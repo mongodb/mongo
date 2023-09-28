@@ -152,6 +152,71 @@ TEST(VectorizerTest, ConvertFilter) {
         *processed.expr);
 }
 
+TEST(VectorizerTest, ConvertUnsupportedFunction) {
+    auto tree1 = make<FunctionCall>("mod", makeSeq(make<Variable>("inputVar"), Constant::int32(4)));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     TypeSignature::kCellType.include(TypeSignature::kAnyScalarType));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree1, bindings);
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "FunctionCall [cellFoldValues_P]\n"
+        "|   Variable [inputVar]\n"
+        "FunctionCall [valueBlockApplyLambda]\n"
+        "|   |   LambdaAbstraction [__l1_0]\n"
+        "|   |   FunctionCall [mod]\n"
+        "|   |   |   Const [4]\n"
+        "|   |   Variable [__l1_0]\n"
+        "|   FunctionCall [cellBlockGetFlatValuesBlock]\n"
+        "|   Variable [inputVar]\n"
+        "Const [Nothing]\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertUnsupportedFunction2) {
+    auto tree1 = make<BinaryOp>(
+        Operations::And,
+        make<BinaryOp>(Operations::Eq, make<Variable>("inputVar"), Constant::int32(40)),
+        make<BinaryOp>(
+            Operations::Eq,
+            make<FunctionCall>("mod", makeSeq(make<Variable>("inputVar"), Constant::int32(4))),
+            Constant::int32(0)));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     TypeSignature::kCellType.include(TypeSignature::kAnyScalarType));
+
+    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Let [__l1_0]\n"
+        "|   FunctionCall [valueBlockLogicalAnd]\n"
+        "|   |   FunctionCall [cellFoldValues_F]\n"
+        "|   |   |   Variable [inputVar]\n"
+        "|   |   FunctionCall [valueBlockEqScalar]\n"
+        "|   |   |   Const [0]\n"
+        "|   |   FunctionCall [valueBlockApplyLambda]\n"
+        "|   |   |   |   LambdaAbstraction [__l2_0]\n"
+        "|   |   |   |   FunctionCall [mod]\n"
+        "|   |   |   |   |   Const [4]\n"
+        "|   |   |   |   Variable [__l2_0]\n"
+        "|   |   |   FunctionCall [cellBlockGetFlatValuesBlock]\n"
+        "|   |   |   Variable [inputVar]\n"
+        "|   |   Variable [__l1_0]\n"
+        "|   Variable [__l1_0]\n"
+        "FunctionCall [cellFoldValues_F]\n"
+        "|   Variable [inputVar]\n"
+        "FunctionCall [valueBlockEqScalar]\n"
+        "|   Const [40]\n"
+        "FunctionCall [cellBlockGetFlatValuesBlock]\n"
+        "Variable [inputVar]\n",
+        *processed.expr);
+}
 
 }  // namespace
 }  // namespace mongo::stage_builder

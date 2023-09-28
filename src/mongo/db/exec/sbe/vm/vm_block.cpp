@@ -71,6 +71,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists
 }
 
 namespace {
+
+bool allBools(const value::TypeTags* tag, size_t sz) {
+    for (size_t i = 0; i < sz; ++i) {
+        if (tag[i] != value::TypeTags::Boolean) {
+            return false;
+        }
+    }
+    return true;
+}
+
 struct FillEmptyFunctor {
     FillEmptyFunctor(value::TypeTags fillTag, value::Value fillVal)
         : _fillTag(fillTag), _fillVal(fillVal) {}
@@ -197,9 +207,10 @@ static const auto invokeLambdaOp =
     value::makeColumnOpWithParams<invokeLambdaOpType, ByteCode::InvokeLambdaFunctor>();
 
 /**
- * Implementation of the valueBlockApplyLambda instruction. This instruction takes a block and an
- * SBE lambda f(), and produces a new block with the result of f() applied to each element of
- * the input.
+ * Implementation of the valueBlockApplyLambda instruction. This instruction takes a mask, a block
+ * and an SBE lambda f(), and produces a new block with the result of f() applied to each element of
+ * the input for which the mask has, in the same position, a 'true' value.
+ * A mask value of Nothing is equivalent to a mask full of 'true' values.
  */
 void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     auto [lamOwn, lamTag, lamVal] = moveFromStack(0);
@@ -209,6 +220,10 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     auto [blockOwn, blockTag, blockVal] = moveFromStack(0);
     popAndReleaseStack();
     value::ValueGuard blockGuard(blockOwn, blockTag, blockVal);
+
+    auto [maskOwn, maskTag, maskVal] = moveFromStack(0);
+    popAndReleaseStack();
+    value::ValueGuard maskGuard(maskOwn, maskTag, maskVal);
 
     if (lamTag != value::TypeTags::LocalLambda) {
         pushStack(false, value::TypeTags::Nothing, 0);
@@ -223,23 +238,39 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     const auto lamPos = value::bitcastTo<int64_t>(lamVal);
     auto* block = value::getValueBlock(blockVal);
 
-    auto outBlock = block->map(invokeLambdaOp.bindParams(*this, code, lamPos));
+    std::unique_ptr<value::ValueBlock> outBlock;
+    if (maskTag == value::TypeTags::valueBlock) {
+        // We have a valid mask, loop only over the enabled indexes.
+        auto* mask = value::getValueBlock(maskVal);
+        auto extractedMask = mask->extract();
+        auto extracted = block->extract();
+        tassert(8123000,
+                "Mask and block have a different number of items",
+                extracted.count == extractedMask.count);
+        tassert(8123001,
+                "Expected mask to be all bool values",
+                allBools(extractedMask.tags, extractedMask.count));
+
+        // Pre-fill with Nothing, and overwrite only the allowed indexes.
+        std::vector<value::Value> valueOut(extracted.count);
+        std::vector<value::TypeTags> tagOut(extracted.count, value::TypeTags::Nothing);
+
+        ByteCode::InvokeLambdaFunctor invoker(*this, code, lamPos);
+        for (size_t i = 0; i < extracted.count; ++i) {
+            if (value::bitcastTo<bool>(extractedMask.vals[i])) {
+                std::tie(tagOut[i], valueOut[i]) = invoker(extracted.tags[i], extracted.vals[i]);
+            }
+        }
+        outBlock =
+            std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
+    } else {
+        outBlock = block->map(invokeLambdaOp.bindParams(*this, code, lamPos));
+    }
 
     pushStack(true,
               value::TypeTags::valueBlock,
               value::bitcastFrom<value::ValueBlock*>(outBlock.release()));
 }
-
-namespace {
-bool allBools(const value::TypeTags* tag, size_t sz) {
-    for (size_t i = 0; i < sz; ++i) {
-        if (tag[i] != value::TypeTags::Boolean) {
-            return false;
-        }
-    }
-    return true;
-}
-}  // namespace
 
 template <class Op>
 std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
