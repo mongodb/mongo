@@ -7,7 +7,7 @@
  *   directly_against_shardsvrs_incompatible,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
- *   requires_fcv_61,
+ *   requires_fcv_60,
  * ]
  */
 (function() {
