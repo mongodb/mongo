@@ -321,7 +321,7 @@ public:
         virtual ~StreamingCursor() = default;
 
         virtual void setCatalogEntries(
-            const stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>&
+            stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>
                 identsToNsAndUUID) = 0;
 
         virtual StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,

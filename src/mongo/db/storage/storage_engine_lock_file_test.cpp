@@ -187,7 +187,7 @@ TEST(StorageEngineLockFileTest, ClearPidAndUnlock) {
 
 class ScopedReadOnlyDirectory {
 public:
-    ScopedReadOnlyDirectory(const std::string& path) : _path(std::move(path)) {
+    ScopedReadOnlyDirectory(const std::string& path) : _path(path) {
         _applyToPathRecursive(_path, makePathReadOnly);
     }
 

@@ -80,6 +80,17 @@ public:
             multikeyPaths = other.multikeyPaths;
         }
 
+        IndexMetaData(IndexMetaData&& other)
+            : spec(std::move(other.spec)),
+              ready(other.ready),
+              isBackgroundSecondaryBuild(other.isBackgroundSecondaryBuild),
+              buildUUID(std::move(other.buildUUID)) {
+            // No need to hold mutex on move, there are no concurrent readers while we're moving
+            // the instance.
+            multikey = other.multikey;
+            multikeyPaths = std::move(other.multikeyPaths);
+        }
+
         /**
          * An index is considered present if it has a non-empty 'spec'.
          * Invalid indexes by this definition include default constructed instances and

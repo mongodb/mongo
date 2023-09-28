@@ -1067,8 +1067,8 @@ public:
 
     ~StreamingCursorImpl() = default;
 
-    void setCatalogEntries(const stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>&
-                               identsToNsAndUUID) {
+    void setCatalogEntries(
+        stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> identsToNsAndUUID) {
         _identsToNsAndUUID = std::move(identsToNsAndUUID);
     }
 

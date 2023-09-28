@@ -1474,10 +1474,10 @@ Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
         }
     }
 
-    _writeMetadata(opCtx,
-                   [indexMetaData = std::move(imd)](BSONCollectionCatalogEntry::MetaData& md) {
-                       md.insertIndex(std::move(indexMetaData));
-                   });
+    _writeMetadata(
+        opCtx, [indexMetaData = std::move(imd)](BSONCollectionCatalogEntry::MetaData& md) mutable {
+            md.insertIndex(std::move(indexMetaData));
+        });
 
     return durableCatalog->createIndex(opCtx, getCatalogId(), ns(), getCollectionOptions(), spec);
 }

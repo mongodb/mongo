@@ -137,52 +137,51 @@ void removeIndex(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
-        [svcCtx = opCtx->getServiceContext(),
-         recoveryUnit,
-         storageEngine,
-         uuid = collection->uuid(),
-         nss = collection->ns(),
-         indexNameStr = indexName.toString(),
-         ident,
-         isTwoPhaseDrop](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
-            StorageEngine::DropIdentCallback onDrop =
-                [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
-                    removeEmptyDirectory(svcCtx, storageEngine, nss);
+    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop([svcCtx = opCtx->getServiceContext(),
+                                                    recoveryUnit,
+                                                    storageEngine,
+                                                    uuid = collection->uuid(),
+                                                    nss = collection->ns(),
+                                                    indexNameStr = indexName.toString(),
+                                                    ident,
+                                                    isTwoPhaseDrop](
+                                                       OperationContext*,
+                                                       boost::optional<Timestamp> commitTimestamp) {
+        StorageEngine::DropIdentCallback onDrop =
+            [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
+                removeEmptyDirectory(svcCtx, storageEngine, nss);
 
-                    if (isTwoPhaseDrop) {
-                        CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
-                            catalog.notifyIdentDropped(ident);
-                        });
-                    }
-                };
-
-            if (isTwoPhaseDrop) {
-                if (!commitTimestamp) {
-                    // Standalone mode will not provide a timestamp.
-                    commitTimestamp = Timestamp::min();
+                if (isTwoPhaseDrop) {
+                    CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
+                        catalog.notifyIdentDropped(ident);
+                    });
                 }
-                LOGV2(22206,
-                      "Deferring table drop for index",
-                      "index"_attr = indexNameStr,
-                      logAttrs(nss),
-                      "uuid"_attr = uuid,
-                      "ident"_attr = ident->getIdent(),
-                      "commitTimestamp"_attr = commitTimestamp);
-                storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
-            } else {
-                LOGV2(6361201,
-                      "Completing drop for index table immediately",
-                      "ident"_attr = ident->getIdent(),
-                      "index"_attr = indexNameStr,
-                      logAttrs(nss));
-                // Intentionally ignoring failure here. Since we've removed the metadata pointing to
-                // the collection, we should never see it again anyway.
-                storageEngine->getEngine()
-                    ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
-                    .ignore();
+            };
+
+        if (isTwoPhaseDrop) {
+            if (!commitTimestamp) {
+                // Standalone mode will not provide a timestamp.
+                commitTimestamp = Timestamp::min();
             }
-        });
+            LOGV2(22206,
+                  "Deferring table drop for index",
+                  "index"_attr = indexNameStr,
+                  logAttrs(nss),
+                  "uuid"_attr = uuid,
+                  "ident"_attr = ident->getIdent(),
+                  "commitTimestamp"_attr = commitTimestamp);
+            storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
+        } else {
+            LOGV2(6361201,
+                  "Completing drop for index table immediately",
+                  "ident"_attr = ident->getIdent(),
+                  "index"_attr = indexNameStr,
+                  logAttrs(nss));
+            // Intentionally ignoring failure here. Since we've removed the metadata pointing to
+            // the collection, we should never see it again anyway.
+            storageEngine->getEngine()->dropIdent(recoveryUnit, ident->getIdent(), onDrop).ignore();
+        }
+    });
 }
 
 Status dropCollection(OperationContext* opCtx,
@@ -238,7 +237,7 @@ Status dropCollection(OperationContext* opCtx,
                 // Intentionally ignoring failure here. Since we've removed the metadata pointing to
                 // the collection, we should never see it again anyway.
                 storageEngine->getEngine()
-                    ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
+                    ->dropIdent(recoveryUnit, ident->getIdent(), onDrop)
                     .ignore();
             }
         });

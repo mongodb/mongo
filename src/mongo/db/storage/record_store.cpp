@@ -102,7 +102,7 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                       bool inclusive,
                                       const AboutToDeleteRecordCallback& aboutToDelete) {
     validateWriteAllowed(opCtx);
-    doCappedTruncateAfter(opCtx, end, inclusive, std::move(aboutToDelete));
+    doCappedTruncateAfter(opCtx, end, inclusive, aboutToDelete);
 }
 
 bool RecordStore::haveCappedWaiters() const {

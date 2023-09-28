@@ -733,7 +733,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     // secondary.
     for (const DurableCatalog::EntryIdentifier& entry : catalogEntries) {
         const auto catalogEntry = _catalog->getParsedCatalogEntry(opCtx, entry.catalogId);
-        const auto md = catalogEntry->metadata;
+        auto md = catalogEntry->metadata;
 
         // Batch up the indexes to remove them from `metaData` outside of the iterator.
         std::vector<std::string> indexesToDrop;
