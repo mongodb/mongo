@@ -57,6 +57,7 @@ export const resetAndInsert = (replSet, db, collName, nDocs) => {
     assert.commandWorked(
         db[collName].insertMany([...Array(nDocs).keys()].map(x => ({a: x})), {ordered: false}));
     replSet.awaitReplication();
+    assert.eq(db.getCollection(collName).find({}).count(), nDocs);
 };
 
 // Run dbCheck with given parameters and potentially wait for completion.
@@ -81,21 +82,18 @@ export const runDbCheck = (replSet,
 
 export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 1000) => {
     let query_count;
-
     assert.soon(
         function() {
             query_count = healthlog.find(query).count();
             if (query_count != numExpected) {
-                jsTestLog("dbCheck command didn't complete, health log query returned " +
-                          query_count + " entries, expected " + numExpected +
-                          "  query: " + tojson(query) +
-                          " found: " + JSON.stringify(healthlog.find(query).toArray()));
+                jsTestLog("health log query returned " + query_count + " entries, expected " +
+                          numExpected + "  query: " + tojson(query) +
+                          " found: " + tojson(healthlog.find(query).toArray()));
             }
             return query_count == numExpected;
         },
-        "dbCheck command didn't complete, health log query returned " + query_count +
-            " entries, expected " + numExpected + "  query: " + tojson(query) +
-            " found: " + JSON.stringify(healthlog.find(query).toArray()),
+        "health log query returned " + query_count + " entries, expected " + numExpected +
+            "  query: " + tojson(query) + " found: " + tojson(healthlog.find(query).toArray()),
         timeout);
 };
 

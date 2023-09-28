@@ -36,6 +36,7 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
   - "mongo/db/write_concern_options.idl"
+  - "mongo/db/record_id.idl"
 
 server_parameters:
     dbCheckHealthLogEveryNBatches:
@@ -48,6 +49,7 @@ server_parameters:
           gte: 1
           lte: 10000
 
+# TODO SERVER-78399: Remove once secondaryIndexChecksInDbCheck feature flag is removed.
 types:
   _id_key:
     bson_serialization_type: any
@@ -102,12 +104,25 @@ structs:
       dbCheck:
         type: string
         cpp_name: coll
+      # TODO SERVER-78399: Remove minKey and maxKey once secondaryIndexChecksInDbCheck feature flag 
+      # is removed.
+      # start and end replace minKey and maxKey when secondaryIndexChecksInDbCheck feature
+      # flag is enabled. It still represents the min/start and max/end of the whole dbcheck invocation, but they 
+      # a BSONObj such as {_id: 5} for the collection data consistency check or {a: "test"} for the
+      # extra index keys check.
       minKey:
         type: _id_key
         default: "BSONKey::min()"
-      maxKey:
+      maxKey: 
         type: _id_key
         default: "BSONKey::max()"
+      # TODO SERVER-78399: Remove optional: true and set default to kMinBSONKey / kMaxBSONKey
+      start:
+        type: object
+        optional: true
+      end:
+        type: object
+        optional: true
       maxCount:
         type: safeInt64
         default: "std::numeric_limits<int64_t>::max()"
@@ -226,12 +241,30 @@ structs:
       md5:
         type: string
         cpp_name: md5
+      # TODO SERVER-78399: Remove minKey and maxKey once secondaryIndexChecksInDbCheck feature flag 
+      # is removed.
+      # batchStart and batchEnd replace minKey and maxKey when secondaryIndexChecksInDbCheck feature
+      # flag is enabled. It still represents the min/start and max/end of a dbcheck batch, but is 
+      # a BSONObj such as {_id: 5} for the collection data consistency check or {a: "test"} for the
+      # extra index keys check.
+      # Note that minKey/maxKey here are different types from minKey/maxKey in DbCheckSingleInvocation, 
+      # and they represent the min/start and max/end of an individual dbCheck batch, not the whole
+      # command invocation.
       minKey:
         type: _id_key
-        cpp_name: minKey
-      maxKey:
+        default: "BSONKey::min()"
+      maxKey: 
         type: _id_key
-        cpp_name: maxKey
+        default: "BSONKey::max()"
+      # TODO SERVER-78399: Remove optional: true and set default to kMinBSONKey / kMaxBSONKey
+      batchStart:
+        type: object
+        cpp_name: batchStart
+        optional: true
+      batchEnd:
+        type: object
+        cpp_name: batchEnd
+        optional: true
       maxRate:
         type: safeInt64
         optional: true

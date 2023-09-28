@@ -10,6 +10,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     awaitDbCheckCompletion,
     checkHealthLog,
@@ -55,19 +56,22 @@ function checkLogAllConsistent(conn) {
 
         let maxResult = healthlog.aggregate([
             {$match: {operation: "dbCheckBatch"}},
-            {$group: {_id: 1, key: {$max: "$data.maxKey"}}}
+            {$group: {_id: 1, key: {$max: "$data.batchEnd"}}}
         ]);
 
         assert(maxResult.hasNext(), "dbCheck put no batches in health log");
-        assert.eq(maxResult.next().key, {"$maxKey": 1}, "dbCheck batches should end at MaxKey");
+        assert.eq(
+            maxResult.next().key, {"_id": {"$maxKey": 1}}, "dbCheck batches should end at MaxKey");
 
         let minResult = healthlog.aggregate([
             {$match: {operation: "dbCheckBatch"}},
-            {$group: {_id: 1, key: {$min: "$data.minKey"}}}
+            {$group: {_id: 1, key: {$min: "$data.batchStart"}}}
         ]);
 
         assert(minResult.hasNext(), "dbCheck put no batches in health log");
-        assert.eq(minResult.next().key, {"$minKey": 1}, "dbCheck batches should start at MinKey");
+        assert.eq(minResult.next().key,
+                  {"_id": {"$minKey": 1}},
+                  "dbCheck batches should start at MinKey");
     }
     // Assert no errors (i.e., found inconsistencies).
     let errs = healthlog.find({"severity": {"$ne": "info"}});
@@ -85,23 +89,23 @@ function checkLogAllConsistent(conn) {
         // These tests only run on debug builds because they rely on dbCheck health-logging
         // all info-level batch results.
 
-        // Finds an entry with data.minKey === MinKey, and then matches its maxKey against
-        // another document's minKey, and so on, and then checks that the result of that search
-        // has data.maxKey === MaxKey.
+        // Finds an entry with data.batchStart === MinKey, and then matches its batchEnd against
+        // another document's batchStart, and so on, and then checks that the result of that search
+        // has data.batchEnd === MaxKey.
         let completeCoverage = healthlog.aggregate([
-                {$match: {"operation": "dbCheckBatch", "data.minKey": MinKey}},
-                {
-                $graphLookup: {
-                    from: "system.healthlog",
-                    startWith: "$data.minKey",
-                    connectToField: "data.minKey",
-                    connectFromField: "data.maxKey",
-                    as: "batchLimits",
-                    restrictSearchWithMatch: {"operation": "dbCheckBatch"}
-                }
-                },
-                {$match: {"batchLimits.data.maxKey": MaxKey}}
-            ]);
+            {$match: {"operation": "dbCheckBatch", "data.batchStart._id": MinKey}},
+            {
+            $graphLookup: {
+                from: "system.healthlog",
+                startWith: "$data.batchStart",
+                connectToField: "data.batchStart",
+                connectFromField: "data.batchEnd",
+                as: "batchLimits",
+                restrictSearchWithMatch: {"operation": "dbCheckBatch"}
+            }
+            },
+            {$match: {"batchLimits.data.batchEnd._id": MaxKey}}
+        ]);
         assert(completeCoverage.hasNext(), "dbCheck batches do not cover full key range");
     }
 }
@@ -235,11 +239,15 @@ function testDbCheckParameters() {
                 return;
             }
             let healthlog = node.getDB("local").system.healthlog;
+
             let keyBoundsResult = healthlog.aggregate([
                 {$match: {operation: "dbCheckBatch"}},
                 {
-                    $group:
-                        {_id: null, minKey: {$min: "$data.minKey"}, maxKey: {$max: "$data.maxKey"}}
+                    $group: {
+                        _id: null,
+                        batchStart: {$min: "$data.batchStart._id"},
+                        batchEnd: {$max: "$data.batchEnd._id"}
+                    }
                 }
             ]);
 
@@ -247,12 +255,12 @@ function testDbCheckParameters() {
 
             const bounds = keyBoundsResult.next();
             const counts = healthLogCounts(healthlog);
-            assert.eq(bounds.minKey, start, "dbCheck minKey field incorrect");
+            assert.eq(bounds.batchStart, start, "dbCheck batchStart field incorrect");
 
             // dbCheck evaluates some exit conditions like maxCount and maxBytes at batch boundary.
             // The batch boundary isn't generally deterministic (e.g. can be time-dependent per
             // maxBatchTimeMillis) hence the greater-than-or-equal comparisons.
-            assert.gte(bounds.maxKey, end, "dbCheck maxKey field incorrect");
+            assert.gte(bounds.batchEnd, end, "dbCheck batchEnd field incorrect");
             assert.gte(counts.totalDocs, end - start);
             assert.gte(counts.totalBytes, (end - start) * docSize);
         });
@@ -263,6 +271,12 @@ function testDbCheckParameters() {
     let end = 9000;
 
     let dbCheckParameters = {minKey: start, maxKey: end};
+    if (FeatureFlagUtil.isPresentAndEnabled(
+            primary,
+            "SecondaryIndexChecksInDbCheck",
+            )) {
+        dbCheckParameters = {start: {_id: start}, end: {_id: end}};
+    }
     runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
 
     checkEntryBounds(start, end);
@@ -272,9 +286,15 @@ function testDbCheckParameters() {
 
     let maxCount = 5000;
 
-    // Do the same with a count constraint. We expect it to reach the count limit before reaching
-    // maxKey.
+    // Do the same with a count constraint. We expect it to reach the count limit before
+    // reaching maxKey.
     dbCheckParameters = {minKey: start, maxKey: end, maxCount: maxCount};
+    if (FeatureFlagUtil.isPresentAndEnabled(
+            primary,
+            "SecondaryIndexChecksInDbCheck",
+            )) {
+        dbCheckParameters = {start: {_id: start}, end: {_id: end}, maxCount: maxCount};
+    }
     runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
 
     checkEntryBounds(start, start + maxCount);
@@ -283,6 +303,12 @@ function testDbCheckParameters() {
     clearHealthLog(replSet);
     let maxSize = maxCount * docSize;
     dbCheckParameters = {minKey: start, maxKey: end, maxSize: maxSize};
+    if (FeatureFlagUtil.isPresentAndEnabled(
+            primary,
+            "SecondaryIndexChecksInDbCheck",
+            )) {
+        dbCheckParameters = {start: {_id: start}, end: {_id: end}, maxSize: maxSize};
+    }
     runDbCheck(replSet, db, multiBatchSimpleCollName, dbCheckParameters, true);
 
     checkEntryBounds(start, start + maxCount);

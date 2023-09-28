@@ -58,10 +58,14 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/dbcheck_gen.h"
+#include "mongo/db/repl/dbcheck_idl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -70,6 +74,7 @@
 #include "mongo/util/md5.hpp"
 #include "mongo/util/uuid.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(SleepDbCheckInBatch);
@@ -232,8 +237,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     int64_t bytes,
     const std::string& expectedHash,
     const std::string& foundHash,
-    const BSONKey& minKey,
-    const BSONKey& maxKey,
+    const BSONObj& batchStart,
+    const BSONObj& batchEnd,
     const boost::optional<Timestamp>& readTimestamp,
     const repl::OpTime& optime,
     const boost::optional<CollectionOptions>& options) {
@@ -248,8 +253,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     builder.append("count", count);
     builder.append("bytes", bytes);
     builder.append("md5", hashes.second);
-    builder.appendAs(minKey.elem(), "minKey");
-    builder.appendAs(maxKey.elem(), "maxKey");
+    builder.append("batchStart", batchStart);
+    builder.append("batchEnd", batchEnd);
     if (readTimestamp) {
         builder.append("readTimestamp", *readTimestamp);
     }
@@ -280,16 +285,23 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
         nss, collectionUUID, severity, msg, OplogEntriesEnum::Batch, builder.obj());
 }
 
+template <typename T>
+const md5_byte_t* md5Cast(const T* ptr) {
+    return reinterpret_cast<const md5_byte_t*>(ptr);
+}
+
 DbCheckHasher::DbCheckHasher(
     OperationContext* opCtx,
     const CollectionPtr& collection,
-    const BSONKey& start,
-    const BSONKey& end,
+    const BSONObj& start,
+    const BSONObj& end,
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters,
+    boost::optional<StringData> indexName,
     int64_t maxCount,
     int64_t maxBytes)
     : _opCtx(opCtx),
       _maxKey(end),
+      _indexName(indexName),
       _maxCount(maxCount),
       _maxBytes(maxBytes),
       _previousDataCorruptionMode(opCtx->recoveryUnit()->getDataCorruptionDetectionMode()),
@@ -310,34 +322,36 @@ DbCheckHasher::DbCheckHasher(
         opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
     }
 
-    if (!collection->isClustered()) {
-        // Get the _id index.
-        const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
-        uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
+    if (!indexName) {
+        if (!collection->isClustered()) {
+            // Get the _id index.
+            const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+            uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
 
-        // Set up a simple index scan on that.
-        _exec = InternalPlanner::indexScan(opCtx,
-                                           &collection,
-                                           desc,
-                                           start.obj(),
-                                           end.obj(),
-                                           BoundInclusion::kIncludeEndKeyOnly,
-                                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                           InternalPlanner::FORWARD,
-                                           InternalPlanner::IXSCAN_FETCH);
-    } else {
-        CollectionScanParams params;
-        params.minRecord = RecordIdBound(uassertStatusOK(
-            record_id_helpers::keyForDoc(start.obj(),
-                                         collection->getClusteredInfo()->getIndexSpec(),
-                                         collection->getDefaultCollator())));
-        params.maxRecord = RecordIdBound(uassertStatusOK(
-            record_id_helpers::keyForDoc(end.obj(),
-                                         collection->getClusteredInfo()->getIndexSpec(),
-                                         collection->getDefaultCollator())));
-        params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
-        _exec = InternalPlanner::collectionScan(
-            opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+            // Set up a simple index scan on that.
+            _exec = InternalPlanner::indexScan(opCtx,
+                                               &collection,
+                                               desc,
+                                               start,
+                                               end,
+                                               BoundInclusion::kIncludeEndKeyOnly,
+                                               PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                               InternalPlanner::FORWARD,
+                                               InternalPlanner::IXSCAN_FETCH);
+        } else {
+            CollectionScanParams params;
+            params.minRecord = RecordIdBound(uassertStatusOK(
+                record_id_helpers::keyForDoc(start,
+                                             collection->getClusteredInfo()->getIndexSpec(),
+                                             collection->getDefaultCollator())));
+            params.maxRecord = RecordIdBound(uassertStatusOK(
+                record_id_helpers::keyForDoc(end,
+                                             collection->getClusteredInfo()->getIndexSpec(),
+                                             collection->getDefaultCollator())));
+            params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+            _exec = InternalPlanner::collectionScan(
+                opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        }
     }
 
     // Fetch relevant indexes if we are doing missing index keys check.
@@ -366,15 +380,85 @@ DbCheckHasher::~DbCheckHasher() {
 }
 
 
-template <typename T>
-const md5_byte_t* md5Cast(const T* ptr) {
-    return reinterpret_cast<const md5_byte_t*>(ptr);
-}
-
 void maybeAppend(md5_state_t* state, const boost::optional<UUID>& uuid) {
     if (uuid) {
         md5_append(state, md5Cast(uuid->toCDR().data()), uuid->toCDR().length());
     }
+}
+
+Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
+                                                 const Collection* collection,
+                                                 const key_string::Value& first,
+                                                 const key_string::Value& last,
+                                                 Date_t deadline) {
+    // hashForExtraIndexKeysCheck must only be called if the hasher was created with indexName.
+    invariant(_indexName);
+    StringData indexName = _indexName.get();
+    // We should have already checked for if the index exists at this timestamp.
+    const IndexDescriptor* indexDescriptor =
+        collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    const IndexCatalogEntry* indexCatalogEntry =
+        collection->getIndexCatalog()->getEntry(indexDescriptor);
+    auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+    const auto ordering = iam->getSortedDataInterface()->getOrdering();
+
+    std::unique_ptr<SortedDataInterface::Cursor> indexCursor =
+        iam->newCursor(opCtx, true /* forward */);
+    auto firstBson =
+        key_string::toBsonSafe(first.getBuffer(), first.getSize(), ordering, first.getTypeBits());
+    auto lastBson =
+        key_string::toBsonSafe(last.getBuffer(), last.getSize(), ordering, last.getTypeBits());
+    indexCursor->setEndPosition(lastBson, true);
+
+    // Iterate through index table.
+    for (auto currEntry = indexCursor->seekForKeyString(first); currEntry;
+         currEntry = indexCursor->nextKeyString()) {
+        const auto keyString = currEntry->keyString;
+        auto keyStringBson = key_string::toBsonSafe(
+            keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+        LOGV2_DEBUG(7844907,
+                    3,
+                    "hasher adding keystring to hash",
+                    "keyString"_attr = keyStringBson,
+                    "indexName"_attr = indexName);
+        // Append the keystring to the hash without the recordId at end.
+        size_t sizeWithoutRecordId = [&] {
+            switch (collection->getRecordStore()->keyFormat()) {
+                case KeyFormat::Long:
+                    return key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(),
+                                                                    keyString.getSize());
+
+                case KeyFormat::String:
+                    return key_string::sizeWithoutRecordIdStrAtEnd(keyString.getBuffer(),
+                                                                   keyString.getSize());
+            }
+            MONGO_UNREACHABLE;
+        }();
+
+        // TODO SERVER-80682: Add rate limiting in hashing.
+        BSONObj currBSON = key_string::toBsonSafe(
+            keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
+        _last = currBSON;
+        _bytesSeen += sizeWithoutRecordId;
+        _countSeen += 1;
+        md5_append(&_state, md5Cast(keyString.getBuffer()), sizeWithoutRecordId);
+    }
+
+    // If we got to the end of the index batch without seeing any keys, set the last key to MaxKey.
+    if (_countSeen == 0) {
+        _last = _maxKey;
+    }
+
+    LOGV2_DEBUG(7844904,
+                3,
+                "Finished hashing one batch in hasher",
+                "firstKeyString"_attr = firstBson,
+                "lastKeyString"_attr = lastBson,
+                "keysHashed"_attr = _countSeen,
+                "bytesHashed"_attr = _bytesSeen,
+                "indexName"_attr = indexName);
+
+    return Status::OK();
 }
 
 Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
@@ -439,9 +523,10 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status DbCheckHasher::hashAll(OperationContext* opCtx,
-                              const CollectionPtr& collPtr,
-                              Date_t deadline) {
+Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
+                                             const CollectionPtr& collPtr,
+                                             Date_t deadline) {
+    BSONObj currentObj;
     RecordId currentRecordId;
     PlanExecutor::ExecState lastState;
     while (PlanExecutor::ADVANCED == (lastState = _exec->getNext(nullptr, &currentRecordId))) {
@@ -494,7 +579,7 @@ Status DbCheckHasher::hashAll(OperationContext* opCtx,
         }
 
         // Update `last` every time.
-        _last = BSONKey::parseFromBSON(currentObj["_id"]);
+        _last = BSON("_id" << currentObj["_id"]);
         _bytesSeen += currentObj.objsize();
         _countSeen += 1;
 
@@ -520,7 +605,7 @@ std::string DbCheckHasher::total(void) {
     return digestToString(digest);
 }
 
-BSONKey DbCheckHasher::lastKey(void) const {
+BSONObj DbCheckHasher::lastKey(void) const {
     return _last;
 }
 
@@ -585,15 +670,101 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             return Status::OK();
         }
 
-        hasher.emplace(opCtx,
-                       collection,
-                       entry.getMinKey(),
-                       entry.getMaxKey(),
-                       entry.getSecondaryIndexCheckParameters());
-        uassertStatusOK(hasher->hashAll(opCtx, collection));
+        // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
+        // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
+        // be used as batchStart.
+        BSONObj batchStart;
+        if (!entry.getBatchStart()) {
+            batchStart = BSON("_id" << entry.getMinKey().elem());
+        } else {
+            batchStart = entry.getBatchStart().get();
+        }
+
+        BSONObj batchEnd;
+        if (!entry.getBatchEnd()) {
+            batchEnd = BSON("_id" << entry.getMaxKey().elem());
+        } else {
+            batchEnd = entry.getBatchEnd().get();
+        }
+
+        // TODO SERVER-78399: Clean up this check once feature flag is removed.
+        const boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =
+            entry.getSecondaryIndexCheckParameters();
+        if (secondaryIndexCheckParameters) {
+            mongo::DbCheckValidationModeEnum validateMode =
+                secondaryIndexCheckParameters.get().getValidateMode();
+            switch (validateMode) {
+                case mongo::DbCheckValidationModeEnum::extraIndexKeysCheck: {
+                    StringData indexName = secondaryIndexCheckParameters.get().getSecondaryIndex();
+
+                    // Create hasher with indexName.
+                    hasher.emplace(opCtx,
+                                   collection,
+                                   batchStart,
+                                   batchEnd,
+                                   entry.getSecondaryIndexCheckParameters(),
+                                   indexName);
+
+                    const IndexDescriptor* indexDescriptor =
+                        collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+                    if (!indexDescriptor) {
+                        std::string msg = "cannot find index " + indexName + " for ns " +
+                            entry.getNss().toStringForErrorMsg();
+                        const auto logEntry =
+                            dbCheckHealthLogEntry(entry.getNss(),
+                                                  boost::none,
+                                                  SeverityEnum::Error,
+                                                  "dbCheck failed",
+                                                  OplogEntriesEnum::Batch,
+                                                  BSON("success" << false << "info" << msg));
+                        HealthLogInterface::get(opCtx)->log(*logEntry);
+                        return Status::OK();
+                    }
+
+                    const IndexCatalogEntry* indexCatalogEntry =
+                        collection.get()->getIndexCatalog()->getEntry(indexDescriptor);
+                    auto iam = indexCatalogEntry->accessMethod()->asSortedData();
+                    const auto ordering = iam->getSortedDataInterface()->getOrdering();
+                    const key_string::Version keyStringVersion =
+                        iam->getSortedDataInterface()->getKeyStringVersion();
+
+                    // Rebuild first and last keystrings from their BSON format.
+                    key_string::Builder firstKS(keyStringVersion);
+                    firstKS.resetToKey(batchStart, ordering);
+                    key_string::Builder lastKS(keyStringVersion);
+                    lastKS.resetToKey(batchEnd, ordering);
+
+                    uassertStatusOK(hasher->hashForExtraIndexKeysCheck(
+                        opCtx, collection.get(), firstKS.getValueCopy(), lastKS.getValueCopy()));
+                    break;
+                }
+                case mongo::DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck:
+                case mongo::DbCheckValidationModeEnum::dataConsistency: {
+                    hasher.emplace(opCtx,
+                                   collection,
+                                   batchStart,
+                                   batchEnd,
+                                   entry.getSecondaryIndexCheckParameters());
+                    uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
+                    break;
+                }
+                    MONGO_UNREACHABLE;
+            }
+        } else {
+            hasher.emplace(
+                opCtx, collection, batchStart, batchEnd, entry.getSecondaryIndexCheckParameters());
+            uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
+        }
 
         std::string expected = entry.getMd5().toString();
         std::string found = hasher->total();
+
+        LOGV2_DEBUG(7844905,
+                    3,
+                    "Finished hashing one batch on secondary",
+                    "expected"_attr = expected,
+                    "found"_attr = found,
+                    "readTimestamp"_attr = entry.getReadTimestamp());
 
         auto logEntry = dbCheckBatchEntry(entry.getBatchId(),
                                           entry.getNss(),
@@ -602,7 +773,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                           hasher->bytesSeen(),
                                           expected,
                                           found,
-                                          entry.getMinKey(),
+                                          batchStart,
                                           hasher->lastKey(),
                                           entry.getReadTimestamp(),
                                           optime,

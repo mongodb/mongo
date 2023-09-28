@@ -8,6 +8,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     assertForDbCheckErrors,
     awaitDbCheckCompletion,
@@ -26,6 +27,7 @@ const testDB = primary.getDB("dbCheck_deleted_collection");
 const collName = "coll_view";
 
 const runTest = (failpoint, mode) => {
+    jsTestLog("Running with failpoint " + failpoint + " and mode " + mode);
     jsTestLog("Reset the health log and delete the collection/view, then create a new collection.");
     resetAndInsert(rst, testDB, collName, 10);
 
@@ -66,8 +68,13 @@ const runTest = (failpoint, mode) => {
         assert.eq(warnings[0]["severity"], "warning");
         assert.eq(warnings[0]["namespace"], testDB[collName].getFullName());
         assert.includes(warnings[0]["data"]["error"], "Collection under dbCheck no longer exists");
-        if (mode == "createView" && failpoint == "hangBeforeProcessingDbCheckRun") {
-            // 'AutoGetCollection' should have failed with 'CommandNotSupportedOnView'.
+        if (mode == "createView" &&
+            (failpoint == "hangBeforeProcessingDbCheckRun" ||
+             FeatureFlagUtil.isPresentAndEnabled(
+                 primary,
+                 "SecondaryIndexChecksInDbCheck",
+                 ))) {
+            // 'acquireCollectionMaybeLockFree' should have failed with 'CommandNotSupportedOnView'.
             assert.includes(warnings[0]["data"]["error"],
                             "but there is a view with the identical name");
         }
