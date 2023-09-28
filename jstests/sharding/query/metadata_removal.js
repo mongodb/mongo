@@ -32,8 +32,8 @@ function runTest(coll) {
 
 const st = new ShardingTest({shards: 2});
 try {
-    assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', st.shard1.shardName);
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.coll', key: {x: 'hashed'}}));
 
     runTest(st.getDB("test").coll);

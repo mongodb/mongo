@@ -12,8 +12,8 @@ const collName = jsTest.name();
 const coll = testDB[collName];
 const nDocs = 100;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: nDocs / 2}}));
 

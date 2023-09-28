@@ -2,8 +2,8 @@
 // various kinds of aggregations return the expected results.
 const shardedAggTest = new ShardingTest({shards: 2, mongos: 1});
 
-assert.commandWorked(shardedAggTest.s0.adminCommand({enablesharding: "aggShard"}));
-shardedAggTest.ensurePrimaryShard('aggShard', shardedAggTest.shard0.shardName);
+assert.commandWorked(shardedAggTest.s0.adminCommand(
+    {enablesharding: "aggShard", primaryShard: shardedAggTest.shard0.shardName}));
 
 const database = shardedAggTest.getDB("aggShard");
 

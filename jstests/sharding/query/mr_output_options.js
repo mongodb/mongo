@@ -5,9 +5,8 @@ const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const testDB = st.getDB("mrShard");
 const inputColl = testDB.srcSharded;
 
-st.adminCommand({enableSharding: testDB.getName()});
+st.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName});
 st.adminCommand({enableSharding: "mrShardOtherDB"});
-st.ensurePrimaryShard(testDB.getName(), st.shard1.shardName);
 
 const nDistinctKeys = 512;
 const nValuesPerKey = 100;

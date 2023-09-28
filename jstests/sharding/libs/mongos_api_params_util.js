@@ -1273,8 +1273,8 @@ export let MongosAPIParametersUtil = (function() {
                 permittedInTxn: false,
                 permittedOnShardedCollection: false,
                 setUp: () => {
-                    assert.commandWorked(st.s.adminCommand({enableSharding: "db"}));
-                    st.ensurePrimaryShard("db", st.shard0.shardName);
+                    assert.commandWorked(st.s.adminCommand(
+                        {enableSharding: "db", primaryShard: st.shard0.shardName}));
                 },
                 command: () => ({shardCollection: "db.collection", key: {_id: 1}})
             }

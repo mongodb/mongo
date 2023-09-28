@@ -94,8 +94,7 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
 
     if (isShardedColl) {
         assert(st);
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-        st.ensurePrimaryShard(dbName, st.shard0.name);
+        assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.name}));
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
         assert.commandWorked(
             st.s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.shard1.shardName}));

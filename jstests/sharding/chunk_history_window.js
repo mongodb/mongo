@@ -63,8 +63,8 @@ const mongosDB = st.s.getDB(jsTestName());
 const mongosColl = mongosDB.test;
 const ns = `${jsTestName()}.test`;
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 st.shardColl(mongosColl, {_id: 1}, false);
 
 const getChunkHistory = (query) => {

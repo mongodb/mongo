@@ -30,8 +30,7 @@ const st =
 // Create a sharded collection:
 // shard0: [-inf, 0)
 // shard1: [0, inf)
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.name);
+assert.commandWorked(st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard0.name}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: 'test.user', middle: {x: 0}}));
 assert.commandWorked(

@@ -9,10 +9,10 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const configDB = st.s0.getDB('config');
-assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
-st.ensurePrimaryShard('test', shard0);
+assert.commandWorked(configDB.adminCommand({enableSharding: 'test', primaryShard: shard0}));
+
 const testDBOnPrimary = st.rs0.getPrimary().getDB('test');
 
 function verifyChunkSplitIntoTwo(namespace, chunk) {

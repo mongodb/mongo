@@ -19,8 +19,8 @@ const st = new ShardingTest({
 const testDB = st.s.getDB(jsTestName());
 
 // Enable sharding on the test database and ensure that the primary is shard0.
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 const caseInsensitiveCollectionName = "change_stream_case_insensitive";
 const caseInsensitive = {

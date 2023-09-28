@@ -12,8 +12,8 @@ const st = new ShardingTest({shards: 2, config: 1});
 const testDB = st.s.getDB(dbName);
 
 // Shard a collection with the only chunk on shard0.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 const sourcePrimary = st.rs0.getPrimary();

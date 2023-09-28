@@ -59,12 +59,10 @@ assert.commandWorked(addShardRes);
 
 // Add some data
 var db = mongos.getDB("foo");
+assert.commandWorked(
+    admin.runCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
 var collA = mongos.getCollection("foo.bar");
-
-// enable sharding on a collection
-assert.commandWorked(admin.runCommand({enableSharding: "" + collA.getDB()}));
-st.ensurePrimaryShard("foo", st.shard0.shardName);
-
 assert.commandWorked(admin.runCommand({shardCollection: "" + collA, key: {_id: 1}}));
 
 // add data to the sharded collection

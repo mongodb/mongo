@@ -25,8 +25,8 @@ const shardedColl = testDB.coll;
 const singleShardColl = testDB.singleShard;
 const shard0DB = st.shard0.getDB(testName);
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Shard shardedColl using hashed sharding
 st.shardColl(shardedColl, {_id: "hashed"}, false);

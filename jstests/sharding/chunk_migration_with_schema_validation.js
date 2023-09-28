@@ -11,10 +11,11 @@ const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
 const dbName = "test";
 const collName = "foo";
 const ns = "test.foo";
+
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 const testColl = st.s.getCollection(ns);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 CreateShardedCollectionUtil.shardCollectionWithChunks(testColl, {x: 1}, [
     {min: {x: MinKey}, max: {x: 50}, shard: st.shard0.shardName},
     {min: {x: 50}, max: {x: MaxKey}, shard: st.shard0.shardName},

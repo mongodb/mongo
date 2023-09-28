@@ -27,6 +27,8 @@ st.configRS.awaitReplication();
 // Create a sharded time-series collection that has fixed buckets.
 const dbName = "test";
 let testDB = st.s.getDB(dbName);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+
 let coll = testDB["timeseries"];
 const timeField = "t";
 coll.drop();
@@ -57,8 +59,6 @@ assert.commandWorked(testDB.adminCommand({
     key: shardKey,
     timeseries: {timeField, bucketRoundingSeconds: 3600, bucketMaxSpanSeconds: 3600}
 }));
-
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 // Set up the shards such that the primary shard has [MinKey, 2022-09-30), and the other shard has
 // [2022-09-30, MaxKey].

@@ -74,8 +74,8 @@ db.dropDatabase();
 
 let coll = db.getCollection("coll");
 
-assert.commandWorked(config.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+assert.commandWorked(
+    config.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 
 assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));

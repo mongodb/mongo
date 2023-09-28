@@ -8,8 +8,8 @@ const collName = "testColl";
 const ns = dbName + "." + collName;
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {oldKey: "hashed"}}));
 
 const existingZoneName = 'x1';

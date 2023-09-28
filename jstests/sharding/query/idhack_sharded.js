@@ -9,8 +9,8 @@ var coll = st.s0.getCollection("test.foo");
 //
 // Pre-split collection: shard 0 takes {x: {$lt: 0}}, shard 1 takes {x: {$gte: 0}}.
 //
-assert.commandWorked(coll.getDB().adminCommand({enableSharding: coll.getDB().getName()}));
-st.ensurePrimaryShard(coll.getDB().toString(), st.shard0.shardName);
+assert.commandWorked(coll.getDB().adminCommand(
+    {enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(coll.getDB().adminCommand({shardCollection: coll.getFullName(), key: {x: 1}}));
 assert.commandWorked(coll.getDB().adminCommand({split: coll.getFullName(), middle: {x: 0}}));
 assert.commandWorked(coll.getDB().adminCommand(

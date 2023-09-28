@@ -13,8 +13,8 @@ var admin = mongos.getDB("admin");
 var dbname = "foo";
 var coll = mongos.getCollection(dbname + ".bar");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard('foo', st.shard0.shardName);
+assert.commandWorked(admin.runCommand({enableSharding: dbname, primaryShard: st.shard0.shardName}));
+var coll = mongos.getCollection(dbname + ".bar");
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 // Make sure split is correctly disabled for unsplittable collection

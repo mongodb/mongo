@@ -30,8 +30,8 @@ assert.commandWorked(
     mongosDB.adminCommand({setParameter: 1, internalQueryAlwaysMergeOnPrimaryShard: true}));
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Shard the test collection on _id.
 assert.commandWorked(

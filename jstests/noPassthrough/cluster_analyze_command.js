@@ -20,8 +20,8 @@ if (!checkSBEEnabled(db)) {
 const coll = db.analyze_coll;
 coll.drop();
 
-assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard1.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
 assert.commandWorked(
     st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: "hashed"}}));
 

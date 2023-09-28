@@ -80,10 +80,9 @@ assert.commandWorked(
 const isNewShardDBOnNewShard =
     configDB.databases.findOne({_id: newShardDB.getName(), primary: "newShard1"}) != null;
 if (!isNewShardDBOnNewShard) {
-    st.ensurePrimaryShard(newShardDB.getName(), "newShard1");
+    assert.commandWorked(st.s.adminCommand({movePrimary: newShardDB.getName(), to: "newShard1"}));
 
-    // Consume collection drop events from the existing change streams caused by movePrimary command
-    // issued by a call to 'ensurePrimaryShard()' above.
+    // Consume collection drop events from the existing change streams caused by the movePrimary
     for (let csCursor of [wholeDBCS, wholeClusterCS]) {
         assertCollectionDropEventObserved(csCursor, newShardDB.getName(), "unusedCollection");
     }

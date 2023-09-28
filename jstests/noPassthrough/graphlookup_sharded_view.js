@@ -7,12 +7,12 @@ const sharded = new ShardingTest({
     shards: [{verbose: 3}, {verbose: 3}, {verbose: 3}],
     config: 1,
 });
-assert(sharded.adminCommand({enableSharding: "test"}));
 
 const testDBName = "test";
-const testDB = sharded.getDB(testDBName);
 const primaryShard = sharded.shard0;
-sharded.ensurePrimaryShard(testDBName, primaryShard.shardName);
+assert(sharded.adminCommand({enableSharding: testDBName, primaryShard: primaryShard.shardName}));
+
+const testDB = sharded.getDB(testDBName);
 
 // Drop the 'profile' tables and then enable profiling on all shards.
 for (const shard of [sharded.shard0, sharded.shard1, sharded.shard2]) {

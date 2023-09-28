@@ -5,11 +5,13 @@ const sourceDB = st.s.getDB("mr_source_db");
 const destDB = st.s.getDB("mr_out_db");
 const sourceColl = sourceDB.mr_source_coll;
 sourceColl.drop();
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: sourceDB.getName(), primaryShard: st.shard0.name}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: destDB.getName(), primaryShard: st.shard0.name}));
 assert.commandWorked(sourceColl.insert({val: 1}));
 assert.commandWorked(sourceColl.insert({val: 2}));
 
-st.ensurePrimaryShard(sourceDB.getName(), st.shard0.name);
-assert.commandWorked(st.s.adminCommand({enableSharding: "mr_source_db"}));
 assert.commandWorked(sourceColl.createIndex({val: 1}));
 assert.commandWorked(st.s.adminCommand({shardCollection: sourceColl.getFullName(), key: {val: 1}}));
 
@@ -23,7 +25,6 @@ function reduceFunc(k, v) {
 const destColl = destDB.mr_out_coll;
 destColl.drop();
 assert.commandWorked(destColl.insert({val: 2}));
-st.ensurePrimaryShard(destDB.getName(), st.shard0.name);
 let result = assert.commandWorked(sourceDB.runCommand({
     mapReduce: sourceColl.getName(),
     map: mapFunc,
@@ -34,8 +35,8 @@ assert.eq(2, destColl.find().count(), result);
 
 // Test that it works when the dbs are on different shards.
 destColl.drop();
-st.ensurePrimaryShard(sourceDB.getName(), st.shard0.name);
-st.ensurePrimaryShard(destDB.getName(), st.shard1.name);
+
+assert.commandWorked(st.s.adminCommand({movePrimary: destDB.getName(), to: st.shard1.name}));
 
 result = assert.commandWorked(sourceDB.runCommand({
     mapReduce: sourceColl.getName(),
@@ -50,8 +51,7 @@ assert.eq(2, destColl.find().count(), result);
 destColl.drop();
 destDB.createCollection(destColl.getName());
 assert.commandWorked(destColl.createIndex({val: 1}, {name: "test_index"}));
-st.ensurePrimaryShard(sourceDB.getName(), st.shard0.name);
-st.ensurePrimaryShard(destDB.getName(), st.shard1.name);
+
 result = assert.commandWorked(sourceDB.runCommand({
     mapReduce: sourceColl.getName(),
     map: mapFunc,

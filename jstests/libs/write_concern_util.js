@@ -9,7 +9,7 @@ export function shardCollectionWithChunks(st, coll, numDocs) {
     var _db = coll.getDB();
     var numberDoc = numDocs || 20;
     coll.createIndex({x: 1}, {unique: true});
-    st.ensurePrimaryShard(_db.toString(), st.shard0.shardName);
+
     st.shardColl(
         coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);
 

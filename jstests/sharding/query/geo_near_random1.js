@@ -11,8 +11,7 @@ var db = s.getDB("test");
 
 var test = new GeoNearRandomTest(testName, db);
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: 'test'}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s0.adminCommand({enablesharding: 'test', primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: ('test.' + testName), key: {_id: 1}}));
 
 test.insertPts(50);

@@ -4,10 +4,11 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 const sharded = new ShardingTest({mongos: 1, shards: 4, config: 1});
-assert(sharded.adminCommand({enableSharding: "test"}));
 
 const testDBName = "test";
 const testDB = sharded.getDB(testDBName);
+
+assert(sharded.adminCommand({enableSharding: testDBName, primaryShard: sharded.shard0.shardName}));
 
 const local = testDB.local;
 local.drop();
@@ -38,7 +39,6 @@ assert.commandWorked(otherForeign.insertMany([
     {_id: 8, shard_key: "shard3"},
 ]));
 
-sharded.ensurePrimaryShard(testDBName, sharded.shard0.shardName);
 assert(sharded.s.adminCommand({shardCollection: local.getFullName(), key: {shard_key: 1}}));
 assert(sharded.s.adminCommand({shardCollection: foreign.getFullName(), key: {shard_key: 1}}));
 assert(sharded.s.adminCommand({shardCollection: otherForeign.getFullName(), key: {shard_key: 1}}));

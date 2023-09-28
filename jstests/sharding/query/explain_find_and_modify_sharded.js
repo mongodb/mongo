@@ -14,16 +14,16 @@ var st = new ShardingTest({shards: 2});
 var testDB = st.s.getDB('test');
 var shardKey = {a: 1};
 
+// Use "st.shard0.shardName" as the primary shard.
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
+
 // Create a collection with an index on the intended shard key.
 var shardedColl = testDB.getCollection(collName);
 shardedColl.drop();
 assert.commandWorked(testDB.createCollection(collName));
 assert.commandWorked(shardedColl.createIndex(shardKey));
 
-// Enable sharding on the database and shard the collection.
-// Use "st.shard0.shardName" as the primary shard.
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.toString(), st.shard0.shardName);
 assert.commandWorked(
     testDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}));
 

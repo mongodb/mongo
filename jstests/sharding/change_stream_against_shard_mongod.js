@@ -19,8 +19,8 @@ const shard0 = st.rs0;
 const shard0Coll = shard0.getPrimary().getCollection(mongosColl.getFullName());
 
 // Enable sharding on the the test database and ensure that the primary is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), shard0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.getURL()}));
 
 // Shard the source collection on {a: 1}. No need to split since it's single-shard.
 st.shardColl(mongosColl, {a: 1}, false);

@@ -73,8 +73,8 @@ testFailGetMoreAfterCursorCheckoutFailpoint(
 
 // Now test both aggregate and getMore under conditions of an actual cluster outage. Shard the
 // collection on shard0, split at {_id: 0}, and move the upper chunk to the other shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});
 
 // Open a change stream on the collection...

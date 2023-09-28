@@ -14,12 +14,13 @@ var staleMongosA = st.s1;
 var staleMongosB = st.s2;
 
 var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+const kDbName = "foo";
+assert.commandWorked(
+    admin.runCommand({enableSharding: kDbName, primaryShard: st.shard1.shardName}));
+var coll = mongos.getCollection(kDbName + ".bar");
 var staleCollA = staleMongosA.getCollection(coll + "");
 var staleCollB = staleMongosB.getCollection(coll + "");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 coll.createIndex({a: 1});
 
 // Shard the collection on {a: 1} and move one chunk to another shard. Updates need to be across
@@ -78,7 +79,6 @@ assert.eq(staleCollB.findOne().x, "x");
 coll.drop();
 coll.createIndex({e: 1});
 // Deletes need to be across two shards to trigger an error.
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
 st.shardColl(coll, {e: 1}, {e: 0}, {e: 1}, coll.getDB(), true);
 
 // Make sure we can successfully remove, even though we have stale state

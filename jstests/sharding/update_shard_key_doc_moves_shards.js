@@ -45,8 +45,7 @@ const updateDocumentShardKeyUsingTransactionApiEnabled =
     isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, shard0);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
 function changeShardKeyWhenFailpointsSet(session,
                                          sessionDB,

@@ -12,8 +12,8 @@ const testDB = st.s.getDB("test");
 const testColl = testDB.coll;
 const unshardedColl = testDB.unsharded;
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Shard testColl on {x:1}, split it at {x:0}, and move chunk {x:1} to shard1.
 st.shardColl(testColl, {x: 1}, {x: 0}, {x: 1});

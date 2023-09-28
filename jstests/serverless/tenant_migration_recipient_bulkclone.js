@@ -20,8 +20,8 @@ const kDbName = kTenantID.str + "_testDB";
 let db = mongos.getDB(kDbName);
 
 // Ensure the donor is the primary shard so that it has the database of the tenant.
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Going to create data for the tenant.");
 assert.commandWorked(db.foo.insert([{_id: 10, x: 1}, {_id: 20, y: 1}, {_id: 30, z: 1}]));

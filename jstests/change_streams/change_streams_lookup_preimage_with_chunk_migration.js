@@ -38,7 +38,7 @@ const recipient = st.shard1;
 const coll = (() => {
     assertDropAndRecreateCollection(db, collName);
 
-    st.ensurePrimaryShard(dbName, donor.shardName);
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: donor.shardName}));
 
     const coll = db.getCollection(collName);
 

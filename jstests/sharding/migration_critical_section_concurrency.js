@@ -12,8 +12,8 @@ import {
 var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({mongos: 1, shards: 2});
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
 
 var testDB = st.s0.getDB('TestDB');
 

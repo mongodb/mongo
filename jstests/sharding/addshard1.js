@@ -62,7 +62,8 @@ assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
           "DB primary is wrong");
 
 var origShard = s.getNonPrimaries("testDB")[0];
-s.ensurePrimaryShard("testDB", origShard);
+assert.commandWorked(s.s.adminCommand({movePrimary: "testDB", to: origShard}));
+
 assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
           origShard,
           "DB primary didn't move");

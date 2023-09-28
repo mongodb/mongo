@@ -19,7 +19,7 @@ st.shardColl(mongosColl, {_id: 1}, {_id: 0}, {_id: 0});
 // Shard the union's target collection on _id with the same chunks, but moving the negative chunk
 // off the primary shard so their distributions are flipped.
 st.shardColl(unionedColl, {_id: 1}, {_id: 0}, {_id: -1});
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
+assert.commandWorked(mongosDB.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
 // Turn on the profiler.
 for (let rs of [st.rs0, st.rs1]) {

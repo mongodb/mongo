@@ -205,8 +205,8 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 {
     const st = new ShardingTest({shards: 2, rs: {nodes: 2, setParameter: setParameterOpts}});
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbNameBase}));
-    st.ensurePrimaryShard(dbNameBase, st.shard0.name);
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbNameBase, primaryShard: st.shard0.name}));
 
     const testCases = [];
     // The analyzeShardKey command is supported on mongos and all shardsvr mongods (both primary and

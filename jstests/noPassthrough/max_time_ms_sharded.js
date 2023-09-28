@@ -45,8 +45,8 @@ var configureMaxTimeNeverTimeOut = function(mode) {
 //
 // Pre-split collection: shard 0 takes {_id: {$lt: 0}}, shard 1 takes {_id: {$gte: 0}}.
 //
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
-st.ensurePrimaryShard(coll.getDB().toString(), st.shard0.shardName);
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));
 assert.commandWorked(

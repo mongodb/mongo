@@ -7,8 +7,8 @@ const nsString = dbName + ".coll";
 const numDocs = 50000;
 const numKeys = 1000;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: nsString, key: {key: 1}}));
 
 // Load chunk data through the stale mongos before moving a chunk.

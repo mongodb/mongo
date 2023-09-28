@@ -11,11 +11,11 @@ TestData.skipCheckOrphans = true;
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s.getDB(jsTestName());
+assert.commandWorked(st.s.getDB("admin").runCommand(
+    {enableSharding: mongosDB.getName(), primaryShard: st.shard0.name}));
+
 const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];
-
-assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.name);
 
 function setAggHang(mode) {
     // Match on the output namespace to avoid hanging the sharding metadata refresh aggregation when

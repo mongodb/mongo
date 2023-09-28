@@ -12,8 +12,7 @@ const st = new ShardingTest({name: jsTestName(), shards: 3});
 const dbname = "test";
 const mongos = st.s0;
 const db = st.getDB(dbname);
-db.adminCommand({enablesharding: dbname});
-st.ensurePrimaryShard('test', st.shard1.shardName);
+db.adminCommand({enablesharding: dbname, primaryShard: st.shard1.shardName});
 
 /**
  * Test that 'shardCollection' command works when there is existing data in collection and does not

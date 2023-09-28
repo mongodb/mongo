@@ -446,8 +446,8 @@ for (let command of commands) {
 
     jsTest.log("testing command " + tojson(test.command));
 
-    assert.commandWorked(staleMongos.adminCommand({enableSharding: db}));
-    st.ensurePrimaryShard(db, st.shard0.shardName);
+    assert.commandWorked(
+        staleMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}));
     assert.commandWorked(staleMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
     // We do this because we expect freshMongos to see that the collection is sharded, which it

@@ -12,8 +12,8 @@
 let rsOptions = {nodes: 2};
 let st = new ShardingTest({shards: {rs0: rsOptions, rs1: rsOptions}});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
 

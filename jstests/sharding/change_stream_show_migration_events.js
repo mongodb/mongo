@@ -38,11 +38,10 @@ const mongos = st.s;
 const mongosColl = mongos.getCollection('test.chunk_mig');
 const mongosDB = mongos.getDB("test");
 
-// Enable sharding to inform mongos of the database, allowing us to open a cursor.
-assert.commandWorked(mongos.adminCommand({enableSharding: mongosDB.getName()}));
-
-// Make sure all chunks start on shard 0.
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+// Enable sharding to inform mongos of the database, allowing us to open a cursor. All chunks start
+// on shard0
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Open a change stream cursor before the collection is sharded.
 const changeStreamShardZero = st.shard0.getCollection('test.chunk_mig').aggregate([

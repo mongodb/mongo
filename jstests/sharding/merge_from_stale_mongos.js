@@ -7,17 +7,17 @@ const st = new ShardingTest({
     mongos: 4,
 });
 
-const freshMongos = st.s0.getDB(jsTestName());
-const staleMongosSource = st.s1.getDB(jsTestName());
-const staleMongosTarget = st.s2.getDB(jsTestName());
-const staleMongosBoth = st.s3.getDB(jsTestName());
+const kDbName = jsTestName();
+const freshMongos = st.s0.getDB(kDbName);
+const staleMongosSource = st.s1.getDB(kDbName);
+const staleMongosTarget = st.s2.getDB(kDbName);
+const staleMongosBoth = st.s3.getDB(kDbName);
+
+assert.commandWorked(staleMongosSource.adminCommand(
+    {enableSharding: staleMongosSource.getName(), primaryShard: st.rs0.getURL()}));
 
 const sourceColl = freshMongos.getCollection("source");
 const targetColl = freshMongos.getCollection("target");
-
-// Enable sharding on the test DB and ensure its primary is shard 0.
-assert.commandWorked(staleMongosSource.adminCommand({enableSharding: staleMongosSource.getName()}));
-st.ensurePrimaryShard(staleMongosSource.getName(), st.rs0.getURL());
 
 // Shards the collection 'coll' through 'mongos'.
 function shardCollWithMongos(mongos, coll) {

@@ -12,8 +12,7 @@ let donor = st.shard0;
 let recipient = st.shard1;
 
 jsTest.log("Make " + donor.shardName + " the primary shard, and shard collection " + ns);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, donor.shardName);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donor.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 jsTest.log("Insert a document with {_id: 0} into " + ns + " through mongos");

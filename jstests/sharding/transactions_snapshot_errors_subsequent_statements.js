@@ -81,16 +81,15 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 jsTestLog("Unsharded transaction");
 
 assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
     st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 // Single shard case simulates the storage engine discarding an in-use snapshot.
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, errorCode, false /* isSharded */);
 }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 // Set up 2 chunks, [minKey, 10), [10, maxKey), each with one document (includes the document

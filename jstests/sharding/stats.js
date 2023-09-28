@@ -5,10 +5,9 @@
  */
 var s = new ShardingTest({name: "stats", shards: 2, mongos: 1});
 
-s.adminCommand({enablesharding: "test"});
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 
 const db = s.getDB("test");
-s.ensurePrimaryShard('test', s.shard1.shardName);
 
 function numKeys(o) {
     var num = 0;

@@ -8,8 +8,8 @@ var runTest = function(writeFunc) {
     var testDB = st.s.getDB('test');
     testDB.dropDatabase();
 
-    assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', st.shard0.shardName);
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 
     assert.commandWorked(testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
     assert.commandWorked(testDB.adminCommand({split: 'test.user', middle: {x: 0}}));

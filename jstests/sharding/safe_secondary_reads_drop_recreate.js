@@ -620,8 +620,8 @@ for (let command of commands) {
         jsTest.log("testing command " + tojson(command) + " under scenario " + scenario);
 
         // Each scenario starts with a sharded collection with shard0 as the primary shard.
-        assert.commandWorked(staleMongos.adminCommand({enableSharding: db}));
-        st.ensurePrimaryShard(db, st.shard0.shardName);
+        assert.commandWorked(
+            staleMongos.adminCommand({enableSharding: db, primaryShard: st.shard0.shardName}));
         assert.commandWorked(staleMongos.adminCommand({shardCollection: nss, key: {x: 1}}));
 
         // We do this because we expect staleMongos to see that the collection is sharded, which

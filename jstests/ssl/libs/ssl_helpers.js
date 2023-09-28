@@ -154,10 +154,9 @@ export function mixedShardTest(options1, options2, shouldSucceed) {
         testShardedLookup(st);
 
         // Test mongos talking to config servers
-        var r = st.adminCommand({enableSharding: "test"});
+        var r = st.adminCommand({enableSharding: "test", primaryShard: st.shard0.shardName});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
-        st.ensurePrimaryShard("test", st.shard0.shardName);
         r = st.adminCommand({movePrimary: 'test', to: st.shard1.shardName});
         assert.eq(r, true, "error movePrimary failed for this configuration");
 

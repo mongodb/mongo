@@ -3,8 +3,8 @@
 var st = new ShardingTest({shards: 1});
 
 var testDB = st.s.getDB('TestSplitDB');
-assert.commandWorked(testDB.adminCommand({enableSharding: 'TestSplitDB'}));
-st.ensurePrimaryShard('TestSplitDB', st.shard0.shardName);
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: 'TestSplitDB', primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(testDB.adminCommand({shardCollection: 'TestSplitDB.Coll', key: {x: 1}}));
 assert.commandWorked(testDB.adminCommand({split: 'TestSplitDB.Coll', middle: {x: 0}}));

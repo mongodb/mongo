@@ -21,8 +21,7 @@ const db = st.s.getDB(dbName);
 
 function testValidation(key, {isValidIndexKey, isValidShardKey}) {
     jsTest.log(`Testing ${tojson({key, isValidIndexKey, isValidShardKey})}`);
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     const createIndexRes = db.getCollection(ns0).createIndex(key);
     if (isValidIndexKey) {

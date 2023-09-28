@@ -104,8 +104,8 @@ kCmdTestCases.forEach(cmdTestCase => {
 // Sharded
 jsTestLog("Testing against sharded collection");
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.rs0.getPrimary().adminCommand({_flushRoutingTableCacheUpdates: ns}));
 

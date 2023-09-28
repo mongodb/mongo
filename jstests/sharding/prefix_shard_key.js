@@ -24,8 +24,7 @@ var db = s.getDB("test");
 var admin = s.getDB("admin");
 var config = s.getDB("config");
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 
 //******************Part 1********************
 

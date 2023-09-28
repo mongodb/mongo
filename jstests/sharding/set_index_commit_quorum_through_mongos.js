@@ -45,8 +45,8 @@ const extractShardReplyFromResponse = (shard, mongosResponse) => {
     return mongosResponse.raw[shardURL];
 };
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Testing setIndexCommitQuorum from a mongos can succeed");
 // Create a sharded collection where only shard0 owns chunks.

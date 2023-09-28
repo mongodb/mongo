@@ -33,8 +33,8 @@ function runTest(readPreference) {
     jsTest.log(`Testing analyzeShardKey with ${tojson({dbName, collName, readPreference})}`);
 
     // Make shard0 the primary shard.
-    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     const mongos0Coll = st.s0.getCollection(ns);
     assert.commandWorked(mongos0Coll.createIndex({x: 1}));

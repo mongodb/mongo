@@ -20,7 +20,7 @@ const metaField = 'hostid';
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const sDB = st.s.getDB(dbName);
-assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
+assert.commandWorked(sDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 const shard0DB = st.shard0.getDB(dbName);
 const shard1DB = st.shard1.getDB(dbName);
 
@@ -123,8 +123,6 @@ function runQuery(
 
 // Shard key on just the time field.
 (function timeShardKey() {
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};
     assert.commandWorked(sDB.adminCommand({
@@ -297,8 +295,6 @@ function runQuery(
 
 // Shard key on the metadata field and time fields.
 (function metaAndTimeShardKey() {
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
     assert.commandWorked(sDB.adminCommand({
         shardCollection: `${dbName}.${collName}`,
         key: {[metaField]: 1, 'time': 1},
@@ -456,8 +452,6 @@ function runQuery(
 
 // Shard key on the metadata fields.
 (function metaFieldShardKey() {
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
     // Shard timeseries collection.
     const metaPrefix = `${metaField}.prefix`;
     const metaSuffix = `${metaField}.suffix`;

@@ -6,8 +6,8 @@ let st = new ShardingTest({shards: 2});
 let mongos = st.s0;
 let db = mongos.getDB('TestDB');
 
-assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard1.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard1.shardName}));
 
 function checkChunkCounts(collName, chunksOnShard0, chunksOnShard1) {
     let counts = st.chunkCounts(collName, 'TestDB');

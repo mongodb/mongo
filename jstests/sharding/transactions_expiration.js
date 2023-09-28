@@ -6,8 +6,7 @@
 
 let st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.name}));
 assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.name}));

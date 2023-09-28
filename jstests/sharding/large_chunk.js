@@ -19,8 +19,8 @@ var db = st.getDB("test");
 //
 
 // Turn on sharding on the 'test.foo' collection and generate a large chunk
-assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
 var bigString = "";
 while (bigString.length < 10000) {

@@ -49,8 +49,8 @@ function runTest(conn, {rst, st}) {
 
     if (st) {
         // Shard collection1 and move one chunk to shard1.
-        assert.commandWorked(conn.adminCommand({enableSharding: dbName}));
-        st.ensurePrimaryShard(dbName, st.shard0.name);
+        assert.commandWorked(
+            conn.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
         assert.commandWorked(testDb.runCommand(
             {createIndexes: collName1, indexes: [{key: {x: 1}, name: "xIndex"}]}));
         assert.commandWorked(conn.adminCommand({shardCollection: ns1, key: {x: 1}}));

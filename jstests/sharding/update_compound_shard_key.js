@@ -23,8 +23,8 @@ const ns = kDbName + '.coll';
 const session = st.s.startSession({retryWrites: true});
 const sessionDB = session.getDatabase(kDbName);
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(
     st.s.getDB('config').adminCommand({shardCollection: ns, key: {x: 1, y: 1, z: 1}}));

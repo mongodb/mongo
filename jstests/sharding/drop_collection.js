@@ -200,8 +200,8 @@ jsTest.log("Move primary with drop and recreate - new primary no chunks.");
     st.shardColl(coll, {skey: 1}, false, false);
 
     jsTest.log("Move database primary back and forth shard 1");
-    st.ensurePrimaryShard(db.getName(), st.shard1.shardName);
-    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+    assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard0.shardName}));
 
     jsTest.log("Drop sharded collection");
     var uuid = getCollectionUUID(coll.getFullName());
@@ -212,7 +212,7 @@ jsTest.log("Move primary with drop and recreate - new primary no chunks.");
     st.shardColl(coll, {skey: 1}, false, false);
 
     jsTest.log("Move database primary to shard 1");
-    st.ensurePrimaryShard(db.getName(), st.shard1.shardName);
+    assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
 
     jsTest.log("Drop sharded collection");
     uuid = getCollectionUUID(coll.getFullName());
@@ -230,10 +230,10 @@ jsTest.log("Move primary with drop and recreate - new primary own chunks.");
     const db = getNewDb();
     const coll = db['movePrimaryWithChunks'];
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
     jsTest.log("Create sharded collection with two chunks on each shard");
-    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
     st.shardColl(coll, {skey: 1}, {skey: 0}, {skey: 0});
 
     assert.eq(1,
@@ -268,7 +268,7 @@ jsTest.log("Move primary with drop and recreate - new primary own chunks.");
                   configDB, coll.getFullName(), {shard: st.shard0.shardName}));
 
     jsTest.log("Move primary of DB to shard 1");
-    st.ensurePrimaryShard(db.getName(), st.shard1.shardName);
+    assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard1.shardName}));
 
     jsTest.log("Drop sharded collection");
     uuid = getCollectionUUID(coll.getFullName());

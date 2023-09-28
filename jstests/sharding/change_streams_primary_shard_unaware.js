@@ -44,8 +44,8 @@ const st = new ShardingTest({
 const mongosDB = st.s0.getDB(testName);
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Create unsharded collection on primary shard.
 const mongosColl = mongosDB[testName];

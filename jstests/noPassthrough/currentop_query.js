@@ -32,8 +32,8 @@ const mongosDB = mongosConn.getDB("currentop_query");
 const mongosColl = mongosDB.currentop_query;
 
 // Enable sharding on the the test database and ensure that the primary is on shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), rsConn.name);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: rsConn.name}));
 
 // On a sharded cluster, aggregations which are dispatched to multiple shards first establish
 // zero-batch cursors and only hit the failpoints on the following getMore. This helper takes a

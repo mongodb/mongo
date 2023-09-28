@@ -22,8 +22,8 @@ export var WriteWithoutShardKeyTestUtil = (function() {
         const splitString = nss.split(".");
         const dbName = splitString[0];
 
-        assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-        st.ensurePrimaryShard(dbName, st.shard0.shardName);
+        assert.commandWorked(
+            st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
         assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: shardKey}));
 
         for (let splitPoint of splitPoints) {

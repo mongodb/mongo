@@ -32,12 +32,12 @@ const mongosDB1 = st.s.getDB(`${jsTestName()}_1`);
 const adminDB = st.s.getDB("admin");
 
 // Enable sharding on mongosDB0 and ensure its primary is shard0.
-assert.commandWorked(mongosDB0.adminCommand({enableSharding: mongosDB0.getName()}));
-st.ensurePrimaryShard(mongosDB0.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB0.adminCommand({enableSharding: mongosDB0.getName(), primaryShard: st.rs0.getURL()}));
 
 // Enable sharding on mongosDB1 and ensure its primary is shard1.
-assert.commandWorked(mongosDB1.adminCommand({enableSharding: mongosDB1.getName()}));
-st.ensurePrimaryShard(mongosDB1.getName(), st.rs1.getURL());
+assert.commandWorked(
+    mongosDB1.adminCommand({enableSharding: mongosDB1.getName(), primaryShard: st.rs1.getURL()}));
 
 // Open a connection to a different collection on each shard. We use direct connections to
 // ensure that the oplog timestamps across the shards overlap.

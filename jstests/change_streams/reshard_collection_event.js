@@ -104,8 +104,7 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
     });
 }
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: primaryShard}));
 
 // Test the behaviour of reshardCollection for a collection.
 // The values of 'collectionUUID' and 'reshardUUID' will be filled in by the validate function.

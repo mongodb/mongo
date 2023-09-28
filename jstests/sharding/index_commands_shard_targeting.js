@@ -195,8 +195,8 @@ const testCases = {
     },
 };
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Test that the index commands send and check shard vesions, and only target the shards
 // that own chunks for the collection.

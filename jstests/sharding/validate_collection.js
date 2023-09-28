@@ -14,6 +14,7 @@ assert(NUM_SHARDS >= 3);
 var st = new ShardingTest({shards: NUM_SHARDS});
 var s = st.s;
 var testDb = st.getDB('test');
+assert.commandWorked(s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 
 function setup() {
     assert.commandWorked(testDb.test.insert({_id: 0}));
@@ -48,14 +49,12 @@ setup();
 validate(true);
 
 // 2. Sharded collection in a DB.
-assert.commandWorked(s.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
+assert.commandWorked(st.s.adminCommand({movePrimary: 'test', to: st.shard0.name}));
 assert.commandWorked(s.adminCommand({shardCollection: 'test.test', key: {_id: 1}}));
 assert.commandWorked(s.adminCommand({shardCollection: 'test.dummy', key: {_id: 1}}));
 validate(true);
 
 // 3. Sharded collection with chunks on two shards.
-st.ensurePrimaryShard('test', st.shard0.shardName);
 assert.commandWorked(s.adminCommand({split: 'test.test', middle: {_id: 1}}));
 assert.commandWorked(
     testDb.adminCommand({moveChunk: 'test.test', find: {_id: 1}, to: st.shard1.shardName}));

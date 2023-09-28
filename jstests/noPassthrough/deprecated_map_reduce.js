@@ -63,9 +63,11 @@ const st = new ShardingTest({shards: 2, mongos: 1});
 
 const session = st.s.getDB("test").getMongo().startSession();
 const mongosDB = session.getDatabase("test");
-const mongosColl = mongosDB.testing;
 
-mongosColl.drop();
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
+
+const mongosColl = mongosDB.testing;
 assert.commandWorked(mongosDB.createCollection(mongosColl.getName(), caseInsensitive));
 
 assert.commandWorked(mongosColl.insert({cust_id: "A", amount: 100, status: "B"}));
@@ -75,8 +77,6 @@ assert.commandWorked(mongosColl.insert({cust_id: "A", amount: 10, status: "B"}))
 assert.commandWorked(mongosColl.insert({cust_id: "A", amount: 20, status: "B"}));
 assert.commandWorked(mongosColl.insert({cust_id: "B", amount: 5, status: "B"}));
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
 assert.commandWorked(
     st.s0.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));
 

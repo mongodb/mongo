@@ -14,13 +14,11 @@ TestData.skipCheckShardFilteringMetadata = true;
 var st = new ShardingTest({shards: 2});
 
 jsTestLog("Setting up initial data");
-
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 for (var i = 0; i < 100; i++) {
     assert.commandWorked(st.s.getDB('test').foo.insert({_id: i}));
 }
-
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {_id: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: 'test.foo', find: {_id: 50}}));

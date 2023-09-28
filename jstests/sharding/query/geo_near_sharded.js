@@ -57,8 +57,8 @@ function test(st, db, sharded, indexType) {
 }
 
 var st = new ShardingTest({shards: 3, mongos: 1});
-assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
 test(st, st.getDB('test'), true, '2dsphere');
 st.stop();

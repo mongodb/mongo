@@ -45,8 +45,7 @@ let recipientLocal = recipient.getDB('local');
 // Recipient:
 jsTest.log('Enable sharding of the collection and split into two chunks....');
 
-assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 2}}));
 

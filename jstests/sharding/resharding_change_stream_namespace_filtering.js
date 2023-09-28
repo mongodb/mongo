@@ -22,6 +22,10 @@ const reshardCollName = "coll_reshard";
 const otherCollName = "coll_other";
 
 const mongosDB = st.s.getDB(dbName);
+
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
 const mongosReshardColl = mongosDB[reshardCollName];
 
 const mongosOtherColl = mongosDB[otherCollName];
@@ -35,7 +39,6 @@ const shardOtherCollCsCursor =
 // Drop, recreate, and shard the 'coll_reshard' collection.
 assertDropAndRecreateCollection(mongosDB, reshardCollName);
 
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 st.shardColl(mongosReshardColl, {a: 1}, {a: 50});
 
 for (let i = 0; i < 100; ++i) {

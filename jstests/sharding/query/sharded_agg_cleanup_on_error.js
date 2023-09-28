@@ -25,6 +25,8 @@ const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
 
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.name}));
 let coll = mongosDB.sharded_agg_cleanup_on_error;
 
 for (let i = 0; i < 10; i++) {
@@ -32,7 +34,6 @@ for (let i = 0; i < 10; i++) {
 }
 
 st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
-st.ensurePrimaryShard(kDBName, st.shard0.name);
 
 function findMatchingCursors(db) {
     return db.getSiblingDB("admin")

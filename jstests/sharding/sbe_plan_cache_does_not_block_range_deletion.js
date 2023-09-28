@@ -18,8 +18,8 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({mongos: 1, config: 1, shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardname}));
 
 const isSBEEnabled = checkSBEEnabled(st.s.getDB(dbName));
 

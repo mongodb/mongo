@@ -160,8 +160,7 @@ runTestGetMore({lsid: {id: new UUID()}, txnNumber: NumberLong(0)});
 // Sharded collection case.
 //
 
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(st.s.adminCommand({movePrimary: kDbName, to: st.shard0.shardName}));
 assert.commandWorked(st.s.getCollection(kNs).createIndex({x: 1}));
 assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
 

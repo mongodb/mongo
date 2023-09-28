@@ -36,8 +36,7 @@ function setUpCollection() {
     const collName = "testColl";
     const ns = dbName + "." + collName;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));

@@ -19,7 +19,6 @@ let docs = Array.from({length: 1000}, (x, i) => ({_id: i, field: "a".repeat(1024
 
 assert.commandWorked(
     st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(coll.createIndex({"_id": "hashed"}));
 assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: "hashed"}}));
 

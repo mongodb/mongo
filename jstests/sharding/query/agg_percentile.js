@@ -14,8 +14,8 @@ const collUnsharded = db[jsTestName() + "_unsharded"];
 assert.commandWorked(db.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 // Range-shard the test collection on _id.
 assert.commandWorked(db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));

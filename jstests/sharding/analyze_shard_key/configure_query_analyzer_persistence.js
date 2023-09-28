@@ -49,8 +49,7 @@ function setUpCollection(conn, {isShardedColl, st}) {
     assert.commandWorked(db.createCollection(collName));
     if (isShardedColl) {
         assert(st);
-        assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-        st.ensurePrimaryShard(dbName, st.shard0.name);
+        assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.name}));
         assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
         assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
         assert.commandWorked(
@@ -227,7 +226,8 @@ function testConfigurationDeletionRenameCollection(conn, {sameDatabase, isSharde
     assert.commandWorked(dstDb.createCollection(dstCollName));
     if (!sameDatabase && st) {
         // On a sharded cluster, the src and dst collections must be on same shard.
-        st.ensurePrimaryShard(dstDbName, st.getPrimaryShardIdForDatabase(srcDbName));
+        assert.commandWorked(st.s.adminCommand(
+            {movePrimary: dstDbName, to: st.getPrimaryShardIdForDatabase(srcDbName)}));
     }
     const dstCollUuid = QuerySamplingUtil.getCollectionUuid(dstDb, dstCollName);
 

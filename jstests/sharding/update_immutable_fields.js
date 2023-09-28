@@ -5,8 +5,8 @@ var mongos = st.s;
 var config = mongos.getDB("config");
 var coll = mongos.getCollection(jsTestName() + ".coll1");
 
-assert.commandWorked(config.adminCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
+assert.commandWorked(
+    config.adminCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(config.adminCommand({shardCollection: "" + coll, key: {a: 1}}));
 
 const shard0Coll = st.shard0.getCollection(coll.getFullName());

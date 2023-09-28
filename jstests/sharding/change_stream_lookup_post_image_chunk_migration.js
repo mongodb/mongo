@@ -23,8 +23,7 @@ const shard1 = st.shard1;
 const shard2 = st.shard2;
 
 // Enable sharding to inform mongos of the database, and make sure all chunks start on shard 0.
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, shard0.shardName);
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
 
 // Create a change stream before any insert or update operations are performed.
 const csBeforeSharding = mongosColl.watch([], {fullDocument: "updateLookup"});

@@ -22,6 +22,8 @@ import {
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
 const ns = kDbName + '.coll';
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 // Enable 'retryWrites' so that the shard key fields are updatable.
 const session = st.s.startSession({retryWrites: true});
@@ -29,9 +31,6 @@ const sessionDB = session.getDatabase(kDbName);
 const coll = sessionDB["coll"];
 const shard0DB = st.shard0.getDB(kDbName);
 const shard1DB = st.shard1.getDB(kDbName);
-
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
 /**
  * Enables profiling on both shards so that we can verify the targeting behaviour.

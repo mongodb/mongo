@@ -17,8 +17,7 @@ newlyCreatedDb.unsharded_coll.findAndModify(
 assert.eq(1, newlyCreatedDb.unsharded_coll.find({}).itcount());
 
 // Tests with sharded database
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.sharded_coll", key: {_id: 1}}));
 
 var db = s.getDB('test');

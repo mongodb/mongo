@@ -4,7 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 function testUnshardedCollection(conn) {
-    const dbName = "testDb";
+    const dbName = "testUnshardedCollectionDb";
     const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const coll = conn.getCollection(ns);
@@ -28,9 +28,13 @@ function testUnshardedCollection(conn) {
 }
 
 function testShardedCollection(st) {
-    const dbName = "testDb";
+    const dbName = "testShardedCollectionDb";
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
+
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
     const coll = st.s.getCollection(ns);
     const currentKey = {currentKey: 1};
     const candidateKey = {candidateKey: 1};
@@ -38,8 +42,6 @@ function testShardedCollection(st) {
     assert.commandWorked(coll.createIndex(currentKey));
     assert.commandWorked(coll.createIndex(candidateKey));
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentKey}));
 
     // Make the collection have the following chunks:

@@ -2,8 +2,8 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 2, chunkSize: 1});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 'hashed'}}));
 
 var configDB = st.s0.getDB('config');

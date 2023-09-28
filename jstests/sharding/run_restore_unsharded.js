@@ -13,13 +13,10 @@ const s = new ShardingTest(
 let mongos = s.s0;
 let db = s.getDB("test");
 
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard("test", s.shard0.shardName);
-
 // Create an unsharded collection.
 assert.commandWorked(db.createCollection("a"));
 const collUUID =
-    s.shard0.getDB("test").runCommand({listCollections: 1}).cursor.firstBatch[0].info.uuid;
+    mongos.getDB("test").runCommand({listCollections: 1}).cursor.firstBatch[0].info.uuid;
 
 // Only sharded collections appear in config.collections
 assert.eq(0, mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).count());

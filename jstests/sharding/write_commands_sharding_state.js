@@ -7,8 +7,8 @@ var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 var dbTestName = 'WriteCommandsTestDB';
 var collName = dbTestName + '.TestColl';
 
-assert.commandWorked(st.s0.adminCommand({enablesharding: dbTestName}));
-st.ensurePrimaryShard(dbTestName, st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: dbTestName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: collName, key: {Key: 1}, unique: true}));
 

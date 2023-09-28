@@ -4,6 +4,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: "limit_push", shards: 2, mongos: 1});
 var db = s.getDB("test");
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 
 // Create some data
 for (let i = 0; i < 100; i++) {
@@ -13,8 +14,6 @@ db.limit_push.createIndex({x: 1});
 assert.eq(100, db.limit_push.find().length(), "Incorrect number of documents");
 
 // Shard the collection
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard1.shardName);
 s.adminCommand({shardcollection: "test.limit_push", key: {x: 1}});
 
 // Now split the and move the data between the shards

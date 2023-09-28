@@ -8,8 +8,8 @@ TestData.skipCheckOrphans = true;
 
 var st = new ShardingTest({name: "remove_shard3", shards: 2, mongos: 2});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.Coll', key: {_id: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: 'TestDB.Coll', middle: {_id: 0}}));
 

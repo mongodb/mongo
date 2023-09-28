@@ -1039,16 +1039,6 @@ var ShardingTest = function ShardingTest(params) {
     };
 
     /**
-     * Helper method for setting primary shard of a database and making sure that it was successful.
-     * Note: first mongos needs to be up.
-     */
-    ShardingTest.prototype.ensurePrimaryShard = function(dbName, shardName) {
-        var db = this.s0.getDB('admin');
-        var res = db.adminCommand({movePrimary: dbName, to: shardName});
-        assert(res.ok || res.errmsg == "it is already the primary", tojson(res));
-    };
-
-    /**
      * Returns a document {isMixedVersion: <bool>, oldestBinVersion: <string>}.
      * The 'isMixedVersion' field is true if any settings to ShardingTest or jsTestOptions indicate
      * this is a multiversion cluster.

@@ -11,6 +11,9 @@ const st = new ShardingTest({name: 'lookup_read_preference', mongos: 1, shards: 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable
 // causal consistency.
 const dbName = jsTestName() + '_db';
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+
 st.s0.setCausalConsistency(true);
 const mongosDB = st.s0.getDB(dbName);
 
@@ -22,8 +25,6 @@ const otherForeign = mongosDB.other_foreign;
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
 st.shardColl(otherForeign, {_id: 1}, {_id: 0}, {_id: 0});
-
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
 
 // Turn on the profiler.
 for (let rs of [st.rs0, st.rs1]) {

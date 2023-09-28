@@ -28,21 +28,21 @@ assert.binVersion(st.shard2, "latest");
 assert.binVersion(st.shard3, "latest");
 assert.binVersion(st.s0, "last-lts");
 
+const fooDB = "fooTest";
+const barDB = "barTest";
 var mongos = st.s0, admin = mongos.getDB('admin'),
-    shards = mongos.getCollection('config.shards').find().toArray(),
+    shards = mongos.getCollection('config.shards').find().toArray();
 
-    fooDB = "fooTest", fooNS = fooDB + ".foo", fooColl = mongos.getCollection(fooNS),
-    fooDonor = st.shard0, fooRecipient = st.shard2, fooDonorColl = fooDonor.getCollection(fooNS),
+assert.commandWorked(admin.runCommand({enableSharding: fooDB, primaryShard: shards[0]._id}));
+assert.commandWorked(admin.runCommand({enableSharding: barDB, primaryShard: shards[3]._id}));
+
+var fooNS = fooDB + ".foo", fooColl = mongos.getCollection(fooNS), fooDonor = st.shard0,
+    fooRecipient = st.shard2, fooDonorColl = fooDonor.getCollection(fooNS),
     fooRecipientColl = fooRecipient.getCollection(fooNS),
 
-    barDB = "barTest", barNS = barDB + ".foo", barColl = mongos.getCollection(barNS),
-    barDonor = st.shard3, barRecipient = st.shard1, barDonorColl = barDonor.getCollection(barNS),
+    barNS = barDB + ".foo", barColl = mongos.getCollection(barNS), barDonor = st.shard3,
+    barRecipient = st.shard1, barDonorColl = barDonor.getCollection(barNS),
     barRecipientColl = barRecipient.getCollection(barNS);
-
-assert.commandWorked(admin.runCommand({enableSharding: fooDB}));
-assert.commandWorked(admin.runCommand({enableSharding: barDB}));
-st.ensurePrimaryShard(fooDB, shards[0]._id);
-st.ensurePrimaryShard(barDB, shards[3]._id);
 
 assert.commandWorked(admin.runCommand({shardCollection: fooNS, key: {a: 1}}));
 assert.commandWorked(admin.runCommand({split: fooNS, middle: {a: 10}}));

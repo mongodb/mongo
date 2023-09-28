@@ -6,8 +6,7 @@ var s = new ShardingTest({name: jsTestName(), shards: 3, mongos: 1, verbose: 1})
 var dbname = "test";
 var coll = "foo";
 var db = s.getDB(dbname);
-db.adminCommand({enablesharding: dbname});
-s.ensurePrimaryShard('test', s.shard1.shardName);
+db.adminCommand({enablesharding: dbname, primaryShard: s.shard1.shardName});
 
 // for simplicity turn off balancer
 s.stopBalancer();

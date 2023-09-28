@@ -65,8 +65,8 @@ const mongod = new Mongo(shardHost);
 const shardColl = mongod.getCollection(routerColl.getFullName());
 const shardDB = shardColl.getDB();
 
-assert.commandWorked(adminDB.runCommand({enableSharding: routerColl.getDB().getName()}));
-st.ensurePrimaryShard(routerColl.getDB().getName(), st.shard0.shardName);
+assert.commandWorked(adminDB.runCommand(
+    {enableSharding: routerColl.getDB().getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(adminDB.runCommand({shardCollection: routerColl.getFullName(), key: {x: 1}}));
 assert.commandWorked(adminDB.runCommand({split: routerColl.getFullName(), middle: {x: 10}}));

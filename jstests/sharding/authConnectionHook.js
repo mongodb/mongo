@@ -24,8 +24,7 @@ adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles
 
 adminDB.auth('admin', 'password');
 
-adminDB.runCommand({enableSharding: "test"});
-st.ensurePrimaryShard('test', st.shard1.shardName);
+adminDB.runCommand({enableSharding: "test", primaryShard: st.shard1.shardName});
 adminDB.runCommand({shardCollection: "test.foo", key: {x: 1}});
 
 for (var i = 0; i < 100; i++) {

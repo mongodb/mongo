@@ -95,8 +95,7 @@ function validateExpectedEventAndConfirmResumability(collParam, expectedOutput) 
     });
 }
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: primaryShard}));
 
 // Test the behaviour of refineCollectionShardKey for a single-collection stream
 validateExpectedEventAndConfirmResumability(kCollName, {

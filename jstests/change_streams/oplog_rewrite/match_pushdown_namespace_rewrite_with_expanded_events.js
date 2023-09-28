@@ -32,10 +32,10 @@ const st = new ShardingTest({
 
 const mongosConn = st.s;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: shard0Only}));
-st.ensurePrimaryShard(shard0Only, st.shard0.shardName);
-assert.commandWorked(st.s.adminCommand({enableSharding: shard1Only}));
-st.ensurePrimaryShard(shard1Only, st.shard1.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: shard0Only, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: shard1Only, primaryShard: st.shard1.shardName}));
 
 const db = mongosConn.getDB(dbName);
 
@@ -725,11 +725,8 @@ verifyOnWholeCluster(resumeAfterToken,
 db.dropDatabase();
 db.getSiblingDB(otherDbName).dropDatabase();
 
-st.adminCommand({enablesharding: dbName});
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-
-st.adminCommand({enablesharding: otherDbName});
-st.ensurePrimaryShard(otherDbName, st.shard1.shardName);
+st.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName});
+st.adminCommand({enablesharding: otherDbName, primaryShard: st.shard1.shardName});
 
 // Open a change stream and store the resume token. This resume token will be used to replay the
 // stream after this point.

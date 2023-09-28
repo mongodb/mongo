@@ -36,8 +36,8 @@ function generateDoc(time, metaValue) {
 // Shard key on just the time field.
 (function timeShardKey() {
     const mongosDB = st.s.getDB(dbName);
-    assert.commandWorked(mongosDB.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(
+        mongosDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     // Shard time-series collection.
     const shardKey = {[timeField]: 1};

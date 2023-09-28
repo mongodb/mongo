@@ -10,8 +10,7 @@ const sampledNsSharded = dbName + "." + collNameSampledSharded;
 const collNameNotSampled = "notSampledColl";
 
 const st = new ShardingTest({mongos: 2, shards: 3, rs: {nodes: 2}});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const mongosDB = st.s.getDB(dbName);
 assert.commandWorked(st.s.adminCommand({shardCollection: sampledNsSharded, key: {x: 1}}));

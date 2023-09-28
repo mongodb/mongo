@@ -23,8 +23,8 @@ function getNumberOfCursorsMoreThanOneBatch() {
 }
 
 coll.drop();
-assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
 

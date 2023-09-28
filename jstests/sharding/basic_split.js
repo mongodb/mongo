@@ -15,8 +15,7 @@ assert.commandFailed(configDB.adminCommand({split: 'user', key: {_id: 1}}));
 // split on unsharded collection (db is not sharding enabled).
 assert.commandFailed(configDB.adminCommand({split: 'test.user', key: {_id: 1}}));
 
-assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', shard0);
+assert.commandWorked(configDB.adminCommand({enableSharding: 'test', primaryShard: shard0}));
 
 // split on unsharded collection (db is sharding enabled).
 assert.commandFailed(configDB.adminCommand({split: 'test.user', key: {_id: 1}}));

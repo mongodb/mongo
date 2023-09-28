@@ -68,8 +68,8 @@ function simulateResharding() {
     st.refreshCatalogCacheForNs(mongos, ns);
 }
 
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(mongos.adminCommand({split: ns, middle: {x: 5}}));
 

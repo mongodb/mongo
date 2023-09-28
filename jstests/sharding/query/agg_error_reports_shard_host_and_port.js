@@ -8,8 +8,8 @@ const mongosDb = st.s.getDB(jsTestName());
 const coll = mongosDb.getCollection("foo");
 
 // Enable sharding on the test DB and ensure its primary is shard 0.
-assert.commandWorked(mongosDb.adminCommand({enableSharding: mongosDb.getName()}));
-st.ensurePrimaryShard(mongosDb.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDb.adminCommand({enableSharding: mongosDb.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the collection.
 coll.drop();

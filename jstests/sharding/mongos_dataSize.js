@@ -62,8 +62,8 @@ function testDataSizeCmd(conn, keyPattern, invalidRanges, numObjects) {
 }
 
 const st = new ShardingTest({mongos: 3, shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 const shardKey1 = {
     x: 1

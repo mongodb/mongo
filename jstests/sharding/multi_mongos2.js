@@ -1,8 +1,8 @@
 // This tests sharding an existing collection that both shards are aware of (SERVER-2828)
 var st = new ShardingTest({shards: 2, mongos: 2});
 
-assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
 // "test.foo" - sharded (by mongos 0)
 assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));

@@ -16,8 +16,8 @@ let testDB = st.s.getDB(dbName);
 // For startParallelOps to write its state.
 let staticMongod = MongoRunner.runMongod({});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();

@@ -64,8 +64,7 @@ st.rs1.getPrimary().getDB('admin').createUser(
 
 jsTestLog('Creating initial data');
 
-st.adminCommand({enablesharding: "test"});
-st.ensurePrimaryShard('test', st.shard0.shardName);
+st.adminCommand({enablesharding: "test", primaryShard: st.shard0.shardName});
 st.adminCommand({shardcollection: "test.foo", key: {i: 1, j: 1}});
 
 // Balancer is stopped by default, so no moveChunks will interfere with the splits we're testing

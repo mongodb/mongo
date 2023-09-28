@@ -26,9 +26,8 @@ const testDB = mongos.getDB(dbName);
 const primary = st.shard0;
 const otherShard = st.shard1;
 
-testDB.dropDatabase();
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(testDB.getName(), primary.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
 
 assert.commandWorked(testDB.createCollection(
     collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}));

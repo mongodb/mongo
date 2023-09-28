@@ -70,8 +70,8 @@ let hashedShardedColl = testDB.hashed;
 let rangeShardedNs = rangeShardedColl.getFullName();
 let hashedShardedNs = hashedShardedColl.getFullName();
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Test range sharding...");
 assert.commandWorked(testDB.adminCommand({shardCollection: rangeShardedNs, key: {x: 1}}));

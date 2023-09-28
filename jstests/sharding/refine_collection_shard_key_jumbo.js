@@ -132,8 +132,7 @@ jsTestLog('********** BALANCER JUMBO TEST **********');
 //
 
 // NOTE: The current shard key is {x: 1}.
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
+assert.commandWorked(st.s.adminCommand({enableSharding: kDbName, primaryShard: primaryShard}));
 assert.commandWorked(st.s.adminCommand({shardCollection: kNsName, key: {x: 1}}));
 
 generateJumboChunk(kNsName, false /* isForNestedCase */);
@@ -158,8 +157,6 @@ assert(st.s.getCollection(kNsName).drop());
 // With a nested shard key.
 //
 
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
 assert.commandWorked(st.s.adminCommand({shardCollection: kNestedNsName, key: {x: 1}}));
 
 generateJumboChunk(kNestedNsName, true /* isForNestedCase */);
@@ -190,8 +187,6 @@ jsTestLog('********** MANUAL (i.e. MOVE CHUNK) JUMBO TEST **********');
 //
 
 // NOTE: The current shard key is {x: 1}.
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
 assert.commandWorked(st.s.adminCommand({shardCollection: kNsName, key: {x: 1}}));
 
 generateJumboChunk(kNsName, false /* isForNestedCase */);
@@ -209,9 +204,6 @@ assert(st.s.getCollection(kNsName).drop());
 //
 // With a nested shard key.
 //
-
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
 assert.commandWorked(st.s.adminCommand({shardCollection: kNestedNsName, key: {x: 1}}));
 
 generateJumboChunk(kNestedNsName, true /* isForNestedCase */);

@@ -25,7 +25,8 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
     setAggHang("alwaysOn");
 
     // Set the primary shard.
-    st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.shardName}));
 
     let comment = jsTestName() + "_comment";
     let outFn = `
@@ -59,7 +60,8 @@ function runPipelineWithStage({stage, shardedColl, expectedfailCode, expectedNum
                 () => tojson(mongosDB.currentOp().inprog));
 
     // Migrate the primary shard from shard0 to shard1.
-    st.ensurePrimaryShard(mongosDB.getName(), st.shard1.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard1.shardName}));
 
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");

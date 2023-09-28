@@ -17,8 +17,8 @@ const runParallelMoveChunk = (numThreads) => {
     const kPadding = new Array(1024).join("x");
 
     let testDB = st.s.getDB('test');
-    assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', st.shard0.shardName);
+    assert.commandWorked(
+        testDB.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
     assert.commandWorked(testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
     let shardKeyVal = 0;

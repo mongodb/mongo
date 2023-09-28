@@ -15,8 +15,7 @@ function runOneMoveChunk() {
     var shard0 = st.shard0.shardName;
     var shard1 = st.shard1.shardName;
 
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, shard0);
+    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
     const keyDoc = {a: 1};
     var ns = kDbName + '.foo';

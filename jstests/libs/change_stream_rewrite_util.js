@@ -163,7 +163,8 @@ export function createShardedCollection(shardingTest, shardKey, dbName, collName
     const coll = db.getCollection(collName);
     assert.commandWorked(coll.createIndex({[shardKey]: 1}));
 
-    shardingTest.ensurePrimaryShard(dbName, shardingTest.shard0.shardName);
+    assert.commandWorked(
+        shardingTest.s.adminCommand({movePrimary: dbName, to: shardingTest.shard0.name}));
 
     // Shard the test collection and split it into two chunks: one that contains all {shardKey: <lt
     // splitAt>} documents and one that contains all {shardKey: <gte splitAt>} documents.

@@ -42,10 +42,8 @@ function awaitReplicaSetMonitorRemoval(nodes, rsName) {
 }
 
 function setupInitialData(st, coll) {
-    coll.drop();
-
-    assert.commandWorked(st.s0.adminCommand({enableSharding: coll.getDB().getName()}));
-    st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
+    assert.commandWorked(st.s0.adminCommand(
+        {enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 
     assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {i: 1}}));
     assert.commandWorked(st.splitAt(coll.getFullName(), {i: 5}));

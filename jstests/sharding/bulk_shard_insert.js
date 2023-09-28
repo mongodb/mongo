@@ -15,8 +15,8 @@ var st = new ShardingTest({
     other: {configOptions: {setParameter: {balancerMigrationsThrottlingMs: 2000}}}
 });
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {Counter: 1}}));
 
 var db = st.s0.getDB('TestDB');

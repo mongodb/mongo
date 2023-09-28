@@ -40,10 +40,10 @@ const ns = dbName + "." + collName;
 
 let st = new ShardingTest(
     {shards: 2, configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}});
-let testColl = st.s.getDB(dbName).getCollection(collName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+let testColl = st.s.getDB(dbName).getCollection(collName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 let donorShard = st.shard0;

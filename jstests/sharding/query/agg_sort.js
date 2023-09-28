@@ -6,8 +6,8 @@ const db = shardingTest.getDB("test");
 const coll = db.sharded_agg_sort;
 coll.drop();
 
-assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName()}));
-shardingTest.ensurePrimaryShard(db.getName(), shardingTest.shard1.shardName);
+assert.commandWorked(shardingTest.s0.adminCommand(
+    {enableSharding: db.getName(), primaryShard: shardingTest.shard1.shardName}));
 assert.commandWorked(
     shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 

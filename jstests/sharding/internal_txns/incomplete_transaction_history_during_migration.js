@@ -15,8 +15,7 @@ const collName = 'testColl';
 const ns = dbName + '.' + collName;
 const testDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 assert.commandWorked(st.s.getCollection(ns).createIndex({x: 1}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));

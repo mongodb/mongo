@@ -20,11 +20,11 @@ const st = new ShardingTest({
 });
 
 const mongosDB = st.s0.getDB(jsTestName());
-const mongosColl = mongosDB[jsTestName()];
+// Ensure the test db primary is st.shard0.shardName.
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
-// Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+const mongosColl = mongosDB[jsTestName()];
 
 const caseInsensitive = {
     locale: "en_US",

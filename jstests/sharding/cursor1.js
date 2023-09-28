@@ -7,8 +7,7 @@ var s = new ShardingTest({name: "sharding_cursor1", shards: 2});
 s.config.settings.find().forEach(printjson);
 
 // create a sharded 'test.foo', for the moment with just one chunk
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard1.shardName);
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
 const db = s.getDB("test");

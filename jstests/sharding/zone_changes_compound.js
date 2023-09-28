@@ -19,8 +19,8 @@ let coll = testDB.compound;
 let ns = coll.getFullName();
 let shardKey = {x: 1, y: 1};
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, primaryShard.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
 
 jsTest.log("Insert docs and check that they end up on the primary shard.");

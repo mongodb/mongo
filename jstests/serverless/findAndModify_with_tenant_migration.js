@@ -32,8 +32,8 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
     const kDbName = tenantID.str + "_test";
     let db = st.q0.getDB(kDbName);
 
-    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.q0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     let cmdObj = donorStartMigrationCmd(tenantID, st.rs1.getURL());
 
@@ -51,8 +51,8 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
     const tenantID = ObjectId();
     const kDbName = tenantID.str + "_test";
 
-    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.q0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     configureFailPoint(adminDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
@@ -71,8 +71,8 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
     const tenantID = ObjectId();
     const kDbName = tenantID.str + "_test";
 
-    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.q0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     let blockingFp = configureFailPoint(adminDB, "pauseTenantMigrationBeforeLeavingBlockingState");
 
@@ -115,11 +115,11 @@ let adminDB = st.rs0.getPrimary().getDB('admin');
 
     const tenantID = ObjectId();
     const kDbName = tenantID.str + "_test";
+    assert.commandWorked(
+        st.q0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+
     let db = st.q0.getDB(kDbName);
     assert.commandWorked(db.foo.insert({'mydata': 1}));
-
-    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
     let blockingFp = configureFailPoint(adminDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     let abortFailPoint =

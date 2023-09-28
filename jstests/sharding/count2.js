@@ -3,8 +3,7 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 var s1 = new ShardingTest({name: "count2", shards: 2, mongos: 2});
 var s2 = s1._mongos[1];
 
-s1.adminCommand({enablesharding: "test"});
-s1.ensurePrimaryShard('test', s1.shard1.shardName);
+s1.adminCommand({enablesharding: "test", primaryShard: s1.shard1.shardName});
 s1.adminCommand({shardcollection: "test.foo", key: {name: 1}});
 
 var db1 = s1.getDB("test").foo;

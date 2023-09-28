@@ -24,9 +24,10 @@ function verifyProfilerListIndexesEntry(
 
 // Creates the source collection and target collection as unsharded collections on shard0.
 function setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, targetCollName) {
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.getDB(dbName).createCollection(sourceCollName));
     assert.commandWorked(st.s.getDB(dbName).createCollection(targetCollName));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     assert.commandWorked(st.s.getDB(dbName)[sourceCollName].insert({a: 10, b: 11}));
     assert.commandWorked(st.s.getDB(dbName)[targetCollName].insert({a: 10, b: 12}));
@@ -35,8 +36,8 @@ function setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, ta
 // Creates the source collection as an unsharded collection on shard0 and the target collection as a
 // sharded collection with one chunk on shard0.
 function setUpUnshardedSourceShardedTargetCollections(st, dbName, sourceCollName, targetCollName) {
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     assert.commandWorked(st.s.getDB(dbName)[sourceCollName].insert({a: 10, b: 11}));
 
@@ -275,7 +276,7 @@ const targetCollName = "targetFoo";
     const targetColl = otherRouter.getDB(dbName)[targetCollName];
     assert(targetColl.drop());
 
-    st.ensurePrimaryShard(dbName, st.shard1.shardName);
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.name}));
     assert.commandWorked(targetColl.insert({a: 10, b: 12}));
 
     // Run $merge and expect it to fail because the router refreshes and discovers the required

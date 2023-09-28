@@ -45,7 +45,7 @@ assert.commandWorked(local.insert({_id: 5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(foreign.insert({a: -5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(foreign.insert({a: 5}, {writeConcern: {w: "majority"}}));
 
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(db.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
 const pipeline = [
     {$lookup: {from: "foreign", localField: "_id", foreignField: "a", as: "f"}},

@@ -5,8 +5,7 @@
 const st = new ShardingTest({shards: 2});
 const dbName = jsTest.name();
 const coll = st.s.getDB(dbName).coll;
-st.s.adminCommand({enableSharding: dbName});
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName});
 
 function runTest(coll) {
     /* eslint-disable */

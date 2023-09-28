@@ -1,5 +1,6 @@
 var s = new ShardingTest({});
 var db = s.getDB("test");
+assert.commandWorked(s.s0.adminCommand({enablesharding: 'test', primaryShard: s.shard0.shardName}));
 
 assert.commandWorked(db.foo.insert({_id: 1}));
 assert.commandWorked(db.foo.renameCollection('bar'));
@@ -13,8 +14,6 @@ assert.eq(db.bar.findOne(), {_id: 2}, '2.1');
 assert.eq(db.bar.count(), 1, '2.2');
 assert.eq(db.foo.count(), 0, '2.3');
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: 'test'}));
-s.ensurePrimaryShard('test', s.shard0.shardName);
 assert.commandWorked(
     s.s0.adminCommand({enablesharding: 'otherDBSamePrimary', primaryShard: s.shard0.shardName}));
 

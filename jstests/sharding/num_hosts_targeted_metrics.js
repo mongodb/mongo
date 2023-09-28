@@ -10,8 +10,8 @@ const st = new ShardingTest({shards: 3});
 const mongos = st.s;
 const testDb = mongos.getDB("test");
 
-assert.commandWorked(mongos.adminCommand({enablesharding: "test"}));
-st.ensurePrimaryShard("test", st.shard1.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enablesharding: "test", primaryShard: st.shard1.shardName}));
 
 // Set up "test.coll0"
 assert.commandWorked(mongos.adminCommand({shardcollection: "test.coll0", key: {x: 1}}));

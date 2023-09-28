@@ -1,5 +1,6 @@
 let s = new ShardingTest({shards: 2});
 let db = s.getDB("test");
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 
 // ************** Test Set #1 *************
 // Basic counts on "bar" collections, not yet sharded.
@@ -12,8 +13,6 @@ assert.eq(1, db.bar.find({n: 1}).count());
 // Basic counts on sharded  "foo" collection.
 
 // 1. Create foo collection, insert 6 docs.
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard1.shardName);
 s.adminCommand({shardcollection: "test.foo", key: {name: 1}});
 
 let primary = s.getPrimaryShard("test").getDB("test");

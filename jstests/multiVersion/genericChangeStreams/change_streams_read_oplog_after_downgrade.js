@@ -28,9 +28,9 @@ const st = new ShardingTest({
     }
 });
 
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 let shardedColl = st.s.getDB(dbName)[collName];
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {sk: 1}}));
 
 const largeStr = '*'.repeat(512);

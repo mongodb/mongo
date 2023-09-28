@@ -15,8 +15,8 @@ assert.commandWorked(primaryDB.setProfilingLevel(2));
 assert.commandWorked(nonPrimaryDB.setProfilingLevel(2));
 
 // Enable sharding on the test DB and ensure that shard0 is the primary.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the target collection, and set the unique flag to ensure that there's a unique
 // index on the shard key.

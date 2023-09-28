@@ -3,8 +3,7 @@
  */
 var s = new ShardingTest({shards: 3, other: {rs: true, chunkSize: 2, enableBalancer: true}});
 
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard0.shardName);
+s.adminCommand({enablesharding: "test", primaryShard: s.shard0.shardName});
 s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true);
 
 var db = s.getDB("test");

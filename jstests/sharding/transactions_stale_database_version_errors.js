@@ -15,11 +15,10 @@ const st = new ShardingTest({shards: 2, mongos: 1});
 enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 // Set up two unsharded collections in different databases with shard0 as their primary.
-
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(
     st.s.getDB(dbName)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);
@@ -38,19 +37,17 @@ assert.commandWorked(session.commitTransaction_forTesting());
 //
 // Stale database version on second command to a shard should fail.
 //
-
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
+assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
 
 session.startTransaction();
 
 // Run first statement on different database so distinct still triggers a SDV.
 const dbName2 = "test2";
 const sessionDB2 = session.getDatabase(dbName2);
-
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName}));
 assert.commandWorked(
     st.s.getDB(dbName2)[collName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName2}));
-st.ensurePrimaryShard(dbName2, st.shard1.shardName);
 
 assert.commandWorked(sessionDB2.runCommand({find: collName, filter: {_id: 0}}));
 
@@ -74,9 +71,9 @@ const otherDbName = "other_test";
 const otherCollName = "bar";
 
 assert.commandWorked(
+    st.s.adminCommand({enableSharding: otherDbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
     st.s.getDB(otherDbName)[otherCollName].insert({_id: 0}, {writeConcern: {w: "majority"}}));
-assert.commandWorked(st.s.adminCommand({enableSharding: otherDbName}));
-st.ensurePrimaryShard(otherDbName, st.shard0.shardName);
 
 const sessionOtherDB = session.getDatabase(otherDbName);
 
@@ -100,9 +97,8 @@ assert.commandWorked(session.commitTransaction_forTesting());
 //
 // The final StaleDbVersion error should be returned if the router exhausts its retries.
 //
-
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-st.ensurePrimaryShard(otherDbName, st.shard1.shardName);
+assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({movePrimary: otherDbName, to: st.shard1.shardName}));
 
 // Disable database metadata refreshes on the stale shard so it will indefinitely return a stale
 // version error.

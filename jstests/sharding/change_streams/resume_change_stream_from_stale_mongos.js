@@ -19,8 +19,8 @@ const firstMongosDB = st.s0.getDB(jsTestName());
 const firstMongosColl = firstMongosDB.test;
 
 // Enable sharding on the test DB and ensure its primary is shard 0.
-assert.commandWorked(firstMongosDB.adminCommand({enableSharding: firstMongosDB.getName()}));
-st.ensurePrimaryShard(firstMongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(firstMongosDB.adminCommand(
+    {enableSharding: firstMongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Establish a change stream while it is unsharded, then shard the collection, move a chunk, and
 // record a resume token after the first chunk migration.

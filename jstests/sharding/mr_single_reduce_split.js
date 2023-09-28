@@ -18,8 +18,8 @@ const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
 assert.commandWorked(mongosDB.dropDatabase());
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(
     mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: 1}}));

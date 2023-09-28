@@ -117,8 +117,8 @@ const kBlockCmdTimeMS = 5 * 60 * 1000;
 const kWaitKillOpTimeoutMS = 5 * 1000;
 const numDocs = 10;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log(
     "Verify that maxTimeMS expiration of the additional request does not affect the command result");

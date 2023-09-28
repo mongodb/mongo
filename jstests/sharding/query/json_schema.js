@@ -5,8 +5,7 @@ const dbName = "json_schema_sharding";
 
 var st = new ShardingTest({shards: 2, mongos: 1});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const testDB = st.s.getDB(dbName);
 const coll = testDB.json_schema_sharding;

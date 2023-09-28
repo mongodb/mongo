@@ -13,13 +13,11 @@ const s =
 let mongos = s.s0;
 let db = s.getDB("test");
 
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard("test", s.shard1.shardName);
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.a", key: {x: 1}});
 s.adminCommand({shardcollection: "test.b", key: {x: 1}});
 
-s.adminCommand({enablesharding: "unusedDB"});
-s.ensurePrimaryShard("unusedDB", s.shard0.shardName);
+s.adminCommand({enablesharding: "unusedDB", primaryShard: s.shard0.shardName});
 
 let primary = s.getPrimaryShard("test").getDB("test");
 let primaryName = s.getPrimaryShard("test").shardName;

@@ -23,9 +23,11 @@ const unshardedViewName = "unsharded_view";
 const viewOnShardedViewName = "sharded_view_view";
 
 function setUpUnshardedCollectionAndView(st, session, primaryShard) {
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: unshardedDbName, primaryShard: primaryShard}));
+
     assert.commandWorked(st.s.getDB(unshardedDbName)[unshardedCollName].insert(
         {_id: 1, x: "unsharded"}, {writeConcern: {w: "majority"}}));
-    st.ensurePrimaryShard(unshardedDbName, primaryShard);
 
     const unshardedView = session.getDatabase(unshardedDbName)[unshardedViewName];
     assert.commandWorked(unshardedView.runCommand(
@@ -37,12 +39,12 @@ function setUpUnshardedCollectionAndView(st, session, primaryShard) {
 function setUpShardedCollectionAndView(st, session, primaryShard) {
     const ns = shardedDbName + "." + shardedCollName;
 
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: shardedDbName, primaryShard: primaryShard}));
     assert.commandWorked(st.s.getDB(shardedDbName)[shardedCollName].insert(
         {_id: -1}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(st.s.getDB(shardedDbName)[shardedCollName].insert(
         {_id: 1}, {writeConcern: {w: "majority"}}));
-    assert.commandWorked(st.s.adminCommand({enableSharding: shardedDbName}));
-    st.ensurePrimaryShard(shardedDbName, primaryShard);
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));

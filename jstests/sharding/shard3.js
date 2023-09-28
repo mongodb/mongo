@@ -4,8 +4,7 @@ import {getChunkSkipsFromAllShards} from "jstests/libs/analyze_plan.js";
 const s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});
 const s2 = s.s1;
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 
 // Ensure that the second mongos will see the movePrimary
@@ -128,8 +127,8 @@ assert.eq(0, secondary.count(), "s count after drop");
 
 // ---- retry commands SERVER-1471 ----
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test2"}));
-s.ensurePrimaryShard('test2', s.shard0.shardName);
+assert.commandWorked(
+    s.s0.adminCommand({enablesharding: "test2", primaryShard: s.shard0.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test2.foo", key: {num: 1}}));
 
 const dba = s.getDB("test2");

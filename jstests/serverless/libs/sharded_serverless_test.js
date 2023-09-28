@@ -65,16 +65,6 @@ export class ShardedServerlessTest {
         jsTest.log("ShardedServerlessTest is created.");
     }
 
-    /**
-     * Helper method for setting primary shard of a database and making sure that it was
-     * successful. Note: first mongoq needs to be up.
-     */
-    ensurePrimaryShard(dbName, shardName) {
-        var db = this.q.getDB('admin');
-        var res = db.adminCommand({movePrimary: dbName, to: shardName});
-        assert(res.ok || res.errmsg == "it is already the primary", tojson(res));
-    }
-
     addTenant(tenantId, shardId) {
         return assert.commandWorked(
             this.configRS.getPrimary()

@@ -175,8 +175,8 @@ var queryConfigChunks = function(st) {
     var shard1 = cursor.next()._id;
     var shard2 = cursor.next()._id;
     assert(!cursor.hasNext());
-    assert.commandWorked(st.s.adminCommand({enablesharding: testDB.getName()}));
-    st.ensurePrimaryShard(testDB.getName(), shard1);
+    assert.commandWorked(
+        st.s.adminCommand({enablesharding: testDB.getName(), primaryShard: shard1}));
 
     // Setup.
     assert.commandWorked(st.s.adminCommand({shardcollection: testColl.getFullName(), key: {e: 1}}));

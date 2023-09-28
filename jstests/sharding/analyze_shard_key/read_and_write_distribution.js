@@ -569,8 +569,8 @@ const mongosSetParametersOpts = {
         setUpCollectionFn: (dbName, collName, isShardedColl) => {
             const ns = dbName + "." + collName;
 
-            assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-            st.ensurePrimaryShard(dbName, st.shard0.name);
+            assert.commandWorked(
+                st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
             if (isShardedColl) {
                 // Set up the sharded collection. Make it have three chunks:

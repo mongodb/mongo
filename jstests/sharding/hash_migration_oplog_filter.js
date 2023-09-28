@@ -22,8 +22,8 @@ let ns = dbName + "." + collName;
 let configDB = st.s.getDB('config');
 let testDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();

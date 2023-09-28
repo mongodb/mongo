@@ -532,9 +532,8 @@ if (explain.hasOwnProperty("shards")) {
     assert.eq(Object.keys(explain.shards).length, 1, explain);
 }
 
-// Enable sharding on the test DB and ensure its primary is shard0000.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+// Ensure the primary shard for the test db is shard0.
+assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.name}));
 
 //
 // Test sharded local collection and unsharded foreign collection.

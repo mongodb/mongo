@@ -18,8 +18,8 @@ let sessionDB = session.getDatabase("unsharded_lookup_in_txn");
 const shardedColl = sessionDB.sharded;
 const unshardedColl = sessionDB.unsharded;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: sessionDB.getName()}));
-st.ensurePrimaryShard(sessionDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: sessionDB.getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(
     st.s.adminCommand({shardCollection: shardedColl.getFullName(), key: {_id: 1}}));

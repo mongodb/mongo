@@ -19,8 +19,8 @@ const db = st.getDB(jsTestName());
 const dbAtShard = st.shard0.getDB(jsTestName());
 
 // Makes sure that the test db is sharded and the data is stored into the only shard.
-assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 let assertShardedGroupResultsMatch = (coll, pipeline) => {
     // Turns to the classic engine at the shard before figuring out its result.

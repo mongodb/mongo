@@ -124,8 +124,9 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 jsTestLog("Unsharded transaction");
 
 assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+assert.commandWorked(
     st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 for (let errorCode of kSnapshotErrors) {
     runTest(st, collName, 1, errorCode, false /* isSharded */);
@@ -133,8 +134,6 @@ for (let errorCode of kSnapshotErrors) {
 
 // Enable sharding and set up 2 chunks, [minKey, 10), [10, maxKey), each with one document
 // (includes the document already inserted).
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 10}}));

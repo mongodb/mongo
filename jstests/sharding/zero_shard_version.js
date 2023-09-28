@@ -5,8 +5,8 @@
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var testDB_s0 = st.s.getDB('test');
-assert.commandWorked(testDB_s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    testDB_s0.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 assert.commandWorked(testDB_s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
 var checkShardMajorVersion = function(conn, expectedMajorVersion) {

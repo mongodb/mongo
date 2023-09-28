@@ -14,8 +14,8 @@ var writeRes;
 // Create a cluster with 3 shards.
 var st = new ShardingTest({shards: 3});
 var testDB = st.s.getDB("test");
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard1.shardName);
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard1.shardName}));
 
 // Create a collection sharded on {a: 1}. Add 2dsphere index to test $geoNear.
 var coll = testDB.getCollection("simple_collation");

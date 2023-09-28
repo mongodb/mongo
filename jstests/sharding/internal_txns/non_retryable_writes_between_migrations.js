@@ -17,8 +17,8 @@ const testDB = st.s.getDB(dbName);
 // Set up a sharded collection with the following chunks:
 // shard0: [MinKey, 0]
 // shard1: [0, MaxKey]
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));

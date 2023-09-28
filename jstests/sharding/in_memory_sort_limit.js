@@ -8,8 +8,8 @@ var st = new ShardingTest({
             {setParameter: {internalQueryMaxBlockingSortMemoryUsageBytes: 32 * 1024 * 1024}}
     }
 });
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 
 // Make sure that at least 1 chunk is on another shard so that mongos doesn't treat this as a
 // single-shard query (which doesn't exercise the bug)

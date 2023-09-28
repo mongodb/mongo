@@ -66,8 +66,7 @@ const st = new ShardingTest({
     }
 });
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 const mongosDB = st.s.getDB(dbName);
 
 // Set up the unsharded sampled collection.

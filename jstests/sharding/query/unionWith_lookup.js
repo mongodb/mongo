@@ -13,8 +13,8 @@ const unionColl = mongosDB[testName + "_union"];
 const lookupColl = mongosDB[testName + "_lookup"];
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Seed the involved collections.
 assert.commandWorked(baseColl.insert({_id: 0}));

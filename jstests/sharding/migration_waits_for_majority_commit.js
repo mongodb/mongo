@@ -17,12 +17,13 @@ import {restartServerReplication, stopServerReplication} from "jstests/libs/writ
 
 // Set up a sharded cluster with two shards, two chunks, and one document in one of the chunks.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
-const testDB = st.s.getDB("test");
+const kDbName = "test";
 
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
+const testDB = st.s.getDB(kDbName);
 assert.commandWorked(testDB.foo.insert({_id: 1}, {writeConcern: {w: "majority"}}));
 
-st.ensurePrimaryShard("test", st.shard0.shardName);
-assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: "test.foo", middle: {_id: 0}}));
 // The default WC is majority and stopServerReplication will prevent satisfying any majority writes.

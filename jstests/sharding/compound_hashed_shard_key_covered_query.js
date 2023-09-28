@@ -6,10 +6,9 @@ import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 const coll = st.s.getDB(kDbName)["coll"];
-
-assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 
 /**
  * Runs find command with the 'filter', 'projection' and 'hint' parameters. Then validates that the

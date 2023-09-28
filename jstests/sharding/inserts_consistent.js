@@ -6,8 +6,8 @@ var admin = mongos.getDB("admin");
 var config = mongos.getDB("config");
 var coll = st.s.getCollection('TestDB.coll');
 
-assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard0.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: 'TestDB.coll', key: {_id: 1}}));
 
 jsTest.log("Refreshing second mongos...");

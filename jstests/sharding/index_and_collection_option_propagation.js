@@ -86,8 +86,7 @@ const ns = dbName + "." + collName;
 var st = new ShardingTest(
     {shards: {rs0: {nodes: 1}, rs1: {nodes: 1}, rs2: {nodes: 1}}, other: {config: 3}});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 // When creating index or setting a collection option on an unsharded collection, only the
 // primary shard is affected.

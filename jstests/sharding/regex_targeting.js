@@ -20,8 +20,8 @@ var collCompound = mongos.getCollection("foo.barCompound");
 var collNested = mongos.getCollection("foo.barNested");
 var collHashed = mongos.getCollection("foo.barHashed");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
-st.ensurePrimaryShard(coll.getDB().toString(), st.shard0.shardName);
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB().toString(), primaryShard: st.shard0.shardName}));
 
 //
 // Split the collection so that "abcde-0" and "abcde-1" go on different shards when possible

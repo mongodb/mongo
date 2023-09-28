@@ -17,8 +17,8 @@ collSharded.createIndex({a: 1});
 collSharded.createIndex({b: 1});
 
 // Enable sharding.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard1.shardName);
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
 db.adminCommand({shardCollection: collSharded.getFullName(), key: {a: 1}});
 
 // Pre-split the collection to ensure that both shards have chunks. Explicitly

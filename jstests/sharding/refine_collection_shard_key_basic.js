@@ -34,12 +34,6 @@ const kConfigTags = 'config.tags';
 const kUnrelatedName = kDbName + '.bar';
 let oldEpoch = null;
 
-function enableShardingAndShardColl(keyDoc) {
-    assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, primaryShard);
-    assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: keyDoc}));
-}
-
 function dropAndRecreateColl(keyDoc) {
     assert.commandWorked(mongos.getDB(kDbName).runCommand({drop: kCollName}));
     assert.commandWorked(mongos.getCollection(kNsName).insert(keyDoc));
@@ -300,7 +294,7 @@ assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: "config.collections", key: {_id: 1, aKey: 1}}),
     ErrorCodes.NamespaceNotSharded);
 
-enableShardingAndShardColl({_id: 1});
+assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 
 // Should fail because shard key is invalid (i.e. bad values).
 assert.commandFailedWithCode(
@@ -335,7 +329,7 @@ assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
 jsTestLog('********** NAMESPACE VALIDATION TESTS **********');
 
-enableShardingAndShardColl({_id: 1});
+assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 
 // Configure failpoint 'hangRefineCollectionShardKeyAfterRefresh' on staleMongos and run
 // refineCollectionShardKey against this mongos in a parallel thread.
@@ -360,7 +354,7 @@ assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
 jsTestLog('********** SHARD KEY VALIDATION TESTS **********');
 
-enableShardingAndShardColl({_id: 1});
+assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 
 // Should fail because new shard key {aKey: 1} does not extend current shard key {_id: 1} of
 // namespace 'db.foo'.
@@ -577,7 +571,7 @@ assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 
 jsTestLog('********** UNIQUENESS PROPERTY TESTS **********');
 
-enableShardingAndShardColl({_id: 1});
+assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: {_id: 1}}));
 assert.commandWorked(mongos.getCollection(kNsName).createIndex({_id: 1, aKey: 1}));
 
 // Verify that refineCollectionShardKey cannot modify a unique=false sharded collection.
@@ -617,7 +611,7 @@ const newKeyDoc = {
     d: 1
 };
 
-enableShardingAndShardColl(oldKeyDoc);
+assert.commandWorked(mongos.adminCommand({shardCollection: kNsName, key: oldKeyDoc}));
 assert.commandWorked(mongos.getCollection(kNsName).createIndex(newKeyDoc));
 
 // CRUD operations before and after refineCollectionShardKey should work as expected.
@@ -771,8 +765,8 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     const shardedNs = dbName + ".shardedColl";
     const refinedNs = dbName + ".refinedColl";
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zone_1'}));
 
     assert.commandWorked(st.s.adminCommand({shardCollection: shardedNs, key: {a: 1, b: 1, c: 1}}));
@@ -825,8 +819,8 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
     const shardedNs = dbName + ".shardedColl";
     const refinedNs = dbName + ".refinedColl";
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({addShardToZone: st.shard0.shardName, zone: 'zone_1'}));
 
     assert.commandWorked(

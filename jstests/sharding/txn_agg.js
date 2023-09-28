@@ -4,8 +4,8 @@
 // ]
 const st = new ShardingTest({shards: 2});
 
-assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard("test", st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {_id: 0}}));

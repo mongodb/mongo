@@ -23,8 +23,8 @@ const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the test collection on _id.
 assert.commandWorked(

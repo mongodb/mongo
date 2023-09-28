@@ -11,14 +11,11 @@
 const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {nodes: 1}});
 
 const db = st.s.getDB(jsTestName());
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
 const otherColl = db.other;
 const coll = db.test;
-otherColl.drop();
-coll.drop();
-
-// Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
 
 // Create a sharded collection on {shard: 1}, split across the cluster at {shard: 1}. Do this
 // for both 'coll' and 'otherColl' so that the latter can be used for $merge tests later.

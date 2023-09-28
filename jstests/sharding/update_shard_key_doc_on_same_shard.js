@@ -37,8 +37,7 @@ const mongos = st.s0;
 const shard0 = st.shard0.shardName;
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, shard0);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
 // ---------------------------------
 // Update shard key retryable write

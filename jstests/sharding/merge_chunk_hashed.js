@@ -15,10 +15,10 @@ let collName = "user";
 let ns = dbName + "." + collName;
 let configDB = mongos.getDB('config');
 let admin = mongos.getDB("admin");
+
+assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 let coll = mongos.getCollection(ns);
 
-assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
 // Setup predictable chunk distribution:

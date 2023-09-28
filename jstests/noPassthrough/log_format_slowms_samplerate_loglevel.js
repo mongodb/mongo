@@ -37,9 +37,9 @@ const dbName = "logtest";
 const mongosDB = mongosConn.getDB(dbName);
 const shardDB = shardConn.getDB(dbName);
 
-// Enable sharding on the the test database and ensure that the primary is on shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), shardConn.name);
+// Ensure that the primary shard for the test database is shard0.
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shardConn.name}));
 
 // Drops and re-shards the test collection, then splits at {_id: 0} and moves the upper chunk to
 // the second shard.

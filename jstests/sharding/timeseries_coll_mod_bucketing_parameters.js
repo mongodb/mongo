@@ -144,6 +144,8 @@ const checkShardRoutingAfterCollMod = function() {
     const shard1 = st.shard1;
     const db = mongos0.getDB(dbName);
 
+    assert.commandWorked(
+        mongos0.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
     // Create and shard a time-series collection using custom bucketing parameters.
     assert.commandWorked(db.createCollection(collName, {
         timeseries: {
@@ -153,8 +155,6 @@ const checkShardRoutingAfterCollMod = function() {
             bucketRoundingSeconds: 60
         }
     }));
-    st.ensurePrimaryShard(db.getName(), shard0.shardName);
-    assert.commandWorked(mongos0.adminCommand({enableSharding: dbName}));
     assert.commandWorked(mongos0.adminCommand({
         shardCollection: viewNss,
         key: {[timeField]: 1},

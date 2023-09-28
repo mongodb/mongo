@@ -8,6 +8,8 @@ const testNs = dbName + "." + collName;
 
 const nDocs = 1000 * 10;
 const st = new ShardingTest({shards: 2});
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 const coll = st.s0.getDB(dbName)[collName];
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < nDocs; i++) {
@@ -16,8 +18,6 @@ for (let i = 0; i < nDocs; i++) {
 assert.commandWorked(bulk.execute());
 
 // Make sure we know which shard will host the data to begin.
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-assert.commandWorked(st.admin.runCommand({enableSharding: dbName}));
 assert.commandWorked(st.admin.runCommand({shardCollection: testNs, key: {_id: 1}}));
 
 // Open some cursors before migrating data.

@@ -65,8 +65,8 @@ const filterExpr = {
     x: {$gt: 50}
 };
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns2, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns3, key: {_id: "hashed"}}));

@@ -7,8 +7,7 @@ var summary = "";
 
 var s = new ShardingTest({name: "shard6", shards: 2});
 
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard1.shardName);
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.data", key: {num: 1}});
 
 var version = s.getDB("admin").runCommand({buildinfo: 1}).versionArray;

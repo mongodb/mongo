@@ -21,7 +21,8 @@ function checkResults(resObj, expectedResult) {
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 const mongos = st.s;
 const dbName = jsTestName();
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 const testDB = mongos.getDB(dbName);
 const shardedCollOne = testDB.shardedCollOne;
 shardedCollOne.drop();
@@ -44,7 +45,6 @@ assert.commandWorked(
 
 // Run each test against both the primary and non-primary shards.
 // Make sure the primary is always shard0.
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 const shardNames = [st.shard0.shardName, st.shard1.shardName];
 shardNames.forEach(function(shardName) {
     jsTestLog("Testing with docs on " + shardName);

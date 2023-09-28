@@ -9,8 +9,8 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 let st = new ShardingTest({shards: 2});
 let mongos = st.s0;
 
-assert.commandWorked(mongos.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 
 assert.commandWorked(
     mongos.adminCommand({shardCollection: 'test.user', key: {x: 'hashed'}, numInitialChunks: 2}));

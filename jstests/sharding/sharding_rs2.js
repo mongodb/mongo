@@ -34,7 +34,7 @@ var s = new ShardingTest({
 var db = s.getDB("test");
 var t = db.foo;
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard0.shardName}));
 // The default WC is 'majority' and fsyncLock will prevent satisfying any majority writes.
 // The default RC is 'local' but fsync will block any refresh on secondaries, that's why RC is
 // defaulted to 'available'.
@@ -44,7 +44,6 @@ assert.commandWorked(s.s.adminCommand({
     defaultWriteConcern: {w: 1},
     writeConcern: {w: "majority"}
 }));
-s.ensurePrimaryShard('test', s.shard0.shardName);
 
 // -------------------------------------------------------------------------------------------
 // ---------- test that config server updates when replica set config changes ----------------

@@ -54,8 +54,7 @@ function runTest({isShardedColl, execCtxType}) {
     jsTest.log(`Test analyzing the shard key ${
         tojsononeline({shardKey, ns, isShardedColl, execCtxType})}`);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     const minVal = -1500;
     const maxVal = 1500;

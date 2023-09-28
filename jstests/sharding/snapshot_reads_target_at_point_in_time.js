@@ -42,14 +42,12 @@ const st = new ShardingTest({
 });
 
 // Set up one sharded collection with 2 chunks, both on the primary shard.
-
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(
     st.s.getDB(dbName)[collName].insert({_id: -5}, {writeConcern: {w: "majority"}}));
 assert.commandWorked(
     st.s.getDB(dbName)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
-
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));

@@ -53,9 +53,9 @@ const runReadCmdWithReadPrefSecondary = (db, collectionName, query, {readConcern
  * @param {String} primaryShardName - Used to ensure the desired shard becomes the primary shard.
  */
 const setupShardedCollection = (shardingTest, dbName, collectionNamespace, primaryShardName) => {
-    assert.commandWorked(shardingTest.s.adminCommand({enableSharding: dbName}));
+    assert.commandWorked(
+        shardingTest.s.adminCommand({enableSharding: dbName, primaryShard: primaryShardName}));
 
-    shardingTest.ensurePrimaryShard(dbName, primaryShardName);
     assert.commandWorked(shardingTest.s.adminCommand({
         shardCollection: collectionNamespace,
         key: {_id: 1},

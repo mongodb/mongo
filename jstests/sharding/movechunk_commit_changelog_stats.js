@@ -11,8 +11,7 @@ var mongos = st.s0;
 var shard0 = st.shard0.shardName;
 var shard1 = st.shard1.shardName;
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, shard0);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
 function assertCountsInChangelog() {
     let changeLog = st.s.getDB('config').changelog.find({what: 'moveChunk.commit'}).toArray();

@@ -13,11 +13,9 @@ var mongos = st.s;
 var admin = mongos.getDB('admin');
 var coll = mongos.getCollection('foo.bar');
 
-// Shard collection
-assert.commandWorked(mongos.adminCommand({enableSharding: coll.getDB() + ''}));
-
-// Just to be sure what primary we start from
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
+// Shard collection with initial chunk on shard0
+assert.commandWorked(mongos.adminCommand(
+    {enableSharding: coll.getDB().getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: coll + '', key: {_id: 1}}));
 
 // Insert one document

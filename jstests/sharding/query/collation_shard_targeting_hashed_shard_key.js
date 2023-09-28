@@ -11,8 +11,7 @@ function shardCollectionWithSplitsAndMoves(
 
     assert.commandWorked(db.runCommand({create: collection.getName(), collation: collation}));
 
-    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
-    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard0.name}));
 
     assert.commandWorked(st.s.adminCommand({
         shardCollection: collection.getFullName(),
@@ -112,8 +111,7 @@ function findQueryWithCollation(collection, query, collation) {
     assert.commandWorked(
         db.runCommand({create: collection.getName(), collation: {locale: "en", strength: 2}}));
 
-    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
-    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: db.getName(), to: st.shard0.name}));
 
     const res = assert.commandFailedWithCode(st.s.adminCommand({
         shardCollection: collection.getFullName(),

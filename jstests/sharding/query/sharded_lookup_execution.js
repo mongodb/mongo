@@ -21,8 +21,8 @@ const testName = "sharded_lookup";
 const mongosDB = st.s0.getDB(testName);
 const shardList = [st.shard0.getDB(testName), st.shard1.getDB(testName)];
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Turn on the profiler and increase the query log level for both shards.
 assert.commandWorked(st.shard0.getDB(testName).setProfilingLevel(2));

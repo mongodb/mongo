@@ -233,10 +233,9 @@ const numShardKeys = 10;
 const numDocs = numShardKeys * 2;
 const splitPoint = numShardKeys / 2;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collNS, key: {x: 1}}));
-
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 const freshMongos = st.s0;
 const staleMongos = st.s1;

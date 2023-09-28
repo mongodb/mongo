@@ -226,8 +226,8 @@ const st = new ShardingTest({shards: 2});
 
 // Ensure shard 0 is the primary shard. This is so that the $merge stage is guaranteed to
 // run on it.
-assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: kDBName}));
-st.ensurePrimaryShard(kDBName, st.shard0.name);
+assert.commandWorked(
+    st.s.getDB("admin").runCommand({enableSharding: kDBName, primaryShard: st.shard0.name}));
 
 // Set up the source collection to be sharded in a way such that each node will have some
 // documents for the remainder of the test.

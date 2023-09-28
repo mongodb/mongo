@@ -15,8 +15,10 @@ const st = new ShardingTest({
 });
 
 const mongosConn = st.s;
+assert.commandWorked(
+    mongosConn.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongosConn.getDB(dbName).getCollection(collName).createIndex({shard: 1}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+
 // Shard the test collection and split it into two chunks: one that contains all {shard: 1}
 // documents and one that contains all {shard: 2} documents.
 st.shardColl(collName,

@@ -25,15 +25,15 @@ const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
 
+st.s.adminCommand({enablesharding: kDBName, primaryShard: st.shard0.name});
+
 let coll = mongosDB.jstest_kill_pinned_cursor;
-coll.drop();
 
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 
 st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
-st.ensurePrimaryShard(kDBName, st.shard0.name);
 
 // The startParallelShell function will take the string it's given and serialize it into a
 // string. This means that we can't pass it functions which capture variables. Instead we use

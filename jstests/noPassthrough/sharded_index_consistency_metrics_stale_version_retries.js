@@ -27,8 +27,8 @@ const ns1 = dbName + ".testColl1";
 const ns2 = dbName + ".testColl2";
 
 // Create 3 sharded collections, two hashed and another with 3 chunks, 1 on shard1 and 2 on shard0.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns0, key: {_id: "hashed"}}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns1, key: {_id: "hashed"}}));

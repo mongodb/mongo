@@ -28,10 +28,10 @@ const config = mongos.getDB("config");
 const mongosDB = mongos.getDB("agg_explain_readPref");
 assert.commandWorked(mongosDB.dropDatabase());
 
-const coll = mongosDB.getCollection("coll");
+assert.commandWorked(
+    config.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
-assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+const coll = mongosDB.getCollection("coll");
 const rs0Primary = st.rs0.getPrimary();
 const rs0Secondary = st.rs0.getSecondary();
 const rs1Primary = st.rs1.getPrimary();

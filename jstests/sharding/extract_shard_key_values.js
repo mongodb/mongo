@@ -72,8 +72,7 @@ function isOwnedBySecondaryShard(doc) {
     return isOwnedByShard(secondaryShard, doc);
 }
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, primaryShard);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: primaryShard}));
 
 jsTestLog('********** ORPHAN FILTERING **********');
 

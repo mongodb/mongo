@@ -14,8 +14,8 @@
  * ]
  */
 var st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 var testDB = st.getDB('test');
 
 // shard the collection on x

@@ -28,8 +28,8 @@ var shards = [st.shard0, st.shard1];
 
 jsTest.log("Enabling sharding for the first time...");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 assert.commandWorked(coll.insert({hello: "world"}));
@@ -72,8 +72,8 @@ jsTest.log("Rebuilding sharded collection with different split...");
 
 coll.drop();
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
+assert.commandWorked(
+    admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard1.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 var bulk = coll.initializeUnorderedBulkOp();

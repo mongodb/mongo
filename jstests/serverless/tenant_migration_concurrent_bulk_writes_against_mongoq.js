@@ -50,8 +50,8 @@ function orderedBulkInsertDuringBlockingState(st, isBulkWriteOrdered) {
 
     const kCollName = 'foo';
 
-    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.q0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     let blockingFp = configureFailPoint(adminDB, "pauseTenantMigrationBeforeLeavingBlockingState");
 
@@ -111,8 +111,8 @@ function orderedBulkInsertAfterTenantMigrationAborted(st, isBulkWriteOrdered) {
 
     const kCollName = 'foo';
 
-    assert.commandWorked(st.q0.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.q0.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     configureFailPoint(adminDB, "abortTenantMigrationBeforeLeavingBlockingState");
 

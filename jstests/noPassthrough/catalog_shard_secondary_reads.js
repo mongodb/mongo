@@ -17,11 +17,12 @@ const st = new ShardingTest({
     configShard: true,
 });
 
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.getDB('test').user.insert({_id: 1234}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'sharded'}));
-st.ensurePrimaryShard('sharded', st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'sharded', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'sharded.user', key: {_id: 1}}));
 
 let configDbEntry = st.s.getDB('config').databases.findOne({_id: 'test'});

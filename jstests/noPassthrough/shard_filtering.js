@@ -15,8 +15,7 @@ const collName = "test.shardfilter";
 const mongosDb = st.s.getDB("test");
 const mongosColl = st.s.getCollection(collName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
-st.ensurePrimaryShard("test", st.shard1.name);
+assert.commandWorked(st.s.adminCommand({enableSharding: "test", primaryShard: st.shard1.name}));
 assert.commandWorked(
     st.s.adminCommand({shardCollection: collName, key: {a: 1, "b.c": 1, "d.e.f": 1}}));
 

@@ -4,8 +4,8 @@ import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 var testDB = st.s.getDB("test");
-assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Create a collection with a v:1 _id index.
 var coll = testDB.getCollection("migration_id_index");

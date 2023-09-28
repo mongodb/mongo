@@ -14,8 +14,8 @@ var testDocMissing = function(useReplicaSet) {
     var coll = mongos.getCollection("foo.bar");
     var admin = mongos.getDB("admin");
 
-    assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
+    assert.commandWorked(
+        admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 
     coll.createIndex({sk: 1});
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {sk: 1}}));

@@ -35,8 +35,8 @@ const max = {
     y: MaxKey
 };
 
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-st.ensurePrimaryShard(dbName, primaryShard.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: primaryShard.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1, y: 1}}));
 
 // Check shard version.

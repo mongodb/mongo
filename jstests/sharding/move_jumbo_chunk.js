@@ -21,8 +21,8 @@ let st = new ShardingTest({
 });
 
 let kDbName = "test";
-assert.commandWorked(st.s.adminCommand({enablesharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: kDbName, primaryShard: st.shard0.shardName}));
 const largeString = 'X'.repeat(10000);
 
 function shardCollectionCreateJumboChunk() {

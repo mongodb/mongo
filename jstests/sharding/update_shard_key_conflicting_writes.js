@@ -21,8 +21,8 @@ let ns = kDbName + '.foo';
 let db = mongos.getDB(kDbName);
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
 // Shards the collection "db.foo" on shard key {"x" : 1} such that negative "x" values are on
 // shard0 and positive on shard1

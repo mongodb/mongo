@@ -175,8 +175,7 @@ var setupSharding = function(shardingTest) {
     var mongo = shardingTest.s;
 
     print("============ enabling sharding on test.foo.");
-    mongo.getDB("admin").runCommand({enableSharding: "test"});
-    shardingTest.ensurePrimaryShard('test', st.shard1.shardName);
+    mongo.getDB("admin").runCommand({enableSharding: "test", primaryShard: st.shard1.shardName});
     mongo.getDB("admin").runCommand({shardCollection: "test.foo", key: {_id: 1}});
 
     var test = mongo.getDB("test");

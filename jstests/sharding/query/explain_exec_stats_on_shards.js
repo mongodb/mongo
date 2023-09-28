@@ -32,8 +32,8 @@ const st = new ShardingTest({shards: numShards});
 const db = st.s.getDB(`${jsTest.name()}_db`);
 
 // Enable sharding on the database and use shard0 as the primary shard.
-assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 
 // Test that the explain's 'executionStats' section includes all relevant fields for each shard
 // when the 'explain' command is executed against a sharded collection.

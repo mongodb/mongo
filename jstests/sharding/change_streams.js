@@ -24,8 +24,8 @@ function runTest(collName, shardKey) {
     });
 
     const mongosDB = st.s0.getDB(jsTestName());
-    assert.commandWorked(st.s0.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+    assert.commandWorked(st.s0.adminCommand(
+        {enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
     const mongosColl = mongosDB[collName];
 

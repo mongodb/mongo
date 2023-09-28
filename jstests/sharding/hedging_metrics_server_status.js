@@ -82,8 +82,8 @@ const ns = dbName + "." + collName;
 const testDB = st.s.getDB(dbName);
 const serverStatusCheckTimeoutMS = 5000;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Force the mongos's replica set monitors to always include all the eligible nodes.
 const replicaSetMonitorProtocol =

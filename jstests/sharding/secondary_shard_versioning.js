@@ -7,8 +7,8 @@ import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};
 let st = new ShardingTest({mongos: 2, shards: {rs0: rsOpts, rs1: rsOpts}});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: 'test.foo', middle: {x: 0}}));

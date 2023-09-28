@@ -28,8 +28,6 @@ function runTest({testFixture, conn, shardLocal, shardOutput}) {
         // When running against a sharded cluster, configure the collections according to
         // 'shardLocal' and 'shardOutput'.
         if (!isReplSet) {
-            assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-            testFixture.ensurePrimaryShard(dbName, testFixture.shard0.shardName);
             if (shardLocal) {
                 testFixture.shardColl(collName, {_id: 1}, {_id: 0}, {_id: 0}, dbName);
             }

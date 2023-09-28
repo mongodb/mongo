@@ -7,8 +7,7 @@ var dbname = "test";
 var coll = "foo";
 var db = s.getDB(dbname);
 
-assert.commandWorked(db.adminCommand({enablesharding: dbname}));
-s.ensurePrimaryShard(dbname, s.shard1.shardName);
+assert.commandWorked(db.adminCommand({enablesharding: dbname, primaryShard: s.shard1.shardName}));
 
 assert.commandWorked(db.adminCommand(
     {shardcollection: dbname + "." + coll, key: {a: "hashed"}, numInitialChunks: 500}));

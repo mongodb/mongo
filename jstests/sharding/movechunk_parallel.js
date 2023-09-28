@@ -23,8 +23,8 @@ var staticMongod = MongoRunner.runMongod({});
 
 var st = new ShardingTest({shards: 4});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
-st.ensurePrimaryShard('TestDB', st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'TestDB', primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {Key: 1}}));
 
 var coll = st.s0.getDB('TestDB').TestColl;

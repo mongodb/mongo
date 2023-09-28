@@ -17,8 +17,7 @@ import {
 const s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(s);
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard1.shardName);
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 
 const db = s.getDB("test");
 const sessionDb = s.s.startSession({retryWrites: true}).getDatabase("test");

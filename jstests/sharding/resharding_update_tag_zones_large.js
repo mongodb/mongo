@@ -44,8 +44,8 @@ const collectionsColl = configDB.getCollection("collections");
 const chunksColl = configDB.getCollection("chunks");
 const tagsColl = configDB.getCollection("tags");
 
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {skey: "hashed"}}));
 
 const zoneName = "testZone";

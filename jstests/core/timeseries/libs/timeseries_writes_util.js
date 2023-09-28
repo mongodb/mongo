@@ -1058,7 +1058,6 @@ export function setUpShardedCluster({nMongos} = {
     assert.commandWorked(testDB.dropDatabase());
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
     primaryShard = st.getPrimaryShard(testDB.getName());
-    st.ensurePrimaryShard(testDB.getName(), primaryShard.shardName);
     otherShard = st.getOther(primaryShard);
     mongos0DB = st.s0.getDB(testDB.getName());
     if (nMongos > 1) {

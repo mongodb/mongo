@@ -11,8 +11,7 @@ var mongos = st.s0;
 var shard0 = st.shard0.shardName;
 var shard1 = st.shard1.shardName;
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, shard0);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
 // Fail if invalid namespace.
 assert.commandFailed(mongos.adminCommand({moveChunk: '', find: {_id: 1}, to: shard1}));

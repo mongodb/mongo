@@ -8,8 +8,6 @@ const collName = "bar";
 const ns = dbName + "." + collName;
 const testDB = st.s.getDB(dbName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 
 // Test "hedge" read preference validation.

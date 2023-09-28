@@ -9,8 +9,8 @@ var mongos = st.s;
 var coll = mongos.getCollection("foo.bar");
 
 // Enable sharding of the collection
-assert.commandWorked(mongos.adminCommand({enablesharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enablesharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));
 assert.commandWorked(mongos.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
 
 var numChunks = 30;

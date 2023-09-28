@@ -13,8 +13,7 @@ var shard1 = st.shard1.shardName;
 
 var ns = kDbName + ".foo";
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, shard0);
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName, primaryShard: shard0}));
 
 // Fail if invalid namespace.
 assert.commandFailed(mongos.adminCommand({mergeChunks: '', bounds: [{a: -1}, {a: 1}]}));

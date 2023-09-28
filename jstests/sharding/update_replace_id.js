@@ -38,8 +38,8 @@ const shard1DB = st.shard1.getDB(jsTestName());
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Enables profiling on both shards so that we can verify the targeting behaviour.
 function restartProfiling() {

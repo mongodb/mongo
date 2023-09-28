@@ -189,14 +189,15 @@ MongoRunner.stopMongod(conn);
 //
 const st = new ShardingTest({shards: 2});
 const shardedDB = st.s.getDB(jsTestName());
+
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: shardedDB.getName(), primaryShard: st.shard0.shardName}));
+
 const shardedSourceColl = shardedDB.coll1;
 const shardedForeignColl = shardedDB.coll2;
 
 const shard0DB = st.shard0.getDB(jsTestName());
 const shard1DB = st.shard1.getDB(jsTestName());
-
-assert.commandWorked(st.s0.adminCommand({enableSharding: shardedDB.getName()}));
-st.ensurePrimaryShard(shardedDB.getName(), st.shard0.shardName);
 
 // Shard 'shardedSourceColl' and 'shardedForeignColl' on {x:1}, split it at {x:0}, and move
 // chunk {x:0} to shard1.

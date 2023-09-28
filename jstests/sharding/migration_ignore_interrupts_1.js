@@ -20,8 +20,7 @@ var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbNa
     shard0Coll1 = shard0.getCollection(ns1), shard1Coll1 = shard1.getCollection(ns1),
     shard2Coll1 = shard2.getCollection(ns1);
 
-assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(admin.runCommand({shardCollection: ns1, key: {a: 1}}));
 assert.commandWorked(admin.runCommand({split: ns1, middle: {a: 0}}));

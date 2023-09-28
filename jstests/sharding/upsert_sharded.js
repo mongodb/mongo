@@ -11,10 +11,11 @@ const st = new ShardingTest({shards: 2, mongos: 1});
 
 const mongos = st.s0;
 const admin = mongos.getDB("admin");
-const coll = mongos.getCollection("foo.bar");
+const kDbName = "test";
 
-assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
+assert(admin.runCommand({enableSharding: kDbName + "", primaryShard: st.shard0.name}).ok);
+
+const coll = mongos.getCollection(kDbName + ".bar");
 
 const upsertSuppliedResult = function(upsertColl, query, newDoc) {
     assert.commandWorked(upsertColl.remove({}));
@@ -47,7 +48,6 @@ const upsertedXVal = function(upsertColl, query, expr) {
 //
 // Tests for non-nested shard key.
 //
-st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {x: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {x: 0}}));
 assert.commandWorked(admin.runCommand(
@@ -172,7 +172,6 @@ coll.drop();
 //
 // Tests for nested shard key.
 //
-st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {'x.x': 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {'x.x': 0}}));
 assert.commandWorked(admin.runCommand(
@@ -254,7 +253,6 @@ coll.drop();
 //
 // Tests for nested _id shard key.
 //
-st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {'_id.x': 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {'_id.x': 0}}));
 assert.commandWorked(admin.runCommand(

@@ -11,14 +11,17 @@ function runTest(conn, {isShardedColl, st}) {
     const numDocs = 10;
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
-    const coll = db.getCollection(collName);
 
+    if (st) {
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    }
+
+    const coll = db.getCollection(collName);
     assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: "ts"}}));
 
     if (isShardedColl) {
         assert(st);
-        assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-        st.ensurePrimaryShard(dbName, st.shard0.name);
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {ts: 1}}));
     }
 

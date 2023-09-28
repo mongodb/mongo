@@ -14,8 +14,8 @@ assert.commandWorked(admin.TestColl.insert({SingleDoc: 1}));
 
 jsTest.log("Setting up collections...");
 
-assert.commandWorked(admin.runCommand({enableSharding: collSh.getDB() + ""}));
-st.ensurePrimaryShard(collSh.getDB() + "", st.shard0.shardName);
+assert.commandWorked(
+    admin.runCommand({enableSharding: collSh.getDB() + "", primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(admin.runCommand({movePrimary: collUn.getDB() + "", to: st.shard1.shardName}));
 

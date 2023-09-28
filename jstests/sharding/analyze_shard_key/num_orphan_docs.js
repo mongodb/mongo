@@ -69,8 +69,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(coll.createIndex(candidateKey));
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentKey}));
 
     // Analyze a shard key while no shards have orphan documents. Chunk distribution:

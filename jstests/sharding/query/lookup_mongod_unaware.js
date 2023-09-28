@@ -66,8 +66,8 @@ const expectedResults = [
 ];
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongos0DB.adminCommand({enableSharding: mongos0DB.getName()}));
-st.ensurePrimaryShard(mongos0DB.getName(), st.shard0.shardName);
+assert.commandWorked(mongos0DB.adminCommand(
+    {enableSharding: mongos0DB.getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(mongos0LocalColl.insert({_id: 0, a: 1}));
 assert.commandWorked(mongos0LocalColl.insert({_id: 1, a: null}));
@@ -164,8 +164,7 @@ assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
 //
 jsTest.log("Running two-level $lookup with a shard that needs recovery");
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'D'}));
-st.ensurePrimaryShard('D', st.shard0.shardName);
+assert.commandWorked(st.s0.adminCommand({enableSharding: 'D', primaryShard: st.shard0.shardName}));
 
 const D = st.s0.getDB('D');
 

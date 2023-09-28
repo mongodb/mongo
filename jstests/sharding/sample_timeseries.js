@@ -33,8 +33,8 @@ function generateId() {
     return currentId++;
 }
 
-assert.commandWorked(testDB.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(testDB.getName(), primary.shardName);
+assert.commandWorked(
+    testDB.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
 
 const testColl = testDB[collName];
 

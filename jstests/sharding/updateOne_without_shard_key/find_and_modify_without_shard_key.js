@@ -20,8 +20,8 @@ const testColl = st.getDB(dbName).getCollection(collectionName);
 // Set up.
 // shard0 -- x: (-inf, 0)
 // shard1 -- x: [0, inf)
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1}, to: st.shard1.shardName}));

@@ -18,8 +18,7 @@ dbForTest.foo.drop();
 var numDocs = 10000;
 
 // shard test.foo and add a split point
-s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', s.shard1.shardName);
+s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});
 s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 s.adminCommand({split: "test.foo", middle: {_id: numDocs / 2}});
 

@@ -26,9 +26,8 @@ const primaryDB = primary.getDB(dbName);
 const otherShard = st.shard1;
 const otherDB = otherShard.getDB(dbName);
 
-testDB.dropDatabase();
-assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(testDB.getName(), primary.shardName);
+assert.commandWorked(
+    mongos.adminCommand({enableSharding: dbName, primaryShard: primary.shardName}));
 
 const shard0RoutingValues = {
     shardNumber: 0,

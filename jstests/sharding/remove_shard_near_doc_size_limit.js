@@ -34,8 +34,8 @@ const bigDocSize = 16 * 1024 * 1024 - 4096;
 const bigDocPayload = "x".repeat(bigDocSize);
 
 let st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 jsTest.log("Sharding collection with one chunk on each shard.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));

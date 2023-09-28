@@ -5,11 +5,11 @@ var st = new ShardingTest({shards: 2, mongos: 1});
 
 var config = st.s.getDB("config");
 var admin = st.s.getDB("admin");
-var coll = st.s.getCollection("foo.bar");
+const kDbName = "foo";
 
 // First enable sharding
-admin.runCommand({enableSharding: coll.getDB() + ""});
-st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
+admin.runCommand({enableSharding: kDbName, primaryShard: st.shard1.shardName});
+var coll = st.s.getCollection(kDbName + ".bar");
 admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
 
 var primary = config.databases.find({_id: coll.getDB() + ""}).primary;

@@ -16,11 +16,9 @@ const st = new ShardingTest({
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 
-assert.commandWorked(mongosDB.dropDatabase());
-
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the test collection on a field called 'shardKey'.
 assert.commandWorked(

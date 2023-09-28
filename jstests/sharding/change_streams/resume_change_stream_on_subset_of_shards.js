@@ -17,8 +17,8 @@ const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB.test;
 
 // Enable sharding on the test DB and ensure its primary is shard 0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Shard the test collection on _id, split the collection into 2 chunks: [MinKey, 0) and
 // [0, MaxKey), then move the [0, MaxKey) chunk to shard 1.

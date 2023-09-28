@@ -35,14 +35,14 @@ const st = new ShardingTest({
 
 // Create database "test0" on shard 0.
 const testDB0 = st.s.getDB("test0");
-assert.commandWorked(testDB0.adminCommand({enableSharding: testDB0.getName()}));
-st.ensurePrimaryShard(testDB0.getName(), st.shard0.shardName);
+assert.commandWorked(
+    testDB0.adminCommand({enableSharding: testDB0.getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(testDB0.createCollection("coll0"));
 
 // Create a database "test1" on shard 1.
 const testDB1 = st.s.getDB("test1");
-assert.commandWorked(testDB1.adminCommand({enableSharding: testDB1.getName()}));
-st.ensurePrimaryShard(testDB1.getName(), st.shard1.shardName);
+assert.commandWorked(
+    testDB1.adminCommand({enableSharding: testDB1.getName(), primaryShard: st.shard1.shardName}));
 assert.commandWorked(testDB1.createCollection("coll1"));
 
 const PropagationPreferenceOptions = Object.freeze({kShard: 0, kConfig: 1});

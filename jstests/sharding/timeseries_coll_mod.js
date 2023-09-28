@@ -86,11 +86,11 @@ function runReadAfterWriteTest() {
         return;
     }
 
+    assert.commandWorked(
+        mongos0.adminCommand({enableSharding: dbName, primaryShard: shard0.shardName}));
     assert.commandWorked(db.createCollection(
         collName,
         {timeseries: {timeField: timeField, metaField: metaField, granularity: 'seconds'}}));
-    st.ensurePrimaryShard(db.getName(), shard0.shardName);
-    assert.commandWorked(mongos0.adminCommand({enableSharding: dbName}));
     assert.commandWorked(mongos0.adminCommand({
         shardCollection: viewNss,
         key: {[timeField]: 1},

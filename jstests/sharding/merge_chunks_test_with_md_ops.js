@@ -4,10 +4,11 @@ var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
-var coll = mongos.getCollection("foo.bar");
+const kDbName = "foo";
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
+assert.commandWorked(
+    admin.runCommand({enableSharding: kDbName + "", primaryShard: st.shard0.shardName}));
+var coll = mongos.getCollection(kDbName + ".bar");
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 st.printShardingStatus();

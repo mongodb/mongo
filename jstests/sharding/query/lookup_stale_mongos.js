@@ -32,8 +32,8 @@ const expectedResults = [
 ];
 
 // Ensure that shard0 is the primary shard.
-assert.commandWorked(mongos0DB.adminCommand({enableSharding: mongos0DB.getName()}));
-st.ensurePrimaryShard(mongos0DB.getName(), st.shard0.shardName);
+assert.commandWorked(mongos0DB.adminCommand(
+    {enableSharding: mongos0DB.getName(), primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(mongos0LocalColl.insert({_id: 0, a: 1}));
 assert.commandWorked(mongos0LocalColl.insert({_id: 1, a: null}));

@@ -3,8 +3,8 @@ import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 var s = new ShardingTest({shards: 2, other: {enableBalancer: true}});
 var config = s.s0.getDB('config');
 
-assert.commandWorked(s.s0.adminCommand({enableSharding: 'needToMove'}));
-s.ensurePrimaryShard('needToMove', s.shard0.shardName);
+assert.commandWorked(
+    s.s0.adminCommand({enableSharding: 'needToMove', primaryShard: s.shard0.shardName}));
 
 // Returns an error when trying to remove a shard that doesn't exist.
 assert.commandFailedWithCode(s.s0.adminCommand({removeshard: "shardz"}), ErrorCodes.ShardNotFound);

@@ -317,8 +317,7 @@ export function testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRang
     jsTest.log(`Testing analyzing a shard key for a sharded collection: ${
         tojsononeline({dbName, collName})}`);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
     assert.commandWorked(st.s.adminCommand(

@@ -21,8 +21,8 @@ enableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 // Set up a sharded collection with 2 chunks, [min, 0) and [0, max), one on each shard, with one
 // document in each.
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));

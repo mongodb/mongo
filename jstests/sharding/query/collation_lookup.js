@@ -554,6 +554,9 @@ const caseInsensitive = {
 };
 
 const mongosDB = st.s0.getDB(testName);
+// Ensure the primary shard for the test db is shard0.
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 const withDefaultCollationColl = mongosDB[testName + "_with_default"];
 const withoutDefaultCollationColl = mongosDB[testName + "_without_default"];
@@ -572,10 +575,6 @@ assert.commandWorked(withoutDefaultCollationColl.insert({_id: "unmatched", str: 
 //
 assert.commandWorked(
     withDefaultCollationColl.createIndex({str: 1}, {collation: {locale: "simple"}}));
-
-// Enable sharding on the test DB and ensure its primary is shard0000.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
 // Shard the collection with a default collation.
 assert.commandWorked(mongosDB.adminCommand({

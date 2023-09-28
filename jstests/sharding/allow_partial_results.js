@@ -14,6 +14,13 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2});
 
+jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
+
 jsTest.log("Insert some data.");
 const nDocs = 100;
 const coll = st.s0.getDB(dbName)[collName];
@@ -22,13 +29,6 @@ for (let i = -50; i < 50; i++) {
     bulk.insert({_id: i});
 }
 assert.commandWorked(bulk.execute());
-
-jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
-st.ensurePrimaryShard(dbName, st.shard1.shardName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
-assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
 
 let findRes;
 

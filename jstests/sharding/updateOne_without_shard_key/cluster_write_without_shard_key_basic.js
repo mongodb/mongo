@@ -21,8 +21,7 @@ let xFieldValueShard1 =
 let unshardedCollName = "unshardedCollection";
 
 // Shard collection
-assert.commandWorked(st.s.adminCommand({enablesharding: dbName}));
-st.ensurePrimaryShard(dbName, shard0Name);
+assert.commandWorked(st.s.adminCommand({enablesharding: dbName, primaryShard: shard0Name}));
 
 // Create a sharded collection and move the chunk x:[0,inf) to shard1.
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));

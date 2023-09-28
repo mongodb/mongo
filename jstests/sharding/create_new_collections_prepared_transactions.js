@@ -23,17 +23,16 @@ const versionSupportsSingleWriteShardCommitOptimization =
     MongoRunner.compareBinVersions(jsTestOptions().mongosBinVersion, "7.1") >= 0;
 
 // Create two databases with different shards as their primaries.
-
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbNameShard0, primaryShard: st.shard0.shardName}));
 assert.commandWorked(
     st.s.getDB(dbNameShard0)[collName].insert({_id: 5}, {writeConcern: {w: "majority"}}));
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbNameShard0}));
-st.ensurePrimaryShard(dbNameShard0, st.shard0.shardName);
-
 // Set up another collection with a different shard (shard2) as its primary shard.
 assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbNameShard2, primaryShard: st.shard2.shardName}));
+assert.commandWorked(
     st.s.getDB(dbNameShard2)[collName].insert({_id: 4}, {writeConcern: {w: "majority"}}));
-st.ensurePrimaryShard(dbNameShard2, st.shard2.shardName);
 
 const session = st.s.getDB(dbNameShard0).getMongo().startSession({causalConsistency: false});
 

@@ -162,8 +162,8 @@ MongoRunner.stopMongod(conn);
 
 //  Sharded cluster
 const st = new ShardingTest({shards: 2});
-assert.commandWorked(st.s.adminCommand({enableSharding: jsTestName()}));
-st.ensurePrimaryShard(jsTestName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
 db = st.rs0.getPrimary().getDB(jsTestName());
 collCount = 0;
 runTests(db, collName, collCount);

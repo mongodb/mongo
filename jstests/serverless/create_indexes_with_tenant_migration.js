@@ -34,8 +34,8 @@ let adminDB = donor.getPrimary().getDB('admin');
     const kDbName = kTenantID.str + "_testDB";
     let db = mongoq.getDB(kDbName);
 
-    assert.commandWorked(mongoq.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        mongoq.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     // Run donorStartMigration command to start migration and poll the migration status with the
     // same command object.
@@ -55,8 +55,8 @@ let adminDB = donor.getPrimary().getDB('admin');
     const kDbName = kTenantID.str + "_testDB";
     let db = mongoq.getDB(kDbName);
 
-    assert.commandWorked(mongoq.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        mongoq.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     let abortFailPoint =
         configureFailPoint(adminDB, "abortTenantMigrationBeforeLeavingBlockingState");
@@ -77,8 +77,8 @@ let adminDB = donor.getPrimary().getDB('admin');
     const kTenantID = ObjectId();
     const kDbName = kTenantID.str + "_testDB";
 
-    assert.commandWorked(mongoq.adminCommand({enableSharding: kDbName}));
-    st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+    assert.commandWorked(
+        mongoq.adminCommand({enableSharding: kDbName, primaryShard: st.shard0.shardName}));
 
     let blockingFailPoint =
         configureFailPoint(adminDB, "pauseTenantMigrationBeforeLeavingBlockingState");

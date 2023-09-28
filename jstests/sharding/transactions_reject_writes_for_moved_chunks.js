@@ -119,6 +119,9 @@ const dbName = "test";
 
 const st = new ShardingTest({shards: 3, mongos: 1, config: 1});
 
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
 var fixtures = [
     {collName: "not_hashed", shardKey: "_id", docs: [{_id: -3}, {_id: 11}, {_id: 3}]},
     {
@@ -140,9 +143,6 @@ fixtures.forEach(function(fixture) {
         fixture.docs[0], {writeConcern: {w: "majority"}}));
     assert.commandWorked(st.s.getDB(dbName)[rangedCollName].insert(
         fixture.docs[1], {writeConcern: {w: "majority"}}));
-
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
     assert.commandWorked(st.s.getDB(dbName)[rangedCollName].createIndex({[fixture.shardKey]: 1}));
     assert.commandWorked(

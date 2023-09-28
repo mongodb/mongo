@@ -22,8 +22,7 @@ import {
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
 var st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
-st.adminCommand({enableSharding: 'test'});
-st.ensurePrimaryShard('test', st.shard0.shardName);
+st.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName});
 st.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
 

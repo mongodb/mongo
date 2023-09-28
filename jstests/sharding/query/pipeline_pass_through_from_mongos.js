@@ -11,8 +11,8 @@ import {
 
 const st = new ShardingTest({shards: 2});
 const mongosDB = st.s0.getDB(jsTestName());
-assert.commandWorked(st.s0.adminCommand({enableSharding: jsTestName()}));
-st.ensurePrimaryShard(jsTestName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: jsTestName(), primaryShard: st.shard0.shardName}));
 const mongosColl = mongosDB.test;
 const mongosOtherColl = mongosDB.otherEmptyCollection;
 const primaryShard = st.shard0.getDB(jsTestName());

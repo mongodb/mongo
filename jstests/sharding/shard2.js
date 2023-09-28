@@ -17,8 +17,7 @@ function printAll() {
 var s = new ShardingTest({shards: 2});
 var db = s.getDB("test");
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-s.ensurePrimaryShard('test', s.shard1.shardName);
+assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 assert.eq(1, findChunksUtil.countChunksForNs(s.config, "test.foo"), "sanity check 1");
 

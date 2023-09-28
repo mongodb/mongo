@@ -36,6 +36,8 @@ const foreignCollName = "testForeignColl";
 const foreignNs = dbName + "." + foreignCollName;
 const mongosDB = st.s.getDB(dbName);
 
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+
 // Set up the local collection. It needs to have at least one document. Otherwise, no nested
 // aggregate queries would be issued.
 assert.commandWorked(mongosDB.getCollection(localCollName).insert([{a: 0}]));
@@ -44,8 +46,6 @@ assert.commandWorked(mongosDB.getCollection(localCollName).insert([{a: 0}]));
 // shard0: [MinKey, 0]
 // shard1: [0, 1000]
 // shard1: [1000, MaxKey]
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
 assert.commandWorked(st.s.adminCommand({shardCollection: foreignNs, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({split: foreignNs, middle: {x: 1000}}));

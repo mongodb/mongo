@@ -56,8 +56,9 @@ function getNewDb() {
     const checkOptions = {'checkIndexes': 1};
     const kIndexes = 60;
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: db.getName()}));
-    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+
     CreateShardedCollectionUtil.shardCollectionWithChunks(db.coll, {x: 1}, [
         {min: {x: MinKey}, max: {x: 1}, shard: st.shard0.shardName},
         {min: {x: 1}, max: {x: MaxKey}, shard: st.shard1.shardName},

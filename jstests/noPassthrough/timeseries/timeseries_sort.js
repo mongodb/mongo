@@ -20,9 +20,7 @@ const fullBucketsCollName = `${dbName}.system.buckets.${collName}`;
 
 const st = new ShardingTest({shards: 2});
 const sDB = st.s.getDB(dbName);
-assert.commandWorked(sDB.adminCommand({enableSharding: dbName}));
-
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(sDB.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Shard time-series collection.
 const shardKey = {

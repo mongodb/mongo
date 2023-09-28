@@ -13,8 +13,8 @@ const ns = dbName + "." + collName;
 const db = st.s.getDB(dbName);
 const coll = db.getCollection(collName);
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 // Make the collection have the following chunks:
 // shard0: [MinKey, 0] (-11000 documents)

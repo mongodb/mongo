@@ -13,17 +13,17 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("merge_requires_unique_index");
 const foreignDB = st.s0.getDB("merge_requires_unique_index_foreign");
-const sourceColl = mongosDB.source;
-let targetColl = mongosDB.target;
-sourceColl.drop();
 
 // Enable sharding on the test DB and ensure that shard0 is the primary.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Enable sharding on the foreign DB, except ensure that shard1 is the primary shard.
-assert.commandWorked(foreignDB.adminCommand({enableSharding: foreignDB.getName()}));
-st.ensurePrimaryShard(foreignDB.getName(), st.rs1.getURL());
+assert.commandWorked(
+    foreignDB.adminCommand({enableSharding: foreignDB.getName(), primaryShard: st.rs1.getURL()}));
+
+const sourceColl = mongosDB.source;
+let targetColl = mongosDB.target;
 
 // Increase the log verbosity for sharding, in the hope of getting a clearer picture of the
 // cluster writer as part of BF-11106. This should be removed once BF-11106 is fixed.

@@ -196,8 +196,7 @@ assert.commandWorked(st.s.adminCommand(
     {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard0.name);
+assert.commandWorked(st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard0.name}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 assert.commandWorked(st.s0.adminCommand({split: 'test.user', middle: {x: 0}}));
 assert.commandWorked(

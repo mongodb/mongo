@@ -11,8 +11,8 @@ const shard0 = st.rs0;
 const shard1 = st.rs1;
 
 // Enable sharding on the test DB and ensure its primary is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 function testWriteConcernError(rs) {
     // Split the target collection at {_id: 10} so that there'll be doc $merge-ed to both shards.

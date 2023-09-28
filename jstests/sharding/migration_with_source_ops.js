@@ -44,8 +44,7 @@ var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns = dbNam
 // Donor:     [0, 20) [20, 40)
 // Recipient:
 jsTest.log('Enabling sharding of the collection and pre-splitting into two chunks....');
-assert.commandWorked(admin.runCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(admin.runCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: ns, key: {a: 1}}));
 assert.commandWorked(admin.runCommand({split: ns, middle: {a: 20}}));
 

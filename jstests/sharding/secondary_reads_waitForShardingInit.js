@@ -62,8 +62,7 @@ const sessionDb = st.s.startSession().getDatabase(dbName);
 
 jsTest.log("Going to write a document to testDB.foo.");
 // Make sure that the test db data is stored into the new shard.
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, shardName);
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shardName}));
 assert.commandWorked(sessionDb.foo.insert({x: 1}));
 
 /**

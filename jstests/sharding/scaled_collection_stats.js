@@ -10,6 +10,9 @@ const ns = dbName + "." + collName;
 
 const st = new ShardingTest({shards: 2});
 
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+
 jsTest.log("Insert some data.");
 const coll = st.s0.getDB(dbName)[collName];
 let bulk = coll.initializeUnorderedBulkOp();
@@ -19,8 +22,6 @@ for (let i = -50; i < 50; i++) {
 assert.commandWorked(bulk.execute());
 
 jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand(

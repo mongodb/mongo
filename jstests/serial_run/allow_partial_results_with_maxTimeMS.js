@@ -30,10 +30,9 @@ const collName = "test-SERVER-57469-coll";
 
 // Set up a 2-shard single-node replicaset cluster.
 const st = new ShardingTest({name: jsTestName(), shards: 2, rs: {nodes: 1}});
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
 const coll = st.s0.getDB(dbName)[collName];
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.name);
 
 // Insert some data.
 function initDb(numSamples, splitPoint) {

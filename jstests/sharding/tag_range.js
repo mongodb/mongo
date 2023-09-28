@@ -3,8 +3,8 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-st.ensurePrimaryShard('test', st.shard1.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.tag_range', key: {_id: 1}}));
 
 function countTags(num, message) {

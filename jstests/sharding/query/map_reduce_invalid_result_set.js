@@ -7,8 +7,8 @@ const st = new ShardingTest({shards: 2});
 const testDB = st.getDB("test");
 const coll = "map_reduce_invalid_result_set";
 
-assert.commandWorked(st.s.adminCommand({enablesharding: "test"}));
-st.ensurePrimaryShard("test", st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enablesharding: "test", primaryShard: st.shard0.shardName}));
 
 const lengthPerString = 1 * 1024 * 1024;
 const nDocs = 17;

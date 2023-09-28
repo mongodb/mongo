@@ -14,8 +14,8 @@ const mongosColl = mongosDB[jsTestName()];
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
 // Test that command succeeds when no internal options have been specified.
 assert.commandWorked(

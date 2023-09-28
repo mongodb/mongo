@@ -8,8 +8,8 @@ let shardPrimaryConfigDB = shardPrimary.getDB('config');
 let testDB = st.s.getDB('test1');
 
 // Create a sharded collection with primary shard 0.
-assert.commandWorked(st.s.adminCommand({enableSharding: testDB.getName()}));
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: testDB.getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: testDB.foo.getFullName(), key: {a: 1}}));
 assert.commandWorked(st.s.adminCommand({split: testDB.foo.getFullName(), middle: {a: 0}}));
 assert.commandWorked(st.s.adminCommand({split: testDB.foo.getFullName(), middle: {a: -1000}}));

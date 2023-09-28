@@ -105,11 +105,11 @@ if (!TestData.configShard) {
 // Create a test database and some dummy data on rs0.
 assert(clusterAdminDB.auth("admin", "pwd"));
 
+assert.commandWorked(clusterTestDB.adminCommand(
+    {enableSharding: clusterTestDB.getName(), primaryShard: st.shard0.shardName}));
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(clusterTestDB.test.insert({_id: i, a: i}));
 }
-
-st.ensurePrimaryShard(clusterTestDB.getName(), st.shard0.shardName);
 
 // Restarts a replset with a different set of parameters. Explicitly set the keyFile to null,
 // since if ReplSetTest#stopSet sees a keyFile property, it attempts to auth before dbhash

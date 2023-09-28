@@ -16,8 +16,8 @@ const dbName = "test";
 const collName = "user";
 const ns = dbName + "." + collName;
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: "hashed"}}));
 

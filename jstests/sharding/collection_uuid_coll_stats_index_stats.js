@@ -41,8 +41,8 @@ const otherShardColl = otherDB["otherShardColl"];
 assert.commandWorked(otherShardColl.insert({x: 1, y: 1}));
 
 // Make sure that the primary shard is different for the shardedCollection and the otherShardColl.
-st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
-st.ensurePrimaryShard(otherDB.getName(), st.shard1.shardName);
+assert.commandWorked(st.s.adminCommand({movePrimary: testDB.getName(), to: st.shard0.shardName}));
+assert.commandWorked(st.s.adminCommand({movePrimary: otherDB.getName(), to: st.shard1.shardName}));
 
 const otherShardUUID = getUUID(otherDB, otherShardColl.getName());
 const shardedUUID = getUUID(testDB, shardedCollection.getName());

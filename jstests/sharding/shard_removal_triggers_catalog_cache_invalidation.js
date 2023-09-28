@@ -38,8 +38,8 @@ const dbName = 'TestDB';
     let router0ShardedColl = st.s0.getDB(dbName)[shardedCollName];
     let router1ShardedColl = st.s1.getDB(dbName)[shardedCollName];
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard1.shardName);
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
     assert.commandWorked(st.s0.adminCommand({shardCollection: shardedCollNs, key: {_id: 1}}));
 
     // Make sure data is inserted into shard0
@@ -111,8 +111,8 @@ const dbName = 'TestDB';
     let router0UnshardedColl = st.s0.getDB(dbName)[unshardedCollName];
     let router1UnshardedColl = st.s1.getDB(dbName)[unshardedCollName];
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    assert.commandWorked(
+        st.s0.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 
     // Insert some documents into the unsharded collection whose primary is the to-be-removed
     // shard0.

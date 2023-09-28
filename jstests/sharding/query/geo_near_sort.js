@@ -7,8 +7,8 @@ const caseInsensitive = {
     strength: 2
 };
 
-assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));
-st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
+assert.commandWorked(
+    st.s0.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
 // Split the data into 2 chunks and move the chunk with _id > 0 to shard 1.

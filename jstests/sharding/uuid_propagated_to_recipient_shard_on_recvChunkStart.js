@@ -14,8 +14,7 @@ let donor = st.shard0;
 let recipient = st.shard1;
 
 let setUp = function() {
-    assert.commandWorked(st.s.adminCommand({enableSharding: db}));
-    st.ensurePrimaryShard(db, donor.shardName);
+    assert.commandWorked(st.s.adminCommand({enableSharding: db, primaryShard: donor.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 1}}));
 };
 

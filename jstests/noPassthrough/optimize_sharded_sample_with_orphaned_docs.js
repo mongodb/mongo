@@ -22,6 +22,10 @@ const mongos = st.s;
 const configDB = mongos.getDB("config");
 
 const mongosDB = mongos.getDB(jsTestName());
+
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: shard0.name}));
+
 const mongosColl = mongosDB.test;
 
 const shard0DB = shard0.getDB(jsTestName());
@@ -53,10 +57,6 @@ function runSampleAndConfirmResults({sampleSize, comment, expectedPlanSummaries}
         }
     }
 }
-
-// Enable sharding on the the test database and ensure that the primary is shard0.
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), shard0.name);
 
 // Shard the collection on {_id: 1}, split at {_id: 0} and move the empty upper chunk to shard1.
 st.shardColl(mongosColl.getName(), {_id: 1}, {_id: 0}, {_id: 0}, mongosDB.getName());

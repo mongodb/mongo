@@ -32,8 +32,8 @@ const replSets = [st.rs0, st.rs1];
 const local = mongosDB.local;
 const foreign = mongosDB.foreign;
 
-assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
+assert.commandWorked(
+    mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
 
 // Turn on the profiler and increase the query log level for both shards.
 for (let rs of replSets) {

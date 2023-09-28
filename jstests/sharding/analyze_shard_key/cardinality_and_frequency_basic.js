@@ -420,8 +420,7 @@ function testAnalyzeCandidateShardKeysShardedCollection(st) {
     jsTest.log(
         `Testing candidate shard keys for a sharded collection: ${tojson({dbName, collName})}`);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentShardKey}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: currentShardKeySplitPoint}));
     assert.commandWorked(st.s.adminCommand(
@@ -476,8 +475,7 @@ function testAnalyzeCurrentShardKeys(st) {
 
     jsTest.log(`Testing current shard key for sharded collections: ${tojson({dbName})}`);
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
 
     let testNum = 0;
     currentKeyTestCases.forEach(testCaseBase => {

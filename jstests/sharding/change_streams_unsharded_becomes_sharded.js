@@ -32,7 +32,7 @@ function testUnshardedBecomesSharded(collToWatch) {
     mongosDB.createCollection(testName);
     mongosColl.createIndex({x: 1});
 
-    st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+    assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.rs0.getURL()}));
 
     // Establish a change stream cursor on the unsharded collection.
     const cst = new ChangeStreamTest(mongosDB);

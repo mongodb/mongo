@@ -41,8 +41,8 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     assert.neq(null, clusterID);
 
     // Setup sharded collection
-    assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
-    st.ensurePrimaryShard('sharded', st.shard0.shardName);
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: 'sharded', primaryShard: st.shard0.shardName}));
 
     assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.foo', key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({split: 'sharded.foo', middle: {x: 0}}));

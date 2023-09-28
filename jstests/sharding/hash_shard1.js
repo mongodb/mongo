@@ -9,8 +9,7 @@ var coll = "foo";
 var ns = dbname + "." + coll;
 var db = s.getDB(dbname);
 var t = db.getCollection(coll);
-db.adminCommand({enablesharding: dbname});
-s.ensurePrimaryShard(dbname, s.shard1.shardName);
+db.adminCommand({enablesharding: dbname, primaryShard: s.shard1.shardName});
 
 // for simplicity start by turning off balancer
 s.stopBalancer();

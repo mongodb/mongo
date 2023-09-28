@@ -14,11 +14,11 @@ var s = new ShardingTest({shards: 2, mongos: 1});
 var dbname = "testDB";
 var coll = "ttl_sharded";
 var ns = dbname + "." + coll;
-let t = s.getDB(dbname).getCollection(coll);
 
-// enable sharding of the collection. Only 1 chunk initially
-s.adminCommand({enablesharding: dbname});
-s.ensurePrimaryShard(dbname, s.shard1.shardName);
+s.adminCommand({enablesharding: dbname, primaryShard: s.shard1.shardName});
+
+// Only 1 chunk initially
+let t = s.getDB(dbname).getCollection(coll);
 s.adminCommand({shardcollection: ns, key: {_id: 1}});
 
 // insert 24 docs, with timestamps at one hour intervals
