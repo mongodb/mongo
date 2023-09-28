@@ -435,25 +435,14 @@ class GDBDumper(Dumper):
 
     def _prefix(self):
         """Return the commands to set up a debugger process."""
-        script_dir = "buildscripts"
-        gdb_dir = os.path.join(script_dir, "gdb")
-        mongo_script = os.path.join(gdb_dir, "mongo.py")
-        mongo_printers_script = os.path.join(gdb_dir, "mongo_printers.py")
-        mongo_lock_script = os.path.join(gdb_dir, "mongo_lock.py")
 
         add_venv_sys_path = f"py sys.path.extend({sys.path})"  # Makes venv packages available in GDB
-        source_mongo = "source %s" % mongo_script
-        source_mongo_printers = "source %s" % mongo_printers_script
-        source_mongo_lock = "source %s" % mongo_lock_script
 
         cmds = [
             "set interactive-mode off",
             "set print thread-events off",  # Suppress GDB messages of threads starting/finishing.
-            "set python print-stack full",
             add_venv_sys_path,
-            source_mongo,
-            source_mongo_printers,
-            source_mongo_lock,
+            "source .gdbinit",
         ]
         return cmds
 
@@ -649,7 +638,7 @@ class GDBDumper(Dumper):
 
         cmds = self._prefix() + cmds + self._postfix()
 
-        call([dbg] + list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
+        call([dbg, "--nx"] + list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
              self._root_logger)
 
     def get_dump_ext(self):
