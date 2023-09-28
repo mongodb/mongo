@@ -49,7 +49,7 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
         _scopedCss.emplace(CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss));
         _collDesc = (*_scopedCss)->getCollectionDescription(opCtx);
 
-        if (!_collDesc->isSharded()) {
+        if (!_collDesc->hasRoutingTable()) {
             invariant(!_collDesc->getReshardingKeyIfShouldForwardOps());
             return;
         }
@@ -75,8 +75,8 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx, const Namespac
                     .cm;
 
             tassert(6862800,
-                    "Routing information for the temporary resharing collection is stale",
-                    _reshardingChunkMgr->isSharded());
+                    "Routing information for the temporary resharding collection is stale",
+                    _reshardingChunkMgr->hasRoutingTable());
         }
     }
 }
