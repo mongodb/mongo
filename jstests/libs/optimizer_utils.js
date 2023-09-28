@@ -338,6 +338,10 @@ export function navigateToPlanPath(doc, path) {
     return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan." + path);
 }
 
+function navigateToNonOptimizerPlanPath(doc, path) {
+    return navigateToPath(doc, "queryPlanner.winningPlan.queryPlan." + path);
+}
+
 export function navigateToRootNode(doc) {
     return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan");
 }
@@ -358,6 +362,10 @@ export function assertValueOnPath(value, doc, path) {
 
 export function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
+}
+
+export function assertValueOnNonOptimizerPlanPath(value, doc, path) {
+    assertValueOnPathFn(value, doc, path, navigateToNonOptimizerPlanPath);
 }
 
 export function runWithParams(keyValPairs, fn) {

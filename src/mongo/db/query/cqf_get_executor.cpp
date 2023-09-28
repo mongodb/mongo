@@ -74,6 +74,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/sampling_estimator.h"
@@ -393,6 +394,7 @@ static ExecParams createExecutor(
     const MultipleCollectionAccessor& collections,
     const bool requireRID,
     const ScanOrder scanOrder,
+    const boost::optional<MatchExpression*> pipelineMatchExpr,
     PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO) {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
@@ -494,7 +496,8 @@ static ExecParams createExecutor(
             nss,
             std::move(sbeYieldPolicy),
             false /*isFromPlanCache*/,
-            true /* generatedByBonsai */};
+            true /* generatedByBonsai */,
+            pipelineMatchExpr};
 }
 
 }  // namespace
@@ -912,6 +915,11 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
         abt = translateCanonicalQueryToABT(
             metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId);
     }
+    // If pipeline exists and is cacheable, save the MatchExpression in ExecParams for binding.
+    const auto pipelineMatchExpr = pipeline && _isCacheable
+        ? boost::make_optional(
+              dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression())
+        : boost::none;
 
     OPTIMIZER_DEBUG_LOG(
         6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2Compact(abt));
@@ -988,7 +996,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                           nss,
                           collections,
                           requireRID,
-                          scanOrder);
+                          scanOrder,
+                          pipelineMatchExpr);
 }
 
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
@@ -1016,6 +1025,13 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> makeExecFromParams(
     std::unique_ptr<CanonicalQuery> cq, ExecParams execArgs) {
+    if (cq) {
+        input_params::bind(cq->getPrimaryMatchExpression(), execArgs.root.second, false);
+    } else if (execArgs.pipelineMatchExpr != boost::none) {
+        // If pipeline contains a parameterized MatchExpression, bind constants.
+        input_params::bind(execArgs.pipelineMatchExpr.get(), execArgs.root.second, false);
+    }
+
     return plan_executor_factory::make(execArgs.opCtx,
                                        std::move(cq),
                                        std::move(execArgs.solution),

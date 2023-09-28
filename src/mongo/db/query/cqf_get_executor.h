@@ -67,6 +67,7 @@ struct ExecParams {
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy;
     bool planIsFromCache;
     bool generatedByBonsai;
+    const boost::optional<MatchExpression*> pipelineMatchExpr;
 };
 
 /**

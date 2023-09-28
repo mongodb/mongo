@@ -240,6 +240,9 @@ std::pair<value::TypeTags, value::Value> genericCompare(
         }
     }
 
+    // TODO: SERVER-82089: Use cmp3w instead of simple comparisons in ABT optimization + lowering of
+    // parameterized constants
+
     return {value::TypeTags::Nothing, 0};
 }
 
