@@ -167,8 +167,8 @@ public:
     }
 
     void
-    validate(
-      const std::string &operation_table_name, const std::string &, database &) override final
+    validate(bool tracking_enabled, const std::string &operation_table_name, const std::string &,
+      database &) override final
     {
         bool first_record = true;
         int ret;
@@ -178,6 +178,12 @@ public:
         /* FIXME-WT-9339. */
         (void)cache_size;
         (void)cache_size_500mb;
+
+        /*
+         * This validate logic uses data from operation tracking, it must have been enabled during
+         * the test.
+         */
+        testutil_assert(tracking_enabled);
 
         /* Open a cursor on the tracking table to read it. */
         scoped_session session = connection_manager::instance().create_session();

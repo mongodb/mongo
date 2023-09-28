@@ -121,7 +121,7 @@ public:
     }
 
     void
-    validate(const std::string &, const std::string &, database &) override final
+    validate(bool, const std::string &, const std::string &, database &) override final
     {
         logger::log_msg(LOG_WARN, "validate: nothing done");
     }

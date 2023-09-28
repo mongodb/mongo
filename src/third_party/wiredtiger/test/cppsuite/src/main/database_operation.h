@@ -68,8 +68,8 @@ public:
     /* Basic update operation that chooses a random key and updates it. */
     virtual void update_operation(thread_worker *tc);
 
-    virtual void validate(
-      const std::string &operation_table_name, const std::string &schema_table_name, database &db);
+    virtual void validate(bool tracking_enabled, const std::string &operation_table_name,
+      const std::string &schema_table_name, database &db);
 
     virtual ~database_operation() = default;
 };

@@ -420,9 +420,12 @@ database_operation::update_operation(thread_worker *tc)
 }
 
 void
-database_operation::validate(
-  const std::string &operation_table_name, const std::string &schema_table_name, database &db)
+database_operation::validate(bool tracking_enabled, const std::string &operation_table_name,
+  const std::string &schema_table_name, database &db)
 {
+    // The default implementation requires the tracking component to be enabled.
+    if (!tracking_enabled)
+        return;
     validator wv;
     wv.validate(operation_table_name, schema_table_name, db);
 }
