@@ -6,7 +6,11 @@
  *   uses_curop_agg_stage
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    assertAlways,
+    assertWhenOwnColl,
+    interruptedQueryErrors
+} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -35,8 +39,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // If the interrupt happens just as the cursor is being checked back in, the cursor will
             // be killed without failing the operation. When this happens, the next getMore will
             // fail with CursorNotFound.
-            assertWhenOwnColl.contains(
-                response.code, [ErrorCodes.Interrupted, ErrorCodes.CursorNotFound], response);
+            assertWhenOwnColl.contains(response.code, interruptedQueryErrors, response);
         }
     };
 

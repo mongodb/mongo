@@ -14,6 +14,7 @@
  */
 import "jstests/libs/override_methods/retry_writes_at_least_once.js";
 
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {
@@ -188,7 +189,7 @@ export function extendWithInternalTransactionsUnsharded($config, $super) {
         // thrown, so we retry on this error in test
         return res &&
             (res.code == ErrorCodes.LinearizableReadConcernError ||
-             (TestData.runningWithShardStepdowns && res.code == ErrorCodes.QueryPlanKilled));
+             (TestData.runningWithShardStepdowns && interruptedQueryErrors.includes(res.code)));
     };
 
     $config.data.getRandomDocument = function getRandomDocument(db, collName) {

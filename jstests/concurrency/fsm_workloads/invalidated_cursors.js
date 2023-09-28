@@ -8,7 +8,7 @@
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {assertAlways, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedOrFailedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
@@ -180,12 +180,9 @@ export const $config = (function() {
                     // killOp.
                     assertAlways.contains(e.code,
                                           [
-                                              ErrorCodes.CursorKilled,
-                                              ErrorCodes.CursorNotFound,
-                                              ErrorCodes.Interrupted,
+                                              ...interruptedQueryErrors,
                                               ErrorCodes.NamespaceNotFound,
-                                              ErrorCodes.OperationFailed,
-                                              ErrorCodes.QueryPlanKilled,
+                                              ErrorCodes.OperationFailed
                                           ],
                                           'unexpected error code: ' + e.code + ': ' + e.message);
                 }

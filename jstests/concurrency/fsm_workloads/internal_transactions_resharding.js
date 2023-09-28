@@ -10,6 +10,7 @@
  *  antithesis_incompatible,
  * ]
  */
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {executeReshardCollection} from "jstests/concurrency/fsm_libs/reshard_collection_util.js";
 import {
@@ -43,7 +44,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.isAcceptableAggregateCmdError = function isAcceptableAggregateCmdError(res) {
         // The aggregate command is expected to involve running getMore commands which are not
         // retryable after a collection rename (done by resharding).
-        return res && (res.code == ErrorCodes.QueryPlanKilled);
+        return res && (interruptedQueryErrors.includes(res.code));
     };
 
     $config.data.isAcceptableRetryError = function isAcceptableRetryError(res) {

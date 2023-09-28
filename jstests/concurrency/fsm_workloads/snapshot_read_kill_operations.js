@@ -5,7 +5,7 @@
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
 
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {assertWhenOwnColl, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     abortTransaction,
     cleanupOnLastIteration
@@ -46,9 +46,7 @@ export const $config = (function() {
             doSnapshotGetMore(collName,
                               this,
                               [
-                                  ErrorCodes.CursorKilled,
-                                  ErrorCodes.CursorNotFound,
-                                  ErrorCodes.Interrupted,
+                                  ...interruptedQueryErrors,
                                   ErrorCodes.LockTimeout,
                                   ErrorCodes.NoSuchTransaction,
                               ],

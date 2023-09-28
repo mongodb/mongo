@@ -4,7 +4,7 @@
  * Sets up a situation where index join strategy will be chosen for $lookup while while running
  * concurrent dropIndexes against the index chosen for the foreign side.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {assertAlways, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     let data = {
@@ -22,7 +22,7 @@ export const $config = (function() {
             } catch (e) {
                 // We expect any errors of query getting killed due to selected index for join is
                 // dropped.
-                assertAlways.eq(e.code, ErrorCodes.QueryPlanKilled);
+                assertAlways.contains(e.code, interruptedQueryErrors);
             }
         },
 

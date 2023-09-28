@@ -10,7 +10,7 @@
  *  assumes_unsharded_collection,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
+import {assertAlways, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const data = {
@@ -56,7 +56,7 @@ export const $config = (function() {
                 assertAlways.commandWorked(res);
                 assertAlways.commandWorkedOrFailedWithCode(
                     localDb.runCommand({getMore: res.cursor.id, collection: myCollName}),
-                    [ErrorCodes.QueryPlanKilled, ErrorCodes.CursorNotFound]);
+                    interruptedQueryErrors);
             }
         }
 

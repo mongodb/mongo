@@ -11,6 +11,7 @@
  *  incompatible_with_concurrency_simultaneous,
  * ]
  */
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
@@ -18,9 +19,6 @@ import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     AnalyzeShardKeyUtil
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
-
-const aggregateInterruptErrors =
-    [ErrorCodes.CursorNotFound, ErrorCodes.CursorKilled, ErrorCodes.QueryPlanKilled];
 
 const kBaseConfig = {
     threadCount: 1,
@@ -906,8 +904,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         // the filtering metadata which would be used for the cursor. Interrupts such as
         // stepdowns can cause a getMore command get fail as a result of the cursor being killed.
         this.expectedAggregateInterruptErrors =
-            cluster.isSharded() && TestData.runningWithShardStepdowns ? aggregateInterruptErrors
-                                                                      : [];
+            cluster.isSharded() && TestData.runningWithShardStepdowns ? interruptedQueryErrors : [];
 
         this.generateShardKeyOptions(cluster);
         this.generateDocumentOptions(cluster);

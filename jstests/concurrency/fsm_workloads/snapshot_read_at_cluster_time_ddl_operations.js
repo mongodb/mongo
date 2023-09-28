@@ -9,7 +9,11 @@
  *   requires_replication,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {
+    assertAlways,
+    assertWhenOwnColl,
+    interruptedQueryErrors
+} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFindAtClusterTime,
     doSnapshotGetMoreAtClusterTime
@@ -21,11 +25,7 @@ export const $config = (function() {
     const states = {
 
         snapshotScan: function snapshotScan(db, collName) {
-            const readErrorCodes = [
-                ErrorCodes.ShutdownInProgress,
-                ErrorCodes.CursorNotFound,
-                ErrorCodes.QueryPlanKilled,
-            ];
+            const readErrorCodes = [...interruptedQueryErrors, ErrorCodes.ShutdownInProgress];
             if (!this.cursorId || this.cursorId == 0) {
                 doSnapshotFindAtClusterTime(db, collName, this, readErrorCodes, {a: 1});
             } else {

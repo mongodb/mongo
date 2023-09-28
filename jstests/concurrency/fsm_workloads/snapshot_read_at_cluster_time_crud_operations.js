@@ -13,7 +13,7 @@
  *   requires_replication,
  * ]
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
+import {assertWhenOwnColl, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFindAtClusterTime,
     doSnapshotGetMoreAtClusterTime
@@ -45,11 +45,7 @@ export const $config = (function() {
                     db,
                     collName,
                     this,
-                    [
-                        ErrorCodes.Interrupted,
-                        ErrorCodes.CursorNotFound,
-                        ErrorCodes.ShutdownInProgress
-                    ],
+                    [...interruptedQueryErrors, ErrorCodes.ShutdownInProgress],
                     (res) => {
                         let expectedDocs = [...Array(this.batchSize).keys()].map(
                             (i) => ({_id: i + this.numDocScanned, x: 1}));
