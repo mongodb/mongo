@@ -11,9 +11,6 @@ for (var i = 0; i < 10; i++) {
     db.foo.insert({_id: i});
 }
 
-// Enable sharding on DB
-assert.commandWorked(s.s0.adminCommand({enablesharding: dbName, primaryShard: s.shard1.shardName}));
-
 // Enable sharding on collection
 assert.commandWorked(s.s0.adminCommand({shardcollection: ns, key: {_id: 1}}));
 
