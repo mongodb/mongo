@@ -2956,6 +2956,138 @@ var ReplSetTest = function ReplSetTest(opts) {
             checkPreImageCollection, liveSecondaries, this, liveSecondaries, msgPrefix);
     };
 
+    function dumpChangeCollection(node, tenantDatabaseName, timestamp, limit, msgPrefix) {
+        const beforeCursor =
+            node.getDB(tenantDatabaseName)["system.change_collection"]
+                .find({"_id": {"$lt": timestamp}})
+                .sort({$natural: -1})
+                .noCursorTimeout()
+                .readConcern("local")
+                .limit(limit / 2);  // We print up to half of the limit in the before part so that
+                                    // the timestamp is centered.
+        const beforeEntries = beforeCursor.toArray().reverse();
+
+        let log = `${msgPrefix} -- Dumping a window of ${limit} entries for ${
+            tenantDatabaseName}.system.change_collection from host ${node.host} centered around ${
+            timestamp.toStringIncomparable()}`;
+
+        beforeEntries.forEach(entry => {
+            log += '\n' + tojsononeline(entry);
+        });
+
+        const remainingWindow = limit - beforeEntries.length;
+        const cursor = node.getDB(tenantDatabaseName)["system.change_collection"]
+                           .find({"_id": {"$gte": timestamp}})
+                           .sort({$natural: 1})
+                           .noCursorTimeout()
+                           .readConcern("local")
+                           .limit(remainingWindow);
+        cursor.forEach(entry => {
+            log += '\n' + tojsononeline(entry);
+        });
+
+        jsTestLog(log);
+    }
+
+    function checkTenantChangeCollection(
+        rst, secondaries, tenantDatabaseName, msgPrefix = 'checkTenantChangeCollection') {
+        print(`${msgPrefix} -- starting check on ${tenantDatabaseName}.system.change_collection`);
+
+        // Prepare reverse read from the primary and specified secondaries.
+        const nodes = [rst.getPrimary(), ...secondaries];
+        let reverseReaders = nodes.map(node => {
+            let reader =
+                new ReverseReader(node, node.getDB(tenantDatabaseName)["system.change_collection"]);
+            // Start all reverseReaders at their last document for the collection.
+            reader.query();
+            return reader;
+        });
+
+        let inspectedEntryCount = 0;
+        while (true) {
+            const entryAndNodeSet = reverseReaders.map(reader => {
+                if (reader.hasNext()) {
+                    return {entry: reader.next(), node: reader.mongo};
+                }
+                return undefined;
+            });
+            let baselineEntryAndNode = undefined;
+
+            entryAndNodeSet.forEach(entryAndNode => {
+                if (entryAndNode === undefined) {
+                    return;
+                }
+
+                if (baselineEntryAndNode === undefined) {
+                    inspectedEntryCount++;
+                    baselineEntryAndNode = entryAndNode;
+                    return;
+                }
+                if (!bsonBinaryEqual(baselineEntryAndNode.entry, entryAndNode.entry)) {
+                    print(`${msgPrefix} -- inconsistency detected in ${
+                              tenantDatabaseName}.system.change_collection` +
+                          "\n" +
+                          `${baselineEntryAndNode.node.host} -> ${
+                              tojsononeline(baselineEntryAndNode.entry)}` +
+                          "\n" +
+                          `${entryAndNode.node.host} -> ${tojsononeline(entryAndNode.entry)}`);
+
+                    dumpChangeCollection(baselineEntryAndNode.node,
+                                         tenantDatabaseName,
+                                         baselineEntryAndNode.entry._id,
+                                         100,
+                                         msgPrefix);
+                    dumpChangeCollection(entryAndNode.node,
+                                         tenantDatabaseName,
+                                         entryAndNode.entry._id,
+                                         100,
+                                         msgPrefix);
+                    assert(
+                        false,
+                        `Found inconsistency in '${tenantDatabaseName}.system.change_collection'`);
+                }
+            });
+
+            if (baselineEntryAndNode === undefined) {
+                break;
+            }
+        }
+        print(`${msgPrefix} -- finished check on ${
+            tenantDatabaseName}.system.change_collection, inspected ${
+            inspectedEntryCount} unique entries`);
+    }
+
+    /**
+     * Check change_collection for all tenants on all nodes, by doing a reverse scan. This check
+     * accounts for the fact that each node might independently truncate the change collection, and
+     * not contain the same number of entries.
+     */
+    function checkChangeCollection(rst, secondaries, msgPrefix = 'checkChangeCollection') {
+        secondaries = secondaries || rst._secondaries;
+        secondaries = secondaries.filter((node) => !isNodeArbiter(node));
+
+        if (secondaries.length == 0) {
+            print(`${msgPrefix} -- no data bearing secondaries specified, nothing to do.`);
+            return;
+        }
+
+        print(`${msgPrefix} -- starting change_collection checks.`);
+        print(`${msgPrefix} -- waiting for secondaries to be ready.`);
+        rst.awaitSecondaryNodes(rst.kDefaultTimeoutMS, secondaries);
+
+        // Get all change_collections for all tenants.
+        let dbNames = rst.getPrimary().getDBNames();
+        dbNames = dbNames.filter((name) => name.endsWith("_config") || name == "config");
+        dbNames.forEach(dbName => checkTenantChangeCollection(rst, secondaries, dbName));
+        print(`${msgPrefix} -- change_collection check complete.`);
+    }
+
+    ReplSetTest.prototype.checkChangeCollection = function(msgPrefix) {
+        var liveSecondaries = _determineLiveSecondaries(this);
+        this.checkReplicaSet(
+            checkChangeCollection, liveSecondaries, this, liveSecondaries, msgPrefix);
+    };
+
     /**
      * Waits for an initial connection to a given node. Should only be called after the node's
      * process has already been started. Updates the corresponding entry in 'this.nodes' with the
@@ -3437,6 +3569,8 @@ var ReplSetTest = function ReplSetTest(opts) {
                 asCluster(this, this._liveNodes, () => this.checkOplogs());
                 print("ReplSetTest stopSet checking preimages.");
                 asCluster(this, this._liveNodes, () => this.checkPreImageCollection());
+                print("ReplSetTest stopSet checking change_collection(s).");
+                asCluster(this, this._liveNodes, () => this.checkChangeCollection());
                 print("ReplSetTest stopSet checking replicated data hashes.");
                 asCluster(this, this._liveNodes, () => this.checkReplicatedDataHashes());
             } else {

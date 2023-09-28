@@ -84,6 +84,7 @@
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/clientcursor.h"
@@ -948,9 +949,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // If not in standalone mode, start background tasks to:
     //  * Periodically remove expired pre-images from the 'system.preimages'
     //  * Periodically remove expired documents from change collections
-    if (!isStandalone && !gPreImageRemoverDisabled) {
-        startChangeStreamExpiredPreImagesRemover(serviceContext);
-        startChangeCollectionExpiredDocumentsRemover(serviceContext);
+    if (!isStandalone) {
+        if (!gPreImageRemoverDisabled) {
+            startChangeStreamExpiredPreImagesRemover(serviceContext);
+        }
+        if (!gChangeCollectionRemoverDisabled) {
+            startChangeCollectionExpiredDocumentsRemover(serviceContext);
+        }
     }
 
     if (computeModeEnabled) {

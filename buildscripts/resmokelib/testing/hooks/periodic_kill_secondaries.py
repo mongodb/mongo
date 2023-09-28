@@ -200,9 +200,12 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             # collection.
             if "set_parameters" in secondary.mongod_options:
                 secondary.mongod_options["set_parameters"]["disableExpiredPreImagesRemover"] = True
+                secondary.mongod_options["set_parameters"][
+                    "disableExpiredChangeCollectionRemover"] = True
             else:
                 secondary.mongod_options["set_parameters"] = {
-                    "disableExpiredPreImagesRemover": True
+                    "disableExpiredPreImagesRemover": True,
+                    "disableExpiredChangeCollectionRemover": True,
                 }
 
             self.logger.info(
@@ -279,9 +282,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 "{} did not exit cleanly after verifying data consistency".format(self.fixture))
 
         for secondary in self.fixture.get_secondaries():
-            # We re-enable the remover for pre-images. It was disabled before re-joining the replSet
-            # as a secondary during the consistency checks.
+            # We re-enable the removers for pre-images and change collections. These were disabled
+            # before re-joining the replSet as a secondary during the consistency checks.
             secondary.mongod_options["set_parameters"].pop("disableExpiredPreImagesRemover")
+            secondary.mongod_options["set_parameters"].pop("disableExpiredChangeCollectionRemover")
 
         self.logger.info("Starting the fixture back up again with no data...")
         self.fixture.setup()
