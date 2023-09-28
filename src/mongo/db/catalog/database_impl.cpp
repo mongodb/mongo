@@ -403,6 +403,8 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
         return droppable;
     }
 
+    assertNoMovePrimaryInProgress(opCtx, nss);
+
     return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime, markFromMigrate);
 }
 
