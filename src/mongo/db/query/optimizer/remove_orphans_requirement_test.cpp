@@ -935,106 +935,110 @@ TEST(PhysRewriter, RemoveOrphanEqualityHashedShardKey) {
         optimized);
 }
 
-// TODO SERVER-78507: Examine the physical alternatives in the memo, rather than the logical nodes,
-// to check that the children of the RIDIntersect have physical alternatives with both combinations
-// of RemoveOrphansRequirement.
 TEST(PhysRewriter, RIDIntersectRemoveOrphansImplementer) {
     using namespace properties;
 
-    ABT scanNode = make<ScanNode>("root", "c1");
+    // Query: {a: {$gt: 1}}
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("a", _traverse1(_cmp("Gt", "1"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
 
-    ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(make<PathGet>("a",
-                                       make<PathTraverse>(
-                                           PathTraverse::kSingleLevel,
-                                           make<PathCompare>(Operations::Eq, Constant::int64(1)))),
-                         make<Variable>("root")),
-        std::move(scanNode));
+    auto prefixId = PrefixId::createForTests();
+    // Shard key: {a: 1}
+    ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(DatabaseNameUtil::deserialize(
+                             boost::none, "test", SerializationContext::stateDefault()),
+                         UUID::gen(),
+                         {},
+                         {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)}},
+                         MultikeynessTrie{},
+                         ConstEval::constFold,
+                         DistributionAndPaths{DistributionType::Centralized},
+                         true /*exists*/,
+                         boost::none /*ce*/,
+                         sm)}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 3 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+    // Fully explore search space to enumerate all alternatives to verify the RIDIntersect rewrite
+    // enumerated the rewrites we expected.
+    phaseManager.getHints()._disableBranchAndBound = true;
+    phaseManager.getHints()._keepRejectedPlans = true;
 
-    {
-        auto prefixId = PrefixId::createForTests();
-        ShardingMetadata sm({{_get("a", _id())._n, CollationOp::Ascending}}, true);
-        auto phaseManager = makePhaseManager(
-            {OptPhase::MemoSubstitutionPhase,
-             OptPhase::MemoExplorationPhase,
-             OptPhase::MemoImplementationPhase},
-            prefixId,
-            {{{"c1",
-               createScanDef(testDBName,
-                             UUID::gen(),
-                             {},
-                             {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}},
-                             MultikeynessTrie{},
-                             ConstEval::constFold,
-                             DistributionAndPaths{DistributionType::Centralized},
-                             true /*exists*/,
-                             boost::none /*ce*/,
-                             sm)}}},
-            boost::none /*costModel*/,
-            {true /*debugMode*/, 3 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-            {});
+    ABT optimized = rootNode;
+    phaseManager.optimize(optimized);
 
-        ABT optimized = rootNode;
-        phaseManager.optimize(optimized);
+    // Examine the memo to verify that there are alternatives in which RemoveOrphansRequirement is
+    // pushed down into the left and right child groups.
+    const auto& memo = phaseManager.getMemo();
 
-        /*
-            Examine the RIDintersectNode in the memo to make sure that it meets the following
-           conditions:
-            1. The right-delegated group needs to have logial node '0' as a scan, and needs to have
-           physical alternatives with RemoveOrphansRequirement both true and false.
-            2. The left-delegated group needs to have logical node '0' as a Sargable [Index] with
-           a=1 and should also have physical alternatives with RemoveOrphansRequirmeent both true
-           and false.
-        */
-
-        const auto& memo = phaseManager.getMemo();
-
-        const RIDIntersectNode* ridIntersectNode = nullptr;
-        for (int groupId = 0; (size_t)groupId < memo.getGroupCount() && !ridIntersectNode;
-             groupId++) {
-            for (auto& node : memo.getLogicalNodes(groupId)) {
-                if (ridIntersectNode = node.cast<RIDIntersectNode>(); ridIntersectNode) {
-                    break;
+    // Get the ID of the group which performs the RIDIntersect.
+    auto ridGroupId = [&memo]() -> boost::optional<size_t> {
+        for (size_t i = 0; i < memo.getGroupCount(); ++i) {
+            for (auto&& node : memo.getLogicalNodes(i)) {
+                if (node.is<RIDIntersectNode>()) {
+                    return {i};
                 }
             }
         }
-        ASSERT(ridIntersectNode);
-        const auto* left = ridIntersectNode->getLeftChild().cast<MemoLogicalDelegatorNode>();
-        const auto* right = ridIntersectNode->getRightChild().cast<MemoLogicalDelegatorNode>();
-        ASSERT(left);
-        ASSERT(right);
+        return boost::none;
+    }();
+    ASSERT_TRUE(ridGroupId.has_value());
 
-        // Given a groupId, checks that the corresponding group contains at least one physical
-        // alternative alternative with RemoveOrphansRequirement 'true' and one with 'false'.
-        // We don't care whether the optimizer found a plan for any of these physical
-        // alternatives; we only care that it attempted all of them.
-        auto containsMustRemoveTrueAndFalse = [&](GroupIdType groupId) {
-            bool containsRemoveOrphansTrueAlternative = false,
-                 containsRemoveOrphansFalseAlternative = false;
-            for (const auto& node : memo.getPhysicalNodes(groupId)) {
-                const PhysProps& props = node->_physProps;
-                ASSERT(hasProperty<RemoveOrphansRequirement>(props));
-                bool result = getPropertyConst<RemoveOrphansRequirement>(props).mustRemove();
-                containsRemoveOrphansTrueAlternative =
-                    containsRemoveOrphansTrueAlternative || result;
-                containsRemoveOrphansFalseAlternative =
-                    containsRemoveOrphansFalseAlternative || !result;
-                if (containsRemoveOrphansTrueAlternative && containsRemoveOrphansFalseAlternative) {
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        // Examine the left delegator.
-        ASSERT(containsMustRemoveTrueAndFalse(left->getGroupId()));
-
-        // Examine the right delegator.
-        ASSERT(containsMustRemoveTrueAndFalse(right->getGroupId()));
+    // Get the result of optimization of this RIDIntersect group when optimized with
+    // RemoveOrphansRequirement{true}.
+    PhysOptimizationResult* ridIntersectWithRemoveOrphans;
+    for (auto&& physOptResult : memo.getPhysicalNodes(*ridGroupId)) {
+        auto physProps = physOptResult->_physProps;
+        if (hasProperty<RemoveOrphansRequirement>(physProps) &&
+            getPropertyConst<RemoveOrphansRequirement>(physProps).mustRemove()) {
+            ridIntersectWithRemoveOrphans = physOptResult.get();
+        }
     }
+    ASSERT_NE(ridIntersectWithRemoveOrphans, nullptr);
+
+    // Keep track whether we've seen alternatives that push the RemoveOrphansRequirement into the
+    // left and right child respectively.
+    bool hasAlternativeWithRorAsLeftChild = false;
+    bool hasAlternativeWithRorAsRightChild = false;
+
+    // Put all alternatives in the same vector to iterate over them.
+    auto allAlternatives = ridIntersectWithRemoveOrphans->_rejectedNodeInfo;
+    if (ridIntersectWithRemoveOrphans->_nodeInfo.has_value()) {
+        allAlternatives.push_back(*ridIntersectWithRemoveOrphans->_nodeInfo);
+    }
+    for (auto&& alternative : allAlternatives) {
+        // We don't care about alternatives that don't use the index.
+        if (!alternative._node.is<NestedLoopJoinNode>()) {
+            continue;
+        }
+        auto nlj = alternative._node.cast<NestedLoopJoinNode>();
+        // Get physical node id of left and right children.
+        auto leftNodeId = nlj->getLeftChild().cast<MemoPhysicalDelegatorNode>()->getNodeId();
+        auto rightNodeId = nlj->getRightChild().cast<MemoPhysicalDelegatorNode>()->getNodeId();
+        // Examine whether the left and right children are optimized with RemoveOrphansRequirement.
+        auto leftRor = getPropertyConst<RemoveOrphansRequirement>(
+            memo.getPhysicalNodes(leftNodeId._groupId).at(leftNodeId._index)->_physProps);
+        auto rightRor = getPropertyConst<RemoveOrphansRequirement>(
+            memo.getPhysicalNodes(rightNodeId._groupId).at(rightNodeId._index)->_physProps);
+        // RemoveOrphansRequirement should only be pushed down to one child.
+        ASSERT_NE(leftRor, rightRor);
+        if (leftRor.mustRemove()) {
+            hasAlternativeWithRorAsLeftChild = true;
+        } else if (rightRor.mustRemove()) {
+            hasAlternativeWithRorAsRightChild = true;
+        }
+    }
+    // Assert that both alternatives exist in the memo.
+    ASSERT_TRUE(hasAlternativeWithRorAsLeftChild);
+    ASSERT_TRUE(hasAlternativeWithRorAsRightChild);
 }
 
 TEST(PhysRewriter, HashedShardKey) {
