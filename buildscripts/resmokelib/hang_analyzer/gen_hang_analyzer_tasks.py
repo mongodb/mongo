@@ -93,7 +93,8 @@ def generate(expansions_file: str = "../expansions.yml",
 
     # gather information from the current task being run
     expansions = read_config_file(expansions_file)
-    distro = expansions.get("distro_id")
+    distro = expansions.get(
+        "large_distro_name") if "large_distro_name" in expansions else expansions.get("distro_id")
     current_task_name = expansions.get("task_name")
     task_id = expansions.get("task_id")
     execution = expansions.get("execution")
