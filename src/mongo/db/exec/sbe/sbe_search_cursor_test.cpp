@@ -77,6 +77,29 @@ const BSONObj query = fromjson(R"(
 {
 })");
 
+const BSONObj queryStoredSource = fromjson(R"(
+{
+    "returnStoredSource": true
+})");
+
+const BSONArray resultStoredSource = BSON_ARRAY(fromjson(R"(
+{
+    "storedSource" : {
+        "fieldA" : 200,
+        "fieldB" : 300
+    },
+    "metaA" : 0,
+    "metaB" : 1
+})") << fromjson(R"(
+{
+    "storedSource" : {
+        "fieldA" : 4,
+        "fieldB" : 5
+    },
+    "metaA" : 2,
+    "metaB" : 3
+})"));
+
 TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
@@ -172,11 +195,6 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
 TEST_F(SearchCursorStageTest, SearchTestLimit) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
-    const BSONObj query2 = fromjson(R"(
-{
-    "returnStoredSource": true
-})");
-
     // Register and fill input slots in the runtime environment.
     auto cursorIdSlot = env->registerSlot("cursorId"_sd,
                                           sbe::value::TypeTags::NumberInt32,
@@ -186,12 +204,12 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
 
     auto firstBatchSlot = env->registerSlot("firstBatch"_sd,
                                             sbe::value::TypeTags::bsonArray,
-                                            stage_builder::makeValue(resultArray).second,
+                                            stage_builder::makeValue(resultStoredSource).second,
                                             true /* owned */,
                                             getSlotIdGenerator());
     auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
                                              sbe::value::TypeTags::bsonObject,
-                                             stage_builder::makeValue(query2).second,
+                                             stage_builder::makeValue(queryStoredSource).second,
                                              true /* owned */,
                                              getSlotIdGenerator());
     auto protocolVersionSlot = env->registerSlot("protocolVersion"_sd,
@@ -244,5 +262,97 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
          st = searchCursor->getNext(), i++) {
     }
     ASSERT_EQ(i, 1);
+}
+
+TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
+    auto env = std::make_unique<RuntimeEnvironment>();
+
+    // Register and fill input slots in the runtime environment.
+    auto cursorIdSlot = env->registerSlot("cursorId"_sd,
+                                          sbe::value::TypeTags::NumberInt32,
+                                          0 /* val */,
+                                          true /* owned */,
+                                          getSlotIdGenerator());
+
+    auto firstBatchSlot = env->registerSlot("firstBatch"_sd,
+                                            sbe::value::TypeTags::bsonArray,
+                                            stage_builder::makeValue(resultStoredSource).second,
+                                            true /* owned */,
+                                            getSlotIdGenerator());
+    auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
+                                             sbe::value::TypeTags::bsonObject,
+                                             stage_builder::makeValue(queryStoredSource).second,
+                                             true /* owned */,
+                                             getSlotIdGenerator());
+    auto protocolVersionSlot = env->registerSlot("protocolVersion"_sd,
+                                                 sbe::value::TypeTags::Nothing,
+                                                 0 /* val */,
+                                                 false /* owned */,
+                                                 getSlotIdGenerator());
+    auto limitSlot = env->registerSlot("limit"_sd,
+                                       sbe::value::TypeTags::NumberInt64,
+                                       10 /* val */,
+                                       true /* owned */,
+                                       getSlotIdGenerator());
+
+    // Generate slots for the outputs.
+    auto resultSlot = generateSlotId();
+    std::vector<std::string> metadataNames = {"metaA", "metaB"};
+    auto metadataSlots = generateMultipleSlotIds(2);
+    std::vector<std::string> fieldNames = {"fieldA", "fieldB"};
+    auto fieldSlots = generateMultipleSlotIds(2);
+
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->uuid = UUID::gen();
+
+    // Build and prepare for execution of the search cursor stage.
+    auto searchCursor = makeS<SearchCursorStage>(NamespaceString(),
+                                                 expCtx->uuid,
+                                                 resultSlot,
+                                                 metadataNames,
+                                                 metadataSlots,
+                                                 fieldNames,
+                                                 fieldSlots,
+                                                 boost::none, /* searchMetaSlot */
+                                                 std::move(cursorIdSlot),
+                                                 std::move(firstBatchSlot),
+                                                 std::move(searchQuerySlot),
+                                                 boost::none, /* sortSpecSlot*/
+                                                 std::move(limitSlot),
+                                                 std::move(protocolVersionSlot),
+                                                 expCtx->explain,
+                                                 nullptr /* yieldPolicy */,
+                                                 kEmptyPlanNodeId);
+
+    auto ctx = makeCompileCtx(std::move(env));
+    prepareTree(ctx.get(), searchCursor.get());
+
+    // Test that all of the output slots are filled correctly.
+    int i = 0;
+    for (auto st = searchCursor->getNext(); st == PlanState::ADVANCED;
+         st = searchCursor->getNext(), i++) {
+        auto curElem = resultStoredSource[i].Obj();
+
+        auto [actualTag, actualVal] = searchCursor->getAccessor(*ctx, resultSlot)->getViewOfValue();
+        auto [expectedTag, expectedVal] = stage_builder::makeValue(curElem["storedSource"].Obj());
+        value::ValueGuard guard(expectedTag, expectedVal);
+        assertValuesEqual(actualTag, actualVal, expectedTag, expectedVal);
+
+        for (size_t p = 0; p < metadataNames.size(); ++p) {
+            ASSERT(curElem.hasField(metadataNames[p]));
+            auto [tag, val] = searchCursor->getAccessor(*ctx, metadataSlots[p])->getViewOfValue();
+            auto expVal = curElem[metadataNames[p]].Int();
+            ASSERT_EQ(tag, sbe::value::TypeTags::NumberInt32);
+            ASSERT_EQ(value::bitcastTo<int32_t>(val), expVal);
+        }
+
+        for (size_t p = 0; p < fieldNames.size(); ++p) {
+            ASSERT(curElem["storedSource"].Obj().hasField(fieldNames[p]));
+            auto [tag, val] = searchCursor->getAccessor(*ctx, fieldSlots[p])->getViewOfValue();
+            auto expVal = curElem["storedSource"][fieldNames[p]].Int();
+            ASSERT_EQ(tag, sbe::value::TypeTags::NumberInt32);
+            ASSERT_EQ(value::bitcastTo<int32_t>(val), expVal);
+        }
+    }
 }
 }  // namespace mongo::sbe

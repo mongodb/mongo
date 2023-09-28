@@ -247,6 +247,8 @@ void SearchCursorStage::open(bool reOpen) {
                         .value());
     tassert(7816111, "Establishing the cursor should yield a non-null value.", _cursor.has_value());
     tryToSetSearchMetaVar();
+
+    _isStoredSource = _searchQuery.getBoolField(kReturnStoredSourceArg);
 }
 
 bool SearchCursorStage::shouldReturnEOF() {
@@ -254,7 +256,7 @@ bool SearchCursorStage::shouldReturnEOF() {
         return true;
     }
 
-    if (isStoredSource() && _limit != 0 && _commonStats.advances >= _limit) {
+    if (_isStoredSource && _limit != 0 && _commonStats.advances >= _limit) {
         return true;
     }
 
@@ -299,10 +301,12 @@ PlanState SearchCursorStage::getNext() {
     }
 
     // Put results/values in slots and advance plan state
-    if (_resultSlot) {
-        _resultAccessor.reset(false,
-                              value::TypeTags::bsonObject,
-                              value::bitcastFrom<const char*>(_response->objdata()));
+    for (auto& accessor : _metadataAccessors) {
+        accessor.reset();
+    }
+
+    for (auto& accessor : _fieldAccessors) {
+        accessor.reset();
     }
 
     for (auto& elem : *_response) {
@@ -312,12 +316,37 @@ PlanState SearchCursorStage::getNext() {
             auto [tag, val] = bson::convertFrom<true>(elem);
             _metadataAccessors[pos].reset(false, tag, val);
         }
-        if (size_t pos = _fieldNames.findPos(elemName); pos != IndexedStringVector::npos) {
-            auto [tag, val] = bson::convertFrom<true>(elem);
-            _fieldAccessors[pos].reset(false, tag, val);
+        if (!_isStoredSource) {
+            if (size_t pos = _fieldNames.findPos(elemName); pos != IndexedStringVector::npos) {
+                auto [tag, val] = bson::convertFrom<true>(elem);
+                _fieldAccessors[pos].reset(false, tag, val);
+            }
         }
     }
 
+    if (_resultSlot || _isStoredSource) {
+        // Remove all metadata fields from response.
+        _resultObj = Document::fromBsonWithMetaData(_response.value()).toBson();
+        if (_isStoredSource) {
+            uassert(7856301,
+                    "StoredSource field must exist in mongot response.",
+                    _resultObj->hasField("storedSource"));
+            _resultObj = _resultObj->getObjectField("storedSource").getOwned();
+
+            for (auto& elem : *_resultObj) {
+                auto elemName = elem.fieldNameStringData();
+                if (size_t pos = _fieldNames.findPos(elemName); pos != IndexedStringVector::npos) {
+                    auto [tag, val] = bson::convertFrom<true>(elem);
+                    _fieldAccessors[pos].reset(false, tag, val);
+                }
+            }
+        }
+        if (_resultSlot) {
+            _resultAccessor.reset(false,
+                                  value::TypeTags::bsonObject,
+                                  value::bitcastFrom<const char*>(_resultObj->objdata()));
+        }
+    }
     return trackPlanState(PlanState::ADVANCED);
 }
 
