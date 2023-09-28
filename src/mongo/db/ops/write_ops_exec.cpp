@@ -3001,6 +3001,11 @@ write_ops::InsertCommandReply performTimeseriesWrites(
                     curOp.getReadWriteType());
     });
 
+    // If an expected collection UUID is provided, always fail because the user-facing time-series
+    // namespace does not have a UUID.
+    checkCollectionUUIDMismatch(
+        opCtx, request.getNamespace(), nullptr, request.getCollectionUUID());
+
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot insert into a time-series collection in a multi-document "
                              "transaction: "
