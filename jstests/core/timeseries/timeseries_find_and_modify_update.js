@@ -17,7 +17,6 @@ import {
     testFindOneAndUpdate,
     timeFieldName
 } from "jstests/core/timeseries/libs/timeseries_writes_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 /**
  * Tests op-style updates.
@@ -464,11 +463,6 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
     // Tests upsert with full measurement & returnNew = false.
     (function testUpsert() {
-        if (FixtureHelpers.isMongos(db)) {
-            jsTestLog("Skipping findAndModify upsert test on sharded cluster.");
-            return;
-        }
-
         testFindOneAndUpdate({
             initialDocList: [doc_t2023_m1_id1_a1],
             cmd: {
@@ -492,11 +486,6 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
     // Tests upsert with full measurement & returnNew = true.
     (function testUpsertWithReturnNew() {
-        if (FixtureHelpers.isMongos(db)) {
-            jsTestLog("Skipping findAndModify upsert test on sharded cluster.");
-            return;
-        }
-
         testFindOneAndUpdate({
             initialDocList: [doc_t2023_m1_id1_a1],
             cmd: {
@@ -520,11 +509,6 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
     // Tests upsert with full measurement: no-op when the query matches but update is a no-op.
     (function testNoopUpsert() {
-        if (FixtureHelpers.isMongos(db)) {
-            jsTestLog("Skipping findAndModify upsert test on sharded cluster.");
-            return;
-        }
-
         testFindOneAndUpdate({
             initialDocList: [doc_t2023_m1_id1_a1],
             cmd: {filter: {}, update: {$unset: {z: ""}}, upsert: true},
