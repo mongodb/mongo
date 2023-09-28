@@ -54,19 +54,23 @@
 namespace mongo::stage_builder {
 namespace sv = sbe::value;
 
+namespace {
+// The set of fields specified in a bucket spec contains the fields that should be available after
+// bucket-level processing _and_ unpacking of this bucket is done. This means that it includes the
+// fields that are computed from the 'metaField' before unpacking but these fields don't correspond
+// to any cell paths, even if they have the same names, and we must exclude them from the cell path
+// requirements.
 std::vector<sv::CellBlock::PathRequest> getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
-    auto&& fieldSet = unpackNode->bucketSpec.fieldSet();
-    auto&& computedMetaProjFields = unpackNode->bucketSpec.computedMetaProjFields();
+    const auto& fieldSet = unpackNode->bucketSpec.fieldSet();
+    const auto& computedFromMeta = unpackNode->bucketSpec.computedMetaProjFields();
 
     std::vector<sv::CellBlock::PathRequest> pathReqs;
-    pathReqs.reserve(fieldSet.size() - computedMetaProjFields.size());
-    for (auto&& field : fieldSet) {
-        // The computed meta fields must not be included in cell path requests.
-        if (computedMetaProjFields.find(field) != computedMetaProjFields.end()) {
-            continue;
+    pathReqs.reserve(fieldSet.size() - computedFromMeta.size());
+    for (const auto& field : fieldSet) {
+        if (computedFromMeta.find(field) == computedFromMeta.end()) {
+            pathReqs.emplace_back(
+                sv::CellBlock::PathRequest{{sv::CellBlock::Get{field}, sv::CellBlock::Id{}}});
         }
-        pathReqs.emplace_back(
-            sv::CellBlock::PathRequest{{sv::CellBlock::Get{field}, sv::CellBlock::Id{}}});
     }
     return pathReqs;
 }
@@ -104,42 +108,59 @@ std::unique_ptr<sbe::EExpression> buildAndTree(sbe::EExpression::Vector& vec,
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::Op::logicAnd, std::move(left), std::move(right));
 }
+}  // namespace
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                            const PlanStageReqs& reqs) {
     const auto unpackNode = static_cast<const UnpackTsBucketNode*>(root);
 
-    // Sets up request for child stage.
-    auto childReqs = reqs.copy().set(kResult);
-    if (auto&& computedMetas = unpackNode->bucketSpec.computedMetaProjFields();
-        !computedMetas.empty()) {
-        for (auto&& computedMeta : computedMetas) {
-            childReqs.set(std::pair(PlanStageSlots::kField, computedMeta));
-        }
-    }
-    // TODO SERVER-79700: Do not request the meta field if the bucket-level filter has dependency
-    // on the 'meta' field. Also we should be able to avoid materialize the temporary BSON object
-    // for the computed meta fields.
-    if (unpackNode->includeMeta) {
-        childReqs.set(std::pair(PlanStageSlots::kField, timeseries::kBucketMetaFieldName));
+    // Setup the request for the child stage that should place the bucket to be unpacked into the
+    // kResult slot.
+    PlanStageReqs childReqs = reqs.copy().clearAllFields().set(kResult);
+    // Computing fields from 'meta' should have been pushed below unpacking as projection stages
+    // over the buckets collection, so the child stage must be able to publish the slots.
+    for (const auto& fieldName : unpackNode->bucketSpec.computedMetaProjFields()) {
+        childReqs.set(std::pair(PlanStageSlots::kField, fieldName));
     }
 
-    // Builds child stage.
+    // We have no way to know whether the child stages would produce the 'meta' field at the bucket
+    // level (e.g. they would, if there is a filter on 'meta'), but if we need the field after
+    // unpacking we might as well request it from the child rather than populate it ourselves.
+    const auto metaInBucket = std::pair(PlanStageSlots::kField, timeseries::kBucketMetaFieldName);
+    if (unpackNode->includeMeta) {
+        childReqs.set(metaInBucket);
+    }
+
+    // Build the child tree.
     auto [childStage, childOutputs] = build(unpackNode->children[0].get(), childReqs);
-    printPlan(*childStage);
+
+    // We'll publish to the 'outputs' all slots, produced by the tree built in this function, even
+    // if they are not requested explicitly by the parent stage. There is no harm in over-
+    // publishing but it's convenient to use unified 'outputs' while building the tree.
+    // The set of the fields visible to the parent stage is ultimately defined by the 'unpackNode'.
+    // If the parent stage requests fields that are not published (e.g. field "b" in pipeline like
+    // [{$project: {a: 1}}, {$project: {x: "$b"}}]), we simply ignore such requests.
+    PlanStageSlots outputs;
+
+    // Propagate the 'meta' and fields computed from 'meta' into the 'outputs'.
+    if (unpackNode->includeMeta) {
+        const boost::optional<std::string>& metaFieldName = unpackNode->bucketSpec.metaField();
+        tassert(7969800, "'metaField' isn't defined but requested", metaFieldName);
+        outputs.set(std::pair(PlanStageSlots::kField, *metaFieldName),
+                    childOutputs.get(metaInBucket));
+    }
+    for (const auto& fieldName : unpackNode->bucketSpec.computedMetaProjFields()) {
+        outputs.set(std::pair(PlanStageSlots::kField, fieldName),
+                    childOutputs.get(std::pair(PlanStageSlots::kField, fieldName)));
+    }
     auto bucketSlot = childOutputs.get(kResult);
 
     // TODO SERVER-79699: Handle the 'wholeBucketFilter'.
 
-    // Creates the TsBucketToCellBlockStage.
-    const auto optMetaSlot = [&]() -> boost::optional<sbe::value::SlotId> {
-        if (unpackNode->includeMeta) {
-            return {_slotIdGenerator.generate()};
-        } else {
-            return boost::none;
-        }
-    }();
+    // The 'TsBucketToCellBlockStage' and 'BlockToRowStage' together transform a single bucket into
+    // a sequence of "rows" with fields, extracted from the bucket's data. The stages between these
+    // two to do block processing over the cells.
     auto pathReqs = getCellPathReqs(unpackNode);
     auto blockSlots = _slotIdGenerator.generateMultiple(pathReqs.size());
     std::unique_ptr<sbe::PlanStage> stage =
@@ -147,13 +168,11 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                                         bucketSlot.slotId,
                                                         pathReqs,
                                                         blockSlots,
-                                                        optMetaSlot,
+                                                        boost::none /* metaField slot*/,
                                                         unpackNode->bucketSpec.timeField(),
                                                         unpackNode->nodeId());
     printPlan(*stage);
 
-    // Begins populating our output map.
-    PlanStageSlots outputs;
     // Adds slots from CellBlocks.
     for (size_t i = 0; i < pathReqs.size(); ++i) {
         auto field = getTopLevelField(pathReqs[i]);
@@ -166,21 +185,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                         TypedSlot{blockSlots[i],
                                   TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
         }
-    }
-
-    // Adds slots for the computed meta fields.
-    if (auto&& computedMetas = unpackNode->bucketSpec.computedMetaProjFields();
-        !computedMetas.empty()) {
-        for (auto&& computedMeta : computedMetas) {
-            outputs.set(std::pair(PlanStageSlots::kField, computedMeta),
-                        childOutputs.get(std::pair(PlanStageSlots::kField, computedMeta)));
-        }
-    }
-    // Re-maps the "meta" field to the user-specified meta field.
-    if (optMetaSlot) {
-        auto metaField = unpackNode->bucketSpec.metaField();
-        tassert(7969800, "'meta' field does not exist but requested", metaField);
-        outputs.set(std::pair(PlanStageSlots::kField, *metaField), *optMetaSlot);
     }
 
     boost::optional<sbe::value::SlotId> bitmapSlotId;
@@ -253,7 +257,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             expression::splitMatchExpressionForColumns(eventFilter);
         {
             sbe::EExpression::Vector andBranches;
-            for (auto& [_, filterMatchExpr] : eventFilterByPath) {
+            for (auto& [_ /* path */, filterMatchExpr] : eventFilterByPath) {
                 auto eventFilterSbExpr = generateFilter(
                     _state, filterMatchExpr.get(), /*rootSlot*/ boost::none, &outputs);
 
@@ -283,44 +287,30 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
     }
 
+    // If the parent wants us to materialize kResult, create an object with all published fields.
     if (reqs.has(PlanStageSlots::kResult)) {
-        // Creates the result object if the caller requested a materialized 'kResult' object.
+        std::vector<std::string> fieldNames;
+        sbe::value::SlotVector fieldSlots;
+        outputs.forEachSlot([&](const PlanStageSlots::Name& name, const TypedSlot& slot) {
+            if (name.first == PlanStageSlots::kField) {
+                fieldNames.push_back(std::string{name.second});
+                fieldSlots.push_back(slot.slotId);
+            }
+        });
+
         auto resultSlot = _slotIdGenerator.generate();
         outputs.set(kResult, resultSlot);
-
-        std::vector<std::string> objFields;
-        sbe::value::SlotVector objSlots;
-        // Includes 'cellPaths' in the result object.
-        for (size_t i = 0; i < pathReqs.size(); ++i) {
-            objFields.push_back(getTopLevelField(pathReqs[i]));
-            objSlots.push_back(unpackedSlots[i]);
-        }
-        // Includes the computed meta fields in the result object.
-        if (auto&& computedMetas = unpackNode->bucketSpec.computedMetaProjFields();
-            !computedMetas.empty()) {
-            for (auto&& computedMeta : computedMetas) {
-                objFields.push_back(computedMeta);
-                objSlots.push_back(
-                    childOutputs.get(std::pair(PlanStageSlots::kField, computedMeta)).slotId);
-            }
-        }
-        // Includes the user-level meta field in the result object.
-        if (optMetaSlot) {
-            objFields.push_back(*unpackNode->bucketSpec.metaField());
-            objSlots.push_back(*optMetaSlot);
-        }
 
         stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
                                                   resultSlot,                  // objSlot
                                                   boost::none,                 // rootSlot
                                                   boost::none,                 // fieldBehavior
                                                   std::vector<std::string>{},  // fields
-                                                  objFields,                   // projectFields
-                                                  objSlots,                    // projectVars
+                                                  fieldNames,                  // projectFields
+                                                  fieldSlots,                  // projectVars
                                                   true,                        // forceNewObject
                                                   false,                       // returnOldObject
                                                   unpackNode->nodeId());
-        printPlan(*stage);
     }
 
     return {std::move(stage), std::move(outputs)};

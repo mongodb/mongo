@@ -225,6 +225,7 @@ public:
     inline void forEachSlot(const PlanStageReqs& reqs,
                             const std::function<void(const TypedSlot&, const Name&)>& fn) const;
     inline void forEachSlot(const std::function<void(const TypedSlot&)>& fn) const;
+    inline void forEachSlot(const std::function<void(const Name&, const TypedSlot&)>& fn) const;
     inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
 
     struct NameHasher {
@@ -441,6 +442,13 @@ void PlanStageSlots::forEachSlot(
 void PlanStageSlots::forEachSlot(const std::function<void(const TypedSlot&)>& fn) const {
     for (const auto& entry : _slots) {
         fn(entry.second);
+    }
+}
+
+void PlanStageSlots::forEachSlot(
+    const std::function<void(const Name&, const TypedSlot&)>& fn) const {
+    for (const auto& entry : _slots) {
+        fn(entry.first, entry.second);
     }
 }
 
