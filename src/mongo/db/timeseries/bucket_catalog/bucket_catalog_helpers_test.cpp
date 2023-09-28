@@ -35,6 +35,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -94,7 +95,7 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
     boost::optional<BSONObj> normalizedMetadata;
     if (metadata.ok()) {
         BSONObjBuilder builder;
-        normalizeMetadata(&builder, metadata, kBucketMetaFieldName);
+        metadata::normalize(metadata, builder, kBucketMetaFieldName);
         normalizedMetadata = builder.obj();
     }
 

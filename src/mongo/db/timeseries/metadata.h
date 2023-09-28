@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/timeseries/metadata.h"
 
-namespace mongo::timeseries::bucket_catalog {
+#include <boost/optional/optional.hpp>
 
-BucketMetadata::BucketMetadata(BSONElement elem,
-                               const StringData::ComparatorInterface* comparator,
-                               boost::optional<StringData> trueMetaFieldName)
-    : _metadataElement(elem), _comparator(comparator) {
-    if (_metadataElement) {
-        BSONObjBuilder objBuilder;
-        // We will get an object of equal size, just with reordered fields.
-        objBuilder.bb().reserveBytes(_metadataElement.size());
-        metadata::normalize(_metadataElement, objBuilder, trueMetaFieldName);
-        _metadata = objBuilder.obj();
-    }
-    // Updates the BSONElement to refer to the copied BSONObj.
-    _metadataElement = _metadata.firstElement();
-}
+namespace mongo::timeseries::metadata {
 
-bool BucketMetadata::operator==(const BucketMetadata& other) const {
-    return _metadataElement.binaryEqualValues(other._metadataElement);
-}
+/**
+ * Normalize metaField value (i.e. sort object keys) for a time-series measurement so that we can
+ * more effectively match a measurement to an existing bucket. If 'as' is specified, the normalized
+ * value will be added to 'builder' with the specified field name; otherwise it will be added with
+ * its original field name.
+ */
+void normalize(const BSONElement& elem,
+               BSONObjBuilder& builder,
+               boost::optional<StringData> as = boost::none);
 
-const BSONObj& BucketMetadata::toBSON() const {
-    return _metadata;
-}
-
-const BSONElement& BucketMetadata::element() const {
-    return _metadataElement;
-}
-
-StringData BucketMetadata::getMetaField() const {
-    return StringData(_metadataElement.fieldName());
-}
-
-const StringData::ComparatorInterface* BucketMetadata::getComparator() const {
-    return _comparator;
-}
-
-}  // namespace mongo::timeseries::bucket_catalog
+}  // namespace mongo::timeseries::metadata
