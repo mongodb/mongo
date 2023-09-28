@@ -30,7 +30,6 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/facilities/overload.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -107,8 +106,12 @@ inline void uassertWTOK(int ret, WT_SESSION* session) {
         }                                                                           \
     } while (false)
 
-#define invariantWTOK(...) \
-    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_invariantWTOK_, __VA_ARGS__))(__VA_ARGS__))
+#define MONGO_invariantWTOK_EXPAND(x) x /**< MSVC workaround */
+#define MONGO_invariantWTOK_PICK(_1, _2, _3, x, ...) x
+#define invariantWTOK(...)                                                                 \
+    MONGO_invariantWTOK_EXPAND(MONGO_invariantWTOK_PICK(                                   \
+        __VA_ARGS__, MONGO_invariantWTOK_3, MONGO_invariantWTOK_2, MONGO_invariantWTOK_1)( \
+        __VA_ARGS__))
 
 struct WiredTigerItem : public WT_ITEM {
     WiredTigerItem(const void* d, size_t s) {

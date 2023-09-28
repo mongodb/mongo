@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/preprocessor/facilities/overload.hpp>
 #include <string>
 
 #include "mongo/platform/compiler.h"
@@ -99,11 +98,11 @@ inline void invariantWithContextAndLocation(
     }
 }
 
-// This helper macro is necessary to make the __VAR_ARGS__ expansion work properly on MSVC.
-#define MONGO_expand(x) x
-
-#define invariant(...) \
-    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_invariant_, __VA_ARGS__))(__VA_ARGS__))
+#define MONGO_invariant_EXPAND(x) x /**< MSVC workaround */
+#define MONGO_invariant_PICK(_1, _2, x, ...) x
+#define invariant(...)      \
+    MONGO_invariant_EXPAND( \
+        MONGO_invariant_PICK(__VA_ARGS__, MONGO_invariant_2, MONGO_invariant_1)(__VA_ARGS__))
 
 // Behaves like invariant in debug builds and is compiled out in release. Use for checks, which can
 // potentially be slow or on a critical path.

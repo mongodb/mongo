@@ -30,7 +30,6 @@
 #pragma once
 
 #include <algorithm>
-#include <boost/preprocessor/facilities/overload.hpp>
 #include <cstdlib>
 #include <exception>
 #include <fmt/format.h>
@@ -545,8 +544,14 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
             MONGO_BASE_ASSERT_VA_FAILED(fail_func, stLocal_);                      \
     } while (false)
 
-#define MONGO_BASE_ASSERT_VA_DISPATCH(...) \
-    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_BASE_ASSERT_VA_, __VA_ARGS__))(__VA_ARGS__))
+#define MONGO_BASE_ASSERT_VA_EXPAND(x) x /**< MSVC workaround */
+#define MONGO_BASE_ASSERT_VA_PICK(_1, _2, _3, _4, x, ...) x
+#define MONGO_BASE_ASSERT_VA_DISPATCH(...)                                        \
+    MONGO_BASE_ASSERT_VA_EXPAND(MONGO_BASE_ASSERT_VA_PICK(__VA_ARGS__,            \
+                                                          MONGO_BASE_ASSERT_VA_4, \
+                                                          MONGO_BASE_ASSERT_VA_3, \
+                                                          MONGO_BASE_ASSERT_VA_2, \
+                                                          MONGO_BASE_ASSERT_VA_1)(__VA_ARGS__))
 
 /**
  * `iassert` is provided as an alternative for `uassert` variants (e.g., `uassertStatusOK`)
