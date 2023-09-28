@@ -60,6 +60,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
@@ -333,7 +334,7 @@ BSONObj CollectionRoutingInfoTargeter::extractBucketsShardKeyFromTimeseriesDoc(
 
     if (auto metaField = timeseriesOptions.getMetaField(); metaField) {
         if (auto metaElement = doc.getField(*metaField); !metaElement.eoo()) {
-            builder.appendAs(metaElement, timeseries::kBucketMetaFieldName);
+            timeseries::metadata::normalize(metaElement, builder, timeseries::kBucketMetaFieldName);
         }
     }
 

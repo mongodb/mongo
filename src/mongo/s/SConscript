@@ -48,6 +48,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface',
         '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_metadata',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_write_util',
         'query/cluster_query',

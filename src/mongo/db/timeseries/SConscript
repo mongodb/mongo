@@ -139,6 +139,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='timeseries_metadata',
+    source=[
+        'metadata.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target='db_timeseries_test',
     source=[

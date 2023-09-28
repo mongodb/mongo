@@ -51,6 +51,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -114,7 +115,7 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
     boost::optional<BSONObj> normalizedMetadata;
     if (metadata.ok()) {
         BSONObjBuilder builder;
-        normalizeMetadata(&builder, metadata, kBucketMetaFieldName);
+        metadata::normalize(metadata, builder, kBucketMetaFieldName);
         normalizedMetadata = builder.obj();
     }
 
