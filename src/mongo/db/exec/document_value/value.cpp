@@ -1250,17 +1250,14 @@ ostream& operator<<(ostream& out, const Value& val) {
     MONGO_verify(false);
 }
 
-Value Value::shred() const {
+void Value::fillCache() const {
     if (isObject()) {
-        return Value(getDocument().shred());
+        getDocument().fillCache();
     } else if (isArray()) {
-        std::vector<Value> values;
         for (auto&& val : getArray()) {
-            values.push_back(val.shred());
+            val.fillCache();
         }
-        return Value(values);
     }
-    return Value(*this);
 }
 
 void Value::serializeForSorter(BufBuilder& buf) const {

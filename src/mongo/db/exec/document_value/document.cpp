@@ -424,21 +424,10 @@ void DocumentStorage::reset(const BSONObj& bson, bool bsonHasMetadata) {
     _metadataFields.setModified(false);
 }
 
-Document DocumentStorage::shred() const {
-    MutableDocument md;
-    // Iterate raw bson if possible. This avoids caching all of the values in a doc that might get
-    // thrown away.
-    if (!isModified() && !bsonHasMetadata()) {
-        for (const auto& elem : _bson) {
-            md[elem.fieldNameStringData()] = Value(elem).shred();
-        }
-    } else {
-        for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance()) {
-            const auto& valueElem = it.get();
-            md[it.fieldName()] = valueElem.val.shred();
-        }
+void DocumentStorage::fillCache() const {
+    for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance()) {
+        it->val.fillCache();
     }
-    return md.freeze();
 }
 
 void DocumentStorage::loadLazyMetadata() const {

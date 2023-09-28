@@ -386,7 +386,7 @@ TEST(DocumentSize, ApproximateSizeIsSnapshotted) {
 
     // Force the cache construction, making the total size of the 'Document' bigger.
     // 'getApproximateSize()' must still return the same value.
-    document["field"];
+    document.fillCache();
     const auto fullCacheSizeSnapshot = document.getApproximateSize();
     const auto fullCacheSizeCurrent = document.getCurrentApproximateSize();
     ASSERT_EQ(noCacheSize, fullCacheSizeSnapshot);
@@ -416,38 +416,6 @@ TEST(DocumentSize, ApproximateSizeDuringBuildIsUpdated) {
     ASSERT_LT(middleBuildSize, peekSize);
     ASSERT_LT(peekSize, beforeFreezeSize);
     ASSERT_EQ(beforeFreezeSize, frozenSize);
-}
-
-TEST(ShredDocument, OutputHasNoBackingBSON) {
-    BSONObj bson =
-        BSON("a" << 1 << "subObj" << BSON("a" << 1) << "subArray" << BSON_ARRAY(BSON("a" << 1)));
-    auto original = fromBson(bson);
-    auto originalSize = original.getApproximateSize();
-
-    auto shredded = original.shred();
-    auto originalSizeAfterShredding = original.getApproximateSize();
-    // Fields in the original doc shouldn't be cached since it was raw bson
-    ASSERT_EQ(originalSize, originalSizeAfterShredding);
-
-    // BSON is more compact than ValueElement
-    auto shreddedSize = shredded.getApproximateSize();
-    ASSERT_LT(originalSize, shreddedSize);
-
-    // Accessing a field shouldn't change the size since all fields are already cached.
-    shredded["a"];
-    ASSERT_EQ(shredded.getCurrentApproximateSize(), shreddedSize);
-}
-
-TEST(ShredDocument, HandlesModifiedDocuments) {
-    BSONObj bson = BSON("a" << 1 << "subObj" << BSON("a" << 1));
-    Document original = fromBson(bson);
-    MutableDocument md(original);
-    md["b"] = Value(2);
-    md["subObj"]["b"] = Value(2);
-    Document shredded = md.freeze().shred();
-
-    ASSERT(!shredded["b"].missing());
-    ASSERT(!shredded["subObj"]["b"].missing());
 }
 
 /** Add Document fields. */

@@ -505,6 +505,99 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
     ASSERT_THROWS_CODE(defaultAccessor[-2], AssertionException, 5643005);
 }
 
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON("a" << largeStr);
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly double
+    // the size of the document. The size of the iterator is double the size of the document because
+    // we greedily fill the cache, so each internal document in memory stores two copies of
+    // largeStr.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 500);
+
+    // Pull in the second document. Both docs remain in the cache so the reported memory should
+    // include both.
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2 * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 * 2 + 500);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForArraysInDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON("arr" << BSON_ARRAY(BSON("subObj" << largeStr)));
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly
+    // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
+    // for the 'arr' element and once for the nested 'subObj' element.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 3 + 1024);
+
+    // Pull in the second document. Both docs remain in the cache so the reported memory should
+    // include both.
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 3) * 2);
+    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 3) * 2 + 1024);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedArraysInDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON("arr" << BSON_ARRAY(BSON_ARRAY(BSON("subObj" << largeStr))));
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly
+    // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
+    // for the 'arr' element and once for the nested 'subObj' element.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 3 + 1024);
+
+    // Pull in the second document. Both docs remain in the cache so the reported memory should
+    // include both.
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 3) * 2);
+    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 3) * 2 + 1024);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedObjInDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON(
+        "obj" << BSON("subObj" << BSON("subObjSubObj" << largeStr) << "uncachedSub" << largeStr));
+    const auto docs = std::deque<DocumentSource::GetNextResult>{Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
+
+    // Pull in the first document, and verify the reported size. TODO SERVER-57011: The approximate
+    // size should not double count the nested strings.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 4);
+}
+
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
     std::string largeStr(1000, 'x');
     auto bsonDoc = BSON("a" << largeStr);
@@ -515,22 +608,18 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
     auto accessor = makeDefaultAccessor(mock, boost::none);
     size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
-    // Pull in the first document, and verify the reported size of the iterator is the same as the
-    // size of the document.
+    // Pull in the first document, and verify the reported size of the iterator is roughly double
+    // the size of the document.
     ASSERT_DOCUMENT_EQ(*accessor[0], docs[0].getDocument());
-    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize);
-
-    // Read the field so that it is coppied into the cache. This will make the document bigger but
-    // shouldn't affect memory tracking.
-    docs[0].getDocument()["a"];
-    ASSERT_GT(docs[0].getDocument().getCurrentApproximateSize(), initialDocSize);
-    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
 
     // The accessor will have marked the first document as expired, and thus freed on the next call
     // to advance().
     advance();
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
-    ASSERT_EQ(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
 }
 
 TEST_F(PartitionIteratorTest, ManualPolicy) {

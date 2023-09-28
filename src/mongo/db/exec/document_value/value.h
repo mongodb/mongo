@@ -370,9 +370,9 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const Value& v);
 
     /**
-     * Returns a cache-only copy of the value with no backing bson.
+     * Populates the internal cache by recursively walking the underlying BSON.
      */
-    Value shred() const;
+    void fillCache() const;
 
     void swap(Value& rhs) {
         _storage.swap(rhs._storage);

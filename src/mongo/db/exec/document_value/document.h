@@ -268,10 +268,10 @@ public:
     }
 
     /**
-     * Returns a cache-only copy of the document with no backing bson.
+     * Populates the internal cache by recursively walking the underlying BSON.
      */
-    Document shred() const {
-        return storage().shred();
+    void fillCache() const {
+        storage().fillCache();
     }
 
     /** Calculate a hash value.

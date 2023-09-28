@@ -516,6 +516,10 @@ void PartitionIterator::getNextDocument() {
     tassert(7169100, "getNextResult must have advanced", getNextRes.isAdvanced());
     auto doc = getNextRes.releaseDocument();
 
+    // Greedily populate the internal document cache to enable easier memory tracking versus
+    // detecting the changing document size during execution of each function.
+    doc.fillCache();
+
     if (_partitionExpr) {
         if (!_partitionComparator) {
             _partitionComparator =
