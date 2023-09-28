@@ -97,16 +97,6 @@ BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime);
 BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OID& bucketId);
 
 /**
- * Normalize metaField value (i.e. sort object keys) for a time-series measurement so that we can
- * more effectively match a measurement to an existing bucket. If 'as' is specified, the normalized
- * value will be added to 'builder' with the specified field name; otherwise it will be added with
- * its original field name.
- */
-void normalizeMetadata(BSONObjBuilder* builder,
-                       const BSONElement& elem,
-                       boost::optional<StringData> as);
-
-/**
  * Generates an aggregation pipeline to identify a bucket eligible to receive a new measurement
  * specified by a document's metadata and timestamp (measurementTs).
  *
