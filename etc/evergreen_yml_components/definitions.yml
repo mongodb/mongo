@@ -2715,6 +2715,21 @@ tasks:
       targets: src/mongo/db/commands:fsync_locked
       compiler: clang
 
+# Validates that the bazel mongo toolchain can be used to compile targets that
+# contain C and asssembly source code files.
+- name: compile_bazel_c_and_asm_targets
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
+  - func: "fetch bazel"
+  - func: "bazel compile (gcc)"
+    vars:
+      targets: src/third_party/unwind:unwind
+      compiler: gcc
+
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test_half
   tags: []
@@ -9064,6 +9079,11 @@ task_groups:
   name: compile_bazel_dist_test_TG
   tasks:
   - compile_bazel_dist_test
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_c_and_asm_targets_TG
+  tasks:
+  - compile_bazel_c_and_asm_targets
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

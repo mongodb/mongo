@@ -9,7 +9,7 @@ platform(
     name = "platform",
     constraint_values = [
         "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
+        "@platforms//cpu:arm64",
         "@bazel_tools//tools/cpp:gcc",
     ],
 )

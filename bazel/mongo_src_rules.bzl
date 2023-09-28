@@ -13,7 +13,8 @@ def mongo_cc_library(
         tags = [],
         copts = [],
         linkopts = [],
-        linkstatic = False):
+        linkstatic = False,
+        local_defines = []):
     """Wrapper around cc_library.
 
     Args:
@@ -28,6 +29,7 @@ def mongo_cc_library(
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_library rule.
+      local_defines: macro definitions passed to all source and header files.
     """
     native.cc_library(
         name = name,
@@ -41,5 +43,6 @@ def mongo_cc_library(
         data = data,
         tags = tags,
         linkstatic = linkstatic,
+        local_defines = local_defines,
         includes = []
     )
