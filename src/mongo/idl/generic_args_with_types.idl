@@ -216,11 +216,6 @@ structs:
                 cpp_name: "dollarTenant"
                 forward_to_shards: true
                 optional: true
-            placementConflictTime:
-                type: logicalTime
-                forward_to_shards: false
-                optional: true
-
     
     GenericReplyFieldsWithTypesV1:
         # This struct is meant to mirror 'generic_reply_fields_api_v1' in '../idl/generic_argument.idl'.
