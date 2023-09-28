@@ -339,32 +339,32 @@ void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
         }
     }
 
-    for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
+    for (const auto& kv : _auths) {
         try {
-            conn->auth(i->second);
+            conn->auth(kv.second);
         } catch (const AssertionException&) {
             LOGV2_WARNING(20149,
                           "Cached auth failed for set: {replicaSet} db: {db} user: {user}",
                           "Cached auth failed",
                           "replicaSet"_attr = _setName,
-                          "db"_attr = i->second[saslCommandUserDBFieldName].str(),
-                          "user"_attr = i->second[saslCommandUserFieldName].str());
+                          "db"_attr = kv.first.toStringForErrorMsg(),
+                          "user"_attr = kv.second[saslCommandUserFieldName].str());
         }
     }
 }
 
 void DBClientReplicaSet::logoutAll(DBClientConnection* conn) {
     _internalAuthRequested = false;
-    for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
+    for (const auto& kv : _auths) {
         BSONObj response;
         try {
-            conn->logout(i->first, response);
+            conn->logout(kv.first, response);
         } catch (const AssertionException& ex) {
             LOGV2_WARNING(20150,
                           "Failed to logout: {connString} on db: {db} with error: {error}",
                           "Failed to logout",
                           "connString"_attr = conn->getServerAddress(),
-                          "db"_attr = i->first,
+                          "db"_attr = kv.first.toStringForErrorMsg(),
                           "error"_attr = redact(ex));
         }
     }
@@ -467,15 +467,19 @@ void DBClientReplicaSet::_auth(const BSONObj& params) {
     _runAuthLoop([&](DBClientConnection* conn) {
         conn->auth(params);
         // Cache the new auth information since we now validated it's good
-        _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
+        const DatabaseName dbName =
+            DatabaseNameUtil::deserialize(boost::none,
+                                          params[saslCommandUserDBFieldName].valueStringDataSafe(),
+                                          SerializationContext::stateAuthPrevalidated());
+        _auths[dbName] = params.getOwned();
     });
 }
 
-void DBClientReplicaSet::logout(const string& dbname, BSONObj& info) {
+void DBClientReplicaSet::logout(const DatabaseName& dbName, BSONObj& info) {
     DBClientConnection* priConn = checkPrimary();
 
-    priConn->logout(dbname, info);
-    _auths.erase(dbname);
+    priConn->logout(dbName, info);
+    _auths.erase(dbName);
 
     /* Also logout the cached secondary connection. Note that this is only
      * needed when we actually have something cached and is last known to be
@@ -484,7 +488,7 @@ void DBClientReplicaSet::logout(const string& dbname, BSONObj& info) {
     if (_lastSecondaryOkConn.get() != nullptr && !_lastSecondaryOkConn->isFailed()) {
         try {
             BSONObj dummy;
-            _lastSecondaryOkConn->logout(dbname, dummy);
+            _lastSecondaryOkConn->logout(dbName, dummy);
         } catch (const DBException&) {
             // Make sure we can't use this connection again.
             MONGO_verify(_lastSecondaryOkConn->isFailed());

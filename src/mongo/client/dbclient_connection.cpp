@@ -125,7 +125,11 @@ void DBClientConnection::_auth(const BSONObj& params) {
         /* note we remember the auth info before we attempt to auth -- if the connection is broken,
          * we will then have it for the next autoreconnect attempt.
          */
-        authCache[params[auth::getSaslCommandUserDBFieldName()].str()] = params.getOwned();
+        const DatabaseName dbName = DatabaseNameUtil::deserialize(
+            boost::none,
+            params[auth::getSaslCommandUserDBFieldName()].valueStringDataSafe(),
+            SerializationContext::stateAuthPrevalidated());
+        authCache[dbName] = params.getOwned();
     }
 
     DBClientBase::_auth(params);
@@ -140,13 +144,10 @@ void DBClientConnection::authenticateInternalUser(auth::StepDownBehavior stepDow
     return DBClientBase::authenticateInternalUser(stepDownBehavior);
 }
 
-void DBClientConnection::logout(const string& dbname, BSONObj& info) {
-    authCache.erase(dbname);
+void DBClientConnection::logout(const DatabaseName& dbName, BSONObj& info) {
+    authCache.erase(dbName);
     _internalAuthOnReconnect = false;
-    runCommand(
-        DatabaseNameUtil::deserialize(boost::none, dbname, SerializationContext::stateDefault()),
-        BSON("logout" << 1),
-        info);
+    runCommand(dbName, BSON("logout" << 1), info);
 }
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTarget(

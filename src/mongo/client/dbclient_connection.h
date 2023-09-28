@@ -91,7 +91,7 @@ public:
      * @param info the result object for the logout command (provided for backwards
      *     compatibility with mongo shell)
      */
-    void logout(const std::string& dbname, BSONObj& info) override;
+    void logout(const DatabaseName& dbName, BSONObj& info) override;
 
     using DBClientBase::runCommandWithTarget;
     std::pair<rpc::UniqueReply, DBClientBase*> runCommandWithTarget(OpMsgRequest request) override;
@@ -131,7 +131,7 @@ protected:
 
     auth::StepDownBehavior _internalAuthStepDownBehavior = auth::StepDownBehavior::kKillConnection;
 
-    std::map<std::string, BSONObj> authCache;
+    absl::flat_hash_map<DatabaseName, BSONObj> authCache;
 
     static AtomicWord<int> _numConnections;
 

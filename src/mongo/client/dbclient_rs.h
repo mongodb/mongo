@@ -107,7 +107,7 @@ public:
      * @param info the result object for the logout command (provided for backwards
      *     compatibility with mongo shell)
      */
-    void logout(const std::string& dbname, BSONObj& info) override;
+    void logout(const DatabaseName& dbname, BSONObj& info) override;
 
     // ----------- simple functions --------------
 
@@ -339,7 +339,7 @@ private:
     // this could be a security issue, as the password is stored in memory
     // not sure if/how we should handle
     bool _internalAuthRequested = false;
-    std::map<std::string, BSONObj> _auths;  // dbName -> auth parameters
+    absl::flat_hash_map<DatabaseName, BSONObj> _auths;  // dbName -> auth parameters
 
     MongoURI _uri;
 

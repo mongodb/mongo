@@ -331,7 +331,7 @@ public:
      * 'info': The result object for the logout command (provided for backwards compatibility with
      *         mongo shell).
      */
-    virtual void logout(const std::string& dbname, BSONObj& info);
+    virtual void logout(const DatabaseName& dbname, BSONObj& info);
 
     virtual bool authenticatedDuringConnect() const {
         return false;

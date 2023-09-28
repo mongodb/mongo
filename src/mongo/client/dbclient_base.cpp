@@ -442,11 +442,8 @@ void DBClientBase::auth(const DatabaseName& dbname, StringData username, StringD
     auth(authParams);
 }
 
-void DBClientBase::logout(const string& dbname, BSONObj& info) {
-    runCommand(
-        DatabaseNameUtil::deserialize(boost::none, dbname, SerializationContext::stateDefault()),
-        BSON("logout" << 1),
-        info);
+void DBClientBase::logout(const DatabaseName& dbName, BSONObj& info) {
+    runCommand(dbName, BSON("logout" << 1), info);
 }
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {

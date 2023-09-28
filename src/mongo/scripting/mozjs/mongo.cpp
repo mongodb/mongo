@@ -592,13 +592,16 @@ void MongoBase::Functions::logout::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
         uasserted(ErrorCodes::BadValue, "logout needs 1 arg");
 
+    JSStringWrapper jsstr;
+    const DatabaseName dbName =
+        DatabaseNameUtil::deserialize(boost::none,
+                                      ValueWriter(cx, args.get(0)).toStringData(&jsstr),
+                                      SerializationContext::stateDefault());
+
     BSONObj ret;
-
-    std::string db = ValueWriter(cx, args.get(0)).toString();
-
     auto conn = getConnection(args);
     if (conn) {
-        conn->logout(db, ret);
+        conn->logout(dbName, ret);
     }
 
     // Make a copy because I want to insulate us from whether conn->logout
