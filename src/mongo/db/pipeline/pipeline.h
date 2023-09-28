@@ -148,6 +148,15 @@ public:
         PipelineValidatorCallback validator = nullptr);
 
     /**
+     * Parses sub-pipelines from a $facet aggregation. Like parse(), but skips top-level
+     * validators.
+     */
+    static std::unique_ptr<Pipeline, PipelineDeleter> parseFacetPipeline(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        PipelineValidatorCallback validator = nullptr);
+
+    /**
      * Like parse, but takes a BSONElement instead of a vector of objects. 'arrElem' must be an
      * array of objects.
      */
@@ -490,6 +499,7 @@ private:
         const std::vector<T>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         PipelineValidatorCallback validator,
+        bool isFacetPipeline,
         std::function<BSONObj(T)> getElemFunc);
 
     /**

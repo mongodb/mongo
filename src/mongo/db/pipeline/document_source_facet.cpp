@@ -328,20 +328,21 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     for (auto&& rawFacet : extractRawPipelines(elem)) {
         const auto facetName = rawFacet.first;
 
-        auto pipeline = Pipeline::parse(rawFacet.second, expCtx, [](const Pipeline& pipeline) {
-            auto sources = pipeline.getSources();
-            std::for_each(sources.begin(), sources.end(), [](auto& stage) {
-                auto stageConstraints = stage->constraints();
-                uassert(40600,
-                        str::stream() << stage->getSourceName()
-                                      << " is not allowed to be used within a $facet stage",
-                        stageConstraints.isAllowedInsideFacetStage());
-                // We expect a stage within a $facet stage to have these properties.
-                invariant(stageConstraints.requiredPosition ==
-                          StageConstraints::PositionRequirement::kNone);
-                invariant(!stageConstraints.isIndependentOfAnyCollection);
+        auto pipeline =
+            Pipeline::parseFacetPipeline(rawFacet.second, expCtx, [](const Pipeline& pipeline) {
+                auto sources = pipeline.getSources();
+                std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+                    auto stageConstraints = stage->constraints();
+                    uassert(40600,
+                            str::stream() << stage->getSourceName()
+                                          << " is not allowed to be used within a $facet stage",
+                            stageConstraints.isAllowedInsideFacetStage());
+                    // We expect a stage within a $facet stage to have these properties.
+                    invariant(stageConstraints.requiredPosition ==
+                              StageConstraints::PositionRequirement::kNone);
+                    invariant(!stageConstraints.isIndependentOfAnyCollection);
+                });
             });
-        });
 
         // Validate that none of the facet pipelines have any conflicting HostTypeRequirements. This
         // verifies both that all stages within each pipeline are consistent, and that the pipelines

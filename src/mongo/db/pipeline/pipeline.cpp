@@ -215,6 +215,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
     const std::vector<T>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator,
+    bool isFacetPipeline,
     std::function<BSONObj(T)> getElemFunc) {
 
     // Before parsing the pipeline, make sure it's not so long that it will make us run out of
@@ -233,12 +234,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseCommon(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(new Pipeline(std::move(stages), expCtx),
                                                         PipelineDeleter(expCtx->opCtx));
 
-    // First call the context-specific validator, which may be different for top-level pipelines
-    // versus nested pipelines.
-    if (validator)
-        validator(*pipeline);
-    else {
+    // First call the top level validator, unless this is a $facet
+    // (nested) pipeline. Then call the context-specific validator if one
+    // is provided.
+    if (!isFacetPipeline) {
         validateTopLevelPipeline(*pipeline);
+    }
+    if (validator) {
+        validator(*pipeline);
     }
 
     // Next run through the common validation rules that apply to every pipeline.
@@ -259,7 +262,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFromArray(
             rawPipelineElement.type() == BSONType::Array);
     auto rawStages = rawPipelineElement.Array();
 
-    return parseCommon<BSONElement>(rawStages, expCtx, validator, [](BSONElement e) {
+    return parseCommon<BSONElement>(rawStages, expCtx, validator, false, [](BSONElement e) {
         uassert(6253720, "Pipeline array element must be an object", e.type() == BSONType::Object);
         return e.embeddedObject();
     });
@@ -269,8 +272,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parse(
     const std::vector<BSONObj>& rawPipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
     PipelineValidatorCallback validator) {
+    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, false, [](BSONObj o) { return o; });
+}
 
-    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, [](BSONObj o) { return o; });
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::parseFacetPipeline(
+    const std::vector<BSONObj>& rawPipeline,
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    PipelineValidatorCallback validator) {
+    return parseCommon<BSONObj>(rawPipeline, expCtx, validator, true, [](BSONObj o) { return o; });
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::create(

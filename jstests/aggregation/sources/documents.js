@@ -129,6 +129,25 @@ assert.throwsWithCode(() => {
     coll.aggregate([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}]);
 }, 40602);
 
+// Must fail due to misplaced $document when database doesn't exist.
+const nonExistingDB = db.getSiblingDB("this_database_does_not_exist");
+assert.throwsWithCode(() => {
+    nonExistingDB.foobar.aggregate([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}]);
+}, 40602);
+
+// Must fail due to misplaced $document when database doesn't exist and no collection specified.
+assert.throwsWithCode(() => {
+    nonExistingDB.aggregate([{$project: {a: [{xx: 1}, {xx: 2}]}}, {$documents: [{a: 1}]}]);
+}, ErrorCodes.InvalidNamespace);
+
+// $unionWith must fail because it requires a collection even when database does not exist
+assert.throwsWithCode(
+    () => {nonExistingDB.aggregate([{
+        $unionWith:
+            {pipeline: [{$documents: {$map: {input: {$range: [0, 5]}, in : {x: "$$this"}}}}]}
+    }])},
+    ErrorCodes.InvalidNamespace);
+
 // $unionWith must fail due to no $document
 assert.throwsWithCode(() => {
     coll.aggregate([{$unionWith: {pipeline: [{$project: {a: [{xx: 1}, {xx: 2}]}}]}}]);

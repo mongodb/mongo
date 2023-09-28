@@ -425,6 +425,22 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             cri = executionNsRoutingInfoStatus.getValue();
         } else if (!((hasChangeStream || startsWithQueue) &&
                      executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
+            // To achieve parity with mongod-style responses, parse and validate the query
+            // even though the namespace is not found.
+            try {
+                auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
+                                                                   involvedNamespaces,
+                                                                   namespaces.executionNss,
+                                                                   request,
+                                                                   cri,
+                                                                   hasChangeStream,
+                                                                   shouldDoFLERewrite);
+                pipeline->validateCommon(false);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // ignore redundant NamespaceNotFound errors.
+            }
+
+            // if validation is ok, just return empty result
             appendEmptyResultSetWithStatus(
                 opCtx, namespaces.requestedNss, executionNsRoutingInfoStatus.getStatus(), result);
             return Status::OK();
