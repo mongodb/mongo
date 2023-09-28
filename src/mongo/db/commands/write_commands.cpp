@@ -36,6 +36,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
@@ -1273,6 +1274,11 @@ public:
                             curOp.isCommand(),
                             curOp.getReadWriteType());
             });
+
+            // If an expected collection UUID is provided, always fail because the user-facing
+            // time-series namespace does not have a UUID.
+            checkCollectionUUIDMismatch(
+                opCtx, request().getNamespace(), nullptr, request().getCollectionUUID());
 
             uassert(
                 ErrorCodes::OperationNotSupportedInTransaction,
