@@ -37,7 +37,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,corrupts_data
     separate_debug: off
     compile_variant: rhel80-asan
   tasks:
@@ -69,7 +69,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -152,7 +152,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -235,7 +235,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling,corrupts_data
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
