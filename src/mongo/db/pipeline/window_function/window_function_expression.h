@@ -929,7 +929,8 @@ public:
                     boost::intrusive_ptr<::mongo::Expression> input,
                     WindowBounds bounds)
         : Expression(expCtx, "$first", std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,
@@ -953,7 +954,8 @@ public:
                    boost::intrusive_ptr<::mongo::Expression> input,
                    WindowBounds bounds)
         : Expression(expCtx, "$last", std::move(input), std::move(bounds)) {
-        expCtx->sbeWindowCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeWindowCompatibility =
+            std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
     }
 
     static boost::intrusive_ptr<Expression> parse(BSONObj obj,

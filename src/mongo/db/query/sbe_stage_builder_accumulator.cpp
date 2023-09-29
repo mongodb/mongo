@@ -1258,7 +1258,6 @@ std::unique_ptr<sbe::EExpression> buildFinalizeLinearFill(
     return makeFunction("aggLinearFillFinalize", std::move(inputVar), std::move(sortBy));
 }
 
-
 template <int N>
 std::vector<std::unique_ptr<sbe::EExpression>> emptyInitializer(
     std::unique_ptr<sbe::EExpression> maxSizeExpr, sbe::value::FrameIdGenerator& frameIdGenerator) {

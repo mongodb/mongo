@@ -3883,7 +3883,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 window.removeExprs =
                     buildWindowRemove(_state, outputField, argExprs.begin()->second->clone());
             } else {
-                window.addExprs = buildWindowAdd(_state, outputField, cloneExprMap(argExprs));
+                window.addExprs =
+                    buildWindowAdd(_state, outputField, cloneExprMap(argExprs), collatorSlot);
                 window.removeExprs = buildWindowRemove(_state, outputField, cloneExprMap(argExprs));
             }
         } else {
@@ -3917,13 +3918,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 
         // Build bound expressions and create window definitions.
-        StringDataSet frameFirstLastAccumulators{"$derivative"};
 
         // Create frame first and last slots if the window requires.
-        if (frameFirstLastAccumulators.count(outputField.expr->getOpName())) {
+        bool frameFirstLastAccumulators = true;
+        if (outputField.expr->getOpName() == "$derivative") {
             windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
             windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
+        } else if (outputField.expr->getOpName() == "$first" && removable) {
+            windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
+            windowFrameLastSlotIdx.push_back(boost::none);
+        } else if (outputField.expr->getOpName() == "$last" && removable) {
+            windowFrameFirstSlotIdx.push_back(boost::none);
+            windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
         } else {
+            frameFirstLastAccumulators = false;
             windowFrameFirstSlotIdx.push_back(boost::none);
             windowFrameLastSlotIdx.push_back(boost::none);
         }
@@ -4049,6 +4057,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 MONGO_UNREACHABLE;
             }
         };
+
         StringDataMap<std::unique_ptr<sbe::EExpression>> finalArgExprs;
         if (outputField.expr->getOpName() == "$derivative") {
             auto unit = getUnitArg(
@@ -4076,6 +4085,24 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             finalArgExprs.emplace(AccArgs::kDerivativeInputLast, std::move(frameLastInput));
             finalArgExprs.emplace(AccArgs::kDerivativeSortByFirst, std::move(frameFirstSortBy));
             finalArgExprs.emplace(AccArgs::kDerivativeSortByLast, std::move(frameLastSortBy));
+        } else if (outputField.expr->getOpName() == "$first" && removable) {
+            tassert(8085502,
+                    str::stream() << "Window function $first expects 1 argument",
+                    argExprs.size() == 1);
+            auto it = argExprs.begin();
+            auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
+            auto inputExpr = it->second->clone();
+            auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
+            finalArgExprs.emplace(AccArgs::kInput, std::move(frameFirstInput));
+        } else if (outputField.expr->getOpName() == "$last" && removable) {
+            tassert(8085503,
+                    str::stream() << "Window function $last expects 1 argument",
+                    argExprs.size() == 1);
+            auto it = argExprs.begin();
+            auto inputExpr = it->second->clone();
+            auto& frameLastSlots = windowFrameLastSlots[*windowFrameLastSlotIdx.back()];
+            auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
+            finalArgExprs.emplace(AccArgs::kInput, std::move(frameLastInput));
         } else if (outputField.expr->getOpName() == "$linearFill") {
             finalArgExprs = std::move(argExprs);
         }
@@ -4084,23 +4111,26 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         std::unique_ptr<sbe::EExpression> finalExpr;
         if (removable) {
             finalExpr = finalArgExprs.size() > 0
-                ? buildWindowFinalize(
-                      _state, outputField, window.windowExprSlots, std::move(finalArgExprs))
-                : buildWindowFinalize(_state, outputField, window.windowExprSlots);
+                ? buildWindowFinalize(_state,
+                                      outputField,
+                                      window.windowExprSlots,
+                                      std::move(finalArgExprs),
+                                      collatorSlot)
+                : buildWindowFinalize(_state, outputField, window.windowExprSlots, collatorSlot);
         } else {
             finalExpr = finalArgExprs.size() > 0
                 ? buildFinalize(_state,
                                 accStmt,
                                 window.windowExprSlots,
                                 std::move(finalArgExprs),
-                                boost::none,
+                                collatorSlot,
                                 _frameIdGenerator)
                 : buildFinalize(
-                      _state, accStmt, window.windowExprSlots, boost::none, _frameIdGenerator);
+                      _state, accStmt, window.windowExprSlots, collatorSlot, _frameIdGenerator);
         }
 
         // Deal with empty window for finalize expressions.
-        if (!frameFirstLastAccumulators.count(outputField.expr->getOpName())) {
+        if (!frameFirstLastAccumulators) {
             auto emptyWindowExpr = [](StringData accExprName) {
                 if (accExprName == "$sum") {
                     return makeConstant(sbe::value::TypeTags::NumberInt32, 0);

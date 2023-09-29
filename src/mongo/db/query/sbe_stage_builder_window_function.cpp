@@ -58,9 +58,11 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveSum(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeSum(StageBuilderState& state,
-                                                         const WindowFunctionStatement& stmt,
-                                                         sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeSum(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     sbe::EExpression::Vector exprs;
     for (auto slot : slots) {
         exprs.push_back(makeVariable(slot));
@@ -82,10 +84,10 @@ AccumulationStatement createFakeAccumulationStatement(StageBuilderState& state,
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddCovariance(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildAccumulator(
-        accStmt, std::move(args), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildAccumulator(accStmt, std::move(args), collatorSlot, *state.frameIdGenerator);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveCovariance(
@@ -112,17 +114,21 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveCovariance(
 }
 
 std::unique_ptr<sbe::EExpression> buildWindowFinalizeCovarianceSamp(
-    StageBuilderState& state, const WindowFunctionStatement& stmt, sbe::value::SlotVector slots) {
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildFinalize(
-        state, accStmt, std::move(slots), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildFinalize(state, accStmt, std::move(slots), collatorSlot, *state.frameIdGenerator);
 }
 
 std::unique_ptr<sbe::EExpression> buildWindowFinalizeCovariancePop(
-    StageBuilderState& state, const WindowFunctionStatement& stmt, sbe::value::SlotVector slots) {
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildFinalize(
-        state, accStmt, std::move(slots), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildFinalize(state, accStmt, std::move(slots), collatorSlot, *state.frameIdGenerator);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddPush(
@@ -143,9 +149,11 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemovePush(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizePush(StageBuilderState& state,
-                                                          const WindowFunctionStatement& stmt,
-                                                          sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizePush(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     sbe::EExpression::Vector exprs;
     for (auto slot : slots) {
         exprs.push_back(makeVariable(slot));
@@ -165,10 +173,10 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeIntegral(
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddIntegral(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildAccumulator(
-        accStmt, std::move(args), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildAccumulator(accStmt, std::move(args), collatorSlot, *state.frameIdGenerator);
 }
 
 
@@ -195,12 +203,13 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveIntegral(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeIntegral(StageBuilderState& state,
-                                                              const WindowFunctionStatement& stmt,
-                                                              sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeIntegral(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildFinalize(
-        state, accStmt, std::move(slots), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildFinalize(state, accStmt, std::move(slots), collatorSlot, *state.frameIdGenerator);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeDerivative(
@@ -214,10 +223,10 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeDerivative(
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddDerivative(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildAccumulator(
-        accStmt, std::move(args), {} /* collatorSlot */, *state.frameIdGenerator);
+    return buildAccumulator(accStmt, std::move(args), collatorSlot, *state.frameIdGenerator);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveDerivative(
@@ -233,14 +242,11 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeDerivative(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
     sbe::value::SlotVector slots,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildFinalize(state,
-                         accStmt,
-                         std::move(slots),
-                         std::move(args),
-                         {} /* collatorSlot */,
-                         *state.frameIdGenerator);
+    return buildFinalize(
+        state, accStmt, std::move(slots), std::move(args), collatorSlot, *state.frameIdGenerator);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddStdDev(
@@ -261,9 +267,11 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveStdDev(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevSamp(StageBuilderState& state,
-                                                                const WindowFunctionStatement& stmt,
-                                                                sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevSamp(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     tassert(8019606, "Incorrect number of arguments", slots.size() == 1);
     sbe::EExpression::Vector exprs;
     for (auto slot : slots) {
@@ -272,9 +280,11 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevSamp(StageBuilderStat
     return makeE<sbe::EFunction>("aggRemovableStdDevSampFinalize", std::move(exprs));
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevPop(StageBuilderState& state,
-                                                               const WindowFunctionStatement& stmt,
-                                                               sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeStdDevPop(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     tassert(8019607, "Incorrect number of arguments", slots.size() == 1);
     sbe::EExpression::Vector exprs;
     for (auto slot : slots) {
@@ -320,10 +330,11 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveAvg(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeAvg(StageBuilderState& state,
-                                                         const WindowFunctionStatement& stmt,
-                                                         sbe::value::SlotVector slots) {
-
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeAvg(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
 
     // Slot 0 contains the accumulated sum, and slot 1 contains the count of summed items.
     tassert(7965900,
@@ -336,6 +347,39 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeAvg(StageBuilderState& stat
     }
 
     return makeFunction("aggRemovableAvgFinalize", std::move(exprs));
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddFirstLast(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> args) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(nullptr);
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveFirstLast(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    std::unique_ptr<sbe::EExpression> args) {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(nullptr);
+    return exprs;
+}
+
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstLast(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    auto it = args.find(AccArgs::kInput);
+    tassert(8085500,
+            str::stream() << "Window function " << AccumulatorFirst::kName << " expects '"
+                          << AccArgs::kInput << "' argument",
+            it != args.end());
+
+    return makeFillEmptyNull(std::move(it->second));
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeFirstN(
@@ -371,9 +415,11 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveFirstN(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstN(StageBuilderState& state,
-                                                            const WindowFunctionStatement& stmt,
-                                                            sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     tassert(8070605, "Expected a single slot", slots.size() == 1);
     return makeFunction("aggRemovableFirstNFinalize", makeVariable(slots[0]));
 }
@@ -411,9 +457,11 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveLastN(
     return exprs;
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalizeLastN(StageBuilderState& state,
-                                                           const WindowFunctionStatement& stmt,
-                                                           sbe::value::SlotVector slots) {
+std::unique_ptr<sbe::EExpression> buildWindowFinalizeLastN(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector slots,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     tassert(8070606, "Expected a single slot", slots.size() == 1);
     return makeFunction("aggRemovableLastNFinalize", makeVariable(slots[0]));
 }
@@ -435,6 +483,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
         {"$stdDevSamp", &emptyInitializer<1>},
         {"$stdDevPop", &emptyInitializer<1>},
         {AccumulatorAvg::kName, &emptyInitializer<2>},
+        {AccumulatorFirst::kName, &emptyInitializer<1>},
+        {AccumulatorLast::kName, &emptyInitializer<1>},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -480,6 +530,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
         {"$stdDevSamp", &buildWindowAddStdDev},
         {"$stdDevPop", &buildWindowAddStdDev},
         {AccumulatorAvg::kName, &buildWindowAddAvg},
+        {AccumulatorFirst::kName, &buildWindowAddFirstLast},
+        {AccumulatorLast::kName, &buildWindowAddFirstLast},
         {"$firstN", &buildWindowAddFirstN},
         {"$lastN", &buildWindowAddLastN},
     };
@@ -495,11 +547,13 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     using BuildAddFn = std::function<std::vector<std::unique_ptr<sbe::EExpression>>(
         StageBuilderState&,
         const WindowFunctionStatement&,
-        StringDataMap<std::unique_ptr<sbe::EExpression>>)>;
+        StringDataMap<std::unique_ptr<sbe::EExpression>>,
+        boost::optional<sbe::value::SlotId>)>;
 
     static const StringDataMap<BuildAddFn> kWindowFunctionBuilders = {
         {"$covarianceSamp", &buildWindowAddCovariance},
@@ -513,7 +567,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
             str::stream() << "Unsupported window function in SBE stage builder: " << opName,
             kWindowFunctionBuilders.find(opName) != kWindowFunctionBuilders.end());
 
-    return std::invoke(kWindowFunctionBuilders.at(opName), state, stmt, std::move(args));
+    return std::invoke(
+        kWindowFunctionBuilders.at(opName), state, stmt, std::move(args), collatorSlot);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
@@ -529,6 +584,8 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
         {"$stdDevSamp", &buildWindowRemoveStdDev},
         {"$stdDevPop", &buildWindowRemoveStdDev},
         {AccumulatorAvg::kName, &buildWindowRemoveAvg},
+        {AccumulatorFirst::kName, &buildWindowRemoveFirstLast},
+        {AccumulatorLast::kName, &buildWindowRemoveFirstLast},
         {"$firstN", &buildWindowRemoveFirstN},
         {"$lastN", &buildWindowRemoveLastN},
     };
@@ -565,11 +622,16 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
     return std::invoke(kWindowFunctionBuilders.at(opName), state, stmt, std::move(args));
 }
 
-std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
-                                                      const WindowFunctionStatement& stmt,
-                                                      sbe::value::SlotVector values) {
-    using BuildFinalizeFn = std::function<std::unique_ptr<sbe::EExpression>(
-        StageBuilderState&, const WindowFunctionStatement&, sbe::value::SlotVector values)>;
+std::unique_ptr<sbe::EExpression> buildWindowFinalize(
+    StageBuilderState& state,
+    const WindowFunctionStatement& stmt,
+    sbe::value::SlotVector values,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    using BuildFinalizeFn =
+        std::function<std::unique_ptr<sbe::EExpression>(StageBuilderState&,
+                                                        const WindowFunctionStatement&,
+                                                        sbe::value::SlotVector values,
+                                                        boost::optional<sbe::value::SlotId>)>;
 
     static const StringDataMap<BuildFinalizeFn> kWindowFunctionBuilders = {
         {"$sum", &buildWindowFinalizeSum},
@@ -589,22 +651,27 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(StageBuilderState& state,
             str::stream() << "Unsupported window function in SBE stage builder: " << opName,
             kWindowFunctionBuilders.find(opName) != kWindowFunctionBuilders.end());
 
-    return std::invoke(kWindowFunctionBuilders.at(opName), state, stmt, std::move(values));
+    return std::invoke(
+        kWindowFunctionBuilders.at(opName), state, stmt, std::move(values), collatorSlot);
 }
 
 std::unique_ptr<sbe::EExpression> buildWindowFinalize(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
     sbe::value::SlotVector values,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
     using BuildFinalizeFn = std::function<std::unique_ptr<sbe::EExpression>(
         StageBuilderState&,
         const WindowFunctionStatement&,
         sbe::value::SlotVector,
-        StringDataMap<std::unique_ptr<sbe::EExpression>>)>;
+        StringDataMap<std::unique_ptr<sbe::EExpression>>,
+        boost::optional<sbe::value::SlotId>)>;
 
     static const StringDataMap<BuildFinalizeFn> kWindowFunctionBuilders = {
         {"$derivative", &buildWindowFinalizeDerivative},
+        {AccumulatorFirst::kName, &buildWindowFinalizeFirstLast},
+        {AccumulatorLast::kName, &buildWindowFinalizeFirstLast},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -612,8 +679,12 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(
             str::stream() << "Unsupported window function in SBE stage builder: " << opName,
             kWindowFunctionBuilders.find(opName) != kWindowFunctionBuilders.end());
 
-    return std::invoke(
-        kWindowFunctionBuilders.at(opName), state, stmt, std::move(values), std::move(args));
+    return std::invoke(kWindowFunctionBuilders.at(opName),
+                       state,
+                       stmt,
+                       std::move(values),
+                       std::move(args),
+                       collatorSlot);
 }
 
 }  // namespace mongo::stage_builder

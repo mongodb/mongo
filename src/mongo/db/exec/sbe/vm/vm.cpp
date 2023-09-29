@@ -8357,7 +8357,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLinearFillFin
     return linearFillInterpolate(x1, y1, x2, y2, {sortByTag, sortByVal});
 }
 
-
 /**
  * Implementation for $firstN/$lastN removable window function
  */
