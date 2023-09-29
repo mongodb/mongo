@@ -108,7 +108,7 @@ public:
                     request().getShardKey());
 
             const auto createCollectionCoordinator = [&] {
-                auto requestToForward = request().getShardsvrCreateCollectionRequest();
+                auto requestToForward = request().getCreateCollectionRequest();
                 // Validates and sets missing time-series options fields automatically.
                 if (requestToForward.getTimeseries()) {
                     auto timeseriesOptions = *requestToForward.getTimeseries();
@@ -125,14 +125,14 @@ public:
                             DDLCoordinatorTypeEnum::kCreateCollection;
                         auto doc = CreateCollectionCoordinatorDocument();
                         doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                        doc.setShardsvrCreateCollectionRequest(requestToForward);
+                        doc.setCreateCollectionRequest(requestToForward);
                         return doc.toBSON();
                     } else {
                         const DDLCoordinatorTypeEnum coordType =
                             DDLCoordinatorTypeEnum::kCreateCollectionPre71Compatible;
                         auto doc = CreateCollectionCoordinatorDocumentLegacy();
                         doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
-                        doc.setShardsvrCreateCollectionRequest(requestToForward);
+                        doc.setCreateCollectionRequest(requestToForward);
                         return doc.toBSON();
                     }
                 }();

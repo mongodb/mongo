@@ -79,7 +79,7 @@ public:
     CreateCollectionCoordinatorLegacy(ShardingDDLCoordinatorService* service,
                                       const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
-          _request(_doc.getShardsvrCreateCollectionRequest()),
+          _request(_doc.getCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
                               << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
@@ -108,7 +108,7 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    mongo::ShardsvrCreateCollectionRequest _request;
+    mongo::CreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
 
@@ -135,7 +135,7 @@ public:
 
     CreateCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
-          _request(_doc.getShardsvrCreateCollectionRequest()),
+          _request(_doc.getCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
                               << "ns" << NamespaceStringUtil::serialize(originalNss()))) {}
@@ -181,7 +181,7 @@ private:
      */
     void _checkPreconditions(std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    mongo::ShardsvrCreateCollectionRequest _request;
+    mongo::CreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
 

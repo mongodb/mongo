@@ -330,7 +330,7 @@ TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
     auto opCtx = makeOpCtx();
     auto tsOptions = TimeseriesOptions("t");
     CreateCommand cmd = CreateCommand(curNss);
-    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    cmd.setTimeseries(std::move(tsOptions));
     uassertStatusOK(createCollection(opCtx.get(), cmd));
 
     ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));

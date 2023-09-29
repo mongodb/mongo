@@ -286,10 +286,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/coll_mod_command_idl',
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_cmds_idl',
-        '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/commands/set_user_write_block_mode_idl',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index_commands_idl',

@@ -91,10 +91,8 @@ namespace {
 void createQEClusteredStateCollection(OperationContext* opCtx, const NamespaceString& nss) {
     CreateCommand createCmd(nss);
     mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
-    CreateCollectionRequest request;
-    request.setClusteredIndex(
+    createCmd.setClusteredIndex(
         stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
-    createCmd.setCreateCollectionRequest(std::move(request));
     auto status = createCollection(opCtx, createCmd);
     if (!status.isOK()) {
         if (status != ErrorCodes::NamespaceExists) {

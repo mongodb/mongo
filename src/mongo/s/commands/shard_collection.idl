@@ -35,44 +35,9 @@ imports:
   - "mongo/s/sharding_types.idl"
 
 structs:
-  ShardCollectionRequest:
-      description: "The base request to shard a collection"
-      strict: false
-      fields:
-        key:
-          type: object
-          description: "The index specification document to use as the shard key."
-        unique:
-          type: bool
-          description: "Whether the shard key index should enforce a unique constraint"
-          default: false
-        numInitialChunks:
-          type: safeInt64
-          description: >-
-            The number of chunks to create initially when sharding an empty collection with a hashed
-            shard key.
-          default: 0
-        presplitHashedZones:
-          type: bool
-          description: >-
-            True if the chunks should be pre-split based on the existing zones when sharding a
-            collection with hashed shard key.
-          default: false
-        implicitlyCreateIndex:
-          description: "Creates an index on the shard key pattern if the collection is empty."
-          type: optionalBool
-        enforceUniquenessCheck:
-          description: >-
-            Controls whether this command verifies that any unique indexes are prefixed by the shard
-            key pattern if unique is true. If true then it will verify and if false then it won't.
-          type: optionalBool
-
   ShardCollection:
     description: "The public shardCollection command."
     strict: false
-    inline_chained_structs: true
-    chained_structs:
-      ShardCollectionRequest: ShardCollectionRequest
     fields:
       shardCollection:
         type: namespacestring
@@ -83,8 +48,27 @@ structs:
           description: >-
             Same as the previous field, but refers to the deprecated version of this command's name.
           optional: true
+      key:
+        type: object
+        description: "The index specification document to use as the shard key."
+      unique:
+        type: bool
+        description: "Whether the shard key index should enforce a unique constraint"
+        default: false
+      numInitialChunks:
+        type: safeInt64
+        description: >-
+          The number of chunks to create initially when sharding an empty collection with a hashed
+          shard key.
+        default: 0
+      presplitHashedZones:
+        type: bool
+        description: >-
+          True if the chunks should be pre-split based on the existing zones when sharding a
+          collection with hashed shard key.
+        default: false
       collation:
-        type: Collation
+        type: object
         description: "The collation to use for the shard key index."
         optional: true
       timeseries:
@@ -95,6 +79,14 @@ structs:
         description: "The expected UUID of the collection."
         type: uuid
         optional: true
+      implicitlyCreateIndex:
+        description: "Creates an index on the shard key pattern if the collection is empty."
+        type: optionalBool
+      enforceUniquenessCheck:
+        description: >-
+          Controls whether this command verifies that any unique indexes are prefixed by the shard
+          key pattern if unique is true. If true then it will verify and if false then it won't.
+        type: optionalBool
 
 commands:
     # Temporary command to run shardCollection with unsplittable=true and track unsharded

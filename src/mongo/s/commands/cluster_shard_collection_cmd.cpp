@@ -115,16 +115,24 @@ public:
         uassert(6464401,
                 "Sharding a Queryable Encryption state collection is not allowed",
                 !nss.isFLE2StateCollection());
-        auto clusterRequest = ShardCollection::parse(IDLParserContext("ShardCollection"), cmdObj);
-        auto shardsvrRequest =
-            ShardsvrCreateCollectionRequest::parse(IDLParserContext("ShardCollection"), cmdObj);
-        shardsvrRequest.setShardKey(clusterRequest.getKey());
 
-        ShardsvrCreateCollection shardsvrCollCmd(nss);
-        shardsvrCollCmd.setShardsvrCreateCollectionRequest(shardsvrRequest);
-        shardsvrCollCmd.setDbName(nss.dbName());
+        auto shardCollRequest = ShardCollection::parse(IDLParserContext("ShardCollection"), cmdObj);
 
-        cluster::createCollection(opCtx, shardsvrCollCmd);
+        ShardsvrCreateCollection shardsvrCollRequest(nss);
+        CreateCollectionRequest requestParamsObj;
+        requestParamsObj.setShardKey(shardCollRequest.getKey());
+        requestParamsObj.setUnique(shardCollRequest.getUnique());
+        requestParamsObj.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
+        requestParamsObj.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
+        requestParamsObj.setCollation(shardCollRequest.getCollation());
+        requestParamsObj.setTimeseries(shardCollRequest.getTimeseries());
+        requestParamsObj.setCollectionUUID(shardCollRequest.getCollectionUUID());
+        requestParamsObj.setImplicitlyCreateIndex(shardCollRequest.getImplicitlyCreateIndex());
+        requestParamsObj.setEnforceUniquenessCheck(shardCollRequest.getEnforceUniquenessCheck());
+        shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
+        shardsvrCollRequest.setDbName(nss.dbName());
+
+        cluster::createCollection(opCtx, shardsvrCollRequest);
 
         // Add only collectionsharded as a response parameter and remove the version to maintain the
         // same format as before.

@@ -57,7 +57,7 @@ enums:
 
 structs:
     TranslatedRequestParams:
-        description: "Subset of ShardsvrCreateCollectionRequest fields that may get overridden once the kTranslateRequest phase gets executed"
+        description: "Subset of CreateCollectionRequest fields that may get overridden once the kTranslateRequest phase gets executed"
         generate_comparison_operators: false
         strict: false
         fields:
@@ -80,7 +80,7 @@ structs:
         strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            ShardsvrCreateCollectionRequest: ShardsvrCreateCollectionRequest
+            CreateCollectionRequest: CreateCollectionRequest
         fields:
             phase:
                 type: CreateCollectionCoordinatorPhaseLegacy
@@ -96,7 +96,7 @@ structs:
         strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            ShardsvrCreateCollectionRequest: ShardsvrCreateCollectionRequest
+            CreateCollectionRequest: CreateCollectionRequest
         fields:
             phase:
                 type: CreateCollectionCoordinatorPhase
