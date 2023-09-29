@@ -5,9 +5,9 @@ t=__wt.$$
 t_pfx=__s_all_tmp_
 trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
 
-# We require python which may not be installed.
-type python > /dev/null 2>&1 || {
-    echo 's_all: python not found'
+# We require python3 which may not be installed.
+type python3 > /dev/null 2>&1 || {
+    echo 's_all: python3 not found'
     exit 1
 }
 
@@ -71,18 +71,18 @@ run()
 # already parallelize internally.
 run "sh ./s_readme $force"
 run "sh ./s_install $force"
-run "python api_config_gen.py"
-run "python api_err.py"
-run "python flags.py"
-run "python log.py"
-run "python stat.py"
-run "python verbose.py"
+run "python3 api_config_gen.py"
+run "python3 api_err.py"
+run "python3 flags.py"
+run "python3 log.py"
+run "python3 stat.py"
+run "python3 verbose.py"
 run "sh ./s_copyright"
 run "sh ./s_style ${fast}"
 run "./s_clang_format ${fast}"
-run "python prototypes.py"
+run "python3 prototypes.py"
 run "sh ./s_typedef -b"
-run "python test_tag.py"
+run "python3 test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
 run "python3 primitive_check.py" "--warning-only"

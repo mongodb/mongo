@@ -56,7 +56,7 @@ done
 # Jumps before returns have already been detected above.
 for f in $files; do
     file_parse $f | sed "s=^=$f:="
-done | python dist/s_function_loop.py |
+done | python3 dist/s_function_loop.py |
     egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
     sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
 
@@ -64,7 +64,7 @@ done | python dist/s_function_loop.py |
 for f in $(grep -l 'WT_WITH_' $files); do
     echo "===$f==="
     cat $f
-done | python dist/s_function_with.py 2>&1 $t || exit 1
+done | python3 dist/s_function_with.py 2>&1 $t || exit 1
 test -s $t && {
     echo "Misuse of WT_WITH_* macros:"
     cat $t
@@ -137,7 +137,7 @@ fi
 
 # __wt_verbose with a bitwise OR category parameter.
 for f in $files; do
-    file_parse $f | python dist/s_function_verbose.py > $t
+    file_parse $f | python3 dist/s_function_verbose.py > $t
     test -s $t && {
         echo "$f: Invalid use of verbose category parameter (bitwise OR)."
         sed 's/^/function @ line:/' < $t

@@ -1,4 +1,3 @@
-from __future__ import print_function
 import filecmp, fnmatch, glob, os, re, shutil, subprocess
 from contextlib import contextmanager
 

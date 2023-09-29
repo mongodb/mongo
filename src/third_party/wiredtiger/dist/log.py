@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from dist import compare_srcfile, format_srcfile
 import log_data

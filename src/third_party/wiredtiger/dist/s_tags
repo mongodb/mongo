@@ -48,7 +48,7 @@ link_tag()
 }
 
 # Link to the tags file from standard build and source directories.
-dirs="`python -c 'import dist; dist.print_source_dirs()'` ../src/os_win"
+dirs="`python3 -c 'import dist; dist.print_source_dirs()'` ../src/os_win"
 for i in $dirs; do
     expr "$i" : ".*/include" > /dev/null && continue
 

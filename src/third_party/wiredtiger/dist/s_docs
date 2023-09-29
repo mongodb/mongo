@@ -30,7 +30,7 @@ wtperf_config()
     # and doesn't stringify #XXX entries; use the -E option to the compiler
     # instead.
     cat ../bench/wtperf/wtperf_opt_inline.h |
-    ${CC:-cc} -E -DOPT_DEFINE_DOXYGEN - | python wtperf_config.py > $t
+    ${CC:-cc} -E -DOPT_DEFINE_DOXYGEN - | python3 wtperf_config.py > $t
     (echo '/START_AUTO_GENERATED_WTPERF_CONFIGURATION/+3,/STOP_AUTO_GENERATED_WTPERF_CONFIGURATION/-1d'
      echo 'i'
      echo ''
@@ -149,7 +149,7 @@ valid_build()
 
 check_docs_data()
 {
-    python docs.py > $t
+    python3 docs.py > $t
     test -s $t && {
         echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
         echo 'Documentation data errors in docs_data.py'
