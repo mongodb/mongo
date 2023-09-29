@@ -7,6 +7,9 @@
  *     # that migration by sending a new `moveChunk` command to the donor shard causing the test to
  *     # hang.
  *     does_not_support_stepdowns,
+ *     # Flaky with a config shard because the failovers it triggers trigger a retry from mongos,
+ *     # which can prevent the fail point from being unset and time out.
+ *     config_shard_incompatible,
  * ]
  */
 (function() {
