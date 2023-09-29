@@ -296,7 +296,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         : MultipleCollectionAccessor{coll.getCollectionPtr()};
 
     plan_cache_util::updatePlanCacheFromCandidates(expCtx()->opCtx,
-                                                   std::move(multipleCollection),
+                                                   multipleCollection,
                                                    _cachingMode,
                                                    *_query,
                                                    std::move(ranking),

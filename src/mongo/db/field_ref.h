@@ -96,12 +96,6 @@ public:
     explicit FieldRef(StringData path);
 
     /**
-     * Field parts accessed through getPart() calls no longer would be valid, after the destructor
-     * ran.
-     */
-    ~FieldRef() {}
-
-    /**
      * Builds a field path out of each field part in 'dottedField'.
      */
     void parse(StringData dottedField);

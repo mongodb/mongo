@@ -105,7 +105,7 @@ void updatePlanCache(OperationContext* opCtx,
         bool shouldOmitDiagnosticInformation =
             CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
         sbe::getPlanCache(opCtx).setPinned(
-            std::move(key),
+            key,
             canonical_query_encoder::computeHash(
                 canonical_query_encoder::encodeForPlanCacheCommand(query)),
             std::move(plan),

@@ -116,7 +116,7 @@ void SpoolStage::spill() {
     SortedFileWriter<RecordId, NullValue> writer(opts, _file);
     _specificStats.spilledRecords += _buffer.size();
     for (size_t i = 0; i < _buffer.size(); ++i) {
-        writer.addAlreadySorted(std::move(_buffer[i]), NullValue());
+        writer.addAlreadySorted(_buffer[i], NullValue());
     }
     _spillFileIters.emplace_back(writer.done());
     _buffer.clear();

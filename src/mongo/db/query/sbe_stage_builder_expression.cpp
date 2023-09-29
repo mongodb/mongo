@@ -3608,7 +3608,7 @@ private:
 
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
-            std::move(dateVar), ErrorCodes::Error{5157904}, std::move(exprName), "date"_sd));
+            dateVar, ErrorCodes::Error{5157904}, std::move(exprName), "date"_sd));
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),

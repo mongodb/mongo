@@ -291,7 +291,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
         if constexpr (isBson) {
             *out = std::move(doc);
         } else {
-            *out = Document{std::move(doc)};
+            *out = Document{doc};
         }
         if (dlOut && recordId) {
             *dlOut = std::move(*recordId);
@@ -721,7 +721,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
             if constexpr (isBson) {
                 *out = std::move(result);
             } else {
-                *out = Document{std::move(result)};
+                *out = Document{result};
             }
         } else {
             // The query is supposed to return an object.

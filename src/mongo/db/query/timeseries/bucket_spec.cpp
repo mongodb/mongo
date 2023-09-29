@@ -478,18 +478,18 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
             .residualExpr = std::move(residualPred)};
 }
 
-BucketSpec::BucketSpec(const std::string& timeField,
-                       const boost::optional<std::string>& metaField,
-                       const std::set<std::string>& fields,
+BucketSpec::BucketSpec(std::string timeField,
+                       boost::optional<std::string> metaField,
+                       std::set<std::string> fields,
                        Behavior behavior,
-                       const std::set<std::string>& computedProjections,
+                       std::set<std::string> computedProjections,
                        bool usesExtendedRange)
-    : _fieldSet(fields),
+    : _fieldSet(std::move(fields)),
       _behavior(behavior),
-      _computedMetaProjFields(computedProjections),
-      _timeField(timeField),
+      _computedMetaProjFields(std::move(computedProjections)),
+      _timeField(std::move(timeField)),
       _timeFieldHashed(FieldNameHasher().hashedFieldName(_timeField)),
-      _metaField(metaField),
+      _metaField(std::move(metaField)),
       _usesExtendedRange(usesExtendedRange) {
     if (_metaField) {
         _metaFieldHashed = FieldNameHasher().hashedFieldName(*_metaField);
@@ -541,6 +541,20 @@ BucketSpec& BucketSpec::operator=(const BucketSpec& other) {
         }
         _usesExtendedRange = other._usesExtendedRange;
     }
+    return *this;
+}
+
+BucketSpec& BucketSpec::operator=(BucketSpec&& other) {
+    _fieldSet = std::move(other._fieldSet);
+    _behavior = other._behavior;
+    _computedMetaProjFields = std::move(other._computedMetaProjFields);
+    _timeField = std::move(other._timeField);
+    _timeFieldHashed = HashedFieldName{_timeField, other._timeFieldHashed->hash()};
+    _metaField = std::move(other._metaField);
+    if (_metaField) {
+        _metaFieldHashed = HashedFieldName{*_metaField, other._metaFieldHashed->hash()};
+    }
+    _usesExtendedRange = other._usesExtendedRange;
     return *this;
 }
 

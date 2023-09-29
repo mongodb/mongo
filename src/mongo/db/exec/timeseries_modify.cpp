@@ -267,7 +267,7 @@ std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
             modifiedMeasurements.emplace_back(doc.getObject());
         } else {
             // The document wasn't modified, write it back to the original bucket unchanged.
-            unchangedMeasurements.emplace_back(std::move(measurement));
+            unchangedMeasurements.emplace_back(measurement);
         }
     }
 
@@ -494,7 +494,7 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
                 // measurement. If we did not, then we should return the old measurement instead.
                 return boost::optional<BSONObj>(std::move(matchedMeasurements[0]));
             } else {
-                return boost::optional<BSONObj>(std::move(modifiedMeasurements[0]));
+                return boost::optional<BSONObj>(modifiedMeasurements[0]);
             }
         }
         return boost::optional<BSONObj>();
@@ -683,7 +683,7 @@ void TimeseriesModifyStage::_prepareToReturnMeasurement(WorkingSetID& out, BSONO
     auto member = _ws->get(out);
     // The measurement does not have record id.
     member->recordId = RecordId{};
-    member->doc.value() = Document{std::move(measurement)};
+    member->doc.value() = Document{measurement};
     _ws->transitionToOwnedObj(out);
 }
 

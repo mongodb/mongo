@@ -165,7 +165,7 @@ void SortStageSimple::spool(WorkingSetID wsid) {
 
     auto sortKey = _sortKeyGen.computeSortKeyFromDocument(member->doc.value());
 
-    _sortExecutor.add(std::move(sortKey), member->doc.value().toBson());
+    _sortExecutor.add(sortKey, member->doc.value().toBson());
     _ws->free(wsid);
 }
 

@@ -67,17 +67,18 @@ public:
     enum class Behavior { kInclude, kExclude };
 
     BucketSpec() = default;
-    BucketSpec(const std::string& timeField,
-               const boost::optional<std::string>& metaField,
-               const std::set<std::string>& fields = {},
+    BucketSpec(std::string timeField,
+               boost::optional<std::string> metaField,
+               std::set<std::string> fields = {},
                Behavior behavior = Behavior::kExclude,
-               const std::set<std::string>& computedProjections = {},
+               std::set<std::string> computedProjections = {},
                bool usesExtendedRange = false);
     BucketSpec(const BucketSpec&);
     BucketSpec(BucketSpec&&);
     BucketSpec(const TimeseriesOptions& tsOptions);
 
     BucketSpec& operator=(const BucketSpec&);
+    BucketSpec& operator=(BucketSpec&&);
 
     // The user-supplied timestamp field name specified during time-series collection creation.
     void setTimeField(std::string&& field);

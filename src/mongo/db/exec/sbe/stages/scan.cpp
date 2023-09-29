@@ -1055,7 +1055,7 @@ void ParallelScanStage::open(bool reOpen) {
                 RecordId lastid{};
                 for (auto& id : rids) {
                     _state->ranges.emplace_back(Range{std::move(lastid), id});
-                    lastid = std::move(id);
+                    lastid = id;
                 }
                 _state->ranges.emplace_back(Range{std::move(lastid), RecordId{}});
             }

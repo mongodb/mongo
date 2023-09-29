@@ -783,7 +783,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
             indexAccessMethod->getSortedDataInterface()->getOrdering(),
             1 /* direction */,
-            std::move(csn->iets),
+            csn->iets,
             {ParameterizedIndexScanSlots::SingleIntervalPlan{indexScanBoundsSlots->first,
                                                              indexScanBoundsSlots->second}}});
     }
@@ -2659,7 +2659,7 @@ SbStage projectPathTraversalsForGroupBy(StageBuilderState& state,
         }
 
         // Don't generate an expression if we have one already.
-        const std::string fp = fieldExpr->getFieldPathWithoutCurrentPrefix().fullPath();
+        std::string fp = fieldExpr->getFieldPathWithoutCurrentPrefix().fullPath();
         if (groupFieldSet.count(fp)) {
             return;
         }

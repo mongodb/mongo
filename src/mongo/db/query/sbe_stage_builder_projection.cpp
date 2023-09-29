@@ -379,7 +379,7 @@ SbExpr evaluateProjection(StageBuilderState& state,
     using Node = PathTreeNode<boost::optional<ProjectionNode>>;
 
     auto tree = buildPathTree<boost::optional<ProjectionNode>>(
-        std::move(paths), std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
+        paths, std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
 
     ProjectionVisitorContext context{state, type, std::move(inputExpr), slots};
 
@@ -425,7 +425,7 @@ SbExpr evaluateSliceOps(StageBuilderState& state,
     using Node = PathTreeNode<boost::optional<ProjectionNode>>;
 
     auto tree = buildPathTree<boost::optional<ProjectionNode>>(
-        std::move(paths), std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
+        paths, std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
 
     // We want to keep the entire input document as-is except for applying the $slice ops, so
     // we use the 'kExclusion' projection type.

@@ -65,7 +65,7 @@ protected:
                 ? MultipleCollectionAccessor{coll.getAcquisition()}
                 : MultipleCollectionAccessor{coll.getCollectionPtr()};
 
-            _allIndicesRequiredChecker->check(opCtx(), std::move(multipleCollection));
+            _allIndicesRequiredChecker->check(opCtx(), multipleCollection);
         }
     }
 

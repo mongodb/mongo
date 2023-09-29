@@ -47,11 +47,9 @@ public:
     MatchPath(MatchPath&&) = default;
 
     MatchPath(const FieldRef& other) : FieldRef(other) {}
-    MatchPath(FieldRef&& other) : FieldRef(std::move(other)) {}
+    MatchPath(FieldRef&& other) : FieldRef(other) {}
 
     explicit MatchPath(StringData path) : FieldRef(path) {}
-
-    ~MatchPath() {}
 
     MatchPath& operator=(const FieldRef& other) {
         *static_cast<FieldRef*>(this) = other;

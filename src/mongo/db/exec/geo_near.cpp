@@ -237,7 +237,7 @@ GeoNear2DStage::DensityEstimator::DensityEstimator(
       _fullBounds(fullBounds),
       _currentLevel(0) {
     // The index status should always be valid.
-    auto result = invariantStatusOK(GeoHashConverter::createFromDoc(std::move(infoObj)));
+    auto result = invariantStatusOK(GeoHashConverter::createFromDoc(infoObj));
 
     _converter = std::move(result);
     _centroidCell = _converter->hash(_nearParams->nearQuery->centroid->oldPoint);

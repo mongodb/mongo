@@ -1063,7 +1063,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                   accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                                   accessMethod->getSortedDataInterface()->getOrdering(),
                                   ixn->direction,
-                                  std::move(ixn->iets),
+                                  ixn->iets,
                                   std::move(parameterizedScanSlots)});
 
     return {std::move(stage), std::move(outputs)};

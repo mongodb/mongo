@@ -285,8 +285,7 @@ WorkingSetMember WorkingSetMember::deserialize(BufReader& buf) {
             auto indexId = buf.read<LittleEndian<unsigned int>>();
             auto snapshotIdRepr = buf.read<LittleEndian<uint64_t>>();
             auto snapshotId = snapshotIdRepr ? SnapshotId{snapshotIdRepr} : SnapshotId{};
-            wsm.keyData.push_back(IndexKeyDatum{
-                std::move(indexKeyPattern), std::move(indexKey), indexId, snapshotId});
+            wsm.keyData.push_back(IndexKeyDatum{indexKeyPattern, indexKey, indexId, snapshotId});
         }
     }
 
