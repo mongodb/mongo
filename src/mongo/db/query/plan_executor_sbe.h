@@ -68,6 +68,16 @@
 namespace mongo {
 class PlanExecutorSBE final : public PlanExecutor {
 public:
+    struct MetaDataAccessor {
+        BSONObj appendToBson(BSONObj doc) const;
+        Document appendToDocument(Document doc) const;
+        // Only for $search queries, holds the metadata returned from mongot.
+        sbe::value::SlotAccessor* metadataSearchScore{nullptr};
+        sbe::value::SlotAccessor* metadataSearchHighlights{nullptr};
+        sbe::value::SlotAccessor* metadataSearchDetails{nullptr};
+        sbe::value::SlotAccessor* metadataSearchSortValues{nullptr};
+    };
+
     PlanExecutorSBE(OperationContext* opCtx,
                     std::unique_ptr<CanonicalQuery> cq,
                     std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
@@ -193,6 +203,9 @@ private:
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
 
+    void initializeAccessors(MetaDataAccessor& accessor,
+                             const stage_builder::PlanStageMetadataSlots& metadataSlots);
+
     enum class State { kClosed, kOpened };
 
     State _state{State::kClosed};
@@ -225,6 +238,8 @@ private:
 
     // Only for clustered collection scans, holds the maximum record ID of the scan, if applicable.
     boost::optional<sbe::value::SlotId> _maxRecordIdSlot;
+
+    MetaDataAccessor _metadataAccessors;
 
     // NOTE: '_stash' stores documents as BSON. Currently, one of the '_stash' is usages is to store
     // documents received from the plan during multiplanning. This means that the documents
