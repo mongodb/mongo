@@ -1,7 +1,7 @@
 /**
  * Test that change streams returns shardCollection events with the options specified on the
  * original user command.
- *
+ * TODO SERVER-81138 remove multiversion_incompatible and fix comparison with 7.0 binaries
  *  @tags: [
  *    requires_fcv_60,
  *    requires_sharding,
@@ -9,6 +9,7 @@
  *    change_stream_does_not_expect_txns,
  *    assumes_unsharded_collection,
  *    assumes_read_preference_unchanged,
+ *    multiversion_incompatible,
  * ]
  */
 
@@ -119,7 +120,8 @@ function runTest(startChangeStream) {
             "shardKey": {"_id": 1},
             "unique": false,
             "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false
+            "presplitHashedZones": false,
+            "capped": false
         }
     });
 
@@ -130,7 +132,8 @@ function runTest(startChangeStream) {
             "shardKey": {"_id": "hashed"},
             "unique": false,
             "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false
+            "presplitHashedZones": false,
+            "capped": false
         }
     });
 
@@ -142,7 +145,8 @@ function runTest(startChangeStream) {
             "shardKey": {"_id": 1},
             "unique": false,
             "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false
+            "presplitHashedZones": false,
+            "capped": false
         }
     });
 
@@ -154,7 +158,8 @@ function runTest(startChangeStream) {
             "shardKey": {"_id": "hashed"},
             "unique": false,
             "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false
+            "presplitHashedZones": false,
+            "capped": false
         }
     });
 
@@ -166,7 +171,8 @@ function runTest(startChangeStream) {
             "shardKey": {"x": "hashed", "y": 1},
             "unique": false,
             "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false
+            "presplitHashedZones": false,
+            "capped": false
         }
     });
 
@@ -179,7 +185,8 @@ function runTest(startChangeStream) {
                 "shardKey": {"_id": "hashed"},
                 "unique": false,
                 "numInitialChunks": NumberLong(10),
-                "presplitHashedZones": false
+                "presplitHashedZones": false,
+                "capped": false
             }
         });
 
@@ -191,7 +198,8 @@ function runTest(startChangeStream) {
             "shardKey": {"_id": 1},
             "unique": true,
             "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false
+            "presplitHashedZones": false,
+            "capped": false
         }
     });
 
@@ -205,9 +213,19 @@ function runTest(startChangeStream) {
                 "unique": false,
                 "numInitialChunks": NumberLong(0),
                 "presplitHashedZones": false,
-                "collation": {"locale": "simple"}
+                "capped": false,
+                "collation": {
+                    "locale": "simple",
+                    "caseLevel": false,
+                    "caseFirst": "off",
+                    "strength": 3,
+                    "numericOrdering": false,
+                    "alternate": "non-ignorable",
+                    "maxVariable": "punct",
+                    "normalization": false
+                }
             }
-        });
+        })
 }
 
 assert.commandWorked(db.adminCommand({enableSharding: dbName}));

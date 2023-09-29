@@ -1,10 +1,11 @@
 /**
  * Verifies that successful commits of Sharding DDL operations generate the expected op entry types
  * (following the format and rules defined in the design doc of PM-1939).
- *
+ * TODO SERVER-81138 remove multiversion_incompatible and fix comparison with 7.0 binaries
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_fcv_70,
+ *   multiversion_incompatible,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
@@ -104,7 +105,8 @@ function testShardCollection() {
                 shardKey: {_id: 'hashed'},
                 unique: false,
                 numInitialChunks: numInitialChunks,
-                presplitHashedZones: false
+                presplitHashedZones: false,
+                capped: false
             }
         },
         // One entry emitted once the metadata is committed on the sharding catalog
@@ -117,7 +119,8 @@ function testShardCollection() {
                 shardKey: {_id: 'hashed'},
                 unique: false,
                 numInitialChunks: numInitialChunks,
-                presplitHashedZones: false
+                presplitHashedZones: false,
+                capped: false
             }
         }
     ];
@@ -166,7 +169,8 @@ function testShardCollection() {
                     metaField: metaField,
                     granularity: granularity,
                     bucketMaxSpanSeconds: maxSpan
-                }
+                },
+                capped: false
 
             }
         },
@@ -186,7 +190,8 @@ function testShardCollection() {
                     metaField: metaField,
                     granularity: granularity,
                     bucketMaxSpanSeconds: maxSpan
-                }
+                },
+                capped: false
             }
         }
     ];

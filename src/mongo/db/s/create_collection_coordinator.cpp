@@ -189,16 +189,16 @@ OptionsAndIndexes getCollectionOptionsAndIndexes(OperationContext* opCtx,
 // 'collation' parameter to succeed (as an acknowledge of what specified in points 1. and 2.)
 BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
                                        const NamespaceString& nss,
-                                       const boost::optional<BSONObj>& collationInRequest) {
+                                       const boost::optional<Collation>& collationInRequest) {
     // Ensure the collation is valid. Currently we only allow the simple collation.
     std::unique_ptr<CollatorInterface> requestedCollator = nullptr;
     if (collationInRequest) {
-        requestedCollator =
-            uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                ->makeFromBSON(collationInRequest.value()));
+        auto collationBson = collationInRequest.value().toBSON();
+        requestedCollator = uassertStatusOK(
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationBson));
         uassert(ErrorCodes::BadValue,
                 str::stream() << "The collation for shardCollection must be {locale: 'simple'}, "
-                              << "but found: " << collationInRequest.value(),
+                              << "but found: " << collationBson,
                 !requestedCollator);
     }
 
@@ -243,11 +243,13 @@ BSONObj makeCreateCommand(const NamespaceString& nss,
                           const boost::optional<Collation>& collation,
                           const TimeseriesOptions& tsOpts) {
     CreateCommand create(nss);
-    create.setTimeseries(tsOpts);
+    CreateCollectionRequest baseRequest;
+    baseRequest.setTimeseries(tsOpts);
     if (collation) {
-        create.setCollation(*collation);
+        baseRequest.setCollation(*collation);
     }
     BSONObj commandPassthroughFields;
+    create.setCreateCollectionRequest(baseRequest);
     return create.toBSON(commandPassthroughFields);
 }
 
@@ -487,7 +489,7 @@ void broadcastDropCollection(OperationContext* opCtx,
 
 boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithSameOptions(
     OperationContext* opCtx,
-    const CreateCollectionRequest& request,
+    const ShardsvrCreateCollectionRequest& request,
     const NamespaceString& originalNss) {
     // If the request is part of a C2C synchronisation, the check on the received UUID must be
     // performed first to honor the contract with mongosync (see SERVER-67885 for details).
@@ -525,7 +527,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithSam
                 return false;
             }
 
-            if (request.getUnique().value_or(false) != cm.isUnique()) {
+            if (request.getUnique() != cm.isUnique()) {
                 return false;
             }
 
@@ -578,7 +580,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithSam
     }
 
     auto requestMatchesExistingCollection = [&] {
-        if (cm.isUnique() != request.getUnique().value_or(false)) {
+        if (cm.isUnique() != request.getUnique()) {
             return false;
         }
 
@@ -625,7 +627,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithSam
 }
 
 void checkCommandArguments(OperationContext* opCtx,
-                           const CreateCollectionRequest& request,
+                           const ShardsvrCreateCollectionRequest& request,
                            const NamespaceString& originalNss) {
     LOGV2_DEBUG(5277902, 2, "Create collection checkCommandArguments", logAttrs(originalNss));
 
@@ -637,8 +639,7 @@ void checkCommandArguments(OperationContext* opCtx,
     uassert(ErrorCodes::InvalidOptions,
             "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
-            !ShardKeyPattern(*request.getShardKey()).isHashedPattern() ||
-                !request.getUnique().value_or(false));
+            !ShardKeyPattern(*request.getShardKey()).isHashedPattern() || !request.getUnique());
 
     if (request.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
@@ -649,7 +650,7 @@ void checkCommandArguments(OperationContext* opCtx,
         const int maxNumInitialChunksForShards =
             Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = request.getNumInitialChunks().value();
+        int numChunks = request.getNumInitialChunks();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "numInitialChunks cannot be more than either: "
                               << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
@@ -683,7 +684,7 @@ void checkCommandArguments(OperationContext* opCtx,
  * Helper function to audit and log the shard collection event.
  */
 void logStartCreateCollection(OperationContext* opCtx,
-                              const CreateCollectionRequest& request,
+                              const ShardsvrCreateCollectionRequest& request,
                               const NamespaceString& originalNss) {
     BSONObjBuilder collectionDetail;
     collectionDetail.append("shardKey", *request.getShardKey());
@@ -734,7 +735,7 @@ void releaseCriticalSectionsOnCoordinator(OperationContext* opCtx,
  * an equivalent descriptor that may be persisted with the recovery document.
  */
 TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
-                                                   CreateCollectionRequest& request,
+                                                   ShardsvrCreateCollectionRequest& request,
                                                    const NamespaceString& originalNss) {
     auto performCheckOnCollectionUUID = [opCtx, request](const NamespaceString& resolvedNss) {
         AutoGetCollection coll{
@@ -832,7 +833,7 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
  */
 std::unique_ptr<InitialSplitPolicy> createPolicy(OperationContext* opCtx,
                                                  const ShardKeyPattern& shardKeyPattern,
-                                                 const CreateCollectionRequest& request,
+                                                 const ShardsvrCreateCollectionRequest& request,
                                                  const NamespaceString& nss,
                                                  const boost::optional<bool>& collectionEmpty) {
     LOGV2_DEBUG(6042001, 2, "Create collection createPolicy", logAttrs(nss));
@@ -841,8 +842,8 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(OperationContext* opCtx,
         InitialSplitPolicy::calculateOptimizationStrategy(
             opCtx,
             shardKeyPattern,
-            request.getNumInitialChunks() ? *request.getNumInitialChunks() : 0,
-            request.getPresplitHashedZones() ? *request.getPresplitHashedZones() : false,
+            request.getNumInitialChunks(),
+            request.getPresplitHashedZones(),
             getTagsAndValidate(opCtx, nss, shardKeyPattern.toBSON()),
             getNumShards(opCtx),
             *collectionEmpty,
@@ -979,7 +980,7 @@ void promoteCriticalSectionsOnCoordinatorToBlockReads(OperationContext* opCtx,
 boost::optional<UUID> createCollectionAndIndexes(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
-    const CreateCollectionRequest& request,
+    const ShardsvrCreateCollectionRequest& request,
     const boost::optional<bool> collectionEmpty,
     const NamespaceString& nss,
     const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams) {
@@ -1018,7 +1019,7 @@ boost::optional<UUID> createCollectionAndIndexes(
             nss,
             shardKeyPattern,
             collationBSON,
-            request.getUnique().value_or(false),
+            request.getUnique(),
             request.getEnforceUniquenessCheck().value_or(true),
             shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
     } else {
@@ -1028,7 +1029,7 @@ boost::optional<UUID> createCollectionAndIndexes(
                                          nss,
                                          shardKeyPattern,
                                          collationBSON,
-                                         request.getUnique().value_or(false) &&
+                                         request.getUnique() &&
                                              request.getEnforceUniquenessCheck().value_or(true),
                                          shardkeyutil::ValidationBehaviorsShardCollection(opCtx)));
     }
@@ -1050,8 +1051,8 @@ boost::optional<UUID> createCollectionAndIndexes(
 }
 
 
-CreateCollectionRequest patchedRequestForChangeStream(
-    const CreateCollectionRequest& originalRequest,
+ShardsvrCreateCollectionRequest patchedRequestForChangeStream(
+    const ShardsvrCreateCollectionRequest& originalRequest,
     const mongo::TranslatedRequestParams& translatedRequestParams) {
     auto req = originalRequest;
     req.setShardKey(translatedRequestParams.getKeyPattern().toBSON());
@@ -1068,7 +1069,7 @@ CreateCollectionRequest patchedRequestForChangeStream(
 boost::optional<CreateCollectionResponse> commit(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
-    const CreateCollectionRequest& request,
+    const ShardsvrCreateCollectionRequest& request,
     boost::optional<InitialSplitPolicy::ShardCollectionConfig>& initialChunks,
     const boost::optional<UUID>& collectionUUID,
     const NamespaceString& nss,
@@ -1110,7 +1111,7 @@ boost::optional<CreateCollectionResponse> commit(
     }
 
     if (request.getUnique()) {
-        coll.setUnique(*request.getUnique());
+        coll.setUnique(request.getUnique());
     }
 
     const auto patchedRequestBSONObj =
@@ -1227,7 +1228,7 @@ void CreateCollectionCoordinatorLegacy::checkIfOptionsConflict(const BSONObj& do
             "Another create collection with different arguments is already running for the same "
             "namespace",
             SimpleBSONObjComparator::kInstance.evaluate(
-                _request.toBSON() == otherDoc.getCreateCollectionRequest().toBSON()));
+                _request.toBSON() == otherDoc.getShardsvrCreateCollectionRequest().toBSON()));
 }
 
 ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
@@ -1286,7 +1287,7 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                     nss(),
                                     shardKeyPattern.toBSON(),
                                     collation,
-                                    _request.getUnique().value_or(false),
+                                    _request.getUnique(),
                                     _request.getUnsplittable().value_or(false))) {
 
                             // A previous request already created and committed the collection
@@ -1359,7 +1360,7 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 audit::logShardCollection(opCtx->getClient(),
                                           NamespaceStringUtil::serialize(nss()),
                                           *_request.getShardKey(),
-                                          _request.getUnique().value_or(false));
+                                          _request.getUnique());
 
                 _initialChunks =
                     createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());
@@ -1420,7 +1421,7 @@ void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
             "Another create collection with different arguments is already running for the same "
             "namespace",
             SimpleBSONObjComparator::kInstance.evaluate(
-                _request.toBSON() == otherDoc.getCreateCollectionRequest().toBSON()));
+                _request.toBSON() == otherDoc.getShardsvrCreateCollectionRequest().toBSON()));
 }
 
 void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
@@ -1568,7 +1569,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 audit::logShardCollection(opCtx->getClient(),
                                           NamespaceStringUtil::serialize(nss()),
                                           *_request.getShardKey(),
-                                          _request.getUnique().value_or(false));
+                                          _request.getUnique());
 
                 _initialChunks =
                     createChunks(opCtx, shardKeyPattern, _collectionUUID, _splitPolicy, nss());

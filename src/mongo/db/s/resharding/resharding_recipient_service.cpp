@@ -741,7 +741,7 @@ void ReshardingRecipientService::RecipientStateMachine::
         // resharding operation to the target cluster. The only information we have is the shard
         // key, but all other fields must either be default-valued or are ignored by C2C.
         // TODO SERVER-66671: The 'createCollRequest' should include the full contents of the
-        // CreateCollectionRequest rather than just the 'shardKey' field.
+        // ShardsvrCreateCollectionRequest rather than just the 'shardKey' field.
         const auto createCollRequest = BSON("shardKey" << _metadata.getReshardingKey().toBSON());
         notifyChangeStreamsOnShardCollection(opCtx.get(),
                                              _metadata.getTempReshardingNss(),

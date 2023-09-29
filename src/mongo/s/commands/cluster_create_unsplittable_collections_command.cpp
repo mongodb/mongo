@@ -103,15 +103,13 @@ public:
             }
 
             ShardsvrCreateCollection shardsvrCollRequest(nss);
-            CreateCollectionRequest requestParamsObj;
-            requestParamsObj.setShardKey(BSON("_id" << 1));
-            requestParamsObj.setTimeseries(req.getTimeseries());
-            requestParamsObj.setCollectionUUID(req.getCollectionUUID());
-            requestParamsObj.setUnsplittable(true);
-            requestParamsObj.setDataShard(req.getDataShard());
-            shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
+            ShardsvrCreateCollectionRequest request;
+            request.parse(IDLParserContext("createUnsplittableCollection"), req.toBSON({}));
+            request.setShardKey(BSON("_id" << 1));
+            request.setUnsplittable(true);
+            request.setDataShard(req.getDataShard());
             shardsvrCollRequest.setDbName(nss.dbName());
-
+            shardsvrCollRequest.setShardsvrCreateCollectionRequest(request);
             cluster::createCollection(opCtx, shardsvrCollRequest);
         }
 

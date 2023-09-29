@@ -35,6 +35,7 @@ global:
         - "mongo/s/shard_version.h"
 
 imports:
+    - "mongo/db/commands/create.idl"
     - "mongo/db/commands/rename_collection.idl"
     - "mongo/db/commands/set_user_write_block_mode.idl"
     - "mongo/db/drop_indexes.idl"
@@ -118,11 +119,13 @@ structs:
                 description: "Latest version of the collection"
                 optional: false
 
-    CreateCollectionRequest:
+    ShardsvrCreateCollectionRequest:
         description: "All the parameters sent by the router."
         generate_comparison_operators: false
         strict: false
         fields:
+            #TODO SERVER-81447: rewrite this Request as a chained struct of 
+            #CreateCollectionRequest and ShardCollectionRequest + unsplittable
             shardKey:
                 type: object_owned
                 description: "The index specification document to use as the shard key."
@@ -130,27 +133,19 @@ structs:
             unique:
                 type: bool
                 description: "Whether the shard key index should enforce a unique constraint."
-                optional: true
+                default: false
             numInitialChunks:
                 type: safeInt64
                 description: >-
                     The number of chunks to create initially when sharding an empty collection with
                     a hashed shard key.
-                optional: true
+                default: 0
             presplitHashedZones:
                 type: bool
                 description: >-
                     True if the chunks should be pre-split based on the existing zones when
                     sharding a collection with hashed shard key.
-                optional: true
-            timeseries:
-                description: "The options to create the time-series collection with."
-                type: TimeseriesOptions
-                optional: true
-            collation:
-                type: object_owned
-                description: "The collation to use for the shard key index."
-                optional: true
+                default: false
             collectionUUID:
                 type: uuid
                 description: "The expected UUID of the collection."
@@ -164,6 +159,110 @@ structs:
                     the shard key pattern if unique is true. If true then it will verify and if
                     false then it won't.
                 type: optionalBool
+            capped:
+                description: "Specify true to create a capped collection. If you specify true, you
+                              must also set a maximum size in the 'size' field."
+                type: safeBool
+                default: false
+            autoIndexId:
+                description: "Specify false to disable the automatic creation of an index on the
+                              _id field."
+                type: safeBool
+                optional: true
+            idIndex:
+                description: "Specify the default _id index specification."
+                type: object
+                optional: true
+            size:
+                description: "Specify a maximum size in bytes for the capped collection."
+                type: safeInt64
+                optional: true
+                validator:
+                    gte: 1
+                    lte: 1125899906842624  # 1 PB
+            max:
+                description: "The maximum number of documents allowed in the capped collection. The
+                              'size' limit takes precedence over this limit."
+                type: safeInt64
+                optional: true
+                validator:
+                    lt: 2147483648  # 2^31
+            storageEngine:
+                description: "Specify a configuration to the storage engine on a per-collection
+                              basis when creating a collection."
+                type: object
+                optional: true
+            validator:
+                description: "Specify validation rules or expressions for the collection."
+                type: object
+                optional: true
+            validationLevel:
+                description: "Determines how strictly to apply the validation rules to existing
+                              documents during an update.
+                              Can be one of following values: 'off', 'strict' or 'moderate'."
+                type: ValidationLevel
+                optional: true
+            validationAction:
+                description: "Determines whether to error on invalid documents or just warn about
+                              the violations but allow invalid documents to be inserted.
+                              Can be either 'warn' or 'error'."
+                type: ValidationAction
+                optional: true
+            indexOptionDefaults:
+                description: "Allows users to specify a default configuration for indexes when
+                              creating a collection."
+                type: IndexOptionDefaults
+                optional: true
+            viewOn:
+                description: "The name of the source collection or view from which to create the
+                              view."
+                type: string
+                optional: true
+                validator:
+                    callback: create_command_validation::validateViewOnNotEmpty
+            pipeline:
+                description: "An array that consists of the aggregation pipeline. Creates the view
+                              by applying the specified pipeline to the 'viewOn' collection or
+                              view."
+                type: array<object>
+                optional: true
+            collation:
+                description: "Specifies the default collation for the collection or the view."
+                type: Collation
+                optional: true
+            changeStreamPreAndPostImages:
+                description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
+                type: ChangeStreamPreAndPostImagesOptions
+                optional: true
+            timeseries:
+                description: "The options to create the time-series collection with."
+                type: TimeseriesOptions
+                optional: true
+            clusteredIndex:
+                description: "Specifies whether this collection should have a clusteredIndex.
+                    Boolean is accepted as the legacy clustered index format for specific internal
+                    collections - and implies clustering by _id. Otherwise, clusters according to
+                    the ClusteredIndexSpec."
+                type:
+                    variant: [safeBool, ClusteredIndexSpec]
+                optional: true
+            expireAfterSeconds:
+                description: "The number of seconds after which old data should be deleted."
+                type: safeInt64
+                optional: true
+            encryptedFields:
+                description: "Specifies the fields that are encrypted by client-side FLE."
+                type: EncryptedFieldConfig
+                optional: true
+            temp:
+                description: "Internal field that can be used in the $out aggregation code."
+                type: safeBool
+                optional: true
+            flags:
+                description: "DEPRECATED"
+                type: safeInt64
+                optional: true
+
             unsplittable:
                 type: optionalBool
                 description: "Flag that identifies whether the collection is splittable in multiple 
@@ -303,7 +402,7 @@ commands:
         namespace: concatenate_with_db
         api_version: ""
         chained_structs:
-            CreateCollectionRequest: CreateCollectionRequest
+            ShardsvrCreateCollectionRequest: ShardsvrCreateCollectionRequest
 
     _shardsvrCreateCollectionParticipant:
         command_name: _shardsvrCreateCollectionParticipant
