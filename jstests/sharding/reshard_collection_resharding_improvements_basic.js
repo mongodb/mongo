@@ -7,6 +7,7 @@
  * ]
  */
 
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 
@@ -18,6 +19,12 @@ const mongos = st.s0;
 const kNumInitialDocs = 500;
 const reshardCmdTest =
     new ReshardCollectionCmdTest({st, dbName: kDbName, collName, numInitialDocs: kNumInitialDocs});
+
+const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000; /* 1 day */
+const topology = DiscoverTopology.findConnectedNodes(mongos);
+const coordinator = new Mongo(topology.configsvr.nodes[0]);
+assert.commandWorked(coordinator.getDB("admin").adminCommand(
+    {setParameter: 1, reshardingCriticalSectionTimeoutMillis: criticalSectionTimeoutMS}));
 
 const testShardDistribution = (mongos) => {
     if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
