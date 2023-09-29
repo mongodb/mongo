@@ -154,7 +154,7 @@ public:
     static constexpr Name kMetadataSearchScore = {kMeta, "metadataSearchScore"_sd};
     static constexpr Name kMetadataSearchHighlights = {kMeta, "metadataSearchHighlights"_sd};
     static constexpr Name kMetadataSearchDetails = {kMeta, "metadataSearchDetails"_sd};
-    static constexpr Name kMetadataSearchSortValues = {kMeta, "metadataSearchSortValues"_sd};
+    static constexpr Name kMetadataSortValues = {kMeta, "metadataSortValues"_sd};
 
     PlanStageSlots() = default;
 
@@ -484,7 +484,7 @@ public:
     static constexpr auto kMetadataSearchScore = PlanStageSlots::kMetadataSearchScore;
     static constexpr auto kMetadataSearchHighlights = PlanStageSlots::kMetadataSearchHighlights;
     static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
-    static constexpr auto kMetadataSearchSortValues = PlanStageSlots::kMetadataSearchSortValues;
+    static constexpr auto kMetadataSortValues = PlanStageSlots::kMetadataSortValues;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,

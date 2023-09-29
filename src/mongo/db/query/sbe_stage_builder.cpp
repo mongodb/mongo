@@ -222,18 +222,6 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
                        *sn->intermediateResultsProtocolVersion,
                        true /* owned */);
     }
-
-    if (cursor.getVarsField()) {
-        auto name = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
-        // Variables on the cursor must be an object.
-        auto varsObj = cursor.getVarsField()->getField(name);
-        if (varsObj.ok()) {
-            auto [tag, val] = sbe::bson::convertFrom<false /* View */>(varsObj);
-            env->resetSlot(env->getSlot(name), tag, val, true);
-            cq.getExpCtx()->variables.setReservedValue(
-                Variables::kSearchMetaId, mongo::Value(varsObj), true);
-        }
-    }
 }
 }  // namespace
 
@@ -535,6 +523,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     invariant(outputs.has(kResult));
     invariant(reqs.has(kRecordId) == outputs.has(kRecordId));
 
+    // TODO: SERVER-78566 add search metadata and SEARCH_META slot to '_data'.
     _data->resultSlot = outputs.getSlotIfExists(stage_builder::PlanStageSlots::kResult);
     _data->recordIdSlot = outputs.getSlotIfExists(stage_builder::PlanStageSlots::kRecordId);
 
@@ -4266,7 +4255,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     PlanStageSlots outputs;
 
     for (size_t i = 0; i < topLevelFields.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, topLevelFields[i]),
+        outputs.set(std::make_pair(PlanStageSlots::kField, std::move(topLevelFields[i])),
                     topLevelFieldSlots[i]);
     }
 
@@ -4274,21 +4263,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto searchResultSlot = isStoredSource && reqs.has(kResult)
         ? boost::make_optional(_slotIdGenerator.generate())
         : boost::none;
-    // Register the $$SEARCH_META slot.
-    [[maybe_unused]] auto searchMetaSlot = _state.getBuiltinVarSlot(Variables::kSearchMetaId);
+    auto searchMetaSlot = _slotIdGenerator.generate();
 
     std::vector<std::string> metadataNames = {Document::metaFieldSearchScore.toString(),
                                               Document::metaFieldSearchHighlights.toString(),
                                               Document::metaFieldSearchScoreDetails.toString(),
                                               Document::metaFieldSearchSortValues.toString()};
     auto metadataSlots = _slotIdGenerator.generateMultiple(metadataNames.size());
-    // We have to generate all search metadata slots until we have migrate everything to SBE, this
-    // is because the metadata usage may depends on post-SBE DocumentSources in the pipeline, the
-    // SBE plan cache won't work in this case.
-    _data->metadataSlots.searchScoreSlot = metadataSlots[0];
-    _data->metadataSlots.searchHighlightsSlot = metadataSlots[1];
-    _data->metadataSlots.searchDetailsSlot = metadataSlots[2];
-    _data->metadataSlots.searchSortValuesSlot = metadataSlots[3];
+    outputs.set(kMetadataSearchScore, metadataSlots[0]);
+    outputs.set(kMetadataSearchHighlights, metadataSlots[1]);
+    outputs.set(kMetadataSearchDetails, metadataSlots[2]);
+    outputs.set(kMetadataSortValues, metadataSlots[3]);
 
     std::vector<std::string> fieldNames =
         isStoredSource ? topLevelFields : std::vector<std::string>{"_id"};
@@ -4302,6 +4287,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                                 metadataSlots,
                                                                 fieldNames,
                                                                 fieldSlots,
+                                                                searchMetaSlot,
                                                                 cursorIdSlot,
                                                                 firstBatchSlot,
                                                                 searchQuerySlot,

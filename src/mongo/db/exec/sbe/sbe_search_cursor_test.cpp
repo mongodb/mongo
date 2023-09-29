@@ -149,6 +149,7 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
                                                  metadataSlots,
                                                  fieldNames,
                                                  fieldSlots,
+                                                 boost::none, /* searchMetaSlot */
                                                  std::move(cursorIdSlot),
                                                  std::move(firstBatchSlot),
                                                  std::move(searchQuerySlot),
@@ -241,6 +242,7 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
                                                  metadataSlots,
                                                  fieldNames,
                                                  fieldSlots,
+                                                 boost::none, /* searchMetaSlot */
                                                  std::move(cursorIdSlot),
                                                  std::move(firstBatchSlot),
                                                  std::move(searchQuerySlot),
@@ -311,6 +313,7 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
                                                  metadataSlots,
                                                  fieldNames,
                                                  fieldSlots,
+                                                 boost::none, /* searchMetaSlot */
                                                  std::move(cursorIdSlot),
                                                  std::move(firstBatchSlot),
                                                  std::move(searchQuerySlot),

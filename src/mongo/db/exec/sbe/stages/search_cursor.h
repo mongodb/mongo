@@ -65,6 +65,7 @@ public:
                       value::SlotVector metadataSlots,
                       std::vector<std::string> fieldNames,
                       value::SlotVector fieldSlots,
+                      boost::optional<value::SlotId> searchMetaSlot,
                       value::SlotId cursorIdSlot,
                       value::SlotId firstBatchSlot,
                       value::SlotId searchQuerySlot,
@@ -100,6 +101,7 @@ public:
 
 private:
     bool shouldReturnEOF();
+    void tryToSetSearchMetaVar();
 
 private:
     const NamespaceString _namespace;
@@ -110,6 +112,7 @@ private:
     const value::SlotVector _metadataSlots;
     const IndexedStringVector _fieldNames;
     const value::SlotVector _fieldSlots;
+    const boost::optional<value::SlotId> _searchMetaSlot;
 
     // Input slots.
     const value::SlotId _cursorIdSlot;
@@ -125,6 +128,7 @@ private:
     value::SlotAccessorMap _metadataAccessorsMap;
     absl::InlinedVector<value::OwnedValueAccessor, 3> _fieldAccessors;
     value::SlotAccessorMap _fieldAccessorsMap;
+    value::OwnedValueAccessor _searchMetaAccessor;
 
     // Input slot accessors.
     value::SlotAccessor* _cursorIdAccessor;

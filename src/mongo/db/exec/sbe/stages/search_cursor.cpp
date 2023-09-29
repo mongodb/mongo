@@ -47,6 +47,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
                                      value::SlotVector metadataSlots,
                                      std::vector<std::string> fieldNames,
                                      value::SlotVector fieldSlots,
+                                     boost::optional<value::SlotId> searchMetaSlot,
                                      value::SlotId cursorIdSlot,
                                      value::SlotId firstBatchSlot,
                                      value::SlotId searchQuerySlot,
@@ -64,6 +65,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
       _metadataSlots(std::move(metadataSlots)),
       _fieldNames(std::move(fieldNames)),
       _fieldSlots(std::move(fieldSlots)),
+      _searchMetaSlot(searchMetaSlot),
       _cursorIdSlot(cursorIdSlot),
       _firstBatchSlot(firstBatchSlot),
       _searchQuerySlot(searchQuerySlot),
@@ -82,6 +84,7 @@ std::unique_ptr<PlanStage> SearchCursorStage::clone() const {
                                                _metadataSlots,
                                                _fieldNames.getUnderlyingVector(),
                                                _fieldSlots,
+                                               _searchMetaSlot,
                                                _cursorIdSlot,
                                                _firstBatchSlot,
                                                _searchQuerySlot,
@@ -159,7 +162,31 @@ value::SlotAccessor* SearchCursorStage::getAccessor(CompileCtx& ctx, value::Slot
     if (auto it = _fieldAccessorsMap.find(slot); it != _fieldAccessorsMap.end()) {
         return it->second;
     }
+    if (_searchMetaSlot && *_searchMetaSlot == slot) {
+        return &_searchMetaAccessor;
+    }
     return ctx.getAccessor(slot);
+}
+
+void SearchCursorStage::tryToSetSearchMetaVar() {
+    if (_searchMetaSlot && _searchMetaAccessor.getViewOfValue().first == value::TypeTags::Nothing &&
+        _cursor && _cursor->getCursorVars()) {
+        // Variables on the cursor must be an object.
+        auto varsObj = Value(_cursor->getCursorVars().value());
+        auto metaVal = varsObj.getDocument().getField(
+            Variables::getBuiltinVariableName(Variables::kSearchMetaId));
+        if (!metaVal.missing()) {
+            auto [tag, val] = value::makeValue(metaVal);
+            _searchMetaAccessor.reset(tag, val);
+            if (metaVal.isObject()) {
+                auto metaValDoc = metaVal.getDocument();
+                if (!metaValDoc.getField("count").missing()) {
+                    auto& opDebug = CurOp::get(_opCtx)->debug();
+                    opDebug.mongotCountVal = metaValDoc.getField("count").wrap("count");
+                }
+            }
+        }
+    }
 }
 
 void SearchCursorStage::open(bool reOpen) {
@@ -219,6 +246,8 @@ void SearchCursorStage::open(bool reOpen) {
                             protocolVersion)
                         .value());
     tassert(7816111, "Establishing the cursor should yield a non-null value.", _cursor.has_value());
+    tryToSetSearchMetaVar();
+
     _isStoredSource = _searchQuery.getBoolField(kReturnStoredSourceArg);
 }
 
@@ -359,6 +388,7 @@ std::unique_ptr<PlanStageStats> SearchCursorStage::getStats(bool includeDebugInf
         bob.append("fieldNames", _fieldNames.getUnderlyingVector());
         bob.append("fieldSlots", _fieldSlots.begin(), _fieldSlots.end());
 
+        bob.appendNumber("searchMetaSlot", static_cast<long long>(*_searchMetaSlot));
         bob.appendNumber("cursorIdSlot", static_cast<long long>(_cursorIdSlot));
         bob.appendNumber("firstBatchSlot", static_cast<long long>(_firstBatchSlot));
         bob.appendNumber("limitSlot", static_cast<long long>(_limitSlot));
@@ -384,6 +414,7 @@ std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint() const {
     DebugPrinter::addIdentifier(ret, _cursorIdSlot);
     DebugPrinter::addIdentifier(ret, _firstBatchSlot);
     DebugPrinter::addIdentifier(ret, _limitSlot);
+    addDebugOptionalSlotIdentifier(ret, _searchMetaSlot);
 
     return ret;
 }
