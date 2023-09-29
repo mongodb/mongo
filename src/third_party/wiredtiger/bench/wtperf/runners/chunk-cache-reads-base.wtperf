@@ -1,6 +1,6 @@
 conn_config="statistics=(all),statistics_log=(json=true,on_close=true,wait=1),cache_size=50MB,eviction=(threads_max=8),tiered_storage=(auth_token=Secret,bucket=bucket2,bucket_prefix=pfx_,name=dir_store)"
 table_count=5
-icount=25000000
+icount=2500000
 key_sz=1024
 value_sz=1024
 run_time=120
