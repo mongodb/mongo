@@ -11,15 +11,17 @@ IFS=' ''	''
 export IFS
 
 build() {
+    set -o pipefail
+
     # Build the standard typedefs.
     f=../src/include/wt_internal.h
     (sed -e '/Forward type declarations .*: BEGIN/{' \
         -e 'n' \
         -e 'q' \
-        -e '}' < $f
+        -e '}' < $f || exit $?
 
     l=`ls ../src/include/*.h ../src/include/*.in |
-        sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
+        sed -e '/wiredtiger.*/d' -e '/queue.h/d'` || exit $?
     egrep -h \
         '^[[:space:]]*(((struct|union)[[:space:]].*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \
         $l |
@@ -30,7 +32,7 @@ build() {
         upper=`echo $n | sed -e 's/^__//' | tr '[a-z]' '[A-Z]'`
         echo "$t $n;"
         echo "    typedef $t $n $upper;"
-    done
+    done || exit $?
 
     # Fixed types we use.
     echo
@@ -42,10 +44,10 @@ build() {
     sed -e '/Forward type declarations .*: END/,${' \
         -e 'p' \
         -e '}' \
-        -e 'd' < $f) > $t
-    ./s_clang_format "${PWD}/$t"
+        -e 'd' < $f) > $t || exit $?
+    ./s_clang_format "${PWD}/$t" || exit $?
     cmp $t $f > /dev/null 2>&1 ||
-        (echo "Building $f" && rm -f $f && cp $t $f)
+        { echo "Building $f" ; cp -f $t $f; }
 }
 
 check() {

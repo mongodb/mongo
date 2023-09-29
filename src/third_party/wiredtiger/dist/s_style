@@ -2,7 +2,7 @@
 
 # General style correction and cleanup.
 t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
+trap 'rm -f "$t"' 0 1 2 3 13 15
 
 # Parallelize if possible.
 xp=""
@@ -41,6 +41,7 @@ else
     # General style correction and cleanup for a single file
     f=$1
     fname=`basename $f`
+    rm -f "$t"
     t=__wt_s_style.$fname.$$
 
     if [ ! -e $f ]; then
