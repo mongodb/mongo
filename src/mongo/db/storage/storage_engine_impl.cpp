@@ -1230,10 +1230,11 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
     opCtx->recoveryUnit()->abandonSnapshot();
 }
 
-void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
-                                            std::shared_ptr<Ident> ident,
-                                            DropIdentCallback&& onDrop) {
-    _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, ident, std::move(onDrop));
+void StorageEngineImpl::addDropPendingIdent(
+    const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+    std::shared_ptr<Ident> ident,
+    DropIdentCallback&& onDrop) {
+    _dropPendingIdentReaper.addDropPendingIdent(dropTime, ident, std::move(onDrop));
 }
 
 void StorageEngineImpl::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
@@ -1248,32 +1249,29 @@ void StorageEngineImpl::checkpoint(OperationContext* opCtx) {
     _engine->checkpoint(opCtx);
 }
 
+StorageEngine::CheckpointIteration StorageEngineImpl::getCheckpointIteration() const {
+    return _engine->getCheckpointIteration();
+}
+
+bool StorageEngineImpl::hasDataBeenCheckpointed(
+    StorageEngine::CheckpointIteration checkpointIteration) const {
+    return _engine->hasDataBeenCheckpointed(checkpointIteration);
+}
+
 void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(OperationContext* opCtx,
                                                                     const Timestamp& timestamp) {
-    // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
-    if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
+    if (_dropPendingIdentReaper.hasExpiredIdents(timestamp)) {
+        LOGV2(22260,
+              "Removing drop-pending idents with drop timestamps before timestamp",
+              "timestamp"_attr = timestamp);
 
-        auto checkpoint = _engine->getCheckpointTimestamp();
-        auto oldest = _engine->getOldestTimestamp();
-
-        // We won't try to drop anything unless we know it is both safe to drop (older than the
-        // oldest timestamp) and present in a checkpoint for non-ephemeral storage engines.
-        // Otherwise, the drop will fail, and we'll keep attempting a drop for each new `timestamp`.
-        // Note that this is not required for correctness and is only done to avoid unnecessary work
-        // and spamming the logs when we actually have nothing to do. Additionally, these values may
-        // have both advanced since `timestamp` was calculated, but this is not expected to be
-        // common and does not affect correctness.
-        // For ephemeral storage engines, we can always drop immediately.
-        const bool safeToDrop = oldest >= *earliestDropTimestamp;
-        const bool canDropWithoutTransientErrors =
-            isEphemeral() || checkpoint >= *earliestDropTimestamp;
-        if (safeToDrop && canDropWithoutTransientErrors) {
-            LOGV2(22260,
-                  "Removing drop-pending idents with drop timestamps before timestamp",
-                  "timestamp"_attr = timestamp);
-
-            _dropPendingIdentReaper.dropIdentsOlderThan(opCtx, timestamp);
-        }
+        _dropPendingIdentReaper.dropIdentsOlderThan(opCtx, timestamp);
+    } else {
+        LOGV2_DEBUG(8097401,
+                    1,
+                    "No drop-pending idents have expired",
+                    "timestamp"_attr = timestamp,
+                    "pendingIdentsCount"_attr = _dropPendingIdentReaper.getNumIdents());
     }
 }
 

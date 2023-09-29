@@ -90,6 +90,16 @@ auto removeEmptyDirectory =
                         "error"_attr = ec.message());
         }
     };
+
+BSONObj toBSON(const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& x) {
+    return stdx::visit(OverloadedVisitor{[](const Timestamp& ts) { return ts.toBSON(); },
+                                         [](const StorageEngine::CheckpointIteration& iter) {
+                                             auto underlyingValue = uint64_t{iter};
+                                             return BSON("checkpointIteration"
+                                                         << std::to_string(underlyingValue));
+                                         }},
+                       x);
+}
 }  // namespace
 
 void removeIndex(OperationContext* opCtx,
@@ -137,51 +147,56 @@ void removeIndex(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop([svcCtx = opCtx->getServiceContext(),
-                                                    recoveryUnit,
-                                                    storageEngine,
-                                                    uuid = collection->uuid(),
-                                                    nss = collection->ns(),
-                                                    indexNameStr = indexName.toString(),
-                                                    ident,
-                                                    isTwoPhaseDrop](
-                                                       OperationContext*,
-                                                       boost::optional<Timestamp> commitTimestamp) {
-        StorageEngine::DropIdentCallback onDrop =
-            [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
-                removeEmptyDirectory(svcCtx, storageEngine, nss);
+    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
+        [svcCtx = opCtx->getServiceContext(),
+         recoveryUnit,
+         storageEngine,
+         uuid = collection->uuid(),
+         nss = collection->ns(),
+         indexNameStr = indexName.toString(),
+         ident,
+         isTwoPhaseDrop](OperationContext*, boost::optional<Timestamp> commitTimestamp) {
+            StorageEngine::DropIdentCallback onDrop =
+                [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
+                    removeEmptyDirectory(svcCtx, storageEngine, nss);
 
-                if (isTwoPhaseDrop) {
-                    CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
-                        catalog.notifyIdentDropped(ident);
-                    });
+                    if (isTwoPhaseDrop) {
+                        CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
+                            catalog.notifyIdentDropped(ident);
+                        });
+                    }
+                };
+
+            if (isTwoPhaseDrop) {
+                stdx::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
+                if (!commitTimestamp) {
+                    // Standalone mode and unreplicated drops will not provide a timestamp. Use the
+                    // checkpoint iteration instead.
+                    dropTime = storageEngine->getEngine()->getCheckpointIteration();
+                } else {
+                    dropTime = *commitTimestamp;
                 }
-            };
-
-        if (isTwoPhaseDrop) {
-            if (!commitTimestamp) {
-                // Standalone mode will not provide a timestamp.
-                commitTimestamp = Timestamp::min();
+                LOGV2(22206,
+                      "Deferring table drop for index",
+                      "index"_attr = indexNameStr,
+                      logAttrs(nss),
+                      "uuid"_attr = uuid,
+                      "ident"_attr = ident->getIdent(),
+                      "dropTime"_attr = toBSON(dropTime));
+                storageEngine->addDropPendingIdent(dropTime, ident, std::move(onDrop));
+            } else {
+                LOGV2(6361201,
+                      "Completing drop for index table immediately",
+                      "ident"_attr = ident->getIdent(),
+                      "index"_attr = indexNameStr,
+                      logAttrs(nss));
+                // Intentionally ignoring failure here. Since we've removed the metadata pointing to
+                // the collection, we should never see it again anyway.
+                storageEngine->getEngine()
+                    ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
+                    .ignore();
             }
-            LOGV2(22206,
-                  "Deferring table drop for index",
-                  "index"_attr = indexNameStr,
-                  logAttrs(nss),
-                  "uuid"_attr = uuid,
-                  "ident"_attr = ident->getIdent(),
-                  "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
-        } else {
-            LOGV2(6361201,
-                  "Completing drop for index table immediately",
-                  "ident"_attr = ident->getIdent(),
-                  "index"_attr = indexNameStr,
-                  logAttrs(nss));
-            // Intentionally ignoring failure here. Since we've removed the metadata pointing to
-            // the collection, we should never see it again anyway.
-            storageEngine->getEngine()->dropIdent(recoveryUnit, ident->getIdent(), onDrop).ignore();
-        }
-    });
+        });
 }
 
 Status dropCollection(OperationContext* opCtx,
@@ -223,16 +238,20 @@ Status dropCollection(OperationContext* opCtx,
                 };
 
             if (storageEngine->supportsPendingDrops()) {
+                stdx::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
                 if (!commitTimestamp) {
-                    // Standalone mode will not provide a timestamp.
-                    commitTimestamp = Timestamp::min();
+                    // Standalone mode and unreplicated drops will not provide a timestamp. Use the
+                    // checkpoint iteration instead.
+                    dropTime = storageEngine->getEngine()->getCheckpointIteration();
+                } else {
+                    dropTime = *commitTimestamp;
                 }
                 LOGV2(22214,
                       "Deferring table drop for collection",
                       logAttrs(nss),
                       "ident"_attr = ident->getIdent(),
-                      "commitTimestamp"_attr = commitTimestamp);
-                storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
+                      "dropTime"_attr = toBSON(dropTime));
+                storageEngine->addDropPendingIdent(dropTime, ident, std::move(onDrop));
             } else {
                 // Intentionally ignoring failure here. Since we've removed the metadata pointing to
                 // the collection, we should never see it again anyway.

@@ -1959,6 +1959,20 @@ bool WiredTigerKVEngine::supportsDirectoryPerDB() const {
     return true;
 }
 
+void WiredTigerKVEngine::_checkpoint(WT_SESSION* session, bool useTimestamp) {
+    _currentCheckpointIteration.fetchAndAdd(1);
+    if (useTimestamp) {
+        invariantWTOK(session->checkpoint(session, "use_timestamp=true"), session);
+    } else {
+        invariantWTOK(session->checkpoint(session, "use_timestamp=false"), session);
+    }
+    auto checkpointedIteration = _finishedCheckpointIteration.fetchAndAdd(1);
+    LOGV2_FOR_RECOVERY(8097402,
+                       2,
+                       "Finished checkpoint, updated iteration counter",
+                       "checkpointIteration"_attr = checkpointedIteration);
+}
+
 void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* session) try {
     // Ephemeral WiredTiger instances cannot do a checkpoint to disk as there is no disk backing
     // the data.
@@ -2003,7 +2017,8 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
     //
     // Third, stableTimestamp >= initialDataTimestamp: Take stable checkpoint. Steady state case.
     if (initialDataTimestamp.asULL() <= 1) {
-        invariantWTOK(session->checkpoint(session, "use_timestamp=false"), session);
+        _checkpoint(session, /*useTimestamp=*/false);
+
         LOGV2_FOR_RECOVERY(5576602,
                            2,
                            "Completed unstable checkpoint.",
@@ -2024,7 +2039,7 @@ void WiredTigerKVEngine::_checkpoint(OperationContext* opCtx, WT_SESSION* sessio
                            "stableTimestamp"_attr = stableTimestamp,
                            "oplogNeededForRollback"_attr = toString(oplogNeededForRollback));
 
-        invariantWTOK(session->checkpoint(session, "use_timestamp=true"), session);
+        _checkpoint(session, /*useTimestamp=*/true);
 
         if (oplogNeededForRollback.isOK()) {
             // Now that the checkpoint is durable, publish the oplog needed to recover from it.
@@ -2041,6 +2056,12 @@ void WiredTigerKVEngine::checkpoint(OperationContext* opCtx) {
     UniqueWiredTigerSession session = _sessionCache->getSession();
     WT_SESSION* s = session->getSession();
     return _checkpoint(opCtx, s);
+}
+
+void WiredTigerKVEngine::forceCheckpoint(bool useStableTimestamp) {
+    UniqueWiredTigerSession session = _sessionCache->getSession();
+    WT_SESSION* s = session->getSession();
+    return _checkpoint(s, useStableTimestamp);
 }
 
 bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, StringData ident) const {

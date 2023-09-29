@@ -293,18 +293,16 @@ TEST_F(KVDropPendingIdentReaperTest,
     ASSERT_EQUALS(identName2, engine->droppedIdents.back());
 }
 
-DEATH_TEST_F(KVDropPendingIdentReaperTest,
-             AddDropPendingIdentTerminatesOnDuplicateDropTimestampAndIdent,
-             "Failed to add drop-pending ident") {
+
+TEST_F(KVDropPendingIdentReaperTest, AddDropPendingIdentSupportsExactDuplicates) {
     Timestamp dropTimestamp{Seconds(100), 0};
 
     KVDropPendingIdentReaper reaper(getEngine());
 
-    {
-        std::shared_ptr<Ident> ident = std::make_shared<Ident>("myident");
-        reaper.addDropPendingIdent(dropTimestamp, ident);
-        reaper.addDropPendingIdent(dropTimestamp, ident);
-    }
+    std::shared_ptr<Ident> ident = std::make_shared<Ident>("myident");
+    reaper.addDropPendingIdent(dropTimestamp, ident);
+    reaper.addDropPendingIdent(dropTimestamp, ident);
+    ASSERT_EQ(reaper.getNumIdents(), 1);
 }
 
 TEST_F(KVDropPendingIdentReaperTest,

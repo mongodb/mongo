@@ -79,16 +79,20 @@ public:
     virtual ~KVDropPendingIdentReaper() = default;
 
     /**
-     * Adds a new drop-pending ident, with its drop timestamp and namespace, to be managed by this
+     * Adds a new drop-pending ident, with its drop time and namespace, to be managed by this
      * class.
      *
-     * When the timestamp is old enough -- the op cannot be rolled back nor new users access the
-     * record store data -- and no remaining operations reference the 'ident', then the
+     * When the drop time is old enough and no remaining operations reference the 'ident', then the
      * index/collection data will be safe to drop unversioned.
+     *
+     * A drop time is considered old enough when:
+     * - (Timestamp) The op cannot be rolled back nor new users access the record store data.
+     * - (CheckpointIteration) The catalog has made its changes durable.
      */
-    void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             std::shared_ptr<Ident> ident,
-                             StorageEngine::DropIdentCallback&& onDrop = nullptr);
+    void addDropPendingIdent(
+        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        std::shared_ptr<Ident> ident,
+        StorageEngine::DropIdentCallback&& onDrop = nullptr);
 
     /**
      * Marks the ident as in use and prevents the reaper from dropping the ident.
@@ -105,6 +109,9 @@ public:
      */
     boost::optional<Timestamp> getEarliestDropTimestamp() const;
 
+    // Returns whether there are expired idents
+    bool hasExpiredIdents(const Timestamp& ts) const;
+
     /**
      * Returns drop-pending idents in a sorted set.
      * Used by the storage engine during catalog reconciliation.
@@ -119,13 +126,14 @@ public:
     /**
      * Notifies this class that the storage engine has advanced its oldest timestamp.
      * Drops all unreferenced drop-pending idents with drop timestamps before 'ts', as well as all
-     * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones).
+     * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones) as
+     * long as the changes have been checkpointed.
      */
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts);
 
     /**
-     * Clears maps of drop pending idents but does not drop idents in storage engine.
-     * Used by rollback before recovering to a stable timestamp.
+     * Clears maps of drop pending idents for timestamped writes but does not drop idents in storage
+     * engine. Used by rollback before recovering to a stable timestamp.
      *
      * This function is called under the same critical section as rollback-to-stable, which happens
      * under the global exclusive lock, and has to be called prior to re-opening the catalog, which
@@ -136,7 +144,7 @@ public:
 private:
     // Contains information identifying what collection/index data to drop as well as determining
     // when to do so.
-    using IdentInfo = struct {
+    struct IdentInfo {
         // Identifier for the storage to drop the associated collection or index data.
         std::string identName;
 
@@ -145,11 +153,15 @@ private:
         State identState;
 
         // The collection or index data can be safely dropped when no references to this token
-        // remain.
+        // remain and the catalog has checkpointed the changes. The latter is mostly useful for
+        // untimestamped writes.
+        stdx::variant<Timestamp, StorageEngine::CheckpointIteration> dropTime;
         std::weak_ptr<Ident> dropToken;
 
         // Callback to run once the ident has been dropped.
         StorageEngine::DropIdentCallback onDrop;
+
+        bool isExpired(const KVEngine* engine, const Timestamp& ts) const;
     };
 
     // Container type for drop-pending namespaces. We use a multimap so that we can order the

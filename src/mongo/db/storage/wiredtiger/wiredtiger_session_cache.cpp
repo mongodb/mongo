@@ -271,15 +271,9 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
     // waiters, as a log flush is much cheaper than a full checkpoint.
     if ((syncType == Fsync::kCheckpointStableTimestamp || syncType == Fsync::kCheckpointAll) &&
         !isEphemeral()) {
-        UniqueWiredTigerSession session = getSession();
-        WT_SESSION* s = session->getSession();
-
         auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
 
-        auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
-                                                                    : "use_timestamp=false";
-
-        invariantWTOK(s->checkpoint(s, config), s);
+        getKVEngine()->forceCheckpoint(syncType == Fsync::kCheckpointStableTimestamp);
 
         if (token) {
             journalListener->onDurable(token.value());
@@ -319,16 +313,10 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             nullptr);
     }
 
-    // Use the journal when available, or a checkpoint otherwise.
-    if (!isEphemeral()) {
-        invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"),
-                      _waitUntilDurableSession);
-        LOGV2_DEBUG(22419, 4, "flushed journal");
-    } else {
-        invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr),
-                      _waitUntilDurableSession);
-        LOGV2_DEBUG(22420, 4, "created checkpoint");
-    }
+    // Flush the journal.
+    invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"),
+                  _waitUntilDurableSession);
+    LOGV2_DEBUG(22419, 4, "flushed journal");
 
     // The session is reset periodically so that WT doesn't consider it a rogue session and log
     // about it. The session doesn't actually pin any resources that need to be released.

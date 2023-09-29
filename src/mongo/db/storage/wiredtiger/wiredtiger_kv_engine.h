@@ -162,6 +162,18 @@ public:
 
     void checkpoint(OperationContext* opCtx) override;
 
+    // Force a WT checkpoint, this will not update internal timestamps.
+    void forceCheckpoint(bool useStableTimestamp);
+
+    StorageEngine::CheckpointIteration getCheckpointIteration() const override {
+        return StorageEngine::CheckpointIteration{_currentCheckpointIteration.load()};
+    }
+
+    bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const override {
+        return _ephemeral || _finishedCheckpointIteration.load() > checkpointIteration;
+    }
+
     bool isEphemeral() const override {
         return _ephemeral;
     }
@@ -456,6 +468,8 @@ private:
 
     void _checkpoint(OperationContext* opCtx, WT_SESSION* session);
 
+    void _checkpoint(WT_SESSION* session, bool useTimestamp);
+
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
      * Only returns when successful. Intializes both '_conn' and '_fileVersion'.
@@ -572,5 +586,16 @@ private:
 
     // The amount of memory alloted for the WiredTiger cache.
     size_t _cacheSizeMB;
+
+    // Counters used for computing whether a checkpointIteration has lapsed or not.
+    //
+    // We use two counters because one isn't sufficient to prove correctness. With two counters we
+    // first increase the first one in order to inform later operations that they will be part of
+    // the next checkpoint. The second one is there to inform waiters on whether they've
+    // successfully been checkpointed or not.
+    //
+    // This is valid because durability is a state all operations will converge to eventually.
+    AtomicWord<std::uint64_t> _currentCheckpointIteration{0};
+    AtomicWord<std::uint64_t> _finishedCheckpointIteration{0};
 };
 }  // namespace mongo
