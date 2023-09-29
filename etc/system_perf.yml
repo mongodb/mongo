@@ -41,6 +41,25 @@ variables:
         variant: compile-amazon2-streams
       - name: schedule_global_auto_tasks
         variant: task_generation
+  _real_compile_al2023_arm64: &_compile_al2023_arm64
+      - name: compile
+        variant: compile-al2023-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _real_compile_al2023_arm64_with_mongocrypt_shlib: &_compile_al2023_arm64_with_mongocrypt_shlib
+      - name: compile
+        variant: compile-al2023-arm64
+      - name: compile_mongocrypt_shlib
+        variant: compile-al2023-arm64-mongocrypt-shlib
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _real_compile_mixed_amazon_linux2_al2023_arm64: &_compile_mixed_amazon_linux2_al2023_arm64
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: compile
+        variant: compile-al2023-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
 
   _real_expansions: &_expansion_updates
       []
@@ -61,6 +80,9 @@ variables:
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
 #  _skip_compile_amazon2_streams: &_compile_amazon2_streams
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
+#  _skip_compile_al2023_arm64: &_compile_al2023_arm64
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
 #  _skip_expansions: &_expansion_updates
@@ -384,6 +406,21 @@ functions:
               set -o igncr
             fi;
 
+            export cleanup=false
+
+            # install go for tools if required (al2023 for now).
+            if [ ! -d "/opt/golang/go1.19" ]; then
+              cleanup=true
+              echo -n "go-lang missing downloading ..."
+              go_file=./go1.19.8.tar.gz
+              wget --quiet https://go.dev/dl/go1.19.8.linux$(echo ${compile_variant} | sed 's/^-al202.//').tar.gz -O "$go_file"
+              echo -n " installing ..."
+              sudo mkdir -p /opt/golang/go1.19
+              sudo tar -C /opt/golang/go1.19 -xzf "$go_file" --strip-components=1
+              [ -e "$go_file" ] && rm -f "$go_file"
+              echo  "done"
+            fi
+
             # set_goenv provides set_goenv()
             . ./set_goenv.sh
             GOROOT="" set_goenv || exit
@@ -397,6 +434,9 @@ functions:
                 go build -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
                 "../../../../../mongodb/bin/$i${exe|}" --version
             done
+            if "$cleanup"; then
+              sudo rm -rf "/opt/golang/go1.19"
+            fi
           fi
     - command: shell.exec
       params:
@@ -1843,6 +1883,59 @@ buildvariants:
     tasks:
       - name: compile_mongocrypt_shlib
 
+  - &compile-al2023-arm64
+    name: compile-al2023-arm64
+    display_name: Compile for Al2023 arm64
+    modules: *modules
+    cron: "0 0 * * *"  # Everyday at 00:00
+    expansions: &compile-al2023-expansions
+      platform: linux
+      project_dir: *project_dir
+      tooltags: ""
+      use_scons_cache: true
+      compile_flags: >-
+        --ssl
+        --separate-debug
+        MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
+        install-mongocryptd
+      compile_variant: -al2023-arm64
+    run_on:
+      - "amazon2023.0-arm64-large"
+    tasks:
+      - name: compile
+
+  - name: compile-al2023-arm64-mongocrypt-shlib
+    display_name: Compile mongo_crypt_v1.so for Al2023 arm64
+    modules: *modules
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    expansions:
+      <<: *compile-al2023-expansions
+      compile_variant: -al2023-arm64
+      compile_flags: >-
+        --separate-debug
+        MONGO_DISTMOD=rhel82
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
+        --allocator=system
+        --enable-free-mon=off
+        --enterprise-features=fle,search
+        --js-engine=none
+        --link-model=dynamic-sdk
+        --enable-http-client=off
+        --ssl=off
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+    run_on:
+      - "amazon2023.0-arm64-large"
+    tasks:
+      - name: compile_mongocrypt_shlib
+
   - name: linux-intel-standalone-classic-query-engine
     display_name: Linux Intel Standalone (Classic Query Engine)
     cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
@@ -2021,6 +2114,36 @@ buildvariants:
       - name: ycsb_60GB
       - name: tpcc
       - name: tpcc_majority
+      - name: linkbench
+      - name: linkbench2
+
+  - name: m60-like-al2023-3-node-replSet.arm.aws.2023-09
+    display_name: M60-like AL2023 3-Node ReplSet ARM AWS 2023-09
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas-like-replica.2023-09
+      infrastructure_provisioning: M60-like-replica.2023-09
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      client_compile_variant: "-al2023-arm64"
+      compile_variant: "-al2023-arm64"
+      canaries: none # Packages required for the canaries are missing.
+    run_on:
+      - "rhel70-perf-M60-like"
+    depends_on: *_compile_al2023_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      # TODO: Turn on with Python3 py-tpcc support (PERF-4758)
+      # - name: tpcc
+      # - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
 
