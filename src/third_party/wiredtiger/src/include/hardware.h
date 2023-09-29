@@ -17,6 +17,35 @@
     } while (0)
 
 /*
+ * WT_READ_ONCE --
+ *
+ * Ensure a single read from memory in the source code produces a single read from memory in the
+ * compiled output.
+ *
+ * The compiler is allowed to optimize loads from memory in multiple ways such as "load fusing",
+ * where the compiler takes multiple reads from a memory location and merges them into a single read
+ * instruction, and "invented loads" where the compiler takes a single load from memory and converts
+ * it into multiple read instructions.
+ *
+ * WiredTiger has many algorithms where threads are allowed to concurrently access and modify the
+ * same memory location, but to do this safely we need to precisely control how reads to memory are
+ * performed. This macro gives us control over this.
+ *
+ * GCC and Clang have a __typeof__ compiler builtin which allows us to temporarily cast the value
+ * being read as a volatile and achieve volatile semantics. For other compilers we'll fall back on
+ * inserting a read barrier after the read (our pre-existing implementation) which prevents invented
+ * and fused loads for this variable in the code following the expression.
+ *
+ * FIXME-WT-11718 - Once Windows build machines that support C11 _Generics are available this macro
+ * will be updated to use _Generic on all platforms.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+#define WT_READ_ONCE(v, val) (v) = (*(volatile __typeof__(val) *)&(val))
+#else
+#define WT_READ_ONCE(v, val) WT_ORDERED_READ(v, val)
+#endif
+
+/*
  * Read a shared location and guarantee that subsequent reads do not see any earlier state.
  */
 #define WT_ORDERED_READ(v, val) \
