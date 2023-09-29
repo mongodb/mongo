@@ -15,13 +15,8 @@ import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
 // Use a higher frequency for periodic noops to speed up the test.
-const reshardingTest = new ReshardingTest({
-    numDonors: 1,
-    numRecipients: 1,
-    periodicNoopIntervalSecs: 1,
-    writePeriodicNoops: true,
-    moveCollection: true
-});
+const reshardingTest = new ReshardingTest(
+    {numDonors: 1, numRecipients: 1, periodicNoopIntervalSecs: 1, writePeriodicNoops: true});
 reshardingTest.setup();
 
 const kDbName = "reshardingDb";

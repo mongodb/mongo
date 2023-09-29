@@ -16,7 +16,7 @@ import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_i
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-const reshardingTest = new ReshardingTest({moveCollection: true});
+const reshardingTest = new ReshardingTest();
 reshardingTest.setup();
 
 const testCases = [

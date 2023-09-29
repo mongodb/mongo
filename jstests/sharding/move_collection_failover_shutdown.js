@@ -16,8 +16,7 @@
  */
 import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 
-const reshardingTest = new ReshardingTest(
-    {numDonors: 1, numRecipients: 1, enableElections: true, moveCollection: true});
+const reshardingTest = new ReshardingTest({numDonors: 1, numRecipients: 1, enableElections: true});
 reshardingTest.setup();
 
 const donorShardNames = reshardingTest.donorShardNames;
