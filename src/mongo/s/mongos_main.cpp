@@ -776,7 +776,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     serviceContext->setSessionManager(std::make_unique<transport::SessionManagerCommon>(
         serviceContext, std::make_unique<ClientTransportObserverMongos>()));
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
+    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
 
     const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
     if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {

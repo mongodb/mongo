@@ -101,7 +101,8 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     _serviceContext = getGlobalServiceContext();
     _setAuthorizationManager();
-    _serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    _serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointMongod>());
     _serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(_serviceContext));
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();
@@ -170,7 +171,10 @@ int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
     Message msg(std::move(sb));
 
     try {
-        _serviceContext->getServiceEntryPoint()->handleRequest(opCtx.get(), msg).get();
+        _serviceContext->getService()
+            ->getServiceEntryPoint()
+            ->handleRequest(opCtx.get(), msg)
+            .get();
     } catch (const AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
     }

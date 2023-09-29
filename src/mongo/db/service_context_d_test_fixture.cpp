@@ -142,7 +142,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         serviceContext->setTickSource(std::move(options._mockTickSource));
     }
 
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
     serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(serviceContext));
 
     auto observerRegistry = std::make_unique<OpObserverRegistry>();

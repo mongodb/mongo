@@ -141,7 +141,7 @@ public:
         setGlobalServiceContext(ServiceContext::make());
         _svcCtx = getGlobalServiceContext();
 
-        _svcCtx->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+        _svcCtx->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
         _svcCtx->setSessionManager(std::make_unique<SessionManagerMongod>(_svcCtx));
 
         auto fastClock = std::make_unique<ClockSourceMock>();

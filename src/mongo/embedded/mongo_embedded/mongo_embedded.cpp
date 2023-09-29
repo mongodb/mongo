@@ -432,7 +432,7 @@ void client_wire_protocol_rpc(mongo_embedded_v1_client* const client,
     ClientGuard clientGuard(client);
 
     auto opCtx = cc().makeOperationContext();
-    auto sep = client->parent_db->serviceContext->getServiceEntryPoint();
+    auto sep = client->parent_db->serviceContext->getService()->getServiceEntryPoint();
 
     auto sb = SharedBuffer::allocate(input_size);
     memcpy(sb.get(), input, input_size);

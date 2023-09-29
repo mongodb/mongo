@@ -148,8 +148,11 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 
             auto requestOpMsg =
                 OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, commandObj).serialize();
-            const auto replyOpMsg = OpMsg::parseOwned(
-                service->getServiceEntryPoint()->handleRequest(opCtx, requestOpMsg).get().response);
+            const auto replyOpMsg = OpMsg::parseOwned(service->getService()
+                                                          ->getServiceEntryPoint()
+                                                          ->handleRequest(opCtx, requestOpMsg)
+                                                          .get()
+                                                          .response);
 
             // Document sequences are not yet being used for responses.
             invariant(replyOpMsg.sequences.empty());

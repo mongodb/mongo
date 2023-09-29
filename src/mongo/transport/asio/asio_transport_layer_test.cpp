@@ -767,7 +767,8 @@ public:
 
     void setUp() override {
         auto* svcCtx = getServiceContext();
-        svcCtx->setServiceEntryPoint(std::make_unique<test::ServiceEntryPointUnimplemented>());
+        svcCtx->getService()->setServiceEntryPoint(
+            std::make_unique<test::ServiceEntryPointUnimplemented>());
         svcCtx->setSessionManager(std::make_unique<test::MockSessionManager>());
         svcCtx->setTransportLayer(makeTLA(svcCtx->getSessionManager()));
     }
@@ -1019,7 +1020,8 @@ public:
         const auto listenerPort = tl->listenerPort();
 
         auto* svcCtx = getServiceContext();
-        svcCtx->setServiceEntryPoint(std::make_unique<test::ServiceEntryPointUnimplemented>());
+        svcCtx->getService()->setServiceEntryPoint(
+            std::make_unique<test::ServiceEntryPointUnimplemented>());
         svcCtx->setSessionManager(std::move(sessionManager));
         svcCtx->setTransportLayer(std::move(tl));
 

@@ -230,7 +230,7 @@ public:
     void setUp() override {
         ServiceContextTest::setUp();
         auto sc = getServiceContext();
-        sc->setServiceEntryPoint(_makeServiceEntryPoint());
+        sc->getService()->setServiceEntryPoint(_makeServiceEntryPoint());
         sc->setSessionManager(_makeSessionManager(sc));
         initializeNewSession();
         invariant(sessionManager()->start());
@@ -263,7 +263,8 @@ public:
     }
 
     MockServiceEntryPoint* sep() {
-        return checked_cast<MockServiceEntryPoint*>(getServiceContext()->getServiceEntryPoint());
+        return checked_cast<MockServiceEntryPoint*>(
+            getServiceContext()->getService()->getServiceEntryPoint());
     }
 
     SessionManagerCommon* sessionManager() {

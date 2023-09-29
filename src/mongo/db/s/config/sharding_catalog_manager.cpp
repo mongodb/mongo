@@ -163,7 +163,7 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
     lsidBuilder.doneFast();
 
     return OpMsg::parseOwned(
-        opCtx->getServiceContext()
+        opCtx->getService()
             ->getServiceEntryPoint()
             ->handleRequest(opCtx, OpMsgRequest::fromDBAndBody(db, bob.obj()).serialize())
             .get()
@@ -232,7 +232,7 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     const auto cmdObj = bob.obj();
 
     const auto replyOpMsg = OpMsg::parseOwned(
-        newOpCtx->getServiceContext()
+        newOpCtx->getService()
             ->getServiceEntryPoint()
             ->handleRequest(newOpCtx.get(),
                             OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmdObj).serialize())

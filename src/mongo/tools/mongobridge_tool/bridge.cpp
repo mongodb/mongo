@@ -531,7 +531,7 @@ int bridgeMain(int argc, char** argv) {
     setGlobalServiceContext(std::move(serviceContextHolder));
     auto serviceContext = getGlobalServiceContext();
 
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>());
+    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>());
     serviceContext->setSessionManager(std::make_unique<SessionManagerBridge>(serviceContext));
 
     {

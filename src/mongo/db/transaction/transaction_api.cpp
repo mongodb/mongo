@@ -457,7 +457,7 @@ void primeInternalClient(Client* client) {
 
 Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
     OperationContext* opCtx, const Message& request) const {
-    auto serviceEntryPoint = opCtx->getServiceContext()->getServiceEntryPoint();
+    auto serviceEntryPoint = opCtx->getService()->getServiceEntryPoint();
     return serviceEntryPoint->handleRequest(opCtx, request);
 }
 

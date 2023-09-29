@@ -144,6 +144,55 @@ private:
 using OperationKey = UUID;
 
 class Service;
+namespace service_context_detail {
+/**
+ * A synchronized owning pointer to avoid setters racing with getters.
+ * This only guarantees that getters receive a coherent value, and
+ * not that the pointer is still valid.
+ *
+ * The kernel of operations is `set` and and `get`, others ops are sugar.
+ */
+template <typename T>
+class SyncUnique {
+public:
+    SyncUnique() = default;
+    explicit SyncUnique(std::unique_ptr<T> p) {
+        set(std::move(p));
+    }
+
+    ~SyncUnique() {
+        set(nullptr);
+    }
+
+    SyncUnique& operator=(std::unique_ptr<T> p) {
+        set(std::move(p));
+        return *this;
+    }
+
+    void set(std::unique_ptr<T> p) {
+        delete _ptr.swap(p.release());
+    }
+
+    T* get() const {
+        return _ptr.load();
+    }
+
+    T* operator->() const {
+        return get();
+    }
+
+    T& operator*() const {
+        return *get();
+    }
+
+    explicit operator bool() const {
+        return static_cast<bool>(get());
+    }
+
+private:
+    AtomicWord<T*> _ptr{nullptr};
+};
+}  // namespace service_context_detail
 
 /**
  * Class representing the context of a service, such as a MongoD database service or
@@ -155,6 +204,8 @@ class Service;
 class ServiceContext final : public Decorable<ServiceContext> {
     ServiceContext(const ServiceContext&) = delete;
     ServiceContext& operator=(const ServiceContext&) = delete;
+    template <typename T>
+    using SyncUnique = service_context_detail::SyncUnique<T>;
 
 public:
     /**
@@ -519,13 +570,6 @@ public:
     transport::TransportLayer* getTransportLayer() const;
 
     /**
-     * Get the service entry point for the service context.
-     *
-     * See ServiceEntryPoint for more details.
-     */
-    ServiceEntryPoint* getServiceEntryPoint() const;
-
-    /**
      * Get the SessionManager.
      */
     transport::SessionManager* getSessionManager() const;
@@ -613,11 +657,6 @@ public:
     void setSessionManager(std::unique_ptr<transport::SessionManager> sm);
 
     /**
-     * Binds the service entry point implementation to the service context.
-     */
-    void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
-
-    /**
      * Binds the TransportLayer to the service context. The TransportLayer should have already
      * had setup() called successfully, but not startup().
      *
@@ -672,54 +711,6 @@ public:
     Service* getService() const;
 
 private:
-    /**
-     * A synchronized owning pointer to avoid setters racing with getters.
-     * This only guarantees that getters receive a coherent value, and
-     * not that the pointer is still valid.
-     *
-     * The kernel of operations is `set` and and `get`, others ops are sugar.
-     */
-    template <typename T>
-    class SyncUnique {
-    public:
-        SyncUnique() = default;
-        explicit SyncUnique(std::unique_ptr<T> p) {
-            set(std::move(p));
-        }
-
-        ~SyncUnique() {
-            set(nullptr);
-        }
-
-        SyncUnique& operator=(std::unique_ptr<T> p) {
-            set(std::move(p));
-            return *this;
-        }
-
-        void set(std::unique_ptr<T> p) {
-            delete _ptr.swap(p.release());
-        }
-
-        T* get() const {
-            return _ptr.load();
-        }
-
-        T* operator->() const {
-            return get();
-        }
-
-        T& operator*() const {
-            return *get();
-        }
-
-        explicit operator bool() const {
-            return static_cast<bool>(get());
-        }
-
-    private:
-        AtomicWord<T*> _ptr{nullptr};
-    };
-
     class ClientObserverHolder {
     public:
         explicit ClientObserverHolder(std::unique_ptr<ClientObserver> observer)
@@ -767,11 +758,6 @@ private:
      * The TransportLayer.
      */
     SyncUnique<transport::TransportLayer> _transportLayer;
-
-    /**
-     * The service entry point
-     */
-    SyncUnique<ServiceEntryPoint> _serviceEntryPoint;
 
     /**
      * The storage engine, if any.
@@ -846,8 +832,12 @@ private:
  * both services can now exist in the same server process (ServiceContext).
  */
 class Service : public Decorable<Service> {
+    template <typename T>
+    using SyncUnique = service_context_detail::SyncUnique<T>;
+
 public:
-    Service(ServiceContext* sc, ClusterRole role) : _sc{sc}, _role{role} {}
+    Service(ServiceContext* sc, ClusterRole role);
+    ~Service();
 
     ServiceContext::UniqueClient makeClient(std::string desc,
                                             std::shared_ptr<transport::Session> session = nullptr) {
@@ -862,9 +852,16 @@ public:
         return _sc;
     }
 
+    void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
+
+    ServiceEntryPoint* getServiceEntryPoint() const {
+        return _serviceEntryPoint.get();
+    }
+
 private:
     ServiceContext* _sc;
     ClusterRole _role;
+    SyncUnique<ServiceEntryPoint> _serviceEntryPoint;
 };
 
 /**

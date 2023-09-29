@@ -282,7 +282,8 @@ public:
         setGlobalServiceContext(ServiceContext::make());
         auto sc = getGlobalServiceContext();
         _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
-        sc->setServiceEntryPoint(std::make_unique<MockCoordinator::Sep>(_coordinator.get()));
+        sc->getService()->setServiceEntryPoint(
+            std::make_unique<MockCoordinator::Sep>(_coordinator.get()));
         sc->setSessionManager(std::make_unique<SessionManagerCommon>(sc));
         sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());
         LOGV2_DEBUG(7015136, 3, "About to start sep");

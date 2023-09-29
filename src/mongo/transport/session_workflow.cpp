@@ -389,7 +389,7 @@ public:
     Impl(SessionWorkflow* workflow, ServiceContext::UniqueClient client)
         : _workflow{workflow},
           _serviceContext{client->getServiceContext()},
-          _sep{_serviceContext->getServiceEntryPoint()},
+          _sep{client->getService()->getServiceEntryPoint()},
           _sessionManager{_serviceContext->getSessionManager()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
 

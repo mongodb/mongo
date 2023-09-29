@@ -932,7 +932,7 @@ private:
         cmdBuilder->append("apiVersion", kOne);
 
         auto svcCtx = _client->getServiceContext();
-        auto sep = svcCtx->getServiceEntryPoint();
+        auto sep = svcCtx->getService()->getServiceEntryPoint();
         auto opMsgRequest = OpMsgRequestBuilder::create(_dbName, cmdBuilder->obj());
         auto requestMessage = opMsgRequest.serialize();
 

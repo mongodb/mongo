@@ -513,7 +513,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     initializeCommandHooks(serviceContext);
 
     serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(serviceContext));
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
 
     // Set up the periodic runner for background job execution. This is required to be running
     // before both the storage engine or the transport layer are initialized.
@@ -1861,7 +1861,7 @@ int mongod_main(int argc, char* argv[]) {
     setUpReplication(service);
     setUpObservers(service);
     setUpMultitenancyCheck(service, gMultitenancySupport);
-    service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    service->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
     service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();

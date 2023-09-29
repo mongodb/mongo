@@ -136,6 +136,9 @@ private:
     std::unique_ptr<Service> _router;
 };
 
+Service::~Service() = default;
+Service::Service(ServiceContext* sc, ClusterRole role) : _sc{sc}, _role{role} {}
+
 ServiceContext::ServiceContext()
     : _opIdRegistry(UniqueOperationIdRegistry::create()),
       _tickSource(makeSystemTickSource()),
@@ -165,6 +168,10 @@ Service* ServiceContext::getService() const {
         if (auto p = getService(role))
             return p;
     MONGO_UNREACHABLE;
+}
+
+void Service::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {
+    _serviceEntryPoint = std::move(sep);
 }
 
 namespace {
@@ -248,10 +255,6 @@ transport::TransportLayer* ServiceContext::getTransportLayer() const {
     return _transportLayer.get();
 }
 
-ServiceEntryPoint* ServiceContext::getServiceEntryPoint() const {
-    return _serviceEntryPoint.get();
-}
-
 transport::SessionManager* ServiceContext::getSessionManager() const {
     return _sessionManager.get();
 }
@@ -280,10 +283,6 @@ void ServiceContext::setPreciseClockSource(std::unique_ptr<ClockSource> newSourc
 
 void ServiceContext::setSessionManager(std::unique_ptr<transport::SessionManager> sm) {
     _sessionManager = std::move(sm);
-}
-
-void ServiceContext::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {
-    _serviceEntryPoint = std::move(sep);
 }
 
 void ServiceContext::setTransportLayer(std::unique_ptr<transport::TransportLayer> tl) {

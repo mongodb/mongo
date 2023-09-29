@@ -67,7 +67,8 @@ public:
         sslGlobalParams.sslCAFile = grpc::CommandServiceTestFixtures::kCAFile;
         sslGlobalParams.sslPEMKeyFile = grpc::CommandServiceTestFixtures::kServerCertificateKeyFile;
 
-        svcCtx->setServiceEntryPoint(std::make_unique<test::ServiceEntryPointUnimplemented>());
+        svcCtx->getService()->setServiceEntryPoint(
+            std::make_unique<test::ServiceEntryPointUnimplemented>());
         svcCtx->setSessionManager(
             std::make_unique<test::MockSessionManager>([this](test::SessionThread& sessionThread) {
                 if (_serverCb) {

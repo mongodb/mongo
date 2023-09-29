@@ -256,7 +256,8 @@ ServiceContext* initialize(const char* yaml_config) {
     ScopeGuard clientGuard([] { Client::releaseCurrent(); });
 
     auto serviceContext = getGlobalServiceContext();
-    serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointEmbedded>());
+    serviceContext->getService()->setServiceEntryPoint(
+        std::make_unique<ServiceEntryPointEmbedded>());
     serviceContext->setSessionManager(std::make_unique<SessionManagerEmbedded>());
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
