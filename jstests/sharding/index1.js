@@ -12,10 +12,6 @@ for (var i = 0; i < 22; i++) {
     }
     assert.commandWorked(bulk.execute());
 
-    if (i == 0) {
-        s.adminCommand({enablesharding: "" + coll._db, primaryShard: s.shard1.shardName});
-    }
-
     print("\n\n\n\n\nTest # " + i);
 
     if (i == 0) {

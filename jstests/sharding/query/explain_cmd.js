@@ -9,6 +9,9 @@ var st = new ShardingTest({shards: 2});
 var db = st.s.getDB("test");
 var explain;
 
+assert.commandWorked(
+    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
+
 // Setup a collection that will be sharded. The shard key will be 'a'. There's also an index on
 // 'b'.
 var collSharded = db.getCollection("mongos_explain_cmd");
@@ -16,9 +19,6 @@ collSharded.drop();
 collSharded.createIndex({a: 1});
 collSharded.createIndex({b: 1});
 
-// Enable sharding.
-assert.commandWorked(
-    db.adminCommand({enableSharding: db.getName(), primaryShard: st.shard1.shardName}));
 db.adminCommand({shardCollection: collSharded.getFullName(), key: {a: 1}});
 
 // Pre-split the collection to ensure that both shards have chunks. Explicitly
