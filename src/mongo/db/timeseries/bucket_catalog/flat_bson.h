@@ -107,6 +107,8 @@ public:
         void setUnset();
         void setValue(const BSONElement& elem);
 
+        int64_t calculateMemUsage() const;
+
     private:
         Value _value;
         Type _type = Type::kUnset;
@@ -272,6 +274,11 @@ public:
         return {entries, entries.begin()};
     }
 
+    /**
+     * Calculate and return the cumulative memory usage of all entries.
+     */
+    int64_t calculateMemUsage() const;
+
 private:
     Entries entries;
 };
@@ -291,6 +298,8 @@ public:
     UpdateStatus update(const BSONObj& doc,
                         boost::optional<StringData> metaField,
                         const StringData::ComparatorInterface* stringComparator);
+
+    int64_t calculateMemUsage();
 
 protected:
     // Helper for update() above to provide recursion of FlatBSONStore element together with a
@@ -352,6 +361,7 @@ struct BSONElementValueBuffer {
     BSONElement get() const;
     void set(const BSONElement&);
     BSONType type() const;
+    int64_t size() const;
 
 private:
     std::unique_ptr<char[]> _buffer;
@@ -376,6 +386,8 @@ public:
      */
     bool isArrayFieldName() const;
     void claimArrayFieldNameForObject(std::string name);
+
+    int64_t calculateMemUsage() const;
 
 private:
     std::string _fieldName;
@@ -409,6 +421,8 @@ public:
      */
     MinMaxStore::Data& max();
     const MinMaxStore::Data& max() const;
+
+    int64_t calculateMemUsage() const;
 
 private:
     MinMaxStore::Data _min;
@@ -487,6 +501,7 @@ struct BSONTypeValue {
     BSONElement get() const;
     void set(const BSONElement&);
     BSONType type() const;
+    int64_t size() const;
 
 private:
     BSONType _type;
@@ -505,10 +520,12 @@ public:
     void initializeRoot();
 
     /**
-     * Min data component access
+     * Schema data component access
      */
     SchemaStore::Data& data();
     const SchemaStore::Data& data() const;
+
+    int64_t calculateMemUsage() const;
 
 private:
     SchemaStore::Data _data;

@@ -437,15 +437,15 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
 
-    // The namespace is stored two times: the bucket itself and openBucketsByKey. We don't have a
-    // great approximation for the _schema or _minmax data structure size, so we use the control
-    // field size as an approximation for _minmax, and half that size for _schema. Since the
-    // metadata is stored in the bucket, we need to add that as well. A unique pointer to the bucket
-    // is stored once: openBucketsById. A raw pointer to the bucket is stored at most twice:
-    // openBucketsByKey, idleBuckets.
-    bucket->memoryUsage += (key.ns.size() * 2) + 1.5 * controlField.objsize() +
-        key.metadata.toBSON().objsize() + sizeof(Bucket) + sizeof(std::unique_ptr<Bucket>) +
-        (sizeof(Bucket*) * 2);
+    // The namespace is stored two times: the bucket itself and openBucketsByKey. The bucket
+    // consists of minmax and schema data so add their memory usage. Since the metadata is stored in
+    // the bucket, we need to add that as well. A unique pointer to the bucket is stored once:
+    // openBucketsById. A raw pointer to the bucket is stored at most twice: openBucketsByKey,
+    // idleBuckets.
+
+    bucket->memoryUsage += (key.ns.size() * 2) + bucket->minmax.calculateMemUsage() +
+        bucket->schema.calculateMemUsage() + key.metadata.toBSON().objsize() + sizeof(Bucket) +
+        sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
 
     return {std::move(bucket)};
 }
