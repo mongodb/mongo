@@ -559,6 +559,12 @@ tasks:
       - func: f_run_dsi_workload
         vars:
           test_control: short
+  - name: canaries_only
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: canaries
   - name: smoke_test_ssl
     priority: 5
     commands:
