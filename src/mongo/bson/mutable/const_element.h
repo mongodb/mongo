@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include "mongo/bson/mutable/api.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/platform/visibility.h"
 
 namespace mongo {
 namespace mutablebson {
@@ -48,7 +48,7 @@ namespace mutablebson {
  *
  *  All calls on ConstElement are simply forwarded to the underlying Element.
  */
-class MONGO_API(mutable_bson) ConstElement {
+class MONGO_MUTABLE_BSON_API ConstElement {
 public:
     // This one argument constructor is intentionally not explicit, since we want to be
     // able to pass Elements to functions taking ConstElements without complaint.

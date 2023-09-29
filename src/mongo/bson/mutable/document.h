@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/mutable/api.h"
 #include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/element.h"
@@ -242,7 +243,7 @@ namespace mutablebson {
  *  ConstElement for the root. ConstElement is much like Element, but does not permit
  *  mutations. See the class comment for ConstElement for more information.
  */
-class MONGO_API(mutable_bson) Document {
+class MONGO_MUTABLE_BSON_API Document {
     // TODO: In principle there is nothing that prevents implementing a deep copy for
     // Document, but for now it is not permitted.
     Document(const Document&) = delete;

@@ -33,10 +33,16 @@
 #include "mongo/platform/visibility.h"
 #include "mongo/platform/visibility_test_lib1.h"
 
+#ifdef MONGO_API_visibility_test_lib2
+#define MONGO_API_VISIBILITY_TEST_LIB2 MONGO_API_EXPORT
+#else
+#define MONGO_API_VISIBILITY_TEST_LIB2 MONGO_API_IMPORT
+#endif
+
 namespace mongo {
 namespace visibility_test_lib2 {
 
-class MONGO_API(visibility_test_lib2) Derived : public visibility_test_lib1::Base {
+class MONGO_API_VISIBILITY_TEST_LIB2 Derived : public visibility_test_lib1::Base {
 public:
     explicit Derived(const std::string& name, double value);
     double value() const;

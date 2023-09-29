@@ -32,8 +32,8 @@
 #include <absl/meta/type_traits.h>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/preprocessor/stringize.hpp>
 #include <cstdint>
+#include <fmt/format.h>
 #include <js-config.h>
 #include <js/Initialization.h>
 #include <mutex>
@@ -78,7 +78,8 @@ void ScriptEngine::setup(bool disableLoadStored) {
 }
 
 std::string ScriptEngine::getInterpreterVersionString() {
-    return "MozJS-" BOOST_PP_STRINGIZE(MOZJS_MAJOR_VERSION);
+    using namespace fmt::literals;
+    return "MozJS-{}"_format(MOZJS_MAJOR_VERSION);
 }
 
 namespace mozjs {

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,26 +29,10 @@
 
 #pragma once
 
-#if !defined(MONGO_USE_VISIBILITY)
+#include "mongo/platform/visibility.h"
 
-#define MONGO_API_EXPORT
-#define MONGO_API_IMPORT
-#define MONGO_PRIVATE
-
+#ifdef MONGO_API_mutable_bson  // Compiling mutable_bson API
+#define MONGO_MUTABLE_BSON_API MONGO_API_EXPORT
 #else
-
-#if defined(_MSC_VER)
-
-#define MONGO_API_EXPORT __declspec(dllexport)
-#define MONGO_API_IMPORT __declspec(dllimport)
-#define MONGO_PRIVATE
-
-#else
-
-#define MONGO_API_EXPORT __attribute__((visibility("default")))
-#define MONGO_API_IMPORT __attribute__((visibility("default")))
-#define MONGO_PRIVATE __attribute__((visibility("hidden")))
-
-#endif
-
+#define MONGO_MUTABLE_BSON_API MONGO_API_IMPORT
 #endif

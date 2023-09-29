@@ -32,7 +32,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/iteration/iterate.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
 #include <map>

@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/mutable/api.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
@@ -123,7 +124,7 @@ class Document;
  *    be removed.
  */
 
-class MONGO_API(mutable_bson) Element {
+class MONGO_MUTABLE_BSON_API Element {
 public:
     typedef uint32_t RepIdx;
 

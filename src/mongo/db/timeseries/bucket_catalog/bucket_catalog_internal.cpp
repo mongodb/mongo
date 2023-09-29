@@ -38,7 +38,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <boost/preprocessor/iteration/iterate.hpp>
 #include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
 #include <climits>
 #include <limits>

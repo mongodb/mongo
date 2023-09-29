@@ -33,10 +33,15 @@
 
 #include "mongo/platform/visibility.h"
 
+#ifdef MONGO_API_visibility_test_lib1
+#define MONGO_VISIBILITY_TEST_LIB1_API MONGO_API_EXPORT
+#else
+#define MONGO_VISIBILITY_TEST_LIB1_API MONGO_API_IMPORT
+#endif
+
 namespace mongo {
 namespace visibility_test_lib1 {
-
-class MONGO_API(visibility_test_lib1) Base {
+class MONGO_VISIBILITY_TEST_LIB1_API Base {
 public:
     explicit Base(const std::string& name);
     std::string_view name() const;
