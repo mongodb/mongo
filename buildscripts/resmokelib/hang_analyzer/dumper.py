@@ -531,7 +531,7 @@ class GDBDumper(Dumper):
         """Dump info."""
 
         dbg = self._find_debugger()
-        logger = _get_process_logger(self._dbg_output, pinfo.name)
+        logger = self._root_logger
         _start_time = datetime.now()
 
         if dbg is None:
