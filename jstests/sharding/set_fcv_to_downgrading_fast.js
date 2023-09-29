@@ -14,7 +14,8 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 const latest = "latest";
 // The FCV downgrade should be < 1 second but we added a buffer for slow machines.
-const timeoutSeconds = 3;
+// Windows is slower but usually can make it in 4s, so we allow it to finish in 6s.
+const timeoutSeconds = _isWindows() ? 6 : 3;
 
 function runStandaloneTest() {
     jsTestLog("Running standalone test");
