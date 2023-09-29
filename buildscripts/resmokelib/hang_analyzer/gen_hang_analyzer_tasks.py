@@ -7,9 +7,9 @@ import random
 import re
 import string
 import sys
-from typing import Any, List, Set
+from typing import List
 
-from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task, TaskDependency, ExistingTask
+from shrub.v2 import BuildVariant, FunctionCall, ShrubProject, Task
 from shrub.v2.command import BuiltInCommand
 from buildscripts.resmokelib.hang_analyzer import dumper
 
@@ -21,8 +21,20 @@ from buildscripts.util.fileops import write_file
 from buildscripts.util.read_config import read_config_file
 from buildscripts.resmokelib.utils import evergreen_conn
 
+GENERATED_TASK_PREFIX = "core_analysis"
+RANDOM_STRING_LENGTH = 5
 
-def get_core_analyzer_commands(task_id: str, execution: str) -> List[FunctionCall]:
+
+def get_generated_task_name(current_task_name: str, execution: str) -> str:
+    # random string so we do not define the same task name for multiple variants which causes issues
+    random_string = ''.join(
+        random.choices(string.ascii_uppercase + string.digits + string.ascii_lowercase,
+                       k=RANDOM_STRING_LENGTH))
+    return f"{GENERATED_TASK_PREFIX}_{current_task_name}{execution}_{random_string}"
+
+
+def get_core_analyzer_commands(task_id: str, execution: str,
+                               core_analyzer_results_url: str) -> List[FunctionCall]:
     """Return setup commands."""
     return [
         FunctionCall("f_expansions_write"),
@@ -55,22 +67,14 @@ def get_core_analyzer_commands(task_id: str, execution: str) -> List[FunctionCal
             }),
         BuiltInCommand(
             "s3.put", {
-                "aws_key":
-                    "${aws_key}",
-                "aws_secret":
-                    "${aws_secret}",
-                "local_file":
-                    "src/mongo-coreanalysis.tgz",
-                "remote_file":
-                    "${project}/${build_variant}/${revision}/hanganalyzer/mongo-coreanalysis-${build_id}-${task_name}-${execution}.tgz",
-                "bucket":
-                    "mciuploads",
-                "permissions":
-                    "public-read",
-                "content_type":
-                    "application/gzip",
-                "display_name":
-                    "Core Analyzer Output - Execution ${execution}",
+                "aws_key": "${aws_key}",
+                "aws_secret": "${aws_secret}",
+                "local_file": "src/mongo-coreanalysis.tgz",
+                "remote_file": core_analyzer_results_url,
+                "bucket": "mciuploads",
+                "permissions": "public-read",
+                "content_type": "application/gzip",
+                "display_name": "Core Analyzer Output - Execution ${execution}",
             }),
         # We delete the core dumps after we are done processing them so they are not
         # reuploaded to s3 in the generated task's post task block
@@ -99,6 +103,7 @@ def generate(expansions_file: str = "../expansions.yml",
     task_id = expansions.get("task_id")
     execution = expansions.get("execution")
     build_variant_name = expansions.get("build_variant")
+    core_analyzer_results_url = expansions.get("core_analyzer_results_url")
 
     try:
         evg_api = evergreen_conn.get_evergreen_api()
@@ -115,12 +120,11 @@ def generate(expansions_file: str = "../expansions.yml",
         return
 
     task_info = evg_api.task_by_id(task_id)
-    generated_task_prefix = "core_analysis"
 
     # make sure we are not creating an infinite loop by generating a task from another generated task
-    if current_task_name.startswith(generated_task_prefix):
+    if current_task_name.startswith(GENERATED_TASK_PREFIX):
         print(
-            f"Skipping task generation because {current_task_name} starts with {generated_task_prefix}"
+            f"Skipping task generation because {current_task_name} starts with {GENERATED_TASK_PREFIX}"
         )
         return
 
@@ -158,13 +162,9 @@ def generate(expansions_file: str = "../expansions.yml",
 
     # Make the evergreen variant that will be generated
     build_variant = BuildVariant(name=build_variant_name, activate=True)
-    commands = get_core_analyzer_commands(task_id, execution)
+    commands = get_core_analyzer_commands(task_id, execution, core_analyzer_results_url)
 
-    # random string so we do not define the same task name for multiple variants which causes issues
-    random_string = ''.join(
-        random.choices(string.ascii_uppercase + string.digits + string.ascii_lowercase, k=5))
-    sub_tasks = set(
-        [Task(f"{generated_task_prefix}_{current_task_name}_{random_string}", commands)])
+    sub_tasks = set([Task(get_generated_task_name(current_task_name, execution), commands)])
 
     if display_task_name:
         # If the task is already in a display task add the new task to the current display task

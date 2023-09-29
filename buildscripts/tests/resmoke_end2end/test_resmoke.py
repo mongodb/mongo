@@ -15,6 +15,8 @@ import yaml
 
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.resmokelib import config, core, suitesconfig
+from buildscripts.resmokelib.hang_analyzer.attach_core_analyzer_task import matches_generated_task_pattern
+from buildscripts.resmokelib.hang_analyzer.gen_hang_analyzer_tasks import get_generated_task_name
 from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
 
@@ -672,3 +674,12 @@ class TestMultiversionConfig(unittest.TestCase):
             self.fail(msg="`resmoke.py multiversion-config` does not output valid yaml.")
 
         os.remove(file_name)
+
+
+class TestCoreAnalyzerFunctions(unittest.TestCase):
+    def test_generated_task_name(self):
+        task_name = "test_tast_name"
+        execution = "0"
+        generated_task_name = get_generated_task_name(task_name, execution)
+        self.assertEquals(matches_generated_task_pattern(task_name, generated_task_name), execution)
+        self.assertIsNone(matches_generated_task_pattern("not_same_task", generated_task_name))

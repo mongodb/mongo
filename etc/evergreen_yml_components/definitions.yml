@@ -2174,6 +2174,12 @@ functions:
   - *upload_coredumps_json
 
   "generate hang analyzer tasks":
+  - command: expansions.update
+    params:
+      updates:
+      - key: core_analyzer_results_url
+        value: ${project}/${compile_variant}/${task_id}/${execution}/core-analyzer-results.tgz
+  - *f_expansions_write
   - command: subprocess.exec
     params:
       binary: bash
@@ -2196,6 +2202,28 @@ functions:
       optional: true
       files:
       - src/hang_analyzer_task.json
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/resmokelib/hang_analyzer/attach_core_analyzer_task.py"
+  - command: attach.artifacts
+    params:
+      optional: true
+      files:
+        - src/core_analyzer_artifact.json
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/core_analyzer_results.txt
+      remote_file: ${core_analyzer_results_url}
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Core Analyzer Results
+      optional: true
 
   ### Process & archive failed unittest artifacts ###
   "gather failed unittests": &gather_failed_unittests
