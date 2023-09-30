@@ -49,7 +49,9 @@ assert.commandWorked(db.runCommand({"dbCheck": 1}));
     print("checking " + tojson(node));
     let entry = node.getDB('local').system.healthlog.findOne({severity: 'error'});
     assert(entry, "No healthlog entry found on " + tojson(node));
-    assert.eq("Error fetching record from record id", entry.msg, tojson(entry));
+    assert.eq("Erroneous index key found with reference to non-existent record id",
+              entry.msg,
+              tojson(entry));
 
     // The erroneous index key should not affect the hashes. The documents should still be the same.
     assert.eq(1, node.getDB('local').system.healthlog.count({severity: 'error'}));

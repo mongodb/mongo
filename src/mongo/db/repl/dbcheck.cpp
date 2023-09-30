@@ -173,7 +173,6 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
                                                       const boost::optional<UUID>& collectionUUID,
                                                       SeverityEnum severity,
                                                       const std::string& msg,
-                                                      ScopeEnum scope,
                                                       OplogEntriesEnum operation,
                                                       const boost::optional<BSONObj>& data) {
     auto entry = std::make_unique<HealthLogEntry>();
@@ -185,7 +184,7 @@ std::unique_ptr<HealthLogEntry> dbCheckHealthLogEntry(const boost::optional<Name
     }
     entry->setTimestamp(Date_t::now());
     entry->setSeverity(severity);
-    entry->setScope(scope);
+    entry->setScope(ScopeEnum::Cluster);
     entry->setMsg(msg);
     entry->setOperation(renderForHealthLog(operation));
     if (data) {
@@ -201,7 +200,6 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
     const boost::optional<NamespaceString>& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
-    ScopeEnum scope,
     OplogEntriesEnum operation,
     const Status& err,
     const BSONObj& context) {
@@ -210,7 +208,6 @@ std::unique_ptr<HealthLogEntry> dbCheckErrorHealthLogEntry(
         collectionUUID,
         SeverityEnum::Error,
         msg,
-        scope,
         operation,
         BSON("success" << false << "error" << err.toString() << "context" << context));
 }
@@ -219,14 +216,12 @@ std::unique_ptr<HealthLogEntry> dbCheckWarningHealthLogEntry(
     const NamespaceString& nss,
     const boost::optional<UUID>& collectionUUID,
     const std::string& msg,
-    ScopeEnum scope,
     OplogEntriesEnum operation,
     const Status& err) {
     return dbCheckHealthLogEntry(nss,
                                  collectionUUID,
                                  SeverityEnum::Warning,
                                  msg,
-                                 ScopeEnum::Cluster,
                                  operation,
                                  BSON("success" << false << "error" << err.toString()));
 }
@@ -286,13 +281,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
     std::string msg =
         "dbCheck batch " + (hashesMatch ? std::string("consistent") : std::string("inconsistent"));
 
-    return dbCheckHealthLogEntry(nss,
-                                 collectionUUID,
-                                 severity,
-                                 msg,
-                                 ScopeEnum::Cluster,
-                                 OplogEntriesEnum::Batch,
-                                 builder.obj());
+    return dbCheckHealthLogEntry(
+        nss, collectionUUID, severity, msg, OplogEntriesEnum::Batch, builder.obj());
 }
 
 template <typename T>
@@ -347,7 +337,7 @@ DbCheckHasher::DbCheckHasher(
                                                BoundInclusion::kIncludeEndKeyOnly,
                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                InternalPlanner::FORWARD,
-                                               InternalPlanner::IXSCAN_DEFAULT);
+                                               InternalPlanner::IXSCAN_FETCH);
         } else {
             CollectionScanParams params;
             params.minRecord = RecordIdBound(uassertStatusOK(
@@ -536,62 +526,24 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
 Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                                              const CollectionPtr& collPtr,
                                              Date_t deadline) {
-    BSONObj currentObjId;
+    BSONObj currentObj;
     RecordId currentRecordId;
-    RecordData record;
     PlanExecutor::ExecState lastState;
-    // Iterate through the _id index and obtain the object ID and record ID pair. If the _id index
-    // key entry is corrupt, getNext() will throw an exception and we will fail the batch.
-    while (PlanExecutor::ADVANCED ==
-           (lastState = _exec->getNext(&currentObjId, &currentRecordId))) {
+    while (PlanExecutor::ADVANCED == (lastState = _exec->getNext(nullptr, &currentRecordId))) {
         SleepDbCheckInBatch.execute([opCtx](const BSONObj& data) {
             int sleepMs = data["sleepMs"].safeNumberInt();
             opCtx->sleepFor(Milliseconds(sleepMs));
         });
 
+        RecordData record;
         if (!collPtr->getRecordStore()->findRecord(opCtx, currentRecordId, &record)) {
             // TODO (SERVER-81117): Determine if this is the correct error code to return.
-            const auto msg = "Error fetching record from record id";
-            const auto status = Status(ErrorCodes::KeyNotFound, msg);
-            const auto logEntry =
-                dbCheckErrorHealthLogEntry(collPtr->ns(),
-                                           collPtr->uuid(),
-                                           msg,
-                                           ScopeEnum::Document,
-                                           OplogEntriesEnum::Batch,
-                                           status,
-                                           BSON("recordID" << currentRecordId.toString()));
-            HealthLogInterface::get(opCtx)->log(*logEntry);
-
-            // If we cannot find the record in the record store, continue onto the next recordId.
-            // The inconsistency will be caught when we compare hashes.
-            continue;
+            return Status(ErrorCodes::NoSuchKey,
+                          "Could not find record ID: " + currentRecordId.toString());
         }
 
-        // We validate the record data before parsing it into a BSONObj, as parsing it into a
-        // BSONObj may hide some of the corruption.
-        int currentObjSize = record.size();
-        const char* currentObjData = record.data();
-
-        if (_secondaryIndexCheckParameters &&
-            _secondaryIndexCheckParameters.value().getValidateMode() ==
-                DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck) {
-            const auto status =
-                validateBSON(currentObjData, currentObjSize, BSONValidateMode::kDefault);
-            if (!status.isOK()) {
-                const auto msg = "Document is not well-formed BSON";
-                const auto logEntry =
-                    dbCheckErrorHealthLogEntry(collPtr->ns(),
-                                               collPtr->uuid(),
-                                               msg,
-                                               ScopeEnum::Document,
-                                               OplogEntriesEnum::Batch,
-                                               status,
-                                               BSON("recordID" << currentRecordId.toString()));
-                HealthLogInterface::get(opCtx)->log(*logEntry);
-            }
-        }
-
+        // If _id is corrupt, getNext() will throw an exception and we'll fail the batch. If any
+        // other field is invalid, toBson() will still parse the raw record data and get the hash.
         BSONObj currentObj = record.toBson();
         if (!currentObj.hasField("_id")) {
             // TODO (SERVER-81117): Determine if this is the correct error code to return.
@@ -617,7 +569,6 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                     collPtr->ns(),
                     collPtr->uuid(),
                     msg,
-                    ScopeEnum::Document,
                     OplogEntriesEnum::Batch,
                     status,
                     BSON("recordID" << currentRecordId.toString() << "missingIndexKeys"
@@ -627,17 +578,12 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
             }
         }
 
-        // Update `last` every time. currentObjId was a BSONObj obtained from the _id index scan
-        // with 1 field in the form {"": _id}. We rehydrate it to add the field names back.
-        //
-        // We use the _id value obtained from the _id index walk so that we can store our last seen
-        // _id and proceed with dbCheck even if the previous record had corruption in its _id
-        // field.
-        _last = key_string::rehydrateKey(BSON("_id" << 1), currentObjId);
-        _countSeen += 1;
+        // Update `last` every time.
+        _last = BSON("_id" << currentObj["_id"]);
         _bytesSeen += currentObj.objsize();
+        _countSeen += 1;
 
-        md5_append(&_state, md5Cast(currentObjData), currentObjSize);
+        md5_append(&_state, md5Cast(currentObj.objdata()), currentObj.objsize());
 
         if (Date_t::now() > deadline) {
             break;
@@ -718,7 +664,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                                   boost::none,
                                                   SeverityEnum::Info,
                                                   "dbCheck failed",
-                                                  ScopeEnum::Cluster,
                                                   OplogEntriesEnum::Batch,
                                                   BSON("success" << false << "info" << msg));
             HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -770,7 +715,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                                   boost::none,
                                                   SeverityEnum::Error,
                                                   "dbCheck failed",
-                                                  ScopeEnum::Index,
                                                   OplogEntriesEnum::Batch,
                                                   BSON("success" << false << "info" << msg));
                         HealthLogInterface::get(opCtx)->log(*logEntry);
@@ -809,19 +753,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         } else {
             hasher.emplace(
                 opCtx, collection, batchStart, batchEnd, entry.getSecondaryIndexCheckParameters());
-            const auto status = hasher->hashForCollectionCheck(opCtx, collection);
-            if (!status.isOK() && status.code() == ErrorCodes::KeyNotFound) {
-                std::unique_ptr<HealthLogEntry> healthLogEntry =
-                    dbCheckErrorHealthLogEntry(entry.getNss(),
-                                               collection->uuid(),
-                                               "Error fetching record from record id",
-                                               ScopeEnum::Index,
-                                               OplogEntriesEnum::Batch,
-                                               status);
-                HealthLogInterface::get(opCtx)->log(*healthLogEntry);
-                return Status::OK();
-            }
-            uassertStatusOK(status);
+            uassertStatusOK(hasher->hashForCollectionCheck(opCtx, collection));
         }
 
         std::string expected = entry.getMd5().toString();
@@ -865,7 +797,6 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         auto logEntry = dbCheckErrorHealthLogEntry(entry.getNss(),
                                                    boost::none,
                                                    msg,
-                                                   ScopeEnum::Cluster,
                                                    OplogEntriesEnum::Batch,
                                                    exception.toStatus(),
                                                    entry.toBSON());
@@ -909,7 +840,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                                                                boost::none /*collectionUUID*/,
                                                                SeverityEnum::Info,
                                                                "",
-                                                               ScopeEnum::Cluster,
                                                                type,
                                                                boost::none /*data*/);
             const auto secondaryIndexCheckParameters =

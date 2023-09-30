@@ -23,13 +23,6 @@ export const clearHealthLog = (replSet) => {
     replSet.awaitReplication();
 };
 
-export const logEveryBatch =
-    (replSet) => {
-        forEachNonArbiterNode(replSet, conn => {
-            conn.adminCommand({setParameter: 1, "dbCheckHealthLogEveryNBatches": 1});
-        })
-    }
-
 export const dbCheckCompleted = (db) => {
     return db.getSiblingDB("admin").currentOp().inprog == undefined ||
         db.getSiblingDB("admin").currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] ===
