@@ -74,15 +74,12 @@ public:
 
     boost::optional<User::CredentialData> generate(const std::string& password) {
         if (password.size() < kMinKeyLength || password.size() > kMaxKeyLength) {
-            LOGV2_ERROR(
-                20255,
-                "Security key in {filename} has length {size}, must be between {minimumLength} "
-                "and {maximumLength} characters",
-                "Security key size is out range",
-                "filename"_attr = _filename,
-                "size"_attr = password.size(),
-                "minimumLength"_attr = kMinKeyLength,
-                "maximumLength"_attr = kMaxKeyLength);
+            LOGV2_ERROR(20255,
+                        "Security key size is out range",
+                        "filename"_attr = _filename,
+                        "size"_attr = password.size(),
+                        "minimumLength"_attr = kMinKeyLength,
+                        "maximumLength"_attr = kMaxKeyLength);
             return boost::none;
         }
 
@@ -144,8 +141,6 @@ bool setUpSecurityKey(const string& filename, ClusterAuthMode mode) {
 
     if (keyStrings.size() > 2) {
         LOGV2_ERROR(20258,
-                    "Only two keys are supported in the security key file, {numKeys} are "
-                    "specified in {filename}",
                     "Only two keys are supported in the security key file",
                     "numKeys"_attr = keyStrings.size(),
                     "filename"_attr = filename);

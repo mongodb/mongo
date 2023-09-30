@@ -591,7 +591,6 @@ void ShardRegistry::_scheduleLookup() {
         .getAsync([](const Status& status) {
             if (!status.isOK()) {
                 LOGV2(4620201,
-                      "Error running reload of ShardRegistry for RSM update, caused by {error}",
                       "Error running reload of ShardRegistry for RSM update",
                       "error"_attr = redact(status));
             }
@@ -640,8 +639,6 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
 
     LOGV2_DEBUG(22731,
                 1,
-                "Found {shardsNumber} shards listed on config server(s) with lastVisibleOpTime: "
-                "{lastVisibleOpTime}",
                 "Succesfully retrieved updated shard list from config server",
                 "shardsNumber"_attr = shards.size(),
                 "lastVisibleOpTime"_attr = reloadOpTime);
@@ -658,7 +655,6 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
         auto shardHostStatus = ConnectionString::parse(shardType.getHost());
         if (!shardHostStatus.isOK()) {
             LOGV2_WARNING(22735,
-                          "Error parsing shard host caused by {error}",
                           "Error parsing shard host",
                           "error"_attr = redact(shardHostStatus.getStatus()));
             continue;
@@ -806,8 +802,6 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
 
     LOGV2_DEBUG(22733,
                 3,
-                "Adding new shard {shardId} with connection string {shardConnectionString} to "
-                "shard registry",
                 "Adding new shard to shard registry",
                 "shardId"_attr = shard->getId(),
                 "shardConnectionString"_attr = connString);

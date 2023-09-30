@@ -392,11 +392,8 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
 
 void CurOp::setMessage_inlock(StringData message) {
     if (_progressMeter.isActive()) {
-        LOGV2_ERROR(20527,
-                    "Changing message from {old} to {new}",
-                    "Updating message",
-                    "old"_attr = redact(_message),
-                    "new"_attr = redact(message));
+        LOGV2_ERROR(
+            20527, "Updating message", "old"_attr = redact(_message), "new"_attr = redact(message));
         MONGO_verify(!_progressMeter.isActive());
     }
     _message = message.toString();  // copy

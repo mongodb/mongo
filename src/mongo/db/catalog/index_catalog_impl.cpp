@@ -1175,7 +1175,6 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
         if (desc) {
             LOGV2_DEBUG(20353,
                         2,
-                        "Index already exists with a different name: {name}, spec: {spec}",
                         "Index already exists with a different name",
                         "name"_attr = desc->indexName(),
                         "spec"_attr = desc->infoObj());

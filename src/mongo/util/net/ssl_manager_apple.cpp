@@ -1553,14 +1553,10 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
 
     const auto badCert = [&](StringData msg, bool warn = false) -> Future<SSLPeerInfo> {
         if (warn) {
-            LOGV2_WARNING(23209,
-                          "SSL peer certificate validation failed: {error}",
-                          "SSL peer certificate validation failed",
-                          "error"_attr = msg);
+            LOGV2_WARNING(23209, "SSL peer certificate validation failed", "error"_attr = msg);
             return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sniName));
         } else {
             LOGV2_ERROR(23212,
-                        "SSL peer certificate validation failed {error}; connection rejected",
                         "SSL peer certificate validation failed; connection rejected",
                         "error"_attr = msg);
             return Status(ErrorCodes::SSLHandshakeFailed, msg);

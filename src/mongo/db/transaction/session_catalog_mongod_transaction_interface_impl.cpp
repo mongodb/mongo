@@ -84,7 +84,6 @@ void MongoDSessionCatalogTransactionInterfaceImpl::abortTransaction(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     LOGV2_DEBUG(21978,
                 3,
-                "Aborting transaction sessionId: {sessionId} txnNumber {txnNumber}",
                 "Aborting transaction",
                 "sessionId"_attr = txnRecord.getSessionId().toBSON(),
                 "txnNumber"_attr = txnRecord.getTxnNum());
@@ -97,8 +96,6 @@ void MongoDSessionCatalogTransactionInterfaceImpl::refreshLocksForPreparedTransa
     auto txnParticipant = TransactionParticipant::get(opCtx);
     LOGV2_DEBUG(21979,
                 3,
-                "Restoring locks of prepared transaction. SessionId: {sessionId} "
-                "TxnNumberAndRetryCounter: {txnNumberAndRetryCounter}",
                 "Restoring locks of prepared transaction",
                 "sessionId"_attr = sessionInfo.getSessionId()->getId(),
                 "txnNumberAndRetryCounter"_attr =

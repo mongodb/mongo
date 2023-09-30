@@ -296,9 +296,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
                         // reconcileCatalogAndIdents() will later drop this ident.
                         LOGV2_ERROR(
                             22268,
-                            "Cannot create an entry in the catalog for the orphaned "
-                            "collection ident: {ident} due to {statusWithNs_getStatus_reason}. "
-                            "Restarting the server will remove this ident",
                             "Cannot create an entry in the catalog for orphaned ident. Restarting "
                             "the server will remove this ident",
                             "ident"_attr = ident,
@@ -364,8 +361,6 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
                     _recoverOrphanedCollection(opCtx, entry.catalogId, entry.nss, collectionIdent);
                 if (!status.isOK()) {
                     LOGV2_WARNING(22266,
-                                  "Failed to recover orphaned data file for collection "
-                                  "'{namespace}': {error}",
                                   "Failed to recover orphaned data file for collection",
                                   logAttrs(entry.nss),
                                   "error"_attr = status);
@@ -751,11 +746,6 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             if (!indexMetaData.multikey && hasMultiKeyPaths) {
                 LOGV2_WARNING(
                     22267,
-                    "The 'multikey' field for index {index} on collection {namespace} was "
-                    "false with non-empty 'multikeyPaths'. This indicates corruption of "
-                    "the catalog. Consider either dropping and recreating the index, or "
-                    "rerunning with the --repair option. See "
-                    "http://dochub.mongodb.org/core/repair for more information.",
                     "The 'multikey' field for index was false with non-empty 'multikeyPaths'. This "
                     "indicates corruption of the catalog. Consider either dropping and recreating "
                     "the index, or rerunning with the --repair option. See "

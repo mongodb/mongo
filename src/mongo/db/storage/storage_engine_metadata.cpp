@@ -99,10 +99,8 @@ std::unique_ptr<StorageEngineMetadata> StorageEngineMetadata::forPath(const std:
         metadata.reset(new StorageEngineMetadata(dbpath));
         Status status = metadata->read();
         if (!status.isOK()) {
-            LOGV2_FATAL_NOTRACE(28661,
-                                "Unable to read the storage engine metadata file: {error}",
-                                "Unable to read the storage engine metadata file",
-                                "error"_attr = status);
+            LOGV2_FATAL_NOTRACE(
+                28661, "Unable to read the storage engine metadata file", "error"_attr = status);
         }
     }
     return metadata;
@@ -236,7 +234,6 @@ void flushMyDirectory(const boost::filesystem::path& file) {
     // massert(13652, str::stream() << "Couldn't find parent dir for file: " << file.string(),);
     if (!file.has_branch_path()) {
         LOGV2(22283,
-              "warning flushMyDirectory couldn't find parent dir for file: {file}",
               "flushMyDirectory couldn't find parent dir for file",
               "file"_attr = file.generic_string());
         return;

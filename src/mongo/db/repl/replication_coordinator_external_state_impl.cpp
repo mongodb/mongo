@@ -1165,11 +1165,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
         if (dbName == DatabaseName::kLocal)
             continue;
 
-        LOGV2_DEBUG(21309,
-                    2,
-                    "Removing temporary collections from {db}",
-                    "Removing temporary collections",
-                    logAttrs(dbName));
+        LOGV2_DEBUG(21309, 2, "Removing temporary collections", logAttrs(dbName));
         Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
         clearTempCollections(opCtx, dbName);
     }
@@ -1216,9 +1212,6 @@ void ReplicationCoordinatorExternalStateImpl::notifyOplogMetadataWaiters(
                 [committedOpTime, reaper](const executor::TaskExecutor::CallbackArgs& args) {
                     if (MONGO_unlikely(dropPendingCollectionReaperHang.shouldFail())) {
                         LOGV2(21310,
-                              "fail point dropPendingCollectionReaperHang enabled. "
-                              "Blocking until fail point is disabled. "
-                              "committedOpTime: {committedOpTime}",
                               "fail point dropPendingCollectionReaperHang enabled. "
                               "Blocking until fail point is disabled",
                               "committedOpTime"_attr = committedOpTime);

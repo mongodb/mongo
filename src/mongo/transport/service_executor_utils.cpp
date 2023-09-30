@@ -106,13 +106,11 @@ Status launchServiceWorkerThread(unique_function<void()> task) {
             int failed = pthread_attr_setstacksize(&attrs, stackSizeToSet);
             if (failed) {
                 LOGV2_WARNING(22949,
-                              "pthread_attr_setstacksize failed: {error}",
                               "pthread_attr_setstacksize failed",
                               "error"_attr = errorMessage(posixError(failed)));
             }
         } else {
             LOGV2_WARNING(22950,
-                          "Stack size set to {stackSizeKiB}KiB. We suggest 1024KiB",
                           "Stack size not set to suggested 1024KiB",
                           "stackSizeKiB"_attr = (limits.rlim_cur / 1024));
         }
@@ -132,15 +130,12 @@ Status launchServiceWorkerThread(unique_function<void()> task) {
         if (failed > 0) {
             LOGV2_ERROR_OPTIONS(4850900,
                                 {logv2::UserAssertAfterLog()},
-                                "pthread_create failed: error: {error}",
                                 "pthread_create failed",
                                 "error"_attr = errorMessage(posixError(failed)));
         } else if (failed < 0) {
             auto ec = lastPosixError();
             LOGV2_ERROR_OPTIONS(4850901,
                                 {logv2::UserAssertAfterLog()},
-                                "pthread_create failed with a negative return code: {code}, errno: "
-                                "{errno}, error: {error}",
                                 "pthread_create failed with a negative return code",
                                 "code"_attr = failed,
                                 "errno"_attr = ec.value(),

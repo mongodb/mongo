@@ -413,10 +413,7 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // Check the oplog buffer after the applier state to ensure the producer is stopped.
             if (isDraining && _oplogBuffer->isEmpty()) {
                 ops.setTermWhenExhausted(termWhenBufferIsEmpty);
-                LOGV2(21239,
-                      "Oplog buffer has been drained in term {term}",
-                      "Oplog buffer has been drained",
-                      "term"_attr = termWhenBufferIsEmpty);
+                LOGV2(21239, "Oplog buffer has been drained", "term"_attr = termWhenBufferIsEmpty);
             } else {
                 // Don't emit empty batches.
                 continue;

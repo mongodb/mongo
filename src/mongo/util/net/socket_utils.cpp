@@ -73,10 +73,7 @@ const struct WinsockInit {
     WinsockInit() {
         WSADATA d;
         if (int e = WSAStartup(MAKEWORD(2, 2), &d)) {
-            LOGV2(23201,
-                  "ERROR: wsastartup failed {error}",
-                  "ERROR: wsastartup failed",
-                  "error"_attr = errorMessage(systemError(e)));
+            LOGV2(23201, "ERROR: wsastartup failed", "error"_attr = errorMessage(systemError(e)));
             quickExit(ExitCode::ntServiceError);
         }
     }
@@ -104,7 +101,6 @@ boost::optional<Milliseconds> getTcpMillisKey(const CString& key, logv2::LogSeve
     if (!swValOpt.isOK()) {
         LOGV2_DEBUG(23203,
                     logSeverity.toInt(),
-                    "can't get KeepAlive parameter: {error}",
                     "Can't get KeepAlive parameter",
                     "error"_attr = swValOpt.getStatus());
         return {};
@@ -164,7 +160,6 @@ void windowsApplyMaxTcpKeepAlive(int sock,
         if (auto ec = windowsSetTcpKeepAlive(sock, idle, interval))
             LOGV2_DEBUG(23204,
                         logSeverity.toInt(),
-                        "failed setting keepalive values: {error}",
                         "Failed setting keepalive values",
                         "error"_attr = errorMessage(ec));
     }
@@ -199,7 +194,6 @@ void applyMax(
     } catch (const std::system_error& ex) {
         LOGV2_DEBUG(23205,
                     severity.toInt(),
-                    "can't get {optname}: {error}",
                     "Can't get socket option",
                     "optname"_attr = optName,
                     "error"_attr = errorMessage(ex.code()));
@@ -214,7 +208,6 @@ void applyMax(
     } catch (const std::system_error& ex) {
         LOGV2_DEBUG(23206,
                     severity.toInt(),
-                    "can't set {optname}: {error}",
                     "Can't set socket option",
                     "optname"_attr = optName,
                     "error"_attr = errorMessage(ex.code()));
@@ -286,10 +279,7 @@ std::string getHostName() {
     int ec = gethostname(buf, 127);
     if (ec || *buf == 0) {
         auto ec = lastSocketError();
-        LOGV2(23202,
-              "can't get this server's hostname {error}",
-              "Can't get this server's hostname",
-              "error"_attr = errorMessage(ec));
+        LOGV2(23202, "Can't get this server's hostname", "error"_attr = errorMessage(ec));
         return "";
     }
     return buf;

@@ -127,7 +127,6 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         _scanned++;
         LOGV2_DEBUG(21656,
                     2,
-                    "Local oplog entry to roll back: {oplogEntry}",
                     "Local oplog entry to roll back",
                     "oplogEntry"_attr = redact(_localOplogValue.first));
         auto status = _rollbackOperation(_localOplogValue.first);

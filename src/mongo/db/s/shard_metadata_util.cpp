@@ -531,11 +531,7 @@ Status deleteDatabasesEntry(OperationContext* opCtx, const DatabaseName& dbName)
         uassertStatusOK(
             getStatusFromWriteCommandResponse(deleteCommandResponse->getCommandReply()));
 
-        LOGV2_DEBUG(22092,
-                    1,
-                    "Successfully cleared persisted metadata for db {db}",
-                    "Successfully cleared persisted metadata for db",
-                    "db"_attr = dbName);
+        LOGV2_DEBUG(22092, 1, "Successfully cleared persisted metadata for db", "db"_attr = dbName);
         return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();

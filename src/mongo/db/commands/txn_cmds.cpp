@@ -133,8 +133,6 @@ public:
 
             LOGV2_DEBUG(20507,
                         3,
-                        "Received commitTransaction for transaction with "
-                        "{txnNumberAndRetryCounter} on session {sessionId}",
                         "Received commitTransaction",
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());
@@ -262,8 +260,6 @@ public:
 
             LOGV2_DEBUG(20508,
                         3,
-                        "Received abortTransaction for transaction with {txnNumberAndRetryCounter} "
-                        "on session {sessionId}",
                         "Received abortTransaction",
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON());

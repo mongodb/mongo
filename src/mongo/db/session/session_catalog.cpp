@@ -190,11 +190,7 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
                                   const ScanSessionsCallbackFn& workerFn) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    LOGV2_DEBUG(21976,
-                2,
-                "Scanning {sessionCount} sessions",
-                "Scanning sessions",
-                "sessionCount"_attr = _sessions.size());
+    LOGV2_DEBUG(21976, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
 
     for (auto& [parentLsid, sri] : _sessions) {
         if (matcher.match(parentLsid)) {
@@ -216,11 +212,7 @@ void SessionCatalog::scanSessions(const SessionKiller::Matcher& matcher,
 void SessionCatalog::scanParentSessions(const ScanSessionsCallbackFn& workerFn) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    LOGV2_DEBUG(6685000,
-                2,
-                "Scanning {sessionCount} sessions",
-                "Scanning sessions",
-                "sessionCount"_attr = _sessions.size());
+    LOGV2_DEBUG(6685000, 2, "Scanning sessions", "sessionCount"_attr = _sessions.size());
 
     for (auto& [parentLsid, sri] : _sessions) {
         ObservableSession osession(lg, sri.get(), &sri->parentSession);

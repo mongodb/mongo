@@ -471,10 +471,7 @@ void logOplogRecords(OperationContext* opCtx,
 
     Status result = insertDocumentsForOplog(opCtx, oplogCollection, records, timestamps);
     if (!result.isOK()) {
-        LOGV2_FATAL(17322,
-                    "write to oplog failed: {error}",
-                    "Write to oplog failed",
-                    "error"_attr = result.toString());
+        LOGV2_FATAL(17322, "Write to oplog failed", "error"_attr = result.toString());
     }
 
     // Insert the oplog records to the respective tenants change collections.
@@ -637,11 +634,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
     ProcessInfo pi;
     if (pi.getAddrSize() == 32) {
         const auto sz = 50LL * 1024LL * 1024LL;
-        LOGV2_DEBUG(21245,
-                    3,
-                    "32bit system; choosing {oplogSizeBytes} bytes oplog",
-                    "Choosing oplog size for 32bit system",
-                    "oplogSizeBytes"_attr = sz);
+        LOGV2_DEBUG(21245, 3, "Choosing oplog size for 32bit system", "oplogSizeBytes"_attr = sz);
         return sz;
     }
     // First choose a minimum size.
@@ -649,11 +642,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 #if defined(__APPLE__)
     // typically these are desktops (dev machines), so keep it smallish
     const auto sz = 192 * 1024 * 1024;
-    LOGV2_DEBUG(21246,
-                3,
-                "Apple system; choosing {oplogSizeBytes} bytes oplog",
-                "Choosing oplog size for Apple system",
-                "oplogSizeBytes"_attr = sz);
+    LOGV2_DEBUG(21246, 3, "Choosing oplog size for Apple system", "oplogSizeBytes"_attr = sz);
     return sz;
 #else
     long long lowerBound = 0;
@@ -664,8 +653,6 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
         bytes = pi.getMemSizeMB() * 1024 * 1024;
         LOGV2_DEBUG(21247,
                     3,
-                    "Ephemeral storage system; lowerBound: {lowerBoundBytes} bytes, "
-                    "{totalMemoryBytes} bytes total memory",
                     "Ephemeral storage system",
                     "lowerBoundBytes"_attr = lowerBound,
                     "totalMemoryBytes"_attr = bytes);
@@ -675,9 +662,6 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
         bytes = File::freeSpace(storageGlobalParams.dbpath);  //-1 if call not supported.
         LOGV2_DEBUG(21248,
                     3,
-                    "Disk storage system; lowerBound: {lowerBoundBytes} bytes, {freeSpaceBytes} "
-                    "bytes free space "
-                    "on device",
                     "Disk storage system",
                     "lowerBoundBytes"_attr = lowerBound,
                     "freeSpaceBytes"_attr = bytes);
@@ -748,10 +732,7 @@ void createOplog(OperationContext* opCtx,
     /* create an oplog collection, if it doesn't yet exist. */
     const auto sz = getNewOplogSizeBytes(opCtx, replSettings);
 
-    LOGV2(21251,
-          "creating replication oplog of size: {oplogSizeMegabytes}MB...",
-          "Creating replication oplog",
-          "oplogSizeMB"_attr = (int)(sz / (1024 * 1024)));
+    LOGV2(21251, "Creating replication oplog", "oplogSizeMB"_attr = (int)(sz / (1024 * 1024)));
 
     CollectionOptions options;
     options.capped = true;
@@ -1065,8 +1046,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           auto nss = extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd);
           if (nss.isDropPendingNamespace()) {
               LOGV2(21253,
-                    "applyCommand: {namespace} : collection is already in a drop-pending state: "
-                    "ignoring collection drop: {command}",
                     "applyCommand: collection is already in a drop-pending state, ignoring "
                     "collection drop",
                     logAttrs(nss),
@@ -1438,8 +1417,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
     const auto& op = *opOrGroupedInserts.getOp();
     LOGV2_DEBUG(21254,
                 3,
-                "applying op (or grouped inserts): {op}, oplog application mode: "
-                "{oplogApplicationMode}",
                 "Applying op (or grouped inserts)",
                 "op"_attr = redact(opOrGroupedInserts.toBSON()),
                 "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
@@ -2232,8 +2209,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
     } else {
         LOGV2_DEBUG(21255,
                     3,
-                    "applying command op: {oplogEntry}, oplog application mode: "
-                    "{oplogApplicationMode}",
                     "Applying command op",
                     "oplogEntry"_attr = redact(op->toBSONForLogging()),
                     "oplogApplicationMode"_attr = OplogApplication::modeToString(mode));
@@ -2438,8 +2413,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
                      opsMapIt->first != "dropDatabase") ||
                     !curOpToApply.acceptableErrors.count(status.code())) {
                     LOGV2_ERROR(21262,
-                                "Failed command {command} on {db} with status {error} during oplog "
-                                "application",
                                 "Failed command during oplog application",
                                 "command"_attr = redact(o),
                                 logAttrs(nss.dbName()),

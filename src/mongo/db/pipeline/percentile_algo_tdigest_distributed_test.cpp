@@ -58,7 +58,7 @@ using std::vector;
 
 vector<double> generateData(size_t n) {
     auto seed = 1680031021;  // arbitrary
-    LOGV2(7492710, "{seed}", "generateData", "seed"_attr = seed);
+    LOGV2(7492710, "generateData", "seed"_attr = seed);
     std::mt19937 generator(seed);
     boost::random::normal_distribution<double> dist(0.0 /* mean */, 0.5 /* sigma */);
 

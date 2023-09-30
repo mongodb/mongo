@@ -760,13 +760,11 @@ void CommandHelpers::evaluateFailCommandFailPoint(OperationContext* opCtx,
                         blockTimeMS >= 0);
 
                 LOGV2(20432,
-                      "Blocking {command} via 'failCommand' failpoint for {blockTime}",
                       "Blocking command via 'failCommand' failpoint",
                       "command"_attr = cmd->getName(),
                       "blockTime"_attr = Milliseconds{blockTimeMS});
                 opCtx->sleepFor(Milliseconds{blockTimeMS});
                 LOGV2(20433,
-                      "Unblocking {command} via 'failCommand' failpoint",
                       "Unblocking command via 'failCommand' failpoint",
                       "command"_attr = cmd->getName());
             }
@@ -927,7 +925,6 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
     } catch (const DBException& e) {
         LOGV2_OPTIONS(20436,
                       {logv2::LogComponent::kAccessControl},
-                      "Checking authorization failed: {error}",
                       "Checking authorization failed",
                       "error"_attr = e.toStatus());
         CommandHelpers::auditLogAuthEvent(opCtx, this, request, e.code());

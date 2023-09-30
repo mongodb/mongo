@@ -211,20 +211,15 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             }
 
             if (!ignoreException) {
-                LOGV2_DEBUG(
-                    21845,
-                    1,
-                    "Error applying operation in transaction. {error}- oplog entry: {oplogEntry}",
-                    "Error applying operation in transaction",
-                    "error"_attr = redact(ex),
-                    "oplogEntry"_attr = redact(op.toBSONForLogging()));
+                LOGV2_DEBUG(21845,
+                            1,
+                            "Error applying operation in transaction",
+                            "error"_attr = redact(ex),
+                            "oplogEntry"_attr = redact(op.toBSONForLogging()));
                 return exceptionToStatus();
             }
             LOGV2_DEBUG(21846,
                         1,
-                        "Encountered but ignoring error: {error} while applying operations for "
-                        "transaction because we are either in initial "
-                        "sync or recovering mode - oplog entry: {oplogEntry}",
                         "Encountered but ignoring error while applying operations for transaction "
                         "because we are either in initial sync or recovering mode",
                         "error"_attr = redact(ex),

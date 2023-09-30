@@ -104,8 +104,6 @@ void InitialSyncBaseCloner::handleStageAttemptFailed(BaseClonerStage* stage, Sta
     hangBeforeCheckingRollBackIdClonerStage.executeIf(
         [&](const BSONObj& data) {
             LOGV2(21076,
-                  "Initial sync cloner {cloner} hanging before checking rollBackId for stage "
-                  "{stage}",
                   "Initial sync cloner hanging before checking rollBackId",
                   "cloner"_attr = getClonerName(),
                   "stage"_attr = stage->getName());
@@ -204,7 +202,6 @@ void InitialSyncBaseCloner::pauseForFuzzer(BaseClonerStage* stage) {
             // initial_sync_test_fixture_test.js, so if you change it here you will need to change
             // it there.
             LOGV2(21066,
-                  "Collection Cloner scheduled a remote command on the {stage}",
                   "Collection Cloner scheduled a remote command",
                   "stage"_attr = describeForFuzzer(stage));
             LOGV2(21067, "initialSyncFuzzerSynchronizationPoint1 fail point enabled");

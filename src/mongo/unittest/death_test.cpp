@@ -104,7 +104,6 @@ public:
 void logAndThrowWithErrnoAt(StringData expr, StringData file, unsigned line) {
     auto ec = lastPosixError();
     LOGV2_ERROR(24138,
-                "{expr} failed: {error} @{file}:{line}",
                 "expression failed",
                 "expr"_attr = expr,
                 "error"_attr = errorMessage(ec),

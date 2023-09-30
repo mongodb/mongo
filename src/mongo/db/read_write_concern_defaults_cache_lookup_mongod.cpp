@@ -93,10 +93,6 @@ void readWriteConcernDefaultsMongodStartupChecks(OperationContext* opCtx) {
                 4615613,
                 {logv2::LogTag::kStartupWarnings},
                 "This node is running as a shard server, but persisted Read/Write Concern (RWC) "
-                "defaults are present in {configSettingsNamespace}. This node was likely "
-                "previously in an unsharded replica set or a config server. The RWC defaults on "
-                "this node will not be used",
-                "This node is running as a shard server, but persisted Read/Write Concern (RWC) "
                 "defaults are present. This node was likely previously in an unsharded replica set "
                 "or a config server. The RWC defaults on this node will not be used",
                 "configSettingsNamespace"_attr = NamespaceString::kConfigSettingsNamespace);

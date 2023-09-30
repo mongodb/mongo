@@ -561,7 +561,6 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
         if (participant->readOnly == Participant::ReadOnly::kUnset) {
             LOGV2_DEBUG(22880,
                         3,
-                        "{sessionId}:{txnNumber} Marking {shardId} as read-only",
                         "Marking shard as read-only participant",
                         "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -584,7 +583,6 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
     if (participant->readOnly != Participant::ReadOnly::kNotReadOnly) {
         LOGV2_DEBUG(22881,
                     3,
-                    "{sessionId}:{txnNumber} Marking {shardId} as having done a write",
                     "Marking shard has having done a write",
                     "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -596,7 +594,6 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
         if (!p().recoveryShardId) {
             LOGV2_DEBUG(22882,
                         3,
-                        "{sessionId}:{txnNumber} Choosing {shardId} as recovery shard",
                         "Choosing shard as recovery shard",
                         "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -663,23 +660,20 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                                                            const BSONObj& cmdObj) {
     RouterTransactionsMetrics::get(opCtx)->incrementTotalRequestsTargeted();
     if (auto txnPart = getParticipant(shardId)) {
-        LOGV2_DEBUG(
-            22883,
-            4,
-            "{sessionId}:{txnNumber} Sending transaction fields to existing participant: {shardId}",
-            "Attaching transaction fields to request for existing participant shard",
-            "sessionId"_attr = _sessionId(),
-            "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-            "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-            "shardId"_attr = shardId,
-            "request"_attr = redact(cmdObj));
+        LOGV2_DEBUG(22883,
+                    4,
+                    "Attaching transaction fields to request for existing participant shard",
+                    "sessionId"_attr = _sessionId(),
+                    "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                    "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                    "shardId"_attr = shardId,
+                    "request"_attr = redact(cmdObj));
         return txnPart->attachTxnFieldsIfNeeded(opCtx, cmdObj, false);
     }
 
     auto txnPart = _createParticipant(opCtx, shardId);
     LOGV2_DEBUG(22884,
                 4,
-                "{sessionId}:{txnNumber} Sending transaction fields to new participant: {shardId}",
                 "Attaching transaction fields to request for new participant shard",
                 "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -884,15 +878,13 @@ void TransactionRouter::Router::onStaleShardOrDbError(OperationContext* opCtx,
                                                       const Status& status) {
     invariant(canContinueOnStaleShardOrDbError(cmdName, status));
 
-    LOGV2_DEBUG(
-        22885,
-        3,
-        "{sessionId}:{txnNumber} Clearing pending participants after stale version error: {error}",
-        "Clearing pending participants after stale version error",
-        "sessionId"_attr = _sessionId(),
-        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-        "error"_attr = redact(status));
+    LOGV2_DEBUG(22885,
+                3,
+                "Clearing pending participants after stale version error",
+                "sessionId"_attr = _sessionId(),
+                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                "error"_attr = redact(status));
 
     // Remove participants created during the current statement so they are sent the correct options
     // if they are targeted again by the retry.
@@ -903,16 +895,13 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     // The router can always retry on a view resolution error.
 
-    LOGV2_DEBUG(
-        22886,
-        3,
-        "{sessionId}:{txnNumber} Clearing pending participants after view resolution error on "
-        "namespace: {namespace}",
-        "Clearing pending participants after view resolution error",
-        "sessionId"_attr = _sessionId(),
-        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-        logAttrs(nss));
+    LOGV2_DEBUG(22886,
+                3,
+                "Clearing pending participants after view resolution error",
+                "sessionId"_attr = _sessionId(),
+                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                logAttrs(nss));
 
     // Requests against views are always routed to the primary shard for its database, but the retry
     // on the resolved namespace does not have to re-target the primary, so pending participants
@@ -934,20 +923,16 @@ bool TransactionRouter::Router::canContinueOnSnapshotError() const {
 void TransactionRouter::Router::onSnapshotError(OperationContext* opCtx, const Status& status) {
     invariant(canContinueOnSnapshotError());
 
-    LOGV2_DEBUG(
-        22887,
-        3,
-        "{sessionId}:{txnNumber} Clearing pending participants and resetting global snapshot "
-        "timestamp after snapshot error: {error}, previous timestamp: "
-        "{previousGlobalSnapshotTimestamp}",
-        "Clearing pending participants and resetting global snapshot timestamp after "
-        "snapshot error",
-        "sessionId"_attr = _sessionId(),
-        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-        "error"_attr = redact(status),
-        "previousGlobalSnapshotTimestamp"_attr =
-            o().atClusterTimeForSnapshotReadConcern->getTime());
+    LOGV2_DEBUG(22887,
+                3,
+                "Clearing pending participants and resetting global snapshot timestamp after "
+                "snapshot error",
+                "sessionId"_attr = _sessionId(),
+                "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                "error"_attr = redact(status),
+                "previousGlobalSnapshotTimestamp"_attr =
+                    o().atClusterTimeForSnapshotReadConcern->getTime());
 
     // The transaction must be restarted on all participants because a new read timestamp will be
     // selected, so clear all pending participants. Snapshot errors are only retryable on the first
@@ -1063,7 +1048,6 @@ void TransactionRouter::Router::_beginTxn(OperationContext* opCtx,
 
             LOGV2_DEBUG(22890,
                         3,
-                        "{sessionId}:{txnNumber} Commit recovery started",
                         "Commit recovery started",
                         "sessionId"_attr = _sessionId(),
                         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1169,8 +1153,6 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
 
     LOGV2_DEBUG(22891,
                 3,
-                "{sessionId}:{txnNumber} Committing using two-phase commit, coordinator: "
-                "{coordinatorShardId}",
                 "Committing using two-phase commit",
                 "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1281,8 +1263,6 @@ BSONObj TransactionRouter::Router::_commitTransaction(
         ShardId shardId = o().participants.cbegin()->first;
         LOGV2_DEBUG(22892,
                     3,
-                    "{sessionId}:{txnNumber} Committing single-shard transaction, single "
-                    "participant: {shardId}",
                     "Committing single-shard transaction",
                     "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1346,8 +1326,6 @@ BSONObj TransactionRouter::Router::_commitTransaction(
     if (writeShards.size() == 0) {
         LOGV2_DEBUG(22893,
                     3,
-                    "{sessionId}:{txnNumber} Committing read-only transaction on "
-                    "{numParticipantShards} shards",
                     "Committing read-only transaction",
                     "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1412,7 +1390,6 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 
     LOGV2_DEBUG(22895,
                 3,
-                "{sessionId}:{txnNumber} Aborting transaction on {numParticipantShards} shard(s)",
                 "Aborting transaction on all participant shards",
                 "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1458,8 +1435,6 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
         LOGV2_DEBUG(
             22896,
             3,
-            "{sessionId}:{txnNumber} Router not sending implicit abortTransaction because commit "
-            "may have been handed off to the coordinator",
             "Not sending implicit abortTransaction to participant shards after error because "
             "coordinating the commit decision may have been handed off to the coordinator shard",
             "sessionId"_attr = _sessionId(),
@@ -1495,8 +1470,6 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
 
     LOGV2_DEBUG(22897,
                 3,
-                "{sessionId}:{txnNumber} Implicitly aborting transaction on {numParticipantShards} "
-                "shard(s) due to error: {error}",
                 "Implicitly aborting transaction on all participant shards",
                 "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1514,7 +1487,6 @@ void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opC
     } catch (const DBException& ex) {
         LOGV2_DEBUG(22898,
                     3,
-                    "{sessionId}:{txnNumber} Implicitly aborting transaction failed {error}",
                     "Implicitly aborting transaction failed",
                     "sessionId"_attr = _sessionId(),
                     "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
@@ -1612,7 +1584,6 @@ void TransactionRouter::Router::_resetRouterStateForStartTransaction(
 
     LOGV2_DEBUG(22889,
                 3,
-                "{sessionId}:{txnNumber} New transaction started",
                 "New transaction started",
                 "sessionId"_attr = _sessionId(),
                 "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),

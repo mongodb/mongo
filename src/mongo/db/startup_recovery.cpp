@@ -282,17 +282,13 @@ Status ensureCollectionProperties(OperationContext* opCtx,
         // that was created manually by the user. Check the list of indexes to confirm index
         // does not exist before attempting to build it or returning an error.
         if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll)) {
-            LOGV2(21001,
-                  "collection {coll_ns} is missing an _id index",
-                  "Collection is missing an _id index",
-                  logAttrs(*coll));
+            LOGV2(21001, "Collection is missing an _id index", logAttrs(*coll));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto writableCollection =
                     catalog->lookupCollectionByUUIDForMetadataWrite(opCtx, coll->uuid());
                 auto status = buildMissingIdIndex(opCtx, writableCollection);
                 if (!status.isOK()) {
                     LOGV2_ERROR(21021,
-                                "could not build an _id index on collection {coll_ns}: {error}",
                                 "Could not build an _id index on collection",
                                 logAttrs(*coll),
                                 "error"_attr = status);
@@ -354,13 +350,10 @@ void assertCappedOplog(OperationContext* opCtx) {
     const Collection* oplogCollection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {
-        LOGV2_FATAL_NOTRACE(
-            40115,
-            "The oplog collection {oplogNamespace} is not capped; a capped oplog is a "
-            "requirement for replication to function.",
-            "The oplog collection is not capped; a capped oplog is a "
-            "requirement for replication to function.",
-            "oplogNamespace"_attr = oplogNss);
+        LOGV2_FATAL_NOTRACE(40115,
+                            "The oplog collection is not capped; a capped oplog is a "
+                            "requirement for replication to function.",
+                            "oplogNamespace"_attr = oplogNss);
     }
 }
 
@@ -610,11 +603,7 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
 
         auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
         for (const auto& indexName : entry.second.first) {
-            LOGV2(21004,
-                  "Rebuilding index. Collection: {collNss} Index: {indexName}",
-                  "Rebuilding index",
-                  logAttrs(collNss),
-                  "index"_attr = indexName);
+            LOGV2(21004, "Rebuilding index", logAttrs(collNss), "index"_attr = indexName);
         }
 
         std::vector<BSONObj> indexSpecs = entry.second.second;

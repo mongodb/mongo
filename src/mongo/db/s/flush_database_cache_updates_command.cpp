@@ -208,11 +208,7 @@ public:
                 criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
-                LOGV2_DEBUG(21981,
-                            1,
-                            "Forcing remote routing table refresh for {db}",
-                            "Forcing remote routing table refresh",
-                            "db"_attr = dbName);
+                LOGV2_DEBUG(21981, 1, "Forcing remote routing table refresh", "db"_attr = dbName);
                 uassertStatusOK(onDbVersionMismatchNoExcept(opCtx, dbName, boost::none));
             }
 

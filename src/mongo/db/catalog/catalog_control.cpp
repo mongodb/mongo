@@ -283,7 +283,6 @@ void openCatalog(OperationContext* opCtx,
 
         for (const auto& indexName : entry.second.first) {
             LOGV2(20275,
-                  "openCatalog: rebuilding index: collection: {collNss}, index: {indexName}",
                   "openCatalog: rebuilding index",
                   logAttrs(collNss),
                   "index"_attr = indexName);

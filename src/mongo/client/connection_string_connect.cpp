@@ -145,7 +145,6 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
                 _connectHook->connect(*this, errmsg, socketTimeout, apiParameters);
 
             LOGV2(20111,
-                  "Replacing connection to {oldConnString} with {newConnString}",
                   "Replacing connection string",
                   "oldConnString"_attr = this->toString(),
                   "newConnString"_attr =

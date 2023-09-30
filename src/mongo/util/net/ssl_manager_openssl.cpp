@@ -2007,14 +2007,12 @@ int ocspClientCallback(SSL* ssl, void* arg) {
         if (swStapleOK.getStatus() == ErrorCodes::OCSPCertificateStatusRevoked) {
             LOGV2_DEBUG(23225,
                         1,
-                        "Stapled OCSP Response validation failed: {error}",
                         "Stapled OCSP Response validation failed",
                         "error"_attr = swStapleOK.getStatus());
             return OCSP_CLIENT_RESPONSE_NOT_ACCEPTABLE;
         }
 
         LOGV2_ERROR(4781101,
-                    "Stapled OCSP Response validation threw an error: {error}",
                     "Stapled OCSP Response validation threw an error",
                     "error"_attr = swStapleOK.getStatus());
 
@@ -2651,7 +2649,6 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
 
             if (!dhparams || SSL_CTX_set_tmp_dh(context, dhparams.get()) != 1) {
                 LOGV2_ERROR(23240,
-                            "Failed to set default DH parameters: {error}",
                             "Failed to set default DH parameters",
                             "error"_attr = getSSLErrorMessage(ERR_get_error()));
             }
@@ -3038,7 +3035,6 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
     int status = X509_load_crl_file(lookup, crlFile.c_str(), X509_FILETYPE_PEM);
     if (status == 0) {
         LOGV2_ERROR(23254,
-                    "cannot read CRL file: {crlFile} {error}",
                     "Cannot read CRL file",
                     "crlFile"_attr = crlFile,
                     "error"_attr = getSSLErrorMessage(ERR_get_error()));
@@ -3049,7 +3045,6 @@ bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) 
         LOGV2(4652601, "ssl imported 1 revoked certificate from the revocation list.");
     } else {
         LOGV2(4652602,
-              "ssl imported {numberCerts} revoked certificates from the revocation list",
               "SSL imported revoked certificates from the revocation list",
               "numberCerts"_attr = status);
     }
@@ -3269,15 +3264,11 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         if (_weakValidation) {
             // do not give warning if certificate warnings are  suppressed
             if (!_suppressNoCertificateWarning) {
-                LOGV2_WARNING(23234,
-                              "no SSL certificate provided by peer",
-                              "No SSL certificate provided by peer");
+                LOGV2_WARNING(23234, "No SSL certificate provided by peer");
             }
             return SSLPeerInfo(sni);
         } else {
-            LOGV2_ERROR(23255,
-                        "no SSL certificate provided by peer; connection rejected",
-                        "No SSL certificate provided by peer; connection rejected");
+            LOGV2_ERROR(23255, "No SSL certificate provided by peer; connection rejected");
             return Status(ErrorCodes::SSLHandshakeFailed,
                           "no SSL certificate provided by peer; connection rejected");
         }
@@ -3288,7 +3279,6 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     if (result != X509_V_OK) {
         if (_allowInvalidCertificates) {
             LOGV2_WARNING(23235,
-                          "SSL peer certificate validation failed: {reason}",
                           "SSL peer certificate validation failed",
                           "reason"_attr = X509_verify_cert_error_string(result));
             return SSLPeerInfo(sni);
@@ -3296,10 +3286,8 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
             str::stream msg;
             msg << "SSL peer certificate validation failed: "
                 << X509_verify_cert_error_string(result);
-            LOGV2_ERROR(23256,
-                        "{error}",
-                        "SSL peer certificate validation failed",
-                        "error"_attr = msg.ss.str());
+            LOGV2_ERROR(
+                23256, "SSL peer certificate validation failed", "error"_attr = msg.ss.str());
             return Status(ErrorCodes::SSLHandshakeFailed, msg);
         }
     }
@@ -3471,15 +3459,11 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         // has a certificate for SSL and the connection is an SSL connection.
         if (_allowInvalidCertificates || _allowInvalidHostnames || isUnixDomainSocket(remoteHost)) {
             LOGV2_WARNING(23238,
-                          "The server certificate does not match the host name. Hostname: "
-                          "{remoteHost} does not match {certificateNames}",
                           "The server certificate does not match the remote host name",
                           "remoteHost"_attr = remoteHost,
                           "certificateNames"_attr = certificateNames.str());
         } else {
             LOGV2_ERROR(23257,
-                        "The server certificate does not match the host name. Hostname: "
-                        "{remoteHost} does not match {certificateNames}",
                         "The server certificate does not match the remote host name",
                         "remoteHost"_attr = remoteHost,
                         "certificateNames"_attr = certificateNames.str());
@@ -3589,10 +3573,7 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             // manner.
             errToThrow = (code == SSL_ERROR_WANT_READ) ? SocketErrorKind::RECV_ERROR
                                                        : SocketErrorKind::SEND_ERROR;
-            LOGV2_ERROR(23258,
-                        "SSL: {error}, possibly timed out during connect",
-                        "SSL: possibly timed out during connect",
-                        "error"_attr = code);
+            LOGV2_ERROR(23258, "SSL: possibly timed out during connect", "error"_attr = code);
             break;
 
         case SSL_ERROR_ZERO_RETURN:
@@ -3604,20 +3585,17 @@ void SSLManagerOpenSSL::_handleSSLError(SSLConnectionOpenSSL* conn, int ret) {
             // If ERR_get_error returned 0, the error queue is empty
             // check the return value of the actual SSL operation
             if (err != 0) {
-                LOGV2_ERROR(
-                    23260, "SSL: {error}", "SSL error", "error"_attr = getSSLErrorMessage(err));
+                LOGV2_ERROR(23260, "SSL error", "error"_attr = getSSLErrorMessage(err));
             } else if (ret == 0) {
                 LOGV2_ERROR(23261, "Unexpected EOF encountered during SSL communication");
             } else {
                 auto ec = lastSystemError();
-                LOGV2_ERROR(23262,
-                            "The SSL BIO reported an I/O error {error}",
-                            "The SSL BIO reported an I/O error",
-                            "error"_attr = errorMessage(ec));
+                LOGV2_ERROR(
+                    23262, "The SSL BIO reported an I/O error", "error"_attr = errorMessage(ec));
             }
             break;
         case SSL_ERROR_SSL: {
-            LOGV2_ERROR(23263, "SSL: {error}", "SSL error", "error"_attr = getSSLErrorMessage(err));
+            LOGV2_ERROR(23263, "SSL error", "error"_attr = getSSLErrorMessage(err));
             break;
         }
 

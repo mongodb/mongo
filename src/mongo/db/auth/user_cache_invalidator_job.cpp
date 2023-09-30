@@ -113,11 +113,7 @@ std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
 }  // namespace
 
 Status userCacheInvalidationIntervalSecsNotify(const int& value) {
-    LOGV2_DEBUG(20259,
-                5,
-                "setInterval: new={newInterval}",
-                "setInterval",
-                "newInterval"_attr = loadInterval());
+    LOGV2_DEBUG(20259, 5, "setInterval", "newInterval"_attr = loadInterval());
     if (hasGlobalServiceContext()) {
         auto service = getGlobalServiceContext();
         if (getUserCacheInvalidator(service)) {
@@ -192,8 +188,6 @@ void UserCacheInvalidator::run() try {
 
     if (swCurrentGeneration.getValue() != _previousGeneration) {
         LOGV2(20263,
-              "User cache generation changed from {previousGeneration} to "
-              "{currentGeneration}; invalidating user cache",
               "User cache generation changed; invalidating user cache",
               "previousGeneration"_attr = oidOrTimestampToString(_previousGeneration),
               "currentGeneration"_attr = oidOrTimestampToString(swCurrentGeneration.getValue()));

@@ -104,7 +104,6 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
         auto ec = addrInfoError(err);
         LOGV2_DEBUG(23170,
                     3,
-                    "Failed to obtain address information for host {hostName}: {error}",
                     "Failed to obtain address information for host",
                     "hostName"_attr = hostName,
                     "error"_attr = errorMessage(ec));
@@ -153,14 +152,10 @@ StatusWith<std::vector<std::string>> getHostFQDNs(std::string hostName,
     }
 
     if (!getNameInfoErrors.empty()) {
-        LOGV2_DEBUG(23171,
-                    3,
-                    "Failed to obtain name info: {errors}",
-                    "Failed to obtain name info",
-                    "errors"_attr = getNameInfoErrors);
+        LOGV2_DEBUG(23171, 3, "Failed to obtain name info", "errors"_attr = getNameInfoErrors);
     }
 
-    LOGV2_DEBUG(7317600, 4, "Name info: {results}", "Name info", "results"_attr = results);
+    LOGV2_DEBUG(7317600, 4, "Name info", "results"_attr = results);
 
     // Deduplicate the results list
     std::sort(results.begin(), results.end());

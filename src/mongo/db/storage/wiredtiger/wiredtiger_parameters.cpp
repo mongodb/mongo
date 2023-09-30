@@ -105,10 +105,7 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
                        << pos));
     }
 
-    LOGV2(22376,
-          "Reconfiguring WiredTiger storage engine with config string: \"{config}\"",
-          "Reconfiguring WiredTiger storage engine",
-          "config"_attr = str);
+    LOGV2(22376, "Reconfiguring WiredTiger storage engine", "config"_attr = str);
 
     invariant(_data.second);
     int ret = _data.second->reconfigure(str.toString().c_str());

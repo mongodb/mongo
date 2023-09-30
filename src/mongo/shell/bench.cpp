@@ -1114,7 +1114,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             if (!this->expectedDoc.isEmpty() && this->expectedDoc.woCompare(result) != 0) {
                 LOGV2_INFO(7056702,
-                           "Bench 'findOne' on: {namespace} expected: {expected} got: {got}",
                            "Bench 'findOne' on namespace got different results then expected",
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expectedDoc,
@@ -1228,7 +1227,6 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
 
             if (this->expected >= 0 && count != this->expected) {
                 LOGV2_INFO(22797,
-                           "Bench 'find' on: {namespace} expected: {expected} got: {got}",
                            "Bench 'find' on namespace got different results then expected",
                            "namespace"_attr = this->ns,
                            "expected"_attr = this->expected,

@@ -147,11 +147,9 @@ Status LogicalSessionCacheImpl::refreshNow(OperationContext* opCtx) {
     try {
         _refresh(opCtx->getClient());
     } catch (const DBException& ex) {
-        LOGV2(
-            20714,
-            "Failed to refresh session cache, will try again at the next refresh interval {error}",
-            "Failed to refresh session cache, will try again at the next refresh interval",
-            "error"_attr = redact(ex));
+        LOGV2(20714,
+              "Failed to refresh session cache, will try again at the next refresh interval",
+              "error"_attr = redact(ex));
         return exceptionToStatus();
     } catch (...) {
         return exceptionToStatus();
@@ -172,21 +170,16 @@ void LogicalSessionCacheImpl::_periodicRefresh(Client* client) {
     try {
         _refresh(client);
     } catch (const DBException& ex) {
-        LOGV2(
-            20710,
-            "Failed to refresh session cache: {error}, will try again at the next refresh interval",
-            "Failed to refresh session cache, will try again at the next refresh interval",
-            "error"_attr = redact(ex));
+        LOGV2(20710,
+              "Failed to refresh session cache, will try again at the next refresh interval",
+              "error"_attr = redact(ex));
     }
 }
 
 void LogicalSessionCacheImpl::_periodicReap(Client* client) {
     auto res = _reap(client);
     if (!res.isOK()) {
-        LOGV2(20711,
-              "Failed to reap transaction table: {error}",
-              "Failed to reap transaction table",
-              "error"_attr = redact(res));
+        LOGV2(20711, "Failed to reap transaction table", "error"_attr = redact(res));
     }
 
     return;
@@ -230,8 +223,6 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
             _sessionsColl->checkSessionsCollectionExists(opCtx);
         } catch (const DBException& ex) {
             LOGV2(20712,
-                  "Sessions collection is not set up: {error}; waiting until next sessions reap "
-                  "interval",
                   "Sessions collection is not set up; waiting until next sessions reap interval",
                   "error"_attr = redact(ex));
             return Status::OK();
@@ -441,8 +432,6 @@ Status LogicalSessionCacheImpl::_addToCacheIfNotFull(WithLock, LogicalSessionRec
             Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
         LOGV2_DEBUG(20715,
                     bumpedSeverity().toInt(),
-                    "Unable to add session {sessionId} into the cache, too many active sessions: "
-                    "{sessionCount}, maximum: {maxSessions}",
                     "Unable to add session into the cache, too many active sessions",
                     "sessionId"_attr = record.getId(),
                     "sessionCount"_attr = _activeSessions.size(),

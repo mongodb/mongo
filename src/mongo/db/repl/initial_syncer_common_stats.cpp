@@ -53,7 +53,6 @@ void LogInitialSyncAttemptStats(const StatusWith<OpTimeAndWallTime>& attemptResu
                                 const BSONObj& stats) {
     // Don't remove or change this log id as it is ingested to Atlas.
     LOGV2(21192,
-          "Initial sync status: {status}, initial sync attempt statistics: {statistics}",
           "Initial sync status and statistics",
           "status"_attr =
               attemptResult.isOK() ? "successful" : (hasRetries ? "in_progress" : "failed"),

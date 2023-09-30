@@ -248,10 +248,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     _executorForAddShard->wait(swCallbackHandle.getValue());
 
     if (response.status == ErrorCodes::ExceededTimeLimit) {
-        LOGV2(21941,
-              "Operation timed out with {error}",
-              "Operation timed out",
-              "error"_attr = redact(response.status));
+        LOGV2(21941, "Operation timed out", "error"_attr = redact(response.status));
     }
 
     if (!response.isOK()) {
@@ -862,7 +859,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         shardType.setTopologyTime(newTopologyTime.asTimestamp());
 
         LOGV2(21942,
-              "Going to insert new entry for shard into config.shards: {shardType}",
               "Going to insert new entry for shard into config.shards",
               "shardType"_attr = shardType.toString());
 
@@ -958,10 +954,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             BSON(ShardType::name() << name << ShardType::draining(true)))) > 0;
 
     if (!isShardCurrentlyDraining) {
-        LOGV2(21945,
-              "Going to start draining shard: {shardId}",
-              "Going to start draining shard",
-              "shardId"_attr = name);
+        LOGV2(21945, "Going to start draining shard", "shardId"_attr = name);
 
         // Record start in changelog
         uassertStatusOK(
@@ -1004,8 +997,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     if (chunkCount > 0 || databaseCount > 0) {
         // Still more draining to do
         LOGV2(21946,
-              "removeShard: draining chunkCount {chunkCount}; databaseCount {databaseCount}; "
-              "jumboCount {jumboCount}",
               "removeShard: draining",
               "chunkCount"_attr = chunkCount,
               "databaseCount"_attr = databaseCount,
@@ -1069,8 +1060,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     // Draining is done, now finish removing the shard.
-    LOGV2(
-        21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
+    LOGV2(21949, "Going to remove shard", "shardId"_attr = name);
 
     // Synchronize the control shard selection, the shard's document removal, and the topology time
     // update to exclude potential race conditions in case of concurrent add/remove shard

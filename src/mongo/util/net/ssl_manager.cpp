@@ -633,21 +633,14 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerLogger, ("SSLManager"))
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         const auto& config = SSLManagerCoordinator::get()->getSSLManager()->getSSLConfiguration();
         if (!config.clientSubjectName.empty()) {
-            LOGV2_DEBUG(23214,
-                        1,
-                        "Client Certificate Name: {name}",
-                        "Client certificate name",
-                        "name"_attr = config.clientSubjectName);
+            LOGV2_DEBUG(
+                23214, 1, "Client certificate name", "name"_attr = config.clientSubjectName);
         }
         if (!config.serverSubjectName().empty()) {
-            LOGV2_DEBUG(23215,
-                        1,
-                        "Server Certificate Name: {name}",
-                        "Server certificate name",
-                        "name"_attr = config.serverSubjectName());
+            LOGV2_DEBUG(
+                23215, 1, "Server certificate name", "name"_attr = config.serverSubjectName());
             LOGV2_DEBUG(23216,
                         1,
-                        "Server Certificate Expiration: {expiration}",
                         "Server certificate expiration",
                         "expiration"_attr = config.serverCertificateExpirationDate);
         }
@@ -686,8 +679,6 @@ Status SSLX509Name::normalizeStrings() {
                 default:
                     LOGV2_DEBUG(23217,
                                 1,
-                                "Certificate subject name contains unknown string type: "
-                                "{entryType} (string value is \"{entryValue}\")",
                                 "Certificate subject name contains unknown string type",
                                 "entryType"_attr = entry.type,
                                 "entryValue"_attr = entry.value);
@@ -866,10 +857,8 @@ bool SSLConfiguration::isClusterMember(
     StringData subjectName, const boost::optional<std::string>& clusterExtensionValue) const {
     auto swClient = parseDN(subjectName);
     if (!swClient.isOK()) {
-        LOGV2_WARNING(23219,
-                      "Unable to parse client subject name: {error}",
-                      "Unable to parse client subject name",
-                      "error"_attr = swClient.getStatus());
+        LOGV2_WARNING(
+            23219, "Unable to parse client subject name", "error"_attr = swClient.getStatus());
         return false;
     }
 
@@ -1367,7 +1356,6 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging) {
 
     if (!versionString.empty()) {
         LOGV2(23218,
-              "Accepted connection with TLS Version {tlsVersion} from connection {remoteHost}",
               "Accepted connection with TLS",
               "tlsVersion"_attr = versionString,
               "remoteHost"_attr = hostForLogging);
@@ -1394,15 +1382,11 @@ bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certH
 }
 
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer) {
-    LOGV2_WARNING(23221,
-                  "Peer certificate '{peerSubjectName}' expires soon",
-                  "Peer certificate expires soon",
-                  "peerSubjectName"_attr = peer);
+    LOGV2_WARNING(23221, "Peer certificate expires soon", "peerSubjectName"_attr = peer);
 }
 
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days) {
     LOGV2_WARNING(23222,
-                  "Peer certificate '{peerSubjectName}' expires in {days}",
                   "Peer certificate expiration information",
                   "peerSubjectName"_attr = peer,
                   "days"_attr = days);

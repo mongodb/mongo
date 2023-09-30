@@ -157,14 +157,11 @@ public:
             const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, destination);
 
             if (!toStatus.isOK()) {
-                LOGV2_OPTIONS(
-                    22755,
-                    {logv2::UserAssertAfterLog(ErrorCodes::ShardNotFound)},
-                    "Could not move chunk in {namespace} to {toShardId} because that shard"
-                    " does not exist",
-                    "moveChunk destination shard does not exist",
-                    "toShardId"_attr = destination,
-                    logAttrs(ns()));
+                LOGV2_OPTIONS(22755,
+                              {logv2::UserAssertAfterLog(ErrorCodes::ShardNotFound)},
+                              "moveChunk destination shard does not exist",
+                              "toShardId"_attr = destination,
+                              logAttrs(ns()));
             }
 
 

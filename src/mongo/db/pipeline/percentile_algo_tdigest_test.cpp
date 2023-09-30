@@ -317,7 +317,7 @@ TEST(TDigestTest, Incorporate_OnlyInfinities) {
         inputs[i] = inf;
     }
     auto seed = time(nullptr);
-    LOGV2(7429515, "{seed}", "Incorporate_OnlyInfinities", "seed"_attr = seed);
+    LOGV2(7429515, "Incorporate_OnlyInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     TDigest d{TDigest::k0_limit, delta};
@@ -360,7 +360,7 @@ TEST(TDigestTest, Incorporate_WithInfinities) {
     }
     vector<double> sorted = inputs;  // sorted by construction
     auto seed = time(nullptr);
-    LOGV2(7429511, "{seed}", "Incorporate_WithInfinities", "seed"_attr = seed);
+    LOGV2(7429511, "Incorporate_WithInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     TDigest d{TDigest::k0_limit, delta};
@@ -449,7 +449,7 @@ TEST(TDigestTest, Incorporate_Great_And_Small) {
     std::sort(sorted.begin(), sorted.end());
 
     auto seed = time(nullptr);
-    LOGV2(7429512, "{seed}", "Incorporate_Great_And_Small", "seed"_attr = seed);
+    LOGV2(7429512, "Incorporate_Great_And_Small", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     TDigest d{TDigest::k0_limit, delta};
@@ -794,7 +794,7 @@ vector<double> generateData(
     if (seed == 0) {
         seed = time(nullptr);
     }
-    LOGV2(7429513, "{seed}", "generateData", "seed"_attr = seed);
+    LOGV2(7429513, "generateData", "seed"_attr = seed);
     std::mt19937 generator(seed);
 
     vector<double> inputs;
@@ -1087,7 +1087,7 @@ TEST(TDigestTest, Duplicates_two_clusters) {
     }
     vector<double> inputs = sorted;
     auto seed = time(nullptr);
-    LOGV2(7429514, "{seed}", "Duplicates_two_clusters", "seed"_attr = seed);
+    LOGV2(7429514, "Duplicates_two_clusters", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     TDigest digest(TDigest::k2_limit, delta);

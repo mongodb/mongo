@@ -620,7 +620,6 @@ size_t WiredTigerUtil::getCacheSizeMB(double requestedCacheSizeGB) {
     }
     if (cacheSizeMB > kMaxSizeCacheMB) {
         LOGV2(22429,
-              "Requested cache size: {requestedMB}MB exceeds max; setting to {maximumMB}MB",
               "Requested cache size exceeds max, setting to maximum",
               "requestedMB"_attr = cacheSizeMB,
               "maximumMB"_attr = kMaxSizeCacheMB);

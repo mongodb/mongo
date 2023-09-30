@@ -302,7 +302,6 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         if (!curOp->debug().errInfo.isOK()) {
             LOGV2_DEBUG(20886,
                         3,
-                        "Caught Assertion in finishCurOp. Op: {operation}, error: {error}",
                         "Caught Assertion in finishCurOp",
                         "operation"_attr = redact(logicalOpToString(curOp->getLogicalOp())),
                         "error"_attr = curOp->debug().errInfo.toString());
@@ -315,10 +314,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         // We need to ignore all errors here. We don't want a successful op to fail because of a
         // failure to record stats. We also don't want to replace the error reported for an op that
         // is failing.
-        LOGV2(20887,
-              "Ignoring error from finishCurOp: {error}",
-              "Ignoring error from finishCurOp",
-              "error"_attr = redact(ex));
+        LOGV2(20887, "Ignoring error from finishCurOp", "error"_attr = redact(ex));
     }
 }
 
@@ -584,8 +580,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         "hangDuringBatchInsert",
         [&nss]() {
             LOGV2(20889,
-                  "Batch insert - hangDuringBatchInsert fail point enabled for namespace "
-                  "{namespace}. Blocking until fail point is disabled",
                   "Batch insert - hangDuringBatchInsert fail point enabled for a namespace. "
                   "Blocking until fail point is disabled",
                   logAttrs(nss));
@@ -1212,8 +1206,6 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         "hangDuringBatchUpdate",
         [&ns]() {
             LOGV2(20890,
-                  "Batch update - hangDuringBatchUpdate fail point enabled for namespace "
-                  "{namespace}. Blocking until fail point is disabled",
                   "Batch update - hangDuringBatchUpdate fail point enabled for a namespace. "
                   "Blocking until fail point is disabled",
                   logAttrs(ns));

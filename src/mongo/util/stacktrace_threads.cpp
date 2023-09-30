@@ -161,7 +161,6 @@ public:
 
     ~CachedMetaGenerator() {
         LOGV2(23393,
-              "CachedMetaGenerator: {hits}/{hitsAndMisses}",
               "CachedMetaGenerator",
               "hits"_attr = _hits,
               "hitsAndMisses"_attr = (_hits + _misses));
@@ -428,10 +427,7 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
                           std::vector<int>& missedTids) {
     std::set<int> pendingTids;
     iterateTids([&](int tid) { pendingTids.insert(tid); });
-    LOGV2(23394,
-          "Preparing to dump up to {numThreads} thread stacks",
-          "Preparing to dump thread stacks",
-          "numThreads"_attr = pendingTids.size());
+    LOGV2(23394, "Preparing to dump thread stacks", "numThreads"_attr = pendingTids.size());
 
     messageStorage.resize(pendingTids.size());
     received.reserve(pendingTids.size());
@@ -448,7 +444,6 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
         if (int r = tgkill(getpid(), *iter, _signal); r < 0) {
             int errsv = errno;
             LOGV2(23395,
-                  "Failed to signal thread ({tid}): {error}",
                   "Failed to signal thread",
                   "tid"_attr = *iter,
                   "error"_attr = strerror(errsv));
@@ -458,10 +453,7 @@ void State::collectStacks(std::vector<ThreadBacktrace>& messageStorage,
             ++iter;
         }
     }
-    LOGV2(23396,
-          "Signalled {numThreads} threads",
-          "Signalled threads",
-          "numThreads"_attr = pendingTids.size());
+    LOGV2(23396, "Signalled threads", "numThreads"_attr = pendingTids.size());
 
     size_t napMicros = 0;
     while (!pendingTids.empty()) {
@@ -528,15 +520,11 @@ void State::printStacks() {
             LOGV2(31423, "===== multithread stacktrace session begin =====");
         }
         void prologue(const BSONObj& obj) override {
-            LOGV2(31424,
-                  "Stacktrace Prologue: {prologue}",
-                  "Stacktrace Prologue",
-                  "prologue"_attr = obj);
+            LOGV2(31424, "Stacktrace Prologue", "prologue"_attr = obj);
         }
         void threadRecordsOpen() override {}
         void threadRecord(const BSONObj& obj) override {
             LOGV2(31425,  //
-                  "Stacktrace Record: {record}",
                   "Stacktrace Record",
                   "record"_attr = obj);
         }
@@ -686,7 +674,6 @@ void initialize(int signal) {
     if (sigaction(signal, &sa, nullptr) != 0) {
         int savedErr = errno;
         LOGV2_FATAL(31376,
-                    "Failed to install sigaction for signal {signal}: {error}",
                     "Failed to install sigaction for signal",
                     "signal"_attr = signal,
                     "error"_attr = strerror(savedErr));

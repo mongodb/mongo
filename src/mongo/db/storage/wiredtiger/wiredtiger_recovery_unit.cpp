@@ -222,10 +222,7 @@ void WiredTigerRecoveryUnit::assertInActiveTxn() const {
     if (_isActive()) {
         return;
     }
-    LOGV2_FATAL(28575,
-                "Recovery unit is not active. Current state: {currentState}",
-                "Recovery unit is not active.",
-                "currentState"_attr = _getState());
+    LOGV2_FATAL(28575, "Recovery unit is not active.", "currentState"_attr = _getState());
 }
 
 void WiredTigerRecoveryUnit::setTxnModified() {

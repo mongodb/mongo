@@ -161,7 +161,6 @@ void MigrationCoordinator::startMigration(OperationContext* opCtx) {
 void MigrationCoordinator::setMigrationDecision(DecisionEnum decision) {
     LOGV2_DEBUG(23891,
                 2,
-                "MigrationCoordinator setting migration decision to {decision}",
                 "MigrationCoordinator setting migration decision",
                 "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
                 "migrationId"_attr = _migrationInfo.getId());
@@ -184,7 +183,6 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
     }
 
     LOGV2(23893,
-          "MigrationCoordinator delivering decision {decision} to self and to recipient",
           "MigrationCoordinator delivering decision to self and to recipient",
           "decision"_attr = (decision == DecisionEnum::kCommitted ? "committed" : "aborted"),
           "migrationId"_attr = _migrationInfo.getId());
@@ -226,17 +224,14 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
 
     _waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(opCtx);
 
-    LOGV2_DEBUG(
-        23895,
-        2,
-        "Bumping transaction number with lsid {lsid} and current txnNumber {currentTxnNumber} on "
-        "recipient shard {recipientShardId} for commit of collection {nss}",
-        "Bumping transaction number on recipient shard for commit",
-        logAttrs(_migrationInfo.getNss()),
-        "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
-        "lsid"_attr = _migrationInfo.getLsid(),
-        "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
-        "migrationId"_attr = _migrationInfo.getId());
+    LOGV2_DEBUG(23895,
+                2,
+                "Bumping transaction number on recipient shard for commit",
+                logAttrs(_migrationInfo.getNss()),
+                "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
+                "lsid"_attr = _migrationInfo.getLsid(),
+                "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
+                "migrationId"_attr = _migrationInfo.getId());
     migrationutil::advanceTransactionOnRecipient(opCtx,
                                                  _migrationInfo.getRecipientShardId(),
                                                  _migrationInfo.getLsid(),
@@ -336,9 +331,6 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     try {
         LOGV2_DEBUG(23900,
                     2,
-                    "Bumping transaction number with lsid {lsid} and current txnNumber "
-                    "{currentTxnNumber} on "
-                    "recipient shard {recipientShardId} for abort of collection {nss}",
                     "Bumping transaction number on recipient shard for abort",
                     logAttrs(_migrationInfo.getNss()),
                     "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),

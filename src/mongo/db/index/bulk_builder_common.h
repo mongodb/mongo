@@ -179,9 +179,6 @@ public:
         }
 
         LOGV2(20685,
-              "Index build: inserted {bulk_getKeysInserted} keys from external sorter into "
-              "index in "
-              "{timer_seconds} seconds",
               "Index build: inserted keys from external sorter into index",
               logAttrs(_ns),
               "index"_attr = _indexName,

@@ -354,7 +354,6 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicy::selectChunksToSplit(
             continue;
         } else if (!candidatesStatus.isOK()) {
             LOGV2_WARNING(21852,
-                          "Unable to enforce zone range policy for collection {namespace}: {error}",
                           "Unable to enforce zone range policy for collection",
                           logAttrs(nss),
                           "error"_attr = candidatesStatus.getStatus());

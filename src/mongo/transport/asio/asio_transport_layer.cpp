@@ -155,11 +155,7 @@ private:
                 ->async_wait(UseFuture{})
                 .tapError([timer = _timer](const Status& status) {
                     if (status != ErrorCodes::CallbackCanceled) {
-                        LOGV2_DEBUG(23011,
-                                    2,
-                                    "Timer received error: {error}",
-                                    "Timer received error",
-                                    "error"_attr = status);
+                        LOGV2_DEBUG(23011, 2, "Timer received error", "error"_attr = status);
                     }
                 });
 
@@ -849,7 +845,6 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                 Date_t timeAfter = Date_t::now();
                 if (timeAfter - timeBefore > kSlowOperationThreshold) {
                     LOGV2_WARNING(23019,
-                                  "DNS resolution while connecting to {peer} took {duration}",
                                   "DNS resolution while connecting to peer was slow",
                                   "peer"_attr = connector->peer,
                                   "duration"_attr = timeAfter - timeBefore);
@@ -998,10 +993,8 @@ Status AsioTransportLayer::setup() {
             const auto& swAddrs =
                 resolver.resolve(HostAndPort(listenAddr, port), _listenerOptions.enableIPv6);
             if (!swAddrs.isOK()) {
-                LOGV2_WARNING(23021,
-                              "Found no addresses for {peer}",
-                              "Found no addresses for peer",
-                              "peer"_attr = swAddrs.getStatus());
+                LOGV2_WARNING(
+                    23021, "Found no addresses for peer", "peer"_attr = swAddrs.getStatus());
                 continue;
             }
             const auto& addrs = swAddrs.getValue();
@@ -1016,7 +1009,6 @@ Status AsioTransportLayer::setup() {
                 auto ec = lastPosixError();
                 if (ec != posixError(ENOENT)) {
                     LOGV2_ERROR(23024,
-                                "Failed to unlink socket file {path} {error}",
                                 "Failed to unlink socket file",
                                 "path"_attr = addr.toString().c_str(),
                                 "error"_attr = errorMessage(ec));
@@ -1048,7 +1040,6 @@ Status AsioTransportLayer::setup() {
             if (errno == EAFNOSUPPORT && _listenerOptions.enableIPv6 && addr.family() == AF_INET6 &&
                 addrIsBindAll()) {
                 LOGV2_WARNING(4206501,
-                              "Failed to bind to address as the platform does not support ipv6",
                               "Failed to bind to {address} as the platform does not support ipv6",
                               "address"_attr = addr.toString());
                 continue;
@@ -1160,7 +1151,6 @@ void AsioTransportLayer::_runListener() noexcept {
         acceptorRecord->acceptor.listen(serverGlobalParams.listenBacklog, ec);
         if (ec) {
             LOGV2_FATAL(31339,
-                        "Error listening for new connections on {listenAddress}: {error}",
                         "Error listening for new connections on listen address",
                         "listenAddrs"_attr = acceptorRecord->address,
                         "error"_attr = ec.message());
@@ -1198,12 +1188,10 @@ void AsioTransportLayer::_runListener() noexcept {
         auto& addr = acceptorRecord->address;
         if (addr.getType() == AF_UNIX && !addr.isAnonymousUNIXSocket()) {
             auto path = addr.getAddr();
-            LOGV2(
-                23017, "removing socket file: {path}", "removing socket file", "path"_attr = path);
+            LOGV2(23017, "removing socket file", "path"_attr = path);
             if (::unlink(path.c_str()) != 0) {
                 auto ec = lastPosixError();
                 LOGV2_WARNING(23022,
-                              "Unable to remove UNIX socket {path}: {error}",
                               "Unable to remove UNIX socket",
                               "path"_attr = path,
                               "error"_attr = errorMessage(ec));
@@ -1306,7 +1294,6 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
 
         if (ec) {
             LOGV2(23018,
-                  "Error accepting new connection on {localEndpoint}: {error}",
                   "Error accepting new connection on local endpoint",
                   "localEndpoint"_attr = endpointToHostAndPort(acceptor.local_endpoint()),
                   "error"_attr = ec.message());
@@ -1340,16 +1327,11 @@ void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
         } catch (const asio::system_error& e) {
             // Swallow connection reset errors.
             if (!isConnectionResetError(e.code())) {
-                LOGV2_WARNING(5746600,
-                              "Error accepting new connection: {error}",
-                              "Error accepting new connection",
-                              "error"_attr = e.code().message());
+                LOGV2_WARNING(
+                    5746600, "Error accepting new connection", "error"_attr = e.code().message());
             }
         } catch (const DBException& e) {
-            LOGV2_WARNING(23023,
-                          "Error accepting new connection: {error}",
-                          "Error accepting new connection",
-                          "error"_attr = e);
+            LOGV2_WARNING(23023, "Error accepting new connection", "error"_attr = e);
         }
 
         // _acceptConnection() is accessed by only one thread (i.e. the listener thread), so an

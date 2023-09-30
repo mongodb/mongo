@@ -182,7 +182,7 @@ public:
         const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
-        LOGV2(20457, "CMD: reIndex {namespace}", "CMD reIndex", logAttrs(toReIndexNss));
+        LOGV2(20457, "CMD reIndex", logAttrs(toReIndexNss));
 
         if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
             uasserted(

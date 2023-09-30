@@ -268,10 +268,7 @@ void BackgroundSync::_run() {
             sleepmillis(100);  // sleep a bit to keep from hammering this thread with temp. errors.
         } catch (const std::exception& e2) {
             // redact(std::exception&) doesn't work
-            LOGV2_FATAL(28546,
-                        "sync producer exception: {error}",
-                        "Sync producer error",
-                        "error"_attr = redact(e2.what()));
+            LOGV2_FATAL(28546, "Sync producer error", "error"_attr = redact(e2.what()));
         }
     }
     // No need to reset optimes here because we are shutting down.
@@ -350,7 +347,6 @@ void BackgroundSync::_produce() {
         lastOpTimeFetched = _lastOpTimeFetched;
         if (!_syncSourceHost.empty()) {
             LOGV2(21080,
-                  "Clearing sync source {syncSource} to choose a new one.",
                   "Clearing sync source to choose a new one",
                   "syncSource"_attr = _syncSourceHost);
         }
@@ -397,11 +393,7 @@ void BackgroundSync::_produce() {
             auto status = _replCoord->abortCatchupIfNeeded(
                 ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
             if (!status.isOK()) {
-                LOGV2_DEBUG(21083,
-                            1,
-                            "Aborting catch-up failed with status: {error}",
-                            "Aborting catch-up failed",
-                            "error"_attr = status);
+                LOGV2_DEBUG(21083, 1, "Aborting catch-up failed", "error"_attr = status);
             }
             return;
         }
@@ -424,18 +416,14 @@ void BackgroundSync::_produce() {
         // Activate maintenance mode and transition to RECOVERING.
         auto status = _replCoord->setMaintenanceMode(opCtx.get(), true);
         if (!status.isOK()) {
-            LOGV2_WARNING(21116,
-                          "Failed to transition into maintenance mode: {error}",
-                          "Failed to transition into maintenance mode",
-                          "error"_attr = status);
+            LOGV2_WARNING(
+                21116, "Failed to transition into maintenance mode", "error"_attr = status);
             // Do not mark ourselves too stale on errors so we can try again next time.
             return;
         }
         status = _replCoord->setFollowerMode(MemberState::RS_RECOVERING);
         if (!status.isOK()) {
             LOGV2_WARNING(21117,
-                          "Failed to transition into {targetState}. "
-                          "Current state: {currentState}. Caused by: {error}",
                           "Failed to perform replica set state transition",
                           "targetState"_attr = MemberState(MemberState::RS_RECOVERING),
                           "currentState"_attr = _replCoord->getMemberState(),
@@ -466,7 +454,6 @@ void BackgroundSync::_produce() {
             _waitForNewSyncSourceSelectionData(sleepMS);
         } else {
             LOGV2(21088,
-                  "Changed sync source from {oldSyncSource} to {newSyncSource}",
                   "Changed sync source",
                   "oldSyncSource"_attr =
                       (oldSource.empty() ? std::string("empty") : oldSource.toString()),
@@ -476,8 +463,6 @@ void BackgroundSync::_produce() {
     } else {
         if (!syncSourceResp.isOK()) {
             LOGV2(21089,
-                  "failed to find sync source, received error "
-                  "{error}",
                   "Failed to find sync source",
                   "error"_attr = syncSourceResp.syncSourceStatus.getStatus());
         }
@@ -496,18 +481,12 @@ void BackgroundSync::_produce() {
     // If we find a good sync source after having gone too stale, disable maintenance mode so we can
     // transition to SECONDARY.
     if (_tooStale.swap(false)) {
-        LOGV2(21091,
-              "No longer too stale. Able to sync from {syncSource}",
-              "No longer too stale. Able to start syncing",
-              "syncSource"_attr = source);
+        LOGV2(21091, "No longer too stale. Able to start syncing", "syncSource"_attr = source);
 
         auto opCtx = cc().makeOperationContext();
         auto status = _replCoord->setMaintenanceMode(opCtx.get(), false);
         if (!status.isOK()) {
-            LOGV2_WARNING(21118,
-                          "Failed to leave maintenance mode: {error}",
-                          "Failed to leave maintenance mode",
-                          "error"_attr = status);
+            LOGV2_WARNING(21118, "Failed to leave maintenance mode", "error"_attr = status);
         }
     }
 
@@ -570,15 +549,12 @@ void BackgroundSync::_produce() {
     const auto logLevel = TestingProctor::instance().isEnabled() ? 0 : 1;
     LOGV2_DEBUG(21092,
                 logLevel,
-                "scheduling fetcher to read remote oplog on {syncSource} starting at "
-                "{lastOpTimeFetched}",
                 "Scheduling fetcher to read remote oplog",
                 "syncSource"_attr = source,
                 "lastOpTimeFetched"_attr = oplogFetcher->getLastOpTimeFetched_forTest());
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         LOGV2_WARNING(21119,
-                      "unable to schedule fetcher to read remote oplog on {syncSource}: {error}",
                       "Unable to schedule fetcher to read remote oplog",
                       "syncSource"_attr = source,
                       "error"_attr = scheduleStatus);
@@ -586,11 +562,7 @@ void BackgroundSync::_produce() {
     }
 
     oplogFetcher->join();
-    LOGV2_DEBUG(21093,
-                1,
-                "fetcher stopped reading remote oplog on {syncSource}",
-                "Fetcher stopped reading remote oplog",
-                "syncSource"_attr = source);
+    LOGV2_DEBUG(21093, 1, "Fetcher stopped reading remote oplog", "syncSource"_attr = source);
 
     // If the background sync is stopped after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
@@ -634,8 +606,6 @@ void BackgroundSync::_produce() {
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         LOGV2_WARNING(
             5579701,
-            "Oplog fetcher got invalid BSON while querying oplog. Denylisting sync source "
-            "{syncSource} for {denylistDuration}.",
             "Oplog fetcher got invalid BSON while querying oplog. Denylisting sync source",
             "syncSource"_attr = source,
             "denylistDuration"_attr = denylistDuration);
@@ -653,7 +623,6 @@ void BackgroundSync::_produce() {
         }
     } else if (!fetcherReturnStatus.isOK()) {
         LOGV2_WARNING(21122,
-                      "Oplog fetcher stopped querying remote oplog with error: {error}",
                       "Oplog fetcher stopped querying remote oplog with error",
                       "error"_attr = redact(fetcherReturnStatus));
     }
@@ -689,7 +658,6 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
         _lastOpTimeFetched = info.lastDocument;
         LOGV2_DEBUG(21096,
                     3,
-                    "batch resetting _lastOpTimeFetched: {lastOpTimeFetched}",
                     "Batch resetting _lastOpTimeFetched",
                     "lastOpTimeFetched"_attr = _lastOpTimeFetched);
     }
@@ -720,11 +688,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         auto status = _replCoord->abortCatchupIfNeeded(
             ReplicationCoordinator::PrimaryCatchUpConclusionReason::kFailedWithError);
         if (!status.isOK()) {
-            LOGV2_DEBUG(21097,
-                        1,
-                        "Aborting catch-up failed with status: {error}",
-                        "Aborting catch-up failed",
-                        "error"_attr = status);
+            LOGV2_DEBUG(21097, 1, "Aborting catch-up failed", "error"_attr = status);
         }
         return;
     }
@@ -754,8 +718,6 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     auto lastApplied = _replCoord->getMyLastAppliedOpTime();
     if (lastApplied != lastOpTimeFetched) {
         LOGV2(21100,
-              "Waiting for all operations from {lastApplied} until {lastOpTimeFetched} to be "
-              "applied before starting rollback.",
               "Waiting for all operations from lastApplied until lastOpTimeFetched to be applied "
               "before starting rollback",
               "lastApplied"_attr = lastApplied,
@@ -837,24 +799,16 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     _rollback = std::make_unique<RollbackImpl>(
         localOplog, &remoteOplog, storageInterface, _replicationProcess, _replCoord);
 
-    LOGV2(21104,
-          "Scheduling rollback (sync source: {syncSource})",
-          "Scheduling rollback",
-          "syncSource"_attr = source);
+    LOGV2(21104, "Scheduling rollback", "syncSource"_attr = source);
     auto status = _rollback->runRollback(opCtx);
     if (status.isOK()) {
         LOGV2(21105, "Rollback successful");
     } else if (status == ErrorCodes::UnrecoverableRollbackError) {
-        LOGV2_FATAL_CONTINUE(21128,
-                             "Rollback failed with unrecoverable error: {error}",
-                             "Rollback failed with unrecoverable error",
-                             "error"_attr = status);
+        LOGV2_FATAL_CONTINUE(
+            21128, "Rollback failed with unrecoverable error", "error"_attr = status);
         fassertFailedWithStatusNoTrace(50666, status);
     } else {
-        LOGV2_WARNING(21124,
-                      "Rollback failed with retryable error: {error}",
-                      "Rollback failed with retryable error",
-                      "error"_attr = status);
+        LOGV2_WARNING(21124, "Rollback failed with retryable error", "error"_attr = status);
     }
 }
 
@@ -905,10 +859,7 @@ HostAndPort BackgroundSync::getSyncTarget() const {
 
 void BackgroundSync::clearSyncTarget() {
     stdx::unique_lock<Latch> lock(_mutex);
-    LOGV2(21106,
-          "Resetting sync source to empty, which was {previousSyncSource}",
-          "Resetting sync source to empty",
-          "previousSyncSource"_attr = _syncSourceHost);
+    LOGV2(21106, "Resetting sync source to empty", "previousSyncSource"_attr = _syncSourceHost);
     _syncSourceHost = HostAndPort();
     _notifySyncSourceSelectionDataChanged(lock);
 }
@@ -967,8 +918,6 @@ void BackgroundSync::start(OperationContext* opCtx) {
         if (_lastOpTimeFetched <= lastAppliedOpTime) {
             LOGV2_DEBUG(21110,
                         1,
-                        "Setting bgsync _lastOpTimeFetched={lastAppliedOpTime}. Previous "
-                        "_lastOpTimeFetched: {previousLastOpTimeFetched}",
                         "Setting bgsync _lastOpTimeFetched to lastAppliedOpTime",
                         "lastAppliedOpTime"_attr = lastAppliedOpTime,
                         "previousLastOpTimeFetched"_attr = _lastOpTimeFetched);
@@ -979,7 +928,6 @@ void BackgroundSync::start(OperationContext* opCtx) {
 
     LOGV2_DEBUG(21111,
                 1,
-                "bgsync fetch queue set to: {lastOpTimeFetched}",
                 "bgsync fetch queue set to lastOpTimeFetched",
                 "lastOpTimeFetched"_attr = _lastOpTimeFetched);
 }
@@ -1000,7 +948,6 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
         throw;
     } catch (const DBException& ex) {
         LOGV2_FATAL(18904,
-                    "Problem reading {namespace}: {error}",
                     "Problem reading from namespace",
                     logAttrs(NamespaceString::kRsOplogNamespace),
                     "error"_attr = redact(ex));
@@ -1009,7 +956,6 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
     OplogEntry parsedEntry(oplogEntry);
     LOGV2_DEBUG(21112,
                 1,
-                "Successfully read last entry of oplog while starting bgsync: {lastOplogEntry}",
                 "Successfully read last entry of oplog while starting bgsync",
                 "lastOplogEntry"_attr = redact(oplogEntry));
     return parsedEntry.getOpTime();

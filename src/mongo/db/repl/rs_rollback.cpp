@@ -178,8 +178,6 @@ void FixUpInfo::removeRedundantOperations() {
 bool FixUpInfo::removeRedundantIndexCommands(UUID uuid, std::string indexName) {
     LOGV2_DEBUG(21659,
                 2,
-                "Attempting to remove redundant index operations from the set of indexes to create "
-                "for collection {uuid}, for index '{indexName}'",
                 "Attempting to remove redundant index operations from the set of indexes to create",
                 "uuid"_attr = uuid,
                 "indexName"_attr = indexName);
@@ -192,8 +190,6 @@ bool FixUpInfo::removeRedundantIndexCommands(UUID uuid, std::string indexName) {
     if (indexes == indexesToCreate.end()) {
         LOGV2_DEBUG(21660,
                     2,
-                    "Collection {uuid} has no indexes to create. Not removing any index creation "
-                    "operations for index '{indexName}'.",
                     "Collection has no indexes to create. Not removing any index creation "
                     "operations for index",
                     "uuid"_attr = uuid,
@@ -210,8 +206,6 @@ bool FixUpInfo::removeRedundantIndexCommands(UUID uuid, std::string indexName) {
     if (indexesToCreateForColl->find(indexName) == indexesToCreateForColl->end()) {
         LOGV2_DEBUG(21661,
                     2,
-                    "Index '{indexName}' was not previously set to be created for collection "
-                    "{uuid}. Not removing any index creation operations.",
                     "Index was not previously set to be created for collection. Not removing any "
                     "index creation operations",
                     "indexName"_attr = indexName,
@@ -223,8 +217,6 @@ bool FixUpInfo::removeRedundantIndexCommands(UUID uuid, std::string indexName) {
     // remove it from that set.
     LOGV2_DEBUG(21662,
                 2,
-                "Index '{indexName}' was previously set to be created for collection {uuid}. "
-                "Removing this redundant index creation operation.",
                 "Index was previously set to be created for collection. Removing this redundant "
                 "index creation operation",
                 "indexName"_attr = indexName,
@@ -318,7 +310,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
     if (isNestedApplyOpsCommand) {
         LOGV2_DEBUG(21663,
                     2,
-                    "Updating rollback FixUpInfo for nested applyOps oplog entry: {oplogEntry}",
                     "Updating rollback FixUpInfo for nested applyOps oplog entry",
                     "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
     }
@@ -443,8 +434,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 auto status = bsonExtractStringField(obj, "index", &indexName);
                 if (!status.isOK()) {
                     LOGV2_FATAL_CONTINUE(21731,
-                                         "Missing index name in dropIndexes operation on rollback, "
-                                         "document: {oplogEntry}",
                                          "Missing index name in dropIndexes operation on rollback",
                                          "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
                     throw RSFatalException(
@@ -484,8 +473,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 if (!status.isOK()) {
                     LOGV2_FATAL_CONTINUE(
                         21732,
-                        "Missing index name in createIndexes operation on rollback, "
-                        "document: {oplogEntry}",
                         "Missing index name in createIndexes operation on rollback",
                         "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
                     throw RSFatalException(
@@ -537,8 +524,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                         21664,
                         2,
                         "Index build that was previously marked to be restarted will now be "
-                        "dropped due to a rolled-back 'startIndexBuild' oplog entry: {buildUUID}",
-                        "Index build that was previously marked to be restarted will now be "
                         "dropped due to a rolled-back 'startIndexBuild' oplog entry",
                         "buildUUID"_attr = buildUUID);
                     buildsToRestart.erase(existingIt);
@@ -583,8 +568,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 LOGV2_DEBUG(21665,
                             2,
-                            "Index build will be restarted after a rolled-back 'abortIndexBuild': "
-                            "{buildUUID}",
                             "Index build will be restarted after a rolled-back 'abortIndexBuild'",
                             "buildUUID"_attr = buildUUID);
                 IndexBuildDetails details{*uuid};
@@ -629,8 +612,6 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
 
                 LOGV2_DEBUG(21666,
                             2,
-                            "Index build will be restarted after a rolled-back 'commitIndexBuild': "
-                            "{buildUUID}",
                             "Index build will be restarted after a rolled-back 'commitIndexBuild'",
                             "buildUUID"_attr = buildUUID);
 
@@ -879,7 +860,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     // RECOVERING state to SECONDARY state until we have reached the minValid oplog entry.
 
     OpTime minValid = fassert(40492, OpTime::parseFromOplogEntry(newMinValidDoc));
-    LOGV2(21668, "Setting minvalid to {minValid}", "Setting minvalid", "minValid"_attr = minValid);
+    LOGV2(21668, "Setting minvalid", "minValid"_attr = minValid);
 
     // This method is only used with storage engines that do not support recover to stable
     // timestamp. As a result, the timestamp on the 'appliedThrough' update does not matter.
@@ -917,7 +898,6 @@ void dropIndex(OperationContext* opCtx,
         IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     if (!writableEntry) {
         LOGV2_WARNING(21725,
-                      "Rollback failed to drop index {indexName} in {namespace}: index not found.",
                       "Rollback failed to drop index: index not found",
                       "indexName"_attr = indexName,
                       logAttrs(nss));
@@ -928,7 +908,6 @@ void dropIndex(OperationContext* opCtx,
         auto status = indexCatalog->dropIndexEntry(opCtx, collection, writableEntry);
         if (!status.isOK()) {
             LOGV2_ERROR(21738,
-                        "Rollback failed to drop index {indexName} in {namespace}: {error}",
                         "Rollback failed to drop index",
                         "indexName"_attr = indexName,
                         logAttrs(nss),
@@ -937,13 +916,11 @@ void dropIndex(OperationContext* opCtx,
     } else {
         auto status = indexCatalog->dropUnfinishedIndex(opCtx, collection, writableEntry);
         if (!status.isOK()) {
-            LOGV2_ERROR(
-                21739,
-                "Rollback failed to drop unfinished index {indexName} in {namespace}: {error}",
-                "Rollback failed to drop unfinished index",
-                "indexName"_attr = indexName,
-                logAttrs(nss),
-                "error"_attr = redact(status));
+            LOGV2_ERROR(21739,
+                        "Rollback failed to drop unfinished index",
+                        "indexName"_attr = indexName,
+                        logAttrs(nss),
+                        "error"_attr = redact(status));
         }
     }
 }
@@ -964,8 +941,6 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
     if (!collection) {
         LOGV2_DEBUG(21670,
                     2,
-                    "Cannot find the collection with uuid: {uuid} in CollectionCatalog during roll "
-                    "back of a createIndexes command.",
                     "Cannot find the collection in CollectionCatalog during rollback of a "
                     "createIndexes command",
                     "uuid"_attr = uuid.toString());
@@ -977,8 +952,6 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
     if (!indexCatalog) {
         LOGV2_DEBUG(21671,
                     2,
-                    "Cannot find the index catalog in collection with uuid: {uuid} during roll "
-                    "back of a createIndexes command.",
                     "Cannot find the index catalog in collection during rollback of a "
                     "createIndexes command",
                     "uuid"_attr = uuid.toString());
@@ -989,8 +962,6 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
         const string& indexName = *itIndex;
 
         LOGV2(21672,
-              "Dropping index in rollback for collection: {namespace}, UUID: {uuid}, index: "
-              "{indexName}",
               "Dropping index in rollback",
               logAttrs(*nss),
               "uuid"_attr = uuid,
@@ -1002,8 +973,6 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
 
         LOGV2_DEBUG(21673,
                     1,
-                    "Dropped index in rollback for collection: {namespace}, UUID: {uuid}, index: "
-                    "{indexName}",
                     "Dropped index in rollback",
                     logAttrs(*nss),
                     "uuid"_attr = uuid,
@@ -1029,8 +998,6 @@ void rollbackDropIndexes(OperationContext* opCtx,
     if (!collection) {
         LOGV2_DEBUG(21674,
                     2,
-                    "Cannot find the collection with uuid: {uuid}in CollectionCatalog during roll "
-                    "back of a dropIndexes command.",
                     "Cannot find the collection in CollectionCatalog during rollback of a "
                     "dropIndexes command",
                     "uuid"_attr = uuid.toString());
@@ -1042,8 +1009,6 @@ void rollbackDropIndexes(OperationContext* opCtx,
         BSONObj indexSpec = itIndex->second;
 
         LOGV2(21675,
-              "Creating index in rollback for collection: {namespace}, UUID: {uuid}, index: "
-              "{indexName}",
               "Creating index in rollback",
               logAttrs(*nss),
               "uuid"_attr = uuid,
@@ -1053,8 +1018,6 @@ void rollbackDropIndexes(OperationContext* opCtx,
 
         LOGV2_DEBUG(21676,
                     1,
-                    "Created index in rollback for collection: {namespace}, UUID: {uuid}, index: "
-                    "{indexName}",
                     "Created index in rollback",
                     logAttrs(*nss),
                     "uuid"_attr = uuid,
@@ -1072,10 +1035,6 @@ void dropCollection(OperationContext* opCtx,
     if (RollbackImpl::shouldCreateDataFiles()) {
         RemoveSaver removeSaver("rollback", "", collection->uuid().toString());
         LOGV2(21677,
-              "Rolling back createCollection on {namespace}: Preparing to write documents to a "
-              "rollback "
-              "file for a collection with uuid {uuid} to "
-              "{rollbackFile}",
               "Rolling back createCollection: Preparing to write documents to a rollback file",
               logAttrs(nss),
               "uuid"_attr = collection->uuid(),
@@ -1093,8 +1052,6 @@ void dropCollection(OperationContext* opCtx,
                 auto status = removeSaver.goingToDelete(curObj);
                 if (!status.isOK()) {
                     LOGV2_FATAL_CONTINUE(21740,
-                                         "Rolling back createCollection on {namespace} failed to "
-                                         "write document to remove saver file: {error}",
                                          "Rolling back createCollection failed to write document "
                                          "to remove saver file",
                                          logAttrs(nss),
@@ -1106,8 +1063,6 @@ void dropCollection(OperationContext* opCtx,
             }
         } catch (const DBException&) {
             LOGV2_FATAL_CONTINUE(21741,
-                                 "Rolling back createCollection on {namespace} failed with "
-                                 "{error}. A full resync is necessary",
                                  "Rolling back createCollection failed. A full resync is necessary",
                                  logAttrs(nss),
                                  "error"_attr = redact(exceptionToStatus()));
@@ -1147,8 +1102,6 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     if (!tmpNameResult.isOK()) {
         LOGV2_FATAL_CONTINUE(
             21743,
-            "Unable to generate temporary namespace to rename collection {renameTo} "
-            "out of the way. {error}",
             "Unable to generate temporary namespace to rename renameTo collection out of the way",
             "renameTo"_attr = info.renameTo,
             "error"_attr = tmpNameResult.getStatus().reason());
@@ -1159,9 +1112,6 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
 
     LOGV2_DEBUG(21678,
                 2,
-                "Attempted to rename collection from {renameFrom} to {renameTo} but "
-                "collection exists already. Temporarily renaming collection "
-                "with UUID {uuid} out of the way to {tempNamespace}",
                 "Attempted to rename collection but renameTo collection exists already. "
                 "Temporarily renaming collection out of the way to a temporary namespace",
                 "renameFrom"_attr = info.renameFrom,
@@ -1177,7 +1127,6 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     if (!renameStatus.isOK()) {
         LOGV2_FATAL_CONTINUE(
             21744,
-            "Unable to rename collection {renameTo} out of the way to {tempNamespace}",
             "Unable to rename renameTo collection out of the way to a temporary namespace",
             "renameTo"_attr = info.renameTo,
             "tempNamespace"_attr = tempNss);
@@ -1193,8 +1142,6 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
     auto dbName = info.renameFrom.dbName();
 
     LOGV2(21679,
-          "Attempting to rename collection with UUID: {uuid}, from: {renameFrom}, to: "
-          "{renameTo}",
           "Attempting to rename collection",
           "uuid"_attr = uuid,
           "renameFrom"_attr = info.renameFrom,
@@ -1218,21 +1165,17 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
         status = renameCollectionForRollback(opCtx, info.renameTo, uuid);
 
         if (!status.isOK()) {
-            LOGV2_FATAL_CONTINUE(
-                21745,
-                "Rename collection failed to roll back twice. We were unable to rename "
-                "collection {renameFrom} to {renameTo}. {error}",
-                "Rename collection failed to roll back twice",
-                "renameFrom"_attr = info.renameFrom,
-                "renameTo"_attr = info.renameTo,
-                "error"_attr = status.toString());
+            LOGV2_FATAL_CONTINUE(21745,
+                                 "Rename collection failed to roll back twice",
+                                 "renameFrom"_attr = info.renameFrom,
+                                 "renameTo"_attr = info.renameTo,
+                                 "error"_attr = status.toString());
             throw RSFatalException(
                 "Rename collection failed to roll back twice. We were unable to rename "
                 "the collection.");
         }
     } else if (!status.isOK()) {
         LOGV2_FATAL_CONTINUE(21746,
-                             "Unable to roll back renameCollection command: {error}",
                              "Unable to roll back renameCollection command",
                              "error"_attr = status.toString());
         throw RSFatalException("Unable to rollback renameCollection command");
@@ -1240,7 +1183,6 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
 
     LOGV2_DEBUG(21680,
                 1,
-                "Renamed collection with UUID: {uuid}, from: {renameFrom}, to: {renameTo}",
                 "Renamed collection",
                 "uuid"_attr = uuid,
                 "renameFrom"_attr = info.renameFrom,
@@ -1280,7 +1222,6 @@ void syncFixUp(OperationContext* opCtx,
             if (nss) {
                 LOGV2_DEBUG(21687,
                             2,
-                            "Refetching document, collection: {namespace}, UUID: {uuid}, {_id}",
                             "Refetching document",
                             logAttrs(*nss),
                             "uuid"_attr = uuid,
@@ -1288,7 +1229,6 @@ void syncFixUp(OperationContext* opCtx,
             } else {
                 LOGV2_DEBUG(21688,
                             2,
-                            "Refetching document, UUID: {uuid}, {_id}",
                             "Refetching document",
                             "uuid"_attr = uuid,
                             "_id"_attr = redact(doc._id));
@@ -1341,8 +1281,6 @@ void syncFixUp(OperationContext* opCtx,
                 continue;
 
             LOGV2(21689,
-                  "Rollback couldn't re-fetch from uuid: {uuid} _id: {_id} "
-                  "{numFetched}/{docsToRefetch}: {error}",
                   "Rollback couldn't re-fetch",
                   "uuid"_attr = uuid,
                   "_id"_attr = redact(doc._id),
@@ -1354,8 +1292,6 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     LOGV2(21690,
-          "Finished refetching documents. Total size of documents refetched: "
-          "{totalSizeOfDocumentsRefetched}",
           "Finished refetching documents",
           "totalSizeOfDocumentsRefetched"_attr = goodVersions.size());
 
@@ -1429,16 +1365,9 @@ void syncFixUp(OperationContext* opCtx,
         // Do not attempt to acquire the database lock with an empty namespace. We should survive
         // an attempt to drop a non-existent collection.
         if (!nss) {
-            LOGV2(21696,
-                  "This collection does not exist, UUID: {uuid}",
-                  "This collection does not exist",
-                  "uuid"_attr = uuid);
+            LOGV2(21696, "This collection does not exist", "uuid"_attr = uuid);
         } else {
-            LOGV2(21697,
-                  "Dropping collection: {namespace}, UUID: {uuid}",
-                  "Dropping collection",
-                  logAttrs(*nss),
-                  "uuid"_attr = uuid);
+            LOGV2(21697, "Dropping collection", logAttrs(*nss), "uuid"_attr = uuid);
             AutoGetDb dbLock(opCtx, nss->dbName(), MODE_X);
 
             Database* db = dbLock.getDb();
@@ -1446,12 +1375,7 @@ void syncFixUp(OperationContext* opCtx,
                 CollectionPtr collection(
                     CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
                 dropCollection(opCtx, *nss, collection, db);
-                LOGV2_DEBUG(21698,
-                            1,
-                            "Dropped collection: {namespace}, UUID: {uuid}",
-                            "Dropped collection",
-                            logAttrs(*nss),
-                            "uuid"_attr = uuid);
+                LOGV2_DEBUG(21698, 1, "Dropped collection", logAttrs(*nss), "uuid"_attr = uuid);
             }
         }
     }
@@ -1483,8 +1407,6 @@ void syncFixUp(OperationContext* opCtx,
         const auto& collectionNamespace = collPair.second.second;
         LOGV2_DEBUG(21701,
                     1,
-                    "Rolling back collection pending being dropped for OpTime: {optime}, "
-                    "collection: {namespace}",
                     "Rolling back collection pending being dropped",
                     "optime"_attr = optime,
                     logAttrs(collectionNamespace));
@@ -1506,11 +1428,7 @@ void syncFixUp(OperationContext* opCtx,
                 CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
             invariant(nss);
 
-            LOGV2(21702,
-                  "Resyncing collection metadata for collection: {namespace}, UUID: {uuid}",
-                  "Resyncing collection metadata",
-                  logAttrs(*nss),
-                  "uuid"_attr = uuid);
+            LOGV2(21702, "Resyncing collection metadata", logAttrs(*nss), "uuid"_attr = uuid);
 
             Lock::DBLock dbLock(opCtx, nss->dbName(), MODE_X);
 
@@ -1530,8 +1448,6 @@ void syncFixUp(OperationContext* opCtx,
                 // collection.
 
                 LOGV2(21703,
-                      "{namespace} not found on remote host, so we do not roll back collmod "
-                      "operation. Instead, we will drop the collection soon.",
                       "Namespace not found on remote host, so we do not roll back collmod "
                       "operation. Instead, we will drop the collection soon",
                       logAttrs(*nss));
@@ -1583,9 +1499,6 @@ void syncFixUp(OperationContext* opCtx,
 
             LOGV2_DEBUG(21704,
                         1,
-                        "Resynced collection metadata for collection: {namespace}, UUID: {uuid}, "
-                        "with: {info}, "
-                        "to: {catalogId}",
                         "Resynced collection metadata",
                         logAttrs(*nss),
                         "uuid"_attr = uuid,
@@ -1639,9 +1552,6 @@ void syncFixUp(OperationContext* opCtx,
         if (RollbackImpl::shouldCreateDataFiles()) {
             removeSaver = std::make_unique<RemoveSaver>("rollback", "", uuid.toString());
             LOGV2(21709,
-                  "Preparing to write deleted documents to a rollback file for collection "
-                  "{namespace} "
-                  "with uuid {uuid} to {rollbackFile}",
                   "Preparing to write deleted documents to a rollback file",
                   logAttrs(*nss),
                   "uuid"_attr = uuid.toString(),
@@ -1653,9 +1563,6 @@ void syncFixUp(OperationContext* opCtx,
             time_t now = time(nullptr);
             if (now - lastProgressUpdate > progressUpdateGap) {
                 LOGV2(21710,
-                      "{deletesProcessed} delete and {updatesProcessed} update operations "
-                      "processed out of "
-                      "{totalOperations} total operations.",
                       "Rollback progress",
                       "deletesProcessed"_attr = deletes,
                       "updatesProcessed"_attr = updates,
@@ -1691,32 +1598,25 @@ void syncFixUp(OperationContext* opCtx,
                     if (found) {
                         auto status = removeSaver->goingToDelete(obj);
                         if (!status.isOK()) {
-                            LOGV2_FATAL_CONTINUE(
-                                21747,
-                                "Rollback cannot write document in namespace {namespace} to "
-                                "archive file: {error}",
-                                "Rollback cannot write document to archive file",
-                                logAttrs(*nss),
-                                "error"_attr = redact(status));
+                            LOGV2_FATAL_CONTINUE(21747,
+                                                 "Rollback cannot write document to archive file",
+                                                 logAttrs(*nss),
+                                                 "error"_attr = redact(status));
                             throw RSFatalException(
                                 str::stream() << "Rollback cannot write document in namespace "
                                               << nss->toStringForErrorMsg() << " to archive file.");
                         }
                     } else {
-                        LOGV2_ERROR(
-                            21730,
-                            "Rollback cannot find object: {pattern} in namespace {namespace}",
-                            "Rollback cannot find object",
-                            "pattern"_attr = pattern,
-                            logAttrs(*nss));
+                        LOGV2_ERROR(21730,
+                                    "Rollback cannot find object",
+                                    "pattern"_attr = pattern,
+                                    logAttrs(*nss));
                     }
                 }
 
                 if (idAndDoc.second.isEmpty()) {
                     LOGV2_DEBUG(21711,
                                 2,
-                                "Deleting document with: {_id}, from collection: {namespace}, with "
-                                "UUID: {uuid}",
                                 "Deleting document",
                                 "_id"_attr = redact(doc._id),
                                 logAttrs(docNss),
@@ -1743,7 +1643,6 @@ void syncFixUp(OperationContext* opCtx,
                                 if (clock->now() - findOneStart > Milliseconds(200))
                                     LOGV2_WARNING(
                                         21726,
-                                        "Roll back slow no _id index for {namespace} perhaps?",
                                         "Roll back slow no _id index for namespace perhaps?",
                                         logAttrs(*nss));
                                 // Would be faster but requires index:
@@ -1783,9 +1682,6 @@ void syncFixUp(OperationContext* opCtx,
 
                                 LOGV2_WARNING(21727,
                                               "Ignoring failure to roll back change to capped "
-                                              "collection {namespace} with _id "
-                                              "{_id}: {error}",
-                                              "Ignoring failure to roll back change to capped "
                                               "collection",
                                               logAttrs(*nss),
                                               "_id"_attr = redact(idAndDoc.first._id.toString(
@@ -1803,8 +1699,6 @@ void syncFixUp(OperationContext* opCtx,
                 } else {
                     LOGV2_DEBUG(21712,
                                 2,
-                                "Updating document with: {_id}, from collection: {namespace}, "
-                                "UUID: {uuid}, to: {doc}",
                                 "Updating document",
                                 "_id"_attr = redact(doc._id),
                                 "namespace"_attr = doc.ns,
@@ -1826,7 +1720,6 @@ void syncFixUp(OperationContext* opCtx,
                 }
             } catch (const DBException& e) {
                 LOGV2(21713,
-                      "Exception in rollback ns:{namespace} {pattern} {error} ndeletes:{deletes}",
                       "Exception in rollback",
                       logAttrs(*nss),
                       "pattern"_attr = pattern,
@@ -1838,7 +1731,6 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     LOGV2(21714,
-          "Rollback deleted {deletes} documents and updated {updates} documents.",
           "Rollback finished deletes and updates",
           "deletes"_attr = deletes,
           "updates"_attr = updates);
@@ -1849,8 +1741,6 @@ void syncFixUp(OperationContext* opCtx,
         // common point.
         const bool force = true;
         LOGV2(21715,
-              "Forcing the stable timestamp to the common point: "
-              "{commonPoint}",
               "Forcing the stable timestamp to the common point",
               "commonPoint"_attr = fixUpInfo.commonPoint.getTimestamp());
         opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(
@@ -1868,9 +1758,6 @@ void syncFixUp(OperationContext* opCtx,
                                         .getTimestamp();
         LOGV2(21716,
               "Setting initialDataTimestamp to the max of local top of oplog and sync source "
-              "top of oplog. Local top of oplog: {localTopOfOplog}, sync "
-              "source top of oplog: {syncSourceTopOfOplog}",
-              "Setting initialDataTimestamp to the max of local top of oplog and sync source "
               "top of oplog",
               "localTopOfOplog"_attr = fixUpInfo.localTopOfOplog.getTimestamp(),
               "syncSourceTopOfOplog"_attr = syncSourceTopOfOplog);
@@ -1885,8 +1772,6 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     LOGV2(21718,
-          "Truncating the oplog at {commonPoint} ({commonPointOurDiskloc}), "
-          "non-inclusive",
           "Truncating the oplog at the common point, non-inclusive",
           "commonPoint"_attr = fixUpInfo.commonPoint.toString(),
           "commonPointOurDiskloc"_attr = fixUpInfo.commonPointOurDiskloc);
@@ -1928,7 +1813,6 @@ void syncFixUp(OperationContext* opCtx,
         // point TS would be incorrect (since this is equal to the stable timestamp), and this write
         // will be included in the unstable checkpoint regardless of its timestamp.
         LOGV2(21719,
-              "Setting appliedThrough to the common point: {commonPoint}",
               "Setting appliedThrough to the common point",
               "commonPoint"_attr = fixUpInfo.commonPoint);
         replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx,
@@ -1947,7 +1831,6 @@ void syncFixUp(OperationContext* opCtx,
     Status status = AuthorizationManager::get(opCtx->getServiceContext())->initialize(opCtx);
     if (!status.isOK()) {
         LOGV2_FATAL_NOTRACE(40496,
-                            "Failed to reinitialize auth data after rollback: {error}",
                             "Failed to reinitialize auth data after rollback",
                             "error"_attr = redact(status));
     }
@@ -1986,10 +1869,7 @@ Status _syncRollback(OperationContext* opCtx,
 
     FixUpInfo how;
     how.localTopOfOplog = replCoord->getMyLastAppliedOpTime();
-    LOGV2(21681,
-          "Starting rollback. Sync source: {syncSource}",
-          "Starting rollback",
-          "syncSource"_attr = rollbackSource.getSource());
+    LOGV2(21681, "Starting rollback", "syncSource"_attr = rollbackSource.getSource());
     how.rbid = rollbackSource.getRollbackId();
     uassert(
         40506, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
@@ -2041,10 +1921,7 @@ Status _syncRollback(OperationContext* opCtx,
     OpTime lastCommittedOpTime = replCoord->getLastCommittedOpTime();
     OpTime committedSnapshot = replCoord->getCurrentCommittedSnapshotOpTime();
 
-    LOGV2(21683,
-          "Rollback common point is {commonPoint}",
-          "Rollback common point",
-          "commonPoint"_attr = commonPointOpTime);
+    LOGV2(21683, "Rollback common point", "commonPoint"_attr = commonPointOpTime);
 
     // This failpoint is used for testing the invariant below.
     if (MONGO_unlikely(rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
@@ -2120,8 +1997,6 @@ Status syncRollback(OperationContext* opCtx,
                                   replicationProcess);
 
     LOGV2(21722,
-          "Rollback finished. The final minValid is: "
-          "{minValid}",
           "Rollback finished",
           "minValid"_attr = replicationProcess->getConsistencyMarkers()->getMinValid(opCtx));
 
@@ -2153,8 +2028,6 @@ void rollback(OperationContext* opCtx,
         auto status = replCoord->setFollowerModeRollback(opCtx);
         if (!status.isOK()) {
             LOGV2(21723,
-                  "Cannot transition from {currentState} to "
-                  "{targetState}{error}",
                   "Cannot perform replica set state transition",
                   "currentState"_attr = replCoord->getMemberState().toString(),
                   "targetState"_attr = MemberState(MemberState::RS_ROLLBACK).toString(),
@@ -2187,7 +2060,6 @@ void rollback(OperationContext* opCtx,
         // so we need to check here first.
         if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
             LOGV2_FATAL_NOTRACE(40507,
-                                "Unable to complete rollback. A full resync may be needed: {error}",
                                 "Unable to complete rollback. A full resync may be needed",
                                 "error"_attr = redact(status));
         }
@@ -2200,9 +2072,6 @@ void rollback(OperationContext* opCtx,
         invariant(ex.code() != ErrorCodes::UnrecoverableRollbackError);
 
         LOGV2_WARNING(21728,
-                      "Rollback cannot complete at this time (retrying later): {error} "
-                      "appliedThrough= {myLastAppliedOpTime} minvalid= "
-                      "{minValid}",
                       "Rollback cannot complete at this time (retrying later)",
                       "error"_attr = redact(ex),
                       "myLastAppliedOpTime"_attr = replCoord->getMyLastAppliedOpTime(),

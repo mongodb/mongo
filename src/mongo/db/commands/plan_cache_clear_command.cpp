@@ -125,7 +125,7 @@ Status clear(OperationContext* opCtx,
                                    version,
                                    false /*matchSecondaryCollections*/);
 
-    LOGV2_DEBUG(23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", logAttrs(nss));
+    LOGV2_DEBUG(23908, 1, "Cleared plan cache", logAttrs(nss));
 
     return Status::OK();
 }

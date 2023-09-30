@@ -431,13 +431,11 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp, LogicalOp logicalOp) {
                     curOp->getReadWriteType());
 
         if (!curOp->debug().errInfo.isOK()) {
-            LOGV2_DEBUG(
-                7276600,
-                3,
-                "Caught Assertion in bulkWrite finishCurOp. Op: {operation}, error: {error}",
-                "Caught Assertion in bulkWrite finishCurOp",
-                "operation"_attr = redact(logicalOpToString(curOp->getLogicalOp())),
-                "error"_attr = curOp->debug().errInfo.toString());
+            LOGV2_DEBUG(7276600,
+                        3,
+                        "Caught Assertion in bulkWrite finishCurOp",
+                        "operation"_attr = redact(logicalOpToString(curOp->getLogicalOp())),
+                        "error"_attr = curOp->debug().errInfo.toString());
         }
 
         // Mark the op as complete, log it and profile if the op should be sampled for profiling.
@@ -447,10 +445,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp, LogicalOp logicalOp) {
         // We need to ignore all errors here. We don't want a successful op to fail because of a
         // failure to record stats. We also don't want to replace the error reported for an op that
         // is failing.
-        LOGV2(7276601,
-              "Ignoring error from bulkWrite finishCurOp: {error}",
-              "Ignoring error from bulkWrite finishCurOp",
-              "error"_attr = redact(ex));
+        LOGV2(7276601, "Ignoring error from bulkWrite finishCurOp", "error"_attr = redact(ex));
     }
 }
 

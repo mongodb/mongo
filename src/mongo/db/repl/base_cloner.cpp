@@ -99,8 +99,6 @@ Status BaseCloner::run() {
     if (!_sharedData->getStatus(lk).isOK()) {
         LOGV2_OPTIONS(21065,
                       {getLogComponent()},
-                      "Failing data clone because of failure outside data clone: "
-                      "{error}",
                       "Failing data clone because of failure outside data clone",
                       "error"_attr = _sharedData->getStatus(lk));
     }
@@ -115,7 +113,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     LOGV2_DEBUG_OPTIONS(21069,
                         1,
                         {getLogComponent()},
-                        "Cloner {cloner} running stage {stage}",
                         "Cloner running stage",
                         "cloner"_attr = getClonerName(),
                         "stage"_attr = stage->getName());
@@ -127,7 +124,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
         [&](const BSONObj& data) {
             LOGV2_OPTIONS(21070,
                           {getLogComponent()},
-                          "Cloner {cloner} hanging before running stage {stage}",
                           "Cloner hanging before running stage",
                           "cloner"_attr = getClonerName(),
                           "stage"_attr = stage->getName());
@@ -141,7 +137,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
         [&](const BSONObj& data) {
             LOGV2_OPTIONS(21071,
                           {getLogComponent()},
-                          "Cloner {cloner} hanging after running stage {stage}",
                           "Cloner hanging after running stage",
                           "cloner"_attr = getClonerName(),
                           "stage"_attr = stage->getName());
@@ -153,7 +148,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStage(BaseClonerStage* stage) {
     LOGV2_DEBUG_OPTIONS(21072,
                         1,
                         {getLogComponent()},
-                        "Cloner {cloner} finished running stage {stage}",
                         "Cloner finished running stage",
                         "cloner"_attr = getClonerName(),
                         "stage"_attr = stage->getName());
@@ -177,7 +171,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                     [&](const BSONObj& data) {
                         LOGV2_OPTIONS(21074,
                                       {getLogComponent()},
-                                      "Cloner {cloner} hanging before retrying stage {stage}",
                                       "Cloner hanging before retrying stage",
                                       "cloner"_attr = getClonerName(),
                                       "stage"_attr = stage->getName());
@@ -189,8 +182,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
                     isThisStageFailPoint);
                 LOGV2_OPTIONS(21075,
                               {getLogComponent()},
-                              "Sync process retrying {cloner} stage {stage} due to "
-                              "{error}",
                               "Sync process retrying cloner stage due to error",
                               "cloner"_attr = getClonerName(),
                               "stage"_attr = stage->getName(),
@@ -204,8 +195,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
             if (!stage->isTransientError(lastError)) {
                 LOGV2_OPTIONS(21077,
                               {getLogComponent()},
-                              "Non-retryable error occurred during cloner "
-                              "{cloner} stage {stage}: {error}",
                               "Non-retryable error occurred during cloner stage",
                               "cloner"_attr = getClonerName(),
                               "stage"_attr = stage->getName(),
@@ -215,8 +204,6 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
             LOGV2_DEBUG_OPTIONS(21078,
                                 1,
                                 {getLogComponent()},
-                                "Transient error occurred during cloner "
-                                "{cloner} stage {stage}: {error}",
                                 "Transient error occurred during cloner stage",
                                 "cloner"_attr = getClonerName(),
                                 "stage"_attr = stage->getName(),

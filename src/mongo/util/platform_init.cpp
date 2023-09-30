@@ -72,7 +72,6 @@ int __cdecl crtDebugCallback(int nRptType, char* originalMessage, int* returnVal
     *returnValue = 0;  // Returned by _CrtDbgReport. (1: starts the debugger).
     bool die = (nRptType != _CRT_WARN);
     LOGV2(23325,
-          "*** C runtime {severity_nRptType}: {firstLine_originalMessage}{die_terminating_sd_sd}",
           "*** C runtime debug report ***",
           "severity_nRptType"_attr = severity(nRptType),
           "firstLine_originalMessage"_attr = firstLine(originalMessage),

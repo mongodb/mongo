@@ -547,8 +547,6 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
 
     LOGV2_DEBUG(22061,
                 2,
-                "Metadata refresh requested for {namespace} at chunk version "
-                "{chunkVersionReceived}",
                 "Metadata refresh requested for collection",
                 logAttrs(nss),
                 "chunkVersionReceived"_attr = chunkVersionReceived);
@@ -630,7 +628,6 @@ Status onCollectionPlacementVersionMismatchNoExcept(
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22062,
-              "Failed to refresh metadata for {namespace} due to {error}",
               "Failed to refresh metadata for collection",
               logAttrs(nss),
               "error"_attr = redact(ex));
@@ -661,7 +658,6 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
         return CollectionMetadata(cm, shardingState->shardId());
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
         LOGV2(505070,
-              "Namespace {namespace} not found, collection may have been dropped",
               "Namespace not found, collection may have been dropped",
               logAttrs(nss),
               "error"_attr = redact(ex));
@@ -762,7 +758,6 @@ Status onDbVersionMismatchNoExcept(OperationContext* opCtx,
         return Status::OK();
     } catch (const DBException& ex) {
         LOGV2(22065,
-              "Failed to refresh databaseVersion for database {db} {error}",
               "Failed to refresh databaseVersion",
               "db"_attr = dbName,
               "error"_attr = redact(ex));

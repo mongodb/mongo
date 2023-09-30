@@ -148,11 +148,7 @@ public:
                 criticalSectionSignal->get(opCtx);
 
             if (Base::request().getSyncFromConfig()) {
-                LOGV2_DEBUG(21982,
-                            1,
-                            "Forcing remote routing table refresh for {namespace}",
-                            "Forcing remote routing table refresh",
-                            logAttrs(ns()));
+                LOGV2_DEBUG(21982, 1, "Forcing remote routing table refresh", logAttrs(ns()));
                 onCollectionPlacementVersionMismatch(opCtx, ns(), boost::none);
             }
 

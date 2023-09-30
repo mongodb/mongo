@@ -94,7 +94,6 @@ void noteStaleShardResponses(OperationContext* opCtx,
     for (const auto& error : staleErrors) {
         LOGV2_DEBUG(22902,
                     4,
-                    "Noting stale config response from {shardId}: {errorInfo}",
                     "Noting stale config response",
                     "shardId"_attr = error.endpoint.shardName,
                     "status"_attr = error.error.getStatus());
@@ -176,7 +175,6 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
 
         LOGV2_DEBUG(22905,
                     4,
-                    "Sending write batch to {shardId}: {request}",
                     "Sending write batch",
                     "shardId"_attr = targetShardId,
                     "request"_attr = redact(request));
@@ -210,7 +208,6 @@ bool processResponseFromRemote(OperationContext* opCtx,
 
     LOGV2_DEBUG(22907,
                 4,
-                "Write results received from {shardInfo}: {response}",
                 "Write results received",
                 "shardInfo"_attr = shardInfo,
                 "status"_attr = redact(batchedCommandResponse.toStatus()));
@@ -290,7 +287,6 @@ bool processErrorResponseFromLocal(OperationContext* opCtx,
 
     LOGV2_DEBUG(22908,
                 4,
-                "Unable to receive write results from {shardInfo}: {error}",
                 "Unable to receive write results",
                 "shardInfo"_attr = shardInfo,
                 "error"_attr = redact(status));
@@ -599,7 +595,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
     LOGV2_DEBUG(22904,
                 4,
-                "Starting execution of a write batch of size {size} for collection {namespace}",
                 "Starting execution of a write batch",
                 logAttrs(nss),
                 "size"_attr = clientRequest.sizeWriteOps());
@@ -768,10 +763,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                 "error"_attr = redact(ex));
 
             // It's okay if we can't refresh, we'll just record errors for the ops if needed
-            LOGV2_WARNING(22911,
-                          "Could not refresh targeter due to {error}",
-                          "Could not refresh targeter",
-                          "error"_attr = redact(ex));
+            LOGV2_WARNING(22911, "Could not refresh targeter", "error"_attr = redact(ex));
         }
 
         //
@@ -806,8 +798,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
     LOGV2_DEBUG(22910,
                 4,
-                "Finished execution of write batch. Execution {succeededOrFailed}, writeConcern "
-                "{wcSucceededOrFailed} for namespace {namespace}",
                 "Finished execution of write batch",
                 "succeededOrFailed"_attr =
                     (clientResponse->isErrDetailsSet() ? "failed" : "succeeded"),

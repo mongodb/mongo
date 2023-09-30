@@ -317,8 +317,6 @@ auto AsyncRequestsSender::RemoteData::handleResponse(RemoteCommandOnAnyCallbackA
                 LOGV2_DEBUG(
                     4615637,
                     1,
-                    "Command to remote {shardId} for hosts {hosts} failed with retryable error "
-                    "{error} and will be retried",
                     "Command to remote shard failed with retryable error and will be retried",
                     "shardId"_attr = _shardId,
                     "attemptedHosts"_attr = rcr.request.target,

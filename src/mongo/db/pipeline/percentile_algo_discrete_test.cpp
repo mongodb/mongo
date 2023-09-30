@@ -55,7 +55,7 @@ using std::vector;
 
 vector<double> generateNormal(size_t n) {
     auto seed = time(nullptr);
-    LOGV2(7514410, "{seed}", "generateNormal", "seed"_attr = seed);
+    LOGV2(7514410, "generateNormal", "seed"_attr = seed);
     std::mt19937 generator(seed);
     boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
 
@@ -153,7 +153,7 @@ TEST(DiscretePercentileTest, Incorporate_OnlyInfinities) {
         inputs[i] = inf;
     }
     auto seed = time(nullptr);
-    LOGV2(7514412, "{seed}", "Incorporate_OnlyInfinities", "seed"_attr = seed);
+    LOGV2(7514412, "Incorporate_OnlyInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     DiscretePercentile dp;
@@ -191,7 +191,7 @@ TEST(DiscretePercentileTest, Incorporate_WithInfinities) {
     const int n = inputs.size();
     vector<double> sorted = inputs;  // sorted by construction
     auto seed = time(nullptr);
-    LOGV2(7514411, "{seed}", "Incorporate_WithInfinities", "seed"_attr = seed);
+    LOGV2(7514411, "Incorporate_WithInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     DiscretePercentile dp;

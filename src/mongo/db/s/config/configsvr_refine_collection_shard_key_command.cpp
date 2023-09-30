@@ -206,10 +206,7 @@ public:
                             shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss));
                     });
             }
-            LOGV2(21922,
-                  "CMD: refineCollectionShardKey: {request}",
-                  "CMD: refineCollectionShardKey",
-                  "request"_attr = request().toBSON({}));
+            LOGV2(21922, "CMD: refineCollectionShardKey", "request"_attr = request().toBSON({}));
 
             ShardingCatalogManager::get(opCtx)->refineCollectionShardKeyDEPRECATED(
                 opCtx, nss, newShardKeyPattern);

@@ -144,7 +144,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     int status = getSysctlByIDWithDefault(mib, 2, std::string("unknown"), &osVersion);
     if (status != 0)
         LOGV2(23345,
-              "Unable to collect OS Version. (errno: {errno} msg: {msg})",
               "Unable to collect OS Version.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));
@@ -154,7 +153,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     status = getSysctlByIDWithDefault(mib, 2, std::string("unknown"), &cpuArch);
     if (status != 0)
         LOGV2(23346,
-              "Unable to collect Machine Architecture. (errno: {errno} msg: {msg})",
               "Unable to collect Machine Architecture.",
               "errno"_attr = status,
               "msg"_attr = strerror(status));

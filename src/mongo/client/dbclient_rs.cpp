@@ -145,8 +145,6 @@ string DBClientReplicaSet::getServerAddress() const {
     if (!_rsm) {
         LOGV2_WARNING(20147,
                       "Trying to get server address for DBClientReplicaSet, "
-                      "but no ReplicaSetMonitor exists for {replicaSet}",
-                      "Trying to get server address for DBClientReplicaSet, "
                       "but no ReplicaSetMonitor exists",
                       "replicaSet"_attr = _setName);
         return str::stream() << _setName << "/";
@@ -331,7 +329,6 @@ void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
             conn->authenticateInternalUser();
         } catch (const DBException& e) {
             LOGV2_WARNING(20148,
-                          "Cached auth failed for set {replicaSet}: {error}",
                           "Cached auth failed",
                           "replicaSet"_attr = _setName,
                           "error"_attr = e.toStatus());
@@ -344,7 +341,6 @@ void DBClientReplicaSet::_authConnection(DBClientConnection* conn) {
             conn->auth(kv.second);
         } catch (const AssertionException&) {
             LOGV2_WARNING(20149,
-                          "Cached auth failed for set: {replicaSet} db: {db} user: {user}",
                           "Cached auth failed",
                           "replicaSet"_attr = _setName,
                           "db"_attr = kv.first.toStringForErrorMsg(),
@@ -361,7 +357,6 @@ void DBClientReplicaSet::logoutAll(DBClientConnection* conn) {
             conn->logout(kv.first, response);
         } catch (const AssertionException& ex) {
             LOGV2_WARNING(20150,
-                          "Failed to logout: {connString} on db: {db} with error: {error}",
                           "Failed to logout",
                           "connString"_attr = conn->getServerAddress(),
                           "db"_attr = kv.first.toStringForErrorMsg(),
@@ -404,7 +399,6 @@ void DBClientReplicaSet::_runAuthLoop(Authenticate authCb) {
 
     LOGV2_DEBUG(20132,
                 3,
-                "dbclient_rs attempting authentication of {replicaSet}",
                 "dbclient_rs attempting authentication",
                 "replicaSet"_attr = _getMonitor()->getName());
 
@@ -631,7 +625,6 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     if (checkLastHost(readPref.get())) {
         LOGV2_DEBUG(20137,
                     3,
-                    "dbclient_rs selecting compatible last used node {lastTagged}",
                     "dbclient_rs selecting compatible last used node",
                     "lastTagged"_attr = _lastSecondaryOkHost);
 
@@ -645,7 +638,6 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     if (!selectedNodeStatus.isOK()) {
         LOGV2_DEBUG(20138,
                     3,
-                    "dbclient_rs no compatible node found: {error}",
                     "dbclient_rs no compatible node found",
                     "error"_attr = redact(selectedNodeStatus.getStatus()));
         return nullptr;
@@ -667,11 +659,8 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     if (monitor->isPrimary(selectedNode)) {
         checkPrimary();
 
-        LOGV2_DEBUG(20139,
-                    3,
-                    "dbclient_rs selecting primary node {connString}",
-                    "dbclient_rs selecting primary node",
-                    "connString"_attr = selectedNode);
+        LOGV2_DEBUG(
+            20139, 3, "dbclient_rs selecting primary node", "connString"_attr = selectedNode);
 
         _lastSecondaryOkConn = _primary;
 
@@ -705,11 +694,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
         }
     }
 
-    LOGV2_DEBUG(20140,
-                3,
-                "dbclient_rs selecting node {connString}",
-                "dbclient_rs selecting node",
-                "connString"_attr = _lastSecondaryOkHost);
+    LOGV2_DEBUG(20140, 3, "dbclient_rs selecting node", "connString"_attr = _lastSecondaryOkHost);
 
     return _lastSecondaryOkConn.get();
 }
@@ -718,11 +703,8 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
     if (!isRetry)
         _lastClient = nullptr;
 
-    LOGV2_DEBUG(20142,
-                3,
-                "dbclient_rs say to primary node in {replicaSet}",
-                "dbclient_rs say to primary node",
-                "replicaSet"_attr = _getMonitor()->getName());
+    LOGV2_DEBUG(
+        20142, 3, "dbclient_rs say to primary node", "replicaSet"_attr = _getMonitor()->getName());
 
     DBClientConnection* primary = checkPrimary();
     if (actualServer)
@@ -815,11 +797,8 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientReplicaSet::r
 }
 
 Message DBClientReplicaSet::_call(Message& toSend, string* actualServer) {
-    LOGV2_DEBUG(20146,
-                3,
-                "dbclient_rs call to primary node in {replicaSet}",
-                "dbclient_rs call to primary node",
-                "replicaSet"_attr = _getMonitor()->getName());
+    LOGV2_DEBUG(
+        20146, 3, "dbclient_rs call to primary node", "replicaSet"_attr = _getMonitor()->getName());
 
     DBClientConnection* m = checkPrimary();
     if (actualServer)

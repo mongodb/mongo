@@ -110,11 +110,7 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
         return {msg};
     }
 
-    LOGV2_DEBUG(22925,
-                3,
-                "Compressing message with {compressor}",
-                "Compressing message",
-                "compressor"_attr = compressor->getName());
+    LOGV2_DEBUG(22925, 3, "Compressing message", "compressor"_attr = compressor->getName());
 
     auto inputHeader = msg.header();
     size_t bufferSize = compressor->getMaxCompressedSize(msg.dataSize()) +
@@ -126,8 +122,6 @@ StatusWith<Message> MessageCompressorManager::compressMessage(
     if (bufferSize > MaxMessageSizeBytes) {
         LOGV2_DEBUG(22926,
                     3,
-                    "Compressed message would be larger than {MaxMessageSizeBytes}, returning "
-                    "original uncompressed message",
                     "Compressed message would be larger than maximum allowed, returning original "
                     "uncompressed message",
                     "MaxMessageSizeBytes"_attr = MaxMessageSizeBytes);
@@ -176,11 +170,7 @@ StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& m
         *compressorId = compressor->getId();
     }
 
-    LOGV2_DEBUG(22927,
-                3,
-                "Decompressing message with {compressor}",
-                "Decompressing message",
-                "compressor"_attr = compressor->getName());
+    LOGV2_DEBUG(22927, 3, "Decompressing message", "compressor"_attr = compressor->getName());
 
     if (compressionHeader.uncompressedSize < 0) {
         return {ErrorCodes::BadValue, "Decompressed message would be negative in size"};
@@ -230,11 +220,7 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
 
     BSONArrayBuilder sub(output->subarrayStart("compression"));
     for (const auto& e : _registry->getCompressorNames()) {
-        LOGV2_DEBUG(22929,
-                    3,
-                    "Offering {compressor} compressor to server",
-                    "Offering compressor to server",
-                    "compressor"_attr = e);
+        LOGV2_DEBUG(22929, 3, "Offering compressor to server", "compressor"_attr = e);
         sub.append(e);
     }
     sub.doneFast();
@@ -262,11 +248,7 @@ void MessageCompressorManager::clientFinish(const BSONObj& input) {
     for (const auto& e : elem.Obj()) {
         auto algoName = e.checkAndGetStringData();
         auto ret = _registry->getCompressor(algoName);
-        LOGV2_DEBUG(22933,
-                    3,
-                    "Adding compressor {compressor}",
-                    "Adding compressor",
-                    "compressor"_attr = ret->getName());
+        LOGV2_DEBUG(22933, 3, "Adding compressor", "compressor"_attr = ret->getName());
         _negotiated.push_back(ret);
     }
 }
@@ -307,18 +289,10 @@ void MessageCompressorManager::serverNegotiate(
         // If the MessageCompressorRegistry knows about a compressor with that name, then it is
         // valid and we add it to our list of negotiated compressors.
         if ((cur = _registry->getCompressor(curName))) {
-            LOGV2_DEBUG(22937,
-                        3,
-                        "{compressor} is supported",
-                        "supported compressor",
-                        "compressor"_attr = cur->getName());
+            LOGV2_DEBUG(22937, 3, "supported compressor", "compressor"_attr = cur->getName());
             _negotiated.push_back(cur);
         } else {  // Otherwise the compressor is not supported and we skip over it.
-            LOGV2_DEBUG(22938,
-                        3,
-                        "{compressor} is not supported",
-                        "compressor is not supported",
-                        "compressor"_attr = curName);
+            LOGV2_DEBUG(22938, 3, "compressor is not supported", "compressor"_attr = curName);
         }
     }
 

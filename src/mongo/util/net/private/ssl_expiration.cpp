@@ -80,7 +80,6 @@ void CertificateExpirationMonitor::run(Client*) {
     if (_certExpiration <= now) {
         // The certificate has expired.
         LOGV2_WARNING(23785,
-                      "Server certificate is now invalid. It expired on {certExpiration}",
                       "Server certificate has expired",
                       "certExpiration"_attr = dateToISOStringUTC(_certExpiration));
         return;
@@ -91,8 +90,6 @@ void CertificateExpirationMonitor::run(Client*) {
     if (remainingValidDuration <= 30 * oneDay) {
         // The certificate will expire in the next 30 days
         LOGV2_WARNING(23786,
-                      "Server certificate will expire on {certExpiration} in "
-                      "{validDuration}.",
                       "Server certificate will expire soon",
                       "certExpiration"_attr = dateToISOStringUTC(_certExpiration),
                       "validDuration"_attr = durationCount<Hours>(remainingValidDuration));

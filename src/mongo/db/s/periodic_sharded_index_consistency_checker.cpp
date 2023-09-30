@@ -202,8 +202,6 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 
                 if (numShardedCollsWithInconsistentIndexes) {
                     LOGV2_WARNING(22051,
-                                  "Found {numShardedCollectionsWithInconsistentIndexes} sharded "
-                                  "collection(s) with inconsistent indexes",
                                   "Found sharded collections with inconsistent indexes",
                                   "numShardedCollectionsWithInconsistentIndexes"_attr =
                                       numShardedCollsWithInconsistentIndexes);
@@ -219,7 +217,6 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 }
             } catch (DBException& ex) {
                 LOGV2(22052,
-                      "Checking sharded index consistency failed with {error}",
                       "Error while checking sharded index consistency",
                       "error"_attr = ex.toStatus());
             }

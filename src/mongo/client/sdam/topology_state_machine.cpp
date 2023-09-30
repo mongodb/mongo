@@ -394,7 +394,6 @@ void TopologyStateMachine::removeServerDescription(TopologyDescription& topology
     topologyDescription.removeServerDescription(serverAddress);
     LOGV2_DEBUG(20220,
                 kLogLevel,
-                "Server '{serverAddress}' was removed from the topology",
                 "Server was removed from the topology",
                 "serverAddress"_attr = serverAddress,
                 "topologyDescription"_attr = topologyDescription.toBSON());

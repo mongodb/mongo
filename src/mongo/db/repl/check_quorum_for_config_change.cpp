@@ -206,7 +206,6 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     ++_numResponses;
     if (!response.isOK()) {
         LOGV2_WARNING(23722,
-                      "Failed to complete heartbeat request to {requestTarget}; {responseStatus}",
                       "Failed to complete heartbeat request to target",
                       "requestTarget"_attr = request.target,
                       "responseStatus"_attr = response.status);
@@ -223,21 +222,16 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
         _vetoStatus =
             Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                    str::stream() << message << ", requestTarget:" << request.target.toString());
-        LOGV2_WARNING(23723,
-                      "Our set name did not match that of {requestTarget}",
-                      message,
-                      "requestTarget"_attr = request.target.toString());
+        LOGV2_WARNING(23723, message, "requestTarget"_attr = request.target.toString());
         return;
     }
 
     if (!hbStatus.isOK() && hbStatus != ErrorCodes::InvalidReplicaSetConfig) {
-        LOGV2_WARNING(
-            23724,
-            "Got error ({hbStatus}) response on heartbeat request to {requestTarget}; {hbResp}",
-            "Got error response on heartbeat request",
-            "hbStatus"_attr = hbStatus,
-            "requestTarget"_attr = request.target,
-            "hbResp"_attr = hbResp);
+        LOGV2_WARNING(23724,
+                      "Got error response on heartbeat request",
+                      "hbStatus"_attr = hbStatus,
+                      "requestTarget"_attr = request.target,
+                      "hbResp"_attr = hbResp);
         _badResponses.push_back(std::make_pair(request.target, hbStatus));
         return;
     }
@@ -256,8 +250,6 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
                                      << ", requestTargetReplSetId: "
                                      << replMetadata.getValue().getReplicaSetId());
             LOGV2_WARNING(23726,
-                          "Our replica set ID of {replSetId} did not match that of "
-                          "{requestTarget}, which is {requestTargetId}",
                           message,
                           "replSetId"_attr = _rsConfig->getReplicaSetId(),
                           "requestTarget"_attr = request.target.toString(),

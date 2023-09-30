@@ -120,8 +120,6 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ? 0 : 2;
                 LOGV2_DEBUG(21975,
                             debugLevel,
-                            "Command on database {db} timed out waiting for read concern to be "
-                            "satisfied. Command: {command}. Info: {error}",
                             "Command timed out waiting for read concern to be satisfied",
                             "db"_attr = request.getDatabase(),
                             "command"_attr =

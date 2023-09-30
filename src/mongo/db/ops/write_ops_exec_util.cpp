@@ -55,7 +55,6 @@ LastOpFixer::~LastOpFixer() {
         replClientInfo().setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(_opCtx);
         LOGV2_DEBUG(20888,
                     5,
-                    "Set last op to system time: {timestamp}",
                     "Set last op to system time",
                     "timestamp"_attr = replClientInfo().getLastOp().getTimestamp());
     }

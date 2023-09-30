@@ -151,7 +151,6 @@ ServiceContext::~ServiceContext() {
     stdx::lock_guard<Latch> lk(_mutex);
     for (const auto& client : _clients) {
         LOGV2_ERROR(23828,
-                    "{client} exists while destroying {serviceContext}",
                     "Non-empty client list when destroying service context",
                     "client"_attr = client->desc(),
                     "serviceContext"_attr = reinterpret_cast<uint64_t>(this));

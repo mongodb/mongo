@@ -199,7 +199,6 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
         return std::vector<SockAddr>(ret.begin(), ret.end());
     } catch (const DBException& ex) {
         LOGV2(23176,
-              "getaddrinfo(\"{host}\") failed: {error}",
               "getaddrinfo invocation failed",
               "host"_attr = target,
               "error"_attr = ex.toStatus());

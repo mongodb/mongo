@@ -100,7 +100,7 @@ DocumentSourceOut::~DocumentSourceOut() {
                 pExpCtx->mongoProcessInterface->dropTempCollection(cleanupOpCtx.get(), deleteNs);
             } catch (const DBException& e) {
                 LOGV2_WARNING(7466203,
-                              "Unexpected error dropping temporary collection; drop will complete ",
+                              "Unexpected error dropping temporary collection; drop will complete "
                               "on next server restart",
                               "error"_attr = e.toString(),
                               "coll"_attr = deleteNs);

@@ -197,8 +197,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
         return ClonerStage<CollectionCloner>::run();
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         LOGV2(21132,
-              "CollectionCloner ns: '{namespace}' uuid: "
-              "UUID(\"{uuid}\") stopped because collection was dropped on source.",
               "CollectionCloner stopped because collection was dropped on source",
               logAttrs(getCloner()->getSourceNss()),
               "uuid"_attr = getCloner()->getSourceUuid());
@@ -243,7 +241,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
         getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk);
     if (indexSpecs.empty()) {
         LOGV2_WARNING(21143,
-                      "No indexes found for collection {namespace} while cloning from {source}",
                       "No indexes found for collection while cloning",
                       logAttrs(_sourceNss),
                       "source"_attr = getSource());
@@ -287,8 +284,6 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
 
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
         LOGV2_WARNING(21144,
-                      "Found the _id_ index spec but the collection specified autoIndexId of false "
-                      "on ns:{namespace}",
                       "Found the _id index spec but the collection specified autoIndexId of false",
                       logAttrs(this->_sourceNss));
     }
@@ -464,8 +459,6 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
                    !mustExit()) {
                 LOGV2(21137,
                       "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
-                      "enabled for {namespace}. Blocking until fail point is disabled.",
-                      "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
                       "enabled. Blocking until fail point is disabled",
                       logAttrs(_sourceNss));
                 mongo::sleepsecs(1);
@@ -487,10 +480,8 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         // 'receivedBatches'.
         ++_stats.fetchedBatches;
         if (_documentsToInsert.size() == 0) {
-            LOGV2_WARNING(21145,
-                          "insertDocumentsCallback, but no documents to insert for ns:{namespace}",
-                          "insertDocumentsCallback, but no documents to insert",
-                          logAttrs(_sourceNss));
+            LOGV2_WARNING(
+                21145, "insertDocumentsCallback, but no documents to insert", logAttrs(_sourceNss));
             return;
         }
         _documentsToInsert.swap(docs);

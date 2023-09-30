@@ -184,7 +184,6 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
         if (VectorClock::isValidComponentTime(operationTime)) {
             LOGV2_DEBUG(22764,
                         5,
-                        "Appending operationTime: {operationTime}",
                         "Appending operationTime",
                         "operationTime"_attr = operationTime.asTimestamp());
             operationTime.appendAsOperationTime(responseBuilder);
@@ -194,7 +193,6 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
             // actual.
             LOGV2_DEBUG(22765,
                         5,
-                        "Appending clusterTime as operationTime {clusterTime}",
                         "Appending clusterTime as operationTime",
                         "clusterTime"_attr = clusterTime.asTimestamp());
             clusterTime.appendAsOperationTime(responseBuilder);
@@ -748,7 +746,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                     defaultWriteConcernSource == DefaultWriteConcernSourceEnum::kGlobal;
                 LOGV2_DEBUG(22766,
                             2,
-                            "Applying default writeConcern on {command} of {writeConcern}",
                             "Applying default writeConcern on command",
                             "command"_attr = request.getCommandName(),
                             "writeConcern"_attr = *wcDefault);
@@ -807,7 +804,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         LOGV2_DEBUG(22767,
                     2,
-                    "Applying default readConcern on {command} of {readConcern}",
                     "Applying default readConcern on command",
                     "command"_attr = invocation->definition()->getName(),
                     "readConcern"_attr = rcDefault);
@@ -1232,18 +1228,13 @@ void ClientCommand::_parseMessage() try {
     if (ErrorCodes::isConnectionFatalMessageParseError(ex.code()))
         _propagateException = true;
 
-    LOGV2_DEBUG(22769,
-                1,
-                "Exception thrown while parsing command {error}",
-                "Exception thrown while parsing command",
-                "error"_attr = redact(ex));
+    LOGV2_DEBUG(22769, 1, "Exception thrown while parsing command", "error"_attr = redact(ex));
     throw;
 }
 
 Future<void> ClientCommand::_execute() {
     LOGV2_DEBUG(22770,
                 3,
-                "Command begin db: {db} msg id: {headerId}",
                 "Command begin",
                 "db"_attr = _getDatabaseStringForLogging(),
                 "headerId"_attr = _rec->getMessage().header().getId());
@@ -1253,20 +1244,17 @@ Future<void> ClientCommand::_execute() {
         .then([this] {
             LOGV2_DEBUG(22771,
                         3,
-                        "Command end db: {db} msg id: {headerId}",
                         "Command end",
                         "db"_attr = _getDatabaseStringForLogging(),
                         "headerId"_attr = _rec->getMessage().header().getId());
         })
         .tapError([this](Status status) {
-            LOGV2_DEBUG(
-                22772,
-                1,
-                "Exception thrown while processing command on {db} msg id: {headerId} {error}",
-                "Exception thrown while processing command",
-                "db"_attr = _getDatabaseStringForLogging(),
-                "headerId"_attr = _rec->getMessage().header().getId(),
-                "error"_attr = redact(status));
+            LOGV2_DEBUG(22772,
+                        1,
+                        "Exception thrown while processing command",
+                        "db"_attr = _getDatabaseStringForLogging(),
+                        "headerId"_attr = _rec->getMessage().header().getId(),
+                        "error"_attr = redact(status));
 
             // Record the exception in CurOp.
             CurOp::get(_rec->getOpCtx())->debug().errInfo = std::move(status);

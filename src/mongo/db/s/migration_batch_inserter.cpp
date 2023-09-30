@@ -235,9 +235,6 @@ void MigrationBatchInserter::run(Status status) const try {
 } catch (const DBException& e) {
     stdx::lock_guard<Client> lk(*_innerOpCtx->getClient());
     _innerOpCtx->getServiceContext()->killOperation(lk, _innerOpCtx, ErrorCodes::Error(6718402));
-    LOGV2(6718407,
-          "Batch application failed: {error}",
-          "Batch application failed",
-          "error"_attr = e.toStatus());
+    LOGV2(6718407, "Batch application failed", "error"_attr = e.toStatus());
 }
 }  // namespace mongo

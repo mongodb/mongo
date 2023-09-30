@@ -203,13 +203,11 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                 if (!validStatus.isOK()) {
                     if (repair == RepairData::kNo) {
                         LOGV2_FATAL(31396,
-                                    "Invalid BSON detected at {id}: {validStatus}",
                                     "Invalid BSON detected",
                                     "id"_attr = id,
                                     "error"_attr = redact(validStatus));
                     }
                     LOGV2_WARNING(20348,
-                                  "Invalid BSON detected at {id}: {validStatus}. Deleting.",
                                   "Invalid BSON detected; deleting",
                                   "id"_attr = id,
                                   "error"_attr = redact(validStatus));

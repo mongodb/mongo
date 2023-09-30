@@ -175,12 +175,8 @@ void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyServ
                             << ") with state document namespace \"" << ns.toStringForErrorMsg()
                             << "\" that is already in use by service "
                             << existingService->getServiceName());
-    LOGV2_INFO(5123008,
-               "Successfully registered PrimaryOnlyService {service} with state documents stored "
-               "in {namespace}",
-               "Successfully registered PrimaryOnlyService",
-               "service"_attr = name,
-               logAttrs(ns));
+    LOGV2_INFO(
+        5123008, "Successfully registered PrimaryOnlyService", "service"_attr = name, logAttrs(ns));
 }
 
 PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(StringData serviceName) {
@@ -512,8 +508,6 @@ void PrimaryOnlyService::onStepDown() {
     }
 
     LOGV2_INFO(5123007,
-               "Interrupting (due to stepDown) PrimaryOnlyService {service} with {numInstances} "
-               "currently running instances and {numOperationContexts} associated operations",
                "Interrupting PrimaryOnlyService due to stepDown",
                "service"_attr = getServiceName(),
                "numInstances"_attr = _activeInstances.size(),
@@ -537,14 +531,11 @@ void PrimaryOnlyService::shutdown() {
     bool hasExecutor;
     {
         stdx::lock_guard lk(_mutex);
-        LOGV2_INFO(
-            5123006,
-            "Shutting down PrimaryOnlyService {service} with {numInstances} currently running "
-            "instances and {numOperationContexts} associated operations",
-            "Shutting down PrimaryOnlyService",
-            "service"_attr = getServiceName(),
-            "numInstances"_attr = _activeInstances.size(),
-            "numOperationContexts"_attr = _opCtxs.size());
+        LOGV2_INFO(5123006,
+                   "Shutting down PrimaryOnlyService",
+                   "service"_attr = getServiceName(),
+                   "numInstances"_attr = _activeInstances.size(),
+                   "numOperationContexts"_attr = _opCtxs.size());
 
         // If the _state is already kPaused, the instances have already been interrupted.
         if (_state != State::kPaused) {
@@ -817,8 +808,6 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
                    instanceID] {
                 LOGV2_DEBUG(5123002,
                             3,
-                            "Starting instance of PrimaryOnlyService {service} with InstanceID "
-                            "{instanceID}",
                             "Starting instance of PrimaryOnlyService",
                             "service"_attr = serviceName,
                             "instanceID"_attr = instanceID);

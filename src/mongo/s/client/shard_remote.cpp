@@ -212,10 +212,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
 
     if (!response.status.isOK()) {
         if (ErrorCodes::isExceededTimeLimitError(response.status.code())) {
-            LOGV2(22739,
-                  "Operation timed out {error}",
-                  "Operation timed out",
-                  "error"_attr = redact(response.status));
+            LOGV2(22739, "Operation timed out", "error"_attr = redact(response.status));
         }
         return response.status;
     }
@@ -316,10 +313,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     Status joinStatus = fetcher.join(opCtx);
     if (!joinStatus.isOK()) {
         if (ErrorCodes::isExceededTimeLimitError(joinStatus.code())) {
-            LOGV2(6195000,
-                  "Operation timed out {error}",
-                  "Operation timed out",
-                  "error"_attr = joinStatus);
+            LOGV2(6195000, "Operation timed out", "error"_attr = joinStatus);
         }
 
         return joinStatus;
@@ -329,8 +323,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
 
     if (!status.isOK()) {
         if (ErrorCodes::isExceededTimeLimitError(status.code())) {
-            LOGV2(
-                22740, "Operation timed out {error}", "Operation timed out", "error"_attr = status);
+            LOGV2(22740, "Operation timed out", "error"_attr = status);
         }
         return status;
     }

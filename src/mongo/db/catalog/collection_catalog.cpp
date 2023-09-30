@@ -2043,12 +2043,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     const auto& nss = coll->ns();
     auto uuid = coll->uuid();
 
-    LOGV2_DEBUG(20280,
-                1,
-                "Registering collection {namespace} with UUID {uuid}",
-                "Registering collection",
-                logAttrs(nss),
-                "uuid"_attr = uuid);
+    LOGV2_DEBUG(20280, 1, "Registering collection", logAttrs(nss), "uuid"_attr = uuid);
 
     auto dbIdPair = std::make_pair(nss.dbName(), uuid);
 

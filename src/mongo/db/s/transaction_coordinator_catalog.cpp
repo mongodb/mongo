@@ -70,8 +70,6 @@ void TransactionCoordinatorCatalog::exitStepUp(Status status) {
     } else {
         LOGV2_WARNING(22444,
                       "Coordinator recovery failed and coordinateCommit requests will not be "
-                      "allowed: {error}",
-                      "Coordinator recovery failed and coordinateCommit requests will not be "
                       "allowed",
                       "error"_attr = status);
     }
@@ -106,13 +104,11 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
                                            const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                            std::shared_ptr<TransactionCoordinator> coordinator,
                                            bool forStepUp) {
-    LOGV2_DEBUG(
-        22439,
-        3,
-        "{sessionId}:{txnNumberAndRetryCounter} Inserting coordinator into in-memory catalog",
-        "Inserting coordinator into in-memory catalog",
-        "sessionId"_attr = lsid.getId(),
-        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
+    LOGV2_DEBUG(22439,
+                3,
+                "Inserting coordinator into in-memory catalog",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     auto txnNumber = txnNumberAndRetryCounter.getTxnNumber();
     auto txnRetryCounter = *txnNumberAndRetryCounter.getTxnRetryCounter();
@@ -231,13 +227,11 @@ TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
 
 void TransactionCoordinatorCatalog::_remove(
     const LogicalSessionId& lsid, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
-    LOGV2_DEBUG(
-        22440,
-        3,
-        "{sessionId}:{txnNumberAndRetryCounter} Removing coordinator from in-memory catalog",
-        "Removing coordinator from in-memory catalog",
-        "sessionId"_attr = lsid.getId(),
-        "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
+    LOGV2_DEBUG(22440,
+                3,
+                "Removing coordinator from in-memory catalog",
+                "sessionId"_attr = lsid.getId(),
+                "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
     auto txnNumber = txnNumberAndRetryCounter.getTxnNumber();
     auto txnRetryCounter = *txnNumberAndRetryCounter.getTxnRetryCounter();
@@ -279,15 +273,10 @@ void TransactionCoordinatorCatalog::join() {
     while (!_noActiveCoordinatorsCV.wait_for(
         ul, stdx::chrono::seconds{5}, [this] { return _coordinatorsBySession.empty(); })) {
         LOGV2(22442,
-              "After 5 seconds of wait there are still {numSessionsLeft} sessions left "
-              "with active coordinators which have not yet completed",
               "After 5 seconds of wait there are still sessions left with active coordinators "
               "which have not yet completed",
               "numSessionsLeft"_attr = _coordinatorsBySession.size());
-        LOGV2(22443,
-              "Active coordinators remaining: {activeCoordinators}",
-              "Active coordinators remaining",
-              "activeCoordinators"_attr = _toString(ul));
+        LOGV2(22443, "Active coordinators remaining", "activeCoordinators"_attr = _toString(ul));
     }
 }
 

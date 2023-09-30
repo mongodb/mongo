@@ -117,15 +117,11 @@ public:
                 boost::none, ns, SerializationContext::stateCommandRequest());
             if (nsIsDbOnly(ns)) {
                 LOGV2(22762,
-                      "Routing metadata flushed for database {db}",
                       "Routing metadata flushed for database",
                       "db"_attr = toStringForLogging(nss));
                 catalogCache->purgeDatabase(nss.dbName());
             } else {
-                LOGV2(22763,
-                      "Routing metadata flushed for collection {namespace}",
-                      "Routing metadata flushed for collection",
-                      logAttrs(nss));
+                LOGV2(22763, "Routing metadata flushed for collection", logAttrs(nss));
                 catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
                 LOGV2(7343300, "Index information flushed for collection", logAttrs(nss));
                 catalogCache->invalidateIndexEntry_LINEARIZABLE(nss);

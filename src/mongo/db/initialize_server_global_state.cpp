@@ -338,7 +338,6 @@ bool checkAndMoveLogFile(const std::string& absoluteLogpath) {
             boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
             if (!ec) {
                 LOGV2(20697,
-                      "Moving existing log file \"{oldLogPath}\" to \"{newLogPath}\"",
                       "Renamed existing log file",
                       "oldLogPath"_attr = absoluteLogpath,
                       "newLogPath"_attr = renameTarget);

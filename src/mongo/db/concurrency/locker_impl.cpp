@@ -252,11 +252,7 @@ void LockerImpl::dump() const {
             entries.push_back(
                 {it.key(), it->status, it->mode, it->recursiveCount, it->unlockPending});
     }
-    LOGV2(20523,
-          "Locker id {id} status: {requests}",
-          "Locker status",
-          "id"_attr = _id,
-          "requests"_attr = entries);
+    LOGV2(20523, "Locker status", "id"_attr = _id, "requests"_attr = entries);
 }
 
 void LockerImpl::_dumpLockerAndLockManagerRequests() {

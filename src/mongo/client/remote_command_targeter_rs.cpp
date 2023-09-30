@@ -64,7 +64,6 @@ RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
 
     LOGV2_DEBUG(20157,
                 1,
-                "Started targeter for {connectionString}",
                 "Started targeter",
                 "connectionString"_attr = ConnectionString::forReplicaSet(
                     rsName, std::vector<HostAndPort>(seedServers.begin(), seedServers.end())));

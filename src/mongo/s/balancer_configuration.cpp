@@ -267,7 +267,6 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* opCtx)
 
     if (settings.getMaxChunkSizeBytes() != getMaxChunkSizeBytes()) {
         LOGV2(22640,
-              "Changing MaxChunkSize setting to {newMaxChunkSizeMB}MB from {oldMaxChunkSizeMB}MB",
               "Changing MaxChunkSize setting",
               "newMaxChunkSizeMB"_attr = settings.getMaxChunkSizeBytes() / (1024 * 1024),
               "oldMaxChunkSizeMB"_attr = getMaxChunkSizeBytes() / (1024 * 1024));

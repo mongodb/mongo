@@ -350,8 +350,6 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
     auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
         LOGV2_DEBUG(21955,
                     2,
-                    "Applying default readConcern on {command} of {readConcernDefault} "
-                    "on {command}",
                     "Applying default readConcern on command",
                     "readConcernDefault"_attr = rcDefault,
                     "command"_attr = invocation->definition()->getName());
@@ -1032,8 +1030,6 @@ void CheckoutSessionAndInvokeCommand::_cleanupTransaction(
     } catch (...) {
         // It is illegal for this to throw so we catch and log this here for diagnosability.
         LOGV2_FATAL(21974,
-                    "Caught exception during transaction {txnNumber} {operation} "
-                    "{logicalSessionId}: {error}",
                     "Unable to stash/abort transaction",
                     "operation"_attr = (isPrepared ? "stash" : "abort"),
                     "txnNumber"_attr = opCtx->getTxnNumber(),
@@ -1471,8 +1467,6 @@ Future<void> RunCommandAndWaitForWriteConcern::_runCommandWithFailPoint() {
     if (auto scoped = failWithErrorCodeInRunCommand.scoped(); MONGO_unlikely(scoped.isActive())) {
         const auto errorCode = scoped.getData()["errorCode"].numberInt();
         LOGV2(21960,
-              "failWithErrorCodeInRunCommand enabled - failing command with error "
-              "code: {errorCode}",
               "failWithErrorCodeInRunCommand enabled, failing command",
               "errorCode"_attr = errorCode);
         BSONObjBuilder errorBuilder;
@@ -1703,11 +1697,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (command->adminOnly()) {
-        LOGV2_DEBUG(21961,
-                    2,
-                    "Admin only command: {command}",
-                    "Admin only command",
-                    "command"_attr = request.getCommandName());
+        LOGV2_DEBUG(21961, 2, "Admin only command", "command"_attr = request.getCommandName());
     }
 
     if (command->shouldAffectCommandCounter()) {
@@ -1895,7 +1885,6 @@ void ExecCommandDatabase::_initiateCommand() {
         LOGV2_DEBUG_OPTIONS(4615605,
                             1,
                             {logv2::LogComponent::kTracking},
-                            "Command metadata: {trackingMetadata}",
                             "Command metadata",
                             "trackingMetadata"_attr = rpc::TrackingMetadata::get(opCtx));
         rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
@@ -2090,8 +2079,6 @@ void ExecCommandDatabase::_handleFailure(Status status) {
 
     LOGV2_DEBUG(21962,
                 1,
-                "Assertion while executing command '{command}' on database '{db}' with "
-                "arguments '{commandArgs}': {error}",
                 "Assertion while executing command",
                 "command"_attr = request.getCommandName(),
                 "db"_attr = request.getDatabase(),
@@ -2142,11 +2129,7 @@ Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execC
     // Otherwise, reply with the parse error. This is useful for cases where parsing fails due to
     // user-supplied input, such as the document too deep error. Since we failed during parsing, we
     // can't log anything about the command.
-    LOGV2_DEBUG(21963,
-                1,
-                "Assertion while parsing command: {error}",
-                "Assertion while parsing command",
-                "error"_attr = ex.toString());
+    LOGV2_DEBUG(21963, 1, "Assertion while parsing command", "error"_attr = ex.toString());
 
     return ex.toStatus();
 }
@@ -2171,7 +2154,6 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                     getCommandRegistry(opCtx)->incrementUnknownCommands();
                     LOGV2_DEBUG(21964,
                                 2,
-                                "No such command: {command}",
                                 "Command not found in registry",
                                 "command"_attr = request.getCommandName());
                     return Status(ErrorCodes::CommandNotFound,
@@ -2182,7 +2164,6 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                 LOGV2_DEBUG(
                     21965,
                     2,
-                    "Run command {db}.$cmd {commandArgs}",
                     "About to run the command",
                     "db"_attr = request.getDatabase(),
                     "client"_attr = (opCtx->getClient() && opCtx->getClient()->hasRemote()
@@ -2208,14 +2189,12 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                     .thenWithState([](auto* runner) { return runner->run(); });
             })
             .tapError([execContext](Status status) {
-                LOGV2_DEBUG(
-                    21966,
-                    1,
-                    "Assertion while executing command '{command}' on database '{db}': {error}",
-                    "Assertion while executing command",
-                    "command"_attr = execContext->getRequest().getCommandName(),
-                    "db"_attr = execContext->getRequest().getDatabaseNoThrow(),
-                    "error"_attr = status.toString());
+                LOGV2_DEBUG(21966,
+                            1,
+                            "Assertion while executing command",
+                            "command"_attr = execContext->getRequest().getCommandName(),
+                            "db"_attr = execContext->getRequest().getDatabaseNoThrow(),
+                            "error"_attr = status.toString());
             });
     past.emplaceValue();
     return future;
@@ -2381,7 +2360,6 @@ struct UnsupportedOpRunner : SynchronousOpRunner {
         // For compatibility reasons, we only log incidents of receiving operations that are not
         // supported and return an empty response to the caller.
         LOGV2(21968,
-              "Operation isn't supported: {operation}",
               "Operation is not supported",
               "operation"_attr = static_cast<int>(executionContext->op()));
         executionContext->currentOp().done();

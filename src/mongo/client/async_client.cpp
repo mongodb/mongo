@@ -151,10 +151,8 @@ void AsyncDBClient::_parseHelloResponse(BSONObj request,
         uassertStatusOK(wire_version::parseWireVersionFromHelloReply(responseBody));
     auto validateStatus = wire_version::validateWireVersion(wireSpec->outgoing, replyWireVersion);
     if (!validateStatus.isOK()) {
-        LOGV2_WARNING(23741,
-                      "Remote host has incompatible wire version: {error}",
-                      "Remote host has incompatible wire version",
-                      "error"_attr = validateStatus);
+        LOGV2_WARNING(
+            23741, "Remote host has incompatible wire version", "error"_attr = validateStatus);
         uasserted(validateStatus.code(),
                   str::stream() << "remote host has incompatible wire version: "
                                 << validateStatus.reason());

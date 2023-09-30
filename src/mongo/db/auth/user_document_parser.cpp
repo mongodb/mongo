@@ -457,8 +457,6 @@ Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSON
             std::string unrecognizedActionsString;
             str::joinStringDelim(unrecognizedActions, &unrecognizedActionsString, ',');
             LOGV2_WARNING(23746,
-                          "Encountered unrecognized actions \"{action}\" while "
-                          "parsing user document for {user}",
                           "Encountered unrecognized actions while parsing user document",
                           "action"_attr = unrecognizedActionsString,
                           "user"_attr = user->getName());

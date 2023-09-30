@@ -181,20 +181,14 @@ void BlockedOp::join() {
 }
 
 void BlockedOp::setIsContended(bool value) {
-    LOGV2(23128,
-          "Setting isContended to {value}",
-          "Setting isContended",
-          "value"_attr = (value ? "true" : "false"));
+    LOGV2(23128, "Setting isContended", "value"_attr = (value ? "true" : "false"));
     stdx::lock_guard lk(_m);
     _latchState.isContended = value;
     _cv.notify_one();
 }
 
 void BlockedOp::setIsWaiting(bool value) {
-    LOGV2(23129,
-          "Setting isWaiting to {value}",
-          "Setting isWaiting",
-          "value"_attr = (value ? "true" : "false"));
+    LOGV2(23129, "Setting isWaiting", "value"_attr = (value ? "true" : "false"));
     stdx::lock_guard lk(_m);
     _interruptibleState.isWaiting = value;
     _cv.notify_one();

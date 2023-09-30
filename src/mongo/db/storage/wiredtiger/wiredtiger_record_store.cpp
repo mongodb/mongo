@@ -225,7 +225,6 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
         },
         numTruncateMarkersToKeep);
     LOGV2(22382,
-          "WiredTiger record store oplog processing took {duration}ms",
           "WiredTiger record store oplog processing finished",
           "duration"_attr = duration_cast<Milliseconds>(initialSetOfMarkers.timeTaken));
     return std::make_shared<WiredTigerRecordStore::OplogTruncateMarkers>(

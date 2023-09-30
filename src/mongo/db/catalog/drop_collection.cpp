@@ -659,7 +659,6 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
         if (nss.isDropPendingNamespace()) {
             auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
             LOGV2(20321,
-                  "Found drop-pending namespace {namespace} with drop optime {dropOpTime}",
                   "Found drop-pending namespace",
                   logAttrs(nss),
                   "dropOpTime"_attr = dropOpTime);
@@ -703,18 +702,15 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
             Status status = db->dropCollection(opCtx, collection->ns());
             if (!status.isOK()) {
                 LOGV2_WARNING(20327,
-                              "could not drop temp collection '{namespace}': {error}",
                               "could not drop temp collection",
                               logAttrs(collection->ns()),
                               "error"_attr = redact(status));
             }
             wuow.commit();
         } catch (const StorageUnavailableException&) {
-            LOGV2_WARNING(
-                20328,
-                "could not drop temp collection '{namespace}' due to WriteConflictException",
-                "could not drop temp collection due to WriteConflictException",
-                logAttrs(collection->ns()));
+            LOGV2_WARNING(20328,
+                          "could not drop temp collection due to WriteConflictException",
+                          logAttrs(collection->ns()));
             opCtx->recoveryUnit()->abandonSnapshot();
         }
         return true;

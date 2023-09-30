@@ -185,8 +185,6 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
             LOGV2_DEBUG(21055,
                         1,
                         "Excluding database due to the 'listDatabases' response not containing a "
-                        "'name' field for this entry: {db}",
-                        "Excluding database due to the 'listDatabases' response not containing a "
                         "'name' field for this entry",
                         "db"_attr = dbBSON);
             continue;
@@ -201,7 +199,6 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
         if (dbName.isLocalDB()) {
             LOGV2_DEBUG(21056,
                         1,
-                        "Excluding database from the 'listDatabases' response: {db}",
                         "Excluding database from the 'listDatabases' response",
                         "db"_attr = dbBSON);
             continue;
@@ -234,11 +231,7 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
 }
 
 void AllDatabaseCloner::handleAdminDbNotValid(const Status& errorStatus) {
-    LOGV2_DEBUG(21059,
-                1,
-                "Validation failed on 'admin' db due to {error}",
-                "Validation failed on 'admin' db",
-                "error"_attr = errorStatus);
+    LOGV2_DEBUG(21059, 1, "Validation failed on 'admin' db", "error"_attr = errorStatus);
     setSyncFailedStatus(errorStatus);
 }
 
@@ -296,14 +289,11 @@ void AllDatabaseCloner::postStage() {
         if (dbStatus.isOK()) {
             LOGV2_DEBUG(21057,
                         1,
-                        "Database clone for '{dbName}' finished: {status}",
                         "Database clone finished",
                         "dbName"_attr = dbName,
                         "status"_attr = dbStatus);
         } else {
             LOGV2_WARNING(21060,
-                          "database '{dbName}' ({dbNumber} of {totalDbs}) "
-                          "clone failed due to {error}",
                           "Database clone failed",
                           "dbName"_attr = dbName,
                           "dbNumber"_attr = (_stats.databasesCloned + 1),

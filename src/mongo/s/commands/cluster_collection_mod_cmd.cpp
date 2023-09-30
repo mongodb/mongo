@@ -128,12 +128,7 @@ public:
                               BSONObjBuilder& result) final {
         const auto& cmd = requestParser.request();
         auto nss = cmd.getNamespace();
-        LOGV2_DEBUG(22748,
-                    1,
-                    "collMod: {namespace} cmd: {command}",
-                    "CMD: collMod",
-                    logAttrs(nss),
-                    "command"_attr = redact(cmdObj));
+        LOGV2_DEBUG(22748, 1, "CMD: collMod", logAttrs(nss), "command"_attr = redact(cmdObj));
 
         auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName());
         if (swDbInfo == ErrorCodes::NamespaceNotFound) {

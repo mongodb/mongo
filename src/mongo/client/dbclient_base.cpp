@@ -835,11 +835,7 @@ void DBClientBase::dropIndex(const NamespaceString& nss,
 
     BSONObj info;
     if (!runCommand(nss.dbName(), cmdBuilder.obj(), info)) {
-        LOGV2_DEBUG(20118,
-                    _logLevel.toInt(),
-                    "dropIndex failed: {info}",
-                    "dropIndex failed",
-                    "info"_attr = info);
+        LOGV2_DEBUG(20118, _logLevel.toInt(), "dropIndex failed", "info"_attr = info);
         uassert(10007, "dropIndex failed", 0);
     }
 }

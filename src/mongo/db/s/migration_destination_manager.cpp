@@ -420,10 +420,7 @@ void MigrationDestinationManager::_setState(State newState) {
 }
 
 void MigrationDestinationManager::_setStateFail(StringData msg) {
-    LOGV2(21998,
-          "Error during migration: {error}",
-          "Error during migration",
-          "error"_attr = redact(msg));
+    LOGV2(21998, "Error during migration", "error"_attr = redact(msg));
     {
         stdx::lock_guard<Latch> sl(_mutex);
         _errmsg = msg.toString();
@@ -437,10 +434,7 @@ void MigrationDestinationManager::_setStateFail(StringData msg) {
 }
 
 void MigrationDestinationManager::_setStateFailWarn(StringData msg) {
-    LOGV2_WARNING(22010,
-                  "Error during migration: {error}",
-                  "Error during migration",
-                  "error"_attr = redact(msg));
+    LOGV2_WARNING(22010, "Error during migration", "error"_attr = redact(msg));
     {
         stdx::lock_guard<Latch> sl(_mutex);
         _errmsg = msg.toString();
@@ -667,10 +661,7 @@ repl::OpTime MigrationDestinationManager::fetchAndApplyBatch(
         } catch (...) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             opCtx->getServiceContext()->killOperation(lk, opCtx, ErrorCodes::Error(51008));
-            LOGV2(21999,
-                  "Batch application failed: {error}",
-                  "Batch application failed",
-                  "error"_attr = redact(exceptionToStatus()));
+            LOGV2(21999, "Batch application failed", "error"_attr = redact(exceptionToStatus()));
         }
     }};
 
@@ -1310,8 +1301,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     !disableResumableRangeDeleter.load());
 
             LOGV2(22001,
-                  "Migration paused because the requested range {range} for {namespace} "
-                  "overlaps with a range already scheduled for deletion",
                   "Migration paused because the requested range overlaps with a range already "
                   "scheduled for deletion",
                   logAttrs(_nss),
@@ -1830,8 +1819,6 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                 LOGV2_ERROR_OPTIONS(
                     16977,
                     {logv2::UserAssertAfterLog()},
-                    "Cannot migrate chunk because the local document {localDoc} has the same _id "
-                    "as the reloaded remote document {remoteDoc}",
                     "Cannot migrate chunk because the local document has the same _id as the "
                     "reloaded remote document",
                     "localDoc"_attr = redact(localDoc),
@@ -1868,8 +1855,6 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
         static Occasionally sampler;
         if (sampler.tick()) {
             LOGV2(22007,
-                  "Migration commit waiting for majority replication for {namespace}, "
-                  "{chunkMin} -> {chunkMax}; waiting to reach this operation: {lastOpApplied}",
                   "Migration commit waiting for majority replication; waiting until the last "
                   "operation applied has been replicated",
                   logAttrs(_nss),
@@ -1882,7 +1867,6 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
     }
 
     LOGV2(22008,
-          "Migration commit succeeded flushing to secondaries for {namespace}, {min} -> {max}",
           "Migration commit succeeded flushing to secondaries",
           logAttrs(_nss),
           "chunkMin"_attr = redact(_min),

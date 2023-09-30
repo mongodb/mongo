@@ -243,7 +243,6 @@ struct DefaultClonerImpl::BatchHandler {
                                                                     true);
                 if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
                     LOGV2_ERROR(20424,
-                                "error: exception cloning object",
                                 "Exception cloning document",
                                 logAttrs(nss),
                                 "error"_attr = redact(status),
@@ -612,10 +611,7 @@ Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
                 continue;
             }
 
-            LOGV2(20422,
-                  "copying indexes for: {collectionInfo}",
-                  "Copying indexes",
-                  "collectionInfo"_attr = params.collectionInfo);
+            LOGV2(20422, "Copying indexes", "collectionInfo"_attr = params.collectionInfo);
 
             const auto nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 

@@ -311,8 +311,6 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         uassertStatusOK(updateCollResponse.toStatus());
 
         LOGV2(7648601,
-              "refineCollectionShardKey updated collection entry for {namespace}: took "
-              "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
               "refineCollectionShardKey updated collection entry",
               logAttrs(nss),
               "durationMillis"_attr = executionTimer.millis(),
@@ -345,8 +343,6 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
                               << updateCollResponse.getN(),
                 updateCollResponse.getN() == 1);
         LOGV2(7648603,
-              "refineCollectionShardKey: updated chunk entries for {namespace}: took "
-              "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
               "refineCollectionShardKey: updated chunk entries",
               logAttrs(nss),
               "durationMillis"_attr = executionTimer.millis(),
@@ -362,8 +358,6 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         uassertStatusOK(updateTagResponse.toStatus());
 
         LOGV2(7648604,
-              "refineCollectionShardKey: updated zone entries for {namespace}: took "
-              "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
               "refineCollectionShardKey: updated zone entries",
               logAttrs(nss),
               "durationMillis"_attr = executionTimer.millis(),
@@ -496,8 +490,6 @@ void ShardingCatalogManager::refineCollectionShardKeyDEPRECATED(
     } catch (const DBException& ex) {
         LOGV2(
             51798,
-            "refineCollectionShardKey: failed to best-effort refresh all shards containing chunks "
-            "in {namespace}",
             "refineCollectionShardKey: failed to best-effort refresh all shards containing chunks",
             "error"_attr = ex.toStatus(),
             logAttrs(nss));

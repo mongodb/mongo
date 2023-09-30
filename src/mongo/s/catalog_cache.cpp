@@ -817,8 +817,6 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 
             LOGV2_DEBUG(22647,
                         3,
-                        "Invalidating cached collection {namespace} that has data "
-                        "on shard {shardId}",
                         "Invalidating cached collection",
                         logAttrs(rt.nss()),
                         "shardId"_attr = shardId);
@@ -826,7 +824,6 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
         });
 
     LOGV2(22648,
-          "Finished invalidating databases and collections with data on shard: {shardId}",
           "Finished invalidating databases and collections that reference specific shard",
           "shardId"_attr = shardId);
 }

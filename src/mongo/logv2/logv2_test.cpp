@@ -444,10 +444,6 @@ TEST_F(LogV2Test, Basic) {
     buffer.clear();
     t4.serialize(buffer);
     ASSERT_EQUALS(lines.back(), fmt::to_string(buffer));
-
-    // Message string is selected when using API that also take a format string
-    LOGV2(20084, "fmtstr {name}", "msgstr", "name"_attr = 1);
-    ASSERT_EQUALS(lines.back(), "msgstr");
 }
 
 TEST_F(LogV2Test, MismatchAttrInLogging) {
@@ -1547,10 +1543,9 @@ TEST_F(LogV2ContainerTest, StringMapUint32) {
 }
 
 TEST_F(LogV2Test, AttrNameCollision) {
-    ASSERT_THROWS_CODE(
-        LOGV2(4793300, "Collision {k1}", "Collision", "k1"_attr = "v1", "k1"_attr = "v2"),
-        AssertionException,
-        4793301);
+    ASSERT_THROWS_CODE(LOGV2(4793300, "Collision", "k1"_attr = "v1", "k1"_attr = "v2"),
+                       AssertionException,
+                       4793301);
 }
 
 TEST_F(LogV2Test, Unicode) {

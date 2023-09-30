@@ -219,8 +219,6 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
         wunit.commit();
 
         LOGV2(20397,
-              "Successfully renamed the target {targetNs} ({targetUUID}) to {tmpName} so that the "
-              "source {sourceNs} ({sourceUUID}) could be renamed to {targetNs2}",
               "Successfully renamed the target so that the source could be renamed",
               "existingTargetNamespace"_attr = targetNs,
               "existingTargetUUID"_attr = targetUUID,
@@ -304,8 +302,6 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
             if (!renameOpTime.isNull()) {
                 LOGV2_FATAL(
                     40616,
-                    "renameCollection: {from} to {to} (with dropTarget=true) - unexpected "
-                    "renameCollection oplog entry written to the oplog with optime {renameOpTime}",
                     "renameCollection (with dropTarget=true): unexpected renameCollection oplog "
                     "entry written to the oplog",
                     "from"_attr = source,
@@ -637,8 +633,6 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
             // Ignoring failure case when dropping the temporary collection during cleanup because
             // the rename operation has already failed for another reason.
             LOGV2(705521,
-                  "Unable to drop temporary collection {tmpName} while renaming from {source} to "
-                  "{target}: {error}",
                   "Unable to drop temporary collection while renaming",
                   "tempCollection"_attr = tmpName,
                   "source"_attr = source,
@@ -960,7 +954,6 @@ Status renameCollection(OperationContext* opCtx,
 
     StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;
     LOGV2(20400,
-          "renameCollectionForCommand: rename {source} to {target}{dropTargetMsg}",
           "renameCollectionForCommand",
           "sourceNamespace"_attr = source,
           "targetNamespace"_attr = target,
@@ -1064,8 +1057,6 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     const std::string uuidToDropString = uuidToDrop ? uuidToDrop->toString() : "<none>";
     const std::string uuidString = uuidToRename ? uuidToRename->toString() : "UUID unknown";
     LOGV2(20401,
-          "renameCollectionForApplyOps: rename {sourceNss} ({uuidString}) to "
-          "{targetNss}{dropTargetMsg}",
           "renameCollectionForApplyOps",
           "sourceNamespace"_attr = sourceNss,
           "uuid"_attr = uuidString,
@@ -1093,7 +1084,6 @@ Status renameCollectionForRollback(OperationContext* opCtx,
                             << ". target: " << target.toStringForErrorMsg());
 
     LOGV2(20402,
-          "renameCollectionForRollback: rename {source} ({uuid}) to {target}.",
           "renameCollectionForRollback",
           "source"_attr = *source,
           "uuid"_attr = uuid,

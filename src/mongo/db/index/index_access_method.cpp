@@ -154,10 +154,7 @@ std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
         return std::make_unique<WildcardAccessMethod>(entry, makeSDI());
     else if (IndexNames::COLUMN == type)
         return std::make_unique<ColumnStoreAccessMethod>(entry, makeCS());
-    LOGV2(20688,
-          "Can't find index for keyPattern {keyPattern}",
-          "Can't find index for keyPattern",
-          "keyPattern"_attr = desc->keyPattern());
+    LOGV2(20688, "Can't find index for keyPattern", "keyPattern"_attr = desc->keyPattern());
     fassertFailed(31021);
 }
 
@@ -495,8 +492,6 @@ void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
 
         NamespaceString ns = entry->getNSSFromCatalog(opCtx);
         LOGV2(20683,
-              "Assertion failure: _unindex failed on: {namespace} for index: {indexName}. "
-              "{error}  KeyString:{keyString}",
               "Assertion failure: _unindex failed",
               "error"_attr = redact(e),
               "keyString"_attr = keyString,

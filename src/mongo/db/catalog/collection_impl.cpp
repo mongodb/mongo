@@ -491,7 +491,6 @@ void CollectionImpl::_initCommon(OperationContext* opCtx) {
         // Log an error and startup warning if the collection validator is malformed.
         LOGV2_WARNING_OPTIONS(20293,
                               {logv2::LogTag::kStartupWarnings},
-                              "Collection {namespace} has malformed validator: {validatorStatus}",
                               "Collection has malformed validator",
                               logAttrs(_ns),
                               "validatorStatus"_attr = _validator.getStatus());

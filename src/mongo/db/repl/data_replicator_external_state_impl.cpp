@@ -115,9 +115,6 @@ ChangeSyncSourceAction DataReplicatorExternalStateImpl::shouldStopFetching(
     if (changeSyncSourceAction != ChangeSyncSourceAction::kContinueSyncing) {
         LOGV2(21150,
               "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
-              "sync source. Current source: {syncSource}, OpTime {lastAppliedOpTime}, "
-              "its sync source index:{syncSourceIndex}",
-              "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
               "sync source",
               "syncSource"_attr = source,
               "lastAppliedOpTime"_attr = oqMetadata.getLastOpApplied(),

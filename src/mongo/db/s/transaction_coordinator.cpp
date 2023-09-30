@@ -300,15 +300,12 @@ TransactionCoordinator::TransactionCoordinator(
                         std::move(affectedNamespacesSet.begin(),
                                   affectedNamespacesSet.end(),
                                   std::back_inserter(_affectedNamespaces));
-                        LOGV2_DEBUG(
-                            22446,
-                            3,
-                            "{sessionId}:{_txnNumberAndRetryCounter} Advancing cluster time to "
-                            "the commit timestamp {commitTimestamp}",
-                            "Advancing cluster time to the commit timestamp",
-                            "sessionId"_attr = _lsid,
-                            "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
-                            "commitTimestamp"_attr = *_decision->getCommitTimestamp());
+                        LOGV2_DEBUG(22446,
+                                    3,
+                                    "Advancing cluster time to the commit timestamp",
+                                    "sessionId"_attr = _lsid,
+                                    "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,
+                                    "commitTimestamp"_attr = *_decision->getCommitTimestamp());
 
                         VectorClockMutable::get(_serviceContext)
                             ->tickClusterTimeTo(LogicalTime(*_decision->getCommitTimestamp()));
@@ -537,7 +534,6 @@ void TransactionCoordinator::_done(Status status) {
 
     LOGV2_DEBUG(22447,
                 3,
-                "{sessionId}:{_txnNumberAndRetryCounter} Two-phase commit completed with {status}",
                 "Two-phase commit completed",
                 "sessionId"_attr = _lsid,
                 "txnNumberAndRetryCounter"_attr = _txnNumberAndRetryCounter,

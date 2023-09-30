@@ -649,9 +649,6 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     sleepBetweenInsertOpTimeGenerationAndLogOp.execute([&](const BSONObj& data) {
         auto numMillis = data["waitForMillis"].numberInt();
         LOGV2(7456300,
-              "Sleeping for {sleepMillis}ms after receiving {numOpTimesReceived} optimes from "
-              "{firstOpTime} to "
-              "{lastOpTime}",
               "Sleeping due to sleepBetweenInsertOpTimeGenerationAndLogOp failpoint",
               "sleepMillis"_attr = numMillis,
               "numOpTimesReceived"_attr = count,

@@ -492,7 +492,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         ProcessId pid = ProcessId::getCurrent();
         const bool is32bit = sizeof(int*) == 4;
         LOGV2(4615611,
-              "MongoDB starting : pid={pid} port={port} dbpath={dbPath} {architecture} host={host}",
               "MongoDB starting",
               "pid"_attr = pid.toNative(),
               "port"_attr = serverGlobalParams.port,
@@ -535,10 +534,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (!storageGlobalParams.repair) {
         auto tl = makeTransportLayer(serviceContext);
         if (auto res = tl->setup(); !res.isOK()) {
-            LOGV2_ERROR(20568,
-                        "Error setting up listener: {error}",
-                        "Error setting up listener",
-                        "error"_attr = res);
+            LOGV2_ERROR(20568, "Error setting up listener", "error"_attr = res);
             return ExitCode::netError;
         }
         serviceContext->setTransportLayer(std::move(tl));
@@ -579,8 +575,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             // Warn if field name matches non-active registered storage engine.
             if (isRegisteredStorageEngine(serviceContext, e.fieldName())) {
                 LOGV2_WARNING(20566,
-                              "Detected configuration for non-active storage engine {fieldName} "
-                              "when current storage engine is {storageEngine}",
                               "Detected configuration for non-active storage engine",
                               "fieldName"_attr = e.fieldName(),
                               "storageEngine"_attr = storageGlobalParams.engine);
@@ -592,8 +586,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (!serviceContext->getStorageEngine()->supportsCappedCollections() &&
         serverGlobalParams.defaultProfile != 0) {
         LOGV2_ERROR(20534,
-                    "Running {storageEngine} with profiling is not supported. Make sure you "
-                    "are not using --profile",
                     "Running the selected storage engine with profiling is not supported",
                     "storageEngine"_attr = storageGlobalParams.engine);
         exitCleanly(ExitCode::badOptions);
@@ -627,7 +619,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         LOGV2_FATAL_OPTIONS(
             20573,
             logv2::LogOptions(logv2::LogComponent::kControl, logv2::FatalMode::kContinue),
-            "** IMPORTANT: {error}",
             "Wrong mongod version",
             "error"_attr = error.toStatus().reason());
         exitCleanly(ExitCode::needDowngrade);
@@ -713,10 +704,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
         Status status = verifySystemIndexes(startupOpCtx.get());
         if (!status.isOK()) {
-            LOGV2_WARNING(20538,
-                          "Unable to verify system indexes: {error}",
-                          "Unable to verify system indexes",
-                          "error"_attr = redact(status));
+            LOGV2_WARNING(20538, "Unable to verify system indexes", "error"_attr = redact(status));
             if (status == ErrorCodes::AuthSchemaIncompatible) {
                 exitCleanly(ExitCode::needUpgrade);
             } else if (status == ErrorCodes::NotWritablePrimary) {
@@ -732,14 +720,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         status =
             globalAuthzManager->getAuthorizationVersion(startupOpCtx.get(), &foundSchemaVersion);
         if (!status.isOK()) {
-            LOGV2_ERROR(
-                20539,
-                "Auth schema version is incompatible: User and role management commands require "
-                "auth data to have at least schema version {minSchemaVersion} but startup could "
-                "not verify schema version: {error}",
-                "Failed to verify auth schema version",
-                "minSchemaVersion"_attr = AuthorizationManager::schemaVersion26Final,
-                "error"_attr = status);
+            LOGV2_ERROR(20539,
+                        "Failed to verify auth schema version",
+                        "minSchemaVersion"_attr = AuthorizationManager::schemaVersion26Final,
+                        "error"_attr = status);
             LOGV2(20540,
                   "To manually repair the 'authSchema' document in the admin.system.version "
                   "collection, start up with --setParameter "
@@ -1032,10 +1016,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (!storageGlobalParams.repair) {
         start = serviceContext->getTransportLayer()->start();
         if (!start.isOK()) {
-            LOGV2_ERROR(20572,
-                        "Error starting listener: {error}",
-                        "Error starting listener",
-                        "error"_attr = start);
+            LOGV2_ERROR(20572, "Error starting listener", "error"_attr = start);
             return ExitCode::netError;
         }
     }
@@ -1075,22 +1056,14 @@ ExitCode initAndListen(ServiceContext* service, int listenPort) {
     try {
         return _initAndListen(service, listenPort);
     } catch (DBException& e) {
-        LOGV2_ERROR(20557,
-                    "Exception in initAndListen: {error}, terminating",
-                    "DBException in initAndListen, terminating",
-                    "error"_attr = e.toString());
+        LOGV2_ERROR(
+            20557, "DBException in initAndListen, terminating", "error"_attr = e.toString());
         return ExitCode::uncaught;
     } catch (std::exception& e) {
-        LOGV2_ERROR(20558,
-                    "Exception in initAndListen std::exception: {error}, terminating",
-                    "std::exception in initAndListen, terminating",
-                    "error"_attr = e.what());
+        LOGV2_ERROR(20558, "std::exception in initAndListen, terminating", "error"_attr = e.what());
         return ExitCode::uncaught;
     } catch (int& n) {
-        LOGV2_ERROR(20559,
-                    "Exception in initAndListen int: {reason}, terminating",
-                    "Exception in initAndListen, terminating",
-                    "reason"_attr = n);
+        LOGV2_ERROR(20559, "Exception in initAndListen, terminating", "reason"_attr = n);
         return ExitCode::uncaught;
     } catch (...) {
         LOGV2_ERROR(20560, "Exception in initAndListen, terminating");
@@ -1816,7 +1789,6 @@ int mongod_main(int argc, char* argv[]) {
         LOGV2_FATAL_OPTIONS(
             20574,
             logv2::LogOptions(logv2::LogComponent::kControl, logv2::FatalMode::kContinue),
-            "Error during global initialization: {error}",
             "Error during global initialization",
             "error"_attr = status);
         quickExit(ExitCode::fail);
@@ -1834,7 +1806,6 @@ int mongod_main(int argc, char* argv[]) {
             LOGV2_FATAL_OPTIONS(
                 20575,
                 logv2::LogOptions(logv2::LogComponent::kControl, logv2::FatalMode::kContinue),
-                "Error creating service context: {error}",
                 "Error creating service context",
                 "error"_attr = redact(cause));
             quickExit(ExitCode::fail);

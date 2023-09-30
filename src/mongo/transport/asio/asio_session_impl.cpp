@@ -159,10 +159,7 @@ void CommonAsioSession::end() {
         std::error_code ec;
         getSocket().shutdown(GenericSocket::shutdown_both, ec);
         if ((ec) && (ec != asio::error::not_connected)) {
-            LOGV2_ERROR(23841,
-                        "Error shutting down socket: {error}",
-                        "Error shutting down socket",
-                        "error"_attr = ec.message());
+            LOGV2_ERROR(23841, "Error shutting down socket", "error"_attr = ec.message());
         }
     }
 }
@@ -229,7 +226,6 @@ Future<void> CommonAsioSession::sinkMessageImpl(Message message, const BatonHand
 void CommonAsioSession::cancelAsyncOperations(const BatonHandle& baton) {
     LOGV2_DEBUG(4615608,
                 3,
-                "Canceling outstanding I/O operations on connection to {remote}",
                 "Canceling outstanding I/O operations on connection to remote",
                 "remote"_attr = _remote);
     stdx::lock_guard lk(_asyncOpMutex);
@@ -257,7 +253,6 @@ bool CommonAsioSession::isConnected() {
     if (!swPollEvents.isOK()) {
         if (swPollEvents != ErrorCodes::NetworkTimeout) {
             LOGV2_WARNING(4615609,
-                          "Failed to poll socket for connectivity check: {error}",
                           "Failed to poll socket for connectivity check",
                           "error"_attr = swPollEvents.getStatus());
             return false;
@@ -276,10 +271,7 @@ bool CommonAsioSession::isConnected() {
                     bytesRead == sizeof(testByte));
             return true;
         } catch (const DBException& e) {
-            LOGV2_WARNING(4615610,
-                          "Failed to check socket connectivity: {error}",
-                          "Failed to check socket connectivity",
-                          "error"_attr = e);
+            LOGV2_WARNING(4615610, "Failed to check socket connectivity", "error"_attr = e);
         }
     }
 
@@ -447,7 +439,6 @@ Future<Message> CommonAsioSession::sourceMessageImpl(const BatonHandle& baton) {
                    << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
                 const auto str = sb.str();
                 LOGV2(4615638,
-                      "recv(): message msgLen {msgLen} is invalid. Min: {min} Max: {max}",
                       "recv(): message mstLen is invalid.",
                       "msgLen"_attr = msgLen,
                       "min"_attr = kHeaderSize,
@@ -751,8 +742,6 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
         if (!sslGlobalParams.disableNonSSLConnectionLogging &&
             _tl->sslMode() == SSLParams::SSLMode_preferSSL) {
             LOGV2(23838,
-                  "SSL mode is set to 'preferred' and connection {connectionId} to {remote} is "
-                  "not using SSL.",
                   "SSL mode is set to 'preferred' and connection to remote is not using SSL.",
                   "connectionId"_attr = id(),
                   "remote"_attr = remote());

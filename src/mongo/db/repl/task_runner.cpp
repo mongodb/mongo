@@ -70,7 +70,6 @@ TaskRunner::NextAction runSingleTask(const TaskRunner::Task& task,
         return task(opCtx, status);
     } catch (...) {
         LOGV2(21777,
-              "Unhandled exception in task runner: {error}",
               "Unhandled exception in task runner",
               "error"_attr = redact(exceptionToStatus()));
     }

@@ -86,7 +86,6 @@ namespace {
 void consoleTerminate(const char* controlCodeName) {
     setThreadName("consoleTerminate");
     LOGV2(23371,
-          "Received event {controlCode}, will terminate after current command ends",
           "Received event, will terminate after current command ends",
           "controlCode"_attr = controlCodeName);
     exitCleanly(ExitCode::kill);
@@ -129,10 +128,8 @@ void eventProcessingThread() {
     HANDLE event = CreateEventA(nullptr, TRUE, FALSE, eventName.c_str());
     if (event == nullptr) {
         auto ec = lastSystemError();
-        LOGV2_WARNING(23382,
-                      "eventProcessingThread CreateEvent failed: {error}",
-                      "eventProcessingThread CreateEvent failed",
-                      "error"_attr = errorMessage(ec));
+        LOGV2_WARNING(
+            23382, "eventProcessingThread CreateEvent failed", "error"_attr = errorMessage(ec));
         return;
     }
 
@@ -143,14 +140,12 @@ void eventProcessingThread() {
         if (returnCode == WAIT_FAILED) {
             auto ec = lastSystemError();
             LOGV2_WARNING(23383,
-                          "eventProcessingThread WaitForSingleObject failed: {error}",
                           "eventProcessingThread WaitForSingleObject failed",
                           "error"_attr = errorMessage(ec));
             return;
         } else {
             auto ec = systemError(returnCode);
             LOGV2_WARNING(23384,
-                          "eventProcessingThread WaitForSingleObject failed: {error}",
                           "eventProcessingThread WaitForSingleObject failed",
                           "error"_attr = errorMessage(ec));
             return;
@@ -189,10 +184,8 @@ bool waitForSignal(const sigset_t& sigset, SignalWaitResult* result) {
         if (result->sig == -1) {
             if (errsv == EINTR)
                 continue;
-            LOGV2_FATAL_CONTINUE(23385,
-                                 "sigwaitinfo failed with error: {error}",
-                                 "sigwaitinfo failed with error",
-                                 "error"_attr = strerror(errsv));
+            LOGV2_FATAL_CONTINUE(
+                23385, "sigwaitinfo failed with error", "error"_attr = strerror(errsv));
             return false;
         }
         return true;
@@ -212,18 +205,13 @@ struct LogRotationState {
 
 void handleOneSignal(const SignalWaitResult& waited, LogRotationState* rotation) {
     int sig = waited.sig;
-    LOGV2(23377,
-          "Received signal {signal}: {error}",
-          "Received signal",
-          "signal"_attr = sig,
-          "error"_attr = strsignal(sig));
+    LOGV2(23377, "Received signal", "signal"_attr = sig, "error"_attr = strsignal(sig));
 #if defined(__linux__)
     const siginfo_t& si = waited.si;
     switch (si.si_code) {
         case SI_USER:
         case SI_QUEUE:
             LOGV2(23378,
-                  "Signal was sent by kill(2) with pid {pid}, uid {uid}",
                   "Signal was sent by kill(2)",
                   "pid"_attr = si.si_pid,
                   "uid"_attr = si.si_uid);
@@ -296,10 +284,7 @@ void signalProcessingThread(LogFileStatus rotate) {
     errno = 0;
     if (int r = pthread_sigmask(SIG_SETMASK, &waitSignals, nullptr); r != 0) {
         int errsv = errno;
-        LOGV2_FATAL(31377,
-                    "pthread_sigmask failed with error: {error}",
-                    "pthread_sigmask failed with error",
-                    "error"_attr = strerror(errsv));
+        LOGV2_FATAL(31377, "pthread_sigmask failed with error", "error"_attr = strerror(errsv));
     }
 
 #if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)

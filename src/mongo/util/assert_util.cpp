@@ -95,7 +95,7 @@ void DBException::traceIfNeeded(const DBException& e) {
     const bool traceNeeded = traceExceptions.load() ||
         (e.code() == ErrorCodes::WriteConflict && traceWriteConflictExceptions.load());
     if (traceNeeded) {
-        LOGV2_WARNING(23075, "DBException thrown {error}", "DBException thrown", "error"_attr = e);
+        LOGV2_WARNING(23075, "DBException thrown", "error"_attr = e);
         logScopedDebugInfo();
         printStackTrace();
     }
@@ -103,12 +103,8 @@ void DBException::traceIfNeeded(const DBException& e) {
 
 MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, unsigned line) {
     assertionCount.condrollover(assertionCount.regular.addAndFetch(1));
-    LOGV2_ERROR(23076,
-                "Assertion failure {expr} {file} {line}",
-                "Assertion failure",
-                "expr"_attr = expr,
-                "file"_attr = file,
-                "line"_attr = line);
+    LOGV2_ERROR(
+        23076, "Assertion failure", "expr"_attr = expr, "file"_attr = file, "line"_attr = line);
     logScopedDebugInfo();
     printStackTrace();
     std::stringstream temp;
@@ -127,12 +123,8 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, un
 MONGO_COMPILER_NOINLINE void invariantFailed(const char* expr,
                                              const char* file,
                                              unsigned line) noexcept {
-    LOGV2_FATAL_CONTINUE(23079,
-                         "Invariant failure {expr} {file} {line}",
-                         "Invariant failure",
-                         "expr"_attr = expr,
-                         "file"_attr = file,
-                         "line"_attr = line);
+    LOGV2_FATAL_CONTINUE(
+        23079, "Invariant failure", "expr"_attr = expr, "file"_attr = file, "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23080, "\n\n***aborting after invariant() failure\n\n");
     callAbort();
@@ -143,7 +135,6 @@ MONGO_COMPILER_NOINLINE void invariantFailedWithMsg(const char* expr,
                                                     const char* file,
                                                     unsigned line) noexcept {
     LOGV2_FATAL_CONTINUE(23081,
-                         "Invariant failure {expr} {msg} {file} {line}",
                          "Invariant failure",
                          "expr"_attr = expr,
                          "msg"_attr = msg,
@@ -159,7 +150,6 @@ MONGO_COMPILER_NOINLINE void invariantOKFailed(const char* expr,
                                                const char* file,
                                                unsigned line) noexcept {
     LOGV2_FATAL_CONTINUE(23083,
-                         "Invariant failure {expr} resulted in status {error} at {file} {line}",
                          "Invariant failure",
                          "expr"_attr = expr,
                          "error"_attr = redact(status),
@@ -175,15 +165,13 @@ MONGO_COMPILER_NOINLINE void invariantOKFailedWithMsg(const char* expr,
                                                       const std::string& msg,
                                                       const char* file,
                                                       unsigned line) noexcept {
-    LOGV2_FATAL_CONTINUE(
-        23085,
-        "Invariant failure {expr} {msg} resulted in status {error} at {file} {line}",
-        "Invariant failure",
-        "expr"_attr = expr,
-        "msg"_attr = msg,
-        "error"_attr = redact(status),
-        "file"_attr = file,
-        "line"_attr = line);
+    LOGV2_FATAL_CONTINUE(23085,
+                         "Invariant failure",
+                         "expr"_attr = expr,
+                         "msg"_attr = msg,
+                         "error"_attr = redact(status),
+                         "file"_attr = file,
+                         "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23086, "\n\n***aborting after invariant() failure\n\n");
     callAbort();
@@ -193,7 +181,6 @@ MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
                                                      const char* file,
                                                      unsigned line) noexcept {
     LOGV2_FATAL_CONTINUE(23087,
-                         "Invariant failure {error} at {file} {line}",
                          "Invariant failure",
                          "error"_attr = redact(status),
                          "file"_attr = file,
@@ -206,12 +193,8 @@ MONGO_COMPILER_NOINLINE void invariantStatusOKFailed(const Status& status,
 MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
                                                        const char* file,
                                                        unsigned line) noexcept {
-    LOGV2_FATAL_CONTINUE(23089,
-                         "Fatal assertion {msgid} at {file} {line}",
-                         "Fatal assertion",
-                         "msgid"_attr = msgid,
-                         "file"_attr = file,
-                         "line"_attr = line);
+    LOGV2_FATAL_CONTINUE(
+        23089, "Fatal assertion", "msgid"_attr = msgid, "file"_attr = file, "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23090, "\n\n***aborting after fassert() failure\n\n");
     callAbort();
@@ -220,12 +203,8 @@ MONGO_COMPILER_NOINLINE void fassertFailedWithLocation(int msgid,
 MONGO_COMPILER_NOINLINE void fassertFailedNoTraceWithLocation(int msgid,
                                                               const char* file,
                                                               unsigned line) noexcept {
-    LOGV2_FATAL_CONTINUE(23091,
-                         "Fatal assertion {msgid} at {file} {line}",
-                         "Fatal assertion",
-                         "msgid"_attr = msgid,
-                         "file"_attr = file,
-                         "line"_attr = line);
+    LOGV2_FATAL_CONTINUE(
+        23091, "Fatal assertion", "msgid"_attr = msgid, "file"_attr = file, "line"_attr = line);
     breakpoint();
     LOGV2_FATAL_CONTINUE(23092, "\n\n***aborting after fassert() failure\n\n");
     quickExit(ExitCode::abrupt);
@@ -236,7 +215,6 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusWithLocation(int msgid,
                                                                  const char* file,
                                                                  unsigned line) noexcept {
     LOGV2_FATAL_CONTINUE(23093,
-                         "Fatal assertion {msgid} {error} at {file} {line}",
                          "Fatal assertion",
                          "msgid"_attr = msgid,
                          "error"_attr = redact(status),
@@ -252,7 +230,6 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
                                                                         const char* file,
                                                                         unsigned line) noexcept {
     LOGV2_FATAL_CONTINUE(23095,
-                         "Fatal assertion {msgid} {error} at {file} {line}",
                          "Fatal assertion",
                          "msgid"_attr = msgid,
                          "error"_attr = redact(status),
@@ -269,7 +246,6 @@ MONGO_COMPILER_NOINLINE void uassertedWithLocation(const Status& status,
     assertionCount.condrollover(assertionCount.user.addAndFetch(1));
     LOGV2_DEBUG(23074,
                 1,
-                "User assertion {error} {file} {line}",
                 "User assertion",
                 "error"_attr = redact(status),
                 "file"_attr = file,
@@ -281,12 +257,8 @@ MONGO_COMPILER_NOINLINE void msgassertedWithLocation(const Status& status,
                                                      const char* file,
                                                      unsigned line) {
     assertionCount.condrollover(assertionCount.msg.addAndFetch(1));
-    LOGV2_ERROR(23077,
-                "Assertion {error} {file} {line}",
-                "Assertion",
-                "error"_attr = redact(status),
-                "file"_attr = file,
-                "line"_attr = line);
+    LOGV2_ERROR(
+        23077, "Assertion", "error"_attr = redact(status), "file"_attr = file, "line"_attr = line);
     error_details::throwExceptionForStatus(status);
 }
 

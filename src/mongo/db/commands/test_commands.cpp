@@ -127,10 +127,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        LOGV2(20505,
-              "Test-only command 'godinsert' invoked coll:{collection}",
-              "Test-only command 'godinsert' invoked",
-              "collection"_attr = nss.coll());
+        LOGV2(20505, "Test-only command 'godinsert' invoked", "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
         Lock::DBLock lk(opCtx, dbName, MODE_X);

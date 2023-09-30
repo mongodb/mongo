@@ -140,9 +140,6 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
             _lastOp = systemOpTime;
         } else {
             LOGV2(21280,
-                  "Not setting the last OpTime for this Client from {lastOp} to the current system "
-                  "time of {systemOpTime} as that would be moving the OpTime backwards.  This "
-                  "should only happen if there was a rollback recently",
                   "Not setting the last OpTime for this Client to the current system time as that "
                   "would be moving the OpTime backwards. This should only happen if there was a "
                   "rollback recently",
@@ -165,11 +162,7 @@ void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(Operation
             // In most cases, it is safe to ignore all errors when the OperationContext is
             // interrupted because we cannot use that OperationContext to wait for writeConcern
             // anyways.
-            LOGV2_DEBUG(21281,
-                        2,
-                        "Ignoring set last op error: {error}",
-                        "Ignoring set last op error",
-                        "error"_attr = e.toStatus());
+            LOGV2_DEBUG(21281, 2, "Ignoring set last op error", "error"_attr = e.toStatus());
             return;
         }
         // Context was not interrupted, throw error up to caller.

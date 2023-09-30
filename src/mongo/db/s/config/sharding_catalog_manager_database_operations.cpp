@@ -244,10 +244,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             DatabaseType db(
                 dbName, resolvedPrimaryShard->getId(), DatabaseVersion(UUID::gen(), clusterTime));
 
-            LOGV2(21938,
-                  "Registering new database {db} in sharding catalog",
-                  "Registering new database in sharding catalog",
-                  "db"_attr = db);
+            LOGV2(21938, "Registering new database in sharding catalog", "db"_attr = db);
 
             // The creation of a new database (and its assignation to resolvedPrimaryShard) is
             // described by the notification of multiple events, following a 2-phase protocol:

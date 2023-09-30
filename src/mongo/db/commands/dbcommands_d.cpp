@@ -314,11 +314,8 @@ public:
                         if (partialOk) {
                             break;  // skipped chunk is probably on another shard
                         }
-                        LOGV2(20452,
-                              "Should have chunk: {expected} have: {observed}",
-                              "Unexpected chunk",
-                              "expected"_attr = n,
-                              "observed"_attr = myn);
+                        LOGV2(
+                            20452, "Unexpected chunk", "expected"_attr = n, "observed"_attr = myn);
                         dumpChunks(opCtx, nss, query, sort);
                         uassert(10040, "chunks out of order", n == myn);
                     }
@@ -391,7 +388,7 @@ public:
         findRequest.setSort(sort);
         std::unique_ptr<DBClientCursor> c = client.find(std::move(findRequest));
         while (c->more()) {
-            LOGV2(20454, "Chunk: {chunk}", "Dumping chunks", "chunk"_attr = c->nextSafe());
+            LOGV2(20454, "Dumping chunks", "chunk"_attr = c->nextSafe());
         }
     }
 };

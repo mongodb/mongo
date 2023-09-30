@@ -127,8 +127,6 @@ void logRemoveCacheEntry(const std::string& ns,
                          const BSONObj& collation) {
     LOGV2_DEBUG(23907,
                 1,
-                "{namespace}: Removed plan cache entry - {query}"
-                "(sort: {sort}; projection: {projection}; collation: {collation})",
                 "Removed plan cache entry",
                 "namespace"_attr = ns,
                 "query"_attr = redact(query),
@@ -144,8 +142,6 @@ void logMissingCacheEntry(const std::string& ns,
                           const BSONObj& collation) {
     LOGV2_DEBUG(23906,
                 1,
-                "{namespace}: Query shape doesn't exist in PlanCache - {query}"
-                "(sort: {sort}; projection: {projection}; collation: {collation})",
                 "Query shape doesn't exist in PlanCache",
                 "namespace"_attr = ns,
                 "query"_attr = redact(query),

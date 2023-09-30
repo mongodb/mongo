@@ -110,16 +110,11 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(21146,
                         1,
-                        "Skipping 'system' collection: {namespace}",
                         "Database cloner skipping 'system' collection",
                         logAttrs(collectionNamespace));
             continue;
         }
-        LOGV2_DEBUG(21147,
-                    2,
-                    "Allowing cloning of collectionInfo: {info}",
-                    "Allowing cloning of collectionInfo",
-                    "info"_attr = info);
+        LOGV2_DEBUG(21147, 2, "Allowing cloning of collectionInfo", "info"_attr = info);
 
         bool isDuplicate = seen.insert(result.getName().toString()).second;
         uassert(51005,
@@ -173,14 +168,9 @@ void DatabaseCloner::postStage() {
         }
         auto collStatus = _currentCollectionCloner->run();
         if (collStatus.isOK()) {
-            LOGV2_DEBUG(21148,
-                        1,
-                        "collection clone finished: {namespace}",
-                        "Collection clone finished",
-                        logAttrs(sourceNss));
+            LOGV2_DEBUG(21148, 1, "Collection clone finished", logAttrs(sourceNss));
         } else {
             LOGV2_ERROR(21149,
-                        "collection clone for '{namespace}' failed due to {error}",
                         "Collection clone failed",
                         logAttrs(sourceNss),
                         "error"_attr = collStatus.toString());

@@ -115,7 +115,6 @@ StatusWith<EventHandle> ScatterGatherRunner::RunnerImpl::start(
     std::vector<RemoteCommandRequest> requests = _algorithm->getRequests();
     for (size_t i = 0; i < requests.size(); ++i) {
         LOGV2(21752,
-              "Scheduling remote command request for {context}: {request}",
               "Scheduling remote command request",
               "context"_attr = _logMessage,
               "request"_attr = requests[i].toString());

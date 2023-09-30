@@ -292,7 +292,6 @@ public:
                               ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,
-              "Splitting chunk {chunkRange} in {namespace} on shard {shardId} at key {splitPoint}",
               "Splitting chunk",
               "chunkRange"_attr = redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString()),
               "splitPoint"_attr = redact(splitPoint),

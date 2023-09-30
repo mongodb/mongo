@@ -196,21 +196,13 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
 
             if (!shard) {
-                LOGV2_DEBUG(22870,
-                            1,
-                            "Could not find shard containing host: {host}",
-                            "Could not find shard containing host",
-                            "host"_attr = target);
+                LOGV2_DEBUG(22870, 1, "Could not find shard containing host", "host"_attr = target);
             }
 
             if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) &&
                 args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
                 LOGV2_FATAL_NOTRACE(
                     50710,
-                    "This mongos server must be upgraded. It is attempting to communicate "
-                    "with an upgraded cluster with which it is incompatible. Error: {error} "
-                    "Crashing in order to bring attention to the incompatibility, rather than "
-                    "erroring endlessly.",
                     "This mongos is attempting to communicate with an upgraded cluster with which "
                     "it is incompatible, so this mongos should be upgraded. Crashing in order to "
                     "bring attention to the incompatibility rather than erroring endlessly.",

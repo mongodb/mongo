@@ -657,13 +657,11 @@ std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::_receive
         const auto& status = ex.toStatus();
         if (ErrorCodes::isInterruption(status.code()) ||
             ErrorCodes::isNetworkError(status.code())) {
-            LOGV2_DEBUG(
-                22986,
-                2,
-                "Session from {remote} encountered a network error during SourceMessage: {error}",
-                "Session from remote encountered a network error during SourceMessage",
-                "remote"_attr = remote,
-                "error"_attr = status);
+            LOGV2_DEBUG(22986,
+                        2,
+                        "Session from remote encountered a network error during SourceMessage",
+                        "remote"_attr = remote,
+                        "error"_attr = status);
         } else if (status == TransportLayer::TicketSessionClosedStatus) {
             // Our session may have been closed internally.
             LOGV2_DEBUG(22987,

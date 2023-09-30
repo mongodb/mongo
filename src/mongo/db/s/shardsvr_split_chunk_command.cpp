@@ -146,10 +146,7 @@ public:
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);
         uassertStatusOK(parseShardNameStatus);
 
-        LOGV2(22104,
-              "Received splitChunk request: {request}",
-              "Received splitChunk request",
-              "request"_attr = redact(cmdObj));
+        LOGV2(22104, "Received splitChunk request", "request"_attr = redact(cmdObj));
 
         std::vector<BSONObj> splitKeys;
         {
