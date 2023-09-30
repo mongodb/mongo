@@ -400,9 +400,9 @@ export const runner = (function() {
 
     async function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {
         for (const workload of workloads) {
+            print(`Loading FSM workload: ${workload}`);
             const {$config} = await import(workload);
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
-            print(tojson($config));
             context[workload] = {config: parseConfig($config)};
             if (applyMultipliers) {
                 context[workload].config.iterations *= executionOptions.iterationMultiplier;
