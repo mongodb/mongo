@@ -180,9 +180,12 @@ bool MultiPlanner::fetchOneDocument(plan_ranker::CandidatePlan* candidate) {
     if (!fetchNextDocument(candidate, _maxNumResults)) {
         candidate->root->detachFromTrialRunTracker();
         if (candidate->status.isOK()) {
-            _maxNumReads = std::min(
-                _maxNumReads,
-                candidate->data.tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>());
+            auto numReads =
+                candidate->data.tracker->getMetric<TrialRunTracker::TrialRunMetric::kNumReads>();
+            // In the case of number of read of the plan is 0, we don't want to set _maxNumReads to
+            // 0 for the following plans, because that will effectively disable the max read bound.
+            // Instead we set a hard limit of 1 _maxNumReads here.
+            _maxNumReads = std::max(1ul, std::min(_maxNumReads, numReads));
         }
         return false;
     }
