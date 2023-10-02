@@ -89,6 +89,8 @@ int main(int argc, char** argv) {
     std::string fileNameFilter;
     std::string internalRunDeathTest;
     mongo::unittest::AutoUpdateConfig autoUpdateConfig;
+    autoUpdateConfig.executablePath =
+        boost::filesystem::canonical(boost::filesystem::path(argVec[0]));
 
     // "list", "repeat", and "autoUpdateAsserts" will be assigned with default values, if
     // not present.

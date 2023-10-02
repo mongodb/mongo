@@ -252,6 +252,13 @@ bool handleAutoUpdate(const std::string& expected,
         return false;
     }
 
+    if (boost::filesystem::last_write_time(boost::filesystem::path(fileName)) >
+        boost::filesystem::last_write_time(config.executablePath)) {
+        std::cout << "Source file " << fileName
+                  << " was modified more recently than the executable, won't auto-update.\n";
+        return false;
+    }
+
     // Compute the total number of lines added or removed before the current macro line.
     auto& lineDeltas = gLineDeltaMap.emplace(fileName, LineDeltaVector{}).first->second;
     int64_t totalDelta = 0;

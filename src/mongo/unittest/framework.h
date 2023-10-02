@@ -40,6 +40,8 @@
 
 #pragma once
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>
 #include <cmath>
 #include <fmt/format.h>
@@ -444,6 +446,7 @@ SpawnInfo& getSpawnInfo();
 struct AutoUpdateConfig {
     bool updateFailingAsserts = false;
     bool revalidateAll = false;
+    boost::filesystem::path executablePath;
 };
 
 AutoUpdateConfig& getAutoUpdateConfig();
