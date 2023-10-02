@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
@@ -324,7 +325,7 @@ BSONObj ChunkManagerTargeter::extractBucketsShardKeyFromTimeseriesDoc(
 
     if (auto metaField = timeseriesOptions.getMetaField(); metaField) {
         if (auto metaElement = doc.getField(*metaField); !metaElement.eoo()) {
-            builder.appendAs(metaElement, timeseries::kBucketMetaFieldName);
+            timeseries::metadata::normalize(metaElement, builder, timeseries::kBucketMetaFieldName);
         }
     }
 

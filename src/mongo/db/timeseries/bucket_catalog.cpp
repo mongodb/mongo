@@ -38,6 +38,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/timeseries/metadata.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/platform/compiler.h"
@@ -46,9 +47,6 @@
 
 namespace mongo {
 namespace {
-
-void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj);
-void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj);
 
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
@@ -66,82 +64,6 @@ uint8_t numDigits(uint32_t num) {
         ++numDigits;
     }
     return numDigits;
-}
-
-void normalizeArray(BSONArrayBuilder* builder, const BSONObj& obj) {
-    for (auto& arrayElem : obj) {
-        if (arrayElem.type() == BSONType::Array) {
-            BSONArrayBuilder subArray = builder->subarrayStart();
-            normalizeArray(&subArray, arrayElem.Obj());
-        } else if (arrayElem.type() == BSONType::Object) {
-            BSONObjBuilder subObject = builder->subobjStart();
-            normalizeObject(&subObject, arrayElem.Obj());
-        } else {
-            builder->append(arrayElem);
-        }
-    }
-}
-
-void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
-    // BSONObjIteratorSorted provides an abstraction similar to what this function does. However it
-    // is using a lexical comparison that is slower than just doing a binary comparison of the field
-    // names. That is all we need here as we are looking to create something that is binary
-    // comparable no matter of field order provided by the user.
-
-    // Helper that extracts the necessary data from a BSONElement that we can sort and re-construct
-    // the same BSONElement from.
-    struct Field {
-        BSONElement element() const {
-            return BSONElement(fieldName.rawData() - 1,  // Include type byte before field name
-                               fieldName.size() + 1,     // Include null terminator after field name
-                               totalSize,
-                               BSONElement::CachedSizeTag{});
-        }
-        bool operator<(const Field& rhs) const {
-            return fieldName < rhs.fieldName;
-        }
-        StringData fieldName;
-        int totalSize;
-    };
-
-    // Put all elements in a buffer, sort it and then continue normalize in sorted order
-    auto num = obj.nFields();
-    static constexpr std::size_t kNumStaticFields = 16;
-    boost::container::small_vector<Field, kNumStaticFields> fields;
-    fields.resize(num);
-    BSONObjIterator bsonIt(obj);
-    int i = 0;
-    while (bsonIt.more()) {
-        auto elem = bsonIt.next();
-        fields[i++] = {elem.fieldNameStringData(), elem.size()};
-    }
-    auto it = fields.begin();
-    auto end = fields.end();
-    std::sort(it, end);
-    for (; it != end; ++it) {
-        auto elem = it->element();
-        if (elem.type() == BSONType::Array) {
-            BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
-            normalizeArray(&subArray, elem.Obj());
-        } else if (elem.type() == BSONType::Object) {
-            BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
-            normalizeObject(&subObject, elem.Obj());
-        } else {
-            builder->append(elem);
-        }
-    }
-}
-
-void normalizeTopLevel(BSONObjBuilder* builder, const BSONElement& elem) {
-    if (elem.type() == BSONType::Array) {
-        BSONArrayBuilder subArray(builder->subarrayStart(elem.fieldNameStringData()));
-        normalizeArray(&subArray, elem.Obj());
-    } else if (elem.type() == BSONType::Object) {
-        BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
-        normalizeObject(&subObject, elem.Obj());
-    } else {
-        builder->append(elem);
-    }
 }
 
 OperationId getOpId(OperationContext* opCtx,
@@ -818,7 +740,7 @@ void BucketCatalog::BucketMetadata::normalize() {
             BSONObjBuilder objBuilder;
             // We will get an object of equal size, just with reordered fields.
             objBuilder.bb().reserveBytes(_metadataElement.size());
-            normalizeTopLevel(&objBuilder, _metadataElement);
+            timeseries::metadata::normalize(_metadataElement, objBuilder);
             _metadata = objBuilder.obj();
         }
         // Updates the BSONElement to refer to the copied BSONObj.
