@@ -105,7 +105,7 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
 }
 
 int64_t AggCmdComponents::size() const {
-    // TODO SERVER-76330 we ignore the size of request here because it is owned by the query shape
+    // TODO SERVER-78429 we ignore the size of request here because it is owned by the query shape
     // on the universal components.
     return std::accumulate(involvedNamespaces.begin(),
                            involvedNamespaces.end(),

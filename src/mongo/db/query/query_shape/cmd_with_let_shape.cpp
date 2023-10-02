@@ -100,8 +100,6 @@ boost::intrusive_ptr<ExpressionContext> CmdWithLetShape::makeDummyExpCtx(
     OperationContext* opCtx) const {
     // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
     // to mongot.
-    // TODO SERVER-76330 look into if this could be consolidated between query stats key
-    // generator types and potentially remove one of the makeQueryStatsKey() overrides
     const auto nss = nssOrUUID.isNamespaceString() ? nssOrUUID.nss() : NamespaceString{};
     // TODO collator should maybe be instantiated?
     auto expCtx =

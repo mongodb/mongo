@@ -200,9 +200,6 @@ struct SerializationOptions {
      *   one given. For any number, this will be the number 1. For any boolean this will be true.
      *
      * Example usage: BSON("myArg" << options.serializeLiteral(_myArg));
-     *
-     * TODO SERVER-76330 If you need a different value to make sure it will parse, you should not
-     * use this API - but use serializeConstrainedLiteral() instead.
      */
     Value serializeLiteral(const BSONElement& e) const;
     Value serializeLiteral(const ImplicitValue& v) const;

@@ -44,6 +44,9 @@ selector:
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
   # we expect a second drop to return status OK.
   - jstests/core/**/explain_upsert.js
+  # TODO SERVER-81387 This test is causing problems we'll need to solve separately before
+  # re-enabling it.
+  - jstests/core/views/views_aggregation.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
