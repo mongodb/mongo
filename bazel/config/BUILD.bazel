@@ -20,3 +20,69 @@ config_setting(
         "//bazel/config:compiler_type": "gcc",
     },
 )
+
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "linux_ppc",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc",
+    ],
+)
+
+config_setting(
+    name = "linux_s390x",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:s390x",
+    ],
+)
+
+config_setting(
+    name = "windows_x86_64",
+    constraint_values = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "opt",
+    values = {"compilation_mode": "opt"},
+)
+
+config_setting(
+    name = "dbg",
+    values = {"compilation_mode": "dbg"},
+)
+
+config_setting(
+    name = "linux_dbg",
+    values = {"compilation_mode": "dbg"},
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "windows_dbg",
+    values = {"compilation_mode": "dbg"},
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)

@@ -1,0 +1,132 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# Used to restrict compilation flags to only be added when compiling with gcc on windows.
+config_setting(
+    name = "gcc_windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//bazel/config:compiler_type": "gcc",
+    },
+)
+
+# TODO(SERVER-80603): conditionally inject libunwind.
+
+GPERFTOOLS_COPTS = ["-Isrc/third_party/gperftools/dist/src"] + select({
+    "@//bazel/config:linux_aarch64": [
+        "-Isrc/third_party/gperftools/platform/linux_aarch64/internal/src",
+    ],
+    "@//bazel/config:linux_x86_64": [
+        "-Isrc/third_party/gperftools/platform/linux_x86_64/internal/src",
+    ],
+    "@//bazel/config:linux_ppc": [
+        "-Isrc/third_party/gperftools/platform/linux_ppc64le/internal/src",
+    ],
+    "@//bazel/config:linux_s390x": [
+        "-Isrc/third_party/gperftools/platform/linux_s390x/internal/src",
+    ],
+    "@//bazel/config:windows_x86_64": [
+        "-Isrc/third_party/gperftools/platform/windows_x86_64/internal/src",
+    ],
+}) + select({
+    "@platforms//os:windows": [
+        "/wd4141",
+        "/wd4305",
+        "/wd4003",
+    ],
+    "//conditions:default": ["-Wno-unused-result"]
+}) + select({
+    ":gcc_windows": ["-Wno-attribute-alias"],
+    "//conditions:default": []
+})
+
+GPERFTOOLS_LOCAL_DEFINES=[
+    "NO_HEAP_CHECK",
+] + select({
+    "@//bazel/config:dbg": [],
+    "//conditions:default": [
+        # For debug builds we want to capture stacks during (de)allocations,
+        # but we don't want to pay that cost for release builds.
+        "NO_TCMALLOC_SAMPLES",
+    ]
+}) + select({
+    "@platforms//cpu:x86_64": [],
+    "//conditions:default": [
+        # For debug builds we enable stack capture, but only on
+        # intel targets, since tcmalloc's unwinder is very slow on other
+        # platforms (see SERVER-28502).
+        "NO_TCMALLOC_SAMPLES"
+    ]
+}) + select({
+    # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
+    "@platforms//cpu:ppc": ["__linux"],
+    "//conditions:default": []
+}) + select({
+    "@//bazel/config:dbg": [],
+    "//conditions:default": ["NDEBUG"]
+})
+
+# Compile C files as a separate target so clang++/g++ can be configured to treat
+# them as C source code.
+mongo_cc_library(
+    name = "tcmalloc_minimal_c",
+    hdrs = glob(["**/*.h"]),
+    srcs = [
+        "dist/src/base/dynamic_annotations.c",
+    ],
+    copts = GPERFTOOLS_COPTS + [
+        "-x c",
+        "-std=c17"
+    ],
+    local_defines = GPERFTOOLS_LOCAL_DEFINES,
+)
+
+mongo_cc_library(
+    name = "tcmalloc_minimal",
+    hdrs = glob(["**/*.h"]),
+    deps = [":tcmalloc_minimal_c"],
+    srcs = [
+        "dist/src/base/elf_mem_image.cc",
+        "dist/src/base/logging.cc",
+        "dist/src/base/spinlock.cc",
+        "dist/src/base/spinlock_internal.cc",
+        "dist/src/base/sysinfo.cc",
+        "dist/src/base/vdso_support.cc",
+        "dist/src/central_freelist.cc",
+        "dist/src/common.cc",
+        "dist/src/internal_logging.cc",
+        "dist/src/malloc_extension.cc",
+        "dist/src/malloc_hook.cc",
+        "dist/src/memfs_malloc.cc",
+        "dist/src/page_heap.cc",
+        "dist/src/sampler.cc",
+        "dist/src/span.cc",
+        "dist/src/stack_trace_table.cc",
+        "dist/src/stacktrace.cc",
+        "dist/src/static_vars.cc",
+        "dist/src/symbolize.cc",
+        "dist/src/thread_cache.cc",
+    ] + select({
+        "@platforms//os:windows": [
+            "dist/src/tcmalloc.cc",
+            "dist/src/windows/port.cc",
+            "dist/src/windows/system-alloc.cc",
+            "dist/src/fake_stacktrace_scope.cc",
+        ],
+        "//conditions:default": [
+            "dist/src/emergency_malloc_for_stacktrace.cc",
+            "dist/src/maybe_threads.cc",
+            "dist/src/system-alloc.cc",
+        ],
+    }) + select({
+        "@//bazel/config:dbg": ["dist/src/debugallocation.cc"],
+        "//conditions:default": ["dist/src/tcmalloc.cc"],
+    }),
+    copts = GPERFTOOLS_COPTS,
+    local_defines = GPERFTOOLS_LOCAL_DEFINES,
+)
+
+# TODO(SERVER-80619): conditionally inject gperftools/platform/$os_$arch/include to dependents.
