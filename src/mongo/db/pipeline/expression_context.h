@@ -344,6 +344,15 @@ public:
     }
 
     /**
+     * Returns true if the tailableMode indicates a tailable
+     * query.
+     */
+    bool isTailable() const {
+        return tailableMode == TailableModeEnum::kTailableAndAwaitData ||
+            tailableMode == TailableModeEnum::kTailable;
+    }
+
+    /**
      * Convenience call that returns true if the tailableMode indicates a tailable and awaitData
      * query.
      */
