@@ -57,6 +57,14 @@ Maxterm::Maxterm(std::initializer_list<Minterm> init)
     }
 }
 
+bool Maxterm::isAlwaysTrue() const {
+    return minterms.size() == 1 && minterms.front().isAlwaysTrue();
+}
+
+bool Maxterm::isAlwaysFalse() const {
+    return minterms.empty();
+}
+
 std::string Maxterm::toString() const {
     std::ostringstream oss{};
     oss << *this;
@@ -82,18 +90,23 @@ Maxterm Maxterm::operator~() const {
 }
 
 void Maxterm::removeRedundancies() {
-    stdx::unordered_set<Minterm> seen{};
+    std::sort(minterms.begin(), minterms.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.mask.count() < rhs.mask.count();
+    });
+
     std::vector<Minterm> newMinterms{};
-    for (const auto& minterm : minterms) {
-        const bool isAlwaysTrue = minterm.mask.none();
-        if (isAlwaysTrue) {
-            newMinterms.clear();
-            newMinterms.emplace_back(minterm);
-            break;
+    newMinterms.reserve(minterms.size());
+
+    for (auto&& minterm : minterms) {
+        bool absorbed = false;
+        for (const auto& seenMinterm : newMinterms) {
+            if (seenMinterm.canAbsorb(minterm)) {
+                absorbed = true;
+                break;
+            }
         }
-        auto [it, isInserted] = seen.insert(minterm);
-        if (isInserted) {
-            newMinterms.push_back(minterm);
+        if (!absorbed) {
+            newMinterms.emplace_back(std::move(minterm));
         }
     }
 
@@ -106,6 +119,52 @@ void Maxterm::append(size_t bitIndex, bool val) {
 
 void Maxterm::appendEmpty() {
     minterms.emplace_back(_numberOfBits);
+}
+
+std::pair<Minterm, Maxterm> extractCommonPredicates(Maxterm maxterm) {
+    if (maxterm.minterms.empty()) {
+        return {Minterm{maxterm.numberOfBits()}, std::move(maxterm)};
+    }
+
+    Bitset commonTruePredicates{maxterm.numberOfBits()};
+    commonTruePredicates.set();
+
+    Bitset commonFalsePredicates{maxterm.numberOfBits()};
+    commonFalsePredicates.set();
+
+    for (const auto& minterm : maxterm.minterms) {
+        commonTruePredicates &= minterm.predicates;
+        commonFalsePredicates &= (minterm.mask ^ minterm.predicates);
+    }
+
+    bool isMaxtermAlwaysTrue = false;
+
+    // Remove common true predicates from the maxterm.
+    if (commonTruePredicates.any()) {
+        for (auto& minterm : maxterm.minterms) {
+            auto setCommon = minterm.predicates & commonTruePredicates;
+            minterm.predicates -= setCommon;
+            minterm.mask -= setCommon;
+            isMaxtermAlwaysTrue = isMaxtermAlwaysTrue | minterm.mask.none();
+        }
+    }
+
+    // Remove common false predicates from the maxterm.
+    if (commonFalsePredicates.any()) {
+        for (auto& minterm : maxterm.minterms) {
+            auto setCommon = (minterm.mask ^ minterm.predicates) & commonFalsePredicates;
+            minterm.mask -= setCommon;
+            isMaxtermAlwaysTrue = isMaxtermAlwaysTrue | minterm.mask.none();
+        }
+    }
+
+    if (isMaxtermAlwaysTrue) {
+        maxterm.minterms.clear();
+        maxterm.appendEmpty();
+    }
+
+    Minterm commonPredicates{commonTruePredicates, commonTruePredicates | commonFalsePredicates};
+    return {std::move(commonPredicates), std::move(maxterm)};
 }
 
 Maxterm Minterm::operator~() const {

@@ -96,10 +96,9 @@ private:
 }  // namespace
 
 std::unique_ptr<MatchExpression> restoreMatchExpression(
-    const boolean_simplification::Maxterm& maxterm,
+    const boolean_simplification::BitsetTreeNode& bitsetTree,
     const std::vector<ExpressionBitInfo>& expressions) {
-    BitsetTreeNode root = boolean_simplification::convertToBitsetTree(maxterm);
-    MatchExpressionRestorer restorer(root, expressions);
+    MatchExpressionRestorer restorer(bitsetTree, expressions);
     return restorer.restore();
 }
 }  // namespace mongo

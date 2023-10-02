@@ -42,7 +42,7 @@ namespace mongo::boolean_simplification {
  * MQL operators are represented as:
  * - $and => BitsetTreeNode{type: And, isNegated: false}, children are not negated
  * - $or => BitsetTreeNode{type: Or, isNegated: false}, children are not negated
- * - $nor => BitsetTreeNode{type: And, isNegated: false}, children are negated
+ * - $nor => BitsetTreeNode{type: Or, isNegated: true}, children are not negated
  * - $not => child is negated
  */
 struct BitsetTreeNode {
@@ -76,6 +76,17 @@ struct BitsetTreeNode {
     std::vector<BitsetTreeNode> internalChildren{};
 
     bool operator==(const BitsetTreeNode&) const = default;
+
+    /**
+     * Return total number of the terms.
+     */
+    size_t calculateNumberOfTerms() const {
+        size_t result = 1;
+        for (const auto& child : internalChildren) {
+            result += child.calculateNumberOfTerms();
+        }
+        return result;
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, const BitsetTreeNode& tree);

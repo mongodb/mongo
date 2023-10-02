@@ -91,10 +91,13 @@ struct Context {
         AlwaysFalse
     };
 
+    explicit Context(size_t maximumNumberOfUniquePredicates)
+        : _maximumNumberOfUniquePredicates{maximumNumberOfUniquePredicates} {}
+
     /**
      * Stores the given MatchExpression and assign a bit index to it. Returns the bit index.
      */
-    size_t getBitIndex(const MatchExpression* expr) {
+    size_t getOrAssignBitIndex(const MatchExpression* expr) {
         auto it = _map.find(expr);
         if (it != _map.end()) {
             return it->second;
@@ -103,11 +106,16 @@ struct Context {
         const size_t bitIndex = expressions.size();
         expressions.emplace_back(expr->clone());
         _map[expressions.back().expression.get()] = bitIndex;
+
         return bitIndex;
     }
 
     size_t getMaxtermSize() const {
         return expressions.size();
+    }
+
+    bool isMaximumNumberOfUniquePredicatesExceeded() const {
+        return _maximumNumberOfUniquePredicates < expressions.size();
     }
 
     std::vector<ExpressionBitInfo> expressions;
@@ -116,6 +124,8 @@ struct Context {
 
 private:
     ExpressionMap _map;
+
+    size_t _maximumNumberOfUniquePredicates;
 };
 
 /**
@@ -131,7 +141,7 @@ public:
     void visit(const AndMatchExpression* expr) final {
         BitsetTreeNode node{BitsetTreeNode::And, _isNegated};
 
-        BitsetVisitor visitor{_context, node, false};
+        BitsetVisitor visitor{_context, node, /* isNegated */ false};
 
         for (size_t childIndex = 0; childIndex < expr->numChildren(); ++childIndex) {
             expr->getChild(childIndex)->acceptVisitor(&visitor);
@@ -143,6 +153,10 @@ public:
                 case Context::AlwaysTrue:
                     _context.bitConflict = Context::None;
                     break;
+            }
+
+            if (MONGO_unlikely(_context.isMaximumNumberOfUniquePredicatesExceeded())) {
+                return;
             }
         }
 
@@ -152,7 +166,7 @@ public:
     void visit(const OrMatchExpression* expr) final {
         BitsetTreeNode node{BitsetTreeNode::Or, _isNegated};
 
-        BitsetVisitor visitor{_context, node, false};
+        BitsetVisitor visitor{_context, node, /* isNegated */ false};
 
         for (size_t childIndex = 0; childIndex < expr->numChildren(); ++childIndex) {
             expr->getChild(childIndex)->acceptVisitor(&visitor);
@@ -165,6 +179,10 @@ public:
                 case Context::AlwaysTrue:
                     return;
             }
+
+            if (MONGO_unlikely(_context.isMaximumNumberOfUniquePredicatesExceeded())) {
+                return;
+            }
         }
 
         _parent.internalChildren.emplace_back(std::move(node));
@@ -172,9 +190,9 @@ public:
 
     void visit(const NorMatchExpression* expr) final {
         // NOR == NOT * OR == AND * NOT
-        BitsetTreeNode node{BitsetTreeNode::And, _isNegated};
+        BitsetTreeNode node{BitsetTreeNode::Or, !_isNegated};
 
-        BitsetVisitor visitor{_context, node, true};
+        BitsetVisitor visitor{_context, node, /* isNegated */ false};
 
         for (size_t childIndex = 0; childIndex < expr->numChildren(); ++childIndex) {
             expr->getChild(childIndex)->acceptVisitor(&visitor);
@@ -186,6 +204,10 @@ public:
                 case Context::AlwaysTrue:
                     _context.bitConflict = Context::None;
                     break;
+            }
+
+            if (MONGO_unlikely(_context.isMaximumNumberOfUniquePredicatesExceeded())) {
+                return;
             }
         }
 
@@ -376,7 +398,7 @@ private:
      * Returns the expressions's bit index if no conflicts happen.
      */
     boost::optional<size_t> visitLeafNode(const MatchExpression* expr) {
-        const size_t bitIndex = _context.getBitIndex(expr);
+        const size_t bitIndex = _context.getOrAssignBitIndex(expr);
         // Process bit conflicts. See comments for BitConlict type for details.
         const bool hasConflict = _parent.leafChildren.size() > bitIndex &&
             _parent.leafChildren.mask[bitIndex] &&
@@ -397,31 +419,36 @@ private:
 };
 }  // namespace
 
-std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>
-transformToBitsetTree(const MatchExpression* root) {
-    Context context{};
+boost::optional<std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>>
+transformToBitsetTree(const MatchExpression* root, size_t maximumNumberOfUniquePredicates) {
+    Context context{maximumNumberOfUniquePredicates};
 
     BitsetTreeNode bitsetRoot{BitsetTreeNode::And, false};
     BitsetVisitor visitor{context, bitsetRoot, false};
     root->acceptVisitor(&visitor);
+
+    if (MONGO_unlikely(context.isMaximumNumberOfUniquePredicatesExceeded())) {
+        return boost::none;
+    }
+
     bitsetRoot.ensureBitsetSize(context.getMaxtermSize());
     switch (context.bitConflict) {
         case Context::None:
             break;
         case Context::AlwaysFalse:
             // Empty OR is always false.
-            return {BitsetTreeNode{BitsetTreeNode::Or, false}, std::move(context.expressions)};
+            return {{BitsetTreeNode{BitsetTreeNode::Or, false}, std::move(context.expressions)}};
         case Context::AlwaysTrue:
             // Empty AND is always true.
-            return {BitsetTreeNode{BitsetTreeNode::And, false}, std::move(context.expressions)};
+            return {{BitsetTreeNode{BitsetTreeNode::And, false}, std::move(context.expressions)}};
     }
 
-    // If we have just one child return it to avoid unnecessary $and or $ $or nodes with only one
+    // If we have just one child return it to avoid unnecessary $and or $or nodes with only one
     // child.
     if (bitsetRoot.leafChildren.mask.count() == 0 && bitsetRoot.internalChildren.size() == 1) {
-        return {std::move(bitsetRoot.internalChildren[0]), std::move(context.expressions)};
+        return {{std::move(bitsetRoot.internalChildren[0]), std::move(context.expressions)}};
     }
 
-    return {std::move(bitsetRoot), std::move(context.expressions)};
+    return {{std::move(bitsetRoot), std::move(context.expressions)}};
 }
 }  // namespace mongo

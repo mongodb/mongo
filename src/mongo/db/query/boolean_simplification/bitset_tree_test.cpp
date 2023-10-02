@@ -98,7 +98,7 @@ TEST(ConvertToBitsetTreeTests, OrExpression) {
 
 TEST(ConvertToBitsetTreeTests, NorExpression) {
     Maxterm maxterm{{
-        Minterm{"000", "001"},
+        Minterm{"100", "101"},
         Minterm{"000", "011"},
         Minterm{"000", "101"},
         Minterm{"010", "011"},
@@ -111,8 +111,10 @@ TEST(ConvertToBitsetTreeTests, NorExpression) {
         orOperand.leafChildren = makeBitsetTerm(minterm);
         expectedTree.internalChildren.emplace_back(std::move(orOperand));
     }
+    expectedTree.ensureBitsetSize(3);
 
     auto tree = convertToBitsetTree(maxterm);
+    tree.ensureBitsetSize(3);
     ASSERT_EQ(expectedTree, tree);
 }
 

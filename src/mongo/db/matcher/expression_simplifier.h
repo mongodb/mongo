@@ -32,11 +32,46 @@
 #include "mongo/db/matcher/expression_bitset_tree_converter.h"
 
 namespace mongo {
+/**
+ * Settings to control simplification of boolean expressions.
+ */
+struct ExpressionSimlifierSettings {
+    /**
+     * Predefined settings without restrictions on boolean expression simplification. Useful
+     * for tests and benchmarks.
+     */
+    static const ExpressionSimlifierSettings kPermissive;
+
+    /**
+     * If the number of unique predicates in an expression is larger than
+     * 'maximumNumberOfUniquePredicates' the expression is considered too big to be simplified.
+     */
+    size_t maximumNumberOfUniquePredicates;
+
+    /**
+     * If a simplified expression contains more conjunctive terms then the number of conjunctive
+     * terms in the original expression times 'maxNumberOfTermsFactor', the simplified expression is
+     * rejected.
+     */
+    double maxNumberOfTermsFactor;
+
+    /**
+     * If the original expression contains AND operator it is still simplified but the common
+     * predicate of the simplified conjunctive terms are taken out of brackets.
+     */
+    bool doNotOpenContainedOrs;
+
+    /**
+     * If the parameter is false we only convert the input expression into DNF form without applying
+     * the Quine–McCluskey algorithm.
+     */
+    bool applyQuineMcCluskey;
+};
 
 /**
- * The function takes the root node of a match expression and converts it into a Disjunctive Normal
- * Form (DNF) represented using bitsets.
+ * Returns simplified MatchExpression if it is possible under conditions specified in the second
+ * parameter 'settings'.
  */
-std::pair<boolean_simplification::Maxterm, std::vector<ExpressionBitInfo>> transformToDNF(
-    const MatchExpression* root);
+boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
+    const MatchExpression* root, const ExpressionSimlifierSettings& settings);
 }  // namespace mongo

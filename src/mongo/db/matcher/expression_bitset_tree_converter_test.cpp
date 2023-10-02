@@ -41,6 +41,13 @@ using mongo::boolean_simplification::makeBitsetTerm;
 using mongo::boolean_simplification::Minterm;
 
 namespace {
+std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>
+transformToBitsetTree(const MatchExpression* root) {
+    auto result = transformToBitsetTree(root, std::numeric_limits<size_t>::max());
+    ASSERT_TRUE(result.has_value());
+    return std::move(*result);
+}
+
 inline void assertExprInfo(const std::vector<ExpressionBitInfo>& expected,
                            const std::vector<ExpressionBitInfo>& actual) {
     ASSERT_EQ(expected.size(), actual.size());
@@ -187,15 +194,15 @@ TEST(BitsetTreeConverterTests, NorExpression) {
         expr->add(std::move(andExpr));
     }
 
-    BitsetTreeNode expectedTree{BitsetTreeNode::And, false};
+    BitsetTreeNode expectedTree{BitsetTreeNode::Or, true};
     expectedTree.leafChildren = makeBitsetTerm("000", "000");
     {
-        BitsetTreeNode orOperand{BitsetTreeNode::And, true};
+        BitsetTreeNode orOperand{BitsetTreeNode::And, false};
         orOperand.leafChildren = makeBitsetTerm("001", "011");
         expectedTree.internalChildren.emplace_back(std::move(orOperand));
     }
     {
-        BitsetTreeNode orOperand{BitsetTreeNode::And, true};
+        BitsetTreeNode orOperand{BitsetTreeNode::And, false};
         orOperand.leafChildren = makeBitsetTerm("111", "111");
         expectedTree.internalChildren.emplace_back(std::move(orOperand));
     }
@@ -255,5 +262,33 @@ TEST(BitsetTreeConverterTests, TwoElemMatches) {
     const auto& [tree, expressions] = transformToBitsetTree(expr.get());
     ASSERT_EQ(expectedTree, tree);
     assertExprInfo(expectedExpressions, expressions);
+}
+
+TEST(BitsetTreeConverterTests, TooManyPredicates) {
+    auto firstOperand = BSON("$gt" << 5);
+    auto secondOperand = BSON("$eq" << 10);
+    auto thirdOperand = BSON("$lt" << 10);
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
+    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
+    auto ltExpr = std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"]);
+
+
+    auto expr = std::make_unique<OrMatchExpression>();
+    {
+        auto andExpr = std::make_unique<AndMatchExpression>();
+        andExpr->add(gtExpr->clone());
+        andExpr->add(std::make_unique<NotMatchExpression>(eqExpr->clone()));
+        expr->add(std::move(andExpr));
+    }
+    {
+        auto andExpr = std::make_unique<AndMatchExpression>();
+        andExpr->add(gtExpr->clone());
+        andExpr->add(eqExpr->clone());
+        andExpr->add(ltExpr->clone());
+        expr->add(std::move(andExpr));
+    }
+
+    const auto result = transformToBitsetTree(expr.get(), 2);
+    ASSERT_FALSE(result.has_value());
 }
 }  // namespace mongo

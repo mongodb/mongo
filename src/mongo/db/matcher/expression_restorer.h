@@ -35,10 +35,11 @@
 
 namespace mongo {
 /**
- * Restore MatchExpression tree from a maxterm and a list of expressions representing bits in the
- * maxterm: i-th expression in the expressions lists represents i-th bit in the maxterm.
+ * Restore MatchExpression tree from a bitset tree and a list of expressions representing bits in
+ * the the bitset tree: i-th expression in the expressions lists represents i-th bit in the bitset
+ * tree.
  */
 std::unique_ptr<MatchExpression> restoreMatchExpression(
-    const boolean_simplification::Maxterm& maxterm,
+    const boolean_simplification::BitsetTreeNode& bitsetTree,
     const std::vector<ExpressionBitInfo>& expressions);
 }  // namespace mongo

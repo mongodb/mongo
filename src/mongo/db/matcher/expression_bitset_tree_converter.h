@@ -47,8 +47,9 @@ struct ExpressionBitInfo {
  * Transform the given MatchExpression tree into a Bitset tree. Returns the bitset tree and a
  * vector of ExpressionBitInfo representing bits in the bitset tree. Every bitset in the BitsetTree
  * has the same number of bits and the size of the vector equals to the number of bits of the
- * bitsets.
+ * bitsets. If the MatchExpression tree contains more than 'maximumNumberOfUniquePredicates' unique
+ * predicates the function ends earlier and returns 'none'.
  */
-std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>
-transformToBitsetTree(const MatchExpression* root);
+boost::optional<std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>>
+transformToBitsetTree(const MatchExpression* root, size_t maximumNumberOfUniquePredicates);
 }  // namespace mongo

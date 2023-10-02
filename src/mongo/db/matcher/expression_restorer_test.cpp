@@ -47,6 +47,13 @@ inline void ASSERT_EXPR(const MatchExpression& expected,
     ASSERT_TRUE(expected.equivalent(actual.get()))
         << expected.debugString() << " != " << actual->debugString();
 }
+
+std::unique_ptr<MatchExpression> restoreMatchExpression(
+    const boolean_simplification::Maxterm& maxterm,
+    const std::vector<ExpressionBitInfo>& expressions) {
+    BitsetTreeNode root = boolean_simplification::convertToBitsetTree(maxterm);
+    return restoreMatchExpression(root, expressions);
+}
 }  // namespace
 
 TEST(RestoreSingleMatchExpressionTests, AlwaysTrue) {

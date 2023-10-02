@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/boolean_simplification/bitset_tree.h"
 
+#include "mongo/util/assert_util.h"
 #include "mongo/util/stream_utils.h"
 
 namespace mongo::boolean_simplification {
@@ -117,7 +118,12 @@ BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
     } else {
         BitsetTreeNode node{BitsetTreeNode::Or, false};
         for (const auto& minterm : maxterm.minterms) {
-            node.internalChildren.emplace_back(restoreBitsetTree(minterm));
+            if (minterm.mask.count() == 1) {
+                const size_t bitIndex = minterm.mask.find_first();
+                node.leafChildren.set(bitIndex, minterm.predicates[bitIndex]);
+            } else {
+                node.internalChildren.emplace_back(restoreBitsetTree(minterm));
+            }
         }
         return node;
     }

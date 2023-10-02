@@ -116,10 +116,13 @@ struct Maxterm {
     Maxterm& operator&=(const Maxterm& rhs);
     Maxterm operator~() const;
 
+    bool isAlwaysTrue() const;
+
+    bool isAlwaysFalse() const;
+
     /**
-     * Removes redundant minterms from the maxterm. A minterm might be redundant if it is a
-     * duplicate of another or the maxterm contains an empty minterm which means that it is always
-     * true and any other minters are not needed.
+     * Removes redundant minterms from the maxterm. A minterm might be redundant if it can be
+     * absorbed by another term. For example, 'a' absorbs 'a & b'. See Absorption law for details.
      */
     void removeRedundancies();
 
@@ -151,10 +154,17 @@ private:
 };
 
 /**
+ * Identify and extract common predicates from the given booleean expression in DNF. Returns the
+ * pair of the extracted predicates and the expression without predicates. If there is no common
+ * predicates the first element of the pair will be empty minterm.
+ */
+std::pair<Minterm, Maxterm> extractCommonPredicates(Maxterm maxterm);
+
+/**
  * Minterms represent a conjunction of an expression in Disjunctive Normal Form and consists of
- * predicates which can be in true (for a predicate A, true form is just A) of false forms (for a
- * predicate A the false form is the negation of A: ~A). Every predicate is represented by a bit in
- * the predicates bitset.
+ * predicates which can be in true (for a predicate A, true form is just A) of false forms (for
+ * a predicate A the false form is the negation of A: ~A). Every predicate is represented by a
+ * bit in the predicates bitset.
  */
 struct Minterm : private BitsetTerm {
     using BitsetTerm::BitsetTerm;
@@ -177,6 +187,18 @@ struct Minterm : private BitsetTerm {
     }
 
     Maxterm operator~() const;
+
+    /**
+     * Returns true if the current minterm can absorb the other minterm. For example, 'a' absorbs 'a
+     * & b'. See Absorption law for details.
+     */
+    bool canAbsorb(const Minterm& other) const {
+        return mask.is_subset_of(other.mask) && predicates == (mask & other.predicates);
+    }
+
+    bool isAlwaysTrue() const {
+        return mask.none();
+    }
 };
 
 inline Maxterm operator&(const Minterm& lhs, const Minterm& rhs) {
