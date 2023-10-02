@@ -16,16 +16,6 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const [secondary, _] = rst.getSecondaries();
-const collModIndexUniqueEnabled =
-    assert.commandWorked(primary.adminCommand({getParameter: 1, featureFlagCollModIndexUnique: 1}))
-        .featureFlagCollModIndexUnique.value;
-
-if (!collModIndexUniqueEnabled) {
-    jsTestLog('Skipping test because the collMod unique index feature flag is disabled');
-    rst.stopSet();
-    quit();
-}
-
 const collName = 'collmod_disallow_duplicates_step_up';
 const db_primary = primary.getDB('test');
 const coll_primary = db_primary.getCollection(collName);

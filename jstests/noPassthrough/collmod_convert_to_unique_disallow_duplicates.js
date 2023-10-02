@@ -21,16 +21,6 @@ rst.startSet();
 rst.initiate();
 
 const primary = rst.getPrimary();
-const collModIndexUniqueEnabled =
-    assert.commandWorked(primary.adminCommand({getParameter: 1, featureFlagCollModIndexUnique: 1}))
-        .featureFlagCollModIndexUnique.value;
-
-if (!collModIndexUniqueEnabled) {
-    jsTestLog('Skipping test because the collMod unique index feature flag is disabled');
-    rst.stopSet();
-    quit();
-}
-
 let collCount = 0;
 const collPrefix = 'collmod_convert_to_unique_disallow_duplicates_';
 
