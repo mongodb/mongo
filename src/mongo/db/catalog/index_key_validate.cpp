@@ -903,17 +903,17 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
                               << "' option cannot be less than 0"};
     }
 
-    const std::string tooLargeErr = str::stream()
-        << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
-        << "' option must be within an acceptable range, try a lower number";
-
     if (mode == ValidateExpireAfterSecondsMode::kSecondaryTTLIndex) {
         // Relax epoch restriction on TTL indexes. This allows us to export and import existing
         // TTL indexes with large values or NaN for the 'expireAfterSeconds' field.
         // Additionally, the 'expireAfterSeconds' for TTL indexes is defined as safeInt (int32_t)
         // in the IDL for listIndexes and collMod. See list_indexes.idl and coll_mod.idl.
         if (expireAfterSeconds > std::numeric_limits<std::int32_t>::max()) {
-            return {ErrorCodes::InvalidOptions, tooLargeErr};
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                                  << "' option cannot be greater than max int32_t ("
+                                  << std::numeric_limits<std::int32_t>::max()
+                                  << ") for secondary indexes, found " << expireAfterSeconds};
         }
     } else {
         // Clustered collections with TTL.
@@ -926,11 +926,19 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
         // of time series collections, we cluster the collection by an OID value, where the
         // timestamp portion is only a 32-bit unsigned integer offset of seconds since the epoch.
         if (expireAfterSeconds > std::numeric_limits<std::int64_t>::max() / 1000) {
-            return {ErrorCodes::InvalidOptions, tooLargeErr};
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                                  << "' option cannot overflow int64_t when cast as milliseconds, "
+                                  << "found " << expireAfterSeconds};
         }
         auto expireAfterMillis = duration_cast<Milliseconds>(Seconds(expireAfterSeconds));
         if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
-            return {ErrorCodes::InvalidOptions, tooLargeErr};
+            return {ErrorCodes::InvalidOptions,
+                    str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                                  << "' option cannot exceed time since last epoch ("
+                                  << duration_cast<Seconds>(
+                                         Milliseconds(Date_t::now().toDurationSinceEpoch()))
+                                  << ") for time-series collections, found " << expireAfterSeconds};
         }
     }
     return Status::OK();
