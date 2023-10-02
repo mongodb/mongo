@@ -32,6 +32,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/util/fail_point',
+        'timeseries_metadata',
         'timeseries_options',
     ],
 )
@@ -126,6 +127,16 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         'timeseries_options',
+    ],
+)
+
+env.Library(
+    target='timeseries_metadata',
+    source=[
+        'metadata.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
