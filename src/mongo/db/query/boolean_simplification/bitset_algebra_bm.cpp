@@ -66,7 +66,7 @@ void bitsetAlgebra_createOrMaxterm(benchmark::State& state) {
  */
 void bitsetAlgebra_createMaxterm(benchmark::State& state) {
     const size_t size = static_cast<size_t>(state.range());
-    const size_t numPredicates = 1u << size;
+    const size_t numPredicates = static_cast<size_t>(1) << size;
 
     for (auto _ : state) {
         Maxterm maxterm{numPredicates};
