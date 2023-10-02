@@ -445,4 +445,8 @@ const Metadata& OptPhaseManager::getMetadata() const {
     return _metadata;
 }
 
+const RIDProjectionsMap& OptPhaseManager::getRIDProjections() const {
+    return _ridProjections;
+}
+
 }  // namespace mongo::optimizer

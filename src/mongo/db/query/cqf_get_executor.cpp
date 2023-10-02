@@ -357,6 +357,7 @@ QueryHints getHintsFromQueryKnobs() {
         internalCascadesOptimizerDisableYieldingTolerantPlans.load();
     hints._minIndexEqPrefixes = internalCascadesOptimizerMinIndexEqPrefixes.load();
     hints._maxIndexEqPrefixes = internalCascadesOptimizerMaxIndexEqPrefixes.load();
+    hints._numSamplingChunks = internalCascadesOptimizerSampleChunks.load();
 
     return hints;
 }
@@ -742,23 +743,26 @@ static OptPhaseManager createPhaseManager(const CEMode mode,
                 entry.second.shardingMetadata().setMayContainOrphans(false);
             }
 
+
             // For sampling estimator, we do not run constant folding, path fusion and exploration
             // phases.
             OptPhaseManager::PhaseSet rewritesSetForSampling{OptPhase::MemoSubstitutionPhase,
                                                              OptPhase::MemoImplementationPhase,
                                                              OptPhase::PathLower,
                                                              OptPhase::ConstEvalPost_ForSampling};
-            OptPhaseManager phaseManagerForSampling{std::move(rewritesSetForSampling),
-                                                    prefixId,
-                                                    false /*requireRID*/,
-                                                    std::move(metadataForSampling),
-                                                    std::make_unique<HeuristicEstimator>(),
-                                                    std::make_unique<HeuristicEstimator>(),
-                                                    std::make_unique<CostEstimatorImpl>(costModel),
-                                                    defaultConvertPathToInterval,
-                                                    constFold,
-                                                    DebugInfo::kDefaultForProd,
-                                                    {} /*hints*/};
+            OptPhaseManager phaseManagerForSampling{
+                std::move(rewritesSetForSampling),
+                prefixId,
+                false /*requireRID*/,
+                std::move(metadataForSampling),
+                std::make_unique<HeuristicEstimator>(),
+                std::make_unique<HeuristicEstimator>(),
+                std::make_unique<CostEstimatorImpl>(costModel),
+                defaultConvertPathToInterval,
+                constFold,
+                DebugInfo::kDefaultForProd,
+                {._numSamplingChunks = hints._numSamplingChunks} /*hints*/};
+
             return {OptPhaseManager::getAllRewritesSet(),
                     prefixId,
                     requireRID,

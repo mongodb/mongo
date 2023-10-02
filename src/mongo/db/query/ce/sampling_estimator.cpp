@@ -150,6 +150,84 @@ private:
     const OptPhaseManager& _phaseManager;
 };
 
+class SamplingChunksTransport {
+
+public:
+    SamplingChunksTransport(NodeToGroupPropsMap& propsMap, const OptPhaseManager& phaseManager)
+        : _propsMap(propsMap), _phaseManager(phaseManager) {}
+
+    void transport(ABT& n, const LimitSkipNode& limit, ABT& child) {
+        if (limit.getProperty().getSkip() != 0) {
+            return;
+        }
+        const PhysicalScanNode& physicalScan = *child.cast<PhysicalScanNode>();
+        const auto& ridProj = _phaseManager.getRIDProjections().at(physicalScan.getScanDefName());
+
+        ABT newPhysicalScan =
+            make<PhysicalScanNode>(FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
+                                   physicalScan.getScanDefName(),
+                                   physicalScan.useParallelScan());
+
+        NodeProps props = _propsMap.at(&physicalScan);
+        properties::getProperty<properties::ProjectionRequirement>(props._physicalProps)
+            .getProjections() = ProjectionNameVector{ridProj};
+        _propsMap.emplace(newPhysicalScan.cast<Node>(), props);
+
+        ABT seekNode = make<SeekNode>(
+            ridProj, physicalScan.getFieldProjectionMap(), physicalScan.getScanDefName());
+        _propsMap.emplace(seekNode.cast<Node>(), props);
+
+        const int32_t limitSize = limit.getProperty().getLimit();
+        const int32_t numChunks = std::min(_phaseManager.getHints()._numSamplingChunks, limitSize);
+        const int32_t chunkSize = limitSize / numChunks;
+
+        ABT outerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(numChunks, 0),
+                                            std::move(newPhysicalScan));
+        ABT innerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(chunkSize, 0),
+                                            std::move(seekNode));
+
+        const NodeProps& limitProps = _propsMap.at(n.cast<Node>());
+        NodeProps sharedProps = NodeProps{limitProps._planNodeId,
+                                          limitProps._groupId,
+                                          limitProps._logicalProps,
+                                          limitProps._physicalProps,
+                                          boost::none /*ridProjName*/,
+                                          CostType::fromDouble(0),
+                                          CostType::fromDouble(0),
+                                          true /*adjustedCE*/};
+
+        NodeProps outerLimitProps = sharedProps;
+        properties::getProperty<properties::ProjectionRequirement>(outerLimitProps._physicalProps)
+            .getProjections() = ProjectionNameVector{ridProj};
+        _propsMap.emplace(outerNode.cast<Node>(), outerLimitProps);
+
+        _propsMap.emplace(innerNode.cast<Node>(), sharedProps);
+
+        ABT nlj = make<NestedLoopJoinNode>(JoinType::Inner,
+                                           ProjectionNameSet{ridProj},
+                                           Constant::boolean(true),
+                                           std::move(outerNode),
+                                           std::move(innerNode));
+
+        _propsMap.emplace(nlj.cast<Node>(), sharedProps);
+        std::swap(n, nlj);
+    }
+
+    /**
+     * Template to handle all other cases - we don't care or need to do anything here, so we
+     * knock out all the other required implementations at once with this template.
+     */
+    template <typename T, typename... Args>
+    void transport(ABT& n, const T& node, Args&&... args) {
+        static_assert(!std::is_same_v<T, LimitSkipNode>, "Missing LimitSkip handler");
+        return;
+    }
+
+private:
+    NodeToGroupPropsMap& _propsMap;
+    const OptPhaseManager& _phaseManager;
+};
+
 class SamplingTransport {
     static constexpr size_t kMaxSampleSize = 1000;
 
@@ -294,6 +372,18 @@ private:
                             "explain"_attr = ExplainGenerator::explainV2(abt));
 
         PlanAndProps planAndProps = _phaseManager.optimizeAndReturnProps(std::move(abt));
+
+        // If internalCascadesOptimizerSampleChunks is a positive integer, sample by chunks using
+        // that value as the number of chunks. Otherwise perform fully randomized sample.
+        if (_phaseManager.getHints()._numSamplingChunks > 0) {
+            SamplingChunksTransport instance{planAndProps._map, _phaseManager};
+            algebra::transport<true>(planAndProps._node, instance);
+
+            OPTIMIZER_DEBUG_LOG(6264807,
+                                5,
+                                "Physical Sampling",
+                                "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
+        }
 
         auto env = VariableEnvironment::build(planAndProps._node);
         SlotVarMap slotMap;

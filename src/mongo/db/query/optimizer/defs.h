@@ -341,6 +341,10 @@ struct QueryHints {
     // index. The minimum bound is only used for testing and in production should remain set to 1.
     size_t _minIndexEqPrefixes = 1;
     size_t _maxIndexEqPrefixes = 1;
+
+    // Rather than sampling a fully random set of documents, sample N documents (5 by default)
+    // randomly and scan sequentially from each of them for the rest.
+    int32_t _numSamplingChunks = 5;
 };
 
 }  // namespace mongo::optimizer

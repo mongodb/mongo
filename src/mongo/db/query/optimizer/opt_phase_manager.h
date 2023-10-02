@@ -154,6 +154,8 @@ public:
 
     const Metadata& getMetadata() const;
 
+    const RIDProjectionsMap& getRIDProjections() const;
+
 private:
     bool hasPhase(OptPhase phase) const;
 
