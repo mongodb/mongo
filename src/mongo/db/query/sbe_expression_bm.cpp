@@ -136,6 +136,7 @@ public:
             &_spoolIdGenerator,
             &_inListsSet,
             &_collatorsMap,
+            _expCtx,
             false /* needsMerge */,
             false /* allowDiskUse */
         };
@@ -199,6 +200,7 @@ private:
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
     stage_builder::StageBuilderState::InListsSet _inListsSet;
     stage_builder::StageBuilderState::CollatorsMap _collatorsMap;
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     sbe::value::SlotId _inputSlotId;
     std::unique_ptr<TimeZoneDatabase> _timeZoneDB;

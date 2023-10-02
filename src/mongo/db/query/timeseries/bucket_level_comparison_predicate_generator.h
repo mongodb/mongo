@@ -154,6 +154,23 @@ public:
                      : builder->createLoosePredicate(matchExpr);
     }
 };
+
+/**
+ * Helper function to make comparison match expressions. When creating $_internalExpr predicates, it
+ * sets mustExecute to true.
+ */
+template <typename T, typename V>
+auto makeCmpMatchExpr(StringData path, V val) {
+    if constexpr (std::is_same_v<T, InternalExprEqMatchExpression> ||
+                  std::is_same_v<T, InternalExprGTMatchExpression> ||
+                  std::is_same_v<T, InternalExprGTEMatchExpression> ||
+                  std::is_same_v<T, InternalExprLTMatchExpression> ||
+                  std::is_same_v<T, InternalExprLTEMatchExpression>) {
+        return std::make_unique<T>(path, val, true /* mustExecute */);
+    } else {
+        return std::make_unique<T>(path, val);
+    }
+}
 }  // namespace timeseries
 
 }  // namespace mongo

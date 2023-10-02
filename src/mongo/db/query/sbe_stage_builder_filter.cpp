@@ -956,32 +956,84 @@ public:
         generatePredicate(_context, *expr->fieldRef(), makePredicate, traversalMode, hasNull);
     }
 
-    // The following are no-ops. The internal expr comparison match expression are produced
-    // internally by rewriting an $expr expression to an AND($expr, $_internalExpr[OP]), which can
-    // later be eliminated by via a conversion into EXACT index bounds, or remains present. In the
-    // latter case we can simply ignore it, as the result of AND($expr, $_internalExpr[OP]) is equal
-    // to just $expr.
-    //
-    // TODO SERVER-62058: This is a correct implementation for the time-series loose filter since
-    // the event filter should be able to filter out non-matching results but will not be
-    // performant. But this is an incorrect implementation for the time-series tight filter since
-    // if the tight filter evalutes to 'true', then the event filter will not be evaluated at all.
-    // Implement the exact behavior for the better performance of the loose filter and the
-    // correctness of the tight filter.
+    void translateExprComparison(const ComparisonMatchExpressionBase* expr, bool mustExecute) {
+        /**
+         * Since InternalExpr* are permitted to return false positives, we simply compile this to an
+         * always "true" expression. In practice, most of the time when an InternalExpr is not
+         * marked with 'mustExecute' it is accompanied by a more precise check which removes the
+         * false positives.
+         */
+        if (!mustExecute) {
+            generateAlwaysBoolean(_context, true);
+            return;
+        }
+
+        ExpressionCompare::CmpOp cmp = [&]() {
+            switch (expr->matchType()) {
+                case MatchExpression::MatchType::INTERNAL_EXPR_EQ:
+                    return ExpressionCompare::CmpOp::EQ;
+                case MatchExpression::MatchType::INTERNAL_EXPR_GT:
+                    return ExpressionCompare::CmpOp::GT;
+                case MatchExpression::MatchType::INTERNAL_EXPR_GTE:
+                    return ExpressionCompare::CmpOp::GTE;
+                case MatchExpression::MatchType::INTERNAL_EXPR_LT:
+                    return ExpressionCompare::CmpOp::LT;
+                case MatchExpression::MatchType::INTERNAL_EXPR_LTE:
+                    return ExpressionCompare::CmpOp::LTE;
+                default:
+                    // Only $expr expressions supported.
+                    MONGO_UNREACHABLE_TASSERT(6205800);
+            }
+        }();
+
+        auto expCtx = _context->state.expCtx;
+        invariant(expCtx);
+
+        auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
+            expCtx.get(), expr->fieldRef()->dottedField().toString(), expCtx->variablesParseState);
+        auto translatedFieldPathExpr = generateExpression(
+            _context->state, fieldPathExpr.get(), _context->rootSlot, _context->slots);
+
+        SbExprBuilder b(_context->state);
+        auto frameId = _context->state.frameIdGenerator->generate();
+        auto newVar = b.makeVariable(frameId, 0);
+
+        auto cmpExpr = ExpressionCompare::create(
+            expCtx.get(),
+            cmp,
+            fieldPathExpr,
+            ExpressionConstant::create(expCtx.get(), Value(expr->getData())));
+
+        auto translatedCmpExpr =
+            generateExpression(_context->state, cmpExpr.get(), _context->rootSlot, _context->slots);
+
+        auto isArrayExpr = b.makeIf(b.makeFillEmptyTrue(b.makeFunction("isArray", newVar.clone())),
+                                    b.makeBoolConstant(true),
+                                    std::move(translatedCmpExpr));
+
+        auto cmpWArrayCheckExpr = b.makeLet(
+            frameId, SbExpr::makeSeq(std::move(translatedFieldPathExpr)), std::move(isArrayExpr));
+
+        auto& frame = _context->topFrame();
+        // Convert the result of the '{$expr: ..}' expression to a boolean value.
+        frame.pushExpr(
+            b.makeFillEmptyFalse(b.makeFunction("coerceToBool"_sd, std::move(cmpWArrayCheckExpr))));
+    }
+
     void visit(const InternalExprEqMatchExpression* expr) final {
-        generateAlwaysBoolean(_context, true);
+        translateExprComparison(expr, expr->mustExecute());
     }
     void visit(const InternalExprGTMatchExpression* expr) final {
-        generateAlwaysBoolean(_context, true);
+        translateExprComparison(expr, expr->mustExecute());
     }
     void visit(const InternalExprGTEMatchExpression* expr) final {
-        generateAlwaysBoolean(_context, true);
+        translateExprComparison(expr, expr->mustExecute());
     }
     void visit(const InternalExprLTMatchExpression* expr) final {
-        generateAlwaysBoolean(_context, true);
+        translateExprComparison(expr, expr->mustExecute());
     }
     void visit(const InternalExprLTEMatchExpression* expr) final {
-        generateAlwaysBoolean(_context, true);
+        translateExprComparison(expr, expr->mustExecute());
     }
 
     void visit(const InternalEqHashedKey* expr) final {}

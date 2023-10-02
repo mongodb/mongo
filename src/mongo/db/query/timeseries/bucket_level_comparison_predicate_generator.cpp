@@ -258,34 +258,34 @@ BucketLevelComparisonPredicateGeneratorBase::Output generateNonTimeFieldPredicat
         case MatchExpression::EQ:
         case MatchExpression::INTERNAL_EXPR_EQ:
             return {makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(minPathStringData,
-                                                                                 matchExprData),
-                              MatchExprPredicate<InternalExprGTEMatchExpression>(maxPathStringData,
-                                                                                 matchExprData)),
+                makeAnd(makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData,
+                                                                         matchExprData),
+                        makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData,
+                                                                         matchExprData)),
                 createTypeEqualityPredicate(
                     params.pExpCtx, matchExprPath, params.assumeNoMixedSchemaData)))};
         case MatchExpression::GT:
         case MatchExpression::INTERNAL_EXPR_GT:
             return {makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                std::make_unique<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
                 createTypeEqualityPredicate(
                     params.pExpCtx, matchExprPath, params.assumeNoMixedSchemaData)))};
         case MatchExpression::GTE:
         case MatchExpression::INTERNAL_EXPR_GTE:
             return {makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                std::make_unique<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
                 createTypeEqualityPredicate(
                     params.pExpCtx, matchExprPath, params.assumeNoMixedSchemaData)))};
         case MatchExpression::LT:
         case MatchExpression::INTERNAL_EXPR_LT:
             return {makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                std::make_unique<InternalExprLTMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTMatchExpression>(minPathStringData, matchExprData),
                 createTypeEqualityPredicate(
                     params.pExpCtx, matchExprPath, params.assumeNoMixedSchemaData)))};
         case MatchExpression::LTE:
         case MatchExpression::INTERNAL_EXPR_LTE:
             return {makeOr(makeVector<std::unique_ptr<MatchExpression>>(
-                std::make_unique<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
                 createTypeEqualityPredicate(
                     params.pExpCtx, matchExprPath, params.assumeNoMixedSchemaData)))};
         default:
@@ -374,42 +374,41 @@ BucketLevelComparisonPredicateGeneratorBase::createTightPredicate(
     switch (matchExpr->matchType()) {
         // All events satisfy $eq if bucket min and max both satisfy $eq.
         case MatchExpression::EQ:
-            return {makePredicate(
-                MatchExprPredicate<EqualityMatchExpression>(minPathStringData, matchExprData),
-                MatchExprPredicate<EqualityMatchExpression>(maxPathStringData, matchExprData))};
+            return {makeAnd(
+                makeCmpMatchExpr<EqualityMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<EqualityMatchExpression>(maxPathStringData, matchExprData))};
         case MatchExpression::INTERNAL_EXPR_EQ:
-            return {makePredicate(
-                MatchExprPredicate<InternalExprEqMatchExpression>(minPathStringData, matchExprData),
-                MatchExprPredicate<InternalExprEqMatchExpression>(maxPathStringData,
-                                                                  matchExprData))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprEqMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprEqMatchExpression>(maxPathStringData, matchExprData))};
 
         // All events satisfy $gt if bucket min satisfy $gt.
         case MatchExpression::GT:
-            return {std::make_unique<GTMatchExpression>(minPathStringData, matchExprData)};
+            return {makeCmpMatchExpr<GTMatchExpression>(minPathStringData, matchExprData)};
         case MatchExpression::INTERNAL_EXPR_GT:
             return {
-                std::make_unique<InternalExprGTMatchExpression>(minPathStringData, matchExprData)};
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(minPathStringData, matchExprData)};
 
         // All events satisfy $gte if bucket min satisfy $gte.
         case MatchExpression::GTE:
-            return {std::make_unique<GTEMatchExpression>(minPathStringData, matchExprData)};
+            return {makeCmpMatchExpr<GTEMatchExpression>(minPathStringData, matchExprData)};
         case MatchExpression::INTERNAL_EXPR_GTE:
             return {
-                std::make_unique<InternalExprGTEMatchExpression>(minPathStringData, matchExprData)};
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData, matchExprData)};
 
         // All events satisfy $lt if bucket max satisfy $lt.
         case MatchExpression::LT:
-            return {std::make_unique<LTMatchExpression>(maxPathStringData, matchExprData)};
+            return {makeCmpMatchExpr<LTMatchExpression>(maxPathStringData, matchExprData)};
         case MatchExpression::INTERNAL_EXPR_LT:
             return {
-                std::make_unique<InternalExprLTMatchExpression>(maxPathStringData, matchExprData)};
+                makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPathStringData, matchExprData)};
 
         // All events satisfy $lte if bucket max satisfy $lte.
         case MatchExpression::LTE:
-            return {std::make_unique<LTEMatchExpression>(maxPathStringData, matchExprData)};
+            return {makeCmpMatchExpr<LTEMatchExpression>(maxPathStringData, matchExprData)};
         case MatchExpression::INTERNAL_EXPR_LTE:
             return {
-                std::make_unique<InternalExprLTEMatchExpression>(maxPathStringData, matchExprData)};
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData, matchExprData)};
         default:
             MONGO_UNREACHABLE_TASSERT(7026901);
     }
@@ -488,20 +487,18 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             // {$gte: 'time - bucketMaxSpanSeconds'}} and a {'control.max' : {$lte: 'time +
             // bucketMaxSpanSeconds'}} predicate which will be helpful in reducing bounds for
             // index scans on 'time' field and routing on mongos.
-            return {makePredicate(
-                MatchExprPredicate<InternalExprLTEMatchExpression>(minPathStringData,
-                                                                   matchExprData),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                   minTime.firstElement()),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(maxPathStringData,
-                                                                   matchExprData),
-                MatchExprPredicate<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                   maxTime.firstElement()),
-                MatchExprPredicate<LTEMatchExpression, Value>(
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData,
+                                                                 minTime.firstElement()),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
+                                                                 maxTime.firstElement()),
+                makeCmpMatchExpr<LTEMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<LTEMatchExpression>(matchExprData,
                                                                _params.bucketMaxSpanSeconds)),
-                MatchExprPredicate<GTEMatchExpression, Value>(
+                makeCmpMatchExpr<GTEMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<GTEMatchExpression>(matchExprData,
                                                                _params.bucketMaxSpanSeconds)))};
@@ -519,11 +516,11 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             //
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$gt: [...]}} that can be rewritten to use $_internalExprGt.
-            return {makePredicate(
-                MatchExprPredicate<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
-                MatchExprPredicate<InternalExprGTMatchExpression>(minPathStringData,
-                                                                  minTime.firstElement()),
-                MatchExprPredicate<GTMatchExpression, Value>(
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(minPathStringData,
+                                                                minTime.firstElement()),
+                makeCmpMatchExpr<GTMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<GTMatchExpression>(matchExprData,
                                                               _params.bucketMaxSpanSeconds)))};
@@ -539,14 +536,14 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             //
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$gte: [...]}} that can be rewritten to use $_internalExprGte.
-            return {makePredicate(MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                      maxPathStringData, matchExprData),
-                                  MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                      minPathStringData, minTime.firstElement()),
-                                  MatchExprPredicate<GTEMatchExpression, Value>(
-                                      timeseries::kBucketIdFieldName,
-                                      constructObjectIdValue<GTEMatchExpression>(
-                                          matchExprData, _params.bucketMaxSpanSeconds)))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData,
+                                                                 minTime.firstElement()),
+                makeCmpMatchExpr<GTEMatchExpression, Value>(
+                    timeseries::kBucketIdFieldName,
+                    constructObjectIdValue<GTEMatchExpression>(matchExprData,
+                                                               _params.bucketMaxSpanSeconds)))};
 
         case MatchExpression::LT:
         case MatchExpression::INTERNAL_EXPR_LT:
@@ -563,11 +560,11 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$lt: [...]}} that can be rewritten to use $_internalExprLt.
 
-            return {makePredicate(
-                MatchExprPredicate<InternalExprLTMatchExpression>(minPathStringData, matchExprData),
-                MatchExprPredicate<InternalExprLTMatchExpression>(maxPathStringData,
-                                                                  maxTime.firstElement()),
-                MatchExprPredicate<LTMatchExpression, Value>(
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPathStringData,
+                                                                maxTime.firstElement()),
+                makeCmpMatchExpr<LTMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<LTMatchExpression>(matchExprData,
                                                               _params.bucketMaxSpanSeconds)))};
@@ -584,14 +581,14 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$lte: [...]}} that can be rewritten to use $_internalExprLte.
 
-            return {makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                      minPathStringData, matchExprData),
-                                  MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                      maxPathStringData, maxTime.firstElement()),
-                                  MatchExprPredicate<LTEMatchExpression, Value>(
-                                      timeseries::kBucketIdFieldName,
-                                      constructObjectIdValue<LTEMatchExpression>(
-                                          matchExprData, _params.bucketMaxSpanSeconds)))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
+                                                                 maxTime.firstElement()),
+                makeCmpMatchExpr<LTEMatchExpression, Value>(
+                    timeseries::kBucketIdFieldName,
+                    constructObjectIdValue<LTEMatchExpression>(matchExprData,
+                                                               _params.bucketMaxSpanSeconds)))};
         default:
             MONGO_UNREACHABLE_TASSERT(7823301);
     }
@@ -613,39 +610,34 @@ ExtendedRangeBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate
     switch (matchExpr->matchType()) {
         case MatchExpression::EQ:
         case MatchExpression::INTERNAL_EXPR_EQ:
-            return {makePredicate(
-                MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(minPath, minTime.firstElement()),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                   maxTime.firstElement()))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPath, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPath, minTime.firstElement()),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPath, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPath, maxTime.firstElement()))};
 
         case MatchExpression::GT:
         case MatchExpression::INTERNAL_EXPR_GT:
-            return {makePredicate(
-                MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
-                MatchExprPredicate<InternalExprGTMatchExpression>(minPath,
-                                                                  minTime.firstElement()))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPath, matchExprData),
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(minPath, minTime.firstElement()))};
 
         case MatchExpression::GTE:
         case MatchExpression::INTERNAL_EXPR_GTE:
-            return {makePredicate(
-                MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
-                                                                   minTime.firstElement()))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPath, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPath, minTime.firstElement()))};
 
         case MatchExpression::LT:
         case MatchExpression::INTERNAL_EXPR_LT:
-            return {makePredicate(
-                MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
-                MatchExprPredicate<InternalExprLTMatchExpression>(maxPath,
-                                                                  maxTime.firstElement()))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTMatchExpression>(minPath, matchExprData),
+                makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPath, maxTime.firstElement()))};
         case MatchExpression::LTE:
         case MatchExpression::INTERNAL_EXPR_LTE:
-            return {makePredicate(
-                MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
-                                                                   maxTime.firstElement()))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPath, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPath, maxTime.firstElement()))};
         default:
             MONGO_UNREACHABLE_TASSERT(7823302);
     }
@@ -698,20 +690,18 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             // {$gte: 'time - bucketMaxSpanSeconds'}} and a {'control.max' : {$lte: 'time +
             // bucketMaxSpanSeconds'}} predicate which will be helpful in reducing bounds for
             // index scans on 'time' field and routing on mongos.
-            return {makePredicate(
-                MatchExprPredicate<InternalExprLTEMatchExpression>(minPathStringData,
-                                                                   matchExprData),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                   minTime.firstElement()),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(maxPathStringData,
-                                                                   matchExprData),
-                MatchExprPredicate<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                   maxTime.firstElement()),
-                MatchExprPredicate<LTEMatchExpression, Value>(
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData,
+                                                                 minTime.firstElement()),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
+                                                                 maxTime.firstElement()),
+                makeCmpMatchExpr<LTEMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<LTEMatchExpression>(matchExprData,
                                                                _params.bucketMaxSpanSeconds)),
-                MatchExprPredicate<GTEMatchExpression, Value>(
+                makeCmpMatchExpr<GTEMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<GTEMatchExpression>(matchExprData,
                                                                _params.bucketMaxSpanSeconds)))};
@@ -730,11 +720,11 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             //
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$gt: [...]}} that can be rewritten to use $_internalExprGt.
-            return {makePredicate(
-                MatchExprPredicate<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
-                MatchExprPredicate<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                   minTime.firstElement()),
-                MatchExprPredicate<GTMatchExpression, Value>(
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData,
+                                                                 minTime.firstElement()),
+                makeCmpMatchExpr<GTMatchExpression, Value>(
                     timeseries::kBucketIdFieldName,
                     constructObjectIdValue<GTMatchExpression>(matchExprData,
                                                               _params.bucketMaxSpanSeconds)))};
@@ -751,14 +741,14 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             //
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$gte: [...]}} that can be rewritten to use $_internalExprGte.
-            return {makePredicate(MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                      maxPathStringData, matchExprData),
-                                  MatchExprPredicate<InternalExprGTEMatchExpression>(
-                                      minPathStringData, minTime.firstElement()),
-                                  MatchExprPredicate<GTEMatchExpression, Value>(
-                                      timeseries::kBucketIdFieldName,
-                                      constructObjectIdValue<GTEMatchExpression>(
-                                          matchExprData, _params.bucketMaxSpanSeconds))),
+            return {makeAnd(makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData,
+                                                                             matchExprData),
+                            makeCmpMatchExpr<InternalExprGTEMatchExpression>(
+                                minPathStringData, minTime.firstElement()),
+                            makeCmpMatchExpr<GTEMatchExpression, Value>(
+                                timeseries::kBucketIdFieldName,
+                                constructObjectIdValue<GTEMatchExpression>(
+                                    matchExprData, _params.bucketMaxSpanSeconds))),
                     rewriteProvidesExactMatchPredicate};
         case MatchExpression::LT:
         case MatchExpression::INTERNAL_EXPR_LT:
@@ -774,14 +764,14 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             //
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$lt: [...]}} that can be rewritten to use $_internalExprLt.
-            return {makePredicate(MatchExprPredicate<InternalExprLTMatchExpression>(
-                                      minPathStringData, matchExprData),
-                                  MatchExprPredicate<InternalExprLTMatchExpression>(
-                                      maxPathStringData, maxTime.firstElement()),
-                                  MatchExprPredicate<LTMatchExpression, Value>(
-                                      timeseries::kBucketIdFieldName,
-                                      constructObjectIdValue<LTMatchExpression>(
-                                          matchExprData, _params.bucketMaxSpanSeconds))),
+            return {makeAnd(makeCmpMatchExpr<InternalExprLTMatchExpression>(minPathStringData,
+                                                                            matchExprData),
+                            makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPathStringData,
+                                                                            maxTime.firstElement()),
+                            makeCmpMatchExpr<LTMatchExpression, Value>(
+                                timeseries::kBucketIdFieldName,
+                                constructObjectIdValue<LTMatchExpression>(
+                                    matchExprData, _params.bucketMaxSpanSeconds))),
                     rewriteProvidesExactMatchPredicate};
         case MatchExpression::LTE:
         case MatchExpression::INTERNAL_EXPR_LTE:
@@ -794,14 +784,14 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             //
             // The same procedure applies to aggregation expressions of the form
             // {$expr: {$lte: [...]}} that can be rewritten to use $_internalExprLte.
-            return {makePredicate(MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                      minPathStringData, matchExprData),
-                                  MatchExprPredicate<InternalExprLTEMatchExpression>(
-                                      maxPathStringData, maxTime.firstElement()),
-                                  MatchExprPredicate<LTEMatchExpression, Value>(
-                                      timeseries::kBucketIdFieldName,
-                                      constructObjectIdValue<LTEMatchExpression>(
-                                          matchExprData, _params.bucketMaxSpanSeconds)))};
+            return {makeAnd(
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
+                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
+                                                                 maxTime.firstElement()),
+                makeCmpMatchExpr<LTEMatchExpression, Value>(
+                    timeseries::kBucketIdFieldName,
+                    constructObjectIdValue<LTEMatchExpression>(matchExprData,
+                                                               _params.bucketMaxSpanSeconds)))};
         default:
             MONGO_UNREACHABLE_TASSERT(7823303);
     }

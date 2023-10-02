@@ -60,6 +60,7 @@ struct StageBuilderState {
                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
                       InListsSet* inListsSet,
                       CollatorsMap* collatorsMap,
+                      boost::intrusive_ptr<ExpressionContext> expCtx,
                       bool needsMerge,
                       bool allowDiskUse)
         : slotIdGenerator{slotIdGenerator},
@@ -71,6 +72,7 @@ struct StageBuilderState {
           env{env},
           data{data},
           variables{variables},
+          expCtx{expCtx},
           needsMerge{needsMerge},
           allowDiskUse{allowDiskUse} {}
 
@@ -129,6 +131,9 @@ struct StageBuilderState {
     PlanStageStaticData* const data;
 
     const Variables& variables;
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+
     // When the mongos splits $group stage and sends it to shards, it adds 'needsMerge'/'fromMongs'
     // flags to true so that shards can sends special partial aggregation results to the mongos.
     bool needsMerge;
