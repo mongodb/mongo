@@ -51,6 +51,7 @@
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tailable_mode.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -104,7 +105,9 @@ Status validateGetMoreCollectionName(StringData collectionName) {
     return Status::OK();
 }
 
-Status validateResumeAfter(const mongo::BSONObj& resumeAfter, bool isClusteredCollection) {
+Status validateResumeAfter(OperationContext* opCtx,
+                           const mongo::BSONObj& resumeAfter,
+                           bool isClusteredCollection) {
     if (resumeAfter.isEmpty()) {
         return Status::OK();
     }
@@ -122,6 +125,14 @@ Status validateResumeAfter(const mongo::BSONObj& resumeAfter, bool isClusteredCo
                           "Malformed resume token: the '_resumeAfter' object must contain"
                           " '$recordId', of type NumberLong, BinData or jstNULL and"
                           " optional '$initialSyncId of type BinData.");
+        }
+        if (resumeAfter.hasField("$initialSyncId")) {
+            auto initialSyncId = repl::ReplicationCoordinator::get(opCtx)->getInitialSyncId(opCtx);
+            auto requestInitialSyncId = uassertStatusOK(UUID::parse(resumeAfter["$initialSyncId"]));
+            if (!initialSyncId || requestInitialSyncId != *initialSyncId) {
+                return Status(ErrorCodes::Error(8132701),
+                              "$initialSyncId mismatch, the query is no longer resumable.");
+            }
         }
     } else if (resumeAfter.nFields() != 1 ||
                (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&

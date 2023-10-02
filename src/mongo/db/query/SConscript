@@ -323,6 +323,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'hint_parser',

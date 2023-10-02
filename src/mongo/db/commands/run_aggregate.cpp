@@ -1029,8 +1029,8 @@ Status runAggregate(OperationContext* opCtx,
                     !ctx->getView());
             const auto& collection = ctx->getCollection();
             const bool isClusteredCollection = collection && collection->isClustered();
-            uassertStatusOK(query_request_helper::validateResumeAfter(*request.getResumeAfter(),
-                                                                      isClusteredCollection));
+            uassertStatusOK(query_request_helper::validateResumeAfter(
+                opCtx, *request.getResumeAfter(), isClusteredCollection));
         }
 
         auto parsePipeline = [&](std::unique_ptr<CollatorInterface> collator) {

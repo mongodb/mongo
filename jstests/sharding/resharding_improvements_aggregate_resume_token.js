@@ -43,7 +43,7 @@ assert.commandFailedWithCode(db.runCommand({
                              ErrorCodes.BadValue);
 
 jsTest.log(
-    "aggregate with $requestResumeToken should return PBRT with recordId and an optional initialSyncId.");
+    "aggregate with $requestResumeToken should return PBRT with recordId and an initialSyncId.");
 let res = db.runCommand({
     aggregate: collName,
     pipeline: [],
@@ -53,6 +53,7 @@ let res = db.runCommand({
 });
 assert.hasFields(res.cursor, ["postBatchResumeToken"]);
 assert.hasFields(res.cursor.postBatchResumeToken, ["$recordId"]);
+assert.hasFields(res.cursor.postBatchResumeToken, ["$initialSyncId"]);
 const resumeToken = res.cursor.postBatchResumeToken;
 
 jsTest.log("aggregate with wrong $recordId type in $resumeAfter should fail");

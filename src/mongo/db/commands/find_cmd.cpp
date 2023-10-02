@@ -446,7 +446,7 @@ public:
             if (!collectionOrView->isView()) {
                 const bool isClusteredCollection = collectionPtr && collectionPtr->isClustered();
                 uassertStatusOK(query_request_helper::validateResumeAfter(
-                    findCommand->getResumeAfter(), isClusteredCollection));
+                    opCtx, findCommand->getResumeAfter(), isClusteredCollection));
             }
             auto expCtx = makeExpressionContext(opCtx, *findCommand, collectionPtr, verbosity);
             auto parsedRequest = uassertStatusOK(
@@ -707,7 +707,7 @@ public:
             // before beginning the operation.
             if (!collectionOrView->isView()) {
                 uassertStatusOK(query_request_helper::validateResumeAfter(
-                    findCommand->getResumeAfter(), isClusteredCollection));
+                    opCtx, findCommand->getResumeAfter(), isClusteredCollection));
             }
 
             auto cq = parseQueryAndBeginOperation(

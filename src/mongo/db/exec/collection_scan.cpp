@@ -61,6 +61,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/str.h"
@@ -364,6 +365,29 @@ void CollectionScan::assertTsHasNotFallenOff(const Record& record) {
             isNewRS || tsHasNotFallenOff);
     // We don't need to check this assertion again after we've confirmed the first oplog event.
     _params.assertTsHasNotFallenOff = boost::none;
+}
+
+BSONObj CollectionScan::getPostBatchResumeToken() const {
+    // Return a resume token compatible with resumable initial sync.
+    if (_params.requestResumeToken) {
+        BSONObjBuilder builder;
+        _lastSeenId.serializeToken("$recordId", &builder);
+        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            auto initialSyncId =
+                repl::ReplicationCoordinator::get(opCtx())->getInitialSyncId(opCtx());
+            if (initialSyncId) {
+                initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
+            }
+        }
+        return builder.obj();
+    }
+    // Return a resume token compatible with resharding oplog sync.
+    if (_params.shouldTrackLatestOplogTimestamp) {
+        return ResumeTokenOplogTimestamp{_latestOplogEntryTimestamp}.toBSON();
+    }
+
+    return {};
 }
 
 namespace {

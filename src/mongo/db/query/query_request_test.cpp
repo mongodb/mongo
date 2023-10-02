@@ -62,7 +62,10 @@
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/max_time_ms_parser.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
@@ -274,30 +277,36 @@ TEST(QueryRequestTest, RequestResumeTokenWithSort) {
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
     FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1);
     findCommand.setResumeAfter(resumeAfter);
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
-                                                            false /* isClusteredCollection */));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
     resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
-                                                        false /* isClusteredCollection */));
+    ASSERT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
     FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL << "$extra" << 1);
     findCommand.setResumeAfter(resumeAfter);
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
-                                                            false /* isClusteredCollection */));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithHint) {
@@ -313,6 +322,9 @@ TEST(QueryRequestTest, ResumeAfterWithHint) {
 }
 
 TEST(QueryRequestTest, ResumeAfterWithSort) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
     FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
@@ -320,8 +332,8 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
-                                                        false /* isClusteredCollection */));
+    ASSERT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -329,6 +341,9 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
 }
 
 TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
     FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
@@ -337,11 +352,14 @@ TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
-                                                        false /* isClusteredCollection */));
+    ASSERT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
     FindCommandRequest findCommand(NamespaceString::kRsOplogNamespace);
     BSONObj resumeAfter = fromjson("{}");
     // Hint must be explicitly set for the query request to validate.
@@ -350,8 +368,30 @@ TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
-    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
-                                                        false /* isClusteredCollection */));
+    ASSERT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
+}
+
+TEST(QueryRequestTest, ResumeAfterMismatchInitialSyncId) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+    auto replCoord =
+        std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext.getServiceContext());
+    repl::ReplicationCoordinator::set(serviceContext.getServiceContext(), std::move(replCoord));
+
+    FindCommandRequest findCommand(testns);
+    BSONObj resumeAfter =
+        BSON("$recordId" << 1LL << "$initialSyncId"
+                         << uassertStatusOK(UUID::parse("12345678-1234-9876-1234-000000000000")));
+    findCommand.setResumeAfter(resumeAfter);
+    // Hint must be explicitly set for the query request to validate.
+    findCommand.setHint(fromjson("{$natural: 1}"));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    findCommand.setRequestResumeToken(true);
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(
+        opCtx, findCommand.getResumeAfter(), false /* isClusteredCollection */));
 }
 
 //

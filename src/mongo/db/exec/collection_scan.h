@@ -85,20 +85,7 @@ public:
         return _latestOplogEntryTimestamp;
     }
 
-    BSONObj getPostBatchResumeToken() const {
-        // Return a resume token compatible with resumable initial sync.
-        if (_params.requestResumeToken) {
-            BSONObjBuilder builder;
-            _lastSeenId.serializeToken("$recordId", &builder);
-            return builder.obj();
-        }
-        // Return a resume token compatible with resharding oplog sync.
-        if (_params.shouldTrackLatestOplogTimestamp) {
-            return ResumeTokenOplogTimestamp{_latestOplogEntryTimestamp}.toBSON();
-        }
-
-        return {};
-    }
+    BSONObj getPostBatchResumeToken() const;
 
     std::unique_ptr<PlanStageStats> getStats() final;
 
