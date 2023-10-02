@@ -85,6 +85,7 @@ selector:
   - jstests/core/timeseries/timeseries_find_and_modify_update.js
   - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
   - jstests/core/timeseries/timeseries_bucket_limit_count.js
+  - jstests/core/timeseries/timeseries_insert_after_update.js
 
   # These use "columnstore indexes are under development and cannot be used without enabling the feature flag"
   - jstests/core/query/null_query_semantics.js
