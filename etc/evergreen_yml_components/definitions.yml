@@ -5743,6 +5743,7 @@ tasks:
         --fuzzMongosConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: config_fuzzer_stress_concurrency_replication_gen
@@ -5772,6 +5773,7 @@ tasks:
       use_large_distro: "true"
       exec_timeout_secs: 14400 # 4 hours
       timeout_secs: 14400 # 4 hours
+      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: config_fuzzer_replica_sets_jscore_passthrough_gen
