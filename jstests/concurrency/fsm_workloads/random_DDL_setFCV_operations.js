@@ -62,8 +62,5 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             db.adminCommand({setFeatureCompatibilityVersion: latestFCV, confirm: true}));
     };
 
-    // TODO(SERVER-81238): Remove next line after resolving build failure
-    $config.iterations = 0;
-
     return $config;
 });

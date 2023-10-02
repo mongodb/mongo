@@ -853,7 +853,6 @@ Status _collModInternal(OperationContext* opCtx,
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
     if (coll) {
-        assertNoMovePrimaryInProgress(opCtx, nss);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
     }
 
