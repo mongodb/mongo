@@ -2,6 +2,7 @@
  * Verifies that collection drops that aren't replicated do not drop the ident until the catalog has
  * been checkpointed.
  * @tags: [
+ *    requires_persistence,
  *    requires_replication,
  *    requires_wiredtiger,
  * ]
