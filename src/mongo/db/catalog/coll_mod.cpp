@@ -282,15 +282,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         }
 
         auto cmrIndex = &parsed.indexRequest;
-
-        if ((cmdIndex.getUnique() || cmdIndex.getPrepareUnique()) &&
-            !feature_flags::gCollModIndexUnique.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            return {ErrorCodes::InvalidOptions,
-                    "collMod does not support converting an index to 'unique' or to "
-                    "'prepareUnique' mode in this FCV."};
-        }
-
         if (cmdIndex.getUnique() && cmdIndex.getForceNonUnique()) {
             return {ErrorCodes::InvalidOptions,
                     "collMod does not support 'unique' and 'forceNonUnique' options at the "

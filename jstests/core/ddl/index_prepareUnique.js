@@ -3,12 +3,6 @@
  *
  * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
-if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
-    jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
-    quit();
-}
 
 const collName_prefix = "index_prepareUnique";
 let count = 0;
