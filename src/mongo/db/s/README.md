@@ -29,6 +29,7 @@ The graph further down visualises the architecture of the MongoDB Sharding syste
   - [UserWriteBlocking](README_user_write_blocking.md)
 - [Sessions and Transactions](README_sessions_and_transactions.md)
 - [Startup and Shutdown](README_startup_and_shutdown.md)
+- [Query Sampling for Shard Key Analyzer](README_analyze_shard_key.md)
 
 ```mermaid
 C4Component
