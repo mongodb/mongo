@@ -338,8 +338,9 @@ TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
         ON_BLOCK_EXIT([&] { tl->shutdown(); });
 
 
-        auto session = client->connect(
-            CommandServiceTestFixtures::defaultServerAddress(), Milliseconds(50), {});
+        auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       {});
         ASSERT_OK(session->finish());
         session.reset();
     }

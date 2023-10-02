@@ -416,7 +416,8 @@ public:
 inline std::shared_ptr<EgressSession> makeEgressSession(
     GRPCTransportLayer& tl,
     const HostAndPort& addr = CommandServiceTestFixtures::defaultServerAddress()) {
-    auto swSession = tl.connect(addr, ConnectSSLMode::kGlobalSSLMode, Milliseconds(5000));
+    auto swSession = tl.connect(
+        addr, ConnectSSLMode::kGlobalSSLMode, CommandServiceTestFixtures::kDefaultConnectTimeout);
     return std::dynamic_pointer_cast<EgressSession>(uassertStatusOK(swSession));
 }
 

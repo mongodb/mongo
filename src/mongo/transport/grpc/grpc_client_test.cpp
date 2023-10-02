@@ -51,8 +51,6 @@ namespace mongo::transport::grpc {
 
 class GRPCClientTest : public ServiceContextTest {
 public:
-    static constexpr Milliseconds kDefaultConnectTimeout = Milliseconds(5000);
-
     virtual void setUp() override {
         getServiceContext()->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
     }
@@ -90,7 +88,8 @@ TEST_F(GRPCClientTest, GRPCClientConnect) {
         client->start(getServiceContext());
 
         for (auto& addr : addresses) {
-            auto session = client->connect(addr, kDefaultConnectTimeout, {});
+            auto session =
+                client->connect(addr, CommandServiceTestFixtures::kDefaultConnectTimeout, {});
             ON_BLOCK_EXIT([&] { session->end(); });
             ASSERT_TRUE(session->isConnected());
 
@@ -119,8 +118,9 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoClientCertificate) {
         auto client = makeClient(std::move(options));
         client->start(getServiceContext());
 
-        auto session = client->connect(
-            CommandServiceTestFixtures::defaultServerAddress(), kDefaultConnectTimeout, {});
+        auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       {});
         auto msg = makeUniqueMessage();
         ASSERT_OK(session->sinkMessage(msg));
         auto swMsgReceived = session->sourceMessage();
@@ -145,8 +145,9 @@ TEST_F(GRPCClientTest, GRPCClientConnectAuthToken) {
         client->start(getServiceContext());
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
-        auto session = client->connect(
-            CommandServiceTestFixtures::defaultServerAddress(), kDefaultConnectTimeout, options);
+        auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       options);
         ASSERT_OK(session->finish());
     };
 
@@ -161,8 +162,9 @@ TEST_F(GRPCClientTest, GRPCClientConnectNoAuthToken) {
     auto clientThreadBody = [&](auto&, auto&) {
         auto client = makeClient();
         client->start(getServiceContext());
-        auto session = client->connect(
-            CommandServiceTestFixtures::defaultServerAddress(), kDefaultConnectTimeout, {});
+        auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       {});
         ASSERT_OK(session->finish());
     };
 
@@ -184,8 +186,9 @@ TEST_F(GRPCClientTest, GRPCClientMetadata) {
         auto client = makeClient();
         client->start(getServiceContext());
         clientId = client->id();
-        auto session = client->connect(
-            CommandServiceTestFixtures::defaultServerAddress(), kDefaultConnectTimeout, {});
+        auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       {});
         ASSERT_OK(session->finish());
     };
 
@@ -213,8 +216,9 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {
-            sessions.push_back(client->connect(
-                CommandServiceTestFixtures::defaultServerAddress(), kDefaultConnectTimeout, {}));
+            sessions.push_back(client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                               CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                               {}));
         }
 
         Notification<void> shutdownFinished;
@@ -232,7 +236,7 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
         }
 
         ASSERT_THROWS_CODE(client->connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                           kDefaultConnectTimeout,
+                                           CommandServiceTestFixtures::kDefaultConnectTimeout,
                                            {}),
                            DBException,
                            ErrorCodes::ShutdownInProgress);

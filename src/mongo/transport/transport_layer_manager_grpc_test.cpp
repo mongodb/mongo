@@ -56,8 +56,6 @@ class AsioGRPCTransportLayerManagerTest : public ServiceContextTest {
 public:
     using ServerCb = std::function<void(Session&)>;
 
-    static constexpr auto kTimeout = Milliseconds(5000);
-
     void setUp() override {
         ServiceContextTest::setUp();
         auto* svcCtx = getServiceContext();
@@ -159,8 +157,10 @@ TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
             ON_BLOCK_EXIT([&] { client->shutdown(); });
 
             for (auto i = 0; i < kNumSessions; i++) {
-                auto session = client->connect(
-                    grpc::CommandServiceTestFixtures::defaultServerAddress(), kTimeout, {});
+                auto session =
+                    client->connect(grpc::CommandServiceTestFixtures::defaultServerAddress(),
+                                    grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                    {});
                 ON_BLOCK_EXIT([&] { ASSERT_OK(session->finish()); });
                 assertEchoSucceeds(*session);
             }
@@ -168,10 +168,11 @@ TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
 
         auto asioThread = monitor.spawn([&] {
             for (auto i = 0; i < kNumSessions; i++) {
-                auto swSession = getAsioTransportLayer().connect(HostAndPort("localhost", 27017),
-                                                                 ConnectSSLMode::kGlobalSSLMode,
-                                                                 kTimeout,
-                                                                 boost::none);
+                auto swSession = getAsioTransportLayer().connect(
+                    HostAndPort("localhost", 27017),
+                    ConnectSSLMode::kGlobalSSLMode,
+                    grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                    boost::none);
                 ASSERT_OK(swSession);
                 ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
                 grpc::assertEchoSucceeds(*swSession.getValue());
@@ -192,8 +193,11 @@ TEST_F(AsioGRPCTransportLayerManagerTest, EgressAsio) {
         uassertStatusOK(session.sinkMessage(swMsg.getValue()));
     });
 
-    auto swSession = getTransportLayerManager().connect(
-        HostAndPort("localhost", 27017), ConnectSSLMode::kGlobalSSLMode, kTimeout, boost::none);
+    auto swSession =
+        getTransportLayerManager().connect(HostAndPort("localhost", 27017),
+                                           ConnectSSLMode::kGlobalSSLMode,
+                                           grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                           boost::none);
     ASSERT_OK(swSession);
     ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
     grpc::assertEchoSucceeds(*swSession.getValue());
