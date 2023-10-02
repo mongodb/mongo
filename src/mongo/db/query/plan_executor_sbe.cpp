@@ -273,8 +273,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                              ObjectType* out,
                              RecordId* dlOut,
                              bool returnOwnedBson,
-                             const PlanExecutorSBE::MetaDataAccessor& metadata,
-                             bool bsonWithMetadata);
+                             const PlanExecutorSBE::MetaDataAccessor* metadata);
 
 template <typename ObjectType>
 PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* dlOut) {
@@ -342,16 +341,17 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
 
         invariant(_state == State::kOpened);
 
-        bool bsonWithMetadata =
-            _cq && (_cq->getExpCtxRaw()->needsMerge || _cq->getExpCtxRaw()->forPerShardCursor);
+        const MetaDataAccessor* metadataAccessors = isDocument ||
+                (_cq && (_cq->getExpCtxRaw()->needsMerge || _cq->getExpCtxRaw()->forPerShardCursor))
+            ? &_metadataAccessors
+            : nullptr;
         auto result = fetchNextImpl(_root.get(),
                                     _result,
                                     _resultRecordId,
                                     out,
                                     dlOut,
                                     _mustReturnOwnedBson,
-                                    _metadataAccessors,
-                                    bsonWithMetadata);
+                                    metadataAccessors);
 
         if (result == sbe::PlanState::IS_EOF) {
             _root->close();
@@ -679,8 +679,7 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
                              ObjectType* out,
                              RecordId* dlOut,
                              bool returnOwnedBson,
-                             const PlanExecutorSBE::MetaDataAccessor& metadata,
-                             bool bsonWithMetadata) {
+                             const PlanExecutorSBE::MetaDataAccessor* metadata) {
     constexpr bool isDocument = std::is_same_v<ObjectType, Document>;
     constexpr bool isBson = std::is_same_v<ObjectType, BSONObj>;
     static_assert(isDocument || isBson);
@@ -727,10 +726,12 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
             // The query is supposed to return an object.
             MONGO_UNREACHABLE;
         }
-        if constexpr (isDocument) {
-            *out = metadata.appendToDocument(std::move(*out));
-        } else if (bsonWithMetadata) {
-            *out = metadata.appendToBson(std::move(*out));
+        if (metadata) {
+            if constexpr (isDocument) {
+                *out = metadata->appendToDocument(std::move(*out));
+            } else {
+                *out = metadata->appendToBson(std::move(*out));
+            }
         }
     }
 
@@ -750,8 +751,7 @@ template sbe::PlanState fetchNextImpl<BSONObj>(sbe::PlanStage* root,
                                                BSONObj* out,
                                                RecordId* dlOut,
                                                bool returnOwnedBson,
-                                               const PlanExecutorSBE::MetaDataAccessor& metadata,
-                                               bool bsonWithMetadata);
+                                               const PlanExecutorSBE::MetaDataAccessor* metadata);
 
 template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
                                                 sbe::value::SlotAccessor* resultSlot,
@@ -759,8 +759,7 @@ template sbe::PlanState fetchNextImpl<Document>(sbe::PlanStage* root,
                                                 Document* out,
                                                 RecordId* dlOut,
                                                 bool returnOwnedBson,
-                                                const PlanExecutorSBE::MetaDataAccessor& metadata,
-                                                bool bsonWithMetadata);
+                                                const PlanExecutorSBE::MetaDataAccessor* metadata);
 
 // NOTE: We intentionally do not expose overload for the 'Document' type. The only interface to get
 // result from plan in 'Document' type is to call 'PlanExecutorSBE::getNextDocument()'.
@@ -772,6 +771,6 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
                          bool returnOwnedBson) {
     // Sending an empty MetaDataAccessor because we currently only deal with search related
     // metadata, and search query won't reach here.
-    return fetchNextImpl(root, resultSlot, recordIdSlot, out, dlOut, returnOwnedBson, {}, false);
+    return fetchNextImpl(root, resultSlot, recordIdSlot, out, dlOut, returnOwnedBson, nullptr);
 }
 }  // namespace mongo

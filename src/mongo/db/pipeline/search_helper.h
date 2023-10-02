@@ -45,6 +45,7 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+static constexpr auto kReturnStoredSourceArg = "returnStoredSource"_sd;
 
 /**
  * A class that contains any functions needed to run $seach queries when the enterprise module

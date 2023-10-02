@@ -4257,8 +4257,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                   false /* owned */,
                                                   &_slotIdGenerator);
 
-    bool isStoredSource =
-        sn->searchQuery.getBoolField(sbe::SearchCursorStage::kReturnStoredSourceArg);
+    bool isStoredSource = sn->searchQuery.getBoolField(kReturnStoredSourceArg);
 
     auto topLevelFields = getTopLevelFields(reqs.getFields());
     auto topLevelFieldSlots = _slotIdGenerator.generateMultiple(topLevelFields.size());
@@ -4275,7 +4274,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         ? boost::make_optional(_slotIdGenerator.generate())
         : boost::none;
     // Register the $$SEARCH_META slot.
-    [[maybe_unused]] auto searchMetaSlot = _state.getBuiltinVarSlot(Variables::kSearchMetaId);
+    _state.getBuiltinVarSlot(Variables::kSearchMetaId);
 
     std::vector<std::string> metadataNames = {Document::metaFieldSearchScore.toString(),
                                               Document::metaFieldSearchHighlights.toString(),

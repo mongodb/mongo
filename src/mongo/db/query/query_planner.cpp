@@ -536,7 +536,7 @@ bool canUseClusteredCollScan(QuerySolutionNode* node,
  * Creates a query solution node for $search plans that are being pushed down into SBE.
  */
 StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
-    const CanonicalQuery& query) {
+    const QueryPlannerParams& params, const CanonicalQuery& query) {
     if (query.cqPipeline().empty()) {
         return {ErrorCodes::InvalidOptions,
                 "not building $search node because the query pipeline is empty"};
@@ -561,9 +561,14 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
         auto searchNode =
             getSearchHelpers(query.getOpCtx()->getServiceContext())->getSearchNode(stage);
 
-        auto querySoln = std::make_unique<QuerySolution>();
-        querySoln->setRoot(std::move(searchNode));
-        return std::move(querySoln);
+        if (searchNode->searchQuery.getBoolField(kReturnStoredSourceArg) ||
+            searchNode->isSearchMeta) {
+            auto querySoln = std::make_unique<QuerySolution>();
+            querySoln->setRoot(std::move(searchNode));
+            return std::move(querySoln);
+        }
+        // Apply shard filter if needed.
+        return QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(searchNode));
     }
 
     return {ErrorCodes::InvalidOptions, "no search stage found at front of pipeline"};
@@ -1666,7 +1671,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // Create a $search QuerySolution if we are performing a $search.
     if (out.empty()) {
-        auto statusWithSoln = tryToBuildSearchQuerySolution(query);
+        auto statusWithSoln = tryToBuildSearchQuerySolution(params, query);
         if (statusWithSoln.isOK()) {
             out.emplace_back(std::move(statusWithSoln.getValue()));
         } else {
