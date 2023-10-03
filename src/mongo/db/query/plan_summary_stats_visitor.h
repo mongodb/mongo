@@ -60,6 +60,9 @@ public:
     void visit(tree_walker::MaybeConstPtr<true, sbe::HashAggStats> stats) override final {
         _summary.usedDisk |= stats->spilledRecords > 0;
     }
+    void visit(tree_walker::MaybeConstPtr<true, sbe::WindowStats> stats) override final {
+        _summary.usedDisk |= stats->spilledRecords > 0;
+    }
     void visit(tree_walker::MaybeConstPtr<true, SortStats> stats) override final {
         _summary.hasSortStage = true;
         _summary.usedDisk = _summary.usedDisk || stats->spills > 0;

@@ -86,6 +86,7 @@ public:
                 size_t partitionSlotCount,
                 std::vector<Window> windows,
                 boost::optional<value::SlotId> collatorSlot,
+                bool allowDiskUse,
                 PlanNodeId nodeId,
                 bool participateInTrialRunTracking = true);
 
@@ -103,17 +104,80 @@ public:
     size_t estimateCompileTimeSize() const final;
 
 private:
+    /**
+     * Get the last row id either in the buffer or spilled.
+     */
     inline size_t getLastRowId();
+
+    /**
+     * Fetch the next row into the window buffer, this call may cause spilling when memory
+     * usage exceeds the threshold.
+     */
     bool fetchNextRow();
+
+    /**
+     * All rows up until the given id (exclusive) will be freed from the window buffer, the spilled
+     * rows will not be deleted.
+     */
     void freeUntilRow(size_t id);
+
+    /**
+     * Free the entire window buffer and the spilled records, reset all relevant states to their
+     * initial values.
+     */
     void freeRows();
+
+    /**
+     * Set the current partition to the row starting at the given id. Updates all window frame
+     * ranges and window states.
+     */
+    void setPartition(int id);
+
+    /**
+     * Set the accessors to the row of given id, either when the row is in memory buffer or when the
+     * row is spilled.
+     */
+    void setAccessors(size_t id,
+                      const std::vector<std::unique_ptr<value::SwitchAccessor>>& accessors,
+                      size_t& bufferedRowIdx,
+                      value::MaterializedRow& spilledRow);
+
+    /**
+     * Clear the accessors to empty. Use the spilled row to hold the Nothing values.
+     */
+    void clearAccessors(const std::vector<std::unique_ptr<value::SwitchAccessor>>& accessors,
+                        value::MaterializedRow& row);
+
+    /**
+     * Set or clear different accessor types.
+     */
     void setCurrAccessors(size_t id);
     void setBoundTestingAccessors(size_t id);
-    void setFrameFirstAccessors(size_t windowIdx, size_t firstId);
+    void setFrameFirstAccessors(size_t windowIdx, size_t id);
     void clearFrameFirstAccessors(size_t windowIdx);
-    void setFrameLastAccessors(size_t windowIdx, size_t lastId);
+    void setFrameLastAccessors(size_t windowIdx, size_t id);
     void clearFrameLastAccessors(size_t windowIdx);
-    void resetPartition(int start);
+
+    /**
+     * Get the last spilled row id.
+     */
+    inline size_t getLastSpilledRowId();
+
+    /**
+     * Get the estimated total memory size, including both the window buffer and the accumulator
+     * states.
+     */
+    inline size_t getMemoryEstimation();
+
+    /**
+     * Read a spilled row of given id into the provided MaterializedRow.
+     */
+    void readSpilledRow(size_t id, value::MaterializedRow& row);
+
+    /**
+     * Spill all the in memory rows inside the window buffer.
+     */
+    void spill();
 
     const value::SlotVector _currSlots;
     const value::SlotVector _boundTestingSlots;
@@ -123,29 +187,36 @@ private:
     const boost::optional<value::SlotId> _collatorSlot;
 
     using BufferedRowAccessor = value::MaterializedRowAccessor<std::deque<value::MaterializedRow>>;
-    // The in/out accessors for the current document slots, and the index pointing to that
-    // document in the window buffer.
+    using SpilledRowAccessor = value::MaterializedSingleRowAccessor;
+    // The in/out accessors for the current document slots. Either pointing to a row in the window
+    // buffer by an index, or a recovered spilled row.
     std::vector<value::SlotAccessor*> _inCurrAccessors;
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _outCurrAccessors;
-    size_t _currRowIdx;
-    // The accessors for document slots under bound testing, and the index pointing to that
-    // document in the window buffer.
-    std::vector<std::unique_ptr<BufferedRowAccessor>> _boundTestingAccessors;
-    size_t _boundTestingRowIdx;
-    // The accessors for the document slots of the first document in range, and the index pointing
-    // to that document in the window buffer. The accessors are switched with _emptyAccessor to
-    // allow empty window frame.
+    std::vector<std::unique_ptr<value::SwitchAccessor>> _outCurrAccessors;
+    std::vector<std::unique_ptr<BufferedRowAccessor>> _outCurrBufferAccessors;
+    size_t _currBufferedRowIdx;
+    std::vector<std::unique_ptr<SpilledRowAccessor>> _outCurrSpillAccessors;
+    value::MaterializedRow _currSpilledRow;
+    // The accessors for document slots under bound testing. Either pointing to a row in the window
+    // buffer by an index, or a recovered spilled row.
+    std::vector<std::unique_ptr<value::SwitchAccessor>> _boundTestingAccessors;
+    std::vector<std::unique_ptr<BufferedRowAccessor>> _boundTestingBufferAccessors;
+    size_t _boundTestingBufferedRowIdx;
+    std::vector<std::unique_ptr<SpilledRowAccessor>> _boundTestingSpillAccessors;
+    value::MaterializedRow _boundTestingSpilledRow;
+    // The accessors for the document slots of the first document in window frame. Either pointing
+    // to a row in the window buffer by an index, or a recovered spilled row.
     std::vector<std::vector<std::unique_ptr<value::SwitchAccessor>>> _outFrameFirstAccessors;
-    std::vector<std::vector<std::unique_ptr<BufferedRowAccessor>>> _outFrameFirstRowAccessors;
-    std::vector<size_t> _frameFirstRowIdxes;
-    // The accessors for the document slots of the last document in range, and the index pointing
-    // to that document in the window buffer. The accessors are switched with _emptyAccessor to
-    // allow empty window frame.
+    std::vector<std::vector<std::unique_ptr<BufferedRowAccessor>>> _outFrameFirstBufferAccessors;
+    std::vector<size_t> _frameFirstBufferedRowIdxes;
+    std::vector<std::vector<std::unique_ptr<SpilledRowAccessor>>> _outFrameFirstSpillAccessors;
+    std::vector<value::MaterializedRow> _frameFirstSpilledRows;
+    // The accessors for the document slots of the last document in window frame. Either pointing
+    // to a row in the window buffer by an index, or a recovered spilled row.
     std::vector<std::vector<std::unique_ptr<value::SwitchAccessor>>> _outFrameLastAccessors;
-    std::vector<std::vector<std::unique_ptr<BufferedRowAccessor>>> _outFrameLastRowAccessors;
-    std::vector<size_t> _frameLastRowIdxes;
-    // An always empty accessor holding Nothing.
-    std::unique_ptr<value::OwnedValueAccessor> _emptyAccessor;
+    std::vector<std::vector<std::unique_ptr<BufferedRowAccessor>>> _outFrameLastBufferAccessors;
+    std::vector<size_t> _frameLastBufferedRowIdxes;
+    std::vector<std::vector<std::unique_ptr<SpilledRowAccessor>>> _outFrameLastSpillAccessors;
+    std::vector<value::MaterializedRow> _frameLastSpilledRows;
     // The out accessors for the window states.
     std::vector<std::vector<std::unique_ptr<value::OwnedValueAccessor>>> _outWindowAccessors;
 
@@ -175,12 +246,35 @@ private:
     std::deque<value::MaterializedRow> _rows;
     // The first id in the buffered rows.
     size_t _firstRowId{1};
-    // The id of the start of the current partition.
-    size_t _currPartitionId{1};
+    // The last id in the buffered rows.
+    size_t _lastRowId{0};
     // The id of the next partition that we have fetched into the buffer.
     boost::optional<size_t> _nextPartitionId{boost::none};
     // Whether the child stage has reached EOF.
     bool _isEOF{false};
+
+    // Whether to allow spilling.
+    bool _allowDiskUse;
+    // The spilled record storage.
+    std::unique_ptr<TemporaryRecordStore> _recordStore{nullptr};
+    // The temporary data structure to hold record batch before they're spilled.
+    static const long _batchSize = 1000;
+    std::vector<Record> _records;
+    std::vector<SharedBuffer> _recordBuffers;
+    std::vector<Timestamp> _recordTimestamps;
+    // The number of memory samples for the rows.
+    size_t _rowMemorySampleCount{0};
+    // The average of memory for the rows calculated from the samples.
+    size_t _rowMemoryAvg{0};
+    // The memory size for each window accumulator state.
+    std::vector<std::vector<size_t>> _windowMemories;
+    // The random number generator for the row memory sampling.
+    PseudoRandom _random{0};
+    // Memory threshold before spilling.
+    const size_t _memoryThreshold = internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load();
+    // The failpoint counter to force spilling, incremented for every window function update,
+    // every document.
+    long long _failPointSpillCounter{0};
 
     WindowStats _specificStats;
 };

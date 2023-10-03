@@ -112,6 +112,7 @@ public:
     struct SorterDeserializeSettings {
         const CollatorInterface* collator{nullptr};
     };
+    static void deserializeForSorterIntoRow(BufReader&, const SorterDeserializeSettings&, RowType&);
     static RowType deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
     void serializeForSorter(BufBuilder& buf) const;
     int memUsageForSorter() const;

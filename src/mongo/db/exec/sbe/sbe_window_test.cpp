@@ -111,6 +111,7 @@ public:
                                    partitionSlots.size(),
                                    std::move(windows),
                                    collatorSlot,
+                                   false /* allowDiskUse */,
                                    kEmptyPlanNodeId);
 
         value::SlotVector resultSlots;

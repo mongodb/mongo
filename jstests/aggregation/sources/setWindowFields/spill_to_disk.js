@@ -7,6 +7,8 @@
  * do_not_wrap_aggregations_in_facets,
  * ]
  */
+import "jstests/libs/sbe_assert_error_override.js";
+
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     seedWithTickerData,
@@ -18,12 +20,6 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
-
-// TODO SERVER-78709: Implement spilling
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    jsTestLog("Skipping the test since spilling is not implemented in SBE yet");
-    quit();
-}
 
 // Doc size was found through logging the size in the SpillableCache. Partition sizes were chosen
 // arbitrarily.
@@ -61,6 +57,14 @@ function changeSpillLimit({mode, maxDocs}) {
             configureFailPoint: 'overrideMemoryLimitForSpill',
             mode: mode,
             'data': {maxDocsBeforeSpill: maxDocs}
+        }
+    });
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: admin,
+        cmdObj: {
+            configureFailPoint: 'overrideMemoryLimitForSpillForSBEWindowStage',
+            mode: mode,
+            'data': {spillCounter: maxDocs}
         }
     });
 }
@@ -340,7 +344,8 @@ function testErrorsWhenCantSpill() {
 testSpillWithDifferentAccumulators();
 testSpillWithDifferentPartitions();
 // We don't execute setWindowFields in a sharded explain.
-if (!FixtureHelpers.isMongos(db)) {
+// TODO SERVER-78714: Implement explain for $setWindowFields.
+if (!FixtureHelpers.isMongos(db) && !checkSBEEnabled(db, ["featureFlagSbeFull"])) {
     testUsedDiskAppearsInExplain();
 }
 testLargeSpill();

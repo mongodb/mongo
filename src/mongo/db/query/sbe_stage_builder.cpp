@@ -4189,6 +4189,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                          partitionSlotCount,
                                          std::move(windows),
                                          collatorSlot,
+                                         _cq.getExpCtx()->allowDiskUse,
                                          windowNode->nodeId());
 
     // Get final window outputs.

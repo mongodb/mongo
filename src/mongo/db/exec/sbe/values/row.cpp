@@ -570,16 +570,25 @@ static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, 
 }
 
 template <typename RowType>
-RowType RowBase<RowType>::deserializeForSorter(BufReader& buf,
-                                               const SorterDeserializeSettings& settings) {
+void RowBase<RowType>::deserializeForSorterIntoRow(BufReader& buf,
+                                                   const SorterDeserializeSettings& settings,
+                                                   RowType& row) {
     auto cnt = buf.read<LittleEndian<size_t>>();
-    RowType result{cnt};
-
+    if (row.size() != cnt) {
+        row.resize(cnt);
+    }
     for (size_t idx = 0; idx < cnt; ++idx) {
         auto [tag, val] = deserializeValue(buf, settings.collator);
-        result.reset(idx, true, tag, val);
+        row.reset(idx, true, tag, val);
     }
+}
 
+template <typename RowType>
+RowType RowBase<RowType>::deserializeForSorter(BufReader& buf,
+                                               const SorterDeserializeSettings& settings) {
+    auto cnt = buf.peek<LittleEndian<size_t>>();
+    RowType result{cnt};
+    RowBase<RowType>::deserializeForSorterIntoRow(buf, settings, result);
     return result;
 }
 
