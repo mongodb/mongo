@@ -43,7 +43,17 @@ for (let i = 0; i < 2; i++) {
         c: {d: "x"},
         e: {"$f": 30},
         f: [{"$a": 41}, {"$b..": 42}],
-        "$v..": null
+        "$v..": null,
+        foo: "bar",
+        bar: "baz",
+        "letterB": "b",
+        "$b": "b",
+        arr: {0: {0: {0: {b: "bar"}}}},
+        maybeStr: (i === 0) ? "2" : 2,
+        "$.1": "$.2",
+        "$.2": "bar",
+        items: [0, 1, 2, 3, 4],
+        lookupField: "field" + i,
     }));
 }
 
@@ -53,7 +63,7 @@ assertGetFieldFailedWithCode({field: "a"}, 3041703);
 
 // Test that $getField fails with a document with one or more arguments of incorrect type.
 assertGetFieldFailedWithCode({field: true, input: {a: "b"}}, 5654602);
-assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 5654601);
+assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 3041704);
 assertGetFieldFailedWithCode(5, 5654602);
 assertGetFieldFailedWithCode(true, 5654602);
 assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, 5654602);
@@ -61,22 +71,21 @@ assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, 5654602);
 // Test that $getField fails with a document with invalid arguments.
 assertGetFieldFailedWithCode({field: "a", input: {a: "b"}, unknown: true}, 3041701);
 
-// Test that $getField fails when 'field' argument is a field reference.
-assertGetFieldFailedWithCode({field: "$a", input: {a: "b"}}, 5654600);
-assertGetFieldFailedWithCode({field: "$a.b", input: {a: "b"}}, 5654600);
-assertGetFieldFailedWithCode({field: "$$CURRENT.a", input: {a: "b"}}, 5654600);
-
-// Test that $getField fails when 'field' argument is an arbitrary expression other than '$const'
-// String.
-assertGetFieldFailedWithCode({$add: [2, 3]}, 5654601);
-assertGetFieldFailedWithCode({field: {$concat: ["a", "b"]}, input: {"a": 1}}, 5654601);
-assertGetFieldFailedWithCode({field: {$cond: [false, null, "x"]}, input: {"a": 1}}, 5654601);
+// Test that $getField fails when 'field' argument is an arbitrary expression that doesn't evaluate
+// to a string.
+assertGetFieldFailedWithCode({$add: [2, 3]}, 3041704);
 assertGetFieldFailedWithCode({$const: true}, 5654602);
 assertGetFieldFailedWithCode({$const: {"a": 1}}, 5654602);
 assertGetFieldFailedWithCode({field: {$const: []}, input: {"a": 1}}, 5654602);
 
 // Test that $getField returns the correct value from the provided object.
 assertGetFieldResultsEq({field: "a", input: {a: "b"}}, [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
+assertGetFieldResultsEq({field: {$concat: ["a", "b"]}, input: {ab: "b"}},
+                        [{_id: 0, test: "b"}, {_id: 1, test: "b"}])
+assertGetFieldResultsEq({field: {$cond: [false, null, "x"]}, input: {x: "b"}},
+                        [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
+assertGetFieldResultsEq({field: {$cond: [{$eq: ["$y", 9]}, null, "x"]}, input: {x: "b"}},
+                        [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
 
 // Test that $getField returns the correct value from the $$CURRENT object.
 assertGetFieldResultsEq("a", [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
@@ -94,6 +103,65 @@ assertGetFieldResultsEq(
     [{_id: 0, test: {"$a": 1, "$b..$c": 2}}, {_id: 1, test: {"$a": 1, "$b..$c": 2}}]);
 assertGetFieldResultsEq({field: {$const: "$f"}, input: "$e"},
                         [{_id: 0, test: 30}, {_id: 1, test: 30}]);
+
+// Test that $getField returns the correct value when 'field' argument contains a field reference
+// evaluating to a string value.
+assertGetFieldResultsEq("$foo", [{_id: 0, test: "baz"}, {_id: 1, test: "baz"}]);
+assertGetFieldResultsEq({$concat: ["$letterB", "a", "r"]},
+                        [{_id: 0, test: "baz"}, {_id: 1, test: "baz"}]);
+
+// Test that $getField fails when 'field' argument is a field reference that evaluates to string for
+// some but not all documents.
+assertGetFieldFailedWithCode("$maybeStr", 3041704);
+
+// Test that $getField fails when 'field' argument is a field reference evaluating to a non-string
+// value.
+assertGetFieldFailedWithCode("$a", 3041704);
+assertGetFieldFailedWithCode("$a.b", 3041704);
+assertGetFieldFailedWithCode("$$CURRENT.a", 3041704);
+assertGetFieldFailedWithCode("$x", 3041704);
+assertGetFieldFailedWithCode("$missing", 3041704);
+assertGetFieldFailedWithCode("$arr.0.1.2.x", 3041704);
+
+// Test that $getField returns the correct value when 'field' argument is a dynamic expression
+// evaluation to a string value.
+assertGetFieldResultsEq({$concat: ["b", "a", "r"]}, [{_id: 0, test: "baz"}, {_id: 1, test: "baz"}]);
+assertGetFieldResultsEq({$concat: [{$getField: {$const: "$b"}}, "a", "r"]},
+                        [{_id: 0, test: "baz"}, {_id: 1, test: "baz"}]);
+assertGetFieldResultsEq({$getField: {$getField: {$const: "$.1"}}},
+                        [{_id: 0, test: "baz"}, {_id: 1, test: "baz"}]);
+assertGetFieldResultsEq("$c.d", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
+assertGetFieldResultsEq("$arr.0.0.0.b", [{_id: 0, test: "baz"}, {_id: 1, test: "baz"}]);
+
+// Test that $getField fails when 'field' argument is a dynamic expression evaluating to a
+// non-string value.
+assertGetFieldFailedWithCode({$add: [1, 2]}, 3041704);
+assertGetFieldFailedWithCode({$mod: [5, 10]}, 3041704);
+assertGetFieldFailedWithCode({$month: "$$NOW"}, 3041704);
+assertGetFieldFailedWithCode({$ne: ["$x", 1]}, 3041704);
+assertGetFieldFailedWithCode({$toDouble: "2.5"}, 3041704);
+assertGetFieldFailedWithCode({$reverseArray: "$items"}, 3041704);
+assertGetFieldFailedWithCode({$mergeObjects: ["$c", "$e"]}, 3041704);
+assertGetFieldFailedWithCode({$mergeObjects: [null, null]}, 3041704);
+
+// Test that $getField returns the correct value when 'field' argument contains reference to a
+// system variable.
+assertGetFieldResultsEq("$$CURRENT.c.d", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
+assertGetFieldResultsEq("$$ROOT.c.d", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
+assertGetFieldResultsEq({$toString: "$$NOW"}, [{_id: 0}, {_id: 1}]);
+
+// Test that $getField fails when 'field' argument is a reference to a system variable that is of
+// resolves to a non-string type or is not available.
+assertGetFieldFailedWithCode("$$NOW", 3041704);
+assertGetFieldFailedWithCode("$$REMOVE", 3041704);
+assertGetFieldFailedWithCode("$$DESCEND", 17276);
+assertGetFieldFailedWithCode("$$PRUNE", 17276);
+assertGetFieldFailedWithCode("$$KEEP", 17276);
+assertGetFieldFailedWithCode("$$USER_ROLES", 3041704);
+// Error code depends on presence of the enterprise module.
+assertGetFieldFailedWithCode("$$SEARCH_META", [6347902, 6347903]);
+// $$CLUSTER_TIME is only available on replica sets and sharded clusters.
+assertGetFieldFailedWithCode("$$CLUSTER_TIME", [3041704, 51144]);
 
 // Test that $getField treats dotted fields as key literals instead of field paths. Note that it is
 // necessary to use $const in places, otherwise object field validation would reject some of these
@@ -209,3 +277,39 @@ assertPipelineResultsEq([{
                             $bucket: {groupBy: {$getField: "x"}, boundaries: [0, 1, 2, 3, 4]}
                         }],  // We should get two buckets here for the two possible values of x.
                         [{_id: 0, count: 1}, {_id: 1, count: 1}]);
+
+// Test $getField expression with uncorrelated $lookup and $project with dynamic field expression.
+{
+    const coll2 = db.expression_get_field_lookup_test;
+    coll2.drop();
+
+    assert.commandWorked(coll2.insert({_id: 0, field0: "0", field1: "1"}));
+
+    assertPipelineResultsEq(
+        [
+            {
+                $lookup: {
+                    let: {
+                        // Either "field0" or "field1"
+                        field: "$lookupField"
+                    }, 
+                    from: "expression_get_field_lookup_test",
+                    pipeline: [
+                        {
+                            $project: {
+                                field: {$getField: {field: "$$field", input: "$$CURRENT"}}
+                            }
+                        }
+                    ],
+                    as: "result"
+                }
+            },
+            {$project: {result: 1}},
+        ], 
+        [
+            {_id: 0, result: [{_id: 0, field: "0"}]},
+            {_id: 1, result: [{_id: 0, field: "1"}]},
+        ]);
+
+    coll2.drop();
+}

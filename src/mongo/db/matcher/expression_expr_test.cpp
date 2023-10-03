@@ -849,6 +849,16 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
         R"({"$expr":{"$getField":{"field":"HASH<b>","input":"?object"}}})",
         serialize(opts));
 
+    createMatcher(fromjson("{$expr: {$getField: {field: \"$b\", input: {a: 1, b: 2}}}}"));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$getField":{"field":"$HASH<b>","input":"?object"}}})",
+        serialize(opts));
+
+    createMatcher(fromjson("{$expr: {$getField: {field: {$const: \"$b\"}, input: {a: 1, b: 2}}}}"));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$getField":{"field":{$const:"HASH<$b>"},"input":"?object"}}})",
+        serialize(opts));
+
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: \"$a\"}}}"));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$getField":{"field":"HASH<b>","input":"$HASH<a>"}}})",

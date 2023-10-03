@@ -7907,39 +7907,23 @@ intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const exp
             str::stream() << kExpressionName << " requires 'input' to be specified",
             inputExpr);
 
-    // The 'field' argument to '$getField' must evaluate to a constant string, for example,
-    // {$const: "$a.b"}. In case the has forgotten to wrap the value into a '$const' or
-    // '$literal' expression, we will raise an error with a more meaningful description.
-    if (auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(fieldExpr.get()); fieldPathExpr) {
-        auto fp = fieldPathExpr->getFieldPath().fullPathWithPrefix();
-        uasserted(5654600,
-                  str::stream() << "'" << fp
-                                << "' is a field path reference which is not allowed "
-                                   "in this context. Did you mean {$literal: '"
-                                << fp << "'}?");
+    if (auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get()); constFieldExpr) {
+        uassert(5654602,
+                str::stream() << kExpressionName
+                              << " requires 'field' to evaluate to type String, "
+                                 "but got "
+                              << typeName(constFieldExpr->getValue().getType()),
+                constFieldExpr->getValue().getType() == BSONType::String);
     }
-
-    auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get());
-    uassert(5654601,
-            str::stream() << kExpressionName
-                          << " requires 'field' to evaluate to a constant, "
-                             "but got a non-constant argument",
-            constFieldExpr);
-    uassert(5654602,
-            str::stream() << kExpressionName
-                          << " requires 'field' to evaluate to type String, "
-                             "but got "
-                          << typeName(constFieldExpr->getValue().getType()),
-            constFieldExpr->getValue().getType() == BSONType::String);
 
     return make_intrusive<ExpressionGetField>(expCtx, fieldExpr, inputExpr);
 }
 
 Value ExpressionGetField::evaluate(const Document& root, Variables* variables) const {
     auto fieldValue = _children[_kField]->evaluate(root, variables);
-    // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
-    // string.
-    tassert(3041704,
+    // If '_children[_kField]' is a constant expression, the parser guarantees that it evaluates to
+    // a string. If it's a dynamic expression, its type can't be deduced during parsing.
+    uassert(3041704,
             str::stream() << kExpressionName
                           << " requires 'field' to evaluate to type String, "
                              "but got "
@@ -7965,22 +7949,31 @@ intrusive_ptr<Expression> ExpressionGetField::optimize() {
 }
 
 Value ExpressionGetField::serialize(const SerializationOptions& options) const {
-    // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
-    // string.
-    auto strPath =
-        static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
+    Value fieldValue;
 
-    Value maybeRedactedPath{options.serializeFieldPathFromString(strPath)};
-    // This is a pretty unique option to serialize. It is both a constant and a field path, which
-    // means that it:
-    //  - should be redacted (if that option is set).
-    //  - should *not* be wrapped in $const iff we are serializing for a debug string
-    if (options.literalPolicy != LiteralSerializationPolicy::kToDebugTypeString) {
-        maybeRedactedPath = Value(Document{{"$const"_sd, maybeRedactedPath}});
+    if (auto fieldExprConst = dynamic_cast<ExpressionConstant*>(_children[_kField].get());
+        fieldExprConst) {
+        auto strPath = fieldExprConst->getValue().getString();
+
+        Value maybeRedactedPath{options.serializeFieldPathFromString(strPath)};
+        // This is a pretty unique option to serialize. It is both a constant and a field path,
+        // which means that it:
+        //  - should be redacted (if that option is set).
+        //  - should *not* be wrapped in $const iff we are serializing for a debug string
+        // However, if we are serializing for a debug string and the string looks like a field
+        // reference, it should be wrapped in $const to make it unambiguous with actual field
+        // references.
+        if (options.literalPolicy != LiteralSerializationPolicy::kToDebugTypeString ||
+            strPath[0] == '$') {
+            maybeRedactedPath = Value(Document{{"$const"_sd, maybeRedactedPath}});
+        }
+        fieldValue = maybeRedactedPath;
+    } else {
+        fieldValue = _children[_kField]->serialize(options);
     }
 
     return Value(Document{{"$getField"_sd,
-                           Document{{"field"_sd, std::move(maybeRedactedPath)},
+                           Document{{"field"_sd, std::move(fieldValue)},
                                     {"input"_sd, _children[_kInput]->serialize(options)}}}});
 }
 

@@ -3779,6 +3779,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: {\"field\": \"foo\", \"input\": {a: 1}}}");
     auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
+
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "ignoredField": {
@@ -3795,6 +3796,163 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
             }
         })",
         BSON("ignoredField" << expression->serialize(SerializationOptions{})));
+
+    expr = fromjson("{$meta: {\"field\": {$const: \"$foo\"}, \"input\": {a: 1}}}");
+    expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": {
+                        "$const": "$foo"
+                    },
+                    "input": {
+                        "a": {
+                            "$const": 1
+                        }
+                    }
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(SerializationOptions{})));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": {
+                        "$const": "$foo"
+                    },
+                    input: {
+                        $const: {"?": "?"}
+                    }
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(
+                 SerializationOptions::kRepresentativeQueryShapeSerializeOptions)));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": {
+                        "$const": "$foo"
+                    },
+                    "input": "?object"
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(
+                 SerializationOptions::kDebugQueryShapeSerializeOptions)));
+}
+
+TEST(ExpressionGetFieldTest, GetFieldWithDynamicFieldExpressionSerializesCorrectly) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: {\"field\": {$toString: \"$foo\"}, \"input\": {a: 1}}}");
+    auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": {
+                        $convert: {
+                            input: "$foo", 
+                            to: {$const: "string"}
+                        }
+                    },
+                    "input": {
+                        "a": {
+                            "$const": 1
+                        }
+                    }
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(SerializationOptions{})));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                $getField: {
+                    field: {
+                        $convert: {
+                            input: "$foo",
+                            to: {$const: "?"}
+                        }
+                    },
+                    input: {
+                        $const: {"?": "?"}
+                    }
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(
+                 SerializationOptions::kRepresentativeQueryShapeSerializeOptions)));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                $getField: {
+                    field: {
+                        $convert: {
+                            input: "$foo",
+                            to: "?string"
+                        }
+                    },
+                    input: "?object"
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(
+                 SerializationOptions::kDebugQueryShapeSerializeOptions)));
+
+    expr = fromjson("{$meta: {\"field\": \"$foo\", \"input\": {a: 1}}}");
+    expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": "$foo",
+                    "input": {
+                        "a": {
+                            "$const": 1
+                        }
+                    }
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(SerializationOptions{})));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": "$foo",
+                    "input": {
+                        $const: {"?": "?"}
+                    }
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(
+                 SerializationOptions::kRepresentativeQueryShapeSerializeOptions)));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": "$foo",
+                    "input": "?object"
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(
+                 SerializationOptions::kDebugQueryShapeSerializeOptions)));
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
