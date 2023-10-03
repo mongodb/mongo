@@ -39,7 +39,7 @@ AggCmdShapeComponents::AggCmdShapeComponents(
     std::vector<BSONObj> pipeline)
     : request(aggRequest),
       involvedNamespaces(std::move(involvedNamespaces_)),
-      pipelineShape(std::move(pipeline)) {}
+      representativePipeline(std::move(pipeline)) {}
 
 void AggCmdShapeComponents::HashValue(absl::HashState state) const {
     if (request.getAllowDiskUse()) {
@@ -48,7 +48,7 @@ void AggCmdShapeComponents::HashValue(absl::HashState state) const {
     if (request.getExplain()) {
         state = absl::HashState::combine(std::move(state), *request.getExplain());
     }
-    for (auto&& shapifiedStage : pipelineShape) {
+    for (auto&& shapifiedStage : representativePipeline) {
         state = absl::HashState::combine(std::move(state), simpleHash(shapifiedStage));
     }
 }
@@ -57,8 +57,12 @@ void AggCmdShape::appendLetCmdSpecificShapeComponents(
     BSONObjBuilder& bob,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const SerializationOptions& opts) const {
-    // TODO SERVER-76330 use representative shape.
-    if (opts == SerializationOptions::kDebugQueryShapeSerializeOptions) {
+    tassert(7633000,
+            "We don't support serializing to the unmodified shape here, since we have already "
+            "shapified and stored the representative query - we've lost the original literals",
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+
+    if (opts == SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
         // We have this copy stored already!
         return _components.appendTo(bob);
     } else {
@@ -66,7 +70,7 @@ void AggCmdShape::appendLetCmdSpecificShapeComponents(
         // re-parse the pipeline from the initial request.
         expCtx->inMongos = _inMongos;
         expCtx->addResolvedNamespaces(_components.involvedNamespaces);
-        auto reparsed = Pipeline::parse(_components.request.getPipeline(), expCtx);
+        auto reparsed = Pipeline::parse(_components.representativePipeline, expCtx);
         auto serializedPipeline = reparsed->serializeToBson(opts);
         AggCmdShapeComponents{
             _components.request, _components.involvedNamespaces, serializedPipeline}
@@ -78,7 +82,7 @@ void AggCmdShapeComponents::appendTo(BSONObjBuilder& bob) const {
     bob.append("command", "aggregate");
 
     // pipeline
-    bob.append(AggregateCommandRequest::kPipelineFieldName, pipelineShape);
+    bob.append(AggregateCommandRequest::kPipelineFieldName, representativePipeline);
 
     // explain
     if (request.getExplain().has_value()) {
@@ -184,7 +188,7 @@ int64_t aggRequestSize(const AggregateCommandRequest& request) {
 }  // namespace
 
 int64_t AggCmdShapeComponents::size() const {
-    return sum({sizeof(*this), _size(pipelineShape), aggRequestSize(request)});
+    return sum({sizeof(*this), _size(representativePipeline), aggRequestSize(request)});
 }
 
 AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
@@ -197,10 +201,10 @@ AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
                       _components,
                       std::move(origNss),
                       aggregateCommand.getCollation().value_or(BSONObj())),
-      // TODO SERVER-76330 use representative shape.
       _components(aggregateCommand,
                   std::move(involvedNamespaces_),
-                  pipeline.serializeToBson(SerializationOptions::kDebugQueryShapeSerializeOptions)),
+                  pipeline.serializeToBson(
+                      SerializationOptions::kRepresentativeQueryShapeSerializeOptions)),
       _inMongos(expCtx->inMongos) {}
 
 }  // namespace mongo::query_shape

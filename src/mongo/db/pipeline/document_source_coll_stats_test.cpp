@@ -44,6 +44,13 @@
 namespace mongo {
 namespace {
 using DocumentSourceCollStatsTest = AggregationContextFixture;
+
+auto representativeShape(const DocumentSourceCollStats& collStatsStage) {
+    SerializationOptions opts{.literalPolicy =
+                                  LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    return collStatsStage.serialize(opts).getDocument().toBson();
+}
+
 TEST_F(DocumentSourceCollStatsTest, QueryShape) {
     auto spec = DocumentSourceCollStatsSpec();
 
@@ -51,13 +58,19 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$collStats":{}})",
         redact(*stage));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$collStats":{}})",
+        representativeShape(*stage));
 
     spec.setCount(BSONObj());
     spec.setQueryExecStats(BSONObj());
     stage = make_intrusive<DocumentSourceCollStats>(getExpCtx(), spec);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$collStats":{"count":"?object","queryExecStats":"?object"}})",
+        R"({"$collStats":{"count":{},"queryExecStats":{}}})",
         redact(*stage));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$collStats":{"count":{},"queryExecStats":{}}})",
+        representativeShape(*stage));
 
     auto latencyStats = LatencyStatsSpec();
     latencyStats.setHistograms(true);
@@ -69,8 +82,8 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                 "latencyStats": {
                     "histograms": true
                 },
-                "count": "?object",
-                "queryExecStats": "?object"
+                "count": {},
+                "queryExecStats": {}
             }
         })",
         redact(*stage));
@@ -92,8 +105,8 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                     "waitForLock": true,
                     "numericOnly": false
                 },
-                "count": "?object",
-                "queryExecStats": "?object"
+                "count": {},
+                "queryExecStats": {}
             }
         })",
         redact(*stage));
@@ -114,8 +127,8 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                     "waitForLock": false,
                     "numericOnly": false
                 },
-                "count": "?object",
-                "queryExecStats": "?object"
+                "count": {},
+                "queryExecStats": {}
             }
         })",
         redact(*stage));

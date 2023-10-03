@@ -69,7 +69,7 @@ struct AggCmdComponents : public SpecificKeyComponents {
 
     int64_t size() const;
 
-    // TODO SERVER-76330 owned here for now, duplicating memory... This is not really accounted for
+    // TODO SERVER-78429 owned here for now, duplicating memory... This is not really accounted for
     // right now but we should fix it soon.
     AggregateCommandRequest request;
     stdx::unordered_set<NamespaceString> involvedNamespaces;

@@ -185,18 +185,22 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
 }
 
 Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) const {
-    // This document source never contains any user information, so serialization options do not
-    // apply.
-    return Value{Document{
-        {kStageName,
-         _transformIdentifiers
-             ? Document{{"transformIdentifiers",
-                         Document{
-                             {"algorithm", TransformAlgorithm_serializer(_algorithm)},
-                             {"hmacKey",
-                              opts.serializeLiteral(BSONBinData(
-                                  _hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive))}}}}
-             : Document{}}}};
+    auto hmacKey = opts.serializeLiteral(
+        BSONBinData(_hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive));
+    if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
+        // The default shape for a BinData under this policy is empty and has sub-type 0 (general).
+        // This doesn't quite work for us since we assert when we parse that it is at least 32 bytes
+        // and also is sub-type 8 (sensitive).
+        hmacKey =
+            Value(BSONBinData("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 32, BinDataType::Sensitive));
+    }
+    return Value{
+        Document{{kStageName,
+                  _transformIdentifiers
+                      ? Document{{"transformIdentifiers",
+                                  Document{{"algorithm", TransformAlgorithm_serializer(_algorithm)},
+                                           {"hmacKey", hmacKey}}}}
+                      : Document{}}}};
 }
 
 DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {

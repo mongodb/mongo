@@ -45,8 +45,8 @@ namespace mongo::query_shape {
  *
  * This struct stores the shapified version of the pipeline as a memory optimization. We'll need to
  * store the BSON version in either case, since often the parsed version needs that BSON to survive
- * as backing memory, so we (plan to - in SERVER-76330) store the representative pipeline shape so
- * that we are able to parse the pipeline again if we need to compute a different shape.
+ * as backing memory, so we store the representative pipeline shape so that we are able to parse the
+ * pipeline again if we need to compute a different shape.
  */
 struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
     AggCmdShapeComponents(const AggregateCommandRequest&,
@@ -59,14 +59,14 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
 
     void HashValue(absl::HashState state) const final;
 
-    // TODO SERVER-76330 We'd like to store the pieces here rather than the full request.
+    // TODO SERVER-78429 we don't need to store this for the pipeline anymore, but we do need some
+    // of the other pieces.
     AggregateCommandRequest request;
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
 
-    // TODO SERVER-76330 for now this is stored as the debug shape, but we'll want to use the
-    // representative shape in the end.
-    std::vector<BSONObj> pipelineShape;
+    // The representative query shape of the pipeline.
+    std::vector<BSONObj> representativePipeline;
 };
 
 /**

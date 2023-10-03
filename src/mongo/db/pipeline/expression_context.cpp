@@ -250,8 +250,6 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::makeBlankExpressionCo
     boost::optional<BSONObj> shapifiedLet) {
     // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
     // to mongot.
-    // TODO SERVER-76330 look into if this could be consolidated between query stats key
-    // generator types and potentially remove one of the makeQueryStatsKey() overrides
     const auto nss = nssOrUUID.isNamespaceString() ? nssOrUUID.nss() : NamespaceString{};
     // This constructor is private, so we can't use `boost::make_instrusive()`.
     return boost::intrusive_ptr<ExpressionContext>{new ExpressionContext(opCtx, nss, shapifiedLet)};

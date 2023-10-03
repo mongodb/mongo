@@ -17,6 +17,7 @@ selector:
   - jstests/core/txns/**/*.js
   # Queryable encryption is not supported on standalone
   - jstests/core/queryable_encryption/**/*.js
+  - jstests/core/timeseries/timeseries_union_with.js
   exclude_with_any_tags:
   # Running $queryStats will increment these counters which can screw up some test assertions.
   - inspects_command_opcounters
