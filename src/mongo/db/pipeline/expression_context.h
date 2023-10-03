@@ -207,6 +207,22 @@ public:
                       boost::optional<ExplainOptions::Verbosity> explain = boost::none);
 
     /**
+     * Constructs a blank ExpressionContext suitable for creating Query Shapes, but it could be
+     * applied to other use cases as well.
+     *
+     * The process for creating a Query Shape sometimes requires re-parsing the BSON into a proper
+     * AST, and for that you need an ExpressionContext.
+     *
+     * Note: this is meant for introspection and is not suitable for using to execute queries -
+     * since it does not contain for example a collation argument or a real MongoProcessInterface
+     * for execution.
+     */
+    static boost::intrusive_ptr<ExpressionContext> makeBlankExpressionContext(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        boost::optional<BSONObj> shapifiedLet = boost::none);
+
+    /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
      * this aggregation pipeline has been interrupted.
      */
@@ -682,6 +698,13 @@ protected:
     bool _requiresTimeseriesExtendedRangeSupport = false;
 
 private:
+    // Instantiates an ExpressionContext which does not increment expression counters and does not
+    // enforce FCV restrictions. It is used for implementing the `makeBlankExpressionContext()`
+    // factory method.
+    ExpressionContext(OperationContext* opCtx,
+                      const NamespaceString& ns,
+                      const boost::optional<BSONObj>& letParameters = boost::none);
+
     std::unique_ptr<ExpressionCounters> _expressionCounters;
     bool _gotTemporarilyUnavailableException = false;
 

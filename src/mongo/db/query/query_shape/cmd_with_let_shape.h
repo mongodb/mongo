@@ -101,15 +101,6 @@ protected:
         const SerializationOptions&) const = 0;
 
     LetShapeComponent _let;
-
-private:
-    /**
-     * We can't materialize and store all possible query shapes, so in order to compute a certain
-     * query shape with any given SerializationOptions we sometimes need to re-parse some BSON into
-     * an AST to understand what values need to be shapified. This process requires an
-     * ExpressionContext. Sub-classes may need this ExpressionContext to be initialized differently.
-     */
-    boost::intrusive_ptr<ExpressionContext> makeDummyExpCtx(OperationContext*) const;
 };
 
 

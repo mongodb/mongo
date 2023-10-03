@@ -91,28 +91,10 @@ void LetShapeComponent::addLetBson(BSONObjBuilder& bob,
 void CmdWithLetShape::appendCmdSpecificShapeComponents(BSONObjBuilder& bob,
                                                        OperationContext* opCtx,
                                                        const SerializationOptions& opts) const {
-    auto expCtx = makeDummyExpCtx(opCtx);
+    auto expCtx =
+        ExpressionContext::makeBlankExpressionContext(opCtx, nssOrUUID, _let.shapifiedLet);
     _let.addLetBson(bob, opts, expCtx);
     appendLetCmdSpecificShapeComponents(bob, expCtx, opts);
-}
-
-boost::intrusive_ptr<ExpressionContext> CmdWithLetShape::makeDummyExpCtx(
-    OperationContext* opCtx) const {
-    // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
-    // to mongot.
-    // TODO SERVER-76330 look into if this could be consolidated between query stats key
-    // generator types and potentially remove one of the makeQueryStatsKey() overrides
-    const auto nss = nssOrUUID.isNamespaceString() ? nssOrUUID.nss() : NamespaceString{};
-    // TODO collator should maybe be instantiated?
-    auto expCtx =
-        make_intrusive<ExpressionContext>(opCtx, nullptr, nss, boost::none, _let.shapifiedLet);
-    expCtx->variables.setDefaultRuntimeConstants(expCtx->opCtx);
-    expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
-    // Expression counters are reported in serverStatus to indicate how often clients use certain
-    // expressions/stages, so it's a side effect tied to parsing. We must stop expression counters
-    // before re-parsing to avoid adding to the counters more than once per a given query.
-    expCtx->stopExpressionCounters();
-    return expCtx;
 }
 
 CmdWithLetShape::CmdWithLetShape(boost::optional<BSONObj> let,
