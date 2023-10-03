@@ -390,11 +390,24 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     // from the _rangesScheduledForDeletion.  std::list iterators are never invalidated, which
     // allows us to save the iterator pointing to the newly added element for use later when
     // deleting it.
-    cleanupComplete.thenRunOn(_executor).getAsync(
-        [self = shared_from_this(), it = _rangesScheduledForDeletion.begin()](Status s) {
-            stdx::lock_guard<Latch> lg(self->_managerLock);
-            self->_rangesScheduledForDeletion.erase(it);
-        });
+    cleanupComplete.thenRunOn(_executor).getAsync([self = shared_from_this(),
+                                                   it = _rangesScheduledForDeletion.begin(),
+                                                   range = range,
+                                                   migrationId = migrationId](Status s) {
+        stdx::lock_guard<Latch> lg(self->_managerLock);
+        self->_rangesScheduledForDeletion.erase(it);
+        if (s.code() == ErrorCodes::IndexNotFound) {
+            // We cannot complete this range deletion right now because we do not have an index
+            // built on the shard key. This situation is expected for a hashed shard key and
+            // recoverable for a range shard key. This index may be rebuilt in the future, so
+            // reschedule the task at the end of the queue.
+            auto _ = self->_submitRangeForDeletion(lg,
+                                                   SemiFuture<void>::makeReady(),
+                                                   range,
+                                                   migrationId,
+                                                   Seconds(orphanCleanupDelaySecs.load()));
+        }
+    });
 
     return cleanupComplete;
 }
