@@ -529,4 +529,25 @@ TEST(NamespaceStringUtilTest, AuthPrevalidatedContext) {
         }
     }
 }
+
+TEST(NamespaceStringUtilTest, SerializingEmptyNamespaceSting) {
+    const auto emptyNss = NamespaceString();
+    const auto kEmptyNss = NamespaceString::kEmpty;
+    const auto sc = SerializationContext::stateDefault();
+    ASSERT_EQ(NamespaceStringUtil::serialize(emptyNss, sc),
+              NamespaceStringUtil::serialize(kEmptyNss, sc));
+
+    const auto emptyDbNss =
+        NamespaceString::createNamespaceString_forTest(DatabaseName::kEmpty, "");
+    ASSERT_EQ(NamespaceStringUtil::serialize(emptyDbNss, sc),
+              NamespaceStringUtil::serialize(kEmptyNss, sc));
+    {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+        const TenantId tid = TenantId(OID::gen());
+        const auto emptyTenantIdDbNss =
+            NamespaceString(DatabaseName::createDatabaseName_forTest(tid, ""));
+        const std::string expectedSerialization = str::stream() << tid.toString() << "_";
+        ASSERT_EQ(NamespaceStringUtil::serialize(emptyTenantIdDbNss, sc), expectedSerialization);
+    }
+}
 }  // namespace mongo

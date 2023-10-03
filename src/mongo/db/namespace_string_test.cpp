@@ -628,5 +628,15 @@ TEST_F(NamespaceStringTest, CompareNSSWithTenantId) {
     ASSERT_GT(ns3, ns2);
 }
 
+TEST_F(NamespaceStringTest, EmptyNamespaceString) {
+    const auto emptyNss = NamespaceString();
+    const auto kEmptyNss = NamespaceString::kEmpty;
+    ASSERT_EQ(emptyNss, kEmptyNss);
+    ASSERT_EQ(emptyNss.toStringForErrorMsg(), kEmptyNss.toStringForErrorMsg());
+    ASSERT_EQ(emptyNss.dbName(), DatabaseName::kEmpty);
+    ASSERT_EQ(emptyNss.coll().empty(), true);
+    ASSERT_EQ(emptyNss.toStringForErrorMsg(), "");
+}
+
 }  // namespace
 }  // namespace mongo

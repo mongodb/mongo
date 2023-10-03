@@ -870,10 +870,11 @@ private:
                 "namespaces cannot have embedded null characters",
                 collectionName.find('\0') == std::string::npos);
 
-        _data.resize(dbName._data.size() + 1 + collectionName.size());
+        _data.resize(collectionName.empty() ? dbName._data.size()
+                                            : dbName._data.size() + 1 + collectionName.size());
         std::memcpy(_data.data(), dbName._data.data(), dbName._data.size());
-        *reinterpret_cast<uint8_t*>(_data.data() + dbName._data.size()) = '.';
         if (!collectionName.empty()) {
+            *reinterpret_cast<uint8_t*>(_data.data() + dbName._data.size()) = '.';
             std::memcpy(_data.data() + dbName._data.size() + 1,
                         collectionName.rawData(),
                         collectionName.size());
