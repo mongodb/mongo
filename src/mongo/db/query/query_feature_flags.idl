@@ -36,6 +36,12 @@ feature_flags:
       default: false
       shouldBeFCVGated: false
 
+    featureFlagOptimizerPlanCache:
+      description: "Enables the plan cache for the Cascades-based query optimizer"
+      cpp_varname: gFeatureFlagOptimizerPlanCache
+      default: false
+      shouldBeFCVGated: false
+
     featureFlagColumnstoreIndexes:
       description: "Enables creation of a new columnstore index type"
       cpp_varname: gFeatureFlagColumnstoreIndexes
