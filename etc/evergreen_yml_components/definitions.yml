@@ -345,6 +345,7 @@ variables:
   - enterprise-amazon2023-arm64
   - enterprise-amazon2023-arm64-lto
   - enterprise-debian11-64
+  - enterprise-debian12-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-arm64
@@ -380,7 +381,9 @@ variables:
   - enterprise-amazon2023
   - enterprise-amazon2023-arm64
   - debian11
+  - debian12
   - enterprise-debian11-64
+  - enterprise-debian12-64
   - rhel70
   - rhel76_compile_rhel70
   - enterprise-rhel-70-64-bit
