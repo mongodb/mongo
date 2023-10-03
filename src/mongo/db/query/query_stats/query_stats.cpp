@@ -60,7 +60,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::query_stats {
 

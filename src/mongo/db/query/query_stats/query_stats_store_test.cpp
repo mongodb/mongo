@@ -114,11 +114,12 @@ public:
         return findKeyGenerator.generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
 
-    BSONObj makeTelemetryKeyAggregateRequest(AggregateCommandRequest acr,
-                                             const Pipeline& pipeline,
-                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             LiteralSerializationPolicy literalPolicy,
-                                             bool applyHmac = false) {
+    BSONObj makeTelemetryKeyAggregateRequest(
+        AggregateCommandRequest acr,
+        const Pipeline& pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        bool applyHmac = false,
+        LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
         auto aggKeyGenerator = std::make_unique<AggKeyGenerator>(acr,
                                                                  pipeline,
                                                                  expCtx,
@@ -893,8 +894,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSimplePipeline) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
-    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    AggregateCommandRequest acr(NamespaceString::createNamespaceString_forTest("testDB.testColl"));
     auto matchStage = fromjson(R"({
             $match: {
                 foo: { $in: ["a", "b"] },
@@ -915,8 +916,64 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setPipeline(rawPipeline);
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
-    auto shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+    auto shapified = makeTelemetryKeyAggregateRequest(acr, *pipeline, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "command": "aggregate",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "foo": {
+                                "$in": [
+                                    "a",
+                                    "b"
+                                ]
+                            },
+                            "bar": {
+                                "$gte": {"$date":"2022-01-01T00:00:00.000Z"}
+                            }
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$x"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$_id",
+                            "c": {
+                                "$first": "$d.e"
+                            },
+                            "f": {
+                                "$sum": {
+                                    "$const": 1
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "$limit": 10
+                    },
+                    {
+                        "$out": {
+                            "coll": "outColl",
+                            "db": "testDB"
+                        }
+                    }
+                ]
+            },
+            "collectionType": "collection"
+        })",
+        shapified);
+
+    shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -980,7 +1037,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setCollation(BSON("locale"
                           << "simple"));
     shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1052,7 +1109,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                            << "var2"
                            << "bar"));
     shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1131,7 +1188,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     expCtx->opCtx->setComment(BSON("comment"
                                    << "note to self"));
     shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1206,119 +1263,15 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
             "bypassDocumentValidation": "?bool"
         })",
         shapified);
-
-    // Test again but with the representative query shape.
-    shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "queryShape": {
-                "cmdNs": {
-                    "db": "HASH<testDB>",
-                    "coll": "HASH<testColl>"
-                },
-                "collation": {
-                    "locale": "simple"
-                },
-                "let": {
-                    "HASH<var1>": {
-                        "$const": "?"
-                    },
-                    "HASH<var2>": {
-                        "$const": "?"
-                    }
-                },
-                "command": "aggregate",
-                "pipeline": [
-                    {
-                        "$match": {
-                            "$and": [
-                                {
-                                    "HASH<foo>": {
-                                        "$in": [
-                                            "?"
-                                        ]
-                                    }
-                                },
-                                {
-                                    "HASH<bar>": {
-                                        "$gte": {"$date":"1970-01-01T00:00:00.000Z"}
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    {
-                        "$unwind": {
-                            "path": "$HASH<x>"
-                        }
-                    },
-                    {
-                        "$group": {
-                            "_id": "$HASH<_id>",
-                            "HASH<c>": {
-                                "$first": "$HASH<d>.HASH<e>"
-                            },
-                            "HASH<f>": {
-                                "$sum": {
-                                    "$const": 1
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "$limit": 1
-                    },
-                    {
-                        "$out": {
-                            "coll": "HASH<outColl>",
-                            "db": "HASH<testDB>"
-                        }
-                    }
-                ],
-                "explain": true,
-                "allowDiskUse": false
-            },
-            "comment": "?",
-            "collectionType": "collection",
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "cursor": {
-                "batchSize": 1
-            },
-            "maxTimeMS": 1,
-            "bypassDocumentValidation": true
-        })",
-        shapified);
 }
-
 TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
-    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    AggregateCommandRequest acr(NamespaceString::createNamespaceString_forTest("testDB.testColl"));
     acr.setPipeline({});
     auto pipeline = Pipeline::parse({}, expCtx);
 
     auto shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "queryShape": {
-                "cmdNs": {
-                    "db": "HASH<testDB>",
-                    "coll": "HASH<testColl>"
-                },
-                "command": "aggregate",
-                "pipeline": []
-            },
-            "collectionType": "collection"
-        })",
-        shapified);  // NOLINT (test auto-update)
-
-    // Test again with the representative query shape.
-    shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -1336,12 +1289,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
 
 TEST_F(QueryStatsStoreTest,
        CorrectlyTokenizesAggregateCommandRequestPipelineWithSecondaryNamespaces) {
-    auto expCtx = make_intrusive<ExpressionContextForTest>(kDefaultTestNss.nss());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto nsToUnionWith =
         NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "otherColl");
     expCtx->addResolvedNamespaces({nsToUnionWith});
 
-    AggregateCommandRequest acr(kDefaultTestNss.nss());
+    AggregateCommandRequest acr(
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "testColl"));
     auto unionWithStage = fromjson(R"({
             $unionWith: {
                 coll: "otherColl",
@@ -1354,12 +1308,12 @@ TEST_F(QueryStatsStoreTest,
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     auto shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
                 "cmdNs": {
-                    "db": "HASH<testDB>",
+                    "db": "HASH<test>",
                     "coll": "HASH<testColl>"
                 },
                 "command": "aggregate",
@@ -1388,50 +1342,7 @@ TEST_F(QueryStatsStoreTest,
             "collectionType": "collection",
             "otherNss": [
                 {
-                    "db": "HASH<testDB>",
-                    "coll": "HASH<otherColl>"
-                }
-            ]
-        })",
-        shapified);
-
-    // Do the same thing with the representative query shape.
-    shapified = makeTelemetryKeyAggregateRequest(
-        acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "queryShape": {
-                "cmdNs": {
-                    "db": "HASH<testDB>",
-                    "coll": "HASH<testColl>"
-                },
-                "command": "aggregate",
-                "pipeline": [
-                    {
-                        "$unionWith": {
-                            "coll": "HASH<otherColl>",
-                            "pipeline": [
-                                {
-                                    "$match": {
-                                        "HASH<val>": {
-                                            "$eq": "?"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    {
-                        "$sort": {
-                            "HASH<age>": 1
-                        }
-                    }
-                ]
-            },
-            "collectionType": "collection",
-            "otherNss": [
-                {
-                    "db": "HASH<testDB>",
+                    "db": "HASH<test>",
                     "coll": "HASH<otherColl>"
                 }
             ]
