@@ -1950,6 +1950,112 @@ standalone nodes by passing `{ repair: true }` to the validate command.
 
 See [RepairMode](https://github.com/mongodb/mongo/blob/4406491b2b137984c2583db98068b7d18ea32171/src/mongo/db/catalog/collection_validation.h#L71).
 
+# Fast Truncation on Internal Collections
+Logical deletes aren't always performant enough to keep up with inserts. To solve this, several internal collections use `CollectionTruncateMarkers` for fast, unreplicated and untimestamped [truncation](http://source.wiredtiger.com/1.4.2/classwiredtiger_1_1_session.html#a80a9ee8697a61a1ad13d893d67d981bb) of expired data, in lieu of logical document deletions.
+
+## CollectionTruncateMarkers
+CollectionTruncateMarkers are an in-memory tracking mechanism to support ranged truncates on a collection.
+
+A collection is broken up into a number of truncate markers. Each truncate marker tracks a range in the collection. Newer entries not captured by a truncate marker are tracked by an in-progress "partial marker".
+```
+                                CollectionTruncateMarkers
+               _______________________________________
+              |             |  ......   |             |   Partial Marker
+              |_____________|___________|_____________|__________
+               Oldest Marker             Newest Marker
+Min RecordId <------------------------------------------------<--- Max RecordId
+
+
+                    Truncate Marker
+         _______________________________________
+        | . Last Record's RecordId              |
+        | . Last Record's Wall Time             |
+        | . Bytes in Marker                     |
+        | . Number of records in Marker         |
+        |_______________________________________|
+                                               ^
+                                               |
+                                           Last Record
+                              Marks the end of the marker's range
+                        Most recent record at the time of marker creation
+```
+A new truncate marker is created when either:
+1. An insert causes the in-progress "partial marker" segment to contain more than the minimum bytes needed for a truncate marker.
+    * The record inserted serves as the 'last record' of the newly created marker.
+2. Partial marker expiration is supported, and an explicit call is made to transform the "partial marker" into a complete truncate marker.
+    * Partial marker expiration is supported for change stream collections and ensures that expired documents in a partial marker will eventually be truncated - even if writes to the namespace cease and the partial marker never meets the minimum bytes requirement.
+
+### Requirements & Properties
+CollectionTruncateMarkers support collections that meet the following requirements:
+* Insert and truncate only. No updates or individual document deletes.
+* [Clustered](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/catalog/README.md#clustered-collections) with no secondary indexes.
+* RecordId's in Timestamp order.
+* Deletion of content follows RecordId ordering.
+  * This is a general property of clustered capped collections.
+
+Collections who use CollectionTruncateMarkers share the following properties:
+* Fast counts aren't expected to be accurate.
+  * Truncates don't track the count and size of documents truncated in exchange for performance gains.
+  * Markers are a best effort way to keep track of the size metrics and when to truncate expired data.
+* Collections aren't expected to be consistent between replica set members.
+  * Truncates are unreplicated, and nodes may truncate ranges at different times.
+* No snapshot read concern support (ex: [SERVER-78296](https://jira.mongodb.org/browse/SERVER-78296)).
+  * Deleting with untimestamped, unreplicated range truncation means point-in-time reads may see inconsistent data.
+
+Each collection utilizing CollectionTruncateMarkers must implement its [own policy](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L277) to determine when there are excess markers and it is time for truncation.
+
+### In-Memory Initialization
+At or shortly after startup, an initial set of CollectionTruncateMarkers are created for each collection. The collection is either scanned or sampled to generate initial markers. Initial truncate markers are best effort, and may hold incorrect estimates about the number of documents and bytes within each marker. Eventually, once the initial truncate markers expire, per truncate marker metrics will converge closer to the correct values.
+
+### Collections that use CollectionTruncateMarkers
+* [The oplog](#oplog-truncation) - `OplogTruncateMarkers`
+* [Change stream change collections](#change-collection-truncation) - `ChangeCollectionTruncateMarkers`
+* [Change stream pre images collections](#pre-images-collection-truncation) - `PreImagesTruncateMarkersPerNsUUID`
+
+### Change Stream Collection Truncation
+Change stream collections which use CollectionTruncateMarkers
+* change collection: `<tenantId>_config.system.change_collection`, exclusive to serverless environments.
+* pre-images: `<tenantId>_config.system.preimages` in serverless, `config.system.preimages` in dedicated environments.
+
+Both change stream collections have a periodic remover thread ([ChangeStreamExpiredPreImagesRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_expired_pre_image_remover.cpp#L71), [ChangeCollectionExpiredDocumentsRemover](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_expired_documents_remover.cpp)).
+Each remover thread:
+1. Creates the tenant's initial CollectionTruncateMarkers for the tenant if they do not yet exist
+    * Lazy initialization of the initial truncate markers is imperative so writes aren't blocked on startup
+2. Iterates through each truncate marker. If a marker is expired, issues a truncate of all records older than the marker's last record, and removes the marker from the set.
+
+#### Cleanup After Unclean Shutdown
+After an unclean shutdown, all expired pre-images are truncated at startup. WiredTiger truncate cannot guarantee a consistent view of previously truncated data on unreplicated, untimestamped ranges after a crash. Unlike the oplog, the change stream collections aren't logged, don't persist any special timestamps, and it's possible that previously truncated documents can resurface after shutdown.
+
+#### Change Collection Truncation
+Change collections are per tenant - and there is one `ChangeCollectionTruncateMarkers` per tenant. The `ChangeStreamChangeCollectionManager` maps the UUID of a tenant's change collection to its corresponding 'ChangeCollectionTruncateMarkers'.
+
+Each tenant has a set 'expireAfterSeconds' parameter. An entry is expired if its 'wall time' is more than 'expireAfterSeconds' older than the node's current wall time. A truncate marker is expired if its last record is expired.
+
+#### Pre Images Collection Truncation
+Each tenant has 1 pre-images collection. Each pre-images collection contains pre-images across all the tenant's pre-image enabled collections.
+
+A pre-images collection is clustered by [ChangeStreamPreImageId](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/pipeline/change_stream_preimage.idl#L69), which implicitly orders pre-images first by their `'nsUUID'` (the UUID of the collection the pre-image is from), their  `'ts'` (the timestamp associated with the pre-images oplog entry), and then by their `'applyOpsIndex'` (the index into the applyOps oplog entry which generated the pre-image, 0 if the pre-image isn't from an applyOps oplog entry).
+
+There is a set of CollectionTruncateMarkers for each 'nsUUD' within a tenant's pre-images collection, `PreImagesTruncateMarkersPerNsUUID`.
+
+In a serverless environment, each tenant has a set 'expireAfterSeconds' parameter. An entry is expired if the 'wall time' associated with the pre-image is more than 'expireAfterSeconds' older than the node's current wall time.
+
+In a dedicated environment, a pre-image is expired if either (1) 'expireAfterSeconds' is set and the pre-image is expired by it or (2) it's 'ts' is less than or equal to the oldest oplog entry timestamp.
+
+For each tenant, `ChangeStreamExpiredPreImagesRemover` iterates over each set of `PreImagesTruncateMarkersPerNsUUID`, and issues a ranged truncate from the truncate marker's last record to the the minimum RecordId for the nsUUID when there is an expired truncate marker.
+
+### Code spelunking starting points:
+* [The CollectionTruncateMarkers class](https://github.com/mongodb/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/collection_truncate_markers.h#L78)
+  * The main api for CollectionTruncateMarkers.
+* [The OplogTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h)
+  * Oplog specific truncate markers.
+* [The ChangeCollectionTruncateMarkers class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_collection_truncate_markers.h#L47)
+  * Change stream change collection specific truncate markers.
+* [The PreImagesTruncateMarkersPerNsUUID class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h#L62)
+  * Truncate markers for a given nsUUID captured within a pre-images collection.
+* [The PreImagesTruncateManager class](https://github.com/10gen/mongo/blob/r7.1.0-rc3/src/mongo/db/change_stream_pre_images_truncate_manager.h#L70)
+  * Manages pre image truncate markers for each tenant.
+
 # Oplog Collection
 
 The `local.oplog.rs` collection maintains a log of all writes done on a server that should be
@@ -2020,21 +2126,9 @@ disregarding any oplog holes.
 
 ## Oplog Truncation
 
-The oplog collection can be truncated both at the front end (most recent entries) and the back end
-(the oldest entries). The capped setting on the oplog collection causes the oldest oplog entries to
-be deleted when new writes increase the collection size past the cap. MongoDB using the WiredTiger
-storage engine with `--replSet` handles oplog collection deletion specially via a purpose built
-[OplogTruncateMarkers](#wiredtiger-oplogtruncatemarkers) mechanism, ignoring the generic capped collection deletion
-mechanism. The front of the oplog may be truncated back to a particular timestamp during replication
-startup recovery or replication rollback.
+The oplog collection can be truncated both at the front end (most recent entries) and the back end (the oldest entries). The capped setting on the oplog collection causes the oldest oplog entries to be deleted when new writes increase the collection size past the cap. MongoDB using the WiredTiger storage engine with `--replSet` handles oplog collection deletion specially via OplogTruncateMarkers, an oplog specific implementation of the [CollectionTruncateMarkers](#collectionTruncateMarkers) mechanism, ignoring the generic capped collection deletion mechanism. The front of the oplog may be truncated back to a particular timestamp during replication startup recovery or replication rollback.
 
-### WiredTiger OplogTruncateMarkers
-
-The WiredTiger storage engine disregards the regular capped collection deletion mechanism for the
-oplog collection and instead uses `OplogTruncateMarkers` to improve performance by batching deletes.
-The oplog is broken up into a number of truncate markers. Each truncate marker tracks a range of the
-oplog, the number of bytes in that range, and the last (newest) entry's record ID. A new truncate
-marker is created when the in-progress marker segment contains more than the minimum bytes needed to
+A new truncate marker is created when the in-progress marker segment contains more than the minimum bytes needed to
 complete the segment; and the oldest truncate marker's oplog is deleted when the oplog size exceeds
 its cap size setting.
 
