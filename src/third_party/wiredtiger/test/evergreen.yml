@@ -1745,18 +1745,6 @@ tasks:
   # All cppsuite pull request tasks must supply the relative path to the config file as we are in
   # the cmake build working directory and the LD_LIBRARY_PATH is .libs.
 
-  - name: cppsuite-background-compact-default
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config: debug_mode=(background_compact,cursor_copy=true)
-          test_config_filename: configs/background_compact_default.txt
-          test_name: background_compact
-
   - name: cppsuite-cache-resize-test-default
     tags: ["pull_request"]
     depends_on:
@@ -1886,17 +1874,6 @@ tasks:
           test_config: debug_mode=(cursor_copy=true)
           test_config_filename: configs/reverse_split_default.txt
           test_name: reverse_split
-
-  - name: cppsuite-background-long
-    tags: ["cppsuite-stress-test"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "cppsuite test"
-        vars:
-          test_config_filename: configs/background_compact_long_running.txt
-          test_name: background_compact
 
   - name: cppsuite-operations-test-stress
     depends_on:

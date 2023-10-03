@@ -126,7 +126,7 @@ checkpoint_operation_thread_config = [
         The rate at which checkpoint is executed.''')
 ]
 
-background_compact_thread_config = throttle_config + [
+background_compact_thread_config = [
     Config('thread_count', 0, r'''
         Specifies the number of threads that will be used to perform background compaction
            operation.''',
@@ -256,7 +256,6 @@ test_config = [
 # Test and their respective configuration sorted alphabetically.
 #
 methods = {
-    'background_compact' : Method(test_config),
     'bounded_cursor_perf' : Method(test_config),
     'bounded_cursor_prefix_indices' : Method(test_config),
     'bounded_cursor_prefix_search_near' : Method(test_config),
