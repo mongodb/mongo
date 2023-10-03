@@ -65,6 +65,7 @@ ops.prepare=0
 ops.random_cursor=0
 ops.rebalance=0
 ops.salvage=0
+ops.throttle=0
 ops.truncate=1
 ops.verify=1
 quiet=1

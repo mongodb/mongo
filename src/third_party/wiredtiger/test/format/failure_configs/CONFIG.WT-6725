@@ -64,6 +64,7 @@ ops.pct.write=36
 ops.prepare=1
 ops.random_cursor=0
 ops.salvage=0
+ops.throttle=0
 ops.truncate=1
 ops.verify=1
 quiet=1

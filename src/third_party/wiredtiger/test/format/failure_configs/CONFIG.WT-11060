@@ -52,6 +52,7 @@ ops.bound_cursor=0
 ops.prepare=1
 ops.random_cursor=1
 ops.salvage=0
+ops.throttle=0
 ops.verify=1
 quiet=1
 random.data_seed=16418622

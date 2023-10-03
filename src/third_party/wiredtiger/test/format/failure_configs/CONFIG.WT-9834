@@ -37,6 +37,7 @@ ops.hs_cursor=1
 ops.prepare=0
 ops.random_cursor=0
 ops.salvage=0
+ops.throttle=0
 ops.verify=1
 quiet=1
 runs.in_memory=0
