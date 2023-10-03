@@ -2709,6 +2709,10 @@ buildvariants:
       - name: ycsb_60GB.long
       - name: crud_workloads_majority
       - name: tpcc
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
 
   - name: linux-standalone-limited-query-stats
     display_name: Linux Standalone 2022-11 (Rate Limited QueryStats)
@@ -2946,6 +2950,10 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
 
   - name: linux-shard-lite-fle.2022-11
     display_name: Linux Shard Lite FLE 2022-11
@@ -3991,6 +3999,11 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: expressive_queries_high_value
         cron: *high-value-workload-cron
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
 
   - name: linux-3-node-replSet-250mbwtcache.2023-05
     display_name: Linux 3-Node ReplSet 250 MB WiredTiger Cache 2023-05
