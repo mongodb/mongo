@@ -263,6 +263,10 @@ CONFIG configuration_list[] = {
 
 {"ops.salvage", "configure salvage", C_BOOL, 100, 1, 0}
 
+{"ops.throttle", "enable delay between ops", C_BOOL, 10, 0, 0}
+
+{"ops.throttle.sleep_us", "average duration of sleep between ops per table, us", 0x0, 0, M(1), M(60)}
+
 {"ops.truncate", "configure truncation", C_BOOL | C_TABLE, 100, 0, 0}
 
 {"ops.verify", "configure verify", C_BOOL, 100, 1, 0}
