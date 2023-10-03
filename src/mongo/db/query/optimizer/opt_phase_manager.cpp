@@ -48,6 +48,7 @@
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo::optimizer {
@@ -198,11 +199,13 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
         tassert(6808702, "Logical writer failed to rewrite fix point.", fixPointRewritten);
 
         input = extractLatestPlan(_memo, rootGroupId);
-        env.rebuild(input);
     }
 
-    if (env.hasFreeVariables()) {
-        tasserted(6808703, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
+    if constexpr (kDebugBuild) {
+        env.rebuild(input);
+        tassert(6808703,
+                "Plan has free variables: " + generateFreeVarsAssertMsg(env),
+                !env.hasFreeVariables());
     }
 }
 
@@ -270,6 +273,7 @@ PlanExtractorResult OptPhaseManager::runMemoPhysicalRewrite(
             tasserted(6808707, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
         }
     }
+
     return result;
 }
 
