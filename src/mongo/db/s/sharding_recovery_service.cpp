@@ -206,8 +206,17 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         boost::optional<AutoGetDb> dbLock;
         boost::optional<AutoGetCollection> collLock;
         if (nsIsDbOnly(NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()))) {
+            tassert(8096300,
+                    "Cannot acquire critical section on the config database",
+                    !nss.isConfigDB());
             dbLock.emplace(opCtx, nss.dbName(), MODE_S);
         } else {
+            if (nss.isConfigDB()) {
+                // Take the 'config' database lock in mode IX to prevent lock upgrade when we later
+                // write to kCollectionCriticalSectionsNamespace.
+                dbLock.emplace(opCtx, nss.dbName(), MODE_IX);
+            }
+
             collLock.emplace(opCtx,
                              nss,
                              MODE_S,
