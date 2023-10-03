@@ -327,7 +327,17 @@ MigrationSourceManager::~MigrationSourceManager() {
     invariant(!_cloneDriver);
     _stats.totalDonorMoveChunkTimeMillis.addAndFetch(_entireOpTimer.millis());
 
-    _completion.emplaceValue();
+    if (_state == kDone) {
+        _completion.emplaceValue();
+    } else {
+        std::string errMsg = "Migration not completed";
+        if (_coordinator) {
+            const auto& migrationId = _coordinator->getMigrationId();
+            errMsg = str::stream() << "Migration " << migrationId << " not completed";
+        }
+        auto status = Status{ErrorCodes::Interrupted, errMsg};
+        _completion.setError(status);
+    }
 }
 
 void MigrationSourceManager::startClone() {
