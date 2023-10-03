@@ -92,23 +92,19 @@ public:
     };
 
     DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
-        : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {
-        if (!_pipeline->getContext()->ns.isOnInternalDb()) {
-            globalOpCounters.gotNestedAggregate();
-        }
-        _pipeline->getContext()->inUnionWith = true;
+                            NamespaceString unionNss,
+                            std::vector<BSONObj> pipeline);
 
-        // If this pipeline is being run as part of explain, then cache a copy to use later during
-        // serialization.
-        if (expCtx->explain >= ExplainOptions::Verbosity::kExecStats) {
-            _cachedPipeline = _pipeline->getSources();
-        }
-    }
+    // Expose a constructor that skips the parsing step for testing purposes.
+    DocumentSourceUnionWith(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
 
     DocumentSourceUnionWith(const DocumentSourceUnionWith& original,
                             const boost::intrusive_ptr<ExpressionContext>& newExpCtx)
-        : DocumentSource(kStageName, newExpCtx), _pipeline(original._pipeline->clone()) {
+        : DocumentSource(kStageName, newExpCtx),
+          _pipeline(original._pipeline->clone()),
+          _userNss(original._userNss),
+          _userPipeline(original._userPipeline) {
         _pipeline->getContext()->inUnionWith = true;
     }
 
@@ -230,6 +226,11 @@ private:
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     Pipeline::SourceContainer _cachedPipeline;
+    // The original, unresolved namespace to union.
+    NamespaceString _userNss;
+    // The aggregation pipeline defined with the user request, prior to optimization and view
+    // resolution.
+    std::vector<BSONObj> _userPipeline;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
     UnionWithStats _stats;
 };
