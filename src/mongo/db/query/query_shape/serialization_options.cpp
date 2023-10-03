@@ -115,6 +115,15 @@ static const auto kRepresentativeJavascriptWithScope = BSONCodeWScope("return ?;
 static const auto kRepresentativeTimestamp = Timestamp::min();
 
 /**
+ * A default redaction strategy that generates easy to check results for testing purposes.
+ */
+std::string applyHmacForTest(StringData s) {
+    // Avoid ending in a parenthesis since the results will occur in a raw string where the )"
+    // sequence will accidentally terminate the string.
+    return str::stream() << "HASH<" << s << ">";
+}
+
+/**
  * Computes a debug string meant to represent "any value of type t", where "t" is the type of the
  * provided argument. For example "?number" for any number (int, double, etc.).
  */
@@ -405,6 +414,14 @@ const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerial
 const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
     SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString,
                          .inMatchExprSortAndDedupElements = false};
+
+const SerializationOptions SerializationOptions::kMarkIdentifiers_FOR_TEST = SerializationOptions{
+    .transformIdentifiers = true, .transformIdentifiersCallback = applyHmacForTest};
+
+const SerializationOptions SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST =
+    SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString,
+                         .transformIdentifiers = true,
+                         .transformIdentifiersCallback = applyHmacForTest};
 
 // Overloads for BSONElem and Value.
 StringData debugTypeString(BSONElement e) {

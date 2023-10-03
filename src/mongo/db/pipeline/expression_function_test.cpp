@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_function.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/framework.h"
 #include "mongo/util/str.h"
@@ -45,19 +46,8 @@ namespace mongo {
 
 namespace {
 
-/**
- * A default redaction strategy that generates easy to check results for testing purposes.
- */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
-
 TEST(ExpressionFunction, SerializeAndRedactArgs) {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.transformIdentifiers = true;
-    options.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     auto expCtx = ExpressionContextForTest();
     auto expr = BSON("$function" << BSON("body"

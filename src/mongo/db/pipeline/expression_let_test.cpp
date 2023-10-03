@@ -48,14 +48,8 @@ namespace mongo {
 namespace ExpressionTests {
 namespace {
 
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
 TEST(RedactionTest, ExpressionLet) {
-    SerializationOptions options;
-    options.transformIdentifiersCallback = applyHmacForTest;
-    options.transformIdentifiers = true;
+    SerializationOptions options = SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     auto expCtx = ExpressionContextForTest{};
 

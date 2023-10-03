@@ -73,12 +73,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo::query_stats {
-/**
- * A default hmac application strategy that generates easy to check results for testing purposes.
- */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
 
 int countAllEntries(const QueryStatsStore& store) {
     int numKeys = 0;
@@ -105,11 +99,10 @@ public:
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
         FindKeyGenerator findKeyGenerator(expCtx, *parsedFind, collectionType);
-        SerializationOptions opts;
-        opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-        if (applyHmac) {
-            opts.transformIdentifiers = true;
-            opts.transformIdentifiersCallback = applyHmacForTest;
+        SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
+        if (!applyHmac) {
+            opts.transformIdentifiers = false;
+            opts.transformIdentifiersCallback = defaultHmacStrategy;
         }
         return findKeyGenerator.generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
@@ -127,10 +120,12 @@ public:
                                                                  acr.getNamespace(),
                                                                  collectionType);
 
-        SerializationOptions opts{.literalPolicy = literalPolicy};
-        if (applyHmac) {
-            opts.transformIdentifiers = true;
-            opts.transformIdentifiersCallback = applyHmacForTest;
+        // SerializationOptions opts{.literalPolicy = literalPolicy};
+        SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
+        opts.literalPolicy = literalPolicy;
+        if (!applyHmac) {
+            opts.transformIdentifiers = false;
+            opts.transformIdentifiersCallback = defaultHmacStrategy;
         }
         return aggKeyGenerator->generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }

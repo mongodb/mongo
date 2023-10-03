@@ -87,6 +87,8 @@ struct SerializationOptions {
     // this purpose. We may do that on the $queryStats read path.
     static const SerializationOptions kRepresentativeQueryShapeSerializeOptions;
     static const SerializationOptions kDebugQueryShapeSerializeOptions;
+    static const SerializationOptions kMarkIdentifiers_FOR_TEST;
+    static const SerializationOptions kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     /**
      * Checks if this SerializationOptions represents the same options as another
@@ -177,7 +179,6 @@ struct SerializationOptions {
             }
         }
     }
-
 
     /**
      * Helper method to call 'serializeLiteral()' on 'e' and append the resulting value to 'bob'

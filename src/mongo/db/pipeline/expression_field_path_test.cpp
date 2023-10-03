@@ -76,10 +76,6 @@ Document fromBson(BSONObj obj) {
     return Document(obj);
 }
 
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
 namespace FieldPath {
 
 /** The provided field path does not pass validation. */
@@ -247,9 +243,7 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
 }
 
 TEST(FieldPath, SerializeWithRedaction) {
-    SerializationOptions options;
-    options.transformIdentifiersCallback = applyHmacForTest;
-    options.transformIdentifiers = true;
+    SerializationOptions options = SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression =

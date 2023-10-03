@@ -47,10 +47,6 @@
 namespace mongo {
 namespace {
 
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
 auto getExpCtx() {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
     return boost::intrusive_ptr<ExpressionContextForTest>{new ExpressionContextForTest(nss)};
@@ -59,9 +55,7 @@ auto getExpCtx() {
 TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
-    SerializationOptions opts = {};
-    opts.transformIdentifiers = true;
-    opts.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     // Most basic sort pattern, confirm that field name gets redacted.
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT

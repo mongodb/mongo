@@ -534,9 +534,7 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     ASSERT_THROWS_CODE(
         sort->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
 }
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
+
 TEST_F(DocumentSourceSortTest, Redaction) {
     createSort(BSON("a" << 1));
     auto boundedSort = DocumentSourceSort::createBoundedSort(

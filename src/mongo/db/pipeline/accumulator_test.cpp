@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -1758,19 +1759,12 @@ TEST(Accumulators, CovarianceWithRandomVariables) {
     assertCovariance<AccumulatorCovariancePop>(&expCtx, randomVariables, boost::none);
     assertCovariance<AccumulatorCovarianceSamp>(&expCtx, randomVariables, boost::none);
 }
-// Test serialization with redaction
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
 
 Value parseAndSerializeAccumExpr(
     const BSONObj& obj,
     std::function<boost::intrusive_ptr<Expression>(
         ExpressionContext* expCtx, BSONElement, const VariablesParseState&)> func) {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.transformIdentifiers = true;
-    options.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
     return expr->serialize(options);
@@ -1780,10 +1774,7 @@ Document parseAndSerializeAccum(
     const BSONElement elem,
     std::function<AccumulationExpression(
         ExpressionContext* const expCtx, BSONElement, VariablesParseState)> func) {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.transformIdentifiers = true;
-    options.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 

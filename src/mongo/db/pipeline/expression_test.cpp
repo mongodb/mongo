@@ -52,6 +52,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/name_expression.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
@@ -193,13 +194,6 @@ void parseAndVerifyResults(
     VariablesParseState vps = expCtx.variablesParseState;
     auto expr = parseFn(&expCtx, elem, vps);
     ASSERT_VALUE_EQ(expr->evaluate({}, &expCtx.variables), expected);
-}
-
-/**
- * A default redaction strategy that generates easy to check results for testing purposes.
- */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
 }
 
 /**
@@ -3804,10 +3798,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.transformIdentifiers = true;
-    options.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
@@ -3880,10 +3871,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
 }
 
 TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.transformIdentifiersCallback = applyHmacForTest;
-    options.transformIdentifiers = true;
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
