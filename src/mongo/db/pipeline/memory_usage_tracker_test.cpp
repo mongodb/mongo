@@ -107,7 +107,7 @@ DEATH_TEST_F(MemoryUsageTrackerTest,
 
 TEST_F(MemoryUsageTrackerTest, MemoryTokenUpdatesCurrentAndMax) {
     {
-        MemoryToken token{50LL, &_tracker};
+        MemoryToken token{50LL, &_tracker["subTracker"]};
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
         {
@@ -130,7 +130,7 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenUpdatesCurrentAndMax) {
 
 TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoved) {
     {
-        MemoryToken token{50LL, &_tracker};
+        MemoryToken token{50LL, &_tracker["subTracker"]};
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
@@ -144,7 +144,7 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoved) {
 
 TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeMoveAssigned) {
     {
-        MemoryToken token{50LL, &_tracker};
+        MemoryToken token{50LL, &_tracker["subTracker"]};
         ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
         ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
         {
@@ -198,7 +198,7 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenCanBeStoredInVector) {
         tokens.resize(10);
         {
             std::vector<MemoryToken> tokens2;
-            tokens2.emplace_back(50LL, &_tracker);
+            tokens2.emplace_back(50LL, &_tracker["subTracker"]);
             tokens2.emplace_back(100LL, &_funcTracker);
             assertMemory();
 
@@ -223,7 +223,7 @@ TEST_F(MemoryUsageTrackerTest, MemoryTokenWith) {
     int64_t total_size = 0;
     std::vector<MemoryTokenWith<std::string>> memory_tracked_vector;
     for (const auto& line : kLines) {
-        memory_tracked_vector.emplace_back(MemoryToken{line.size(), &_tracker}, line);
+        memory_tracked_vector.emplace_back(MemoryToken{line.size(), &_tracker["subTracker"]}, line);
         total_size += line.size();
         ASSERT_EQ(total_size, _tracker.currentMemoryBytes());
         ASSERT_EQ(total_size, _tracker.maxMemoryBytes());

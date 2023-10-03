@@ -51,7 +51,9 @@ private:
     const Value& _getValue(const Value& v) const {
         return v;
     }
-    const Value& _getValue(const MemoryTokenWith<Value>& v) const {
+
+    template <typename Tracker>
+    const Value& _getValue(const MemoryTokenWithImpl<Tracker, Value>& v) const {
         return v.value();
     }
 
@@ -66,7 +68,10 @@ template <typename Iterator>
 Value convertToValueFromMemoryTokenWithValue(Iterator begin, Iterator end, size_t size) {
     std::vector<Value> result;
     result.reserve(size);
-    std::transform(begin, end, std::back_inserter(result), [](const auto& v) { return v.value(); });
+    while (begin != end) {
+        result.emplace_back(begin->value());
+        ++begin;
+    }
     return Value{std::move(result)};
 }
 

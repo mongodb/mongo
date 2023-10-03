@@ -170,7 +170,7 @@ public:
 private:
     void _processValue(const Value& val) final;
 
-    using MultiSet = std::multiset<MemoryTokenWith<Value>, MemoryTokenValueComparator>;
+    using MultiSet = std::multiset<SimpleMemoryTokenWith<Value>, MemoryTokenValueComparator>;
 
     MultiSet createMultiSet() const;
 
@@ -256,7 +256,7 @@ private:
     // firstN/lastN do NOT ignore null values.
     void _processValue(const Value& val) final;
 
-    std::deque<MemoryTokenWith<Value>> _deque;
+    std::deque<SimpleMemoryTokenWith<Value>> _deque;
     Sense _variant;
 };
 
@@ -393,7 +393,8 @@ private:
     // initialized.
     boost::optional<SortKeyGenerator> _sortKeyGenerator;
     boost::optional<SortKeyComparator> _sortKeyComparator;
-    boost::optional<std::multimap<Value, MemoryTokenWith<Value>, std::function<bool(Value, Value)>>>
+    boost::optional<
+        std::multimap<Value, SimpleMemoryTokenWith<Value>, std::function<bool(Value, Value)>>>
         _map;
 };
 

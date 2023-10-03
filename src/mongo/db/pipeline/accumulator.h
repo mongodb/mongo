@@ -80,7 +80,7 @@ public:
 
     AccumulatorState(ExpressionContext* const expCtx,
                      int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
-        : _memUsageTracker(nullptr /* base */, maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
+        : _memUsageTracker(maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
 
     /** Marks the beginning of a new group. The input is the result of evaluating
      *  AccumulatorExpression::initializer, which can read from the group key.
@@ -167,7 +167,7 @@ protected:
     }
 
     /// subclasses are expected to update this as necessary
-    MemoryUsageTracker::Impl _memUsageTracker;
+    SimpleMemoryUsageTracker _memUsageTracker;
 
     /// Member which tracks if this accumulator requires any more input values to compute its final
     /// result. In general, most accumulators require all input values, however, some accumulators

@@ -58,7 +58,7 @@ public:
         if (value.nullish()) {
             return;
         }
-        _values.emplace(MemoryToken{value.getApproximateSize(), &_memUsageTracker},
+        _values.emplace(SimpleMemoryToken{value.getApproximateSize(), &_memUsageTracker},
                         std::move(value));
     }
 
@@ -87,7 +87,7 @@ protected:
           _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {}
 
     // Holds all the values in the window, in order, with constant-time access to both ends.
-    std::multiset<MemoryTokenWith<Value>, MemoryTokenValueComparator> _values;
+    std::multiset<SimpleMemoryTokenWith<Value>, MemoryTokenValueComparator> _values;
 };
 
 template <AccumulatorMinMax::Sense sense>

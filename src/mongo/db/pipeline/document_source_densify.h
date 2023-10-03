@@ -339,13 +339,12 @@ public:
                                   std::list<FieldPath> partitions,
                                   RangeStatement range)
         : DocumentSource(kStageName, pExpCtx),
-          _memTracker(
-              MemoryUsageTracker(false, internalDocumentSourceDensifyMaxMemoryBytes.load())),
+          _memTracker(internalDocumentSourceDensifyMaxMemoryBytes.load()),
           _field(std::move(field)),
           _partitions(std::move(partitions)),
           _range(std::move(range)),
           _partitionTable(pExpCtx->getValueComparator()
-                              .makeUnorderedValueMap<MemoryTokenWith<DensifyValue>>()) {
+                              .makeUnorderedValueMap<SimpleMemoryTokenWith<DensifyValue>>()) {
         _maxDocs = internalQueryMaxAllowedDensifyDocs.load();
     };
 
@@ -545,9 +544,9 @@ private:
         if (_partitionExpr) {
             auto partitionKey = getDensifyPartition(doc);
             auto partitionVal = getDensifyValue(doc);
-            MemoryToken memoryToken{partitionKey.getApproximateSize() +
-                                        partitionVal.getApproximateSize(),
-                                    &_memTracker};
+            SimpleMemoryToken memoryToken{partitionKey.getApproximateSize() +
+                                              partitionVal.getApproximateSize(),
+                                          &_memTracker};
             _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
             uassert(6007200,
                     str::stream() << "$densify exceeded memory limit of "
@@ -610,13 +609,13 @@ private:
     // Keep track of documents generated, error if it goes above the limit.
     size_t _docsGenerated = 0;
     size_t _maxDocs = 0;
-    MemoryUsageTracker _memTracker;
+    SimpleMemoryUsageTracker _memTracker;
 
     DensifyState _densifyState = DensifyState::kUninitializedOrBelowRange;
     FieldPath _field;
     std::list<FieldPath> _partitions;
     RangeStatement _range;
     // Store of the value we've seen for each partition.
-    ValueUnorderedMap<MemoryTokenWith<DensifyValue>> _partitionTable;
+    ValueUnorderedMap<SimpleMemoryTokenWith<DensifyValue>> _partitionTable;
 };
 }  // namespace mongo

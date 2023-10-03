@@ -216,8 +216,9 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
 
 void AccumulatorMinMaxN::_processValue(const Value& val) {
     // Ignore nullish values.
-    if (val.nullish())
+    if (val.nullish()) {
         return;
+    }
 
     // Only compare if we have 'n' elements.
     if (static_cast<long long>(_set.size()) == *_n) {
@@ -233,7 +234,7 @@ void AccumulatorMinMaxN::_processValue(const Value& val) {
         }
     }
 
-    _set.emplace(MemoryToken{val.getApproximateSize(), &_memUsageTracker}, val);
+    _set.emplace(SimpleMemoryToken{val.getApproximateSize(), &_memUsageTracker}, val);
     checkMemUsage();
 }
 
@@ -322,8 +323,8 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
         }
     }
 
-    _deque.emplace_back(MemoryToken{valToProcess.getApproximateSize(), &_memUsageTracker},
-                        valToProcess);
+    _deque.emplace_back(SimpleMemoryToken{valToProcess.getApproximateSize(), &_memUsageTracker},
+                        std::move(valToProcess));
     checkMemUsage();
 }
 
@@ -357,7 +358,7 @@ boost::intrusive_ptr<Expression> AccumulatorFirstLastN::parseExpression(
 }
 
 void AccumulatorFirstLastN::reset() {
-    _deque = std::deque<MemoryTokenWith<Value>>();
+    _deque = std::deque<SimpleMemoryTokenWith<Value>>();
 }
 
 Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
@@ -643,9 +644,9 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
     keyOutPair.first.fillCache();
     const auto memUsage = keyOutPair.first.getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
-    _map->emplace(
-        keyOutPair.first,
-        MemoryTokenWith<Value>{MemoryToken{memUsage, &_memUsageTracker}, keyOutPair.second});
+    _map->emplace(keyOutPair.first,
+                  SimpleMemoryTokenWith<Value>{SimpleMemoryToken{memUsage, &_memUsageTracker},
+                                               keyOutPair.second});
     checkMemUsage();
 }
 

@@ -102,7 +102,7 @@ PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
       _sortExpr(exprFromSort(_expCtx, sortPattern)),
       _state(IteratorState::kNotInitialized),
       _cache(std::make_unique<SpillableCache>(_expCtx, tracker)),
-      _memoryToken(0, tracker) {}
+      _memoryToken(0, &(*tracker)["PartitionIterator"]) {}
 
 optional<Document> PartitionIterator::operator[](int index) {
     auto docDesired = _indexOfCurrentInPartition + index;

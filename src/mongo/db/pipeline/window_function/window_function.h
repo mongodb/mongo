@@ -47,7 +47,7 @@ class WindowFunctionState {
 public:
     WindowFunctionState(ExpressionContext* const expCtx,
                         int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
-        : _expCtx(expCtx), _memUsageTracker(nullptr /* base*/, maxAllowedMemoryUsageBytes) {}
+        : _expCtx(expCtx), _memUsageTracker(maxAllowedMemoryUsageBytes) {}
     virtual ~WindowFunctionState() = default;
 
     WindowFunctionState(const WindowFunctionState&) = delete;
@@ -66,6 +66,6 @@ public:
 
 protected:
     ExpressionContext* _expCtx;
-    MemoryUsageTracker::Impl _memUsageTracker;
+    SimpleMemoryUsageTracker _memUsageTracker;
 };
 }  // namespace mongo
