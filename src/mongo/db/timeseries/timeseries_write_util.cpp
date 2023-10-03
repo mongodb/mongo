@@ -934,4 +934,16 @@ void performAtomicWritesForUpdate(
                                       stmtId,
                                       bucketIds);
 }
+
+BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringData viewNss) {
+    BSONObjBuilder b;
+    for (auto&& e : cmd) {
+        if (e.fieldNameStringData() == cmdName) {
+            b.append(cmdName, viewNss);
+        } else {
+            b.append(e);
+        }
+    }
+    return b.obj();
+}
 }  // namespace mongo::timeseries

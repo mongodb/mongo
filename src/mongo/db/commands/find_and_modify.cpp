@@ -516,7 +516,14 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     // Initialize curOp information.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setNS_inlock(nsString);
+        if (req.getIsTimeseriesNamespace()) {
+            auto viewNss = nsString.getTimeseriesViewNamespace();
+            curOp.setNS_inlock(viewNss);
+            curOp.setOpDescription_inlock(timeseries::timeseriesViewCommand(
+                unparsedRequest().body, "findAndModify", viewNss.coll()));
+        } else {
+            curOp.setNS_inlock(nsString);
+        }
         curOp.ensureStarted();
     }
 

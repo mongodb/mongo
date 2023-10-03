@@ -646,13 +646,7 @@ export function getRelevantProfilerEntries(db, coll, requestType) {
                 // Filters out events recorded because of StaleConfig error.
                 "ok": {$ne: 0},
             },
-            // Potential two-phase protocol write command.
-            {
-                "op": "command",
-                "ns": `${db.getName()}.${sysCollName}`,
-                [`command.${requestType}`]: `${sysCollName}`,
-            },
-            // Targeted write command.
+            // Potential two-phase protocol write command and targeted write command.
             {
                 "op": "command",
                 "ns": `${db.getName()}.${collName}`,

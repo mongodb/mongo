@@ -261,4 +261,9 @@ void performAtomicWritesForUpdate(
     bool fromMigrate,
     StmtId stmtId,
     std::set<OID>* bucketIds);
+
+/**
+ * Change the bucket namespace to time-series view namespace for time-series command.
+ */
+BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringData viewNss);
 }  // namespace mongo::timeseries
