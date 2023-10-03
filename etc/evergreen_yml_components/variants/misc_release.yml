@@ -499,6 +499,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2023-lto
+    large_distro_name: amazon2023.0-large
   tasks:
   - name: compile_test_and_package_serial_lto_no_unittests_TG
     distros:
@@ -780,6 +781,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2023-arm64-lto
+    large_distro_name: amazon2023.0-arm64-large
   tasks:
   - name: compile_test_and_package_serial_lto_no_unittests_TG
     distros:
