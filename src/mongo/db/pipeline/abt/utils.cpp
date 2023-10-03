@@ -105,15 +105,22 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
     return result;
 }
 
+// This function generates an ABT representing a path from a string. This works by searching
+// backwards in the string and using each component (delimited by '.') to build up an ABT.
+// For example, 'a.b.c' results in PathGet[a] PathGet[b] PathGet[c].
 ABT translateShardKeyField(std::string shardKey) {
     auto abt = make<PathIdentity>();
-    size_t curPos = 0;
-    size_t nextPos = 0;
-    while (nextPos != std::string::npos) {
-        nextPos = shardKey.find('.', curPos);
-        abt =
-            make<PathGet>(FieldNameType{shardKey.substr(curPos, nextPos - curPos)}, std::move(abt));
-        curPos = nextPos + 1;
+    // Keep track of the search space in the string.
+    size_t curPos = shardKey.size();
+    while (curPos != std::string::npos) {
+        // Get the index of the start of the next component in the path. This may return npos which
+        // is an alias for -1.
+        size_t start = shardKey.find_last_of('.', curPos - 1);
+        // Add path component into ABT.
+        abt = make<PathGet>(FieldNameType{shardKey.substr(start + 1, curPos - start - 1)},
+                            std::move(abt));
+        // Update search space for the next component.
+        curPos = start;
     }
     return abt;
 }
