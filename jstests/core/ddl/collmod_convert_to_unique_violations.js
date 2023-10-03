@@ -15,6 +15,13 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
+    jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
+    quit();
+}
+
 function sortViolationsArray(arr) {
     // Sorting unsorted arrays of unsorted arrays -- Sort subarrays, then sort main array by first
     // key of subarray.

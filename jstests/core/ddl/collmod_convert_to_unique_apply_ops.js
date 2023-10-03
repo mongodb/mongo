@@ -20,6 +20,13 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
+    jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
+    quit();
+}
+
 const collName = 'collmod_convert_to_unique_apply_ops';
 const coll = db.getCollection(collName);
 coll.drop();

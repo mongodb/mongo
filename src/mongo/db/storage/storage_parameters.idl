@@ -180,6 +180,12 @@ server_parameters:
 
 
 feature_flags:
+    featureFlagCollModIndexUnique:
+        description: "When enabled, collMod supports making an index unique"
+        cpp_varname: feature_flags::gCollModIndexUnique
+        default: true
+        version: 6.0
+        shouldBeFCVGated: true
     featureFlagLargeBatchedOperations:
         description:  >-
             Enable support for replicating batched operations over multiple applyOps oplog

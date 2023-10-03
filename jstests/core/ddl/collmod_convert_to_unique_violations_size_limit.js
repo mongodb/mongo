@@ -15,6 +15,15 @@
  *  tenant_migration_incompatible,
  * ]
  */
+const collModIndexUniqueEnabled = assert
+                                      .commandWorked(db.getMongo().adminCommand(
+                                          {getParameter: 1, featureFlagCollModIndexUnique: 1}))
+                                      .featureFlagCollModIndexUnique.value;
+
+if (!collModIndexUniqueEnabled) {
+    jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
+    quit();
+}
 
 function sortViolationsArray(arr) {
     // Sorting unsorted arrays of unsorted arrays -- Sort subarrays, then sort main array by first
