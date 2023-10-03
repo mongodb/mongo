@@ -68,6 +68,11 @@ OS_DOCKER_LOOKUP = {
                      "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
                      "file"
                  ]), "python3"),
+    'debian12': ('debian:12-slim', "apt",
+                 frozenset([
+                     "python3", "python-is-python3", "wget", "pkg-config", "systemd", "procps",
+                     "file"
+                 ]), "python3"),
     'debian71': ('debian:7-slim', "apt",
                  frozenset(["python", "python3", "wget", "pkg-config", "systemd", "procps",
                             "file"]), "python3"),

@@ -65,6 +65,7 @@ class ToolchainDistroName(Tuple[str, ...], enum.Enum):
     DEBIAN9 = ('debian92', )
     DEBIAN10 = ('debian10', )
     DEBIAN11 = ('debian11', )
+    DEBIAN12 = ('debian12', )
     MACOS1012 = ('macos-1012', )
     MACOS1014 = ('macos-1014', )
     MACOS1100 = ('macos-1100', )
