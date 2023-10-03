@@ -1061,7 +1061,7 @@ TEST(IntervalSimplification, SimplifyMinKey) {
 
 TEST(IntervalSimplification, IsIntervalEmpty) {
     auto isEmpty = [&](IntervalRequirement interval) {
-        return isIntervalEmpty(interval, ConstEval::constFold);
+        return isIntervalEmpty(interval);
     };
     // Equality intervals are never empty.
     ASSERT_FALSE(isEmpty({{true, Constant::minKey()}, {true, Constant::minKey()}}));

@@ -45,7 +45,6 @@
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 
-
 namespace mongo::optimizer {
 
 // Handler which should return a boolean indicating if we are allowed to inline an EvaluationNode.

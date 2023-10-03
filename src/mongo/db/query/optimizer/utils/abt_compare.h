@@ -56,4 +56,36 @@ int compareIntervalExpr(const IntervalReqExpr::Node& i1, const IntervalReqExpr::
  * Used to compare PartialSchemaEntry trees.
  */
 int comparePartialSchemaRequirementsExpr(const PSRExpr::Node& n1, const PSRExpr::Node& n2);
+
+/**
+ * The result of a comparison operation evaluated during constant folding.
+ */
+enum class CmpResult : int32_t {
+    kTrue = 1,
+    kFalse = 0,
+    kLt = -1,
+    kEq = 0,
+    kGt = 1,
+    kIncomparable = std::numeric_limits<int>::max()
+};
+
+/**
+ * Compare ABT equality in a fast way without invoking constant folding.
+ * - Returns kIncomparable if nothing can be determined about the comparison between the two
+ *   arguments.
+ * - Otherwise return kTrue, or kFalse depending on the comparison.
+ */
+CmpResult cmpEqFast(const ABT& lhs, const ABT& rhs);
+
+/**
+ * Three way comparison of the two arguments via direct value interface without using constant
+ * folding. The 'op' argument signifies how to interpret the 3w comparison - either as a boolean
+ * comparison function, or directly as a 3w comparison.
+ * - Returns kIncomparable if nothing can be determined about the comparison between the two
+ * arguments.
+ * - If op is {<, <=, >, >=}, return kTrue or kFalse depending on whether it is true or false.
+ * - If op is a 3-way comparison, return -1 if lhs < rhs, or 1 lhs > rhs.
+ * Notice that this function is not used for equality comparison.
+ */
+CmpResult cmp3wFast(Operations op, const ABT& lhs, const ABT& rhs);
 }  // namespace mongo::optimizer

@@ -135,7 +135,7 @@ bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval);
 /**
  * Returns true if after constant folding we can tell the interval never returns true.
  */
-bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold);
+bool isIntervalEmpty(const IntervalRequirement& interval);
 
 /**
  * Returns true if (i) the given interval contains a requirement for the path to be an array AND

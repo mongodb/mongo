@@ -53,18 +53,6 @@
 
 namespace mongo::optimizer {
 
-// Three way comparison of the two arguments. Returns boost::none if nothing can be determined
-// about the comparison between the two arguments.
-static boost::optional<int> cmpABT(const ABT& a1, const ABT& a2, const ConstFoldFn& constFold) {
-    ABT result = make<BinaryOp>(Operations::Cmp3w, a1, a2);
-    constFold(result);
-    if (const auto resultConst = result.cast<Constant>()) {
-        invariant(resultConst->isValueInt32());
-        return resultConst->getValueInt32();
-    }
-    return boost::none;
-};
-
 ABT minABT(const ABT& v1, const ABT& v2) {
     return make<If>(make<BinaryOp>(Operations::Lte, v1, v2), v1, v2);
 };
@@ -80,23 +68,25 @@ void constFoldInterval(IntervalRequirement& interval, const ConstFoldFn& constFo
 
 // Returns true if the interval can be proven to be empty. If no conclusion can be made, or the
 // interval is provably not empty, returns false.
-bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold) {
+
+bool isIntervalEmpty(const IntervalRequirement& interval) {
     if (interval.getLowBound() == BoundRequirement{false, Constant::maxKey()} ||
         interval.getHighBound() == BoundRequirement{false, Constant::minKey()}) {
         return true;
     }
-    const auto boundsCmp =
-        cmpABT(interval.getLowBound().getBound(), interval.getHighBound().getBound(), constFold);
+
+    CmpResult boundsCmp = cmp3wFast(
+        Operations::Cmp3w, interval.getLowBound().getBound(), interval.getHighBound().getBound());
     // Can't make any conclusions about the comparison between the bounds. We don't know for sure
     // that it's empty.
-    if (!boundsCmp) {
+    if (boundsCmp == CmpResult::kIncomparable) {
         return false;
     }
     const bool hasExclusiveBound =
         !interval.getLowBound().isInclusive() || !interval.getHighBound().isInclusive();
     // If lower bound greater than upper bound, or the bounds are equal but the interval is
     // not completely inclusive, we have an empty interval.
-    return *boundsCmp == 1 || (*boundsCmp == 0 && hasExclusiveBound);
+    return boundsCmp == CmpResult::kGt || (boundsCmp == CmpResult::kEq && hasExclusiveBound);
 }
 
 std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& int1,
@@ -165,10 +155,10 @@ std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& in
         {cInc, c}, {dInc, make<If>(std::move(overlapAndNonEmptyCond), Constant::minKey(), d)}};
     constFoldInterval(primaryInt1, constFold);
     constFoldInterval(primaryInt2, constFold);
-    if (!isIntervalEmpty(primaryInt1, constFold)) {
+    if (!isIntervalEmpty(primaryInt1)) {
         result.push_back(std::move(primaryInt1));
     }
-    if (!isIntervalEmpty(primaryInt2, constFold)) {
+    if (!isIntervalEmpty(primaryInt2)) {
         result.push_back(std::move(primaryInt2));
     }
 
@@ -198,7 +188,7 @@ std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& in
     // Analyze an aux interval for const-ness or emptiness, and add it to our result.
     const auto addAuxInterval = [&](IntervalRequirement auxInterval) {
         constFoldInterval(auxInterval, constFold);
-        if (!isIntervalEmpty(auxInterval, constFold)) {
+        if (!isIntervalEmpty(auxInterval)) {
             if (auxInterval.isConstant()) {
                 invariant(auxInterval.isEquality());
                 // Find the primary interval and merge with it.
@@ -302,7 +292,7 @@ boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::
 
     // Remove empty intervals.
     for (auto it = constDisjIntervals.begin(); it != constDisjIntervals.end();) {
-        if (isIntervalEmpty(*it, constFold)) {
+        if (isIntervalEmpty(*it)) {
             it = constDisjIntervals.erase(it);
         } else {
             it++;
@@ -440,8 +430,8 @@ static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequire
     // are inclusive.
     ABT maxLow = foldFn(maxABT(low1, low2));
     ABT minHigh = foldFn(minABT(high1, high2));
-    if (foldFn(make<BinaryOp>(Operations::Gt, maxLow, minHigh)) == Constant::boolean(true)) {
-        // Low bound is greater than high bound.
+    if (cmp3wFast(Operations::Gt, maxLow, minHigh) == CmpResult::kTrue) {
+        //   Low bound is greater than high bound.
         return {};
     }
 
@@ -455,10 +445,8 @@ static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequire
     BoundRequirement lowBoundPrimary(low1Inc && low2Inc, maxLow);
     BoundRequirement highBoundPrimary(high1Inc && high2Inc, minHigh);
 
-    const bool boundsEqual =
-        foldFn(make<BinaryOp>(Operations::Eq, std::move(maxLow), std::move(minHigh))) ==
-        Constant::boolean(true);
-    if (boundsEqual) {
+    auto boundsEqual = cmpEqFast(maxLow, minHigh);
+    if (boundsEqual == CmpResult::kTrue) {
         if (low1Inc && high1Inc && low2Inc && high2Inc) {
             // Point interval.
             return {{std::move(lowBoundPrimary), std::move(highBoundPrimary)}};
@@ -492,16 +480,15 @@ static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequire
     const auto addAuxInterval = [&](ABT low, ABT high, BoundRequirement& bound) {
         IntervalRequirement interval{{true, low}, {true, high}};
 
-        const ABT comparison =
-            foldFn(make<BinaryOp>(Operations::Lte, std::move(low), std::move(high)));
-        if (comparison == Constant::boolean(true)) {
+        CmpResult comparison = cmp3wFast(Operations::Lte, low, high);
+        if (comparison == CmpResult::kTrue) {
             if (interval.isEquality()) {
                 // We can determine the two bounds are equal.
                 bound = {true /*inclusive*/, bound.getBound()};
             } else {
                 result.push_back(std::move(interval));
             }
-        } else if (!comparison.is<Constant>()) {
+        } else if (comparison == CmpResult::kIncomparable) {
             // We cannot determine statically how the two bounds compare.
             result.push_back(std::move(interval));
         }
@@ -591,9 +578,10 @@ static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequire
         addAuxInterval(std::move(low), std::move(high), highBoundPrimary);
     }
 
-    if (!boundsEqual || (lowBoundPrimary.isInclusive() && highBoundPrimary.isInclusive())) {
-        // We add the main interval to the result as long as it is a valid point interval, or the
-        // bounds are not equal.
+    if (boundsEqual == CmpResult::kIncomparable || boundsEqual == CmpResult::kFalse ||
+        (lowBoundPrimary.isInclusive() && highBoundPrimary.isInclusive())) {
+        //  We add the main interval to the result as long as it is a valid point interval, or
+        //  the bounds are not equal.
         result.emplace_back(std::move(lowBoundPrimary), std::move(highBoundPrimary));
     }
     return result;

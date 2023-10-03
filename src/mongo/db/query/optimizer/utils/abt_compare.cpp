@@ -441,4 +441,96 @@ private:
 int comparePartialSchemaRequirementsExpr(const PSRExpr::Node& n1, const PSRExpr::Node& n2) {
     return PSRExprComparator{}.comparePSRExpr(n1, n2);
 }
+
+CmpResult cmpEqFast(const ABT& lhs, const ABT& rhs) {
+    if (lhs == rhs) {
+        // If the subtrees are equal, we can conclude that their result is equal because we
+        // have only pure functions.
+        return CmpResult::kTrue;
+    } else if (lhs.is<Constant>() && rhs.is<Constant>()) {
+        // We have two constants which are not equal.
+        return CmpResult::kFalse;
+    }
+    return CmpResult::kIncomparable;
+}
+
+CmpResult cmp3wFast(Operations op, const ABT& lhs, const ABT& rhs) {
+    const auto lhsConst = lhs.cast<Constant>();
+    const auto rhsConst = rhs.cast<Constant>();
+
+    if (lhsConst) {
+        const auto [lhsTag, lhsVal] = lhsConst->get();
+
+        if (rhsConst) {
+            const auto [rhsTag, rhsVal] = rhsConst->get();
+
+            const auto [compareTag, compareVal] =
+                sbe::value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+            uassert(7086701,
+                    "Invalid comparison result",
+                    compareTag == sbe::value::TypeTags::NumberInt32);
+            const auto cmpVal = sbe::value::bitcastTo<int32_t>(compareVal);
+
+            switch (op) {
+                case Operations::Lt:
+                    return (cmpVal < 0) ? CmpResult::kTrue : CmpResult::kFalse;
+                case Operations::Lte:
+                    return (cmpVal <= 0) ? CmpResult::kTrue : CmpResult::kFalse;
+                case Operations::Gt:
+                    return (cmpVal > 0) ? CmpResult::kTrue : CmpResult::kFalse;
+                case Operations::Gte:
+                    return (cmpVal >= 0) ? CmpResult::kTrue : CmpResult::kFalse;
+                case Operations::Cmp3w:
+                    return cmpVal > 0 ? CmpResult::kGt
+                                      : (cmpVal < 0 ? CmpResult::kLt : CmpResult::kEq);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        } else {
+            if (lhsTag == sbe::value::TypeTags::MinKey) {
+                switch (op) {
+                    case Operations::Lte:
+                        return CmpResult::kTrue;
+                    case Operations::Gt:
+                        return CmpResult::kFalse;
+                    default:
+                        break;
+                }
+            } else if (lhsTag == sbe::value::TypeTags::MaxKey) {
+                switch (op) {
+                    case Operations::Lt:
+                        return CmpResult::kFalse;
+                    case Operations::Gte:
+                        return CmpResult::kTrue;
+                    default:
+                        break;
+                }
+            }
+        }
+    } else if (rhsConst) {
+        const auto [rhsTag, rhsVal] = rhsConst->get();
+
+        if (rhsTag == sbe::value::TypeTags::MinKey) {
+            switch (op) {
+                case Operations::Lt:
+                    return CmpResult::kFalse;
+                case Operations::Gte:
+                    return CmpResult::kTrue;
+                default:
+                    break;
+            }
+        } else if (rhsTag == sbe::value::TypeTags::MaxKey) {
+            switch (op) {
+                case Operations::Lte:
+                    return CmpResult::kTrue;
+                case Operations::Gt:
+                    return CmpResult::kFalse;
+                default:
+                    break;
+            }
+        }
+    }
+
+    return CmpResult::kIncomparable;
+}
 }  // namespace mongo::optimizer
