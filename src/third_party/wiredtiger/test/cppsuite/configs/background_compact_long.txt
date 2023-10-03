@@ -1,0 +1,47 @@
+# Configuration for background_compact.
+duration_seconds=7200,
+cache_size_mb=10000,
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=100,
+        key_count_per_collection=1000000,
+        thread_count=10,
+        key_size=10,
+        value_size=1000
+    ),
+    insert_config=
+    (
+        thread_count=50,
+        op_rate=10ms,
+        ops_per_transaction=(min=5,max=20),
+        key_size=10,
+        value_size=1000
+    ),
+    remove_config=
+    (
+        op_rate=1s,
+        ops_per_transaction=( max=1,min=0),
+        thread_count=1
+    ),
+    custom_config=
+    (
+        op_rate=600s,
+        thread_count=1
+    ),
+    background_compact_config=
+    (
+        thread_count=1,
+        free_space_target_mb=1,
+        op_rate=1200s
+    ),
+    checkpoint_config=
+    (
+        op_rate=60s,
+    )
+),
+operation_tracker=
+(
+    enabled=false,
+)
