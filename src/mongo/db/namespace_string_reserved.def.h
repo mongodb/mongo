@@ -139,6 +139,11 @@ NSS_CONSTANT(kShardingDDLCoordinatorsNamespace,
              DatabaseName::kConfig,
              "system.sharding_ddl_coordinators"_sd)
 
+// Namespace for storing MultiUpdateCoordinator state documents.
+NSS_CONSTANT(kMultiUpdateCoordinatorsNamespace,
+             DatabaseName::kConfig,
+             "localMigrationBlockingOperations.multiUpdateCoordinators"_sd)
+
 // Namespace for persisting sharding DDL rename participant state documents
 NSS_CONSTANT(kShardingRenameParticipantsNamespace,
              DatabaseName::kConfig,
