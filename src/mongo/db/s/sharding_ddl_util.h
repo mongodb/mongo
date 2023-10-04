@@ -65,7 +65,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     StringData dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor);
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    bool throwOnError = true);
 
 /**
  * Erase tags metadata from config server for the given namespace, using the _configsvrRemoveTags
