@@ -29,9 +29,20 @@
 
 #include "mongo/db/cluster_role.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+namespace {
+
+const std::array<std::pair<ClusterRole, StringData>, 3> roleNames{{
+    {ClusterRole::ShardServer, "shard"_sd},
+    {ClusterRole::ConfigServer, "config"_sd},
+    {ClusterRole::RouterServer, "router"_sd},
+}};
+
+}  // namespace
 
 ClusterRole::ClusterRole(Value role) : _roleMask(role) {}
 
@@ -67,6 +78,29 @@ bool ClusterRole::has(const ClusterRole& role) const {
 
 bool ClusterRole::hasExclusively(const ClusterRole& role) const {
     return _roleMask == role._roleMask;
+}
+
+BSONArray toBSON(ClusterRole role) {
+    BSONArrayBuilder bab;
+    for (auto&& [key, name] : roleNames) {
+        if (role.has(key)) {
+            bab.append(name);
+        }
+    }
+    return bab.arr();
+}
+
+std::ostream& operator<<(std::ostream& os, ClusterRole r) {
+    StringData sep;
+    os << "ClusterRole{";
+    for (auto&& [key, name] : roleNames) {
+        if (r.has(key)) {
+            os << sep << name;
+            sep = "|";
+        }
+    }
+    os << "}";
+    return os;
 }
 
 }  // namespace mongo

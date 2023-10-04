@@ -307,7 +307,7 @@ commands:
                 optional: true
                 stability: stable
             saslSupportedMechs:
-                type: 
+                type:
                     variant: [string, object_owned]
                 optional: true
                 stability: stable

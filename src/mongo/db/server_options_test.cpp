@@ -977,6 +977,8 @@ TEST(ClusterRole, MonoRole) {
     ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::ConfigServer));
     ASSERT_FALSE(shardRole.hasExclusively(ClusterRole::RouterServer));
 
+    // Role cannot be set to config server only.
+
     const ClusterRole routerRole{ClusterRole::RouterServer};
     ASSERT_FALSE(routerRole.has(ClusterRole::None));
     ASSERT_FALSE(routerRole.has(ClusterRole::ShardServer));
@@ -1029,6 +1031,37 @@ TEST(ClusterRole, MultiRole) {
     ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::ShardServer));
     ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::ConfigServer));
     ASSERT_FALSE(anyRole.hasExclusively(ClusterRole::RouterServer));
+}
+
+TEST(ClusterRole, ToBson) {
+    using R = ClusterRole;
+    const auto s = R::ShardServer;
+    const auto c = R::ConfigServer;
+    const auto r = R::RouterServer;
+
+    struct Case {
+        R actual;
+        std::vector<std::string> expected;
+    };
+
+    const std::vector<Case> allCases{
+        {R{}, {}},
+        {R{s}, {"shard"}},
+        // {R{c}, {"config"}}, // Role cannot be set to config server only.
+        {R{s, c}, {"shard", "config"}},
+        {R{r}, {"router"}},
+        {R{s, r}, {"shard", "router"}},
+        {R{c, r}, {"config", "router"}},
+        {R{s, c, r}, {"shard", "config", "router"}},
+    };
+
+    for (auto&& [actual, expected] : allCases) {
+        BSONArrayBuilder bab;
+        for (auto&& roleStr : expected) {
+            bab.append(roleStr);
+        }
+        ASSERT_BSONOBJ_EQ(bab.arr(), toBSON(actual));
+    }
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

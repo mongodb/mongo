@@ -85,6 +85,8 @@ public:
 
         BSONObjBuilder result;
 
+        result.append("clusterRoles", toBSON(serverGlobalParams.clusterRole));
+
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
 
