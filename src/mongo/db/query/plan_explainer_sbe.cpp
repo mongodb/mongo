@@ -302,6 +302,10 @@ void statsToBSON(const QuerySolutionNode* node,
                 for (const auto& field : utsbn->bucketSpec.fieldSet()) {
                     fieldsBab.append(field);
                 }
+                if (utsbn->bucketSpec.behavior() == timeseries::BucketSpec::Behavior::kInclude &&
+                    utsbn->includeMeta) {
+                    fieldsBab.append(*utsbn->bucketSpec.metaField());
+                }
             }
             {
                 BSONArrayBuilder fieldsBab{bob->subarrayStart("computedMetaProjFields")};
@@ -312,7 +316,7 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("includeMeta", utsbn->includeMeta);
             bob->append("eventFilter",
                         utsbn->eventFilter ? utsbn->eventFilter->serialize() : BSONObj());
-            bob->append("wholebucketFilter",
+            bob->append("wholeBucketFilter",
                         utsbn->wholeBucketFilter ? utsbn->wholeBucketFilter->serialize()
                                                  : BSONObj());
 

@@ -1251,6 +1251,11 @@ bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
         std::move(monotonicIdFields),
         std::move(groupStage->getMutableAccumulationStatements()),
         groupStage->getMaxMemoryUsageBytes());
+
+    // Streaming group isn't supported in SBE yet and we don't want to run the pipeline in hybrid
+    // mode due to potential perf impact.
+    pExpCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
+
     return true;
 }
 

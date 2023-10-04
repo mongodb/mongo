@@ -1637,12 +1637,6 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
     if (unpack && !unpack->isSbeCompatible()) {
         expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
     }
-    if (unpack && sort) {
-        // TODO SERVER-79061: disable only the case when it's possible for bounded sort to be used.
-        // NB: tests in jstests/core/timeseries/timeseries_lastpoint.js over-specify the expected
-        // plan shapes and fail when lowered to SBE even if the bounded sort isn't used.
-        expCtx->sbePipelineCompatibility = SbeCompatibility::notCompatible;
-    }
 
     // But in classic it may be eligible for a post-planning sort optimization. We check eligibility
     // and perform the rewrite here.

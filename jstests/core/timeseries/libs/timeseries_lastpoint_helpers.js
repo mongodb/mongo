@@ -25,6 +25,7 @@ export function verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter
 
     // Assert that the time-series aggregation results match that of the observer collection.
     const expected = observerColl.aggregate(pipeline).toArray();
+
     const actual = tsColl.aggregate(pipeline).toArray();
     assertArrayEq({actual, expected});
 }
