@@ -569,7 +569,7 @@ def _run_scan():
         fp.write(f"""#/!bin/sh
 curl --retry 5 -s -L -O https://detect.synopsys.com/detect{BLACKDUCK_DETECT_VERSION}.sh
 echo "{BLACKDUCK_DETECT_CHECKSUM}  detect{BLACKDUCK_DETECT_VERSION}.sh" | sha256sum --check && \
-bash detect{BLACKDUCK_DETECT_VERSION}.sh --blackduck.url={bdc.url} --blackduck.api.token={bdc.token} --detect.report.timeout={BLACKDUCK_TIMEOUT_SECS} --snippet-matching --upload-source --detect.wait.for.results=true --logging.level.detect=TRACE --detect.diagnostic=true --detect.cleanup=false
+bash detect{BLACKDUCK_DETECT_VERSION}.sh --blackduck.url={bdc.url} --blackduck.api.token={bdc.token} --detect.timeout={BLACKDUCK_TIMEOUT_SECS} --snippet-matching --upload-source --detect.wait.for.results=true --logging.level.detect=TRACE --detect.diagnostic=true --detect.cleanup=false
 """.encode())
         fp.flush()
 
