@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import sys
@@ -45,8 +46,12 @@ class CoreAnalyzer(Subcommand):
             core_dump_dir = self.options.core_dir or os.path.curdir
 
         analysis_dir = os.path.join(base_dir, "analysis")
-        dumpers = dumper.get_dumpers(self.root_logger, self.options.debugger_output)
-        dumpers.dbg.analyze_cores(core_dump_dir, install_dir, analysis_dir)
+        dumpers = dumper.get_dumpers(self.root_logger, None)
+        report = dumpers.dbg.analyze_cores(core_dump_dir, install_dir, analysis_dir)
+
+        if self.options.generate_report:
+            with open("report.json", "w") as file:
+                json.dump(report, file)
 
     def setup_logging(self, logger: Optional[logging.Logger]):
         if logger is None:
@@ -93,12 +98,5 @@ class CoreAnalyzerPlugin(PluginInterface):
         )
 
         parser.add_argument(
-            '-o', '--debugger-output', dest='debugger_output', action="append",
-            choices=('file', 'stdout'), default=['stdout'],
-            help="If 'stdout', then the debugger's output is written to the Python"
-            " process's stdout. If 'file', then the debugger's output is written"
-            " to a file named debugger_<process>_<pid>.log for each process it"
-            " attaches to. This option can be specified multiple times on the"
-            " command line to have the debugger's output written to multiple"
-            " locations. By default, the debugger's output is written only to the"
-            " Python process's stdout.")
+            "--generate-report", '-r', action="store_true", default=False,
+            help="Whether to generate a report used to log individual tests in evergreen.")
