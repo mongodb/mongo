@@ -76,6 +76,31 @@ modules:
   prefix: src/third_party
   branch: develop
 
+- name: dsi
+  repo: git@github.com:10gen/dsi.git
+  prefix: ${workdir}/src
+  branch: master
+- name: genny
+  repo: git@github.com:10gen/genny.git
+  prefix: ${workdir}/src
+  branch: master
+- name: workloads
+  repo: git@github.com:10gen/workloads.git
+  prefix: ${workdir}/src
+  branch: master
+- name: YCSB
+  repo: git@github.com:mongodb-labs/YCSB.git
+  prefix: ${workdir}/src
+  branch: production
+- name: flamegraph
+  repo: git@github.com:mongodb-forks/flamegraph.git
+  prefix: ${workdir}/src
+  branch: master
+- name: PrivateWorkloads
+  repo: git@github.com:10gen/PrivateWorkloads.git
+  prefix: ${workdir}/src
+  branch: production
+
 #######################################
 #             Variable                #
 #######################################
@@ -448,6 +473,11 @@ functions:
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
         wtdevelop: ${wtdevelop_rev}
+        dsi: ${dsi_rev}
+        genny: ${genny_rev}
+        workloads: ${workloads_rev}
+        YCSB: ${YCSB_rev}
+        flamegraph: ${flamegraph_rev}
 
   # Get get the mongo repo, no modules. Useful for inspecting the commit history with the
   # `git` Python tool.
