@@ -138,12 +138,18 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
     auto it = inputDoc.fieldIterator();
     size_t projectedFields = 0;
 
+    bool isIncl = isIncluded();
+
     while (it.more()) {
         auto fieldName = it.fieldName();
 
         if (_projectedFields.find(fieldName) != _projectedFields.end()) {
-            outputProjectedField(
-                fieldName, applyLeafProjectionToValue(it.next().second), outputDoc);
+            if (isIncl) {
+                outputProjectedField(fieldName, it.next().second, outputDoc);
+            } else {
+                outputProjectedField(fieldName, Value(), outputDoc);
+                it.advance();
+            }
             ++projectedFields;
         } else if (auto childIt = _children.find(fieldName); childIt != _children.end()) {
             outputProjectedField(
@@ -277,7 +283,7 @@ Document ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> ex
 void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explain,
                                MutableDocument* output) const {
     // Determine the boolean value for projected fields in the explain output.
-    const bool projVal = !applyLeafProjectionToValue(Value(true)).missing();
+    const bool projVal = isIncluded();
 
     // Always put "_id" first if it was projected (implicitly or explicitly).
     if (_projectedFields.find("_id") != _projectedFields.end()) {
