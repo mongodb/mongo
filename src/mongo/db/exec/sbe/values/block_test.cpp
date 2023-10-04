@@ -304,7 +304,9 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSubfield) {
         auto& valsOut = cellBlocks[0]->getValueBlock();
         auto numObj = blockToBsonArr(valsOut);
         ASSERT_BSONOBJ_EQ(
-            numObj, fromjson("{result: [null, null, {b: [2,3]}, {b: [4,5]}, null, {b: [[999]]}]}"));
+            numObj,
+            fromjson(
+                "{result: [{b: 1}, {b: [999, 999]}, {b: [2,3]}, {b: [4,5]}, null, {b: [[999]]}]}"));
         ASSERT_EQ(posInfoToString(cellBlocks[0]->filterPositionInfo()), "111011");
     }
 

@@ -109,7 +109,7 @@ void walkField(BsonWalkNode* node, const BSONElement& elem) {
     if (elem.type() == BSONType::Object) {
         walkObj(node, elem.embeddedObject());
         if (node->traverseChild) {
-            walkObj(node->traverseChild.get(), elem.embeddedObject());
+            walkField(node->traverseChild.get(), elem);
         }
     } else if (elem.type() == BSONType::Array) {
         if (node->traverseChild) {
