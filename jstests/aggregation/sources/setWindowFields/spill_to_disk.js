@@ -208,16 +208,18 @@ function testUsedDiskAppearsInExplain() {
         {$sort: {_id: 1}}
     ];
 
+    const stageName =
+        checkSBEEnabled(db, ["featureFlagSbeFull"]) ? "window" : "$_internalSetWindowFields";
     let stages = getAggPlanStages(
         coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true}),
-        "$_internalSetWindowFields");
+        stageName);
     assert(stages[0]["usedDisk"], stages);
 
     // Run an explain query with the default memory limit, so 'usedDisk' should be false.
     changeSpillLimit({mode: 'off', maxDocs: null});
     stages = getAggPlanStages(
         coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true}),
-        "$_internalSetWindowFields");
+        stageName);
     assert(!stages[0]["usedDisk"], stages);
 }
 
@@ -344,8 +346,7 @@ function testErrorsWhenCantSpill() {
 testSpillWithDifferentAccumulators();
 testSpillWithDifferentPartitions();
 // We don't execute setWindowFields in a sharded explain.
-// TODO SERVER-78714: Implement explain for $setWindowFields.
-if (!FixtureHelpers.isMongos(db) && !checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (!FixtureHelpers.isMongos(db)) {
     testUsedDiskAppearsInExplain();
 }
 testLargeSpill();
