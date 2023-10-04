@@ -714,7 +714,7 @@ private:
 
             // 1. Get batch bounds (stored in batchStats) and run reverse lookup if
             // skipLookupForExtraKeys is not set.
-            // TODO SERVER-79717: Revisit case where skipLookupForExtraKeys is true, if we can
+            // TODO SERVER-81592: Revisit case where skipLookupForExtraKeys is true, if we can
             // avoid doing two index walks (one for batching and one for hashing).
             auto batchFirst = lookupStart;
             Status reverseLookupStatus = _getExtraIndexKeysBatchAndRunReverseLookup(
@@ -1170,6 +1170,8 @@ private:
                                keyStringBson,
                                iam,
                                indexCatalogEntry);
+            } else {
+                LOGV2_DEBUG(7971700, 3, "Skipping reverse lookup for extra index keys dbcheck");
             }
 
             batchStats.lastIndexKey = keyString;

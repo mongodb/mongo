@@ -23,6 +23,37 @@ TestData.skipCheckDBHashes = true;
 const dbName = "dbCheckExtraIndexKeys";
 const collName = "dbCheckExtraIndexKeysColl";
 
+const allErrorsOrWarningsQuery = {
+    $or: [{"severity": "warning"}, {"severity": "error"}]
+};
+const recordNotFoundQuery = {
+    "severity": "error",
+    "msg": "found extra index key entry without corresponding document"
+};
+const recordDoesNotMatchQuery = {
+    "severity": "error",
+    "msg":
+        "found index key entry with corresponding document/keystring set that does not contain the expected key string"
+};
+const collNotFoundWarningQuery = {
+    severity: "warning",
+    "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
+};
+const indexNotFoundWarningQuery = {
+    severity: "warning",
+    "msg": "abandoning dbCheck extra index keys check because index no longer exists"
+};
+const warningQuery = {
+    "severity": "warning"
+};
+const infoOrErrorQuery = {
+    $or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]
+};
+const infoBatchQuery = {
+    "severity": "info",
+    "operation": "dbCheckBatch"
+}
+
 const replSet = new ReplSetTest({
     name: jsTestName(),
     nodes: 2,
@@ -64,10 +95,7 @@ function checkNumBatchesAndSnapshots(
     healthLog, nDocs, batchSize, snapshotSize, inconsistentBatch = false) {
     const expectedNumBatches = Math.ceil(nDocs / batchSize);
 
-    let query = {
-        "severity": "info",
-        "operation": "dbCheckBatch",
-    };
+    let query = infoBatchQuery;
     if (inconsistentBatch) {
         query = {"severity": "error", "msg": "dbCheck batch inconsistent"};
     }
@@ -114,17 +142,13 @@ function collNotFoundBeforeDbCheck() {
 
     hangBeforeExtraIndexKeysCheck.off();
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
-    };
-    checkHealthLog(primaryHealthLog, query, 1);
+    checkHealthLog(primaryHealthLog, collNotFoundWarningQuery, 1);
     // If index not found before db check, we won't create any oplog entry.
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, warningQuery, 0);
 
-    query = {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    // No other info or error logs.
+    checkHealthLog(primaryHealthLog, infoOrErrorQuery, 0);
+    checkHealthLog(secondaryHealthLog, infoOrErrorQuery, 0);
 }
 
 function indexNotFoundBeforeDbCheck() {
@@ -140,17 +164,13 @@ function indexNotFoundBeforeDbCheck() {
     };
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
-    let query = {
-        severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because index no longer exists"
-    };
-    checkHealthLog(primaryHealthLog, query, 1);
+    checkHealthLog(primaryHealthLog, indexNotFoundWarningQuery, 1);
     // If index not found before db check, we won't create any oplog entry.
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, warningQuery, 0);
 
-    query = {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    // No other info or error logs.
+    checkHealthLog(primaryHealthLog, infoOrErrorQuery, 0);
+    checkHealthLog(secondaryHealthLog, infoOrErrorQuery, 0);
 }
 
 function collNotFoundDuringReverseLookup() {
@@ -183,19 +203,14 @@ function collNotFoundDuringReverseLookup() {
     hangBeforeReverseLookupCatalogSnapshot.off();
 
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
-    };
     jsTestLog("checking primary health log");
-    checkHealthLog(primaryHealthLog, query, 1);
+    checkHealthLog(primaryHealthLog, collNotFoundWarningQuery, 1);
     // If index not found during reverse lookup, we won't create any oplog entry for that batch.
     jsTestLog("checking secondary health log");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, warningQuery, 0);
 
-    query = {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, infoOrErrorQuery, 0);
+    checkHealthLog(secondaryHealthLog, infoOrErrorQuery, 0);
 }
 
 function indexNotFoundDuringReverseLookup() {
@@ -227,19 +242,14 @@ function indexNotFoundDuringReverseLookup() {
     hangBeforeReverseLookupCatalogSnapshot.off();
 
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because index no longer exists"
-    };
     jsTestLog("checking primary health log");
-    checkHealthLog(primaryHealthLog, query, 1);
+    checkHealthLog(primaryHealthLog, indexNotFoundWarningQuery, 1);
     // If index not found during reverse lookup, we won't create any oplog entry for that batch.
     jsTestLog("checking secondary health log");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, warningQuery, 0);
 
-    query = {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, infoOrErrorQuery, 0);
+    checkHealthLog(secondaryHealthLog, infoOrErrorQuery, 0);
 }
 
 function collNotFoundDuringHashing() {
@@ -272,19 +282,15 @@ function collNotFoundDuringHashing() {
     hangBeforeExtraIndexKeysHashing.off();
 
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
-    };
+
     jsTestLog("checking primary health log");
-    checkHealthLog(primaryHealthLog, query, 1);
+    checkHealthLog(primaryHealthLog, collNotFoundWarningQuery, 1);
     // If index not found during hashing, we won't create any oplog entry for that batch.
     jsTestLog("checking secondary health log");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, warningQuery, 0);
 
-    query = {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, infoOrErrorQuery, 0);
+    checkHealthLog(secondaryHealthLog, infoOrErrorQuery, 0);
 }
 
 function indexNotFoundDuringHashing() {
@@ -316,19 +322,14 @@ function indexNotFoundDuringHashing() {
     hangBeforeExtraIndexKeysHashing.off();
 
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        severity: "warning",
-        "msg": "abandoning dbCheck extra index keys check because index no longer exists"
-    };
     jsTestLog("checking primary health log");
-    checkHealthLog(primaryHealthLog, query, 1);
+    checkHealthLog(primaryHealthLog, indexNotFoundWarningQuery, 1);
     // If index not found during hashing, we won't create any oplog entry for that batch.
     jsTestLog("checking secondary health log");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, warningQuery, 0);
 
-    query = {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, infoOrErrorQuery, 0);
+    checkHealthLog(secondaryHealthLog, infoOrErrorQuery, 0);
 }
 
 function keysChangedBeforeHashing() {
@@ -368,18 +369,13 @@ function keysChangedBeforeHashing() {
 
     awaitDbCheckCompletion(replSet, primaryDB);
 
-    let query = {$or: [{"severity": "warning"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
+    checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
-    query = {
-        "severity": "info",
-        "operation": "dbCheckBatch",
-    };
     jsTestLog("Checking for correct number of batches on primary");
-    checkHealthLog(primaryHealthLog, query, 2);
+    checkHealthLog(primaryHealthLog, infoBatchQuery, 2);
     jsTestLog("Checking for correct number of batches on secondary");
-    checkHealthLog(secondaryHealthLog, query, 2);
+    checkHealthLog(secondaryHealthLog, infoBatchQuery, 2);
 }
 
 function allIndexKeysNotFoundDuringReverseLookup(nDocs) {
@@ -426,12 +422,12 @@ function allIndexKeysNotFoundDuringReverseLookup(nDocs) {
     // If all index keys are deleted during reverse lookup, we won't create any oplog entry.
     checkHealthLog(secondaryHealthLog, query, 0);
 
-    query = {"severity": "info", "operation": "dbCheckBatch"};
-    checkHealthLog(primaryHealthLog, query, 1);
-    checkHealthLog(secondaryHealthLog, query, 1);
-    query = {"severity": "error"};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, infoBatchQuery, 1);
+    checkHealthLog(secondaryHealthLog, infoBatchQuery, 1);
+
+    // Only the one warning entry.
+    checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 1);
+    checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
     if (debugBuild) {
         assert(rawMongoProgramOutput().match(/7844803.*could not find any keys in index/),
@@ -483,33 +479,29 @@ function keyNotFoundDuringReverseLookup(nDocs) {
     hangAfterReverseLookupCatalogSnapshot.off();
 
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        "severity": "error",
-        "msg":
-            "found index key entry with corresponding document/keystring set that does not contain the expected key string"
-    };
+
     jsTestLog("checking primary health log");
     // First doc was valid, second doc was not found but we continue with dbcheck.
-    checkHealthLog(primaryHealthLog, query, nDocs - 2);
+    checkHealthLog(primaryHealthLog, recordDoesNotMatchQuery, nDocs - 2);
+    checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs - 2);
     jsTestLog("checking secondary health log");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
-    query = {"msg": "dbcheck extra keys check batch on primary"};
     jsTestLog("checking primary for correct num of health logs");
-    checkHealthLog(primaryHealthLog, query, nDocs - 1);
+    checkHealthLog(primaryHealthLog, infoBatchQuery, nDocs - 1);
 
-    query = {"msg": "dbCheck batch consistent"};
     jsTestLog("checking secondary for correct num of health logs");
-    checkHealthLog(secondaryHealthLog, query, nDocs - 1);
+    checkHealthLog(secondaryHealthLog, infoBatchQuery, nDocs - 1);
 
     skipUpdatingIndexDocumentPrimary.off();
     skipUpdatingIndexDocumentSecondary.off();
 }
 
-function noExtraIndexKeys(nDocs, batchSize, snapshotSize) {
+function noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
     clearRawMongoProgramOutput();
     jsTestLog("Testing that a valid index will not result in any health log entries with " + nDocs +
-              "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize);
+              "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+              ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs);
     assert.commandWorked(primaryDB.runCommand({
@@ -525,13 +517,13 @@ function noExtraIndexKeys(nDocs, batchSize, snapshotSize) {
         validateMode: "extraIndexKeysCheck",
         secondaryIndex: "a_1",
         maxDocsPerBatch: batchSize,
-        batchWriteConcern: writeConcern
+        batchWriteConcern: writeConcern,
+        skipLookupForExtraKeys: skipLookupForExtraKeys
     };
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /* awaitCompletion */);
 
-    let query = {$or: [{"severity": "warning"}, {"severity": "error"}]};
-    checkHealthLog(primaryHealthLog, query, 0);
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
+    checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
     jsTestLog("Checking for correct number of batches on primary");
     checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
@@ -541,10 +533,11 @@ function noExtraIndexKeys(nDocs, batchSize, snapshotSize) {
     resetSnapshotSize();
 }
 
-function recordNotFound(nDocs, batchSize, snapshotSize) {
+function recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
     clearRawMongoProgramOutput();
     jsTestLog("Testing that an extra key will generate a health log entry with " + nDocs +
-              "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize);
+              "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+              ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs);
     const primaryColl = primaryDB.getCollection(collName);
@@ -571,22 +564,23 @@ function recordNotFound(nDocs, batchSize, snapshotSize) {
         validateMode: "extraIndexKeysCheck",
         secondaryIndex: "a_1",
         maxDocsPerBatch: batchSize,
-        batchWriteConcern: writeConcern
+        batchWriteConcern: writeConcern,
+        skipLookupForExtraKeys: skipLookupForExtraKeys
     };
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
-    let query = {
-        "severity": "error",
-        "msg": "found extra index key entry without corresponding document"
-    };
-    jsTestLog("Checking primary for record not found error");
-    checkHealthLog(primaryHealthLog, query, nDocs);
-    query = {"severity": "error"};
-    // No other errors on primary.
-    checkHealthLog(primaryHealthLog, query, nDocs);
+    if (skipLookupForExtraKeys) {
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
+    } else {
+        jsTestLog("Checking primary for record not found error");
+        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocs);
+        // No other errors on primary.
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
+    }
+
     jsTestLog(
         "Checking secondary for record not found error, should have 0 since secondary skips reverse lookup");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
     jsTestLog("Checking for correct number of batches on primary");
     checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
@@ -598,11 +592,12 @@ function recordNotFound(nDocs, batchSize, snapshotSize) {
     resetSnapshotSize();
 }
 
-function recordDoesNotMatch(nDocs, batchSize, snapshotSize) {
+function recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
     clearRawMongoProgramOutput();
     jsTestLog(
         "Testing that a key with a record that does not contain the expected keystring will generate a health log entry with " +
-        nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize);
+        nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs);
     const primaryColl = primaryDB.getCollection(collName);
@@ -631,24 +626,23 @@ function recordDoesNotMatch(nDocs, batchSize, snapshotSize) {
         validateMode: "extraIndexKeysCheck",
         secondaryIndex: "a_1",
         maxDocsPerBatch: batchSize,
-        batchWriteConcern: writeConcern
+        batchWriteConcern: writeConcern,
+        skipLookupForExtraKeys: skipLookupForExtraKeys
     };
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
-    let query = {
-        "severity": "error",
-        "msg":
-            "found index key entry with corresponding document/keystring set that does not contain the expected key string"
-    };
-    jsTestLog("Checking primary for record does not match error");
-    checkHealthLog(primaryHealthLog, query, nDocs);
+    if (skipLookupForExtraKeys) {
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
+    } else {
+        jsTestLog("Checking primary for record does not match error");
+        checkHealthLog(primaryHealthLog, recordDoesNotMatchQuery, nDocs);
 
-    query = {"severity": "error"};
-    // No other errors on primary.
-    checkHealthLog(primaryHealthLog, query, nDocs);
+        // No other errors on primary.
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
+    }
     jsTestLog(
         "Checking secondary for record does not match error, should have 0 since secondary skips reverse lookup");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
     jsTestLog("Checking for correct number of batches on primary");
     checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
@@ -660,11 +654,13 @@ function recordDoesNotMatch(nDocs, batchSize, snapshotSize) {
     resetSnapshotSize();
 }
 
-function hashingInconsistentExtraKeyOnPrimary(nDocs, batchSize, snapshotSize) {
+function hashingInconsistentExtraKeyOnPrimary(
+    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
     clearRawMongoProgramOutput();
     jsTestLog(
         "Testing that an extra key on only the primary will log an inconsistent batch health log entry: " +
-        nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize);
+        nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
 
     setSnapshotSize(snapshotSize);
     const primaryColl = primaryDB.getCollection(collName);
@@ -690,22 +686,26 @@ function hashingInconsistentExtraKeyOnPrimary(nDocs, batchSize, snapshotSize) {
         validateMode: "extraIndexKeysCheck",
         secondaryIndex: "a_1",
         maxDocsPerBatch: batchSize,
-        batchWriteConcern: writeConcern
+        batchWriteConcern: writeConcern,
+        skipLookupForExtraKeys: skipLookupForExtraKeys
     };
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
-    let query = {
-        "severity": "error",
-        "msg": "found extra index key entry without corresponding document"
-    };
-    jsTestLog("Checking primary for record not found error");
-    checkHealthLog(primaryHealthLog, query, nDocs);
-    jsTestLog("Checking secondary for record not found error, should have 0");
-    checkHealthLog(secondaryHealthLog, query, 0);
+    if (skipLookupForExtraKeys) {
+        jsTestLog("Checking primary for errors");
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
 
-    query = {"severity": "error"};
-    // No other errors on primary.
-    checkHealthLog(primaryHealthLog, query, nDocs);
+        jsTestLog("Checking secondary for record not found error, should have 0");
+        checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
+    } else {
+        jsTestLog("Checking primary for record not found error");
+        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocs);
+        jsTestLog("Checking secondary for record not found error, should have 0");
+        checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
+
+        // No other errors on primary.
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
+    }
 
     jsTestLog("Checking for correct number of batches on primary");
     checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
@@ -729,10 +729,13 @@ allIndexKeysNotFoundDuringReverseLookup(10);
 keyNotFoundDuringReverseLookup(10);
 
 function runMainTests(nDocs, batchSize, snapshotSize) {
-    noExtraIndexKeys(nDocs, batchSize, snapshotSize);
-    recordDoesNotMatch(nDocs, batchSize, snapshotSize);
-    recordNotFound(nDocs, batchSize, snapshotSize);
-    hashingInconsistentExtraKeyOnPrimary(nDocs, batchSize, snapshotSize);
+    [true, false].forEach((skipLookupForExtraKeys) => {
+        noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
+        recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
+        recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
+        hashingInconsistentExtraKeyOnPrimary(
+            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
+    });
 }
 
 // Test with docs < batch size
