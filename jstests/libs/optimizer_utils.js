@@ -10,6 +10,16 @@ export function checkCascadesOptimizerEnabled(theDB) {
 }
 
 /**
+ * Utility for checking if the experimental Cascades optimizer code path is enabled (checks
+ * framework control for M4+).
+ */
+export function checkExperimentalCascadesOptimizerEnabled(theDB) {
+    const val = theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1})
+                    .internalQueryFrameworkControl;
+    return val == "tryBonsaiExperimental" || val == "forceBonsai";
+}
+
+/**
  * Utility for checking if the Cascades optimizer feature flag is on.
  */
 export function checkCascadesFeatureFlagEnabled(theDB) {
