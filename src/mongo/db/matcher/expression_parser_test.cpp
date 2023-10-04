@@ -386,6 +386,33 @@ TEST(MatchExpressionParserTest, ExprParsesSuccessfullyWithinTopLevelAnd) {
             .getStatus());
 }
 
+TEST(MatchExpressionParserTest, ExprParseFailsWithEmptyAnd) {
+    auto query = fromjson("{$and: []}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(), "$and argument must be a non-empty array");
+}
+
+TEST(MatchExpressionParserTest, ExprParseFailsWithNotArrayAnd) {
+    auto query = fromjson("{$and: 'dummy string'}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(), "$and argument must be an array");
+}
+
+TEST(MatchExpressionParserTest, ExprParseFailsWithNotObjectInArrayAnd) {
+    auto query = fromjson("{$and: ['dummy string']}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(), "$and argument's entries must be objects");
+}
+
 TEST(MatchExpressionParserTest, ExprFailsToParseWithTopLevelNot) {
     auto query = fromjson("{$not: {x: 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -396,6 +423,24 @@ TEST(MatchExpressionParserTest, ExprFailsToParseWithTopLevelNot) {
         result.getStatus().reason() ==
         "unknown top level operator: $not. If you are trying to negate an entire expression, "
         "use $nor.");
+}
+
+TEST(MatchExpressionParserTest, ExprParseFailsWithStringNot) {
+    auto query = fromjson("{ a: {$not: 'dummy string'}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(), "$not argument must be a regex or an object");
+}
+
+TEST(MatchExpressionParserTest, ExprParseFailsWithEmptyNot) {
+    auto query = fromjson("{ a: {$not: {}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(
+        query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr);
+    ASSERT_EQ(result.getStatus(), ErrorCodes::BadValue);
+    ASSERT_EQ(result.getStatus().reason(), "$not argument must be a non-empty object");
 }
 
 TEST(MatchExpressionParserTest, ExprFailsToParseWithinElemMatch) {
@@ -446,13 +491,13 @@ TEST(MatchExpressionParserTest, InternalExprEqParsesCorrectly) {
     ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 6}}")));
 }
 
-TEST(MatchesExpressionParserTest, InternalExprEqComparisonToArrayDoesNotParse) {
+TEST(MatchExpressionParserTest, InternalExprEqComparisonToArrayDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = fromjson("{'a.b': {$_internalExprEq: [5]}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
 
-TEST(MatchesExpressionParserTest, InternalExprEqComparisonToUndefinedDoesNotParse) {
+TEST(MatchExpressionParserTest, InternalExprEqComparisonToUndefinedDoesNotParse) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto query = fromjson("{'a.b': {$_internalExprEq: undefined}}");
     ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);

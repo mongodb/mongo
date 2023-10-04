@@ -1324,7 +1324,8 @@ StatusWithMatchExpression parseTreeTopLevel(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     DocumentParseLevel currentLevel) {
     if (elem.type() != BSONType::Array) {
-        return {Status(ErrorCodes::BadValue, str::stream() << T::kName << " must be an array")};
+        return {Status(ErrorCodes::BadValue,
+                       str::stream() << T::kName << " argument must be an array")};
     }
 
     auto temp =
@@ -1332,12 +1333,14 @@ StatusWithMatchExpression parseTreeTopLevel(
 
     auto arr = elem.Obj();
     if (arr.isEmpty()) {
-        return Status(ErrorCodes::BadValue, "$and/$or/$nor must be a nonempty array");
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << T::kName << " argument must be a non-empty array");
     }
 
     for (auto e : arr) {
         if (e.type() != BSONType::Object)
-            return Status(ErrorCodes::BadValue, "$or/$and/$nor entries need to be full objects");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << T::kName << " argument's entries must be objects");
 
         auto sub = parse(e.Obj(), expCtx, extensionsCallback, allowedFeatures, currentLevel);
         if (!sub.isOK())
@@ -1600,12 +1603,12 @@ StatusWithMatchExpression parseNot(boost::optional<StringData> name,
     }
 
     if (elem.type() != BSONType::Object) {
-        return {ErrorCodes::BadValue, "$not needs a regex or a document"};
+        return {ErrorCodes::BadValue, "$not argument must be a regex or an object"};
     }
 
     auto notObject = elem.Obj();
     if (notObject.isEmpty()) {
-        return {ErrorCodes::BadValue, "$not cannot be empty"};
+        return {ErrorCodes::BadValue, "$not argument must be a non-empty object"};
     }
 
     auto theAnd = std::make_unique<AndMatchExpression>(createAnnotation(expCtx, "$and", BSONObj()));
