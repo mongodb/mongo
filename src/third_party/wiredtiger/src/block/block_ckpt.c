@@ -685,6 +685,14 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
         if (F_ISSET(ckpt, WT_CKPT_FAKE) || !F_ISSET(ckpt, WT_CKPT_DELETE))
             continue;
 
+        /*
+         * Set the "from" checkpoint structure. If it applies to a previous object, there's nothing
+         * more to do.
+         */
+        a = ckpt->bpriv;
+        if (a->root_objectid != block->objectid)
+            continue;
+
         if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_2))
             __wt_ckpt_verbose(session, block, "delete", ckpt->name, ckpt->raw.data, ckpt->raw.size);
 
@@ -697,9 +705,8 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
                 break;
 
         /*
-         * Set the from/to checkpoint structures, where the "to" value may be the live tree.
+         * Set the "to" checkpoint structure, it may be the live tree.
          */
-        a = ckpt->bpriv;
         if (F_ISSET(next_ckpt, WT_CKPT_ADD))
             b = &block->live;
         else
