@@ -183,6 +183,14 @@ function runTest(fixture) {
     fixture.asAdmin(({conn}) => testCheckedOps(conn, true));
     fixture.asUser(({conn}) => testCheckedOps(conn, false, ErrorCodes.UserWritesBlocked));
 
+    // Ensure that attempting to enabling write blocking again is a no-op under various
+    // circumstances
+    fixture.enableWriteBlockMode();
+    fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
+    fixture.stepDown();
+    fixture.enableWriteBlockMode();
+    fixture.assertWriteBlockMode(WriteBlockState.ENABLED);
+
     // Ensure that profiling works while user writes are blocked.
     testProfiling(fixture);
 

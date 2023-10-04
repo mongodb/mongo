@@ -158,6 +158,9 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
                         3,
                         "The user writes recoverable critical section was already acquired",
                         logAttrs(nss));
+
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
             return;
         }
 
@@ -268,6 +271,9 @@ void UserWritesRecoverableCriticalSectionService::
                         "block user "
                         "writes, do nothing",
                         logAttrs(nss));
+
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
             return;
         }
 
@@ -308,6 +314,9 @@ void UserWritesRecoverableCriticalSectionService::
                 3,
                 "The user writes recoverable critical section was not currently taken, do nothing",
                 logAttrs(nss));
+
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
             return;
         }
 
@@ -321,6 +330,9 @@ void UserWritesRecoverableCriticalSectionService::
                         "The user writes recoverable critical section was already not blocking "
                         "user writes, do nothing",
                         logAttrs(nss));
+
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
             return;
         }
 
@@ -355,6 +367,9 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
                 3,
                 "The user writes recoverable critical section was already released, do nothing",
                 logAttrs(nss));
+
+            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
             return;
         }
 
