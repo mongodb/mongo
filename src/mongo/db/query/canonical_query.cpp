@@ -85,7 +85,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies,
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-    bool isCountLike) {
+    bool isCountLike,
+    bool isSearchQuery) {
     if (givenExpCtx) {
         // Caller provided an ExpressionContext, let's go ahead and use that.
         auto swParsedFind = parsed_find_command::parse(givenExpCtx,
@@ -100,7 +101,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                             std::move(swParsedFind.getValue()),
                             explain,
                             std::move(cqPipeline),
-                            isCountLike);
+                            isCountLike,
+                            isSearchQuery);
     } else {
         // No ExpressionContext provided, let's call the override that makes one for us.
         auto swResults = parsed_find_command::parse(
@@ -109,8 +111,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
             return swResults.getStatus();
         }
         auto&& [expCtx, parsedFind] = std::move(swResults.getValue());
-        return canonicalize(
-            std::move(expCtx), std::move(parsedFind), explain, std::move(cqPipeline), isCountLike);
+        return canonicalize(std::move(expCtx),
+                            std::move(parsedFind),
+                            explain,
+                            std::move(cqPipeline),
+                            isCountLike,
+                            isSearchQuery);
     }
 }
 
@@ -120,13 +126,17 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     std::unique_ptr<ParsedFindCommand> parsedFind,
     bool explain,
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-    bool isCountLike) {
+    bool isCountLike,
+    bool isSearchQuery) {
 
     // Make the CQ we'll hopefully return.
     auto cq = std::make_unique<CanonicalQuery>();
     cq->setExplain(explain);
-    if (auto initStatus = cq->initCq(
-            std::move(expCtx), std::move(parsedFind), std::move(cqPipeline), isCountLike);
+    if (auto initStatus = cq->initCq(std::move(expCtx),
+                                     std::move(parsedFind),
+                                     std::move(cqPipeline),
+                                     isCountLike,
+                                     isSearchQuery);
         !initStatus.isOK()) {
         return initStatus;
     }
@@ -156,7 +166,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     auto initStatus = cq->initCq(baseQuery.getExpCtx(),
                                  std::move(swParsedFind.getValue()),
                                  {} /* an empty cqPipeline */,
-                                 baseQuery.isCountLike());
+                                 baseQuery.isCountLike(),
+                                 baseQuery.isSearchQuery());
     invariant(initStatus.isOK());
     return {std::move(cq)};
 }
@@ -164,7 +175,8 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
                               std::unique_ptr<ParsedFindCommand> parsedFind,
                               std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-                              bool isCountLike) {
+                              bool isCountLike,
+                              bool isSearchQuery) {
     _expCtx = expCtx;
     _findCommand = std::move(parsedFind->findCommandRequest);
 
@@ -197,6 +209,7 @@ Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     }
     _cqPipeline = std::move(cqPipeline);
     _isCountLike = isCountLike;
+    _isSearchQuery = isSearchQuery;
 
     // Perform SBE auto-parameterization if there is not already a reason not to.
     _disablePlanCache = internalQueryDisablePlanCache.load();

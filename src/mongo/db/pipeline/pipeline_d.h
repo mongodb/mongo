@@ -154,6 +154,10 @@ public:
      */
     static BSONObj getPostBatchResumeToken(const Pipeline* pipeline);
 
+    // Returns true if it is a $search pipeline, 'featureFlagSearchInSbe' is enabled and
+    // forceClassicEngine is false.
+    static bool isSearchPresentAndEligibleForSbe(const Pipeline* pipeline);
+
 private:
     PipelineD();  // does not exist:  prevent instantiation
 

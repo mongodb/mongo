@@ -170,14 +170,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
 
 // Establish the search query cursor and fill in the search slots.
 void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq) {
-    if (cq.cqPipeline().empty()) {
+    if (cq.cqPipeline().empty() || !cq.isSearchQuery()) {
         return;
     }
     auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
     auto stage = cq.cqPipeline().front()->documentSource();
-    if (!searchHelper->isSearchStage(stage) && !searchHelper->isSearchMetaStage(stage)) {
-        return;
-    }
 
     // Build a SearchNode in order to retrieve the search info.
     auto sn = searchHelper->getSearchNode(stage);

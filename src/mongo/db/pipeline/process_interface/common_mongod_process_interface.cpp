@@ -474,11 +474,16 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
 
-    boost::optional<DocumentSource*> firstStage = pipeline->getSources().empty()
-        ? boost::optional<DocumentSource*>{}
-        : pipeline->getSources().front().get();
+    Pipeline::SourceContainer& sources = pipeline->getSources();
+    boost::optional<DocumentSource*> firstStage =
+        sources.empty() ? boost::optional<DocumentSource*>{} : sources.front().get();
     invariant(!firstStage || !dynamic_cast<DocumentSourceCursor*>(*firstStage));
-    if (firstStage && !(*firstStage)->constraints().requiresInputDocSource) {
+
+    bool skipRequiresInputDocSourceCheck =
+        PipelineD::isSearchPresentAndEligibleForSbe(pipeline.get());
+
+    if (!skipRequiresInputDocSourceCheck && firstStage &&
+        !(*firstStage)->constraints().requiresInputDocSource) {
         // There's no need to attach a cursor here.
         getSearchHelpers(expCtx->opCtx->getServiceContext())
             ->prepareSearchForNestedPipeline(pipeline.get());
