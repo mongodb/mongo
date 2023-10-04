@@ -37,3 +37,7 @@ feature_flags:
     cpp_varname: feature_flags::gConcurrencyInChunkMigration
     default: true
     version: 5.0
+  featureFlagShardKeyIndexOptionalHashedSharding:
+    description: "Feature flag to make a supporting shard key index for hashed sharding optional"
+    cpp_varname: gFeatureFlagShardKeyIndexOptionalHashedSharding
+    default: false
