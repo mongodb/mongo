@@ -475,12 +475,9 @@ class GDBDumper(Dumper):
             mongodb_dump_storage_engine_info = "mongodb-dump-storage-engine-info"
 
             for pid in pinfo.pidv:
-                if not logger.mongo_process_filename:
-                    set_logging_on_commands = []
-                    set_logging_off_commands = []
-                    raw_stacks_commands = []
-                else:
-                    base, ext = os.path.splitext(logger.mongo_process_filename)
+                filename = "debugger_%s_%d.log" % (os.path.splitext(pinfo.name)[0], pid)
+                if logger:
+                    base, ext = os.path.splitext(filename)
                     set_logging_on_commands = [
                         'set logging file %s_%d%s' % (base, pid, ext), 'set logging on'
                     ]
@@ -496,6 +493,10 @@ class GDBDumper(Dumper):
                         'set logging off',
                         'set logging redirect off',
                     ]
+                else:
+                    set_logging_on_commands = []
+                    set_logging_off_commands = []
+                    raw_stacks_commands = []
 
                 mongodb_waitsfor_graph = "mongodb-waitsfor-graph debugger_waitsfor_%s_%d.gv" % \
                     (pinfo.name, pid)
@@ -531,7 +532,7 @@ class GDBDumper(Dumper):
         """Dump info."""
 
         dbg = self._find_debugger()
-        logger = _get_process_logger(self._dbg_output, pinfo.name)
+        logger = self._root_logger
         _start_time = datetime.now()
 
         if dbg is None:
