@@ -117,6 +117,10 @@ const UserWriteBlockHelpers = (function() {
             throw "UNIMPLEMENTED";
         }
 
+        stepDown() {
+            throw "UNIMPLEMENTED";
+        }
+
         setProfilingLevel(level) {
             throw "UNIMPLEMENTED";
         }
@@ -211,6 +215,16 @@ const UserWriteBlockHelpers = (function() {
             this.rst.stopSet();
         }
 
+        stepDown() {
+            const primary = this.rst.getPrimary();
+
+            this.rst.asCluster(this.rst.nodes, () => {
+                this.rst.awaitReplication();
+                assert.commandWorked(primary.adminCommand({replSetStepDown: 20}));
+                this.rst.stepUp(primary);
+            });
+        }
+
         setProfilingLevel(level) {
             return assert.commandWorked(
                 this.adminConn.getDB(jsTestName()).setProfilingLevel(level));
@@ -271,6 +285,24 @@ const UserWriteBlockHelpers = (function() {
 
         stop() {
             this.st.stop();
+        }
+
+        stepDown() {
+            const forceStepDown = function(rst) {
+                const primary = rst.getPrimary();
+
+                rst.asCluster(rst.nodes, () => {
+                    rst.awaitReplication();
+                    assert.commandWorked(primary.adminCommand({replSetStepDown: 20}));
+                    rst.stepUp(primary);
+                });
+            };
+
+            this.st._rs.forEach((rst) => {
+                forceStepDown(rst.test);
+            });
+
+            forceStepDown(this.st.configRS);
         }
 
         setProfilingLevel(level) {
