@@ -202,6 +202,9 @@ protected:
     // Writes the given value to the output doc, replacing the existing value of 'field' if present.
     virtual void outputProjectedField(StringData field, Value val, MutableDocument* outDoc) const;
 
+    // Used to determine if the node is an inclusion or exclusion node.
+    virtual bool isIncluded() const = 0;
+
     StringMap<std::unique_ptr<ProjectionNode>> _children;
     StringMap<boost::intrusive_ptr<Expression>> _expressions;
 
