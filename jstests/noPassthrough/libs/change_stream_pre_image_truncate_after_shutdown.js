@@ -252,13 +252,15 @@ export class PreImageTruncateAfterShutdownTest {
     // Common logic for testing truncate behavior of pre-images expired by the oldest oplog entry.
     //
     // 'restartFn': Shuts down the node tied to the original 'conn' and returns the new 'conn' of
-    // the node restarted in the replica set.
+    // the node restarted in the replica set. If restarting under --repair mode, the return value
+    // will be ignored.
     /** @private */
     _testExpireByOplogCommon({
         runAsPrimary,
         numExpiredPreImages,
         numUnexpiredPreImages,
         cleanShutdown,
+        restartWithRepair,
         restartFn = (conn) => {},
     }) {
         let conn = runAsPrimary ? this._rst.getPrimary() : this._rst.getSecondary();
@@ -422,8 +424,57 @@ export class PreImageTruncateAfterShutdownTest {
             numExpiredPreImages,
             numUnexpiredPreImages,
             cleanShutdown,
+            restartWithRepair: false,
             restartFn,
         });
+    }
+
+    _createStandaloneOpts({
+        conn,
+        connDBPath,
+        restartWithQueryableBackup,
+        restartWithRecoverToOplogTimestamp,
+        restartWithRecoverFromOplogAsStandalone,
+        restartWithRepair
+    }) {
+        // 'recoverToOplogTimestamp' is only compatible when 'queryableBackupMode' is set.
+        assert(!restartWithRecoverToOplogTimestamp ||
+               (restartWithRecoverToOplogTimestamp && restartWithQueryableBackup));
+        // 'queryableBackupMode' isn't compatible with 'recoverFromOplogAsStandalone'.
+        assert(!restartWithRecoverFromOplogAsStandalone || !restartWithQueryableBackup);
+        // --repair is incompatible with all other options.
+        assert(!(restartWithRepair &&
+                 (restartWithQueryableBackup || restartWithRecoverFromOplogAsStandalone ||
+                  restartWithRecoverToOplogTimestamp)));
+
+        const standaloneStartupOpts = {
+            dbpath: connDBPath,
+            noReplSet: true,
+            noCleanData: true,
+            setParameter: {logComponentVerbosity: tojson({storage: 1})}
+        };
+
+        if (restartWithRepair) {
+            // --repair is not compatible with the rest of options.
+            standaloneStartupOpts.repair = "";
+        }
+
+        // Finalize the restart options for standalone before shutting down in case  a timestamp is
+        // needed for 'recoverFromOplogAsStandalone'.
+        if (restartWithQueryableBackup) {
+            standaloneStartupOpts.queryableBackupMode = "";
+        }
+        if (restartWithRecoverToOplogTimestamp) {
+            const recoveryTimestamp =
+                assert.commandWorked(conn.getDB(this.testName).runCommand({ping: 1})).operationTime;
+            standaloneStartupOpts.setParameter.recoverToOplogTimestamp =
+                tojson({timestamp: recoveryTimestamp});
+        }
+        if (restartWithRecoverFromOplogAsStandalone) {
+            standaloneStartupOpts.setParameter.recoverFromOplogAsStandalone = true;
+        }
+
+        return standaloneStartupOpts;
     }
 
     // Tests pre-image truncate behavior when a node in a replica set is shutdown, brought back up
@@ -438,6 +489,9 @@ export class PreImageTruncateAfterShutdownTest {
     //                              'recoverToOplogTimestamp'.
     // 'restartWithRecoverFromOplogAsStandalone': Whether to restart 'conn' in standalone with
     //                              'recoverFromOplogAsStandalone' set to true.
+    // 'restartWithRepair': Whether to restart the node with --repair set. This option is not
+    //                              compatible with the others since the node will automatically
+    //                              shutdown once it is repaired.
     testTruncateByOldestOplogTSStandalone({
         runAsPrimary,
         numExpiredPreImages,
@@ -446,6 +500,7 @@ export class PreImageTruncateAfterShutdownTest {
         restartWithQueryableBackup,
         restartWithRecoverToOplogTimestamp,
         restartWithRecoverFromOplogAsStandalone,
+        restartWithRepair,
     }) {
         jsTest.log(`Running testTruncateByOldestOplogTS with ${tojson({
             runAsPrimary,
@@ -455,47 +510,39 @@ export class PreImageTruncateAfterShutdownTest {
             restartWithQueryableBackup,
             restartWithRecoverToOplogTimestamp,
             restartWithRecoverFromOplogAsStandalone,
+            restartWithRepair,
         })}`);
-
-        // 'recoverToOplogTimestamp' is only compatible when 'queryableBackupMode' is set.
-        assert(!restartWithRecoverToOplogTimestamp ||
-               (restartWithRecoverToOplogTimestamp && restartWithQueryableBackup));
-        // 'queryableBackupMode' isn't compatible with 'recoverFromOplogAsStandalone'.
-        assert(!restartWithRecoverFromOplogAsStandalone || !restartWithQueryableBackup);
 
         // Restarts the node in standalone according to the specified restart parameters.
         // Re-connects the node to the replica set before returning a new "conn".
         const restartFn = (conn) => {
             const connDBPath = conn.dbpath;
-            const standaloneStartupOpts = {
-                dbpath: connDBPath,
-                noReplSet: true,
-                noCleanData: true,
-            };
-
-            // Finalize the restart options for standalone before shutting down in case
-            // a timestamp is needed for 'recoverFromOplogAsStandalone'.
-            if (restartWithQueryableBackup) {
-                standaloneStartupOpts.queryableBackupMode = "";
-            }
-            if (restartWithRecoverToOplogTimestamp) {
-                const recoveryTimestamp =
-                    assert.commandWorked(conn.getDB(this.testName).runCommand({ping: 1}))
-                        .operationTime;
-                standaloneStartupOpts.setParameter = {
-                    recoverToOplogTimestamp: tojson({timestamp: recoveryTimestamp})
-                };
-            }
-            if (restartWithRecoverFromOplogAsStandalone) {
-                standaloneStartupOpts.setParameter = 'recoverFromOplogAsStandalone=true';
-            }
+            const standaloneStartupOpts = this._createStandaloneOpts({
+                conn,
+                connDBPath,
+                restartWithQueryableBackup,
+                restartWithRecoverToOplogTimestamp,
+                restartWithRecoverFromOplogAsStandalone,
+                restartWithRepair
+            });
 
             this._shutdownNode(conn, cleanShutdown);
 
             // Start node up in standalone.
             jsTest.log(`Starting node as standalone with startup options ${
                 tojson(standaloneStartupOpts)}`);
-            const standaloneConn = MongoRunner.runMongod(standaloneStartupOpts);
+            clearRawMongoProgramOutput();
+            let standaloneConn = MongoRunner.runMongod(standaloneStartupOpts);
+            // --repair will shutdown the server after starting up. As a result, start it again but
+            // assuming a clean shutdown state.
+            if (restartWithRepair) {
+                assert(!standaloneConn);
+                standaloneConn = MongoRunner.runMongod({
+                    dbpath: connDBPath,
+                    noReplSet: true,
+                    noCleanData: true,
+                });
+            }
             this._assertNumPreImagesAfterShutdown({
                 conn: standaloneConn,
                 numExpiredPreImages,
@@ -518,6 +565,7 @@ export class PreImageTruncateAfterShutdownTest {
             numExpiredPreImages,
             numUnexpiredPreImages,
             cleanShutdown,
+            restartWithRepair,
             restartFn,
         });
     }

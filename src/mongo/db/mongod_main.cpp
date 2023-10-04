@@ -677,6 +677,20 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         ScriptEngine::setup();
     }
 
+    const auto isStandalone =
+        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
+
+    if (storageGlobalParams.repair) {
+        // Change stream collections can exist, even on a standalone, provided the standalone used
+        // to be part of a replica set. Ensure the change stream collections on startup contain
+        // consistent data.
+        //
+        // This is here because repair will shutdown the node as it implies --upgrade as well. The
+        // branch below will exit the server.
+        startup_recovery::recoverChangeStreamCollections(
+            startupOpCtx.get(), isStandalone, lastShutdownState);
+    }
+
     if (storageGlobalParams.upgrade) {
         LOGV2(20537, "Finished checking dbs");
         exitCleanly(ExitCode::clean);
@@ -936,9 +950,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             return waitForShutdown();
         }
     }
-
-    const auto isStandalone =
-        !repl::ReplicationCoordinator::get(serviceContext)->getSettings().isReplSet();
 
     // Change stream collections can exist, even on a standalone, provided the standalone used to be
     // part of a replica set. Ensure the change stream collections on startup contain consistent
