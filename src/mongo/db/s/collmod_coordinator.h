@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/db/s/collmod_coordinator_document_gen.h"
+#include "mongo/db/s/sharded_collmod_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
@@ -70,8 +72,14 @@ private:
     struct ShardingInfo {
         // The primary shard for the collection, only set if the collection is sharded.
         ShardId primaryShard;
-        // The shards owning chunks for the collection, only set if the collection is sharded.
-        std::vector<ShardId> shardsOwningChunks;
+        // Flag that tells if the primary db shard has chunks for the collection.
+        bool isPrimaryOwningChunks;
+        // The participant shards owning chunks for the collection, only set if the collection is
+        // sharded.
+        std::vector<ShardId> participantsOwningChunks;
+        // The participant shards not owning chunks for the collection, only set if the collection
+        // is sharded.
+        std::vector<ShardId> participantsNotOwningChunks;
     };
 
     ShardingDDLCoordinatorMetadata const& metadata() const override {
@@ -110,6 +118,16 @@ private:
     BSONObj _initialState;
     mutable Mutex _docMutex = MONGO_MAKE_LATCH("CollModCoordinator::_docMutex");
     CollModCoordinatorDocument _doc;
+
+    std::vector<AsyncRequestsSender::Response> _sendCollModToPrimaryShard(
+        OperationContext* opCtx,
+        ShardsvrCollModParticipant& request,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    std::vector<AsyncRequestsSender::Response> _sendCollModToParticipantShards(
+        OperationContext* opCtx,
+        ShardsvrCollModParticipant& request,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     const mongo::CollModRequest _request;
 

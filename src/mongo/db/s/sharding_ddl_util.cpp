@@ -280,7 +280,8 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     StringData dbName,
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const bool throwOnError) {
 
     // The AsyncRequestsSender ignore impersonation metadata so we need to manually attach them to
     // the command
@@ -292,7 +293,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     }
     auto authenticatedCommand = bob.obj();
     return sharding_util::sendCommandToShards(
-        opCtx, dbName, authenticatedCommand, shardIds, executor);
+        opCtx, dbName, authenticatedCommand, shardIds, executor, throwOnError);
 }
 
 void removeTagsMetadataFromConfig(OperationContext* opCtx,

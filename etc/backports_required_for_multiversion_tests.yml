@@ -231,6 +231,8 @@ last-continuous:
     ticket: SERVER-71477
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
+  - test_file: jstests/sharding/index_and_collection_option_propagation.js
+    ticket: SERVER-71819
   - test_file: jstests/core/clustered_collection_collation.js
     ticket: SERVER-72224
   - test_file: jstests/core/clustered/clustered_collection_collation.js
@@ -576,6 +578,8 @@ last-lts:
     ticket: SERVER-71477
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
+  - test_file: jstests/sharding/index_and_collection_option_propagation.js
+    ticket: SERVER-71819
   - test_file: jstests/core/clustered/clustered_collection_collation.js
     ticket: SERVER-72224
   - test_file: jstests/core/project_with_collation.js
