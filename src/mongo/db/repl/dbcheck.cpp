@@ -504,31 +504,34 @@ Status DbCheckHasher::validateMissingKeys(OperationContext* opCtx,
                      &multikeyPaths,
                      currentRecordId);
 
+        auto cursor = iam->newCursor(opCtx);
         for (const auto& key : keyStrings) {
             // TODO: SERVER-79866 increment _bytesSeen by appropriate amount
             // _bytesSeen += key.getSize();
-            auto cursor = iam->newCursor(opCtx);
+
+            // seekForKeyString returns the closest key string if the exact keystring does not
+            // exist.
             auto ksEntry = cursor->seekForKeyString(key);
             if (!ksEntry) {
-                // TODO (SERVER-80960): Handle the old keystring format without appended RecordId
-                // if this is a unique index.
                 _missingIndexKeys.push_back(BSON(descriptor->indexName() << key.toString()));
                 continue;
             }
 
+            // TODO (SERVER-80960): Handle the old keystring format without appended RecordId
+            // if this is a unique index.
             auto foundRecordId = ksEntry.get().loc;
             if (foundRecordId != currentRecordId) {
-                _mismatchedIndexKeys.push_back(
-                    BSON(descriptor->indexName()
-                         << key.toString() << "recordId" << foundRecordId.toString()
-                         << "expectedRecordId" << currentRecordId.toString()));
+                _missingIndexKeys.push_back(BSON(descriptor->indexName()
+                                                 << key.toString() << "foundRecordId"
+                                                 << foundRecordId.toString() << "expectedRecordId"
+                                                 << currentRecordId.toString()));
             }
         }
     }
 
-    if (_missingIndexKeys.size() > 0 || _mismatchedIndexKeys.size() > 0) {
+    if (_missingIndexKeys.size() > 0) {
         // TODO (SERVER-81117): Determine if this is the correct error code to return.
-        return Status(ErrorCodes::NoSuchKey, "Document has missing and/or mismatched index keys");
+        return Status(ErrorCodes::NoSuchKey, "Document has missing index keys");
     }
     return Status::OK();
 }
@@ -609,10 +612,9 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                 DbCheckValidationModeEnum::dataConsistencyAndMissingIndexKeysCheck) {
             // Conduct missing index keys check.
             _missingIndexKeys.clear();
-            _mismatchedIndexKeys.clear();
             auto status = validateMissingKeys(opCtx, currentObj, currentRecordId, collPtr);
             if (!status.isOK()) {
-                const auto msg = "Document has missing and/or mismatched index keys";
+                const auto msg = "Document has missing index keys";
                 const auto logEntry = dbCheckErrorHealthLogEntry(
                     collPtr->ns(),
                     collPtr->uuid(),
@@ -621,8 +623,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
                     OplogEntriesEnum::Batch,
                     status,
                     BSON("recordID" << currentRecordId.toString() << "missingIndexKeys"
-                                    << _missingIndexKeys << "mismatchedIndexKeys"
-                                    << _mismatchedIndexKeys));
+                                    << _missingIndexKeys));
                 HealthLogInterface::get(opCtx)->log(*logEntry);
             }
         }

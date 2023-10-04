@@ -47,7 +47,7 @@ const errQuery = {
 
 const missingKeyErrQuery = {
     ...errQuery,
-    msg: "Document has missing and/or mismatched index keys",
+    msg: "Document has missing index keys",
 };
 
 // Return a dbCheck health log query for 'numMissing' missing index keys.
@@ -55,7 +55,7 @@ function getMissingIndexKeysQuery(numMissing) {
     return {
         operation: "dbCheckBatch",
         severity: "error",
-        msg: "Document has missing and/or mismatched index keys",
+        msg: "Document has missing index keys",
         "data.context.recordID": {$exists: true},
         $and: [
             {"data.context.missingIndexKeys": {$exists: true}},

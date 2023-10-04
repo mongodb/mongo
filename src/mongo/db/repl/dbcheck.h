@@ -225,7 +225,6 @@ private:
 
     std::vector<const IndexCatalogEntry*> _indexes;
     std::vector<BSONObj> _missingIndexKeys;
-    std::vector<BSONObj> _mismatchedIndexKeys;
 
     boost::optional<SecondaryIndexCheckParameters> _secondaryIndexCheckParameters;
 };
