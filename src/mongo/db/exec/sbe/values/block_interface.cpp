@@ -50,13 +50,13 @@ str::stream& operator<<(str::stream& stream, const DeblockedTagVals& vals) {
 void DeblockedTagValStorage::copyValuesFrom(const DeblockedTagValStorage& other) {
     if (other.owned) {
         owned = true;
-        tags.reserve(other.tags.size());
-        vals.reserve(other.vals.size());
+        tags.resize(other.tags.size(), value::TypeTags::Nothing);
+        vals.resize(other.vals.size(), 0);
 
         for (size_t i = 0; i < other.tags.size(); ++i) {
             auto [cpyTag, cpyVal] = copyValue(other.tags[i], other.vals[i]);
-            tags.push_back(cpyTag);
-            vals.push_back(cpyVal);
+            tags[i] = cpyTag;
+            vals[i] = cpyVal;
         }
     } else {
         owned = false;
@@ -74,13 +74,12 @@ void DeblockedTagValStorage::release() {
     }
 }
 
-std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) const {
+std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) {
     return defaultMapImpl(op);
 }
 
-std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) const {
-    boost::optional<DeblockedTagValStorage> st;
-    auto extracted = deblock(st);
+std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
+    auto extracted = extract();
 
     if (extracted.count == 0) {
         return std::make_unique<HeterogeneousBlock>();
@@ -94,7 +93,7 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) const
     return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
 }
 
-std::unique_ptr<ValueBlock> HeterogeneousBlock::map(const ColumnOp& op) const {
+std::unique_ptr<ValueBlock> HeterogeneousBlock::map(const ColumnOp& op) {
     auto outBlock = std::make_unique<HeterogeneousBlock>();
 
     size_t numElems = _vals.size();

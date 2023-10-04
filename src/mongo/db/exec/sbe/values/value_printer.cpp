@@ -548,6 +548,11 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << valueBlock->extract();
             break;
         }
+        case TypeTags::cellBlock: {
+            auto* cellBlock = getCellBlock(val);
+            stream << "CellBlock: " << cellBlock->getValueBlock().extract();
+            break;
+        }
 
         case TypeTags::pcreRegex:
         case TypeTags::jsFunction:

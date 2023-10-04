@@ -53,6 +53,14 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
     invariant(_blockSlotIds.size() == _valsOutSlotIds.size());
 }
 
+BlockToRowStage::~BlockToRowStage() {
+    for (auto& run : _deblockedValueRuns) {
+        for (auto [t, v] : run) {
+            value::releaseValue(t, v);
+        }
+    }
+}
+
 std::unique_ptr<PlanStage> BlockToRowStage::clone() const {
     return std::make_unique<BlockToRowStage>(_children[0]->clone(),
                                              _blockSlotIds,
@@ -99,7 +107,7 @@ PlanState BlockToRowStage::getNextFromDeblockedValues() {
         return PlanState::IS_EOF;
     }
 
-    for (size_t i = 0; i < _blocks.size(); ++i) {
+    for (size_t i = 0; i < _deblockedValueRuns.size(); ++i) {
         auto [t, v] = _deblockedValueRuns[i][_curIdx];
         _valsOutAccessors[i].reset(t, v);
     }
@@ -111,7 +119,6 @@ PlanState BlockToRowStage::getNextFromDeblockedValues() {
 // The underlying buffer for blocks has been updated after getNext() on the child, so we need to
 // prepare deblocking the new blocks.
 void BlockToRowStage::prepareDeblock() {
-    _blocks.clear();
     _deblockedValueRuns.clear();
 
     // Extract the value in the bitmap slot into a selectivity vector, to determine which indexes
@@ -139,16 +146,11 @@ void BlockToRowStage::prepareDeblock() {
         auto [tag, val] = acc->getViewOfValue();
         invariant(tag == value::TypeTags::valueBlock || tag == value::TypeTags::cellBlock);
 
-        const auto* valueBlock = tag == value::TypeTags::valueBlock
+        auto* valueBlock = tag == value::TypeTags::valueBlock
             ? value::getValueBlock(val)
             : &value::getCellBlock(val)->getValueBlock();
 
-        // We need to clone the block because the underlying buffer may be invalidated after
-        // yielding.
-        // TODO SERVER-79629: Avoid cloning the block.
-        _blocks.emplace_back(valueBlock->clone());
-
-        auto deblocked = _blocks.back()->extract();
+        auto deblocked = valueBlock->extract();
         tassert(8044674,
                 "Bitmap must be same size as data blocks",
                 selectivityVector.empty() || deblocked.count == selectivityVector.size());
@@ -158,14 +160,16 @@ void BlockToRowStage::prepareDeblock() {
         tvVec.reserve(onesInBitset.get_value_or(deblocked.count));
         for (size_t i = 0; i < deblocked.count; ++i) {
             if (selectivityVector.empty() || selectivityVector[i]) {
-                tvVec.push_back(deblocked[i]);
+                // TODO SERVER-79629: We can avoid the copy here and do it only when a yield
+                // actually happens.
+                tvVec.push_back(value::copyValue(deblocked[i].first, deblocked[i].second));
             }
         }
 
         _deblockedValueRuns.emplace_back(std::move(tvVec));
 
         tassert(7962151, "Block's count must always be same as count of deblocked values", [&] {
-            if (auto optCnt = _blocks.back()->tryCount()) {
+            if (auto optCnt = valueBlock->tryCount()) {
                 return *optCnt == deblocked.count;
             } else {
                 return true;
@@ -183,7 +187,7 @@ PlanState BlockToRowStage::getNext() {
     // interrupts so that we don't hold the lock on the underlying collection for too long.
     checkForInterrupt(_opCtx);
 
-    if (!_blocks.empty() && getNextFromDeblockedValues() == PlanState::ADVANCED) {
+    if (!_deblockedValueRuns.empty() && getNextFromDeblockedValues() == PlanState::ADVANCED) {
         return trackPlanState(PlanState::ADVANCED);
     }
 

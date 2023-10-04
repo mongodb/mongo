@@ -59,6 +59,7 @@ public:
                     PlanNodeId nodeId,
                     PlanYieldPolicy* yieldPolicy = nullptr,
                     bool participateInTrialRunTracking = true);
+    ~BlockToRowStage();
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -84,7 +85,6 @@ private:
     const value::SlotVector _valsOutSlotIds;
     const boost::optional<value::SlotId> _bitmapSlotId;
 
-    std::vector<std::unique_ptr<value::ValueBlock>> _blocks;
     // Values extracted from the blocks. The memory for these values are owned by the blocks in the
     // '_blocks' member.
     std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> _deblockedValueRuns;

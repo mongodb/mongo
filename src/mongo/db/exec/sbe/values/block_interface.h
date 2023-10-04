@@ -122,6 +122,9 @@ struct DeblockedTagValStorage {
  * Currently we only support getting all of the deblocked values via 'extract()' but PM-3168 will
  * extend the interface to allow for other operations to be applied which may run directly on the
  * underlying format or take advantage of precomputed summaries.
+ *
+ * In general no functions on a ValueBlock should be considered thread-safe, regardless of
+ * constness.
  */
 struct ValueBlock {
     ValueBlock() = default;
@@ -161,12 +164,12 @@ struct ValueBlock {
      */
     virtual boost::optional<size_t> tryCount() const = 0;
 
-    virtual std::unique_ptr<ValueBlock> map(const ColumnOp& op) const;
+    virtual std::unique_ptr<ValueBlock> map(const ColumnOp& op);
 
 protected:
     virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const = 0;
 
-    std::unique_ptr<ValueBlock> defaultMapImpl(const ColumnOp& op) const;
+    std::unique_ptr<ValueBlock> defaultMapImpl(const ColumnOp& op);
 
     boost::optional<DeblockedTagValStorage> _deblockedStorage;
 };
@@ -218,7 +221,7 @@ public:
         return _count;
     }
 
-    std::unique_ptr<ValueBlock> map(const ColumnOp& op) const override {
+    std::unique_ptr<ValueBlock> map(const ColumnOp& op) override {
         auto [tag, val] = op.processSingle(_tag, _val);
         return std::make_unique<MonoBlock>(_count, tag, val);
     }
@@ -294,7 +297,7 @@ public:
         return std::make_unique<HeterogeneousBlock>(*this);
     }
 
-    std::unique_ptr<ValueBlock> map(const ColumnOp& op) const override;
+    std::unique_ptr<ValueBlock> map(const ColumnOp& op) override;
 
 private:
     void release() noexcept {

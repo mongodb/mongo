@@ -53,8 +53,8 @@ const BSONObj kSampleBucket = fromjson(R"(
 })");
 
 TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
-    // A TsCellBlock can be created in an "unowned" state.
-    auto cellBlock = std::make_unique<value::TsCellBlock>(
+    // A TsCellBlockForTopLevelField can be created in an "unowned" state.
+    auto cellBlock = std::make_unique<value::TsCellBlockForTopLevelField>(
         1,     /* count */
         false, /* owned */
         value::TypeTags::bsonObject,
