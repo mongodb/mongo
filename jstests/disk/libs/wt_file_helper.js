@@ -223,12 +223,7 @@ export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
  */
 export let runWiredTigerTool = function(...args) {
     const cmd = ['wt'].concat(args);
-    // TODO (SERVER-67632): Check the return code on Windows variants again.
-    if (_isWindows()) {
-        run.apply(undefined, cmd);
-    } else {
-        assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
-    }
+    assert.eq(run.apply(undefined, cmd), 0, "error executing: " + cmd.join(' '));
 };
 
 /**
