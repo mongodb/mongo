@@ -40,32 +40,22 @@ namespace mongo::query_stats {
 
 struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
     FindCmdQueryStatsStoreKeyComponents(const FindCommandRequest* findCmd)
-        : _shapifiedReadConcern(shapifyReadConcern(findCmd->getReadConcern().value_or(BSONObj()))),
-          _allowPartialResults(findCmd->getAllowPartialResults().value_or(false)),
+        : _allowPartialResults(findCmd->getAllowPartialResults().value_or(false)),
+          _noCursorTimeout(findCmd->getNoCursorTimeout().value_or(false)),
           _hasField{
-              .readConcern = findCmd->getReadConcern().has_value(),
               .batchSize = findCmd->getBatchSize().has_value(),
-              .maxTimeMS = findCmd->getMaxTimeMS().has_value(),
               .allowPartialResults = findCmd->getAllowPartialResults().has_value(),
               .noCursorTimeout = findCmd->getNoCursorTimeout().has_value(),
           } {}
 
-    /**
-     * Returns a copy of the read concern object. If there is an "afterClusterTime" component, the
-     * timestamp is shapified according to 'opts'.
-     */
-    static BSONObj shapifyReadConcern(
-        const BSONObj& readConcern,
-        const SerializationOptions& opts =
-            SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     std::int64_t size() const {
-        return _hasField.readConcern ? _shapifiedReadConcern.objsize() : 0;
+        return 0;
     }
 
     void HashValue(absl::HashState state) const final {
         absl::HashState::combine(
-            std::move(state), _hasField, simpleHash(_shapifiedReadConcern), _allowPartialResults);
+            std::move(state), _hasField, _allowPartialResults, _noCursorTimeout);
     }
 
     void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
@@ -74,21 +64,16 @@ struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
     // struct. Since each QueryStatsEntry can have its own FindKeyGenerator, it's better to
     // minimize the struct's size as much as possible.
 
-    // Preserved literal except afterClusterTime is shapified.
-    BSONObj _shapifiedReadConcern;
-
     // Preserved literal.
     bool _allowPartialResults;
+    bool _noCursorTimeout;
 
     // This anonymous struct represents the presence of the member variables as C++ bit fields.
     // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
     struct HasField {
-        bool readConcern : 1 = false;
         bool batchSize : 1 = false;
-        bool maxTimeMS : 1 = false;
         bool allowPartialResults : 1 = false;
         bool noCursorTimeout : 1 = false;
-
         bool operator==(const HasField& other) const = default;
 
     } _hasField;
@@ -96,9 +81,7 @@ struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
     template <typename H>
     friend H AbslHashValue(H h, const HasField& hasField) {
         return H::combine(std::move(h),
-                          hasField.readConcern,
                           hasField.batchSize,
-                          hasField.maxTimeMS,
                           hasField.noCursorTimeout,
                           hasField.allowPartialResults);
     }
@@ -107,9 +90,10 @@ struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
 static_assert(
-    // expecting a BSONObj and one word for the allowPartialResults and another word for the
-    // _hasField.
-    sizeof(FindCmdQueryStatsStoreKeyComponents) <= sizeof(BSONObj) + 8 + 8,
+    // Expecting a BSONObj and two bytes for allowPartialResults and noCursorTimeout, and another
+    // byte for _hasField. For alignment reasons (alignment is 8 bytes here), this means the trailer
+    // will bring up the total bytecount to a multiple of 8.
+    sizeof(FindCmdQueryStatsStoreKeyComponents) <= sizeof(BSONObj) + 8,
     "Size of FindCmdQueryStatsStoreKeyComponents is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new "
@@ -124,6 +108,8 @@ public:
         : KeyGenerator(expCtx->opCtx,
                        std::make_unique<query_shape::FindCmdShape>(request, expCtx),
                        request.findCommandRequest->getHint(),
+                       request.findCommandRequest->getReadConcern(),
+                       request.findCommandRequest->getMaxTimeMS().has_value(),
                        collectionType),
           _components(request.findCommandRequest.get()) {}
 

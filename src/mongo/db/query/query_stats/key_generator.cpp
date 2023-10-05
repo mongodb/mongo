@@ -37,14 +37,19 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
                                                const ClientMetadata* clientMetadata,
                                                boost::optional<BSONObj> commentObj,
                                                boost::optional<BSONObj> hint,
-                                               std::unique_ptr<APIParameters> apiParams,
                                                boost::optional<BSONObj> readPreference,
-                                               query_shape::CollectionType collectionType)
+                                               boost::optional<BSONObj> writeConcern,
+                                               boost::optional<BSONObj> readConcern,
+                                               std::unique_ptr<APIParameters> apiParams,
+                                               query_shape::CollectionType collectionType,
+                                               bool maxTimeMS)
     : _queryShape(std::move(queryShape)),
       _clientMetaData(clientMetadata ? clientMetadata->getDocument().getOwned() : BSONObj()),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
       _readPreference(readPreference.value_or(BSONObj()).getOwned()),
+      _writeConcern(writeConcern.value_or(BSONObj()).getOwned()),
+      _shapifiedReadConcern(shapifyReadConcern(readConcern.value_or(BSONObj()))),
       _apiParams(std::move(apiParams)),
       _comment(commentObj ? _commentObj.firstElement() : BSONElement()),
       _collectionType(collectionType),
@@ -52,8 +57,29 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
       _hasField{.clientMetaData = bool(clientMetadata),
                 .comment = bool(commentObj),
                 .hint = bool(hint),
-                .readPreference = bool(readPreference)} {
+                .readPreference = bool(readPreference),
+                .writeConcern = bool(writeConcern),
+                .readConcern = bool(readConcern),
+                .maxTimeMS = maxTimeMS} {
     tassert(7973600, "shape must not be null", _queryShape);
+}
+
+BSONObj UniversalKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
+                                                   const SerializationOptions& opts) {
+    // Read concern should not be considered a literal.
+    // afterClusterTime is distinct for every operation with causal consistency enabled. We
+    // normalize it in order not to blow out the telemetry store cache.
+    if (readConcern["afterClusterTime"].eoo()) {
+        return readConcern.copy();
+    } else {
+        BSONObjBuilder bob;
+
+        if (auto levelElem = readConcern["level"]) {
+            bob.append(levelElem);
+        }
+        opts.appendLiteral(&bob, "afterClusterTime", readConcern["afterClusterTime"]);
+        return bob.obj();
+    }
 }
 
 int64_t UniversalKeyComponents::size() const {
@@ -61,12 +87,24 @@ int64_t UniversalKeyComponents::size() const {
         (_apiParams ? sizeof(*_apiParams) + shape_helpers::optionalSize(_apiParams->getAPIVersion())
                     : 0) +
         _hintObj.objsize() + (_hasField.clientMetaData ? _clientMetaData.objsize() : 0) +
-        _commentObj.objsize() + (_hasField.readPreference ? _readPreference.objsize() : 0);
+        _commentObj.objsize() + (_hasField.readPreference ? _readPreference.objsize() : 0) +
+        (_hasField.readConcern ? _shapifiedReadConcern.objsize() : 0) +
+        (_hasField.writeConcern ? _writeConcern.objsize() : 0);
 }
 
 void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
     if (_hasField.comment) {
         opts.appendLiteral(&bob, "comment", _comment);
+    }
+
+    if (_hasField.readConcern) {
+        auto readConcernToAppend = _shapifiedReadConcern;
+        if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
+            // The options aren't the same as the first time we shapified, so re-computation is
+            // necessary (e.g. use "?timestamp" instead of the representative Timestamp(0, 0)).
+            readConcernToAppend = shapifyReadConcern(_shapifiedReadConcern, opts);
+        }
+        bob.append("readConcern", readConcernToAppend);
     }
 
     if (const auto& apiVersion = _apiParams->getAPIVersion()) {
@@ -85,6 +123,10 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
         bob.append("$readPreference", _readPreference);
     }
 
+    if (_hasField.writeConcern) {
+        bob.append("writeConcern", _writeConcern);
+    }
+
     if (_hasField.clientMetaData) {
         bob.append("client", _clientMetaData);
     }
@@ -94,22 +136,32 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
     if (!_hintObj.isEmpty()) {
         bob.append("hint", shape_helpers::extractHintShape(_hintObj, opts));
     }
+    if (_hasField.maxTimeMS) {
+        opts.appendLiteral(&bob, "maxTimeMS", 0ll);
+    }
 }
 
 KeyGenerator::KeyGenerator(OperationContext* opCtx,
                            std::unique_ptr<query_shape::Shape> queryShape,
                            boost::optional<BSONObj> hint,
+                           boost::optional<BSONObj> readConcern,
+                           bool maxTimeMS,
                            query_shape::CollectionType collectionType)
     : _universalComponents(
           std::move(queryShape),
           ClientMetadata::get(opCtx->getClient()),
           opCtx->getCommentOwnedCopy(),
           hint,
-          std::make_unique<APIParameters>(APIParameters::get(opCtx)),
           ReadPreferenceSetting::get(opCtx).usedDefaultReadPrefValue()
               ? boost::none
               : boost::make_optional(ReadPreferenceSetting::get(opCtx).toInnerBSON()),
-          collectionType) {}
+          opCtx->getWriteConcern().isImplicitDefaultWriteConcern()
+              ? boost::none
+              : boost::make_optional(opCtx->getWriteConcern().toBSON()),
+          readConcern,
+          std::make_unique<APIParameters>(APIParameters::get(opCtx)),
+          collectionType,
+          maxTimeMS) {}
 
 BSONObj KeyGenerator::generate(OperationContext* opCtx,
                                const SerializationOptions& opts,

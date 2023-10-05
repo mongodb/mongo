@@ -53,15 +53,19 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
                           std::vector<BSONObj> shapifiedPipeline);
 
+    AggCmdShapeComponents(OptionalBool explain,
+                          OptionalBool allowDiskUse,
+                          stdx::unordered_set<NamespaceString> involvedNamespaces,
+                          std::vector<BSONObj> shapifiedPipeline);
+
     int64_t size() const final;
 
     void appendTo(BSONObjBuilder&) const;
 
     void HashValue(absl::HashState state) const final;
 
-    // TODO SERVER-78429 we don't need to store this for the pipeline anymore, but we do need some
-    // of the other pieces.
-    AggregateCommandRequest request;
+    OptionalBool explain;
+    OptionalBool allowDiskUse;
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
 

@@ -31,57 +31,26 @@
 
 namespace mongo::query_stats {
 
-BSONObj FindCmdQueryStatsStoreKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
-                                                                const SerializationOptions& opts) {
-    // Read concern should not be considered a literal.
-    // afterClusterTime is distinct for every operation with causal consistency enabled. We
-    // normalize it in order not to blow out the telemetry store cache.
-    if (readConcern["afterClusterTime"].eoo()) {
-        return readConcern.copy();
-    } else {
-        BSONObjBuilder bob;
-
-        if (auto levelElem = readConcern["level"]) {
-            bob.append(levelElem);
-        }
-        opts.appendLiteral(&bob, "afterClusterTime", readConcern["afterClusterTime"]);
-        return bob.obj();
-    }
-}
 
 void FindCmdQueryStatsStoreKeyComponents::appendTo(BSONObjBuilder& bob,
                                                    const SerializationOptions& opts) const {
-    if (_hasField.readConcern) {
-        auto readConcernToAppend = _shapifiedReadConcern;
-        if (opts != SerializationOptions::kRepresentativeQueryShapeSerializeOptions) {
-            // The options aren't the same as the first time we shapified, so re-computation is
-            // necessary (e.g. use "?timestamp" instead of the representative Timestamp(0, 0)).
-            readConcernToAppend = shapifyReadConcern(_shapifiedReadConcern, opts);
-        }
-        bob.append(FindCommandRequest::kReadConcernFieldName, readConcernToAppend);
-    }
 
     if (_hasField.allowPartialResults) {
         bob.append(FindCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);
     }
 
-    // Fields for literal redaction. Adds batchSize, maxTimeMS, and noCursorTimeOut.
+    // Fields for literal redaction. Adds batchSize, and noCursorTimeOut.
 
     if (_hasField.noCursorTimeout) {
-        // Capture whether noCursorTimeout was specified in the query, do not distinguish
-        // between true or false.
-        opts.appendLiteral(
-            &bob, FindCommandRequest::kNoCursorTimeoutFieldName, _hasField.noCursorTimeout);
+        bob.append(FindCommandRequest::kNoCursorTimeoutFieldName, _noCursorTimeout);
     }
 
-    // We don't store the specified maxTimeMS or batch size values since they don't matter.
+    // We don't store the specified batch size value since it doesn't matter.
     // Provide an arbitrary literal long here.
     tassert(7973602,
             "Serialization policy not supported - original values have been discarded",
             opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
-    if (_hasField.maxTimeMS) {
-        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, 0ll);
-    }
+
     if (_hasField.batchSize) {
         opts.appendLiteral(&bob, FindCommandRequest::kBatchSizeFieldName, 0ll);
     }
@@ -90,14 +59,12 @@ std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* 
     auto fcr =
         static_cast<const query_shape::FindCmdShape*>(universalComponents()._queryShape.get())
             ->toFindCommandRequest();
-    if (_components._hasField.readConcern)
-        fcr->setReadConcern(_components._shapifiedReadConcern);
     if (_components._hasField.allowPartialResults)
         fcr->setAllowPartialResults(_components._allowPartialResults);
+    if (_components._hasField.noCursorTimeout)
+        fcr->setNoCursorTimeout(_components._noCursorTimeout);
     if (_components._hasField.batchSize)
         fcr->setBatchSize(1ll);
-    if (_components._hasField.maxTimeMS)
-        fcr->setMaxTimeMS(1ll);
     return fcr;
 }
 }  // namespace mongo::query_stats

@@ -57,40 +57,23 @@ namespace mongo::query_stats {
 
 AggCmdComponents::AggCmdComponents(const AggregateCommandRequest& request_,
                                    stdx::unordered_set<NamespaceString> involvedNamespaces_)
-    : request(request_), involvedNamespaces(std::move(involvedNamespaces_)) {}
+    : involvedNamespaces(std::move(involvedNamespaces_)),
+      _bypassDocumentValidation(request_.getBypassDocumentValidation().value_or(false)),
+      _hasField{.batchSize = request_.getCursor().getBatchSize().has_value(),
+                .bypassDocumentValidation = request_.getBypassDocumentValidation().has_value()} {}
+
 
 void AggCmdComponents::HashValue(absl::HashState state) const {
     state = absl::HashState::combine(std::move(state),
-                                     request.getCursor().getBatchSize().has_value(),
-                                     request.getMaxTimeMS().has_value(),
-                                     request.getBypassDocumentValidation().has_value());
+                                     _bypassDocumentValidation,
+                                     _hasField.batchSize,
+                                     _hasField.bypassDocumentValidation);
     // We don't need to add 'involvedNamespaces' here since they are already tracked/duplicated in
     // the Pipeline component of the query shape. We just expose them here for ease of
     // analysis/querying.
 }
 
 void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
-    // cursor
-    if (auto param = request.getCursor().getBatchSize()) {
-        BSONObjBuilder cursorInfo = bob.subobjStart(AggregateCommandRequest::kCursorFieldName);
-        opts.appendLiteral(&cursorInfo,
-                           SimpleCursorOptions::kBatchSizeFieldName,
-                           static_cast<long long>(param.get()));
-        cursorInfo.doneFast();
-    }
-
-    // maxTimeMS
-    if (auto param = request.getMaxTimeMS()) {
-        opts.appendLiteral(&bob,
-                           AggregateCommandRequest::kMaxTimeMSFieldName,
-                           static_cast<long long>(param.get()));
-    }
-
-    // bypassDocumentValidation
-    if (auto param = request.getBypassDocumentValidation()) {
-        opts.appendLiteral(
-            &bob, AggregateCommandRequest::kBypassDocumentValidationFieldName, bool(param.get()));
-    }
 
     // otherNss
     if (!involvedNamespaces.empty()) {
@@ -102,15 +85,34 @@ void AggCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions&
         }
         otherNss.doneFast();
     }
+
+    // bypassDocumentValidation
+    if (_hasField.bypassDocumentValidation) {
+        bob.append(AggregateCommandRequest::kBypassDocumentValidationFieldName,
+                   _bypassDocumentValidation);
+    }
+
+    // We don't store the specified batch size values since they don't matter.
+    // Provide an arbitrary literal long here.
+
+    tassert(78429,
+            "Serialization policy not supported - original values have been discarded",
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged);
+
+    if (_hasField.batchSize) {
+        // cursor
+        BSONObjBuilder cursorInfo = bob.subobjStart(AggregateCommandRequest::kCursorFieldName);
+        opts.appendLiteral(&cursorInfo, SimpleCursorOptions::kBatchSizeFieldName, 0ll);
+        cursorInfo.doneFast();
+    }
 }
 
 int64_t AggCmdComponents::size() const {
-    // TODO SERVER-78429 we ignore the size of request here because it is owned by the query shape
-    // on the universal components.
-    return std::accumulate(involvedNamespaces.begin(),
-                           involvedNamespaces.end(),
-                           0,
-                           [](int64_t total, const auto& nss) { return total + nss.size(); });
+    return sizeof(*this) +
+        std::accumulate(involvedNamespaces.begin(),
+                        involvedNamespaces.end(),
+                        0,
+                        [](int64_t total, const auto& nss) { return total + nss.size(); });
 }
 
 void AggKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
@@ -128,6 +130,8 @@ AggKeyGenerator::AggKeyGenerator(AggregateCommandRequest request,
                    std::make_unique<query_shape::AggCmdShape>(
                        request, origNss, involvedNamespaces, pipeline, expCtx),
                    request.getHint(),
+                   request.getReadConcern(),
+                   request.getMaxTimeMS().has_value(),
                    collectionType),
       _components(request, std::move(involvedNamespaces)) {}
 

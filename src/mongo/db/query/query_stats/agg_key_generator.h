@@ -69,10 +69,15 @@ struct AggCmdComponents : public SpecificKeyComponents {
 
     int64_t size() const;
 
-    // TODO SERVER-78429 owned here for now, duplicating memory... This is not really accounted for
-    // right now but we should fix it soon.
-    AggregateCommandRequest request;
     stdx::unordered_set<NamespaceString> involvedNamespaces;
+    bool _bypassDocumentValidation;
+
+    // This anonymous struct represents the presence of the member variables as C++ bit fields.
+    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
+    struct HasField {
+        bool batchSize : 1 = false;
+        bool bypassDocumentValidation : 1 = false;
+    } _hasField;
 };
 
 /**

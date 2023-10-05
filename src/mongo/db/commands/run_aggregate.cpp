@@ -1396,6 +1396,7 @@ Status runAggregate(OperationContext* opCtx,
                 query_settings::QuerySettings(),
                 &bodyBuilder);
         }
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKeyGenerator));
     } else {
         auto maybePinnedCursor = executeUntilFirstBatch(
             opCtx, expCtx, request, cmdObj, privileges, origNss, extDataSrcGuard, execs, result);

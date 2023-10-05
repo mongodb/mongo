@@ -37,17 +37,25 @@ AggCmdShapeComponents::AggCmdShapeComponents(
     const AggregateCommandRequest& aggRequest,
     stdx::unordered_set<NamespaceString> involvedNamespaces_,
     std::vector<BSONObj> pipeline)
-    : request(aggRequest),
+    :  // {explain : true} in an aggregate command sets the verbosity of explain to 'kQueryPlanner'.
+       // {explain: false} never sets explain so we can't include this input in the shape.
+      explain(aggRequest.getExplain().has_value() ? OptionalBool(true) : OptionalBool(boost::none)),
+      allowDiskUse(aggRequest.getAllowDiskUse()),
+      involvedNamespaces(std::move(involvedNamespaces_)),
+      representativePipeline(std::move(pipeline)) {}
+
+AggCmdShapeComponents::AggCmdShapeComponents(
+    OptionalBool explain,
+    OptionalBool allowDiskUse,
+    stdx::unordered_set<NamespaceString> involvedNamespaces_,
+    std::vector<BSONObj> pipeline)
+    : explain(explain),
+      allowDiskUse(allowDiskUse),
       involvedNamespaces(std::move(involvedNamespaces_)),
       representativePipeline(std::move(pipeline)) {}
 
 void AggCmdShapeComponents::HashValue(absl::HashState state) const {
-    if (request.getAllowDiskUse()) {
-        state = absl::HashState::combine(std::move(state), bool(request.getAllowDiskUse()));
-    }
-    if (request.getExplain()) {
-        state = absl::HashState::combine(std::move(state), *request.getExplain());
-    }
+    state = absl::HashState::combine(std::move(state), explain, allowDiskUse);
     for (auto&& shapifiedStage : representativePipeline) {
         state = absl::HashState::combine(std::move(state), simpleHash(shapifiedStage));
     }
@@ -72,8 +80,10 @@ void AggCmdShape::appendLetCmdSpecificShapeComponents(
         expCtx->addResolvedNamespaces(_components.involvedNamespaces);
         auto reparsed = Pipeline::parse(_components.representativePipeline, expCtx);
         auto serializedPipeline = reparsed->serializeToBson(opts);
-        AggCmdShapeComponents{
-            _components.request, _components.involvedNamespaces, serializedPipeline}
+        AggCmdShapeComponents{_components.explain,
+                              _components.allowDiskUse,
+                              _components.involvedNamespaces,
+                              serializedPipeline}
             .appendTo(bob);
     }
 }
@@ -85,20 +95,16 @@ void AggCmdShapeComponents::appendTo(BSONObjBuilder& bob) const {
     bob.append(AggregateCommandRequest::kPipelineFieldName, representativePipeline);
 
     // explain
-    if (request.getExplain().has_value()) {
-        bob.append(AggregateCommandRequest::kExplainFieldName, true);
-    }
+    if (explain.has_value())
+        bob.append(AggregateCommandRequest::kExplainFieldName, bool(explain));
 
     // allowDiskUse
-    if (auto param = request.getAllowDiskUse(); param.has_value()) {
-        bob.append(AggregateCommandRequest::kAllowDiskUseFieldName, param.value_or(false));
+    if (allowDiskUse.has_value()) {
+        bob.append(AggregateCommandRequest::kAllowDiskUseFieldName, bool(allowDiskUse));
     }
 }
 
 namespace {
-int64_t sum(const std::initializer_list<int64_t>& sizes) {
-    return std::accumulate(sizes.begin(), sizes.end(), 0, std::plus{});
-}
 
 int64_t _size(const std::vector<BSONObj>& objects) {
     return std::accumulate(objects.begin(), objects.end(), 0, [](int64_t total, const auto& obj) {
@@ -106,89 +112,10 @@ int64_t _size(const std::vector<BSONObj>& objects) {
         return total + sizeof(BSONObj) + obj.objsize();
     });
 }
-
-int64_t _size(const PassthroughToShardOptions& passthroughToShardOpts) {
-    return passthroughToShardOpts.getShard().size();
-}
-
-int64_t _size(const ExchangeSpec& exchange) {
-    return sum(
-        {exchange.getKey().objsize(),
-         (exchange.getBoundaries() ? _size(exchange.getBoundaries().get()) : 0),
-         (exchange.getConsumerIds() ? 4 * static_cast<int64_t>(exchange.getConsumerIds()->size())
-                                    : 0)});
-}
-
-int64_t _size(const EncryptionInformation& encryptInfo) {
-    tasserted(7659700,
-              "Unexpected encryption information - not expecting to collect query shape stats on "
-              "encrypted querys");
-}
-
-int64_t singleDataSourceSize(int64_t runningTotal, const ExternalDataSourceInfo& source) {
-    // Here we include the 'sizeof' since its expected to be contained in a vector, which will
-    // have a variable number of these.
-    return runningTotal + sizeof(ExternalDataSourceInfo) + source.getUrl().size();
-}
-
-int64_t _size(const std::vector<ExternalDataSourceOption>& externalDataSources) {
-    // External data sources aren't currently expected to be used much in production Atlas
-    // clusters, so it's probably pretty unlikely that this code will ever be exercised. That
-    // said, there's not reason it shouldn't work and be tracked correctly.
-    return std::accumulate(
-        externalDataSources.begin(),
-        externalDataSources.end(),
-        0,
-        [](int64_t runningTotal, const ExternalDataSourceOption& opt) {
-            const auto& sources = opt.getDataSources();
-            return sum({runningTotal,
-                        // Include the 'sizeof' to account for the variable number in the vector.
-                        sizeof(ExternalDataSourceOption),
-                        static_cast<int64_t>(opt.getCollName().size()),
-                        std::accumulate(sources.begin(), sources.end(), 0, singleDataSourceSize)});
-        });
-}
-
-int64_t _size(const DatabaseName& dbName) {
-    return dbName.size();
-}
-
-int64_t _size(const BSONObj& obj) {
-    return obj.objsize();
-}
-
-template <typename T>
-int64_t _size(const boost::optional<T>& optionalT) {
-    return optionalT ? _size(*optionalT) : 0;
-}
-
-// variadic base case.
-template <typename T>
-int64_t sumOfSizes(const T& t) {
-    return _size(t);
-}
-
-// variadic recursive case. Making the compiler expand the pluses everywhere to give us good
-// formatting at the call site. sumOfSizes(x, y, z) rather than _size(x) + _size(y) + _size(z).
-template <typename T, typename... Args>
-int64_t sumOfSizes(const T& t, const Args&... args) {
-    return _size(t) + sumOfSizes(args...);
-}
-
-int64_t aggRequestSize(const AggregateCommandRequest& request) {
-    return sumOfSizes(request.getPipeline(),
-                      request.getUnwrappedReadPref(),
-                      request.getExchange(),
-                      request.getPassthroughToShard(),
-                      request.getEncryptionInformation(),
-                      request.getExternalDataSources(),
-                      request.getDbName());
-}
-
 }  // namespace
 
 int64_t AggCmdShapeComponents::size() const {
-    return sum({sizeof(*this), _size(representativePipeline), aggRequestSize(request)});
+    return sizeof(*this) + _size(representativePipeline);
 }
 
 AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,

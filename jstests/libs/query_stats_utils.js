@@ -269,3 +269,105 @@ export function resetQueryStatsStore(conn, queryStatsStoreSize) {
     assert.commandWorked(
         conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: queryStatsStoreSize}));
 }
+
+/**
+ *  Checks that the given object contains the dottedPath.
+ * @param {object} object
+ * @param {string} dottedPath
+ */
+function hasValueAtPath(object, dottedPath) {
+    let nestedFields = dottedPath.split(".");
+    for (const nestedField of nestedFields) {
+        if (!object.hasOwnProperty(nestedField)) {
+            return false
+        }
+        object = object[nestedField];
+    }
+    return true;
+}
+
+/**
+ * We run the command on an new database with an empty collection that has an index {v:1}. We then
+ * obtain the queryStats key entry that is created and check the following things.
+ * 1. The command associated with the key matches the commandName.
+ * 2. The fields nested inside of queryShape field of the key exactly matches those given by
+ * shapeFields.
+ * 3. The list of fields of the key exactly matches those given by keyFields.
+ * /**
+ * @param {string} commandName -  string name of type of command, ex. "find" or "aggregate"
+ * @param {object} commandObj - The command that will be  run
+ * @param {object} shapeFields - List of fields that are part of the queryShape and should be nested
+ *     inside of Query Shape
+ * @param {object} keyFields - List of outer fields not nested inside queryShape but should be part
+ *     of the key
+ */
+export function runCommandAndValidateQueryStats({commandName, commandObj, shapeFields, keyFields}) {
+    let options = {
+        setParameter: {internalQueryStatsRateLimit: -1},
+    };
+
+    const conn = MongoRunner.runMongod(options);
+    const testDB = conn.getDB("test");
+    var coll = testDB[jsTestName()];
+    coll.drop();
+
+    // Have to create an index for hint not to fail.
+    assert.commandWorked(coll.createIndex({v: 1}));
+
+    assert.commandWorked(testDB.runCommand(commandObj));
+    let stats = getQueryStats(conn);
+    assert.eq(1, stats.length);
+
+    for (const entry of stats) {
+        assert.eq(entry.key.queryShape.command, commandName);
+        const kApplicationName = "MongoDB Shell";
+        assert.eq(entry.key.client.application.name, kApplicationName);
+
+        {
+            assert(hasValueAtPath(entry, "key.client.driver"), entry);
+            assert(hasValueAtPath(entry, "key.client.driver.name"), entry);
+            assert(hasValueAtPath(entry, "key.client.driver.version"), entry);
+        }
+
+        {
+            assert(hasValueAtPath(entry, "key.client.os"), entry);
+            assert(hasValueAtPath(entry, "key.client.os.type"), entry);
+            assert(hasValueAtPath(entry, "key.client.os.name"), entry);
+            assert(hasValueAtPath(entry, "key.client.os.architecture"), entry);
+            assert(hasValueAtPath(entry, "key.client.os.version"), entry);
+        }
+
+        // Every path in shapeFields is in the queryShape.
+        let shapeFieldsPrefixes = [];
+        for (const field of shapeFields) {
+            assert(hasValueAtPath(entry.key.queryShape, field),
+                   `QueryShape: ${tojson(entry.key.queryShape)} is missing field ${field}`);
+            shapeFieldsPrefixes.push(field.split(".")[0]);
+        }
+
+        // Every field in queryShape is in shapeFields or is the base of a path in shapeFields.
+        for (const field in entry.key.queryShape) {
+            assert(shapeFieldsPrefixes.includes(field),
+                   `Unexpected field ${field} in shape for ${commandName}`);
+        }
+
+        // Every path in keyFields is in the key.
+        let keyFieldsPrefixes = [];
+        for (const field of keyFields) {
+            assert(hasValueAtPath(entry.key, field),
+                   `Key: ${tojson(entry.key)} is missing field ${field}`);
+            keyFieldsPrefixes.push(field.split(".")[0]);
+        }
+
+        // Every field in the key is in keyFields or is the base of a path in keyFields.
+        for (const field in entry.key) {
+            assert(keyFieldsPrefixes.includes(field),
+                   `Unexpected field ${field} in key for ${commandName}`);
+        }
+    }
+    // $hint can only be string(index name) or object (index spec).
+    assert.throwsWithCode(() => {
+        coll.find({v: {$eq: 2}}).hint({'v': 60, $hint: -128}).itcount();
+    }, ErrorCodes.BadValue);
+    MongoRunner.stopMongod(conn);
+}

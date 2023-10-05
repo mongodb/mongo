@@ -68,14 +68,24 @@ namespace mongo::query_stats {
  * class's member variables.
  */
 struct UniversalKeyComponents {
-    // TODO SERVER-78429 it feels like maxTimeMS and readConcern are missing from here - at least?
     UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
                            const ClientMetadata* clientMetadata,
                            boost::optional<BSONObj> commentObj,
                            boost::optional<BSONObj> hint,
-                           std::unique_ptr<APIParameters> apiParams,
                            boost::optional<BSONObj> readPreference,
-                           query_shape::CollectionType collectionType);
+                           boost::optional<BSONObj> writeConcern,
+                           boost::optional<BSONObj> readConcern,
+                           std::unique_ptr<APIParameters> apiParams,
+                           query_shape::CollectionType collectionType,
+                           bool maxTimeMS);
+    /**
+     * Returns a copy of the read concern object. If there is an "afterClusterTime" component, the
+     * timestamp is shapified according to 'opts'.
+     */
+    static BSONObj shapifyReadConcern(
+        const BSONObj& readConcern,
+        const SerializationOptions& opts =
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
 
     int64_t size() const;
 
@@ -90,6 +100,10 @@ struct UniversalKeyComponents {
     BSONObj _commentObj;      // Shapify this value.
     BSONObj _hintObj;         // Preserve this value.
     BSONObj _readPreference;  // Preserve this value.
+    BSONObj _writeConcern;    // Preserve this value.
+
+    // Preserved literal except afterClusterTime is shapified.
+    BSONObj _shapifiedReadConcern;
 
     // Separate the possibly-enormous BSONObj from the remaining members
 
@@ -112,6 +126,9 @@ struct UniversalKeyComponents {
         bool comment : 1 = false;
         bool hint : 1 = false;
         bool readPreference : 1 = false;
+        bool writeConcern : 1 = false;
+        bool readConcern : 1 = false;
+        bool maxTimeMS : 1 = false;
     } _hasField;
 };
 
@@ -156,6 +173,8 @@ H AbslHashValue(H h, const UniversalKeyComponents& components) {
                       components._comment.type(),
                       simpleHash(components._hintObj),
                       simpleHash(components._readPreference),
+                      simpleHash(components._writeConcern),
+                      simpleHash(components._shapifiedReadConcern),
                       components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
                       components._collectionType,
                       components._hasField);
@@ -167,14 +186,17 @@ H AbslHashValue(H h, const UniversalKeyComponents::HasField& hasField) {
                       hasField.clientMetaData,
                       hasField.comment,
                       hasField.hint,
-                      hasField.readPreference);
+                      hasField.readPreference,
+                      hasField.writeConcern,
+                      hasField.readConcern,
+                      hasField.maxTimeMS);
 }
 
 
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
 static_assert(
-    sizeof(UniversalKeyComponents) <= sizeof(query_shape::Shape) + 4 * sizeof(BSONObj) +
+    sizeof(UniversalKeyComponents) <= sizeof(query_shape::Shape) + 6 * sizeof(BSONObj) +
             sizeof(BSONElement) + sizeof(std::unique_ptr<APIParameters>) +
             sizeof(query_shape::CollectionType) + sizeof(query_shape::QueryShapeHash) +
             sizeof(int64_t),
@@ -267,6 +289,8 @@ protected:
         OperationContext* opCtx,
         std::unique_ptr<query_shape::Shape> queryShape,
         boost::optional<BSONObj> hint,
+        boost::optional<BSONObj> readConcern,
+        bool maxTimeMS,
         query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
 
     /**

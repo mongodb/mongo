@@ -107,11 +107,11 @@ public:
         return findKeyGenerator.generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
 
-    BSONObj makeTelemetryKeyAggregateRequest(AggregateCommandRequest acr,
-                                             const Pipeline& pipeline,
-                                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             LiteralSerializationPolicy literalPolicy,
-                                             bool applyHmac = false) {
+    BSONObj makeQueryStatsKeyAggregateRequest(AggregateCommandRequest acr,
+                                              const Pipeline& pipeline,
+                                              const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              LiteralSerializationPolicy literalPolicy,
+                                              bool applyHmac = false) {
         auto aggKeyGenerator = std::make_unique<AggKeyGenerator>(acr,
                                                                  pipeline,
                                                                  expCtx,
@@ -506,8 +506,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<z>": 1,
                 "HASH<c>": 1
             },
-            "noCursorTimeout": "?bool",
             "maxTimeMS": "?number",
+            "noCursorTimeout": false,
             "batchSize": "?number"
         })",
         key);
@@ -565,9 +565,9 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<z>": 1,
                 "HASH<c>": 1
             },
-            "allowPartialResults": true,
-            "noCursorTimeout": "?bool",
             "maxTimeMS": "?number",
+            "allowPartialResults": true,
+            "noCursorTimeout": false,
             "batchSize": "?number"
         })",
         key);
@@ -619,9 +619,9 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<z>": 1,
                 "HASH<c>": 1
             },
-            "allowPartialResults": false,
-            "noCursorTimeout": "?bool",
             "maxTimeMS": "?number",
+            "allowPartialResults": false,
+            "noCursorTimeout": false,
             "batchSize": "?number"
         })",
         key);
@@ -910,7 +910,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setPipeline(rawPipeline);
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
-    auto shapified = makeTelemetryKeyAggregateRequest(
+    auto shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -974,7 +974,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setHint(BSON("z" << 1 << "c" << 1));
     acr.setCollation(BSON("locale"
                           << "simple"));
-    shapified = makeTelemetryKeyAggregateRequest(
+    shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1046,7 +1046,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                                    << "$foo")
                            << "var2"
                            << "bar"));
-    shapified = makeTelemetryKeyAggregateRequest(
+    shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1125,7 +1125,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
     acr.setBypassDocumentValidation(true);
     expCtx->opCtx->setComment(BSON("comment"
                                    << "note to self"));
-    shapified = makeTelemetryKeyAggregateRequest(
+    shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1194,16 +1194,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "HASH<z>": 1,
                 "HASH<c>": 1
             },
+            "maxTimeMS": "?number",
+            "bypassDocumentValidation": true,
             "cursor": {
                 "batchSize": "?number"
-            },
-            "maxTimeMS": "?number",
-            "bypassDocumentValidation": "?bool"
+            }
         })",
         shapified);
 
     // Test again but with the representative query shape.
-    shapified = makeTelemetryKeyAggregateRequest(
+    shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1280,11 +1280,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "HASH<z>": 1,
                 "HASH<c>": 1
             },
+            "maxTimeMS": 1,
+            "bypassDocumentValidation": true,
             "cursor": {
                 "batchSize": 1
-            },
-            "maxTimeMS": 1,
-            "bypassDocumentValidation": true
+            }
         })",
         shapified);
 }
@@ -1295,7 +1295,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
     acr.setPipeline({});
     auto pipeline = Pipeline::parse({}, expCtx);
 
-    auto shapified = makeTelemetryKeyAggregateRequest(
+    auto shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1312,7 +1312,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields
         shapified);  // NOLINT (test auto-update)
 
     // Test again with the representative query shape.
-    shapified = makeTelemetryKeyAggregateRequest(
+    shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1348,7 +1348,7 @@ TEST_F(QueryStatsStoreTest,
     acr.setPipeline(rawPipeline);
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
-    auto shapified = makeTelemetryKeyAggregateRequest(
+    auto shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToDebugTypeString, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -1391,7 +1391,7 @@ TEST_F(QueryStatsStoreTest,
         shapified);
 
     // Do the same thing with the representative query shape.
-    shapified = makeTelemetryKeyAggregateRequest(
+    shapified = makeQueryStatsKeyAggregateRequest(
         acr, *pipeline, expCtx, LiteralSerializationPolicy::kToRepresentativeParseableValue, true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

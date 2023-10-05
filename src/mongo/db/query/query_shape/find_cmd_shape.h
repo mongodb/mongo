@@ -77,6 +77,8 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
     OptionalBool mirrored;
     OptionalBool oplogReplay;
 
+    // This anonymous struct represents the presence of the member variables as C++ bit fields.
+    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
     struct HasField {
         bool projection : 1;
         bool sort : 1;
