@@ -9,6 +9,11 @@ export function checkCascadesOptimizerEnabled(theDB) {
     return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
 }
 
+// TODO SERVER-82185: Remove this once M2-eligibility checker + E2E parameterization implemented
+export function checkPlanCacheParameterization(theDB) {
+    return false;
+}
+
 /**
  * Utility for checking if the experimental Cascades optimizer code path is enabled (checks
  * framework control for M4+).
