@@ -308,6 +308,12 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_MODEL
+    "Build the model for lightweight formal verification"
+    DEFAULT ON
+)
+
+config_bool(
     ENABLE_S3
     "Build the S3 storage extension"
     DEFAULT OFF
@@ -395,9 +401,9 @@ if(ENABLE_DEBUG_INFO)
         # Ensure a PDB file can be generated for debugging symbols.
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /DEBUG")
     else()
-        # Higher debug levels `-g3`/`-ggdb3` emit additional debug information, including 
+        # Higher debug levels `-g3`/`-ggdb3` emit additional debug information, including
         # macro definitions that allow us to evaluate macros such as `p S2C(session)` inside of gdb.
-        # This needs to be in DWARF version 2 format or later - and should be by default - but 
+        # This needs to be in DWARF version 2 format or later - and should be by default - but
         # we'll specify version 4 here to be safe.
         add_compile_options(-g3)
         add_compile_options(-ggdb3)

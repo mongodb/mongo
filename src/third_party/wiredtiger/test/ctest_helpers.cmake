@@ -38,7 +38,7 @@ function(create_test_executable target)
     # Define our test executable.
     add_executable(${target} ${CREATE_TEST_SOURCES})
 
-    # For MacOS builds we need to generate a dSYM bundle that contains the debug symbols for each 
+    # For MacOS builds we need to generate a dSYM bundle that contains the debug symbols for each
     # executable. The name of the binary will either be the name of the target or some other name
     # passed to this function. We need to use the correct one for the dsymutil.
     if (WT_DARWIN)
@@ -240,9 +240,9 @@ function(define_c_test)
         PARSE_ARGV
         0
         "C_TEST"
-        ""
+        "CXX"
         "TARGET;DIR_NAME;EXEC_SCRIPT;LABEL"
-        "SOURCES;FLAGS;ARGUMENTS;VARIANTS;DEPENDS;ADDITIONAL_FILES"
+        "SOURCES;LIBS;FLAGS;ARGUMENTS;VARIANTS;DEPENDS;ADDITIONAL_FILES"
     )
     if (NOT "${C_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Unknown arguments to define_c_test: ${C_TEST_UNPARSED_ARGUMENTS}")
@@ -272,6 +272,9 @@ function(define_c_test)
         if(NOT "${C_TEST_ADDITIONAL_FILES}" STREQUAL "")
             list(APPEND additional_file_args ${C_TEST_ADDITIONAL_FILES})
         endif()
+        if(C_TEST_CXX)
+            list(APPEND additional_file_args CXX)
+        endif()
         set(exec_wrapper)
         if(WT_WIN)
             # This is a workaround to run our csuite tests under Windows using CTest. When executing a test,
@@ -285,6 +288,7 @@ function(define_c_test)
             # Define the c test to be executed with a script, rather than invoking the binary directly.
             create_test_executable(${C_TEST_TARGET}
                 SOURCES ${C_TEST_SOURCES}
+                LIBS ${C_TEST_LIBS}
                 ADDITIONAL_FILES ${additional_file_args}
                 BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
                 ${additional_executable_args}
@@ -294,6 +298,7 @@ function(define_c_test)
         else()
             create_test_executable(${C_TEST_TARGET}
                 SOURCES ${C_TEST_SOURCES}
+                LIBS ${C_TEST_LIBS}
                 ADDITIONAL_FILES ${additional_file_args}
                 BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${C_TEST_DIR_NAME}
                 ${additional_executable_args}
