@@ -425,8 +425,8 @@ public:
         return seCtx()->getServiceExecutor();
     }
 
-    bool useDedicatedThread() {
-        return seCtx()->useDedicatedThread();
+    bool usesDedicatedThread() {
+        return seCtx()->usesDedicatedThread();
     }
 
     std::shared_ptr<ServiceExecutor::TaskRunner> taskRunner() {
@@ -491,7 +491,7 @@ private:
         invariant(!_work);
         if (_nextWork)
             return Future{std::move(_nextWork)};  // Already have one ready.
-        if (useDedicatedThread()) {
+        if (usesDedicatedThread()) {
             // Yield here to avoid pinning the CPU. Give other threads some CPU
             // time to avoid a spiky latency distribution (BF-27452). Even if
             // this client can run continuously and receive another command
@@ -803,7 +803,7 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
             _cleanupSession(status);
             return;
         }
-        if (useDedicatedThread()) {
+        if (usesDedicatedThread()) {
             try {
                 _doOneIteration().get();
                 _scheduleIteration();

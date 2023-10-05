@@ -49,17 +49,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
 namespace mongo::transport {
-namespace {
-const auto getServiceExecutorSynchronous =
-    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
 
-const ServiceContext::ConstructorActionRegisterer serviceExecutorSynchronousRegisterer{
-    "ServiceExecutorSynchronous", [](ServiceContext* ctx) {
-        getServiceExecutorSynchronous(ctx) = std::make_unique<ServiceExecutorSynchronous>(ctx);
-    }};
-}  // namespace
+namespace service_executor_synchronous_detail {
 
-class ServiceExecutorSynchronous::SharedState : public std::enable_shared_from_this<SharedState> {
+class ServiceExecutorSyncImpl::SharedState : public std::enable_shared_from_this<SharedState> {
 private:
     class LockRef {
     public:
@@ -88,7 +81,9 @@ private:
     };
 
 public:
-    void schedule(Task task);
+    explicit SharedState(RunTaskInline runTaskInline) : _runTaskInline(runTaskInline) {}
+
+    void schedule(Task task, StringData name);
 
     bool isRunning() const {
         return _isRunning.loadRelaxed();
@@ -105,13 +100,14 @@ public:
 private:
     class WorkerThreadInfo;
 
+    const RunTaskInline _runTaskInline;
     mutable stdx::mutex _mutex;  // NOLINT
     stdx::condition_variable _cv;
     AtomicWord<bool> _isRunning;
     size_t _threads = 0;
 };
 
-class ServiceExecutorSynchronous::SharedState::WorkerThreadInfo {
+class ServiceExecutorSyncImpl::SharedState::WorkerThreadInfo {
 public:
     explicit WorkerThreadInfo(std::shared_ptr<SharedState> sharedState)
         : sharedState{std::move(sharedState)} {}
@@ -127,9 +123,9 @@ public:
     std::deque<Task> queue;
 };
 
-void ServiceExecutorSynchronous::SharedState::schedule(Task task) {
+void ServiceExecutorSyncImpl::SharedState::schedule(Task task, StringData name) {
     if (!isRunning()) {
-        task(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
+        task(Status(ErrorCodes::ShutdownInProgress, "{} is not running"_format(name)));
         return;
     }
 
@@ -140,11 +136,10 @@ void ServiceExecutorSynchronous::SharedState::schedule(Task task) {
         return;
     }
 
-    LOGV2_DEBUG(22983, 3, "Starting ServiceExecutorSynchronous worker thread");
     auto workerInfo = std::make_unique<WorkerThreadInfo>(shared_from_this());
     workerInfo->queue.push_back(std::move(task));
 
-    Status status = launchServiceWorkerThread([w = std::move(workerInfo)] {
+    auto runTask = [w = std::move(workerInfo)] {
         w->sharedState->lock().onStartThread();
         ScopeGuard onEndThreadGuard = [&] {
             w->sharedState->lock().onEndThread();
@@ -156,23 +151,31 @@ void ServiceExecutorSynchronous::SharedState::schedule(Task task) {
         };
 
         w->run();
-    });
-    // The usual way to fail to schedule is to invoke the task, but in this case
-    // we don't have the task anymore. We gave it away to the callback that the
-    // failed thread was supposed to run.
-    iassert(status);
+    };
+
+    if (_runTaskInline == RunTaskInline{true}) {
+        runTask();
+    } else {
+        // The usual way to fail to schedule is to invoke the task,
+        // but in this case we will not have the task anymore.
+        // We will have given it away while attempting to launch the thread.
+        LOGV2_DEBUG(22983, 3, "Starting ServiceExecutorSynchronous worker thread");
+        iassert(launchServiceWorkerThread(std::move(runTask)));
+    }
 }
 
-ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext*)
-    : _sharedState{std::make_shared<SharedState>()} {}
+ServiceExecutorSyncImpl::ServiceExecutorSyncImpl(RunTaskInline runTaskInline,
+                                                 std::string statsFieldName)
+    : _sharedState{std::make_shared<SharedState>(runTaskInline)},
+      _statsFieldName(std::move(statsFieldName)) {}
 
-ServiceExecutorSynchronous::~ServiceExecutorSynchronous() = default;
+ServiceExecutorSyncImpl::~ServiceExecutorSyncImpl() = default;
 
-void ServiceExecutorSynchronous::start() {
+void ServiceExecutorSyncImpl::start() {
     _sharedState->setIsRunning(true);
 }
 
-Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
+Status ServiceExecutorSyncImpl::shutdown(Milliseconds timeout) {
     LOGV2_DEBUG(22982, 3, "Shutting down passthrough executor");
     auto stopLock = _sharedState->lock();
     _sharedState->setIsRunning(false);
@@ -183,58 +186,85 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
     return Status::OK();
 }
 
-ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx) {
-    auto& ref = getServiceExecutorSynchronous(ctx);
-    invariant(ref);
-    return ref.get();
-}
-
-void ServiceExecutorSynchronous::_schedule(Task task) {
-    _sharedState->schedule(std::move(task));
-}
-
-size_t ServiceExecutorSynchronous::getRunningThreads() const {
+size_t ServiceExecutorSyncImpl::getRunningThreads() const {
     return _sharedState->lock().threads();
 }
 
-void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
+void ServiceExecutorSyncImpl::appendStats(BSONObjBuilder* bob) const {
     // Has one client per thread and waits synchronously on that thread.
     int threads = getRunningThreads();
-    BSONObjBuilder{bob->subobjStart("passthrough")}
+    BSONObjBuilder{bob->subobjStart(_statsFieldName)}
         .append("threadsRunning", threads)
         .append("clientsInTotal", threads)
         .append("clientsRunning", threads)
         .append("clientsWaitingForData", 0);
 }
 
-void ServiceExecutorSynchronous::_runOnDataAvailable(const std::shared_ptr<Session>& session,
-                                                     Task task) {
-    invariant(session);
-    yieldIfAppropriate();
-    _schedule(std::move(task));
-}
-
-auto ServiceExecutorSynchronous::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+auto ServiceExecutorSyncImpl::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
     if (!_sharedState->isRunning())
         iassert(Status(ErrorCodes::ShutdownInProgress, "Executor is not running"));
 
     /** Schedules on this. */
     class ForwardingTaskRunner : public TaskRunner {
     public:
-        explicit ForwardingTaskRunner(ServiceExecutorSynchronous* e) : _e{e} {}
+        explicit ForwardingTaskRunner(ServiceExecutorSyncImpl* e) : _e{e} {}
 
         void schedule(Task task) override {
-            _e->_schedule(std::move(task));
+            _e->_sharedState->schedule(std::move(task), _e->getName());
         }
 
         void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
-            _e->_runOnDataAvailable(std::move(session), std::move(task));
+            invariant(session);
+            _e->yieldIfAppropriate();
+            _e->_sharedState->schedule(std::move(task), _e->getName());
         }
 
     private:
-        ServiceExecutorSynchronous* _e;
+        ServiceExecutorSyncImpl* _e;
     };
     return std::make_unique<ForwardingTaskRunner>(this);
+}
+
+}  // namespace service_executor_synchronous_detail
+
+/////////////////////////////
+// ServiceExecutorSynchronous
+/////////////////////////////
+
+namespace {
+const auto getServiceExecutorSynchronous =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorSynchronous>>();
+
+const ServiceContext::ConstructorActionRegisterer serviceExecutorSynchronousRegisterer{
+    "ServiceExecutorSynchronous", [](ServiceContext* ctx) {
+        getServiceExecutorSynchronous(ctx) = std::make_unique<ServiceExecutorSynchronous>();
+    }};
+}  // namespace
+
+ServiceExecutorSynchronous* ServiceExecutorSynchronous::get(ServiceContext* ctx) {
+    auto& ref = getServiceExecutorSynchronous(ctx);
+    invariant(ref);
+    return ref.get();
+}
+
+/////////////////////////
+// Service ExecutorInline
+/////////////////////////
+
+namespace {
+const auto getServiceExecutorInline =
+    ServiceContext::declareDecoration<std::unique_ptr<ServiceExecutorInline>>();
+
+const ServiceContext::ConstructorActionRegisterer serviceExecutorInlineRegisterer{
+    "ServiceExecutorInline", [](ServiceContext* ctx) {
+        getServiceExecutorInline(ctx) = std::make_unique<ServiceExecutorInline>();
+    }};
+}  // namespace
+
+ServiceExecutorInline* ServiceExecutorInline::get(ServiceContext* ctx) {
+    auto& ref = getServiceExecutorInline(ctx);
+    invariant(ref);
+    return ref.get();
 }
 
 }  // namespace mongo::transport

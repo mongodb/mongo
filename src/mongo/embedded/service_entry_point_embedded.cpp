@@ -70,7 +70,7 @@ namespace {
 class EmbeddedClientObserver final : public ServiceContext::ClientObserver {
     void onCreateClient(Client* client) {
         auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-        seCtx->setUseDedicatedThread(true);
+        seCtx->setThreadModel(seCtx->kSynchronous);
         transport::ServiceExecutorContext::set(client, std::move(seCtx));
     }
     void onDestroyClient(Client*) {}

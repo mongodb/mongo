@@ -41,9 +41,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/message_compressor_registry.h"
-#include "mongo/transport/service_executor_fixed.h"
-#include "mongo/transport/service_executor_reserved.h"
-#include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util_core.h"
@@ -93,21 +91,12 @@ public:
         appendMessageCompressionStats(&b);
 
         auto svcCtx = opCtx->getServiceContext();
+
         {
             BSONObjBuilder section = b.subobjStart("serviceExecutors");
-
-            if (auto executor = transport::ServiceExecutorSynchronous::get(svcCtx)) {
-                executor->appendStats(&section);
-            }
-
-            if (auto executor = transport::ServiceExecutorReserved::get(svcCtx)) {
-                executor->appendStats(&section);
-            }
-
-            if (auto executor = transport::ServiceExecutorFixed::get(svcCtx)) {
-                executor->appendStats(&section);
-            }
+            transport::ServiceExecutor::appendAllServerStats(&section, svcCtx);
         }
+
         if (auto tl = svcCtx->getTransportLayer())
             tl->appendStatsForServerStatus(&b);
 

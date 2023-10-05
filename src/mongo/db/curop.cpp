@@ -280,7 +280,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
     }
 
     if (const auto seCtx = transport::ServiceExecutorContext::get(client)) {
-        infoBuilder->append("threaded"_sd, seCtx->useDedicatedThread());
+        infoBuilder->append("threaded"_sd, seCtx->usesDedicatedThread());
     }
 
     if (clientOpCtx) {

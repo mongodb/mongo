@@ -73,10 +73,15 @@ public:
     static void startupAll(ServiceContext* svcCtx);
 
     /**
-     * Shuts downa ll executors registered as ServiceContext decorations.
+     * Shuts down all executors registered as ServiceContext decorations.
      * If an executor fails to shut down, a warning will be logged, but shutdowns will continue.
      */
     static void shutdownAll(ServiceContext* svcCtx, Milliseconds timeout);
+
+    /**
+     * Append statistics to the `network.serviceExecutors` serverStatus output.
+     */
+    static void appendAllServerStats(BSONObjBuilder*, ServiceContext*);
 
     virtual ~ServiceExecutor() = default;
 
@@ -115,6 +120,21 @@ public:
  */
 class ServiceExecutorContext {
 public:
+    // Roughly a 1:1 mapping to the ServiceExecutor type which will be used.
+    // ThreadModel::kSynchronous + canUseReserved may result in ServiceExecutorReserved.
+    enum class ThreadModel {
+        kFixed,
+        kSynchronous,
+        kInline,
+    };
+
+    // Manually hoist these enum values into the class to aid callsite usage.
+    // As our toolchain is updated, we may be able to replace this with a simple:
+    // `using enum ThreadModel;`
+    static constexpr inline auto kFixed = ThreadModel::kFixed;
+    static constexpr inline auto kSynchronous = ThreadModel::kSynchronous;
+    static constexpr inline auto kInline = ThreadModel::kInline;
+
     /**
      * Get a pointer to the ServiceExecutorContext for a given client.
      *
@@ -147,26 +167,26 @@ public:
     ServiceExecutorContext& operator=(ServiceExecutorContext&&) = delete;
 
     /**
-     * Set the threading model for the associated Client's service execution.
+     * Set the thread model for the associated Client's service execution.
      *
-     * This function is only valid to invoke with the Client lock or before the Client is set.
+     * These functions are only valid to invoke with the Client lock or before the Client is set.
      */
-    void setUseDedicatedThread(bool dedicated) noexcept;
+    void setThreadModel(ThreadModel model);
 
     /**
      * Set if reserved resources are available for the associated Client's service execution.
      *
      * This function is only valid to invoke with the Client lock or before the Client is set.
      */
-    void setCanUseReserved(bool canUseReserved) noexcept;
+    void setCanUseReserved(bool canUseReserved);
 
     /**
      * Get the ThreadingModel for the associated Client.
      *
      * This function is valid to invoke either on the Client thread or with the Client lock.
      */
-    bool useDedicatedThread() const noexcept {
-        return _useDedicatedThread;
+    bool usesDedicatedThread() const {
+        return _threadModel != ThreadModel::kFixed;
     }
 
     /**
@@ -175,15 +195,15 @@ public:
      * This function is only valid to invoke from the associated Client thread. This function does
      * not require the Client lock since all writes must also happen from that thread.
      */
-    ServiceExecutor* getServiceExecutor() noexcept;
+    ServiceExecutor* getServiceExecutor();
 
 private:
     Client* _client = nullptr;
     SessionManager* _sessionManager = nullptr;
 
-    bool _useDedicatedThread = true;
     bool _canUseReserved = false;
     bool _hasUsedSynchronous = false;
+    ThreadModel _threadModel{ThreadModel::kSynchronous};
 
     /** For tests to override the behavior of `getServiceExecutor()`. */
     std::function<ServiceExecutor*()> _getServiceExecutorForTest;

@@ -228,7 +228,7 @@ SessionManagerCommon::~SessionManagerCommon() = default;
 void SessionManagerCommon::configureServiceExecutorContext(Client* client,
                                                            bool isPrivilegedSession) const {
     auto seCtx = std::make_unique<ServiceExecutorContext>();
-    seCtx->setUseDedicatedThread(gInitialUseDedicatedThread);
+    seCtx->setThreadModel(gInitialUseDedicatedThread ? seCtx->kSynchronous : seCtx->kFixed);
     seCtx->setCanUseReserved(isPrivilegedSession);
     stdx::lock_guard lk(*client);
     ServiceExecutorContext::set(client, std::move(seCtx));

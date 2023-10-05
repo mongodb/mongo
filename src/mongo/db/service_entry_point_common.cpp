@@ -208,10 +208,10 @@ using namespace fmt::literals;
 
 Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
                                   std::shared_ptr<CommandInvocation> invocation) {
-    auto useDedicatedThread = [&] {
+    auto usesDedicatedThread = [&] {
         auto client = rec->getOpCtx()->getClient();
         if (auto context = transport::ServiceExecutorContext::get(client); context) {
-            return context->useDedicatedThread();
+            return context->usesDedicatedThread();
         }
         tassert(5453901,
                 "Threading model may only be absent for internal and direct clients",
@@ -219,7 +219,7 @@ Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
         return true;
     }();
     return CommandHelpers::runCommandInvocation(
-        std::move(rec), std::move(invocation), useDedicatedThread);
+        std::move(rec), std::move(invocation), usesDedicatedThread);
 }
 
 /*
@@ -2526,9 +2526,9 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
             if (auto seCtx = transport::ServiceExecutorContext::get(opCtx->getClient())) {
                 if (auto invocation = CommandInvocation::get(opCtx);
                     invocation && !invocation->isSafeForBorrowedThreads()) {
-                    // If the last command wasn't safe for a borrowed thread, then let's move
-                    // off of it.
-                    seCtx->setUseDedicatedThread(true);
+                    // If the last command wasn't safe for a borrowed thread,
+                    // then let's move off of it.
+                    seCtx->setThreadModel(seCtx->kSynchronous);
                 }
             }
 
