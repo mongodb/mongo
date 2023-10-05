@@ -221,6 +221,13 @@ protected:
                                       const NamespaceString& ns,
                                       TimeseriesOptions userOpts);
 
+    /**
+     * If passed namespace is a timeseries, returns TimeseriesOptions. Otherwise, returns
+     * boost::none.
+     */
+    virtual boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
+                                                                     const NamespaceString& ns);
+
 private:
     /**
      * Looks up the collection default collator for the collection given by 'collectionUUID'. A

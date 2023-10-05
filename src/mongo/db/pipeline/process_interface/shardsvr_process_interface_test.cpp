@@ -32,6 +32,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <system_error>
 
+#include "mongo/base/shim.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
@@ -56,6 +57,14 @@
 
 namespace mongo {
 namespace {
+
+std::shared_ptr<MongoProcessInterface> MongoProcessInterfaceCreateImpl(OperationContext* opCtx) {
+    return std::make_shared<ShardServerProcessInterface>(
+        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
+}
+
+auto mongoProcessInterfaceCreateRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
+    MongoProcessInterface::create, MongoProcessInterfaceCreateImpl);
 
 class ShardsvrProcessInterfaceTest : public ShardedAggTestFixture {
 public:
@@ -115,6 +124,16 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
+    // Mock the response to $out's "aggregate" request to config server, that is a part of
+    // getIndexSpecs.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ("collections", request.cmdObj.firstElement().valueStringDataSafe());
+        // Response is empty for the unsharded untracked collection.
+        return CursorResponse(kTestAggregateNss, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
     // Mock the response to $out's "listIndexes" request.
     const BSONObj indexBSON = BSON("_id" << 1);
     const BSONObj listIndexesResponse = BSON("v" << 1 << "key" << indexBSON << "name"
@@ -139,6 +158,16 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
         tempNss = NamespaceString::createNamespaceString_forTest(
             request.dbname, request.cmdObj.firstElement().valueStringDataSafe());
         return BSON("ok" << 1);
+    });
+
+    // Mock the response to $out's "aggregate" request to config server, that is a part of
+    // createIndexes.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ("aggregate", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ("collections", request.cmdObj.firstElement().valueStringDataSafe());
+        // Response is empty for the unsharded untracked collection.
+        return CursorResponse(kTestAggregateNss, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
     // Mock the response to $out's "createIndexes" request.
@@ -167,7 +196,7 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
 
     // Mock the response to the drop of the temporary collection.
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ("drop", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ("_shardsvrDropCollection", request.cmdObj.firstElement().fieldNameStringData());
         ASSERT_EQ(tempNss.dbName(), request.dbname);
         ASSERT_EQ(tempNss.coll(), request.cmdObj.firstElement().valueStringData());
         return BSON("ok" << 1);

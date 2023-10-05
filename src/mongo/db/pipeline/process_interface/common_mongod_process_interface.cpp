@@ -864,17 +864,26 @@ void CommonMongodProcessInterface::_handleTimeseriesCreateError(const DBExceptio
     // specification as the time-series view we wanted to create, we should not throw an
     // error. The user is allowed to overwrite an existing time-series collection when
     // entering this function.
-    auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
-    // Confirming the error is NamespaceExists and that there is a time-series view in that
-    // namespace.
-    if (ex.code() != ErrorCodes::NamespaceExists || !view || !view->timeseries()) {
+
+    // Confirming the error is NamespaceExists
+    if (ex.code() != ErrorCodes::NamespaceExists) {
         throw;
     }
-    // Confirming the time-series options of the existing view are the same as expected.
-    auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(opCtx, ns, true);
+    auto timeseriesOpts = _getTimeseriesOptions(opCtx, ns);
+    // Confirming there is a time-series view in that namespace and the time-series options of the
+    // existing view are the same as expected.
     if (!timeseriesOpts || !mongo::timeseries::optionsAreEqual(timeseriesOpts.value(), userOpts)) {
         throw;
     }
+}
+
+boost::optional<TimeseriesOptions> CommonMongodProcessInterface::_getTimeseriesOptions(
+    OperationContext* opCtx, const NamespaceString& ns) {
+    auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
+    if (!view || !view->timeseries()) {
+        return boost::none;
+    }
+    return mongo::timeseries::getTimeseriesOptions(opCtx, ns, true /*convertToBucketsNamespace*/);
 }
 
 void CommonMongodProcessInterface::writeRecordsToRecordStore(

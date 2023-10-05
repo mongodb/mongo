@@ -181,6 +181,10 @@ public:
                             std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                             const WriteConcernOptions& wc,
                             boost::optional<OID> targetEpoch) final;
+
+private:
+    boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,
+                                                             const NamespaceString& ns) final;
 };
 
 }  // namespace mongo
