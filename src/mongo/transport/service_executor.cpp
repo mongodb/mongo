@@ -66,6 +66,19 @@ auto getServiceExecutorContext =
 void incrThreadingModelStats(ServiceExecutorStats& stats, bool useDedicatedThread, int step) {
     (useDedicatedThread ? stats.usesDedicated : stats.usesBorrowed) += step;
 }
+
+template <typename Func>
+void forEachServiceExecutor(ServiceContext* svcCtx, const Func& func) {
+    const auto call = [&]<typename T>(std::type_identity<T>) {
+        if (auto exec = T::get(svcCtx))
+            func(exec);
+    };
+
+    call(std::type_identity<ServiceExecutorSynchronous>{});
+    call(std::type_identity<ServiceExecutorReserved>{});
+    call(std::type_identity<ServiceExecutorFixed>{});
+}
+
 }  // namespace
 
 ServiceExecutorStats ServiceExecutorStats::get(ServiceContext* ctx) noexcept {
@@ -189,28 +202,24 @@ void ServiceExecutor::yieldIfAppropriate() const {
     }
 }
 
-void ServiceExecutor::shutdownAll(ServiceContext* serviceContext, Date_t deadline) {
-    auto getTimeout = [&] {
-        auto now = serviceContext->getPreciseClockSource()->now();
-        return std::max(Milliseconds{0}, deadline - now);
-    };
+void ServiceExecutor::startupAll(ServiceContext* svcCtx) {
+    // Starts each ServiceExecutor in turn until complete or one of them fails.
+    forEachServiceExecutor(svcCtx, [&](ServiceExecutor* exec) { exec->start(); });
+}
 
-    if (auto status = transport::ServiceExecutorFixed::get(serviceContext)->shutdown(getTimeout());
-        !status.isOK()) {
-        LOGV2(4907202, "Failed to shutdown ServiceExecutorFixed", "error"_attr = status);
-    }
+void ServiceExecutor::shutdownAll(ServiceContext* svcCtx, Milliseconds timeout) {
+    auto clock = svcCtx->getPreciseClockSource();
+    auto deadline = clock->now() + timeout;
 
-    if (auto exec = transport::ServiceExecutorReserved::get(serviceContext)) {
-        if (auto status = exec->shutdown(getTimeout()); !status.isOK()) {
-            LOGV2(4907201, "Failed to shutdown ServiceExecutorReserved", "error"_attr = status);
+    forEachServiceExecutor(svcCtx, [&](ServiceExecutor* exec) {
+        const auto myTimeout = std::max(Milliseconds{0}, deadline - clock->now());
+        if (auto status = exec->shutdown(myTimeout); !status.isOK()) {
+            LOGV2(4907200,
+                  "Failed to shutdown ServiceExecutor",
+                  "executor"_attr = exec->getName(),
+                  "error"_attr = status);
         }
-    }
-
-    if (auto status =
-            transport::ServiceExecutorSynchronous::get(serviceContext)->shutdown(getTimeout());
-        !status.isOK()) {
-        LOGV2(4907200, "Failed to shutdown ServiceExecutorSynchronous", "error"_attr = status);
-    }
+    });
 }
 
 }  // namespace mongo::transport

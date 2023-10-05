@@ -60,7 +60,9 @@ public:
     void endSessionByClient(Client* client) override;
     void endAllSessionsNoTagMask();
 
-    Status start() override;
+    Status start() override {
+        return Status::OK();
+    }
     bool shutdown(Milliseconds timeout) override;
     bool shutdownAndWait(Milliseconds timeout);
     bool waitForNoSessions(Milliseconds timeout);
