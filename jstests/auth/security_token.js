@@ -57,13 +57,13 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
         assert.eq(usersCountDollar.n, 1, 'user1 should exist on tenant users collection');
 
         // Count again using unsigned tenant token.
-        conn._setSecurityToken(_createTenantToken(tenantID));
+        conn._setSecurityToken(_createTenantToken({tenant: tenantID}));
         const usersCountToken = assert.commandWorked(admin.runCommand(countUserCmd));
         assert.eq(usersCountToken.n, 1, 'user1 should exist on tenant users collection');
         conn._setSecurityToken(undefined);
 
         // Users without `useTenant` should not be able to use unsigned tenant tokens.
-        baseConn._setSecurityToken(_createTenantToken(tenantID));
+        baseConn._setSecurityToken(_createTenantToken({tenant: tenantID}));
         assert.commandFailed(baseAdmin.runCommand(countUserCmd));
         baseConn._setSecurityToken(undefined);
     } else {

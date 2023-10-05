@@ -578,7 +578,8 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 
     const tenantId = getTenantIdForDatabase(dbName);
     const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName, tenantId);
-    const securityToken = useSecurityToken ? _createTenantToken(ObjectId(tenantId)) : undefined;
+    const securityToken =
+        useSecurityToken ? _createTenantToken({tenant: ObjectId(tenantId)}) : undefined;
 
     // If the command is already prefixed, just run it
     if (isCmdObjWithTenantId(cmdObj)) {

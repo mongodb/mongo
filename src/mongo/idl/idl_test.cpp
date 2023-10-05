@@ -2536,7 +2536,8 @@ OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant) {
     request.body = obj;
 
     using VTS = auth::ValidatedTenancyScope;
-    request.validatedTenancyScope = VTS(std::move(tenant), VTS::TenantForTestingTag{});
+    request.validatedTenancyScope =
+        VTS(std::move(tenant), VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
     return request;
 }
 

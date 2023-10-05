@@ -72,6 +72,9 @@ namespace {
 const auto validatedTenancyScopeDecoration =
     OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
 
+const auto tenantProtocolHandle =
+    Client::declareDecoration<ValidatedTenancyScope::TenantProtocol>();
+
 // Signed auth tokens are for internal testing only, and require the use of a preshared key.
 // These tokens will have fixed values for kid/iss/aud fields.
 // This usage will be replaced by full OIDC processing at a later time.
@@ -149,6 +152,7 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData security
 
     IDLParserContext ctxt("securityToken");
     auto parsed = parseSignedToken(securityToken);
+    using TenantProtocol = ValidatedTenancyScope::TenantProtocol;
     // Unsigned tenantId provided via highly privileged connection will respect tenantId field only.
     if (parsed.signature.empty()) {
         auto* as = AuthorizationSession::get(client);
@@ -161,6 +165,22 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData security
                 "Unsigned security token must contain a tenantId",
                 jwt.getTenantId() != boost::none);
         _tenantOrUser = jwt.getTenantId().get();
+        _tenantProtocol = [&]() {
+            if (jwt.getExpectPrefix().has_value() && jwt.getExpectPrefix().value() == true) {
+                return TenantProtocol::kAtlasProxy;
+            }
+
+            return TenantProtocol::kDefault;
+        }();
+        if (client) {
+            const auto existingProtocol = (*client)[tenantProtocolHandle];
+            const auto newProtocol = _tenantProtocol;
+            massert(8154400,
+                    "Connection protocol can only change once.",
+                    existingProtocol == TenantProtocol::kUninitialized ||
+                        existingProtocol == newProtocol);
+            (*client)[tenantProtocolHandle] = newProtocol;
+        }
         return;
     }
 
@@ -213,6 +233,22 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, StringData security
 
     _tenantOrUser = std::move(swUserName.getValue());
     _expiration = jwt.getExpiration();
+    _tenantProtocol = [&]() {
+        if (jwt.getExpectPrefix().has_value() && jwt.getExpectPrefix().value() == true) {
+            return TenantProtocol::kAtlasProxy;
+        }
+
+        return TenantProtocol::kDefault;
+    }();
+    if (client) {
+        const auto existingProtocol = (*client)[tenantProtocolHandle];
+        const auto newProtocol = _tenantProtocol;
+        massert(8054401,
+                "Connection protocol can only change once.",
+                existingProtocol == TenantProtocol::kUninitialized ||
+                    existingProtocol == newProtocol);
+        (*client)[tenantProtocolHandle] = newProtocol;
+    }
 }
 
 ValidatedTenancyScope::ValidatedTenancyScope(Client* client, TenantId tenant)
@@ -281,15 +317,16 @@ void ValidatedTenancyScope::set(OperationContext* opCtx,
     validatedTenancyScopeDecoration(opCtx) = std::move(token);
 }
 
-
 ValidatedTenancyScope::ValidatedTenancyScope(const UserName& username,
                                              StringData secret,
+                                             ValidatedTenancyScope::TenantProtocol protocol,
                                              TokenForTestingTag tag)
-    : ValidatedTenancyScope(username, secret, Date_t::now() + kDefaultExpiration, tag) {}
+    : ValidatedTenancyScope(username, secret, Date_t::now() + kDefaultExpiration, protocol, tag) {}
 
 ValidatedTenancyScope::ValidatedTenancyScope(const UserName& username,
                                              StringData secret,
                                              Date_t expiration,
+                                             ValidatedTenancyScope::TenantProtocol protocol,
                                              TokenForTestingTag) {
     invariant(!secret.empty());
 
@@ -304,6 +341,7 @@ ValidatedTenancyScope::ValidatedTenancyScope(const UserName& username,
     body.setAudience(kTestOnlyAudience.toString());
     body.setTenantId(username.getTenant());
     body.setExpiration(std::move(expiration));
+    body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
 
     std::string payload = "{}.{}"_format(base64url::encode(tojson(header.toBSON())),
                                          base64url::encode(tojson(body.toBSON())));
@@ -319,13 +357,17 @@ ValidatedTenancyScope::ValidatedTenancyScope(const UserName& username,
                        base64url::encode(StringData(reinterpret_cast<const char*>(computed.data()),
                                                     computed.size())));
 
+    _tenantProtocol = protocol;
+
     if (gTestOnlyValidatedTenancyScopeKey == secret) {
         _tenantOrUser = username;
         _expiration = body.getExpiration();
     }
 }
 
-ValidatedTenancyScope::ValidatedTenancyScope(TenantId tenant, TenantForTestingTag) {
+ValidatedTenancyScope::ValidatedTenancyScope(TenantId tenant,
+                                             ValidatedTenancyScope::TenantProtocol protocol,
+                                             TenantForTestingTag) {
     crypto::JWSHeader header;
     header.setType("JWT"_sd);
     header.setAlgorithm("none"_sd);
@@ -337,10 +379,12 @@ ValidatedTenancyScope::ValidatedTenancyScope(TenantId tenant, TenantForTestingTa
     body.setAudience(std::string{"mongod-testing"});
     body.setTenantId(tenant);
     body.setExpiration(Date_t::max());
+    body.setExpectPrefix(protocol == ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
 
     _originalToken = "{}.{}."_format(base64url::encode(tojson(header.toBSON())),
                                      base64url::encode(tojson(body.toBSON())));
     _tenantOrUser = std::move(tenant);
+    _tenantProtocol = protocol;
 }
 
 }  // namespace mongo::auth

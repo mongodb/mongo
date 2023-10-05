@@ -100,9 +100,13 @@ protected:
         client = getServiceContext()->getService()->makeClient("test");
     }
 
-    std::string makeSecurityToken(const UserName& userName) {
+    std::string makeSecurityToken(const UserName& userName,
+                                  ValidatedTenancyScope::TenantProtocol protocol =
+                                      ValidatedTenancyScope::TenantProtocol::kDefault) {
         using VTS = auth::ValidatedTenancyScope;
-        return VTS(userName, "secret"_sd, VTS::TokenForTestingTag{}).getOriginalToken().toString();
+        return VTS(userName, "secret"_sd, protocol, VTS::TokenForTestingTag{})
+            .getOriginalToken()
+            .toString();
     }
 
     ServiceContext::UniqueClient client;
@@ -221,6 +225,48 @@ TEST_F(ValidatedTenancyScopeTestFixture, WrongScopeKey) {
                                 DBException,
                                 ErrorCodes::Unauthorized,
                                 "Token signature invalid");
+}
+
+TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenDoesNotExpectPrefix) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    auto kOid = OID::gen();
+    const TenantId kTenantId(kOid);
+    auto body = BSON("ping" << 1);
+    UserName user("user", "admin", kTenantId);
+    auto token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kDefault);
+    auto validated = ValidatedTenancyScope::create(client.get(), body, token);
+
+    ASSERT_TRUE(validated->tenantId() == kTenantId);
+    ASSERT_FALSE(validated->isFromAtlasProxy());
+
+    token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
+    ASSERT_THROWS_CODE(
+        ValidatedTenancyScope::create(client.get(), body, token), DBException, 8054401);
+}
+
+TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenHasPrefixExpectPrefix) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    auto kOid = OID::gen();
+    const TenantId kTenantId(kOid);
+    auto body = BSON("ping" << 1);
+    UserName user("user", "admin", kTenantId);
+    auto token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
+    auto validated = ValidatedTenancyScope::create(client.get(), body, token);
+
+    ASSERT_TRUE(validated->tenantId() == kTenantId);
+    ASSERT_TRUE(validated->isFromAtlasProxy());
+
+    token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kDefault);
+    ASSERT_THROWS_CODE(
+        ValidatedTenancyScope::create(client.get(), body, token), DBException, 8054401);
 }
 
 }  // namespace

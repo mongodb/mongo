@@ -116,6 +116,12 @@ structs:
                 type: tenant_id_hex
                 cpp_name: tenantId
                 optional: true
+            "mongodb/expectPrefix":
+                description: If TRUE, mongod will expect to receive tenant-prefixed database names,
+                    and should respond the same way.
+                type: safeBool
+                cpp_name: expectPrefix
+                optional: true
             nbf:
                 description: Time at which the JWT becomes valid. (Unix Epoch)
                 type: unixEpoch

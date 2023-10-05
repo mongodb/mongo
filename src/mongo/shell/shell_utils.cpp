@@ -469,23 +469,33 @@ BSONObj _createSecurityToken(const BSONObj& args, void* data) {
                 !argv[1].valueStringData().empty());
 
     using VTS = auth::ValidatedTenancyScope;
-    auto token =
-        VTS(UserName::parseFromBSON(argv[0]), argv[1].valueStringData(), VTS::TokenForTestingTag{});
+    auto token = VTS(UserName::parseFromBSON(argv[0]),
+                     argv[1].valueStringData(),
+                     VTS::TenantProtocol::kDefault,
+                     VTS::TokenForTestingTag{});
     return BSON("" << token.getOriginalToken());
 }
 
 /**
  * Generate an unsigned security token which contains a tenant component.
- * @param tenant OID - The tenantId.
+ * @param object - { tenant: OID, expectPrefix: bool }
  * @return string - Unsigned compact serialized JWS on an OIDC token.
  */
 BSONObj _createTenantToken(const BSONObj& args, void* data) {
     uassert(8039400,
-            "_createTenantToken requires an objectid",
-            (args.nFields() == 1) && (args.firstElement().type() == jstOID));
-
+            "_createTenantToken requires one argument, and it must be an object",
+            args.nFields() == 1 && args.firstElement().isABSONObj());
+    const auto obj = args.firstElement().Obj();
+    uassert(8154401,
+            "_createTenantToken requires field `tenant` of type ObjectId",
+            obj.hasField("tenant"_sd) && obj["tenant"_sd].type() == jstOID);
+    const auto tenant = TenantId::parseFromBSON(obj["tenant"_sd]);
+    const auto expectPrefix = obj["expectPrefix"].booleanSafe();
     using VTS = auth::ValidatedTenancyScope;
-    auto token = VTS(TenantId{args.firstElement().OID()}, VTS::TenantForTestingTag{});
+    const auto token =
+        VTS(tenant,
+            (expectPrefix ? VTS::TenantProtocol::kAtlasProxy : VTS::TenantProtocol::kDefault),
+            VTS::TenantForTestingTag{});
     return BSON("" << token.getOriginalToken());
 }
 

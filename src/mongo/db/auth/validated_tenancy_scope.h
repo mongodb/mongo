@@ -50,6 +50,8 @@ namespace auth {
 
 class ValidatedTenancyScope {
 public:
+    enum class TenantProtocol { kUninitialized = 0, kDefault, kAtlasProxy };
+
     ValidatedTenancyScope() = delete;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;
 
@@ -102,6 +104,14 @@ public:
         return _originalToken;
     }
 
+    /**
+     * Return true if the tenant protocol parsed from the mongodb/expectPrefix field is AtlasProxy.
+     * Atlas proxy is the only protocol with `expectPrefix` enabled.
+     */
+    bool isFromAtlasProxy() const {
+        return _tenantProtocol == TenantProtocol::kAtlasProxy;
+    }
+
     Date_t getExpiration() const {
         return _expiration;
     }
@@ -117,17 +127,21 @@ public:
      */
     struct TokenForTestingTag {};
     static constexpr Minutes kDefaultExpiration{15};
-    explicit ValidatedTenancyScope(const UserName& username, StringData secret, TokenForTestingTag);
+    explicit ValidatedTenancyScope(const UserName& username,
+                                   StringData secret,
+                                   TenantProtocol protocol,
+                                   TokenForTestingTag);
     explicit ValidatedTenancyScope(const UserName& username,
                                    StringData secret,
                                    Date_t expiration,
+                                   TenantProtocol protocol,
                                    TokenForTestingTag);
 
     /**
      * Setup a validated tenant for test, do not use outside of test code.
      */
     struct TenantForTestingTag {};
-    explicit ValidatedTenancyScope(TenantId tenant, TenantForTestingTag);
+    explicit ValidatedTenancyScope(TenantId tenant, TenantProtocol protocol, TenantForTestingTag);
 
     /**
      * Initializes a VTS object with original BSON only.
@@ -156,6 +170,10 @@ private:
     // It should only persist into construction within the shell,
     // where VTS is used for sending token data to a server via _originalBSON.
     stdx::variant<std::monostate, UserName, TenantId> _tenantOrUser;
+
+    // Define the protocol used by the connection to the server. It will only be set to AtlasProxy
+    // if the token received contains `expectPrefix` to true and will be changed only once.
+    TenantProtocol _tenantProtocol{TenantProtocol::kDefault};
 };
 
 }  // namespace auth

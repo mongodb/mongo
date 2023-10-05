@@ -1840,7 +1840,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     ASSERT_OK(createUser(kTenant2UserTest, {{"readWriteAnyDatabase", "admin"}}));
 
     {
-        VTS validatedTenancyScope(kTenant1UserTest, kVTSKey, VTS::TokenForTestingTag{});
+        VTS validatedTenancyScope(
+            kTenant1UserTest, kVTSKey, VTS::TenantProtocol::kDefault, VTS::TokenForTestingTag{});
 
         // Actual expiration used by AuthorizationSession will be the minimum of
         // the token's known expiraiton time and the expiration time passed in.
@@ -1863,7 +1864,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     }
 
     {
-        VTS validatedTenancyScope(kTenant1UserTest, kVTSKey, VTS::TokenForTestingTag{});
+        VTS validatedTenancyScope(
+            kTenant1UserTest, kVTSKey, VTS::TenantProtocol::kDefault, VTS::TokenForTestingTag{});
 
         // Perform authentication checks.
         VTS::set(_opCtx.get(), validatedTenancyScope);
@@ -1904,7 +1906,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
     // Create a new validated tenancy scope for the readWriteAny tenant user.
     {
-        VTS validatedTenancyScope(kTenant2UserTest, kVTSKey, VTS::TokenForTestingTag{});
+        VTS validatedTenancyScope(
+            kTenant2UserTest, kVTSKey, VTS::TenantProtocol::kDefault, VTS::TokenForTestingTag{});
         VTS::set(_opCtx.get(), validatedTenancyScope);
 
         ASSERT_OK(

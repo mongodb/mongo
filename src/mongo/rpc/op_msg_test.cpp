@@ -846,10 +846,12 @@ TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
 
     using VTS = auth::ValidatedTenancyScope;
     const auto kTenantId = TenantId(OID::gen());
-    const auto token =
-        VTS(UserName("user", "admin", kTenantId), "secret"_sd, VTS::TokenForTestingTag{})
-            .getOriginalToken()
-            .toString();
+    const auto token = VTS(UserName("user", "admin", kTenantId),
+                           "secret"_sd,
+                           VTS::TenantProtocol::kDefault,
+                           VTS::TokenForTestingTag{})
+                           .getOriginalToken()
+                           .toString();
     auto msg =
         OpMsgBytes{
             kNoFlags,  //
@@ -997,7 +999,7 @@ TEST(OpMsgRequestBuilder, WithVTS) {
     auto const body = fromjson("{ping: 1}");
 
     using VTS = auth::ValidatedTenancyScope;
-    VTS vts = VTS(tenantId, VTS::TenantForTestingTag{});
+    VTS vts = VTS(tenantId, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
     ASSERT(msg.validatedTenancyScope);
@@ -1021,7 +1023,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
 
     for (auto nonPrefixedTenantId :
          {false, true}) {  // tenantId supplied in the security token or $tenant.
-        VTS vts = VTS(tenantId, VTS::TenantForTestingTag{});
+        VTS vts = VTS(tenantId, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
 
         auto sc = SerializationContext::stateCommandRequest();
         sc.setTenantIdSource(nonPrefixedTenantId);
@@ -1055,7 +1057,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
 
     for (auto nonPrefixedTenantId :
          {false, true}) {  // tenantId supplied in the security token or $tenant.
-        VTS vts = VTS(tenantId, VTS::TenantForTestingTag{});
+        VTS vts = VTS(tenantId, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
 
         auto sc = SerializationContext::stateCommandRequest();
         sc.setPrefixState(false);
@@ -1092,7 +1094,7 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
 
     for (auto nonPrefixedTenantId :
          {false, true}) {  // tenantId supplied in the security token or $tenant.
-        VTS vts = VTS(tenantId, VTS::TenantForTestingTag{});
+        VTS vts = VTS(tenantId, VTS::TenantProtocol::kDefault, VTS::TenantForTestingTag{});
 
         auto sc = SerializationContext::stateCommandRequest();
         sc.setPrefixState(true);

@@ -152,6 +152,8 @@ TEST(JWKManager, validateTokenFromKeys) {
 
     ASSERT_BSONOBJ_EQ(validatedToken.getBodyBSON(), bodyBSON);
     ASSERT_BSONOBJ_EQ(validatedToken.getBody().toBSON(), body.toBSON());
+    ASSERT_TRUE(body.getTenantId() == boost::none);
+    ASSERT_FALSE(body.getExpectPrefix());
 }
 
 TEST(JWKManager, failsWithExpiredToken) {
@@ -183,6 +185,37 @@ TEST(JWKManager, failsWithModifiedHeaderForADifferentKey) {
     ASSERT_OK(manager.loadKeys());
     ASSERT_THROWS(JWSValidatedToken(&manager, modifiedToken), DBException);
 }
+
+// Serialization Header: { "typ": 'JWT', "alg": 'RS256', "kid": 'custom-key-2' }
+// Serialization Body: { "iss": "JWSCompactParserTest", "sub": "jwsParserTest1", "exp": 2147483647,
+//                      "aud": ["jwt@kernel.mongodb.com"],
+//                       "mongodb/tenantId": "636d957b2646ddfaf9b5e13f", "mongodb/expectPrefix":
+//                       true
+//                     }
+constexpr auto kTenancyTokenHeader =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImN1c3RvbS1rZXktMiJ9";
+constexpr auto kTenancyTokenBody =
+    "eyJpc3MiOiJKV1NDb21wYWN0UGFyc2VyVGVzdCIsInN1YiI6Imp3c1BhcnNlclRlc3QxIiwiZXhwIjoyMTQ3NDgzNjQ3LC"
+    "JhdWQiOlsiand0QGtlcm5lbC5tb25nb2RiLmNvbSJdLCJtb25nb2RiL3RlbmFudElkIjoiNjM2ZDk1N2IyNjQ2ZGRmYWY5"
+    "YjVlMTNmIiwibW9uZ29kYi9leHBlY3RQcmVmaXgiOnRydWV9";
+constexpr auto kTenancyTokenSignature =
+    "JlYD8ufBrzXCn6qStS8t6D6O3GFwoNjhAWiz7QbvuvSJiiHLWAJ3eVDop7NHV6Y276hkCu-1_"
+    "c0uyNQhuTpd902GFOxqtO6xNa5QQ04fEwBWMdRmmnggdrFntB2l1wrb7TDTStAqt5jKRyXARpqYaVfxf9wU_"
+    "QWs997SIqRTjyEopFdbc_-nyZ-ddy3RDZY17H6Gl1I3UaaeoJX1-5-sKkWbmBrDHp2S9SHnfr-mBZxSU7PPTE2zNVm6I-"
+    "CY8OAzS465iOjbD4-9NbHiNo4wWOPrLDOHtepxKkYFiAnbFISWZ85Vvxe8QbrxpuqxrPxEQEZGmIqXSjU4IXY2GDBo6Q";
+TEST(JWKManager, testTenancyExpectPrefix) {
+    auto tenancyToken =
+        kTenancyTokenHeader + "."_sd + kTenancyTokenBody + "."_sd + kTenancyTokenSignature;
+    BSONObj keys = getTestJWKSet();
+
+    auto bodyString = base64url::decode(kTenancyTokenBody);
+    BSONObj bodyBSON = fromjson(bodyString);
+    JWT body = JWT::parse(IDLParserContext("JWT"), bodyBSON);
+
+    ASSERT_TRUE(body.getTenantId() != boost::none);
+    ASSERT_TRUE(*body.getExpectPrefix());
+}
+
 #endif
 }  // namespace mongo::crypto
 
