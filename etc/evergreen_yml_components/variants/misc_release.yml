@@ -2187,6 +2187,7 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: external_auth_oidc_azure_TG
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_auth
   - name: .jstestfuzz .common
