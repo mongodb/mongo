@@ -158,7 +158,7 @@ checkpoint(void *arg)
             lock_writeunlock(session, &g.backup_lock);
 
         /* Verify the checkpoints. */
-        wts_verify_checkpoint(conn, ckpt_vrfy_name);
+        wts_verify_mirrors(conn, ckpt_vrfy_name, NULL);
 
         secs = mmrand(&g.extra_rnd, 5, 40);
     }

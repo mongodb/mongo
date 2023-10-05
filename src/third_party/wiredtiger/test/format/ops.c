@@ -959,9 +959,10 @@ ops(void *arg)
     uint32_t max_rows, ntries, range, rnd;
     u_int i, throttle_delay_max;
     const char *iso_config;
-    bool greater_than, intxn, prepared;
+    bool greater_than, intxn, prepared, mirrored_truncate;
 
     tinfo = arg;
+    mirrored_truncate = false;
 
     /*
      * Characterize the per-thread random number generator. Normally we want independent behavior so
@@ -1006,6 +1007,7 @@ ops(void *arg)
             __wt_sleep(throttle_delay / WT_MILLION, throttle_delay % WT_MILLION);
         }
 rollback_retry:
+        mirrored_truncate = false;
         if (tinfo->quit)
             break;
 
@@ -1302,7 +1304,9 @@ rollback_retry:
                 goto rollback;
             skip2 = table;
         }
-        if (ret == 0 && table->mirror)
+        if (ret == 0 && table->mirror) {
+            if (op == TRUNCATE)
+                mirrored_truncate = true;
             for (i = 1; i <= ntables; ++i)
                 if (tables[i] != skip1 && tables[i] != skip2 && tables[i]->mirror) {
                     tinfo->table = tables[i];
@@ -1313,6 +1317,7 @@ rollback_retry:
                     if (ret == WT_ROLLBACK)
                         break;
                 }
+        }
 skip_operation:
         table = tinfo->table = NULL;
 
@@ -1407,6 +1412,9 @@ rollback:
             snap_repeat_update(tinfo, false);
             break;
         }
+
+        if (mirrored_truncate)
+            wts_verify_mirrored_truncate(tinfo);
 
         intxn = false;
     }
