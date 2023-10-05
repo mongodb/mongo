@@ -56,10 +56,12 @@ let checkIndex = function(collName, expectedIndexNames) {
 
     checkIndex('user', ['_id_', 'xy']);
 
-    // Check that making the shard key compatible index hidden fails.
-    assert.commandFailedWithCode(
-        testDB.runCommand({collMod: 'user', index: {name: 'xy', hidden: true}}),
-        ErrorCodes.InvalidOptions);
+    if (jsTestOptions().mongosBinVersion != "last-lts") {
+        // Check that making the shard key compatible index hidden fails.
+        assert.commandFailedWithCode(
+            testDB.runCommand({collMod: 'user', index: {name: 'xy', hidden: true}}),
+            ErrorCodes.InvalidOptions);
+    }
 
     assert.commandWorked(testDB.runCommand({drop: 'user'}));
 })();

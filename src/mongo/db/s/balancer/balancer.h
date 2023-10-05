@@ -269,6 +269,11 @@ private:
                                                      const DefragmentationActionResponse& response,
                                                      ActionsStreamPolicy* policy);
 
+    /**
+     * Disables the balancer for a collection by setting `noBalance` to true.
+     */
+    void _disableBalancer(OperationContext* opCtx, NamespaceString nss);
+
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
 
