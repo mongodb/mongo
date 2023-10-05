@@ -148,6 +148,12 @@ public:
         repl::ReadConcernLevel readConcern,
         const BSONObj& sort = BSONObj()) override;
 
+    std::vector<NamespaceString> getUnsplittableCollectionNamespacesForDbOutsideOfShards(
+        OperationContext* opCtx,
+        const DatabaseName& dbName,
+        const std::vector<ShardId>& excludedShards,
+        repl::ReadConcernLevel readConcern) override;
+
     StatusWith<std::vector<DatabaseName>> getDatabasesForShard(OperationContext* opCtx,
                                                                const ShardId& shardName) override;
 

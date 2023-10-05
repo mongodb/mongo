@@ -98,7 +98,7 @@ private:
      * Returns the list of unsharded collections for the given database. These are the collections
      * the recipient is expected to clone.
      */
-    std::vector<NamespaceString> getUnshardedCollections(OperationContext* opCtx) const;
+    std::vector<NamespaceString> getCollectionsToClone(OperationContext* opCtx) const;
 
     /**
      * Ensures that there are no orphaned collections in the recipient's catalog data, asserting

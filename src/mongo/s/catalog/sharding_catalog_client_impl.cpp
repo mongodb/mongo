@@ -349,6 +349,75 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
+AggregateCommandRequest makeUnsplittableCollectionsDataShardAggregation(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const std::vector<ShardId>& excludedShards) {
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, CollectionType::ConfigNS);
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
+                                                           std::vector<BSONObj>()};
+    resolvedNamespaces[NamespaceString::kConfigsvrChunksNamespace.coll()] = {
+        NamespaceString::kConfigsvrChunksNamespace, std::vector<BSONObj>()};
+    expCtx->setResolvedNamespaces(resolvedNamespaces);
+
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+
+    Pipeline::SourceContainer stages;
+
+    // 1. Match config.collections entries with database name = dbName
+    // {
+    //     $match: {
+    //         _id: {$regex: dbName.*, unsplittable: true}
+    //     }
+    // }
+    const auto db =
+        DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest());
+    stages.emplace_back(DocumentSourceMatch::create(
+        BSON(CollectionType::kNssFieldName << BSON("$regex"
+                                                   << "^{}\\."_format(pcre_util::quoteMeta(db)))
+                                           << CollectionType::kUnsplittableFieldName << true),
+        expCtx));
+
+    // 2. Retrieve config.chunks entries with the same uuid as the one from the
+    // config.collections document.
+    //
+    // The $lookup stage gets the config.chunks documents and puts them in a field called
+    // "chunks" in the document produced during stage 1.
+    //
+    // {
+    //      $lookup: {
+    //          from: "chunks",
+    //          as: "chunks",
+    //          localField: "uuid",
+    //          foreignField: "uuid"
+    //      }
+    // }
+    const Doc lookupPipeline{{"from", NamespaceString::kConfigsvrChunksNamespace.coll()},
+                             {"as", "chunks"_sd},
+                             {"localField", CollectionType::kUuidFieldName},
+                             {"foreignField", CollectionType::kUuidFieldName}};
+
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup", lookupPipeline}}.toBson().firstElement(), expCtx));
+
+    // 3. Filter only the collection entries where the chunk has the shard field equal to shardId.
+    // {
+    //      $match: {
+    //          chunks.shard: {$nin: <excludedShards>}
+    //      }
+    // }
+    BSONObjBuilder ninBuilder;
+    ninBuilder.append("$nin", excludedShards);
+    stages.emplace_back(
+        DocumentSourceMatch::create(Doc{{"chunks.shard", ninBuilder.obj()}}.toBson(), expCtx));
+
+    auto pipeline = Pipeline::create(std::move(stages), expCtx);
+    auto serializedPipeline = pipeline->serializeToBson();
+    return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
+}
+
 /**
  * Returns keys for the given purpose and have an expiresAt value greater than newerThanThis on the
  * given shard.
@@ -732,6 +801,27 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getUnsplittableCollectio
     }
 
     return collections;
+}
+
+std::vector<NamespaceString>
+ShardingCatalogClientImpl::getUnsplittableCollectionNamespacesForDbOutsideOfShards(
+    OperationContext* opCtx,
+    const DatabaseName& dbName,
+    const std::vector<ShardId>& excludedShards,
+    repl::ReadConcernLevel readConcern) {
+    auto aggRequest =
+        makeUnsplittableCollectionsDataShardAggregation(opCtx, dbName, excludedShards);
+    std::vector<BSONObj> collectionEntries =
+        Grid::get(opCtx)->catalogClient()->runCatalogAggregation(
+            opCtx, aggRequest, repl::ReadConcernArgs(readConcern));
+    std::vector<NamespaceString> collectionNames;
+    collectionNames.reserve(collectionEntries.size());
+    for (const auto& coll : collectionEntries) {
+        auto nssField = coll.getField(CollectionType::kNssFieldName);
+        collectionNames.push_back(NamespaceStringUtil::deserialize(
+            boost::none, nssField.String(), SerializationContext::stateDefault()));
+    }
+    return collectionNames;
 }
 
 StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContext* opCtx,
