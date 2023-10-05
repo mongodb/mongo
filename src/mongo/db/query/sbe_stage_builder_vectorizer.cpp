@@ -249,14 +249,18 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
             if (!lambdaArg.expr.has_value()) {
                 return lambdaArg;
             }
-            return {makeLet(lambda->varName(),
-                            std::move(*argument.expr),
-                            makeABTFunction("cellFoldValues_F"_sd,
-                                            std::move(*lambdaArg.expr),
-                                            makeVariable(*argument.sourceCell))),
-                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
-                        .include(argument.typeSignature.intersect(TypeSignature::kNothingType)),
-                    {}};
+            // TODO: if the body of the lambda is just a scalar constant, create a block
+            // of the same size of the block argument filled with that value.
+            if (TypeSignature::kBlockType.isSubset(lambdaArg.typeSignature)) {
+                return {makeLet(lambda->varName(),
+                                std::move(*argument.expr),
+                                makeABTFunction("cellFoldValues_F"_sd,
+                                                std::move(*lambdaArg.expr),
+                                                makeVariable(*argument.sourceCell))),
+                        TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                            .include(argument.typeSignature.intersect(TypeSignature::kNothingType)),
+                        {}};
+            }
         }
     }
 
