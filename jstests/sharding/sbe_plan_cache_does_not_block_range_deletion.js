@@ -7,6 +7,8 @@
  *   # SBE is not yet used for clustered collections, and this test centers on the behavior of the
  *   # SBE plan cache.
  *   expects_explicit_underscore_id_index,
+ *   # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   cqf_incompatible,
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

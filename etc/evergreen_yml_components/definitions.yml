@@ -8761,6 +8761,15 @@ tasks:
       suite: cqf_experimental_no_passthrough
       use_large_distro: "true"
 
+- <<: *gen_task_template
+  name: cqf_experimental_sharding_passthrough_gen
+  tags: [cqf]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: cqf_experimental_sharding_passthrough
+      use_large_distro: "true"
+
 - <<: *task_template
   name: streams
   tags: []

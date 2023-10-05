@@ -5,6 +5,8 @@
  *  @tags: [
  *   # The SBE plan cache was enabled by default in 6.3.
  *   requires_fcv_63,
+ *  # TODO SERVER-67607: Test plan cache with CQF enabled.
+ *   cqf_incompatible,
  * ]
  */
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
