@@ -880,9 +880,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     } else {
         // Clear match expression auto-parameterization by setting max param count to zero before
         // CQ to ABT translation
-        if (!feature_flags::gFeatureFlagOptimizerPlanCache.isEnabled(
-                serverGlobalParams.featureCompatibility))
-            MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
+        MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
         abt = translateCanonicalQueryToABT(
             metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId);
     }
