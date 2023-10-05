@@ -163,7 +163,7 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
     WT_RET(__wt_config_gets(session, cfg, "get", &cval));
     if (WT_STRING_MATCH("all_durable", cval.str, cval.len)) {
         /*
-         * If there is durable timestamp set, there is nothing to return. No need to walk the
+         * If there is no durable timestamp set, there is nothing to return. No need to walk the
          * concurrent transactions.
          */
         if (!txn_global->has_durable_timestamp) {
