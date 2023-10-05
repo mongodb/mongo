@@ -109,13 +109,17 @@ ABT translatePipeline(const Metadata& metadata,
                       ProjectionName scanProjName,
                       std::string scanDefName,
                       PrefixId& prefixId,
-                      const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
+                      const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss,
+                      bool parameterized) {
     auto opCtx = cc().makeOperationContext();
     auto pipeline =
         parsePipeline(NamespaceString::createNamespaceString_forTest("a." + scanDefName),
                       pipelineStr,
                       *opCtx,
                       involvedNss);
+    if (parameterized)
+        MatchExpression::parameterize(
+            dynamic_cast<DocumentSourceMatch*>(pipeline.get()->peekFront())->getMatchExpression());
     return translatePipelineToABT(metadata,
                                   *pipeline.get(),
                                   scanProjName,
@@ -357,24 +361,39 @@ std::string ABTGoldenTestFixture::testABTTranslationAndOptimization(
  */
 std::string ABTGoldenTestFixture::testParameterizedABTTranslation(StringData variationName,
                                                                   StringData findCmd,
+                                                                  StringData pipelineStr,
                                                                   std::string scanDefName,
                                                                   Metadata metadata) {
-
     auto&& stream = _ctx->outStream();
 
-    formatGoldenTestHeader(variationName, "", findCmd, scanDefName, {}, metadata, stream);
-
-    auto opCtx = makeOperationContext();
-    auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(findCmd));
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
+    bool isFindCmd = findCmd != "";
+    formatGoldenTestHeader(variationName,
+                           isFindCmd ? "" : pipelineStr,
+                           isFindCmd ? findCmd : "",
+                           scanDefName,
+                           {},
+                           metadata,
+                           stream);
     auto prefixId = PrefixId::createForTests();
 
-    return formatGoldenTestExplain(translateCanonicalQueryToABT(metadata,
-                                                                *statusWithCQ.getValue(),
-                                                                ProjectionName{"test"},
-                                                                make<ScanNode>("test", "test"),
-                                                                prefixId),
-                                   stream);
+    // Query is find command.
+    if (isFindCmd) {
+        auto opCtx = makeOperationContext();
+        auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(findCmd));
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
+        ASSERT_OK(statusWithCQ.getStatus());
+
+        return formatGoldenTestExplain(translateCanonicalQueryToABT(metadata,
+                                                                    *statusWithCQ.getValue(),
+                                                                    ProjectionName{"test"},
+                                                                    make<ScanNode>("test", "test"),
+                                                                    prefixId),
+                                       stream);
+    }
+
+    // Query is aggregation pipeline.
+    ABT translated = translatePipeline(
+        metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, {}, true);
+    return formatGoldenTestExplain(translated, stream);
 }
 }  // namespace mongo::optimizer

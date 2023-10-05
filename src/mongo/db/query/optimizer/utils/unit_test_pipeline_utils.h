@@ -56,7 +56,8 @@ ABT translatePipeline(const Metadata& metadata,
                       ProjectionName scanProjName,
                       std::string scanDefName,
                       PrefixId& prefixId,
-                      const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
+                      const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {},
+                      bool parameterized = false);
 
 void formatGoldenTestHeader(StringData variationName,
                             StringData pipelineStr,
@@ -97,7 +98,8 @@ protected:
         const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
 
     std::string testParameterizedABTTranslation(StringData variationName,
-                                                StringData findCmd,
+                                                StringData findCmd = "",
+                                                StringData pipelineStr = "",
                                                 std::string scanDefName = "collection",
                                                 Metadata metadata = {
                                                     {{"collection", createScanDef({}, {})}}});
