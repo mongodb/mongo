@@ -3344,6 +3344,7 @@ tasks:
     vars:
       suite: pretty-printer-tests
       install_dir: build/install/dist-test/bin
+      exec_timeout_secs: 1800 # 30 min timeout.
 
 
 ## run_unittests with UndoDB live-record ##
