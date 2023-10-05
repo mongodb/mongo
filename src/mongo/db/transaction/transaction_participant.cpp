@@ -2078,9 +2078,10 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
     }
 }
 
-void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx) {
+void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx,
+                                                                    bool isSplitPreparedTxn) {
     invariant(opCtx->getWriteUnitOfWork());
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(opCtx->lockState()->isRSTLLocked() || isSplitPreparedTxn);
     opCtx->getWriteUnitOfWork()->commit();
     opCtx->setWriteUnitOfWork(nullptr);
 
@@ -2097,7 +2098,7 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
     OperationContext* userOpCtx,
     repl::SplitPrepareSessionManager* splitPrepareManager,
     const Timestamp& commitTimestamp,
-    const Timestamp& durableTimestamp) {
+    const Timestamp& durableTimestamp) noexcept {
 
     const auto& userSessionId = _sessionId();
     const auto& userTxnNumber = o().activeTxnNumberAndRetryCounter.getTxnNumber();
@@ -2133,12 +2134,10 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
         newTxnParticipant.beginOrContinueTransactionUnconditionally(
             splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
 
-        // This function is called while userOpCtx's lockState is under an UninterruptibleLockGuard,
-        // because once entering "committing with prepare" we cannot throw an exception, and
-        // therefore our lock acquisitions cannot be interruptible. We need to set an
-        // UninterruptibleLockGuard on newTxnParticipant's locker (this will be swapped into
-        // splitOpCtx's locker in unstashTransactionResources) in order to prevent the split
-        // transaction's lock acquisitions from being interruptible.
+        // We cannot throw exceptions in the middle of committing multiple split transactions,
+        // and therefore our lock acquisitions cannot be interruptible. We also must set the
+        // UninterruptibleLockGuard before unstashTransactionResources because this function
+        // can throw when reacquiring locks and tickets.
         UninterruptibleLockGuard noInterrupt(                   // NOLINT
             newTxnParticipant.o().txnResourceStash->locker());  // NOLINT
         newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "commitTransaction");
@@ -2147,8 +2146,11 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
         splitOpCtx->recoveryUnit()->setDurableTimestamp(durableTimestamp);
 
         {
-            Lock::GlobalLock rstl(splitOpCtx.get(), LockMode::MODE_IX);
-            newTxnParticipant._commitStorageTransaction(splitOpCtx.get());
+            // Commit the storage transaction. We do not need to acquire RSTL here since the
+            // original transaction is already holding RSTL in IX mode. We also should not
+            // try to acquire RSTL again because that could deadlock with stepdown.
+            newTxnParticipant._commitStorageTransaction(splitOpCtx.get(),
+                                                        true /* isSplitPreparedTxn */);
             auto operationCount = newTxnParticipant.p().transactionOperations.numOperations();
             auto oplogOperationBytes =
                 newTxnParticipant.p().transactionOperations.getTotalOperationBytes();
@@ -2264,7 +2266,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
     auto* splitPrepareManager =
         repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
-    bool isSplitPreparedTxn = opCtx->writesAreReplicated() &&
+    bool haveSplitPreparedTxns = opCtx->writesAreReplicated() &&
         splitPrepareManager->isSessionSplit(_sessionId(),
                                             o().activeTxnNumberAndRetryCounter.getTxnNumber());
 
@@ -2286,7 +2288,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
         // If we are a primary aborting a transaction that was split into smaller prepared
         // transactions, cascade the abort.
-        if (isSplitPreparedTxn) {
+        if (haveSplitPreparedTxns) {
             _abortSplitPreparedTxnOnPrimary(opCtx, splitPrepareManager);
         }
 
@@ -2324,7 +2326,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
         // is not cleaning up some internal TransactionParticipant state, updating metrics, or
         // logging the end of the transaction. That will either be cleaned up in the
         // ServiceEntryPoint's abortGuard or when the next transaction begins.
-        invariant(!isSplitPreparedTxn);
+        invariant(!haveSplitPreparedTxns);
         _cleanUpTxnResourceOnOpCtx(opCtx, TerminationCause::kAborted);
         opObserver->onTransactionAbort(opCtx, boost::none);
         _finishAbortingActiveTransaction(opCtx, expectedStates);
@@ -2332,7 +2334,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 }
 
 void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
-    OperationContext* userOpCtx, repl::SplitPrepareSessionManager* splitPrepareManager) {
+    OperationContext* userOpCtx, repl::SplitPrepareSessionManager* splitPrepareManager) noexcept {
 
     const auto& userSessionId = _sessionId();
     const auto& userTxnNumber = o().activeTxnNumberAndRetryCounter.getTxnNumber();
@@ -2361,8 +2363,24 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
             TransactionParticipant::get(splitOpCtx.get());
         newTxnParticipant.beginOrContinueTransactionUnconditionally(
             splitOpCtx.get(), {*(splitOpCtx->getTxnNumber())});
+
+        // We cannot throw exceptions in the middle of aborting multiple split transactions,
+        // and therefore our lock acquisitions cannot be interruptible. We also must set the
+        // UninterruptibleLockGuard before unstashTransactionResources because this function
+        // can throw when reacquiring locks and tickets.
+        UninterruptibleLockGuard noInterrupt(                   // NOLINT
+            newTxnParticipant.o().txnResourceStash->locker());  // NOLINT
         newTxnParticipant.unstashTransactionResources(splitOpCtx.get(), "abortTransaction");
-        newTxnParticipant.abortTransaction(splitOpCtx.get());
+
+        {
+            // Abort the storage transaction. We do not need to acquire RSTL here since the
+            // original transaction is already holding RSTL in IX mode. We also should not
+            // try to acquire RSTL again because that could deadlock with stepdown.
+            newTxnParticipant._cleanUpTxnResourceOnOpCtx(
+                splitOpCtx.get(), TerminationCause::kAborted, true /* isSplitPreparedTxn */);
+            newTxnParticipant._finishAbortingActiveTransaction(splitOpCtx.get(),
+                                                               TransactionState::kPrepared);
+        }
 
         checkedOutSession->checkIn(splitOpCtx.get(), OperationContextSession::CheckInReason::kDone);
     }
@@ -2434,7 +2452,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
 }
 
 void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
-    OperationContext* opCtx, TerminationCause terminationCause) {
+    OperationContext* opCtx, TerminationCause terminationCause, bool isSplitPreparedTxn) {
     // Log the transaction if its duration is longer than the slowMS command threshold.
     _logSlowTransaction(
         opCtx,
@@ -2445,10 +2463,13 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
 
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
     if (opCtx->getWriteUnitOfWork()) {
-        // We could have failed trying to get the initial global lock; in that case we will have a
-        // WriteUnitOfWork but not have allocated the storage transaction.  That is the only case
-        // where it is legal to abort a unit of work without the RSTL.
-        invariant(opCtx->lockState()->isRSTLLocked() || !opCtx->recoveryUnit()->isActive());
+        // There are two cases that are legal to abort a unit of work without RSTL:
+        // 1. We are aborting a split prepared transaction, in which case the RSTL is held by
+        //    the original prepared transaction.
+        // 2. We have failed trying to get the initial global lock, in which case we will have
+        //    a WriteUnitOfWork but not have allocated the storage transaction.
+        invariant(opCtx->lockState()->isRSTLLocked() || isSplitPreparedTxn ||
+                  !opCtx->recoveryUnit()->isActive());
         opCtx->setWriteUnitOfWork(nullptr);
     }
 
