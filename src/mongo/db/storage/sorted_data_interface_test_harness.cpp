@@ -58,7 +58,7 @@ auto SortedDataInterfaceHarnessHelper::newSortedDataInterface(
         toInsert.begin(), toInsert.end(), IndexEntryComparison(Ordering::make(BSONObj()))));
 
     auto index = newSortedDataInterface(unique, partial);
-    auto client = serviceContext()->makeClient("insertToIndex");
+    auto client = serviceContext()->getService()->makeClient("insertToIndex");
     auto opCtx = newOperationContext(client.get());
     Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
     insertToIndex(opCtx.get(), index.get(), toInsert);

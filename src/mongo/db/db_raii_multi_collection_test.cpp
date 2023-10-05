@@ -66,7 +66,7 @@ public:
         ClientAndCtx;
 
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
-        auto client = getServiceContext()->makeClient(clientName);
+        auto client = getServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
         client->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
         return std::make_pair(std::move(client), std::move(opCtx));

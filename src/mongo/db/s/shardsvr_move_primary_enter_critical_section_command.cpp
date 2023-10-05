@@ -93,7 +93,7 @@ public:
                 // Using the original operation context, the two write operations to enter the
                 // critical section (acquire and promote) would use the same txnNumber, which would
                 // cause the failure of the second operation.
-                auto newClient = getGlobalServiceContext()->makeClient(
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
                     "ShardsvrMovePrimaryEnterCriticalSection");
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(

@@ -177,7 +177,7 @@ TEST_F(LockerImplTest, FailPointInLockFailsGlobalNonIntentLocksIfTheyCannotBeImm
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
-    auto newClient = getServiceContext()->makeClient("userClient", session);
+    auto newClient = getServiceContext()->getService()->makeClient("userClient", session);
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
 
@@ -205,7 +205,7 @@ TEST_F(LockerImplTest, FailPointInLockFailsNonIntentLocksIfTheyCannotBeImmediate
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
-    auto newClient = getServiceContext()->makeClient("userClient", session);
+    auto newClient = getServiceContext()->getService()->makeClient("userClient", session);
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
 

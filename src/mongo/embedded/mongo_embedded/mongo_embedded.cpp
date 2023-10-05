@@ -199,7 +199,8 @@ struct mongo_embedded_v1_client {
 
     explicit mongo_embedded_v1_client(mongo_embedded_v1_instance* const db)
         : parent_db(db),
-          client(db->serviceContext->makeClient("embedded", db->transportLayer->createSession())) {
+          client(db->serviceContext->getService()->makeClient(
+              "embedded", db->transportLayer->createSession())) {
         this->parent_db->clientCount.addAndFetch(1);
     }
 

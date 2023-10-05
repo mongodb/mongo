@@ -80,8 +80,8 @@ void releaseCriticalSectionInEmptySession(OperationContext* opCtx,
                                           const BSONObj& reason) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     if (txnParticipant) {
-        auto newClient =
-            getGlobalServiceContext()->makeClient("ShardsvrMovePrimaryExitCriticalSection");
+        auto newClient = getGlobalServiceContext()->getService()->makeClient(
+            "ShardsvrMovePrimaryExitCriticalSection");
         AlternativeClientRegion acr(newClient);
         auto newOpCtx = CancelableOperationContext(
             cc().makeOperationContext(),

@@ -151,7 +151,7 @@ std::shared_ptr<const repl::HelloResponse> awaitHelloWithNewOpCtx(
     TopologyVersion topologyVersion,
     const repl::SplitHorizon::Parameters& horizonParams,
     Date_t deadline) {
-    auto newClient = getGlobalServiceContext()->makeClient("awaitIsHello");
+    auto newClient = getGlobalServiceContext()->getService()->makeClient("awaitIsHello");
     auto newOpCtx = newClient->makeOperationContext();
     return replCoord->awaitHelloResponse(newOpCtx.get(), horizonParams, topologyVersion, deadline);
 }
@@ -414,7 +414,7 @@ TEST_F(ReplCoordTest,
 
 void doReplSetInitiate(ReplicationCoordinatorImpl* replCoord, Status* status) {
     BSONObjBuilder garbage;
-    auto client = getGlobalServiceContext()->makeClient("rsi");
+    auto client = getGlobalServiceContext()->getService()->makeClient("rsi");
     auto opCtx = client->makeOperationContext();
     *status =
         replCoord->processReplSetInitiate(opCtx.get(),
@@ -1070,7 +1070,7 @@ public:
     ReplicationAwaiter(ReplicationCoordinatorImpl* replCoord, ServiceContext* service)
         : _replCoord(replCoord),
           _service(service),
-          _client(service->makeClient("replAwaiter")),
+          _client(service->getService()->makeClient("replAwaiter")),
           _opCtx(_client->makeOperationContext()),
           _finished(false),
           _result(ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0))) {}
@@ -1569,7 +1569,7 @@ protected:
     struct SharedClientAndOperation {
         static SharedClientAndOperation make(ServiceContext* serviceContext) {
             SharedClientAndOperation result;
-            result.client = serviceContext->makeClient("StepDownThread");
+            result.client = serviceContext->getService()->makeClient("StepDownThread");
             result.opCtx = result.client->makeOperationContext();
             return result;
         }
@@ -5519,7 +5519,7 @@ TEST_F(ReplCoordTest,
 }
 
 void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status, bool force = false) {
-    auto client = getGlobalServiceContext()->makeClient("rsr");
+    auto client = getGlobalServiceContext()->getService()->makeClient("rsr");
     auto opCtx = client->makeOperationContext();
 
     BSONObjBuilder garbage;
@@ -5671,7 +5671,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
 }
 
 void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* status, bool force) {
-    auto client = getGlobalServiceContext()->makeClient("rsr");
+    auto client = getGlobalServiceContext()->getService()->makeClient("rsr");
     auto opCtx = client->makeOperationContext();
 
     BSONObjBuilder garbage;

@@ -239,7 +239,7 @@ protected:
     }
 
     void runFunctionFromDifferentOpCtx(std::function<void(OperationContext*)> func) {
-        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
         AlternativeClientRegion acr(newClientOwned);
         auto newOpCtx = cc().makeOperationContext();
         func(newOpCtx.get());

@@ -58,7 +58,7 @@ namespace {
 std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
                                                  const std::string& path,
                                                  ClockSource* clockSource) {
-    auto client = serviceContext->makeClient("myClient");
+    auto client = serviceContext->getService()->makeClient("myClient");
     auto opCtx = serviceContext->makeOperationContext(client.get());
     return std::make_unique<WiredTigerKVEngine>(
         opCtx.get(),
@@ -78,7 +78,7 @@ public:
     void setUp() override {
         setGlobalServiceContext(ServiceContext::make());
         auto serviceContext = getGlobalServiceContext();
-        client = serviceContext->makeClient("myClient");
+        client = serviceContext->getService()->makeClient("myClient");
         opCtx = serviceContext->makeOperationContext(client.get());
         kvEngine = makeKVEngine(serviceContext, home.path(), &cs);
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit()),

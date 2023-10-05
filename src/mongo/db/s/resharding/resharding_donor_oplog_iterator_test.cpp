@@ -195,7 +195,7 @@ public:
     }
 
     ServiceContext::UniqueClient makeKillableClient() {
-        auto client = getServiceContext()->makeClient("ReshardingDonorOplogIterator");
+        auto client = getServiceContext()->getService()->makeClient("ReshardingDonorOplogIterator");
         return client;
     }
 
@@ -286,7 +286,7 @@ TEST_F(ReshardingDonorOplogIterTest, ExhaustWithIncomingInserts) {
         Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override {
             ++numCalls;
 
-            auto client = _serviceContext->makeClient("onAwaitInsertCalled");
+            auto client = _serviceContext->getService()->makeClient("onAwaitInsertCalled");
             AlternativeClientRegion acr(client);
             auto opCtx = cc().makeOperationContext();
             _onAwaitInsertCalled(opCtx.get(), numCalls);

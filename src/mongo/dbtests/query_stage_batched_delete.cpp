@@ -387,7 +387,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsDeletedWriteConflict
     auto serviceContext = getGlobalServiceContext();
 
     // Issue the batched delete through different client than the default _client test member.
-    auto batchedDeleteClient = serviceContext->makeClient("batchedDeleteClient");
+    auto batchedDeleteClient = serviceContext->getService()->makeClient("batchedDeleteClient");
     auto batchedDeleteOpCtx = batchedDeleteClient->makeOperationContext();
     boost::intrusive_ptr<ExpressionContext> batchedDeleteExpCtx =
         make_intrusive<ExpressionContext>(batchedDeleteOpCtx.get(), nullptr, nss);
@@ -522,7 +522,7 @@ TEST_F(QueryStageBatchedDeleteTest, BatchedDeleteStagedDocIsUpdatedToNotMatchCli
     auto serviceContext = getGlobalServiceContext();
 
     // Issue the batched delete through different client than the default _client test member.
-    auto batchedDeleteClient = serviceContext->makeClient("batchedDeleteClient");
+    auto batchedDeleteClient = serviceContext->getService()->makeClient("batchedDeleteClient");
     auto batchedDeleteOpCtx = batchedDeleteClient->makeOperationContext();
     boost::intrusive_ptr<ExpressionContext> batchedDeleteExpCtx =
         make_intrusive<ExpressionContext>(batchedDeleteOpCtx.get(), nullptr, nss);

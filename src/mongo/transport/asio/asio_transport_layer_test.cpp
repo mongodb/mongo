@@ -1026,7 +1026,7 @@ public:
         svcCtx->setTransportLayer(std::move(tl));
 
         _connThread = std::make_unique<ConnectionThread>(listenerPort);
-        _client = svcCtx->makeClient("NetworkBatonTest", pf.future.get());
+        _client = svcCtx->getService()->makeClient("NetworkBatonTest", pf.future.get());
     }
 
     void tearDown() override {

@@ -119,8 +119,8 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
     if (collectionUUID) {
         // The multi-document remove command cannot be run in  transactions, so run it using
         // an alternative client.
-        auto newClient = opCtx->getServiceContext()->makeClient("removeRangeDeletions-" +
-                                                                collectionUUID->toString());
+        auto newClient =
+            opCtx->getService()->makeClient("removeRangeDeletions-" + collectionUUID->toString());
         AlternativeClientRegion acr{newClient};
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

@@ -1466,7 +1466,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (Client::getCurrent()) {
         oldClient = Client::releaseCurrent();
     }
-    Client::setCurrent(serviceContext->makeClient("shutdownTask"));
+    Client::setCurrent(serviceContext->getService()->makeClient("shutdownTask"));
     const auto client = Client::getCurrent();
     {
         stdx::lock_guard<Client> lk(*client);

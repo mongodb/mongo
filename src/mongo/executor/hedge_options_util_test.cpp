@@ -104,7 +104,8 @@ protected:
 
 private:
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
-    ServiceContext::UniqueClient _client = _serviceCtx->makeClient("RemoteCommandRequestTest");
+    ServiceContext::UniqueClient _client =
+        _serviceCtx->getService()->makeClient("RemoteCommandRequestTest");
 };
 
 TEST_F(HedgeOptionsUtilTestFixture, ExplicitOperationHedging) {

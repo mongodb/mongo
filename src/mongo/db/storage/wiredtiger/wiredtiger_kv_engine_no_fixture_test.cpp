@@ -111,7 +111,7 @@ private:
 std::unique_ptr<WiredTigerKVEngine> makeKVEngine(ServiceContext* serviceContext,
                                                  const std::string& path,
                                                  ClockSource* clockSource) {
-    auto client = serviceContext->makeClient("myclient");
+    auto client = serviceContext->getService()->makeClient("myclient");
     auto opCtx = serviceContext->makeOperationContext(client.get());
     return std::make_unique<WiredTigerKVEngine>(
         opCtx.get(),
@@ -187,7 +187,7 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Create an OperationContext with the WiredTigetRecoveryUnit.
     serviceContext->registerClientObserver(std::make_unique<KVTestClientObserver>(kvEngine.get()));
-    auto client = serviceContext->makeClient("myclient");
+    auto client = serviceContext->getService()->makeClient("myclient");
     auto opCtx = serviceContext->makeOperationContext(client.get());
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");

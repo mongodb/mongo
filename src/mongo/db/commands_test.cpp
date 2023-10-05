@@ -432,7 +432,7 @@ public:
         _authzManager->setAuthEnabled(true);
 
         _session = _transportLayer.createSession();
-        _client = getServiceContext()->makeClient("testClient", _session);
+        _client = getServiceContext()->getService()->makeClient("testClient", _session);
         _registry = getCommandRegistry(_client->getService());
         _authzSession = AuthorizationSession::get(_client.get());
 

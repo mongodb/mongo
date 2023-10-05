@@ -1091,7 +1091,7 @@ TEST_F(ReshardingTxnClonerTest,
 
     // Make two in progress transactions so the one started by resharding must block.
     {
-        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
         AlternativeClientRegion acr(newClientOwned);
         auto newOpCtx = cc().makeOperationContext();
         makeInProgressTxn(newOpCtx.get(),
@@ -1193,7 +1193,7 @@ TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnInProgressInternalTxnFor
 
     // Make two in progress transactions so the one started by resharding must block.
     {
-        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
         AlternativeClientRegion acr(newClientOwned);
         auto newOpCtx = cc().makeOperationContext();
         makeInProgressTxn(newOpCtx.get(),

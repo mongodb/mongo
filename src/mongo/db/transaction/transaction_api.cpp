@@ -468,7 +468,7 @@ ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& db
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
     _hooks->runRequestHook(&cmdBuilder);
 
-    auto client = _serviceContext->makeClient("SEP-internal-txn-client");
+    auto client = _serviceContext->getService()->makeClient("SEP-internal-txn-client");
     AlternativeClientRegion clientRegion(client);
 
     // Note that _token is only cancelled once the caller of the transaction no longer cares about

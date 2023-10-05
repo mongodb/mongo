@@ -223,7 +223,8 @@ TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
     auto cursorId = cursorPin.getCursor()->cursorid();
 
     // Set up another client to kill the cursor.
-    auto killCursorClientOwned = getGlobalServiceContext()->makeClient("killCursorClient");
+    auto killCursorClientOwned =
+        getGlobalServiceContext()->getService()->makeClient("killCursorClient");
     // Keep around a raw pointer for when we transfer ownership of killingClientOwned to the global
     // current client.
     Client* killCursorClient = killCursorClientOwned.get();

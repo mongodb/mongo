@@ -2918,8 +2918,8 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsBadValueWhenFilterContains
 
 TEST_F(StorageInterfaceImplTest, DeleteByFilterOnCappedCollection) {
     transport::TransportLayerMock transportLayerMock;
-    auto userClient = getOperationContext()->getServiceContext()->makeClient(
-        "user", transportLayerMock.createSession());
+    auto userClient =
+        getOperationContext()->getService()->makeClient("user", transportLayerMock.createSession());
     AlternativeClientRegion acr(userClient);
     const auto opCtx = cc().makeOperationContext();
     ASSERT(cc().isFromUserConnection());

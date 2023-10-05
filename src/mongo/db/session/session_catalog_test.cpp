@@ -1591,7 +1591,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
 // scheduling, however, this test case still gives us a good coverage.
 TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
     auto runTest = [&](const LogicalSessionId& lsid) {
-        auto client = getServiceContext()->makeClient("ConcurrentCheckOutAndKill");
+        auto client = getServiceContext()->getService()->makeClient("ConcurrentCheckOutAndKill");
         AlternativeClientRegion acr(client);
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(lsid);

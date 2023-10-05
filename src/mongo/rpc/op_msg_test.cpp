@@ -832,7 +832,7 @@ protected:
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getServiceContext(), std::move(authzManager));
 
-        client = getServiceContext()->makeClient("test");
+        client = getServiceContext()->getService()->makeClient("test");
     }
 
     ServiceContext::UniqueClient client;

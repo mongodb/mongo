@@ -49,8 +49,8 @@ TEST_F(ClientTest, UuidsAreDifferent) {
     // This test trivially asserts that the uuid for two Client instances are different. This is not
     // intended to test the efficacy of our uuid generation. Instead, this is to make sure that we
     // are not default constructing or reusing the same UUID for all Client instances.
-    auto client1 = getServiceContext()->makeClient(kClientName1);
-    auto client2 = getServiceContext()->makeClient(kClientName2);
+    auto client1 = getServiceContext()->getService()->makeClient(kClientName1);
+    auto client2 = getServiceContext()->getService()->makeClient(kClientName2);
 
     ASSERT_NE(client1->getUUID(), client2->getUUID());
 }

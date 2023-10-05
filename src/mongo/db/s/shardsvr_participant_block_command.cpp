@@ -140,8 +140,8 @@ public:
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
             if (txnParticipant) {
-                auto newClient =
-                    getGlobalServiceContext()->makeClient("ShardSvrParticipantBlockCmdClient");
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                    "ShardSvrParticipantBlockCmdClient");
                 AlternativeClientRegion acr(newClient);
                 auto cancelableOperationContext = CancelableOperationContext(
                     cc().makeOperationContext(),

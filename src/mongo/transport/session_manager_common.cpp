@@ -242,7 +242,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         session->shouldOverrideMaxConns(serverGlobalParams.maxConnsOverride);
     const bool verbose = !quiet();
 
-    auto uniqueClient = _svcCtx->makeClient("conn{}"_format(session->id()), session);
+    auto uniqueClient = _svcCtx->getService()->makeClient("conn{}"_format(session->id()), session);
     auto client = uniqueClient.get();
 
     std::shared_ptr<transport::SessionWorkflow> workflow;

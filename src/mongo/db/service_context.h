@@ -217,8 +217,8 @@ public:
         virtual ~ClientObserver() = default;
 
         /**
-         * Hook called after a new client "client" is created on a service by
-         * service->makeClient().
+         * Hook called after a new client "client" is created on a service
+         * managed by this ServiceContext.
          *
          * For a given client and registered instance of ClientObserver, if onCreateClient
          * returns without throwing an exception, onDestroyClient will be called when "client"
@@ -422,20 +422,9 @@ public:
      *
      * All calls to registerClientObserver must complete before ServiceContext
      * is used in multi-threaded operation, or is used to create clients via calls
-     * to makeClient.
+     * to makeClient on Service instances managed by this ServiceContext.
      */
     void registerClientObserver(std::unique_ptr<ClientObserver> observer);
-
-    /**
-     * Creates a new Client object representing a client session associated with this
-     * ServiceContext.
-     *
-     * The "desc" string is used to set a descriptive name for the client, used in logging.
-     *
-     * If supplied, "session" is the transport::Session used for communicating with the client.
-     */
-    UniqueClient makeClient(std::string desc,
-                            std::shared_ptr<transport::Session> session = nullptr);
 
     /** Internal: Called by Service->makeClient. */
     UniqueClient makeClientForService(std::string desc,
@@ -705,7 +694,7 @@ public:
      * Otherwise, returns the router service.
      *
      * Gets the "main service" of this ServiceContext. Used when a caller needs
-     * some Service (e.g. to call `makeClient`), but it doesn't matter which
+     * some Service, but it doesn't matter which
      * Service they get.
      */
     Service* getService() const;
@@ -839,6 +828,14 @@ public:
     Service(ServiceContext* sc, ClusterRole role);
     ~Service();
 
+    /**
+     * Creates a new Client object representing a client session associated with this
+     * Service.
+     *
+     * The "desc" string is used to set a descriptive name for the client, used in logging.
+     *
+     * If supplied, "session" is the transport::Session used for communicating with the client.
+     */
     ServiceContext::UniqueClient makeClient(std::string desc,
                                             std::shared_ptr<transport::Session> session = nullptr) {
         return _sc->makeClientForService(std::move(desc), std::move(session), this);

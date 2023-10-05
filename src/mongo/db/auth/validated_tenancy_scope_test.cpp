@@ -97,7 +97,7 @@ protected:
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getServiceContext(), std::move(authzManager));
 
-        client = getServiceContext()->makeClient("test");
+        client = getServiceContext()->getService()->makeClient("test");
     }
 
     std::string makeSecurityToken(const UserName& userName) {

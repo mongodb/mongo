@@ -155,8 +155,8 @@ public:
             clients;
         clients.reserve(k);
         for (int i = 0; i < k; ++i) {
-            auto client =
-                getServiceContext()->makeClient(str::stream() << "test client for thread " << i);
+            auto client = getServiceContext()->getService()->makeClient(
+                str::stream() << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
             client->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
             clients.emplace_back(std::move(client), std::move(opCtx));

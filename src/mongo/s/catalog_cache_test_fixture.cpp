@@ -95,7 +95,7 @@ void CoreCatalogCacheTestFixture::setUp() {
 executor::NetworkTestEnv::FutureHandle<boost::optional<CollectionRoutingInfo>>
 CoreCatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceString& nss) {
     return launchAsync([this, nss] {
-        auto client = getServiceContext()->makeClient("Test");
+        auto client = getServiceContext()->getService()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
         auto cri = uassertStatusOK(
@@ -107,7 +107,7 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceStr
 executor::NetworkTestEnv::FutureHandle<boost::optional<CollectionRoutingInfo>>
 CoreCatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceString& nss) {
     return launchAsync([this, nss] {
-        auto client = getServiceContext()->makeClient("Test");
+        auto client = getServiceContext()->getService()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
         auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
@@ -127,7 +127,7 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const Namespa
         nss, boost::none, cm.dbPrimary());
 
     return launchAsync([this, nss] {
-        auto client = getServiceContext()->makeClient("Test");
+        auto client = getServiceContext()->getService()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
         return boost::make_optional(

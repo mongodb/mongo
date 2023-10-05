@@ -140,7 +140,7 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
     FailPointEnableBlock skipAppendingReqFields("allowSkippingAppendRequiredFieldsToResponse");
 
     // Create a new client/operation context per command
-    auto client = getServiceContext()->makeClient("ClusterCmdClient");
+    auto client = getServiceContext()->getService()->makeClient("ClusterCmdClient");
     auto opCtx = client->makeOperationContext();
 
     {

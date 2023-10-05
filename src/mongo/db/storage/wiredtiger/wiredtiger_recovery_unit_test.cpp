@@ -177,7 +177,7 @@ public:
     ClientAndCtx makeClientAndOpCtx(RecoveryUnitHarnessHelper* harnessHelper,
                                     const std::string& clientName) {
         auto sc = harnessHelper->serviceContext();
-        auto client = sc->makeClient(clientName);
+        auto client = sc->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
         opCtx->setRecoveryUnit(harnessHelper->newRecoveryUnit(),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

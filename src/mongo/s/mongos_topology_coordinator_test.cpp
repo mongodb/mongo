@@ -137,7 +137,7 @@ TEST_F(MongosTopoCoordTest, AwaitHelloResponseReturnsCurrentMongosTopologyVersio
 
     bool helloReturned = false;
     stdx::thread getHelloThread([&] {
-        Client::setCurrent(getServiceContext()->makeClient("getHelloThread"));
+        Client::setCurrent(getServiceContext()->getService()->makeClient("getHelloThread"));
         auto threadOpCtx = cc().makeOperationContext();
         const auto response =
             getTopoCoord().awaitHelloResponse(threadOpCtx.get(), currentTopologyVersion, deadline);
@@ -286,7 +286,7 @@ TEST_F(MongosTopoCoordTest, HelloReturnsErrorOnEnteringQuiesceMode) {
     auto timesEnteredFailPoint = waitForHelloFailPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([&] { waitForHelloFailPoint->setMode(FailPoint::off, 0); });
     stdx::thread getHelloThread([&] {
-        Client::setCurrent(getServiceContext()->makeClient("getHelloThread"));
+        Client::setCurrent(getServiceContext()->getService()->makeClient("getHelloThread"));
         auto threadOpCtx = cc().makeOperationContext();
         auto maxAwaitTime = Milliseconds(5000);
         auto deadline = now() + maxAwaitTime;
@@ -324,7 +324,7 @@ TEST_F(MongosTopoCoordTest, AlwaysDecrementNumAwaitingTopologyChangesOnErrorMong
 
     AtomicWord<bool> helloReturned{false};
     stdx::thread getHelloThread([&] {
-        Client::setCurrent(getServiceContext()->makeClient("getHelloThread"));
+        Client::setCurrent(getServiceContext()->getService()->makeClient("getHelloThread"));
         auto threadOpCtx = cc().makeOperationContext();
         ASSERT_THROWS_CODE(
             getTopoCoord().awaitHelloResponse(threadOpCtx.get(), currentTopologyVersion, deadline),

@@ -152,7 +152,7 @@ BSONObj TicketedWorkloadDriver::metrics() const {
 }
 
 void TicketedWorkloadDriver::_read(int32_t i) {
-    auto client = _svcCtx->makeClient("reader_" + std::to_string(i));
+    auto client = _svcCtx->getService()->makeClient("reader_" + std::to_string(i));
     auto opCtx = client->makeOperationContext();
     AdmissionContext admCtx;
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
@@ -164,7 +164,7 @@ void TicketedWorkloadDriver::_read(int32_t i) {
 }
 
 void TicketedWorkloadDriver::_write(int32_t i) {
-    auto client = _svcCtx->makeClient("writer_" + std::to_string(i));
+    auto client = _svcCtx->getService()->makeClient("writer_" + std::to_string(i));
     auto opCtx = client->makeOperationContext();
     AdmissionContext admCtx;
     admCtx.setPriority(AdmissionContext::Priority::kNormal);

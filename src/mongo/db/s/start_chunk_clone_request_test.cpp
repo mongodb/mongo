@@ -52,7 +52,7 @@ namespace {
 
 TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     auto serviceContext = ServiceContext::make();
-    auto client = serviceContext->makeClient("TestClient");
+    auto client = serviceContext->getService()->makeClient("TestClient");
     auto opCtx = client->makeOperationContext();
 
     MigrationSessionId sessionId = MigrationSessionId::generate("shard0001", "shard0002");

@@ -93,7 +93,7 @@ int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
 // Benchmark the performance of computing and hashing the query stats key for an IDHACK query.
 void BM_ShapfiyIDHack(benchmark::State& state) {
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("query_test");
+    auto client = serviceCtx->getService()->makeClient("query_test");
 
     auto opCtx = client->makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
@@ -111,7 +111,7 @@ void BM_ShapfiyIDHack(benchmark::State& state) {
 // Benchmark computing the query stats key and its hash for a mildly complex query predicate.
 void BM_ShapfiyMildlyComplex(benchmark::State& state) {
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("query_test");
+    auto client = serviceCtx->getService()->makeClient("query_test");
 
     auto opCtx = client->makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());

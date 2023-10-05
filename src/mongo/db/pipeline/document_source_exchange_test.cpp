@@ -164,7 +164,7 @@ protected:
         std::vector<ThreadInfo> threads;
         for (size_t idx = 0; idx < nConsumers; ++idx) {
             ServiceContext::UniqueClient client =
-                getServiceContext()->makeClient("exchange client");
+                getServiceContext()->getService()->makeClient("exchange client");
             ServiceContext::UniqueOperationContext opCtxOwned =
                 getServiceContext()->makeOperationContext(client.get());
             OperationContext* opCtx = opCtxOwned.get();
@@ -543,7 +543,8 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
     std::vector<ThreadInfo> threads;
 
     for (size_t idx = 0; idx < nConsumers; ++idx) {
-        ServiceContext::UniqueClient client = getServiceContext()->makeClient("exchange client");
+        ServiceContext::UniqueClient client =
+            getServiceContext()->getService()->makeClient("exchange client");
         ServiceContext::UniqueOperationContext opCtxOwned =
             getServiceContext()->makeOperationContext(client.get());
         OperationContext* opCtx = opCtxOwned.get();

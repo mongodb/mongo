@@ -1519,7 +1519,7 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     // Since count() does not work in a transaction, call count() by bypassing the transaction api
     // Allow the thread to be killable. If interrupted, the call to runCommand will fail with the
     // interruption.
-    auto client = _serviceContext->makeClient("SEP-int-fle-crud");
+    auto client = _serviceContext->getService()->makeClient("SEP-int-fle-crud");
 
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();
@@ -1860,7 +1860,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     // Pop off the current op context so we can get a fresh set of read concern settings
     // Allow the thread to be killable. If interrupted, the call to runCommand will fail with the
     // interruption.
-    auto client = _opCtx->getServiceContext()->makeClient("FLETagNoTXNQuery");
+    auto client = _opCtx->getServiceContext()->getService()->makeClient("FLETagNoTXNQuery");
 
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();

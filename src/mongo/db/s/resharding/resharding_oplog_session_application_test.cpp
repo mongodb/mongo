@@ -762,7 +762,7 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     // Make two in progress transactions so the one started by resharding must block.
     {
-        auto newClientOwned = getServiceContext()->makeClient("newClient");
+        auto newClientOwned = getServiceContext()->getService()->makeClient("newClient");
         AlternativeClientRegion acr(newClientOwned);
         auto newOpCtx = cc().makeOperationContext();
         makeInProgressTxn(newOpCtx.get(),

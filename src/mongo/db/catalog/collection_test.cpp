@@ -813,7 +813,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
         return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
     };
 
-    auto longLivedClient = getServiceContext()->makeClient("longLived");
+    auto longLivedClient = getServiceContext()->getService()->makeClient("longLived");
     auto longLivedOpCtx = longLivedClient->makeOperationContext();
     WriteUnitOfWork longLivedWUOW(longLivedOpCtx.get());
 
@@ -874,7 +874,7 @@ TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
         return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
     };
 
-    auto longLivedClient = getServiceContext()->makeClient("longLived");
+    auto longLivedClient = getServiceContext()->getService()->makeClient("longLived");
     auto longLivedOpCtx = longLivedClient->makeOperationContext();
 
     RecordId initialId;
@@ -966,7 +966,7 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     }
 
     // Setup the cursor that should rollover.
-    auto otherClient = getServiceContext()->makeClient("otherClient");
+    auto otherClient = getServiceContext()->getService()->makeClient("otherClient");
     auto otherOpCtx = otherClient->makeOperationContext();
     auto cursor = rs->getCursor(otherOpCtx.get());
     ASSERT(cursor->next());

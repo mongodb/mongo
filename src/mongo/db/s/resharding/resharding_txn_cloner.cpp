@@ -333,8 +333,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
         .onCompletion([chainCtx](Status status) {
             if (chainCtx->pipeline) {
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
-                auto client =
-                    cc().getServiceContext()->makeClient("ReshardingTxnClonerCleanupClient");
+                auto client = cc().getServiceContext()->getService()->makeClient(
+                    "ReshardingTxnClonerCleanupClient");
 
                 // TODO(SERVER-74658): Please revisit if this thread could be made killable.
                 {

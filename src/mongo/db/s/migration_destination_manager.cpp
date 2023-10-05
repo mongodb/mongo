@@ -1349,7 +1349,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         // currently supported in retryable writes.
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         {
-            auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+            auto newClient =
+                outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
             AlternativeClientRegion acr(newClient);
             auto executor =
                 Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -1409,7 +1410,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             migrateThreadHangAtStep3.pauseWhileSet();
         }
 
-        auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+        auto newClient =
+            outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
         AlternativeClientRegion acr(newClient);
         auto executor =
             Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -1682,7 +1684,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         }
     } else {
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-        auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+        auto newClient =
+            outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
         AlternativeClientRegion acr(newClient);
         auto executor =
             Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
@@ -1711,7 +1714,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
     }
 
     outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+    auto newClient =
+        outerOpCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
     AlternativeClientRegion acr(newClient);
     auto executor =
         Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

@@ -428,7 +428,7 @@ TEST_F(ChangeCollectionTruncateExpirationTest, TruncatesAreOnlyAfterAllDurable) 
     }
 
     // Create an oplog hole in an alternate client.
-    auto altClient = getServiceContext()->makeClient("alt-client");
+    auto altClient = getServiceContext()->getService()->makeClient("alt-client");
     auto altOpCtx = altClient->makeOperationContext();
 
     // Wrap insertDocumentToChangeCollection call in WUOW to prevent inner WUOW from commiting.

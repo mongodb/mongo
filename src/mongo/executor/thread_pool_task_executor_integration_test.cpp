@@ -153,7 +153,7 @@ private:
 };
 
 TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
-    auto client = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
+    auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = client->makeOperationContext();
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
@@ -196,7 +196,7 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldReceiveMultipleResponses) {
 }
 
 TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
-    auto client = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
+    auto client = getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = client->makeOperationContext();
 
     RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
@@ -231,7 +231,8 @@ TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
 TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
     // Turn on the failCommand failpoint for 'isMaster' on the server that we will schedule
     // 'isMaster' on below
-    auto failCmdClient = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
+    auto failCmdClient =
+        getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
     auto opCtx = failCmdClient->makeOperationContext();
 
     auto configureFailpointCmd = BSON("configureFailPoint"
@@ -280,7 +281,8 @@ TEST_F(TaskExecutorFixture, RunExhaustShouldStopOnFailure) {
     });
 
     {
-        auto client = getGlobalServiceContext()->makeClient("TaskExecutorExhaustTest");
+        auto client =
+            getGlobalServiceContext()->getService()->makeClient("TaskExecutorExhaustTest");
         auto opCtx = client->makeOperationContext();
 
         RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),

@@ -44,7 +44,7 @@ namespace mongo {
 
 void TicketHolderTestFixture::setUp() {
     ServiceContextTest::setUp();
-    _client = getServiceContext()->makeClient("test");
+    _client = getServiceContext()->getService()->makeClient("test");
     _opCtx = _client->makeOperationContext();
 }
 

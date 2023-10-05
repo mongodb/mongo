@@ -125,7 +125,7 @@ private:
         // Use a small journal for testing to account for the unlikely event that the underlying
         // filesystem does not support fast allocation of a file of zeros.
         std::string extraStrings = "log=(file_max=1m,prealloc=false)";
-        auto client = _svcCtx->makeClient("opCtx");
+        auto client = _svcCtx->getService()->makeClient("opCtx");
         auto opCtx = client->makeOperationContext();
         auto kv = std::make_unique<WiredTigerKVEngine>(opCtx.get(),
                                                        kWiredTigerEngineName,

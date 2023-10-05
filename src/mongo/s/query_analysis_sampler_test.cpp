@@ -962,8 +962,8 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
 
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
-    auto client =
-        getGlobalServiceContext()->makeClient("TryGenerateSampleIdExternalClient", session);
+    auto client = getGlobalServiceContext()->getService()->makeClient(
+        "TryGenerateSampleIdExternalClient", session);
     auto opCtxHolder = client->makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
@@ -1014,7 +1014,8 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
         "queryAnalysisSamplerBurstMultiplier", 1};
 
     // Note how this client does not have a network session.
-    auto client = getGlobalServiceContext()->makeClient("TryGenerateSampleIdInternalClient");
+    auto client =
+        getGlobalServiceContext()->getService()->makeClient("TryGenerateSampleIdInternalClient");
     auto opCtxHolder = client->makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
@@ -1049,8 +1050,8 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
 
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
-    auto client =
-        getGlobalServiceContext()->makeClient("RefreshConfigurationsNewCollectionUuid", session);
+    auto client = getGlobalServiceContext()->getService()->makeClient(
+        "RefreshConfigurationsNewCollectionUuid", session);
     auto opCtxHolder = client->makeOperationContext();
     auto opCtx = opCtxHolder.get();
 

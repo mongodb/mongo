@@ -631,13 +631,13 @@ TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
-    auto writeClient = getGlobalServiceContext()->makeClient("writeClient", session);
+    auto writeClient = getGlobalServiceContext()->getService()->makeClient("writeClient", session);
     auto writeOpCtx = writeClient->makeOperationContext();
     boost::optional<Lock::GlobalLock> globalWrite;
     globalWrite.emplace(writeOpCtx.get(), MODE_IX);
     ASSERT(globalWrite->isLocked());
 
-    auto readClient = getGlobalServiceContext()->makeClient("readClient", session);
+    auto readClient = getGlobalServiceContext()->getService()->makeClient("readClient", session);
     auto readOpCtx = readClient->makeOperationContext();
     boost::optional<Lock::GlobalLock> globalRead;
     globalRead.emplace(readOpCtx.get(), MODE_IS);

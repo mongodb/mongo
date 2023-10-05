@@ -211,7 +211,7 @@ protected:
         auto serviceContextHolder = ServiceContext::make();
         serviceContext = serviceContextHolder.get();
         setGlobalServiceContext(std::move(serviceContextHolder));
-        client = serviceContext->makeClient("test");
+        client = serviceContext->getService()->makeClient("test");
         opCtx = serviceContext->makeOperationContext(client.get());
 
         auto uniqueAuthzManagerExternalStateMock =

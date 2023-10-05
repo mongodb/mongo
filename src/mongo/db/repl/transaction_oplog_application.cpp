@@ -831,8 +831,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
         {
             // Make a new opCtx so that we can set the lsid when applying the prepare
             // transaction oplog entry.
-            auto newClient =
-                opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
+            auto newClient = opCtx->getServiceContext()->getService()->makeClient(
+                "reconstruct-prepared-transactions");
 
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();

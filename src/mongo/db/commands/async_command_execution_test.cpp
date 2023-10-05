@@ -154,7 +154,7 @@ void killAsyncCommand(AsyncCommandExecutionTest::TestState& state) {
 void AsyncCommandExecutionTest::runTestForCommand(StringData command) {
     BSONObj syncResponse, asyncResponse;
 
-    auto client = getServiceContext()->makeClient("Client");
+    auto client = getServiceContext()->getService()->makeClient("Client");
     auto strand = ClientStrand::make(std::move(client));
 
     {

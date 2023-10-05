@@ -436,7 +436,8 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
                             session.kill(ErrorCodes::InterruptedAtShutdown));
     });
 
-    auto newClient = opCtx->getServiceContext()->makeClient("ImplicitlyAbortTxnAtShutdown");
+    auto newClient =
+        opCtx->getServiceContext()->getService()->makeClient("ImplicitlyAbortTxnAtShutdown");
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {
         stdx::lock_guard<mongo::Client> lk(*newClient.get());

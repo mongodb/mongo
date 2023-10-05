@@ -60,7 +60,7 @@ namespace {
 auto scenario(bool debugLogEnabled, bool slowOp, bool forceSample) {
     static const logv2::LogComponent component = logv2::LogComponent::kDefault;
     const auto serviceContext = ServiceContext::make();
-    const auto client = serviceContext->makeClient("log_with_sampling_test");
+    const auto client = serviceContext->getService()->makeClient("log_with_sampling_test");
     const auto opCtx = client->makeOperationContext();
 
     auto loggedSeverityGuard = unittest::MinimumLoggedSeverityGuard(

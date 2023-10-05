@@ -1453,7 +1453,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
     // Verify that the CollectionCatalog returns the latest collection with the index present. This
     // has to be done in an alternative client as we already have an open snapshot from an earlier
     // point-in-time above.
-    auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     auto latestColl =
@@ -1497,7 +1497,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
 
     // Verify that the CollectionCatalog returns the latest collection. This has to be done in an
     // alternative client as we already have an open snapshot from an earlier point-in-time above.
-    auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     auto latestColl =
@@ -1596,7 +1596,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
 
     // Collection is not shared from the latest instance. This has to be done in an  alternative
     // client as we already have an open snapshot from an earlier point-in-time above.
-    auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     auto latestColl =
@@ -1689,7 +1689,7 @@ TEST_F(CollectionCatalogTimestampTest,
 
     // Collection is not shared from the latest instance. This has to be done in an  alternative
     // client as we already have an open snapshot from an earlier point-in-time above.
-    auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("AlternativeClient");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     auto latestColl =
@@ -3357,7 +3357,7 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
     }
 
     // In a different client, open the latest collection instance and verify the index is not ready.
-    auto newClient = opCtx->getServiceContext()->makeClient("alternativeClient");
+    auto newClient = opCtx->getServiceContext()->getService()->makeClient("alternativeClient");
     auto newOpCtx = newClient->makeOperationContext();
     auto latestCatalog = CollectionCatalog::latest(newOpCtx.get());
     auto latestColl =

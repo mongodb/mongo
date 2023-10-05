@@ -135,10 +135,10 @@ public:
         NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("test.findandnoopupdate");
 
-        auto client1 = serviceContext->makeClient("client1");
+        auto client1 = serviceContext->getService()->makeClient("client1");
         auto opCtx1 = client1->makeOperationContext();
 
-        auto client2 = serviceContext->makeClient("client2");
+        auto client2 = serviceContext->getService()->makeClient("client2");
         auto opCtx2 = client2->makeOperationContext();
 
         auto registry = std::make_unique<OpObserverRegistry>();

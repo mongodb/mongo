@@ -132,7 +132,7 @@ TEST(AsioTransportLayer, ShortReadsAndWritesWork) {
 
     assertOK(handle->runCommandRequest(ecr).get());
 
-    auto client = sc->makeClient(__FILE__);
+    auto client = sc->getService()->makeClient(__FILE__);
     auto opCtx = client->makeOperationContext();
 
     handle->runCommandRequest(ecr, opCtx->getBaton()).get(opCtx.get());

@@ -115,9 +115,9 @@ void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
     invariant(_state == State::kNotStarted);
     _pool = makeThreadPool(_getReadOrWrite());
     _waitForMajorityClient =
-        ClientStrand::make(ctx->makeClient(kWaitClientName + _getReadOrWrite()));
+        ClientStrand::make(ctx->getService()->makeClient(kWaitClientName + _getReadOrWrite()));
     _waitForMajorityCancellationClient =
-        ClientStrand::make(ctx->makeClient(kCancelClientName + _getReadOrWrite()));
+        ClientStrand::make(ctx->getService()->makeClient(kCancelClientName + _getReadOrWrite()));
     _backgroundWorkComplete = _periodicallyWaitForMajority();
     _pool->startup();
     _state = State::kRunning;

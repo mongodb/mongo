@@ -390,7 +390,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         earlyCursor->save();
         earlyReader->recoveryUnit()->abandonSnapshot();
 
-        auto client1 = harnessHelper->serviceContext()->makeClient("c1");
+        auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
         RecordId id2 = _oplogOrderInsertOplog(t1.get(), rs, 20);
@@ -398,7 +398,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
         RecordId id3;
         {  // create 2nd doc
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
@@ -411,7 +411,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             earlyCursor->restore();
             ASSERT(!earlyCursor->next());
 
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
@@ -422,7 +422,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         }
 
         {
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
@@ -434,7 +434,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         }
 
         {
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
@@ -451,7 +451,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
 
     {  // now all 3 docs should be visible
-        auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+        auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
@@ -467,7 +467,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     // Rollback the last two oplog entries, then insert entries with older optimes and ensure that
     // the visibility rules aren't violated. See SERVER-21645
     {
-        auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+        auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
         rs->cappedTruncateAfter(
             opCtx.get(), id1, false /* inclusive */, nullptr /* aboutToDelete callback */);
@@ -484,7 +484,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         earlyCursor->save();
         earlyReader->recoveryUnit()->abandonSnapshot();
 
-        auto client1 = harnessHelper->serviceContext()->makeClient("c1");
+        auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
         RecordId id2 = _oplogOrderInsertOplog(t1.get(), rs, 2);
@@ -493,7 +493,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
         RecordId id3;
         {  // create 2nd doc
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
@@ -506,7 +506,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             ASSERT(earlyCursor->restore());
             ASSERT(!earlyCursor->next());
 
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
@@ -517,7 +517,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         }
 
         {
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
@@ -529,7 +529,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         }
 
         {
-            auto client2 = harnessHelper->serviceContext()->makeClient("c2");
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
             Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());

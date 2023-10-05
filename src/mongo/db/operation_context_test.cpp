@@ -102,7 +102,7 @@ class OperationContextTest : public ServiceContextTest {
 public:
     auto makeClient(std::string desc = "OperationContextTest",
                     std::shared_ptr<transport::Session> session = nullptr) {
-        return getServiceContext()->makeClient(desc, session);
+        return getServiceContext()->getService()->makeClient(desc, session);
     }
 };
 
@@ -174,12 +174,12 @@ TEST_F(OperationContextTest, OpCtxGroup) {
     ASSERT_TRUE(group1.isEmpty());
     {
         auto serviceCtx1 = ServiceContext::make();
-        auto client1 = serviceCtx1->makeClient("OperationContextTest1");
+        auto client1 = serviceCtx1->getService()->makeClient("OperationContextTest1");
         auto opCtx1 = group1.makeOperationContext(*client1);
         ASSERT_FALSE(group1.isEmpty());
 
         auto serviceCtx2 = ServiceContext::make();
-        auto client2 = serviceCtx2->makeClient("OperationContextTest2");
+        auto client2 = serviceCtx2->getService()->makeClient("OperationContextTest2");
         {
             auto opCtx2 = group1.makeOperationContext(*client2);
             opCtx1.discard();
@@ -200,7 +200,7 @@ TEST_F(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group2;
     {
         auto serviceCtx = ServiceContext::make();
-        auto client = serviceCtx->makeClient("OperationContextTest");
+        auto client = serviceCtx->getService()->makeClient("OperationContextTest");
         auto opCtx = group2.adopt(client->makeOperationContext());
         ASSERT_FALSE(group2.isEmpty());
         ASSERT_TRUE(opCtx->checkForInterruptNoAssert().isOK());
@@ -215,7 +215,7 @@ TEST_F(OperationContextTest, OpCtxGroup) {
     OperationContextGroup group4;
     {
         auto serviceCtx = ServiceContext::make();
-        auto client = serviceCtx->makeClient("OperationContextTest");
+        auto client = serviceCtx->getService()->makeClient("OperationContextTest");
         auto opCtx1 = group3.makeOperationContext(*client);
         auto p1 = opCtx1.opCtx();
         auto opCtx2 = group4.take(std::move(opCtx1));
@@ -302,7 +302,7 @@ public:
         serviceCtx->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
         serviceCtx->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
         serviceCtx->setTickSource(std::make_unique<TickSourceMock<>>());
-        client = serviceCtx->makeClient("OperationDeadlineTest");
+        client = serviceCtx->getService()->makeClient("OperationDeadlineTest");
     }
 
     void checkForInterruptForTimeout(OperationContext* opCtx) {
@@ -1101,7 +1101,7 @@ TEST_F(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {
 
 TEST_F(OperationContextTest, TestActiveClientOperationsForClientsWithoutSession) {
     auto serviceCtx = getServiceContext();
-    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto client = serviceCtx->getService()->makeClient("OperationContextTest");
     ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
     {
         auto opCtx = client->makeOperationContext();
@@ -1115,7 +1115,7 @@ TEST_F(OperationContextTest, TestActiveClientOperations) {
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
 
     auto serviceCtx = getServiceContext();
-    auto client = serviceCtx->makeClient("OperationContextTest", session);
+    auto client = serviceCtx->getService()->makeClient("OperationContextTest", session);
     ASSERT_EQ(serviceCtx->getActiveClientOperations(), 0);
 
     {
@@ -1134,7 +1134,7 @@ TEST_F(OperationContextTest, TestActiveClientOperations) {
 }
 
 TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
-    auto client = makeClient("MainClient");
+    auto client = getService()->makeClient("MainClient");
     auto opCtx = client->makeOperationContext();
 
     const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(
@@ -1149,7 +1149,7 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
             stdx::thread thread([&]() mutable {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-                auto threadClient = makeClient("ThreadClient");
+                auto threadClient = getService()->makeClient("ThreadClient");
 
                 // Generate report in absence of any opCtx
                 CurOp::reportCurrentOpForClient(

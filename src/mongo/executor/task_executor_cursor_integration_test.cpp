@@ -124,7 +124,7 @@ private:
     std::shared_ptr<ThreadPoolTaskExecutor> _executor;
     std::shared_ptr<NetworkInterface> _ni;
     ServiceContext::UniqueClient _client =
-        getGlobalServiceContext()->makeClient("TaskExecutorCursorTest");
+        getGlobalServiceContext()->getService()->makeClient("TaskExecutorCursorTest");
 };
 
 size_t createTestData(std::string ns, size_t numDocs) {

@@ -122,7 +122,7 @@ class TaskExecutorCursorTestFixture : public Base {
 public:
     void setUp() override {
         Base::setUp();
-        client = serviceCtx->makeClient("TaskExecutorCursorTest");
+        client = serviceCtx->getService()->makeClient("TaskExecutorCursorTest");
         opCtx = client->makeOperationContext();
         static_cast<Derived*>(this)->postSetUp();
     }

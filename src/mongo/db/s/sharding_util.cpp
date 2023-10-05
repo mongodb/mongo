@@ -332,7 +332,7 @@ void retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
                 initialTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm());
 
         try {
-            auto newClient = opCtx->getServiceContext()->makeClient(newClientName);
+            auto newClient = opCtx->getServiceContext()->getService()->makeClient(newClientName);
             auto newOpCtx = newClient->makeOperationContext();
             AlternativeClientRegion altClient(newClient);
 

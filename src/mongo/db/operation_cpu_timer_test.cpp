@@ -62,7 +62,7 @@ namespace mongo {
 class OperationCPUTimerTest : public ServiceContextTest {
 public:
     auto makeClient() const {
-        return getGlobalServiceContext()->makeClient("AlternativeClient");
+        return getGlobalServiceContext()->getService()->makeClient("AlternativeClient");
     }
 
     OperationCPUTimers* getTimers() const {

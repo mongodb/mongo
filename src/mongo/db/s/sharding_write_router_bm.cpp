@@ -127,7 +127,7 @@ protected:
     }
 
     void setupCatalogCacheMock(ServiceContext* serviceContext, bool withShardedCollection) {
-        const auto client = serviceContext->makeClient("test-setup");
+        const auto client = serviceContext->getService()->makeClient("test-setup");
         const auto opCtxHolder = client->makeOperationContext();
         OperationContext* opCtx = opCtxHolder.get();
 
@@ -275,7 +275,7 @@ BENCHMARK_DEFINE_F(ShardingWriteRouterTestFixture, BM_InsertGetDestinedRecipient
     for (auto keepRunning : state) {
         benchmark::ClobberMemory();
 
-        const auto client = serviceContext()->makeClient("test");
+        const auto client = serviceContext()->getService()->makeClient("test");
         const auto opCtx = client->makeOperationContext();
 
         OperationShardingState::setShardRole(
@@ -298,7 +298,7 @@ BENCHMARK_DEFINE_F(ShardingWriteRouterTestFixture, BM_UpdateGetDestinedRecipient
     for (auto keepRunning : state) {
         benchmark::ClobberMemory();
 
-        const auto client = serviceContext()->makeClient("test");
+        const auto client = serviceContext()->getService()->makeClient("test");
         const auto opCtx = client->makeOperationContext();
 
         OperationShardingState::setShardRole(
@@ -320,7 +320,7 @@ BENCHMARK_DEFINE_F(WriteRouterTestFixture, BM_UnshardedDestinedRecipient)
     for (auto keepRunning : state) {
         benchmark::ClobberMemory();
 
-        const auto client = serviceContext()->makeClient("test");
+        const auto client = serviceContext()->getService()->makeClient("test");
         const auto opCtx = client->makeOperationContext();
 
         Lock::DBLock dbLock{opCtx.get(), kNss.dbName(), MODE_IX};

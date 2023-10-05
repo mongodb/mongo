@@ -93,7 +93,7 @@ Simulation::~Simulation() {}
 
 void Simulation::setup() {
     _svcCtx = ServiceContext::make();
-    _client = _svcCtx->makeClient(suiteName());
+    _client = _svcCtx->getService()->makeClient(suiteName());
 
     _tickSource = initTickSourceMock<ServiceContext, Nanoseconds>(_svcCtx.get());
     _eventQueue = std::make_unique<EventQueue>(*_tickSource, [this]() {

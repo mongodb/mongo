@@ -154,7 +154,7 @@ void removeFromIndex(OperationContext* opCtx,
 inline void removeFromIndex(HarnessHelper* harness,
                             SortedDataInterface* index,
                             std::initializer_list<IndexKeyEntry> toRemove) {
-    auto client = harness->serviceContext()->makeClient("removeFromIndex");
+    auto client = harness->serviceContext()->getService()->makeClient("removeFromIndex");
     removeFromIndex(harness->newOperationContext(client.get()).get(), index, toRemove);
 }
 

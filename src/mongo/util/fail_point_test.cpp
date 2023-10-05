@@ -469,7 +469,7 @@ void assertFunctionInterruptible(std::function<void(Interruptible* interruptible
     service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setTickSource(std::make_unique<TickSourceMock<>>());
 
-    const auto client = service->makeClient("FailPointTest");
+    const auto client = service->getService()->makeClient("FailPointTest");
     auto opCtx = client->makeOperationContext();
     opCtx->setDeadlineAfterNowBy(Milliseconds{999}, ErrorCodes::ExceededTimeLimit);
 

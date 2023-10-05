@@ -103,7 +103,8 @@ protected:
     }
 
     ServiceContext::UniqueServiceContext _svcCtx = ServiceContext::make();
-    ServiceContext::UniqueClient _client = _svcCtx->makeClient("ThroughputProbingTest");
+    ServiceContext::UniqueClient _client =
+        _svcCtx->getService()->makeClient("ThroughputProbingTest");
 
     MockPeriodicRunner* _runner;
     MockTicketHolder _readTicketHolder;

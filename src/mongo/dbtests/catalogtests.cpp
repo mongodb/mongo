@@ -63,8 +63,8 @@ public:
         NamespaceString competingNss =
             NamespaceString::createNamespaceString_forTest("test.competingCollection");
 
-        auto client1 = serviceContext->makeClient("client1");
-        auto client2 = serviceContext->makeClient("client2");
+        auto client1 = serviceContext->getService()->makeClient("client1");
+        auto client2 = serviceContext->getService()->makeClient("client2");
 
         auto op1 = client1->makeOperationContext();
         auto op2 = client2->makeOperationContext();

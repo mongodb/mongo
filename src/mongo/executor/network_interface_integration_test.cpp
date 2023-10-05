@@ -603,7 +603,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
     constexpr auto requestTimeout = Milliseconds{1000};
 
     auto serviceContext = ServiceContext::make();
-    auto client = serviceContext->makeClient("NetworkClient");
+    auto client = serviceContext->getService()->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
 
     auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();
@@ -646,7 +646,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
     constexpr auto requestTimeout = Milliseconds{600};
 
     auto serviceContext = ServiceContext::make();
-    auto client = serviceContext->makeClient("NetworkClient");
+    auto client = serviceContext->getService()->makeClient("NetworkClient");
     auto opCtx = client->makeOperationContext();
 
     auto stopWatch = serviceContext->getPreciseClockSource()->makeStopWatch();

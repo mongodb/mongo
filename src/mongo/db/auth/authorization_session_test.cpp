@@ -132,7 +132,7 @@ public:
         ServiceContextMongoDTest::setUp();
 
         _session = transportLayer.createSession();
-        _client = getServiceContext()->makeClient("testClient", _session);
+        _client = getServiceContext()->getService()->makeClient("testClient", _session);
         _opCtx = _client->makeOperationContext();
         managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
 
@@ -628,7 +628,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
             SockAddr::create(clientSource, 5555, AF_UNSPEC),
             SockAddr::create(serverAddress, 27017, AF_UNSPEC),
             nullptr);
-        auto client = getServiceContext()->makeClient("testClient", mock_session);
+        auto client = getServiceContext()->getService()->makeClient("testClient", mock_session);
         auto opCtx = client->makeOperationContext();
         ASSERT_OK(authzSession->addAndAuthorizeUser(opCtx.get(), kSpencerTestRequest, boost::none));
         authzSession->logoutDatabase(client.get(), kTestDB, "Kill the test!"_sd);
@@ -640,7 +640,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
             SockAddr::create(clientSource, 5555, AF_UNSPEC),
             SockAddr::create(serverAddress, 27017, AF_UNSPEC),
             nullptr);
-        auto client = getServiceContext()->makeClient("testClient", mock_session);
+        auto client = getServiceContext()->getService()->makeClient("testClient", mock_session);
         auto opCtx = client->makeOperationContext();
         ASSERT_NOT_OK(
             authzSession->addAndAuthorizeUser(opCtx.get(), kSpencerTestRequest, boost::none));

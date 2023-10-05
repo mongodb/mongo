@@ -92,7 +92,7 @@ public:
 };
 
 TEST_F(ClientStrandTest, CreateOnly) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     // We have no bound Client.
     assertStrandNotBound(strand);
@@ -105,7 +105,7 @@ TEST_F(ClientStrandTest, CreateOnly) {
 }
 
 TEST_F(ClientStrandTest, BindOnce) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     // We have no bound Client.
     assertStrandNotBound(strand);
@@ -124,7 +124,7 @@ TEST_F(ClientStrandTest, BindOnce) {
 }
 
 TEST_F(ClientStrandTest, BindMultipleTimes) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     // We have no bound Client.
     assertStrandNotBound(strand);
@@ -145,7 +145,7 @@ TEST_F(ClientStrandTest, BindMultipleTimes) {
 }
 
 TEST_F(ClientStrandTest, BindMultipleTimesAndDismiss) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     // We have no bound Client.
     assertStrandNotBound(strand);
@@ -169,7 +169,7 @@ TEST_F(ClientStrandTest, BindMultipleTimesAndDismiss) {
 }
 
 TEST_F(ClientStrandTest, BindLocalBeforeWorkerThread) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
     auto barrier = std::make_shared<unittest::Barrier>(2);
 
     // Set our state to an initial value. It is unsynchronized, but ClientStrand does synchronize,
@@ -219,7 +219,7 @@ TEST_F(ClientStrandTest, BindLocalBeforeWorkerThread) {
 }
 
 TEST_F(ClientStrandTest, BindLocalAfterWorkerThread) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
     auto barrier = std::make_shared<unittest::Barrier>(2);
 
     // Set our state to an initial value. It is unsynchronized, but ClientStrand does synchronize,
@@ -270,7 +270,7 @@ TEST_F(ClientStrandTest, BindLocalAfterWorkerThread) {
 }
 
 TEST_F(ClientStrandTest, BindManyWorkerThreads) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     constexpr size_t kCount = 10;
     auto barrier = std::make_shared<unittest::Barrier>(kCount);
@@ -308,8 +308,8 @@ TEST_F(ClientStrandTest, BindManyWorkerThreads) {
 }
 
 TEST_F(ClientStrandTest, SwapStrands) {
-    auto strand1 = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
-    auto strand2 = ClientStrand::make(getServiceContext()->makeClient(kClientName2));
+    auto strand1 = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
+    auto strand2 = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName2));
 
     assertStrandNotBound(strand1);
     assertStrandNotBound(strand2);
@@ -333,7 +333,7 @@ TEST_F(ClientStrandTest, SwapStrands) {
 TEST_F(ClientStrandTest, Executor) {
     constexpr size_t kCount = 10;
 
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     assertStrandNotBound(strand);
 
@@ -365,7 +365,7 @@ TEST_F(ClientStrandTest, Executor) {
 }
 
 DEATH_TEST_F(ClientStrandTest, ReplaceCurrentAfterBind, ClientStrand::kUnableToRecoverClient) {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     assertStrandNotBound(strand);
 
@@ -376,14 +376,14 @@ DEATH_TEST_F(ClientStrandTest, ReplaceCurrentAfterBind, ClientStrand::kUnableToR
     // practice, this failure mode is most likely if someone is using an AlternativeClientRegion,
     // which has its own issues.
     auto stolenClient = Client::releaseCurrent();
-    Client::setCurrent(getServiceContext()->makeClient(kClientName2));
+    Client::setCurrent(getServiceContext()->getService()->makeClient(kClientName2));
 
     // Dismiss the guard for an explicit failure point.
     guard.dismiss();
 }
 
 DEATH_TEST_F(ClientStrandTest, ReleaseCurrentAfterBind, "No client to release") {
-    auto strand = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
+    auto strand = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
 
     assertStrandNotBound(strand);
 
@@ -397,8 +397,8 @@ DEATH_TEST_F(ClientStrandTest, ReleaseCurrentAfterBind, "No client to release") 
 }
 
 DEATH_TEST_F(ClientStrandTest, BindAfterBind, "Already have client on this thread") {
-    auto strand1 = ClientStrand::make(getServiceContext()->makeClient(kClientName1));
-    auto strand2 = ClientStrand::make(getServiceContext()->makeClient(kClientName2));
+    auto strand1 = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName1));
+    auto strand2 = ClientStrand::make(getServiceContext()->getService()->makeClient(kClientName2));
 
     assertStrandNotBound(strand1);
     assertStrandNotBound(strand2);

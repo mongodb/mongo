@@ -42,7 +42,7 @@ namespace {
 
 struct ClientAndOpCtx {
     ClientAndOpCtx(ServiceContext* service, std::string desc)
-        : client(service->makeClient(std::move(desc), nullptr)),
+        : client(service->getService()->makeClient(std::move(desc), nullptr)),
           opCtx(client->makeOperationContext()) {}
 
     ServiceContext::UniqueClient client;

@@ -49,7 +49,7 @@ class RewriteStateChangeErrorsTest : public unittest::Test {
 public:
     RewriteStateChangeErrorsTest() {
         sc = ServiceContext::make();
-        cc = sc->makeClient("test", nullptr);
+        cc = sc->getService()->makeClient("test", nullptr);
         opCtx = sc->makeOperationContext(cc.get());
     }
 

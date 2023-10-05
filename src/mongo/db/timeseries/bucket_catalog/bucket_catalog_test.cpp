@@ -201,7 +201,7 @@ BucketCatalogTest::RunBackgroundTaskAndWaitForFailpoint::~RunBackgroundTaskAndWa
 
 std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
 BucketCatalogTest::_makeOperationContext() {
-    auto client = getServiceContext()->makeClient("BucketCatalogTest");
+    auto client = getServiceContext()->getService()->makeClient("BucketCatalogTest");
     auto opCtx = client->makeOperationContext();
     return {std::move(client), std::move(opCtx)};
 }

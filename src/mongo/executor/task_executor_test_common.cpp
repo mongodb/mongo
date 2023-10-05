@@ -396,7 +396,7 @@ COMMON_EXECUTOR_TEST(EventWaitingWithTimeoutTest) {
     serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
-    auto client = serviceContext->makeClient("for testing");
+    auto client = serviceContext->getService()->makeClient("for testing");
     auto opCtx = client->makeOperationContext();
 
     auto deadline = mockClock->now() + Milliseconds{1};
@@ -418,7 +418,7 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
     serviceContext->setFastClockSource(std::make_unique<ClockSourceMock>());
     auto mockClock = static_cast<ClockSourceMock*>(serviceContext->getFastClockSource());
 
-    auto client = serviceContext->makeClient("for testing");
+    auto client = serviceContext->getService()->makeClient("for testing");
     auto opCtx = client->makeOperationContext();
 
     auto deadline = mockClock->now() + Milliseconds{1};

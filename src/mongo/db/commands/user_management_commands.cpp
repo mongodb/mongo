@@ -800,7 +800,7 @@ public:
         :  // Don't transactionalize on standalone.
           _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()},
           // Subclient used by transaction operations.
-          _client{opCtx->getServiceContext()->makeClient(forCommand.toString())},
+          _client{opCtx->getServiceContext()->getService()->makeClient(forCommand.toString())},
           _dbName{DatabaseNameUtil::deserialize(
               tenant, kAdminDB, SerializationContext::stateDefault())},
           _sessionInfo{LogicalSessionFromClient(UUID::gen())} {

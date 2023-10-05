@@ -348,7 +348,7 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
 
 TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
     auto svcCtx = ServiceContext::make();
-    auto client = svcCtx->makeClient("ClientMetadataTest");
+    auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
     auto opCtx = client->makeOperationContext();
     // metadataElem is of BSON type int
     auto obj = BSON("a" << 4);
@@ -367,7 +367,7 @@ TEST(ClientMetadataTest, TestInvalidDocWhileSettingOpCtxMetadata) {
 
 TEST(ClientMetadataTest, TestEooElemAsValueToSetOpCtxMetadata) {
     auto svcCtx = ServiceContext::make();
-    auto client = svcCtx->makeClient("ClientMetadataTest");
+    auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
     auto opCtx = client->makeOperationContext();
     // metadataElem is of BSON type eoo
     auto metadataElem = BSONElement();
@@ -384,7 +384,7 @@ TEST(ClientMetadataTest, TestEooElemAsValueToSetOpCtxMetadata) {
 
 TEST(ClientMetadataTest, InternalClientLimit) {
     auto svcCtx = ServiceContext::make();
-    auto client = svcCtx->makeClient("ClientMetadataTest");
+    auto client = svcCtx->getService()->makeClient("ClientMetadataTest");
 
     std::string tooLargeValue(600, 'x');
 

@@ -99,7 +99,8 @@ void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
 void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
     // Since this function is async, we need to create a new client and operation context to run
     // 'transitionFromDedicatedConfigServer'.
-    auto clientGuard = ClientStrand::make(serviceContext->makeClient("ShardingReady"))->bind();
+    auto clientGuard =
+        ClientStrand::make(serviceContext->getService()->makeClient("ShardingReady"))->bind();
     auto uniqueOpCtx = clientGuard->makeOperationContext();
 
     auto as = AuthorizationSession::get(uniqueOpCtx->getClient());

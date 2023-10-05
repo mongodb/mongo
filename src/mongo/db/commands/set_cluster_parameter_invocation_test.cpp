@@ -191,7 +191,7 @@ TEST(SetClusterParameterCommand, SucceedsWithObjectParameter) {
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("SomeTest");
+    auto client = serviceCtx->getService()->makeClient("SomeTest");
 
     auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
 
@@ -221,7 +221,7 @@ TEST(SetClusterParameterCommand, ThrowsWithNonObjectParameter) {
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("SomeTest");
+    auto client = serviceCtx->getService()->makeClient("SomeTest");
 
     auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
 
@@ -250,7 +250,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenServerParameterValidationFails) {
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("SomeTest");
+    auto client = serviceCtx->getService()->makeClient("SomeTest");
 
     auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
 
@@ -281,7 +281,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenDBUpdateFails) {
     DBClientMock dbServiceMock = alwaysFailingDbClient();
 
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("SomeTest");
+    auto client = serviceCtx->getService()->makeClient("SomeTest");
 
     auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
 
@@ -311,7 +311,7 @@ TEST(SetClusterParameterCommand, ThrowsWhenParameterNotPresent) {
     DBClientMock dbServiceMock = alwaysSucceedingDbClient();
 
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("SomeTest");
+    auto client = serviceCtx->getService()->makeClient("SomeTest");
 
     auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) {
         return ServerParameterSet::getClusterParameterSet()->get("doesNotExistParam"_sd);
@@ -344,7 +344,7 @@ TEST(SetClusterParameterCommand, TenantIdPassesThrough) {
     MockServerParameter sp = alwaysValidatingServerParameter("TenantIdPassesThroughParameter"_sd);
 
     auto serviceCtx = ServiceContext::make();
-    auto client = serviceCtx->makeClient("SomeTest");
+    auto client = serviceCtx->getService()->makeClient("SomeTest");
 
     auto mpsPtr = std::make_unique<MockParameterService>([&](StringData s) { return &sp; });
 

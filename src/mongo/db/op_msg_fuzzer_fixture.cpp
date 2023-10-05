@@ -110,7 +110,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     _serviceContext->setPeriodicRunner(makePeriodicRunner(_serviceContext));
 
-    _clientStrand = ClientStrand::make(_serviceContext->makeClient("test", _session));
+    _clientStrand = ClientStrand::make(_serviceContext->getService()->makeClient("test", _session));
     auto clientGuard = _clientStrand->bind();
     auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
 
