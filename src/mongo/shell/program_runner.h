@@ -138,7 +138,7 @@ public:
 class ProgramRunner {
 public:
     /** Launch the program. */
-    void start(bool shouldLogArgs = true);
+    void start();
 
     /** Reads the program's output into the provided instance of ProgramOutputMultiplexer.
      *  Note that the passed-in multiplexer will typically be the global programOutputLogger so that

@@ -162,7 +162,6 @@ globals:
   runProgram: true
   runMongoProgram: true
   runNonMongoProgram: true
-  runNonMongoProgramQuietly: true
   _runMongoProgram: true
   _startMongoProgram: true
   startMongoProgram: true
