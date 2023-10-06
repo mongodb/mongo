@@ -409,15 +409,6 @@ public:
     }
 
     /**
-     * Get this session's current idea of what the cluster's maxWireVersion is.
-     *
-     * The initial value for this is the first wire version that included gRPC support.
-     */
-    int getClusterMaxWireVersion() const {
-        return _sharedState->clusterMaxWireVersion.load();
-    };
-
-    /**
      * Indicates to the server side that the client will not be sending any further messages, then
      * blocks until all messages from the server have been read and the server has returned a final
      * status. Once a status has been received, this session's termination status is updated

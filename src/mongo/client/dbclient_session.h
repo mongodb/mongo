@@ -148,8 +148,6 @@ public:
     /**
      * Disconnects the client and interrupts operations if they are currently blocked waiting for
      * the network. If autoreconnect is on, the underlying session will be re-established.
-     * Shutting down a connection does not imply that we are shutting down the process, although
-     * the two events often happen together.
      */
     virtual void shutdown();
 

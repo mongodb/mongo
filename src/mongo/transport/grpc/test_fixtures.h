@@ -239,19 +239,6 @@ public:
         return options;
     }
 
-    static GRPCTransportLayer::Options makeTLOptions() {
-        GRPCTransportLayer::Options options{};
-        options.bindIpList = {};
-        options.bindPort = kBindPort;
-        options.maxServerThreads = kMaxThreads;
-        options.useUnixDomainSockets = false;
-        options.unixDomainSocketPermissions = DEFAULT_UNIX_PERMS;
-        options.enableEgress = true;
-        options.clientMetadata = makeClientMetadataDocument();
-
-        return options;
-    }
-
     static std::unique_ptr<Server> makeServer(CommandService::RPCHandler handler,
                                               Server::Options options) {
         std::vector<std::unique_ptr<Service>> services;

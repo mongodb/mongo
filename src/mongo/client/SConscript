@@ -11,11 +11,6 @@ env.SConscript(
     exports=['env'],
 )
 
-
-def shouldBuildGRPC(myEnv):
-    return myEnv.TargetOSIs('linux') and myEnv['ENABLE_GRPC_BUILD']
-
-
 # Contains only the core ConnectionString functionality, *not* the ability to call connect() and
 # return a DBClientBase* back. For that you need to link against the 'clientdriver_network' library.
 env.Library(
@@ -177,8 +172,6 @@ env.Library(
 
 clientDriverEnv = env.Clone()
 clientDriverEnv.InjectThirdParty('asio')
-if shouldBuildGRPC(env):
-    clientDriverEnv.InjectThirdParty(libraries=['grpc'])
 
 clientDriverEnv.Library(
     target='clientdriver_minimal',
@@ -213,7 +206,6 @@ clientDriverEnv.Library(
         'mongo_uri_connect.cpp',
         'connpool.cpp',
         'dbclient_connection.cpp',
-        'dbclient_grpc_stream.cpp' if shouldBuildGRPC(env) else [],
         'dbclient_rs.cpp',
         'dbclient_session.cpp',
         'global_conn_pool.cpp',
@@ -237,7 +229,6 @@ clientDriverEnv.Library(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/transport/grpc/grpc_transport_layer' if shouldBuildGRPC(env) else [],
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
@@ -448,20 +439,6 @@ env.CppUnitTest(
         'replica_set_monitor_test_helper',
     ],
 )
-if shouldBuildGRPC(env):
-    clientDriverEnv.CppUnitTest(
-        target='dbclient_grpc_stream_test',
-        source=[
-            'dbclient_grpc_stream_test.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/db/service_context_non_d',
-            '$BUILD_DIR/mongo/db/service_context_test_fixture',
-            '$BUILD_DIR/mongo/transport/grpc/grpc_transport_mock',
-            '$BUILD_DIR/mongo/util/version_impl',
-            'clientdriver_network',
-        ],
-    )
 
 # TODO SERVER-75914: remove the condition when the test can reliably run on Windows.
 if not env.TargetOSIs('windows'):

@@ -34,7 +34,7 @@
 #include "mongo/transport/asio/asio_session_impl.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/grpc/grpc_session.h"
-#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/test_fixtures.h"
@@ -122,8 +122,8 @@ private:
         grpcOpts.maxServerThreads = grpc::CommandServiceTestFixtures::kMaxThreads;
         grpcOpts.enableEgress = true;
         grpcOpts.clientMetadata = grpc::makeClientMetadataDocument();
-        auto grpcLayer = std::make_unique<grpc::GRPCTransportLayerImpl>(getServiceContext(),
-                                                                        std::move(grpcOpts));
+        auto grpcLayer =
+            std::make_unique<grpc::GRPCTransportLayer>(getServiceContext(), std::move(grpcOpts));
         uassertStatusOK(grpcLayer->registerService(std::make_unique<grpc::CommandService>(
             grpcLayer.get(),
             [&](auto session) { _serverCb(*session); },
