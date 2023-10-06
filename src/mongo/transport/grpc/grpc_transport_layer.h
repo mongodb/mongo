@@ -30,15 +30,9 @@
 #pragma once
 
 #include <boost/optional.hpp>
-#include <memory>
 
-#include "mongo/config.h"
-#include "mongo/db/service_context.h"
-#include "mongo/transport/grpc/client.h"
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 
 namespace mongo::transport::grpc {
 
@@ -50,8 +44,15 @@ namespace mongo::transport::grpc {
  * The egress portion of this TransportLayer always communicates via the mongodb.CommandService,
  * but other arbitrary gRPC services can be used in the ingress portion. Such services can be
  * registered with this transport layer via registerService() before setup() is called.
+ *
+ * On shutdown, it cancels all outstanding RPCs (both ingress and egress) and blocks until they have
+ * completed. If egress mode is enabled, this entails waiting for all sessions to be destructed. If
+ * ingress mode is enabled, this entails waiting for all RPC handlers to return.
  */
 class GRPCTransportLayer : public TransportLayer {
+protected:
+    GRPCTransportLayer() = default;
+
 public:
     struct Options {
         explicit Options(const ServerGlobalParams& params);
@@ -66,31 +67,19 @@ public:
         boost::optional<BSONObj> clientMetadata;
     };
 
-    GRPCTransportLayer(ServiceContext* svcCtx, Options options);
+    virtual ~GRPCTransportLayer() {}
 
     /**
      * Add the service to the list that will be served once this transport layer has been started.
      * If no services have been registered at the time when setup() is invoked, no server will be
      * created. All services must be registered before setup() is invoked.
      */
-    Status registerService(std::unique_ptr<Service> svc);
+    virtual Status registerService(std::unique_ptr<Service> svc) = 0;
 
-    Status setup() override;
-
-    Status start() override;
-
-    /**
-     * Cancels all outstanding RPCs (both ingress and egress) and blocks until they have completed.
-     * If egress mode is enabled, this entails waiting for all sessions to be destructed.
-     * If ingress mode is enabled, this entails waiting for all RPC handlers to return.
-     */
-    void shutdown() override;
-
-    StatusWith<std::shared_ptr<Session>> connect(
+    virtual StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
-        ConnectSSLMode sslMode,
         Milliseconds timeout,
-        boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
+        boost::optional<std::string> authToken = boost::none) = 0;
 
     /**
      * The server's current gRPC integration doesn't support async networking, so this is
@@ -115,30 +104,15 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     /**
-     * gRPC's C++ library does not currently support rotating TLS certificates manually, so this
-     * just does nothing and logs a message.
-     */
-    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
-                              bool asyncOCSPStaple) override;
-
-    /**
      * The gRPC integration doesn't support the use of transient SSL contexts, so this always
      * returns an error.
      */
     StatusWith<std::shared_ptr<const transport::SSLConnectionContext>> createTransientSSLContext(
-        const TransientSSLParams& transientSSLParams) override;
+        const TransientSSLParams& transientSSLParams) override {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      "Transient SSL contexts are not supported when using gRPC.");
+    }
 #endif
-
-private:
-    mutable stdx::mutex _mutex;
-    bool _isShutdown = false;
-
-    std::shared_ptr<Client> _client;
-    std::unique_ptr<Server> _server;
-    ServiceContext* const _svcCtx;
-    // Invalidated after setup().
-    std::vector<std::unique_ptr<Service>> _services;
-    Options _options;
 };
 
 }  // namespace mongo::transport::grpc

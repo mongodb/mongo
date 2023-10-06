@@ -369,7 +369,9 @@ void DBClientSession::connectNoHello(const HostAndPort& serverAddress,
     }
     _sessionCreationTimeMicros = curTimeMicros64();
     _lastConnectivityCheck = Date_t::now();
-    _session->setTimeout(_socketTimeout);
+    if (_socketTimeout) {
+        _session->setTimeout(_socketTimeout);
+    }
     LOGV2_DEBUG(20119, 1, "Connected to host", "connString"_attr = toString());
 }
 

@@ -35,7 +35,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/grpc/grpc_session.h"
-#include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
 #include "mongo/transport/transport_layer.h"
@@ -70,23 +70,10 @@ public:
         return makePeriodicRunner(getServiceContext());
     }
 
-    static GRPCTransportLayer::Options makeTLOptions() {
-        GRPCTransportLayer::Options options{};
-        options.bindIpList = {};
-        options.bindPort = CommandServiceTestFixtures::kBindPort;
-        options.maxServerThreads = CommandServiceTestFixtures::kMaxThreads;
-        options.useUnixDomainSockets = false;
-        options.unixDomainSocketPermissions = DEFAULT_UNIX_PERMS;
-        options.enableEgress = true;
-        options.clientMetadata = makeClientMetadataDocument();
-
-        return options;
-    }
-
     std::unique_ptr<GRPCTransportLayer> makeTL(
         CommandService::RPCHandler serverCb = makeNoopRPCHandler(),
-        GRPCTransportLayer::Options options = makeTLOptions()) {
-        auto tl = std::make_unique<GRPCTransportLayer>(getServiceContext(), std::move(options));
+        GRPCTransportLayer::Options options = CommandServiceTestFixtures::makeTLOptions()) {
+        auto tl = std::make_unique<GRPCTransportLayerImpl>(getServiceContext(), std::move(options));
         uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
             tl.get(), std::move(serverCb), std::make_unique<WireVersionProvider>())));
         return tl;
@@ -194,7 +181,8 @@ public:
 
     void setUp() override {
         GRPCTransportLayerTest::setUp();
-        _tl = std::make_unique<GRPCTransportLayer>(getServiceContext(), makeTLOptions());
+        _tl = std::make_unique<GRPCTransportLayerImpl>(getServiceContext(),
+                                                       CommandServiceTestFixtures::makeTLOptions());
         uassertStatusOK(_tl->setup());
     }
 
@@ -239,7 +227,7 @@ TEST_F(IdleChannelPrunerTest, StopsWithTransportLayer) {
 
 TEST_F(GRPCTransportLayerTest, ConnectAndListen) {
     unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
-        auto options = makeTLOptions();
+        auto options = CommandServiceTestFixtures::makeTLOptions();
         options.bindIpList = {"localhost", "127.0.0.1", "::1"};
         options.bindPort = CommandServiceTestFixtures::kBindPort;
         options.useUnixDomainSockets = true;
@@ -268,7 +256,7 @@ TEST_F(GRPCTransportLayerTest, ConnectAndListen) {
 }
 
 TEST_F(GRPCTransportLayerTest, UnixDomainSocketPermissions) {
-    auto options = makeTLOptions();
+    auto options = CommandServiceTestFixtures::makeTLOptions();
     auto permissions = S_IRWXO & S_IRWXG & S_IRWXU;
     options.useUnixDomainSockets = true;
     options.unixDomainSocketPermissions = permissions;
@@ -322,7 +310,7 @@ TEST_F(GRPCTransportLayerTest, ConnectionError) {
             // Ensure second attempt on already created channel object also gracefully fails.
             tryConnect();
         },
-        makeTLOptions());
+        CommandServiceTestFixtures::makeTLOptions());
 }
 
 TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
@@ -362,7 +350,7 @@ TEST_F(GRPCTransportLayerTest, Unary) {
             assertEchoSucceeds(*session);
             ASSERT_OK(session->finish());
         },
-        makeTLOptions());
+        CommandServiceTestFixtures::makeTLOptions());
 }
 
 TEST_F(GRPCTransportLayerTest, Exhaust) {
@@ -404,7 +392,7 @@ TEST_F(GRPCTransportLayerTest, Exhaust) {
             }
             ASSERT_OK(session->finish());
         },
-        makeTLOptions());
+        CommandServiceTestFixtures::makeTLOptions());
 }
 
 TEST_F(GRPCTransportLayerTest, Awaitable) {
@@ -445,7 +433,7 @@ TEST_F(GRPCTransportLayerTest, Awaitable) {
             }
             session->end();
         },
-        makeTLOptions());
+        CommandServiceTestFixtures::makeTLOptions());
 }
 
 TEST_F(GRPCTransportLayerTest, Unacknowledged) {
@@ -479,7 +467,7 @@ TEST_F(GRPCTransportLayerTest, Unacknowledged) {
 
             ASSERT_OK(session->finish());
         },
-        makeTLOptions());
+        CommandServiceTestFixtures::makeTLOptions());
 }
 
 }  // namespace
