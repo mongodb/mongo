@@ -243,7 +243,7 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture() const {
             // for determining whether the critical section should begin).
             return RemainingOperationTimes{Milliseconds(-1), Milliseconds::max()};
         })
-        .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) {
+        .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) mutable {
             // If remainingTimes.max (or remainingTimes.min) is Milliseconds::max, then use -1 so
             // that the scale of the y-axis is still useful when looking at FTDC metrics.
             auto clampIfMax = [](Milliseconds t) {

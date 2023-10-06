@@ -267,7 +267,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         auto request = UpdateRequest();
         request.setNamespaceString(_myStashNss);
         request.setQuery(idQuery);
-        request.setUpdateModification(updateMod);
+        request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
 
@@ -302,7 +302,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         auto request = UpdateRequest();
         request.setNamespaceString(_outputNss);
         request.setQuery(idQuery);
-        request.setUpdateModification(updateMod);
+        request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
 

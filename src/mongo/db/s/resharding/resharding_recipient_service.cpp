@@ -1135,10 +1135,8 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
     const CancelableOperationContextFactory& factory) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCreatingCollection);
-    _transitionState(std::move(newRecipientCtx),
-                     std::move(cloneDetails),
-                     std::move(startConfigTxnCloneTime),
-                     factory);
+    _transitionState(
+        std::move(newRecipientCtx), std::move(cloneDetails), startConfigTxnCloneTime, factory);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(

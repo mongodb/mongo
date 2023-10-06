@@ -125,8 +125,8 @@ public:
         return _updateOp.getCollation().get_value_or(emptyCollation);
     }
 
-    void setUpdateModification(const write_ops::UpdateModification& updateMod) {
-        _updateOp.setU(updateMod);
+    void setUpdateModification(write_ops::UpdateModification updateMod) {
+        _updateOp.setU(std::move(updateMod));
     }
 
     const write_ops::UpdateModification& getUpdateModification() const {

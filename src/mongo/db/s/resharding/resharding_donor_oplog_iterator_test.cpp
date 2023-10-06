@@ -113,7 +113,7 @@ class ReshardingDonorOplogIterTest : public ShardServerTestFixture {
 public:
     repl::MutableOplogEntry makeInsertOplog(Timestamp ts, BSONObj doc) {
         ReshardingDonorOplogId oplogId(ts, ts);
-        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kInsert, std::move(doc), {}, oplogId);
+        return makeOplog(_crudNss, _uuid, repl::OpTypeEnum::kInsert, doc, {}, oplogId);
     }
 
     repl::MutableOplogEntry makeFinalOplog(Timestamp ts) {
@@ -186,7 +186,7 @@ public:
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
         return ExecutorFuture(executor)
-            .then([iter, executor, factory] {
+            .then([iter, executor, factory]() mutable {
                 return iter->getNextBatch(
                     std::move(executor), CancellationToken::uncancelable(), factory);
             })

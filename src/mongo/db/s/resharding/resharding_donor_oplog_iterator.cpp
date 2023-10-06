@@ -125,7 +125,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
 
     stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
 
-    return Pipeline::create(std::move(stages), std::move(expCtx));
+    return Pipeline::create(std::move(stages), expCtx);
 }
 
 std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline& pipeline) {
@@ -209,7 +209,7 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                 return future_util::withCancellation(_insertNotifier->awaitInsert(_resumeToken),
                                                      cancelToken);
             })
-            .then([this, cancelToken, executor, factory] {
+            .then([this, cancelToken, executor, factory]() mutable {
                 return getNextBatch(std::move(executor), cancelToken, factory);
             });
     }

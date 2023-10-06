@@ -1274,7 +1274,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                 timeseries::translateQuery(updateRequest->getQuery(), *metaField));
             auto modification = uassertStatusOK(
                 timeseries::translateUpdate(updateRequest->getUpdateModification(), *metaField));
-            updateRequest->setUpdateModification(modification);
+            updateRequest->setUpdateModification(std::move(modification));
         }
     }
 

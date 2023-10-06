@@ -132,7 +132,7 @@ public:
         return std::make_shared<ReshardingCoordinator>(
             this,
             ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
-                                                 std::move(initialState)),
+                                                 initialState),
             std::make_shared<ExternalStateForTest>(),
             _serviceContext);
     }

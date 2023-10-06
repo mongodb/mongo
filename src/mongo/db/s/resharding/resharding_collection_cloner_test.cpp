@@ -153,7 +153,7 @@ protected:
             createChunkManager(newShardKeyPattern, configCacheChunksData));
         auto [rawPipeline, expCtx] = _cloner->makeRawPipeline(
             operationContext(), std::make_shared<MockMongoInterface>(configCacheChunksData));
-        _pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+        _pipeline = Pipeline::parse(rawPipeline, expCtx);
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));

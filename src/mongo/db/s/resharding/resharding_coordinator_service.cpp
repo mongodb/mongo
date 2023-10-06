@@ -1315,7 +1315,7 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
     auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
         IDLParserContext("ReshardingCoordinatorService::checkIfConflictsWithOtherInstances"),
-        std::move(initialState));
+        initialState);
 
     for (const auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const ReshardingCoordinator*>(instance);
@@ -1371,7 +1371,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
     return std::make_shared<ReshardingCoordinator>(
         this,
         ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
-                                             std::move(initialState)),
+                                             initialState),
         std::make_shared<ReshardingCoordinatorExternalStateImpl>(),
         _serviceContext);
 }
@@ -2512,7 +2512,7 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
 
         collectionPlacementAsVector.reserve(collectionPlacement.size());
         for (auto& elem : collectionPlacement) {
-            collectionPlacementAsVector.emplace_back(std::move(elem));
+            collectionPlacementAsVector.emplace_back(elem);
         }
         return collectionPlacementAsVector;
     }();
