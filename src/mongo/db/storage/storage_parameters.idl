@@ -78,6 +78,13 @@ server_parameters:
         default: 2048
         validator:
             gte: 1
+    skipDroppingHashedShardKeyIndex:
+        description: >-
+            Skips dropping hashed shard key supporting indexes when calling dropIndexes with the '*' parameter. Used for testing purposes.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: skipDroppingHashedShardKeyIndex
+        default: false
 
 feature_flags:
     featureFlagLockFreeReads:

@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -66,13 +67,13 @@ const IndexDescriptor* findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                  bool requireSingleKey);
 
 /**
- * Returns true if the given index name is the last remaining index that is compatible with the
- * shard key index.
+ * Returns true if the given index name is the last remaining index that is compatible with a
+ * range shard key. Hashed shard key indexes can be dropped.
  */
-bool isLastShardKeyIndex(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const IndexCatalog* indexCatalog,
-                         const std::string& indexName,
-                         const BSONObj& shardKey);
+bool isLastRangedShardKeyIndex(OperationContext* opCtx,
+                               const CollectionPtr& collection,
+                               const IndexCatalog* indexCatalog,
+                               const std::string& indexName,
+                               const BSONObj& shardKey);
 
 }  // namespace mongo

@@ -69,8 +69,13 @@ public:
         _impl->get().throwIfReshardingInProgress(nss);
     }
 
+    // Same as getShardKeyPattern().toBSON()
     const BSONObj& getKeyPattern() const {
         return _impl->get().getKeyPattern();
+    }
+
+    const ShardKeyPattern& getShardKeyPattern() const {
+        return _impl->get().getShardKeyPattern();
     }
 
     const std::vector<std::unique_ptr<FieldRef>>& getKeyPatternFields() const {

@@ -132,6 +132,16 @@ env.Library(
 )
 
 env.Library(
+    target="sharding_feature_flag",
+    source=[
+        'sharding_feature_flags.idl'
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
+    ]
+)
+
+env.Library(
     target="load_balancer_feature_flag",
     source=[
         'load_balancer_feature_flag.idl'
@@ -219,7 +229,6 @@ env.Library(
         'shard_id.cpp',
         'shard_invalidated_for_targeting_exception.cpp',
         'sharding_ddl_50_upgrade_downgrade.idl',
-        'sharding_feature_flags.idl',
         'stale_exception.cpp',
         'type_collection_timeseries_fields.idl',
         'would_change_owning_shard_exception.cpp',
@@ -235,6 +244,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
         "load_balancer_feature_flag",
+        "sharding_feature_flag",
     ]
 )
 
