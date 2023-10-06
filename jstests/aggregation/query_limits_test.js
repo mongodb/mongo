@@ -73,7 +73,7 @@ function testLargeProject() {
 
 // Run $and and $or with many different types of predicates.
 function testLargeAndOrPredicates() {
-    // TODO: SERVER-78635 remove this early return once this ticket is done. This is a
+    // TODO: SERVER-80735 remove this early return once this ticket is done. This is a
     // Bonsai-specific issues with PSR.
     if (isBonsaiEnabled) {
         return;
