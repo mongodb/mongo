@@ -235,6 +235,7 @@ protected:
     void _unregisterResourceNameIfNoLongerNeeded(WithLock lk, ResourceId resId, StringData resName);
 
 
+    friend class DDLLockManagerTest;
     friend class ShardingCatalogManager;
     friend class ShardingDDLCoordinator;
     friend class ShardingDDLCoordinatorService;

@@ -219,8 +219,14 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContex
     // Check under the DDL db lock if this is the primary shard for the database
     DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns.dbName());
 
-    // Finally, acquire the collection DDL lock
-    _collLock.emplace(opCtx, opCtx->lockState(), ns, reason, mode, true /*waitForRecovery*/);
+    // Acquire the collection DDL lock.
+    // If the ns represents a timeseries buckets collection, translate to its corresponding view ns.
+    _collLock.emplace(opCtx,
+                      opCtx->lockState(),
+                      ns.isTimeseriesBucketsCollection() ? ns.getTimeseriesViewNamespace() : ns,
+                      reason,
+                      mode,
+                      true /*waitForRecovery*/);
 }
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(OperationContext* opCtx,

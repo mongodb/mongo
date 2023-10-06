@@ -233,6 +233,8 @@ private:
     std::unique_ptr<Locker> _locker;
 
     std::stack<DDLLockManager::ScopedBaseDDLLock> _scopedLocks;
+
+    friend class ShardingDDLCoordinatorTest;
 };
 
 template <class StateDoc>

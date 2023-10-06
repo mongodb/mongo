@@ -255,10 +255,18 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireAllLocksAsync(
     OperationContext* opCtx,
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) {
+    // Fetching all the locks that need to be acquired. Sort them by nss to avoid deadlocks.
+    // If the requested nss represents a timeseries buckets namespace, translate it to its view nss.
+    std::set<NamespaceString> locksToAcquire;
+    locksToAcquire.insert(originalNss().isTimeseriesBucketsCollection()
+                              ? originalNss().getTimeseriesViewNamespace()
+                              : originalNss());
 
-    // Fetching all the locks that need to be acquired
-    std::set<NamespaceString> locksToAcquire = _getAdditionalLocksToAcquire(opCtx);
-    locksToAcquire.insert(originalNss());
+    for (const auto& additionalLock : _getAdditionalLocksToAcquire(opCtx)) {
+        locksToAcquire.insert(additionalLock.isTimeseriesBucketsCollection()
+                                  ? additionalLock.getTimeseriesViewNamespace()
+                                  : additionalLock);
+    }
 
     // Acquiring all DDL locks in sorted order to avoid deadlocks
     // Note that the sorted order is provided by default through the std::set container
@@ -374,13 +382,6 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 return ExecutorFuture<void>(**executor);
             }
             return _translateTimeseriesNss(executor, token);
-        })
-        .then([this, executor, token, anchor = shared_from_this()] {
-            if (const auto bucketNss = metadata().getBucketNss()) {
-                return _acquireLockAsync<NamespaceString>(
-                    executor, token, bucketNss.value(), MODE_X);
-            }
-            return ExecutorFuture<void>(**executor);
         })
         .then([this, anchor = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
