@@ -193,7 +193,8 @@ bool InternalBucketGeoWithinMatchExpression::_matchesBSONObj(const BSONObj& obj)
 }
 
 void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
-                                                       const SerializationOptions& opts) const {
+                                                       const SerializationOptions& opts,
+                                                       bool includePath) const {
     BSONObjBuilder bob(builder->subobjStart(InternalBucketGeoWithinMatchExpression::kName));
     // Serialize the geometry shape.
     BSONObjBuilder withinRegionBob(

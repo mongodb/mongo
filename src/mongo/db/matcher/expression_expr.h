@@ -96,7 +96,9 @@ public:
         _debugStringAttachTagInfo(&debug);
     }
 
-    void serialize(BSONObjBuilder* out, const SerializationOptions& opts) const final;
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final;
 
     bool isTriviallyTrue() const final;
 

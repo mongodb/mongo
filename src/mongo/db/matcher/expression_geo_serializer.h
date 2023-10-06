@@ -57,5 +57,6 @@ namespace mongo {
  */
 void geoCustomSerialization(BSONObjBuilder* bob,
                             const BSONObj& obj,
-                            const SerializationOptions& opts);
+                            const SerializationOptions& opts = {},
+                            bool includePath = true);
 }  // namespace mongo

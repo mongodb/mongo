@@ -107,7 +107,8 @@ public:
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts) const final;
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;
@@ -176,7 +177,8 @@ public:
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts) const final;
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return &_subs;
@@ -252,7 +254,8 @@ public:
     virtual void debugString(StringBuilder& debug, int indentationLevel) const;
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts) const final;
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final;
 
     virtual bool equivalent(const MatchExpression* other) const;
 

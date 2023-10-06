@@ -104,12 +104,12 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts) const {
+void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                   const SerializationOptions& opts,
+                                                                   bool includePath) const {
     BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
     SerializationOptions options = opts;
-    options.includePath = true;
-    _sub->serialize(&elemMatchBob, options);
+    _sub->serialize(&elemMatchBob, options, true);
     elemMatchBob.doneFast();
 }
 
@@ -174,13 +174,13 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     }
 }
 
-void ElemMatchValueMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts) const {
+void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                  const SerializationOptions& opts,
+                                                                  bool includePath) const {
     BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
     SerializationOptions options = opts;
-    options.includePath = false;
     for (auto&& child : _subs) {
-        child->serialize(&emBob, options);
+        child->serialize(&emBob, options, false);
     }
     emBob.doneFast();
 }
@@ -217,7 +217,8 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
 }
 
 void SizeMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                        const SerializationOptions& opts) const {
+                                                        const SerializationOptions& opts,
+                                                        bool includePath) const {
     opts.appendLiteral(bob, "$size", _size);
 }
 

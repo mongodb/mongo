@@ -70,8 +70,9 @@ void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug,
 }
 
 void InternalSchemaXorMatchExpression::serialize(BSONObjBuilder* out,
-                                                 const SerializationOptions& opts) const {
+                                                 const SerializationOptions& opts,
+                                                 bool includePath) const {
     BSONArrayBuilder arrBob(out->subarrayStart(kName));
-    _listToBSON(&arrBob, opts);
+    _listToBSON(&arrBob, opts, includePath);
 }
 }  //  namespace mongo

@@ -48,7 +48,8 @@ void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentation
 }
 
 void WhereMatchExpressionBase::serialize(BSONObjBuilder* out,
-                                         const SerializationOptions& opts) const {
+                                         const SerializationOptions& opts,
+                                         bool includePath) const {
     opts.appendLiteral(out, "$where", BSONCode(getCode()));
 }
 

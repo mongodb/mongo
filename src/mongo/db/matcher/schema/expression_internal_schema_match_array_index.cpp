@@ -73,12 +73,13 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
 }
 
 void InternalSchemaMatchArrayIndexMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts) const {
-    bob->append(kName,
-                BSON("index" << opts.serializeLiteral(_index) << "namePlaceholder"
-                             << opts.serializeFieldPathFromString(
-                                    _expression->getPlaceholder().value_or(""))
-                             << "expression" << _expression->getFilter()->serialize(opts)));
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(
+        kName,
+        BSON(
+            "index" << opts.serializeLiteral(_index) << "namePlaceholder"
+                    << opts.serializeFieldPathFromString(_expression->getPlaceholder().value_or(""))
+                    << "expression" << _expression->getFilter()->serialize(opts, includePath)));
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::clone() const {

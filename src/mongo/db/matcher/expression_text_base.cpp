@@ -54,7 +54,8 @@ void TextMatchExpressionBase::debugString(StringBuilder& debug, int indentationL
 }
 
 void TextMatchExpressionBase::serialize(BSONObjBuilder* out,
-                                        const SerializationOptions& opts) const {
+                                        const SerializationOptions& opts,
+                                        bool includePath) const {
     const fts::FTSQuery& ftsQuery = getFTSQuery();
     out->append("$text",
                 BSON("$search" << opts.serializeLiteral(ftsQuery.getQuery()) << "$language"

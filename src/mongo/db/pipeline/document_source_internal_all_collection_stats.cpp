@@ -162,10 +162,6 @@ void DocumentSourceInternalAllCollectionStats::serializeToArray(
         auto doc = Document{{getSourceName(), bob.obj()}};
         array.push_back(Value(doc));
     } else {
-        auto opts = explain ? SerializationOptions{.includePath = false,
-                                                   .verbosity = boost::make_optional(
-                                                       ExplainOptions::Verbosity::kQueryPlanner)}
-                            : SerializationOptions{};
         array.push_back(serialize(opts));
         if (_absorbedMatch) {
             _absorbedMatch->serializeToArray(array);

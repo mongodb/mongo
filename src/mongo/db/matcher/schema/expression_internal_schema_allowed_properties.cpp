@@ -130,8 +130,9 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
     return true;
 }
 
-void InternalSchemaAllowedPropertiesMatchExpression::serialize(
-    BSONObjBuilder* builder, const SerializationOptions& opts) const {
+void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
+                                                               const SerializationOptions& opts,
+                                                               bool includePath) const {
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
@@ -147,12 +148,12 @@ void InternalSchemaAllowedPropertiesMatchExpression::serialize(
     for (auto&& [pattern, expression] : _patternProperties) {
         patternPropertiesBuilder << BSON(
             "regex" << opts.serializeLiteral(BSONRegEx(pattern.rawRegex)) << "expression"
-                    << expression->getFilter()->serialize(opts));
+                    << expression->getFilter()->serialize(opts, includePath));
     }
     patternPropertiesBuilder.doneFast();
 
     BSONObjBuilder otherwiseBuilder(expressionBuilder.subobjStart("otherwise"));
-    _otherwise->getFilter()->serialize(&otherwiseBuilder, opts);
+    _otherwise->getFilter()->serialize(&otherwiseBuilder, opts, includePath);
     otherwiseBuilder.doneFast();
     expressionBuilder.doneFast();
 }

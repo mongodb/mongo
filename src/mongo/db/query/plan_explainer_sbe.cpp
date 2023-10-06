@@ -279,8 +279,7 @@ void statsToBSON(const QuerySolutionNode* node,
                 BSONObjBuilder filtersBob(bob->subobjStart("filtersByPath"));
                 for (const auto& [path, matchExpr] : cisn->filtersByPath) {
                     SerializationOptions opts;
-                    opts.includePath = false;
-                    filtersBob.append(path, matchExpr->serialize(opts));
+                    filtersBob.append(path, matchExpr->serialize(opts, false));
                 }
             }
 

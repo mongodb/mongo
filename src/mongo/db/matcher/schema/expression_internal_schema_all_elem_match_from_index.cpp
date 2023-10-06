@@ -81,10 +81,10 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuild
 }
 
 void InternalSchemaAllElemMatchFromIndexMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, const SerializationOptions& opts) const {
-    bob->append(
-        kName,
-        BSON_ARRAY(opts.serializeLiteral(_index) << _expression->getFilter()->serialize(opts)));
+    BSONObjBuilder* bob, const SerializationOptions& opts, bool includePath) const {
+    bob->append(kName,
+                BSON_ARRAY(opts.serializeLiteral(_index)
+                           << _expression->getFilter()->serialize(opts, includePath)));
 }
 
 MatchExpression::ExpressionOptimizerFunc

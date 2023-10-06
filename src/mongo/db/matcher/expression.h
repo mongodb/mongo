@@ -524,16 +524,31 @@ public:
      * If 'options.literalPolicy' is set to 'kToDebugTypeString', the result is no longer expected
      * to re-parse, since we will put strings in places where strings may not be accpeted
      * syntactically (e.g. a number is always expected, as in with the $mod expression).
+     *
+     * includePath:
+     * If set to false, serializes without including the path. For example {a: {$gt: 2}} would
+     * serialize as just {$gt: 2}.
+     *
+     * It is expected that most callers want to set 'includePath' to true to get a correct
+     * serialization. Internally, we may set this to false if we have a situation where an outer
+     * expression serializes a path and we don't want to repeat the path in the inner expression.
+
+     * For example in {a: {$elemMatch: {$eq: 2}}} the "a" is serialized by the $elemMatch, and
+     * should not be serialized by the EQ child.
+     * The $elemMatch will serialize {a: {$elemMatch: <recurse>}} and the EQ will serialize just
+     * {$eq: 2} instead of its usual {a: {$eq: 2}}.
      */
-    virtual void serialize(BSONObjBuilder* out, const SerializationOptions& options) const = 0;
+    virtual void serialize(BSONObjBuilder* out,
+                           const SerializationOptions& options = {},
+                           bool includePath = true) const = 0;
 
     /**
      * Convenience method which serializes this MatchExpression to a BSONObj. See the override with
      * a BSONObjBuilder* argument for details.
      */
-    BSONObj serialize(const SerializationOptions& options = {}) const {
+    BSONObj serialize(const SerializationOptions& options = {}, bool includePath = true) const {
         BSONObjBuilder bob;
-        serialize(&bob, options);
+        serialize(&bob, options, includePath);
         return bob.obj();
     }
 

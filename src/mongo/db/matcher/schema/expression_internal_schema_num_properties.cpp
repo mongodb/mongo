@@ -42,7 +42,8 @@ void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debu
 }
 
 void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out,
-                                                           const SerializationOptions& opts) const {
+                                                           const SerializationOptions& opts,
+                                                           bool includePath) const {
     opts.appendLiteral(out, _name, _numProperties);
 }
 
