@@ -3,9 +3,11 @@
  * index can be successfully created if the recipient shard is restarted during building-index
  * stage.
  *
+ * This test restarts a replica set node, which requires persistence.
  * @tags: [
  *  requires_fcv_72,
- *  featureFlagReshardingImprovements
+ *  featureFlagReshardingImprovements,
+ *  requires_persistence,
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
