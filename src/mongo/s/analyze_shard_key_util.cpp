@@ -55,6 +55,9 @@ namespace mongo {
 namespace analyze_shard_key {
 
 Status validateNamespace(const NamespaceString& nss) {
+    if (!nss.isValid()) {
+        return Status(ErrorCodes::InvalidNamespace, str::stream() << "The namespace is invalid");
+    }
     if (nss.isOnInternalDb()) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "Cannot run against an internal collection");

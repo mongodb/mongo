@@ -45,6 +45,8 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/namespace_string_util.h"
 
@@ -87,6 +89,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
 
         std::vector<BSONObj> stages;
         if (auto& nss = _spec.getNamespace()) {
+            uassertStatusOK(validateNamespace(*nss));
             stages.push_back(
                 BSON("$match" << BSON(SampledQueryDocument::kNsFieldName
                                       << NamespaceStringUtil::serialize(

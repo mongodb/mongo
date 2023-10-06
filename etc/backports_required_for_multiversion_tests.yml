@@ -481,6 +481,8 @@ last-continuous:
     ticket: SERVER-79446
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
+  - test_file: jstests/sharding/analyze_shard_key/ns_validation.js
+    ticket: SERVER-81939
   suites: null
 last-lts:
   all:
@@ -1028,4 +1030,6 @@ last-lts:
     ticket: SERVER-79446
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
+  - test_file: jstests/sharding/analyze_shard_key/ns_validation.js
+    ticket: SERVER-81939
   suites: null
