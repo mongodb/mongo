@@ -502,5 +502,11 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
     }
 }
 
+bool isMoveCollection(boost::optional<ProvenanceEnum> provenance) {
+    return provenance &&
+        (provenance.get() == ProvenanceEnum::kMoveCollection ||
+         provenance.get() == ProvenanceEnum::kBalancerMoveCollection);
+}
+
 }  // namespace resharding
 }  // namespace mongo

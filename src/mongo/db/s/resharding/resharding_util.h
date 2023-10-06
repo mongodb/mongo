@@ -367,5 +367,10 @@ void validateShardDistribution(const std::vector<ShardKeyRange>& shardDistributi
                                OperationContext* opCtx,
                                const ShardKeyPattern& keyPattern);
 
+/**
+ * Returns true if the provenance is moveCollection or balancerMoveCollection.
+ */
+bool isMoveCollection(boost::optional<ProvenanceEnum> provenance);
+
 }  // namespace resharding
 }  // namespace mongo

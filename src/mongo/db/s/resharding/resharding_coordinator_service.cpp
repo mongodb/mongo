@@ -2145,7 +2145,7 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                    cm.emplace(cri.cm);
                }
 
-               if (_metadata.getProvenance() == ProvenanceEnum::kMoveCollection) {
+               if (resharding::isMoveCollection(_metadata.getProvenance())) {
                    // Verify if the moveCollection is redundant by checking if the operation is
                    // attempting to move to the same shard.
                    std::set<ShardId> shardIdsSet;

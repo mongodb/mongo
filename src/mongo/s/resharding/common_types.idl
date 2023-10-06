@@ -96,6 +96,7 @@ enums:
             kReshardCollection: "reshardCollection"
             kMoveCollection: "moveCollection"
             kUnshardCollection: "unshardCollection"
+            kBalancerMoveCollection: "balancerMoveCollection"
 
 structs:
     CommonReshardingMetadata:

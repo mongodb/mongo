@@ -221,11 +221,12 @@ selector:
   - jstests/sharding/api_params_transaction_sharded.js
   - jstests/sharding/api_params_transaction_unsharded.js
 
-  # TODO SERVER-51495: Re-enable these tests after reshardCollection is resilient to config server
-  # primary failovers.
+  # These tests use the resharding test fixture, which performs its own addShard. Config server stepdowns can
+  # interrupt the addShard operation resulting in the test cluster not being initalized properly.
+  # TODO SERVER-51495: Re-enable these tests after resharding, moveCollection, and unshardCollection
+  # are resilient to config server primary failovers.
   - jstests/sharding/*reshard*.js
-  - jstests/sharding/move_collection_basic.js
-  - jstests/sharding/abort_move_collection_basic.js
+  - jstests/sharding/*move*collection*.js
   - jstests/sharding/unshard_collection_basic.js
   - jstests/sharding/abort_unshard_collection_basic.js
 
