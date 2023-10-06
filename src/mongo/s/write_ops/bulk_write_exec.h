@@ -216,6 +216,12 @@ public:
     void processLocalChildBatchError(const TargetedWriteBatch& batch,
                                      const AsyncRequestsSender::Response& response);
 
+
+    /**
+     * Processes an error encountered while trying to target writes in this BulkWriteOp.
+     */
+    void processTargetingError(const StatusWith<WriteType>& targetStatus);
+
     /**
      * Processes the response to a single WriteOp at index opIdx directly and cleans up all
      * associated childOps. The response is captured by the BulkWriteReplyItem. We don't expect

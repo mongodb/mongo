@@ -12,8 +12,6 @@
  *   does_not_support_transactions,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
- *   # TODO SERVER-79506 Remove this tag.
- *   assumes_unsharded_collection,
  * ]
  */
 import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
@@ -144,37 +142,16 @@ assert.commandFailedWithCode(
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
-// Test update fails userAllowedWriteNS.
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {
-            update: 0,
-            filter: {_id: 1},
-            updateMods: {$set: {skey: "MongoDB2"}},
-        },
-    ],
-    nsInfo: [{ns: "test.system.profile"}]
-});
-
-assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
-
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.InvalidNamespace});
-assert(!res.cursor.firstBatch[1]);
-
 var coll2 = db.getCollection("coll2");
 coll2.drop();
 
 // Test update continues on error with ordered:false.
-assert.commandWorked(coll2.createIndex({x: 1}, {unique: true}));
-assert.commandWorked(coll2.insert({x: 3}));
-assert.commandWorked(coll2.insert({x: 4}));
+assert.commandWorked(coll2.insert({_id: 3}));
+assert.commandWorked(coll2.insert({_id: 4}));
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
-        {update: 0, filter: {x: 3}, updateMods: {$inc: {x: 1}}, upsert: true},
+        {update: 0, filter: {_id: 3}, updateMods: {$inc: {_id: 1}}, upsert: true},
         {update: 1, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}, upsert: true},
     ],
     nsInfo: [{ns: "test.coll2"}, {ns: "test.coll"}],
@@ -185,7 +162,7 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.DuplicateKey});
+                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 0});
 
 assert.docEq(res.cursor.firstBatch[1].upserted, {_id: 1});
@@ -194,13 +171,12 @@ coll.drop();
 coll2.drop();
 
 // Test update stop on error with ordered:true.
-assert.commandWorked(coll2.createIndex({x: 1}, {unique: true}));
-assert.commandWorked(coll2.insert({x: 3}));
-assert.commandWorked(coll2.insert({x: 4}));
+assert.commandWorked(coll2.insert({_id: 3}));
+assert.commandWorked(coll2.insert({_id: 4}));
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
-        {update: 0, filter: {x: 3}, updateMods: {$inc: {x: 1}}, upsert: true},
+        {update: 0, filter: {_id: 3}, updateMods: {$inc: {_id: 1}}, upsert: true},
         {update: 1, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}, upsert: true},
         {insert: 0, document: {_id: 1, skey: "MongoDB"}},
     ],
@@ -211,7 +187,7 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.DuplicateKey});
+                     {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
 assert(!res.cursor.firstBatch[1]);
 coll.drop();
 coll2.drop();
@@ -346,78 +322,6 @@ assert.eq(coll1.find().itcount(), 1);
 coll.drop();
 coll1.drop();
 
-// Test delete fails userAllowedWriteNS.
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {
-            delete: 0,
-            filter: {_id: 1},
-        },
-    ],
-    nsInfo: [{ns: "test.system.profile"}]
-});
-
-assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
-
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
-assert(!res.cursor.firstBatch[1]);
-
-// Test delete continues on error with ordered:false.
-coll.insert({_id: 1, skey: "MongoDB"});
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {
-            delete: 0,
-            filter: {_id: 0},
-        },
-        {delete: 1, filter: {_id: 1}}
-    ],
-    nsInfo: [{ns: "test.system.profile"}, {ns: "test.coll"}],
-    ordered: false
-});
-
-assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
-
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
-assert(!res.cursor.firstBatch[2]);
-
-assert(!coll.findOne());
-
-coll.drop();
-
-// Test delete stop on error with ordered:true.
-coll.insert({_id: 1, skey: "MongoDB"});
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {
-            delete: 0,
-            filter: {_id: 0},
-        },
-        {delete: 1, filter: {_id: 1}},
-        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-    ],
-    nsInfo: [{ns: "test.system.profile"}, {ns: "test.coll"}],
-});
-
-assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
-
-cursorEntryValidator(res.cursor.firstBatch[0],
-                     {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
-assert(!res.cursor.firstBatch[1]);
-
-assert.eq(coll.findOne().skey, "MongoDB");
-
-coll.drop();
-
 // Test BypassDocumentValidator
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(db.runCommand({collMod: "coll", validator: {a: {$exists: true}}}));
@@ -432,29 +336,6 @@ assert.commandWorked(res);
 assert.eq(res.numErrors, 1);
 
 assert.eq(0, coll.count({_id: 3}));
-coll.drop();
-
-// Test that we correctly count multiple errors for different write types when ordered=false.
-res = db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {insert: 0, document: {_id: 1}},
-        {insert: 0, document: {_id: 2}},
-        // error 1: duplicate key error
-        {insert: 0, document: {_id: 1}},
-        {delete: 0, filter: {_id: 2}},
-        // error 2: user can't write to namespace
-        {delete: 1, filter: {_id: 0}},
-        {update: 0, filter: {_id: 0}, updateMods: {$set: {x: 1}}},
-        // error 3: invalid update operator
-        {update: 0, filter: {_id: 0}, updateMods: {$blah: {x: 1}}},
-    ],
-    nsInfo: [{ns: "test.coll"}, {ns: "test.system.profile"}],
-    ordered: false
-});
-
-assert.commandWorked(res);
-assert.eq(res.numErrors, 3);
 coll.drop();
 
 // Checking n and nModified on update success and failure.
@@ -484,7 +365,8 @@ res = db.adminCommand({
     ops: [
         {
             update: 0,
-            filter: {$expr: {$eq: ["$skey", "MongoDB"]}},
+            // TODO SERVER-81952: Remove shard key from the filter
+            filter: {_id: 0, $expr: {$eq: ["$skey", "MongoDB"]}},
             updateMods: {skey: "$$targetKey"},
             constants: {targetKey: "MongoDB2"}
         },

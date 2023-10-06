@@ -241,6 +241,14 @@ void WriteOp::_updateOpState() {
         }
     }
 
+    // If we already combined replies from a previous round of targeting, we need to make sure to
+    // combine that partial result with any new ones. _bulkWriteReplyItem will be overwritten
+    // below with a new merged reply combining all of the values in childSuccesses, and so we need
+    // to add our existing partial result to childSuccesses to get it merged in too.
+    if (_bulkWriteReplyItem) {
+        childSuccesses.push_back(&_bulkWriteReplyItem.value());
+    }
+
     if (!childErrors.empty() && isRetryError) {
         if (!childSuccesses.empty()) {
             // Some child operations were successful on some of the shards. We must remember the
@@ -302,6 +310,9 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
 void WriteOp::setOpComplete(boost::optional<BulkWriteReplyItem> bulkWriteReplyItem) {
     dassert(_state == WriteOpState_Ready);
     _bulkWriteReplyItem = std::move(bulkWriteReplyItem);
+    // The reply item will currently have the index for the batch it was sent to a shard with,
+    // rather than its index in the client request, so we need to correct it.
+    _bulkWriteReplyItem->setIdx(getWriteItem().getItemIndex());
     _state = WriteOpState_Completed;
     // No need to updateOpState, set directly
 }

@@ -15,8 +15,6 @@
  *   does_not_support_transactions,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
- *   # TODO SERVER-79506 Remove this tag.
- *   assumes_unsharded_collection,
  * ]
  */
 import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";

@@ -407,6 +407,73 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_RecordTargetErrors) {
                                     {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)}));
 }
 
+// Test that we abort execution when we receive a targeting error in a transaction.
+TEST_F(BulkWriteOpTest, TargetErrorsInTxn) {
+    ShardId shardId("shard");
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint0(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    // Initialize the targeter so that x >= 0 values are untargetable so target call will encounter
+    // an error.
+    targeters.push_back(initTargeterHalfRange(nss0, endpoint0));
+
+    // Set up state so that the first write is targetable but the second is not.
+    auto request = BulkWriteCommandRequest(
+        {
+            BulkWriteInsertOp(0, BSON("x" << -1)),
+            BulkWriteInsertOp(0, BSON("x" << 1)),
+        },
+        {NamespaceInfoEntry(nss0)});
+
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that
+    // is how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    TargetedBatchMap targeted;
+    auto targetStatus = bulkWriteOp.target(targeters, true, targeted);
+
+    // Even though the first write is targetable, we should stop immediately and report failure
+    // because we are in a transaction.
+    ASSERT_NOT_OK(targetStatus);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
+    ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+
+    bulkWriteOp.processTargetingError(targetStatus);
+    ASSERT(bulkWriteOp.isFinished());
+
+    auto [replies, numErrors, _, __] = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(numErrors, 1);
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_NOT_OK(replies[0].getStatus());
+}
+
+// Test that we abort execution and throw a top-level error when receiving a
+// TransientTransactionError while attempting to target writes in a transaction.
+TEST_F(BulkWriteOpTest, TransientTargetErrorsInTxn) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that
+    // is how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    BulkWriteOp bulkWriteOp(_opCtx, BulkWriteCommandRequest({}, {}));
+    auto transientErrorTargetStatus =
+        StatusWith<WriteType>(ErrorCodes::StaleEpoch, "simulating error for test");
+
+    ASSERT_THROWS_CODE(bulkWriteOp.processTargetingError(transientErrorTargetStatus),
+                       DBException,
+                       ErrorCodes::StaleEpoch);
+    ASSERT(bulkWriteOp.isFinished());
+}
+
 // Test multiple ordered ops that target two different shards.
 TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_DifferentShard) {
     ShardId shardIdA("shardA");
@@ -2398,6 +2465,80 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorUnordered)
         // The command should be considered finished.
         ASSERT(bulkWriteOp.isFinished());
     }
+}
+
+// Test that if we receive a mix of success/failure from shards and have to partially retarget that
+// the success result(s) from the first round of targeting are factored into the op's final reply.
+TEST_F(BulkWriteOpTest, SuccessfulShardRepliesAreSavedAfterRetargeting) {
+    // Set up an op that will target both shards.
+    auto multiDelete = BulkWriteDeleteOp(0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)));
+    multiDelete.setMulti(true);
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    auto request = BulkWriteCommandRequest({multiDelete}, {NamespaceInfoEntry(nss0)});
+    BulkWriteOp op(_opCtx, request);
+
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    ShardEndpoint endpointA0(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointB0(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterSplitRange(nss0, endpointA0, endpointB0));
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(op.target(targeters, false, targeted));
+
+    // We should initially target writes to be sent in parallel to both shards.
+    ASSERT_EQUALS(targeted.size(), 2);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    // Simulate OK response from first shard.
+    auto reply1 = BulkWriteReplyItem(0);
+    reply1.setN(2);
+    op.noteChildBatchResponse(*targeted[shardIdA], {reply1}, boost::none, boost::none);
+
+    // The write should still be pending.
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    // Simulate StaleConfig from second shard.
+    auto error =
+        Status{StaleConfigInfo(nss0,
+                               ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                               boost::none,
+                               shardIdB),
+               "Mock error: shard version mismatch"};
+    op.noteChildBatchError(*targeted[shardIdB], error);
+
+    // We should have marked the write as ready so we can retarget as needed.
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Ready);
+
+    // Clear targeting map for a new round of targeting.
+    targeted.clear();
+
+    // We should have retargeted only the write to shardB, since we already succeeded on sharda
+    ASSERT_OK(op.target(targeters, false, targeted));
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
+    ASSERT_EQ(op.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    // Simulate OK response from second shard.
+    auto reply2 = BulkWriteReplyItem(0);
+    reply2.setN(0);
+    op.noteChildBatchResponse(*targeted[shardIdB], {reply2}, boost::none, boost::none);
+
+    // We should now be done.
+    ASSERT(op.isFinished());
+
+    auto [replies, numErrors, _, __] = op.generateReplyInfo();
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(numErrors, 0);
+    ASSERT_OK(replies[0].getStatus());
+    // Seeing n: 2 here proves we saved the success reply from the first round of targeting.
+    ASSERT_EQ(replies[0].getN(), 2);
 }
 
 /**

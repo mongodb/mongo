@@ -530,6 +530,8 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
         bool recordTargetErrors = refreshedTargeter;
         auto targetStatus = bulkWriteOp.target(targeters, recordTargetErrors, childBatches);
         if (!targetStatus.isOK()) {
+            bulkWriteOp.processTargetingError(targetStatus);
+
             dassert(childBatches.size() == 0u);
             // The target error comes from one of the targeters. But to avoid getting another target
             // error from another targeter in retry, we simply refresh all targeters and only retry
@@ -960,6 +962,23 @@ void BulkWriteOp::noteChildBatchResponse(
                 _retriedStmtIds->end(), retriedStmtIds->begin(), retriedStmtIds->end());
         } else {
             _retriedStmtIds = retriedStmtIds;
+        }
+    }
+}
+
+void BulkWriteOp::processTargetingError(const StatusWith<WriteType>& targetStatus) {
+    invariant(!targetStatus.isOK());
+    // Note that the targeting logic already handles recording the error for the appropriate
+    // WriteOp, so we only need to update the BulkWriteOp state here.
+    if (_inTransaction) {
+        _aborted = true;
+
+        // Throw when there is a transient transaction error since this should be a top
+        // level error and not just a write error.
+        if (isTransientTransactionError(targetStatus.getStatus().code(),
+                                        false /* hasWriteConcernError */,
+                                        false /* isCommitOrAbort */)) {
+            uassertStatusOK(targetStatus);
         }
     }
 }

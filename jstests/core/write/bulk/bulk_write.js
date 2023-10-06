@@ -7,8 +7,6 @@
  *   command_not_supported_in_serverless,
  *   # TODO SERVER-52419 Remove this tag.
  *   featureFlagBulkWriteCommand,
- *   # TODO SERVER-79506 Remove this tag.
- *   assumes_unsharded_collection,
  * ]
  */
 var coll = db.getCollection("coll");
