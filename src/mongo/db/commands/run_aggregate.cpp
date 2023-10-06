@@ -1502,8 +1502,11 @@ Status _runAggregate(OperationContext* opCtx,
                 .getAsync([](auto) {});
         }
 
-        const bool bonsaiEligible =
-            isEligibleForBonsai(request, *pipeline, opCtx, collections.getMainCollection());
+        auto bonsaiEligibility =
+            determineBonsaiEligibility(opCtx, collections.getMainCollection(), request, *pipeline);
+        const bool bonsaiEligible = isEligibleForBonsaiUnderFrameworkControl(
+            opCtx, request.getExplain().has_value(), bonsaiEligibility);
+
         bool bonsaiExecSuccess = true;
         if (bonsaiEligible) {
             uassert(6624344,
@@ -1544,6 +1547,7 @@ Status _runAggregate(OperationContext* opCtx,
                                                           collections,
                                                           std::move(queryHints),
                                                           request.getHint(),
+                                                          bonsaiEligibility,
                                                           pipeline.get());
             }();
             if (maybeExec) {

@@ -83,7 +83,7 @@ public:
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
         QueryParameterMap qp;
 
-        if (!isEligibleForBonsai_forTesting(*cq)) {
+        if (!isEligibleForBonsai_forTesting(*cq).isFullyEligible()) {
             state.SkipWithError("CanonicalQuery is not supported by CQF");
             return;
         }

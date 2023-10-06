@@ -50,8 +50,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/basic_types.h"
-#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/curop.h"
@@ -89,9 +87,6 @@
 #include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
-#include "mongo/db/query/optimizer/cascades/memo.h"
-#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -118,7 +113,6 @@
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
-#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -943,6 +937,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     const MultipleCollectionAccessor& collections,
     QueryHints queryHints,
     const boost::optional<BSONObj>& indexHint,
+    BonsaiEligibility eligibility,
     Pipeline* pipeline,
     const CanonicalQuery* canonicalQuery) {
     if (MONGO_unlikely(failConstructingBonsaiExecutor.shouldFail())) {
@@ -1182,6 +1177,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     const MultipleCollectionAccessor& collections,
     QueryHints queryHints,
+    BonsaiEligibility eligibility,
     const CanonicalQuery* query) {
     boost::optional<BSONObj> indexHint;
     if (!query->getFindCommandRequest().getHint().isEmpty()) {
@@ -1198,6 +1194,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                               collections,
                                               std::move(queryHints),
                                               indexHint,
+                                              eligibility,
                                               nullptr /* pipeline */,
                                               query);
 }

@@ -91,7 +91,8 @@ public:
         QueryParameterMap queryParameters;
 
         if (!isEligibleForBonsai_forTesting(testServiceContext.getServiceContext(),
-                                            *parsedPipeline.get())) {
+                                            *parsedPipeline.get())
+                 .isFullyEligible()) {
             state.SkipWithError("Pipeline is not supported by CQF");
             return;
         }

@@ -131,17 +131,14 @@ using namespace optimizer;
 namespace {
 
 /**
- * Visitor that is responsible for indicating whether a MatchExpression is eligible for Bonsai by
- * setting the '_eligible' member variable. Expressions which are "test-only" and not officially
- * supported should set _eligible to false.
+ * Visitor that is responsible for indicating whether a MatchExpression is eligible for Bonsai
+ * by setting the '_eligibility' member variable. Expressions which are "test-only" and not
+ * officially supported should set _eligibility to Ineligible.
  */
 class ABTMatchExpressionVisitor : public MatchExpressionConstVisitor {
 public:
-    ABTMatchExpressionVisitor(bool& eligible,
-                              QueryFrameworkControlEnum frameworkControl,
-                              bool queryHasNaturalHint)
-        : _eligible(eligible),
-          _frameworkControl(frameworkControl),
+    ABTMatchExpressionVisitor(bool queryHasNaturalHint)
+        : _eligibility(BonsaiEligibility::FullyEligible),
           _queryHasNaturalHint(queryHasNaturalHint) {}
 
     void visit(const LTEMatchExpression* expr) override {
@@ -171,15 +168,13 @@ public:
         // Dotted path equality to null is not supported.
         const auto fieldRef = expr->fieldRef();
         if (fieldRef && fieldRef->numParts() > 1) {
-            _eligible &= std::none_of(expr->getEqualities().begin(),
-                                      expr->getEqualities().end(),
-                                      [](auto&& elt) { return elt.isNull(); });
+            _eligibility.setIneligibleIf(std::any_of(expr->getEqualities().begin(),
+                                                     expr->getEqualities().end(),
+                                                     [](auto&& elt) { return elt.isNull(); }));
         }
 
         // $in over a regex predicate is not supported.
-        if (!expr->getRegexes().empty()) {
-            _eligible = false;
-        }
+        _eligibility.setIneligibleIf(!expr->getRegexes().empty());
     }
     void visit(const ExistsMatchExpression* expr) override {
         assertSupportedPathExpression(expr);
@@ -373,9 +368,13 @@ public:
         unsupportedExpression(expr);
     }
 
+    const BonsaiEligibility& eligibility() const {
+        return _eligibility;
+    }
+
 private:
     void unsupportedExpression(const MatchExpression* expr) {
-        _eligible = false;
+        _eligibility.setIneligible();
     }
 
     void assertSupportedComparisonMatchExpression(const ComparisonMatchExpression* expr) {
@@ -383,32 +382,28 @@ private:
 
         // Dotted path equality to null is not supported.
         const auto fieldRef = expr->fieldRef();
-        if (fieldRef && fieldRef->numParts() > 1 && expr->getData().isNull()) {
-            _eligible = false;
-        }
+        _eligibility.setIneligibleIf(fieldRef && fieldRef->numParts() > 1 &&
+                                     expr->getData().isNull());
     }
 
     void assertSupportedPathExpression(const PathMatchExpression* expr) {
         const auto fieldRef = FieldRef(expr->path());
-        if (fieldRef.hasNumericPathComponents())
-            _eligible = false;
+        _eligibility.setIneligibleIf(fieldRef.hasNumericPathComponents());
 
-        // In M2, match expressions which compare against _id should fall back because they could
-        // use the _id index unless the query has a $natural hint.
-        if (!fieldRef.empty() && fieldRef.getPart(0) == "_id" &&
-            _frameworkControl == QueryFrameworkControlEnum::kTryBonsai && !_queryHasNaturalHint) {
-            _eligible = false;
+        // Match expressions which compare against _id are only fully eligible if the query has a
+        // $natural hint. Otherwise, they could use the _id index.
+        if (!fieldRef.empty() && fieldRef.getPart(0) == "_id" && !_queryHasNaturalHint) {
+            _eligibility.minOf(BonsaiEligibility::Experimental);
         }
     }
 
-    bool& _eligible;
-    const QueryFrameworkControlEnum _frameworkControl;
+    BonsaiEligibility _eligibility;
     bool _queryHasNaturalHint;
 };
 
 class ABTUnsupportedAggExpressionVisitor : public ExpressionConstVisitor {
 public:
-    ABTUnsupportedAggExpressionVisitor(bool& eligible) : _eligible(eligible) {}
+    ABTUnsupportedAggExpressionVisitor() : _eligibility(BonsaiEligibility::FullyEligible) {}
 
     void visit(const ExpressionConstant* expr) override final {
         unsupportedExpression();
@@ -1002,17 +997,21 @@ public:
         unsupportedExpression();
     }
 
-private:
-    void unsupportedExpression() {
-        _eligible = false;
+    const BonsaiEligibility& eligibility() const {
+        return _eligibility;
     }
 
-    bool& _eligible;
+private:
+    void unsupportedExpression() {
+        _eligibility.setIneligible();
+    }
+
+    BonsaiEligibility _eligibility;
 };
 
 class ABTTransformerVisitor : public TransformerInterfaceConstVisitor {
 public:
-    ABTTransformerVisitor(bool& eligible) : _eligible(eligible) {}
+    ABTTransformerVisitor() : _eligibility(BonsaiEligibility::FullyEligible) {}
 
     void visit(const projection_executor::ExclusionProjectionExecutor* transformer) override {
         checkUnsupportedInclusionExclusion(transformer);
@@ -1034,9 +1033,13 @@ public:
         unsupportedTransformer(transformer);
     }
 
+    const BonsaiEligibility& eligibility() const {
+        return _eligibility;
+    }
+
 private:
     void unsupportedTransformer(const TransformerInterface* transformer) {
-        _eligible = false;
+        _eligibility.setIneligible();
     }
 
     template <typename T>
@@ -1061,23 +1064,20 @@ private:
             }
         }
 
-        ABTUnsupportedAggExpressionVisitor aggVisitor(_eligible);
+        ABTUnsupportedAggExpressionVisitor aggVisitor;
         stage_builder::ExpressionWalker walker{&aggVisitor, nullptr, nullptr};
         expression_walker::walk(transformer->rootReplacementExpression().get(), &walker);
+        _eligibility.minOf(aggVisitor.eligibility());
     }
 
-    bool& _eligible;
+    BonsaiEligibility _eligibility;
 };
 
+//
+// Check unsupported command options.
+//
 template <class RequestType>
-bool isEligibleCommon(const RequestType& request,
-                      OperationContext* opCtx,
-                      const CollectionPtr& collection,
-                      QueryFrameworkControlEnum frameworkControl) {
-    //
-    // Check unsupported command options.
-    //
-
+BonsaiEligibility eligibilityOfCommandOptions(const RequestType& request) {
     // The FindCommandRequest defaults some parameters to BSONObj() instead of boost::none.
     auto hasParam = [&](auto param) {
         if constexpr (std::is_same_v<decltype(param), boost::optional<BSONObj>>) {
@@ -1088,7 +1088,7 @@ bool isEligibleCommon(const RequestType& request,
     };
     if (hasParam(request.getResumeAfter()) || request.getRequestResumeToken() ||
         request.getLegacyRuntimeConstants()) {
-        return false;
+        return BonsaiEligibility::Ineligible;
     }
 
     // Below we enforce that the collection collation is empty (aka, "simple"). Therefore we can
@@ -1103,93 +1103,106 @@ bool isEligibleCommon(const RequestType& request,
         }
     }(request.getCollation());
     if (hasNonSimpleCollation) {
-        return false;
+        return BonsaiEligibility::Ineligible;
     }
 
-    // In M2, we should fall back on any index hint that is not a $natural hint.
-    auto hasIndexHint = [&](auto param) {
-        if constexpr (std::is_same_v<decltype(param), boost::optional<BSONObj>>) {
-            return param && !param->isEmpty() &&
-                param->firstElementFieldNameStringData() != query_request_helper::kNaturalSortField;
-        } else {
-            return !param.isEmpty() &&
-                param.firstElementFieldNameStringData() != query_request_helper::kNaturalSortField;
+    return BonsaiEligibility::FullyEligible;
+}
+
+BonsaiEligibility eligibilityOfNonNaturalIndexHint(const boost::optional<BSONObj>& param) {
+    if (param) {
+        if (!param->isEmpty() &&
+            param->firstElementFieldNameStringData() != query_request_helper::kNaturalSortField) {
+            // $natural is the only hint fully supported.
+            return BonsaiEligibility::Experimental;
         }
-    };
-    if (frameworkControl == QueryFrameworkControlEnum::kTryBonsai &&
-        hasIndexHint(request.getHint())) {
-        return false;
     }
+    return BonsaiEligibility::FullyEligible;
+}
 
-    //
-    // Check unsupported index types.
-    //
+BonsaiEligibility eligibilityOfIndexes(IndexCatalog::IndexIterator* indexIterator) {
+    auto eligibility = BonsaiEligibility{BonsaiEligibility::FullyEligible};
 
-    if (!collection)
-        return true;
-
-    const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
-    auto indexIterator =
-        indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
-
-    auto hint = request.getHint();
-    auto queryHasNaturalHint = [&hint]() {
-        if constexpr (std::is_same_v<decltype(hint), boost::optional<BSONObj>>) {
-            return hint && !hint->isEmpty() &&
-                hint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
-        } else {
-            return !hint.isEmpty() &&
-                hint.firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
+    while (indexIterator->more()) {
+        const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
+        if (descriptor.hidden()) {
+            // An index that is hidden will not be considered by the optimizer, so we don't need
+            // to check its eligibility further.
+            continue;
         }
-    }();
 
-    // If the query has a hint specifying $natural, then there is no need to inspect the index
-    // catalog since we know we will generate a collection scan plan.
-    if (!queryHasNaturalHint) {
-        while (indexIterator->more()) {
-            const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
-            if (descriptor.hidden()) {
-                // An index that is hidden will not be considered by the optimizer, so we don't need
-                // to check its eligibility further.
-                continue;
-            }
+        // In M2, allow {id: 'hashed'} index for test coverage purposes, but we don't add it to
+        // the metadata.
+        if (descriptor.isHashedIdIndex()) {
+            continue;
+        }
 
-            // In M2, allow {id: 'hashed'} index for test coverage purposes, but we don't add it to
-            // the metadata.
-            if (descriptor.isHashedIdIndex()) {
-                continue;
-            }
+        // When any non-hidden, non-_id index is present, a query is only fully eligible with a
+        // $natural hint.
+        if (!descriptor.isIdIndex()) {
+            eligibility.minOf(BonsaiEligibility::Experimental);
+        }
 
-            // In M2, we should fallback on any non-hidden, non-_id index on a query with no
-            // $natural hint.
-            if (!descriptor.isIdIndex() &&
-                frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
-                return false;
-            }
+        if (descriptor.getIndexType() != IndexType::INDEX_BTREE) {
+            // Return early if ineligible.
+            return BonsaiEligibility::Ineligible;
+        }
 
-            if (descriptor.getIndexType() != IndexType::INDEX_BTREE) {
-                return false;
-            }
-
-            if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
-                descriptor.isPartial() || descriptor.isSparse() ||
-                !descriptor.collation().isEmpty()) {
-                return false;
-            }
+        if (descriptor.infoObj().hasField(IndexDescriptor::kExpireAfterSecondsFieldName) ||
+            descriptor.isPartial() || descriptor.isSparse() || !descriptor.collation().isEmpty()) {
+            return BonsaiEligibility::Ineligible;
         }
     }
 
-    //
-    // Check unsupported collection types.
-    //
+    return eligibility;
+}
 
-    if (collection->isClustered() || !collection->getCollectionOptions().collation.isEmpty() ||
-        collection->getTimeseriesOptions() || collection->isCapped()) {
-        return false;
-    }
+// Eligibility determination common across FindCommandRequest and AggregateCommandRequest.
+template <class RequestType>
+BonsaiEligibility determineEligibilityCommon(const RequestType& request,
+                                             OperationContext* opCtx,
+                                             const CollectionPtr& collection) {
+    auto eligibility = BonsaiEligibility{BonsaiEligibility::FullyEligible};
 
-    // Check notablescan.
-    return !storageGlobalParams.noTableScan.load();
+    return eligibility.minOf([&]() { return eligibilityOfCommandOptions(request); })
+        .minOf([&]() { return eligibilityOfNonNaturalIndexHint(request.getHint()); })
+        .minOf([&]() {
+            // Check unsupported index types.
+            if (!collection)
+                return BonsaiEligibility{BonsaiEligibility::FullyEligible};
+
+            auto hint = request.getHint();
+            auto queryHasNaturalHint = [&hint]() {
+                if constexpr (std::is_same_v<decltype(hint), boost::optional<BSONObj>>) {
+                    return hint && !hint->isEmpty() &&
+                        hint->firstElementFieldNameStringData() ==
+                        query_request_helper::kNaturalSortField;
+                } else {
+                    return !hint.isEmpty() &&
+                        hint.firstElementFieldNameStringData() ==
+                        query_request_helper::kNaturalSortField;
+                }
+            }();
+
+            // If the query has a hint specifying $natural, then there is no need to inspect the
+            // index catalog since we know we will generate a collection scan plan.
+            if (!queryHasNaturalHint) {
+                const IndexCatalog& indexCatalog = *collection->getIndexCatalog();
+                auto indexIterator =
+                    indexCatalog.getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+
+                return eligibilityOfIndexes(indexIterator.get());
+            } else {
+                return BonsaiEligibility{BonsaiEligibility::FullyEligible};
+            }
+        })
+        // Check unsupported collection types.
+        .setIneligibleIf(collection &&
+                         (collection->isClustered() ||
+                          !collection->getCollectionOptions().collation.isEmpty() ||
+                          collection->getTimeseriesOptions() || collection->isCapped()))
+        // Check notablescan.
+        .setIneligibleIf(storageGlobalParams.noTableScan.load());
 }
 
 boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum frameworkControl) {
@@ -1207,8 +1220,8 @@ boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum framework
             return false;
         case QueryFrameworkControlEnum::kTryBonsai:
         case QueryFrameworkControlEnum::kTryBonsaiExperimental:
-            // Return boost::none to indicate that we should not force eligibility of bonsai nor the
-            // classic engine.
+            // Return boost::none to indicate that we should not force eligibility of bonsai nor
+            // the classic engine.
             return boost::none;
         case QueryFrameworkControlEnum::kForceBonsai:
             return true;
@@ -1217,153 +1230,179 @@ boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum framework
     MONGO_UNREACHABLE;
 }
 
-bool isEligibleForBonsai(ServiceContext* serviceCtx,
-                         const Pipeline& pipeline,
-                         QueryFrameworkControlEnum frameworkControl,
-                         bool queryHasNaturalHint) {
-    ABTUnsupportedDocumentSourceVisitorContext visitorCtx{frameworkControl, queryHasNaturalHint};
+BonsaiEligibility checkSupportedFeatures(ServiceContext* serviceCtx,
+                                         const Pipeline& pipeline,
+                                         bool queryHasNaturalHint) {
+    ABTUnsupportedDocumentSourceVisitorContext visitorCtx{queryHasNaturalHint};
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
     DocumentSourceWalker walker(reg, &visitorCtx);
     walker.walk(pipeline);
-    return visitorCtx.eligible;
+    return visitorCtx.eligibility;
 }
 
-bool isEligibleForBonsai(const CanonicalQuery& cq, QueryFrameworkControlEnum frameworkControl) {
+BonsaiEligibility checkSupportedFeatures(const CanonicalQuery& cq) {
     auto expression = cq.getPrimaryMatchExpression();
 
     auto hint = cq.getFindCommandRequest().getHint();
     bool hasNaturalHint = !hint.isEmpty() &&
         hint.firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
 
-    bool eligible = true;
-    ABTMatchExpressionVisitor visitor(eligible, frameworkControl, hasNaturalHint);
+    ABTMatchExpressionVisitor visitor(hasNaturalHint);
     MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
     tree_walker::walk<true, MatchExpression>(expression, &walker);
+    auto eligibility = visitor.eligibility();
 
-    if (cq.getProj() && eligible) {
-        auto projExecutor = projection_executor::buildProjectionExecutor(
-            cq.getExpCtx(),
-            cq.getProj(),
-            ProjectionPolicies::findProjectionPolicies(),
-            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams});
-        ABTTransformerVisitor visitor(eligible);
-        TransformerInterfaceWalker walker(&visitor);
-        walker.walk(projExecutor.get());
+    return eligibility.minOf([&]() {
+        if (cq.getProj()) {
+            auto projExecutor = projection_executor::buildProjectionExecutor(
+                cq.getExpCtx(),
+                cq.getProj(),
+                ProjectionPolicies::findProjectionPolicies(),
+                projection_executor::BuilderParamsBitSet{
+                    projection_executor::kDefaultBuilderParams});
+            ABTTransformerVisitor visitor{};
+            TransformerInterfaceWalker walker(&visitor);
+            walker.walk(projExecutor.get());
+            return visitor.eligibility();
+        } else {
+            return BonsaiEligibility{BonsaiEligibility::FullyEligible};
+        }
+    });
+}
+
+/**
+ * Use the framework control to determine the minimum required eligibility level.
+ */
+BonsaiEligibility::Eligibility getMinRequiredEligibility(OperationContext* opCtx) {
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    switch (frameworkControl) {
+        case QueryFrameworkControlEnum::kForceBonsai:
+            return BonsaiEligibility::Ineligible;
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
+            return BonsaiEligibility::Experimental;
+        default:
+            return BonsaiEligibility::FullyEligible;
     }
-
-    return eligible;
 }
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(enableExplainInBonsai);
 
-bool isEligibleForBonsai(const AggregateCommandRequest& request,
-                         const Pipeline& pipeline,
-                         OperationContext* opCtx,
-                         const CollectionPtr& collection) {
-    auto frameworkControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
+                                             const CollectionPtr& collection,
+                                             const AggregateCommandRequest& request,
+                                             const Pipeline& pipeline) {
+    return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
+        .minOf([&]() { return determineEligibilityCommon(request, opCtx, collection); })
+        .setIneligibleIf(request.getRequestReshardingResumeToken().has_value())
+        .setIneligibleIf(request.getExchange().has_value())
+        .minOf([&]() {
+            auto hint = request.getHint();
+            bool hasNaturalHint = hint.has_value() && !hint->isEmpty() &&
+                hint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
 
-    if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
-        return *forceBonsai;
-    }
-
-    // Explain is not currently supported but is allowed if the failpoint is set
-    // for testing purposes.
-    // TODO SERVER-77719: eventually explain should be permitted by default with tryBonsai, but we
-    // will still want to fall back on explain commands with tryBonsaiExperimental.
-    if (!MONGO_unlikely(enableExplainInBonsai.shouldFail()) && request.getExplain()) {
-        return false;
-    }
-
-    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection, frameworkControl) &&
-        !request.getRequestReshardingResumeToken().has_value() && !request.getExchange();
-
-    // Early return to avoid unnecessary work of walking the input pipeline.
-    if (!commandOptionsEligible) {
-        return false;
-    }
-
-    auto hint = request.getHint();
-    bool hasNaturalHint = hint.has_value() && !hint->isEmpty() &&
-        hint->firstElementFieldNameStringData() == query_request_helper::kNaturalSortField;
-
-    return isEligibleForBonsai(
-        opCtx->getServiceContext(), pipeline, frameworkControl, hasNaturalHint);
+            return checkSupportedFeatures(opCtx->getServiceContext(), pipeline, hasNaturalHint);
+        });
 }
 
-bool isEligibleForBonsai(const CanonicalQuery& cq,
-                         OperationContext* opCtx,
-                         const CollectionPtr& collection) {
-    auto frameworkControl =
-        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
-    if (auto forceBonsai = shouldForceEligibility(frameworkControl); forceBonsai.has_value()) {
-        return *forceBonsai;
-    }
-
-    if (!cq.useCqfIfEligible()) {
-        return false;
-    }
-
-    // Explain is not currently supported but is allowed if the failpoint is set
-    // for testing purposes.
-    // TODO SERVER-77719: eventually explain should be permitted by default with tryBonsai, but we
-    // will still want to fall back on explain commands with tryBonsaiExperimental.
-    if (!MONGO_unlikely(enableExplainInBonsai.shouldFail()) && cq.getExplain()) {
-        return false;
-    }
-
+BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
+                                             const CollectionPtr& collection,
+                                             const CanonicalQuery& cq) {
     auto request = cq.getFindCommandRequest();
-    bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection, frameworkControl) &&
-        request.getSort().isEmpty() && request.getMin().isEmpty() && request.getMax().isEmpty() &&
-        !request.getReturnKey() && !request.getSingleBatch() && !request.getTailable() &&
-        !request.getSkip() && !request.getLimit() && !request.getNoCursorTimeout() &&
-        !request.getAllowPartialResults() && !request.getAllowSpeculativeMajorityRead() &&
-        !request.getAwaitData() && !request.getReadOnce() && !request.getShowRecordId() &&
-        !request.getTerm();
+    return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
+        .setIneligibleIf(!cq.useCqfIfEligible())
+        .minOf([&]() { return determineEligibilityCommon(request, opCtx, collection); })
+        .setIneligibleIf(!request.getSort().isEmpty())
+        .setIneligibleIf(!request.getMin().isEmpty())
+        .setIneligibleIf(!request.getMax().isEmpty())
+        .setIneligibleIf(request.getReturnKey())
+        .setIneligibleIf(request.getSingleBatch())
+        .setIneligibleIf(request.getTailable())
+        .setIneligibleIf(request.getSkip().has_value())
+        .setIneligibleIf(request.getLimit().has_value())
+        .setIneligibleIf(request.getNoCursorTimeout())
+        .setIneligibleIf(request.getAllowPartialResults())
+        .setIneligibleIf(request.getAllowSpeculativeMajorityRead())
+        .setIneligibleIf(request.getAwaitData())
+        .setIneligibleIf(request.getReadOnce())
+        .setIneligibleIf(request.getShowRecordId())
+        .setIneligibleIf(request.getTerm().has_value())
+        .minOf([&]() { return checkSupportedFeatures(cq); });
+}
 
-    // Early return to avoid unnecessary work of walking the input expression.
-    if (!commandOptionsEligible) {
-        return false;
+bool isEligibleForBonsaiUnderFrameworkControl(OperationContext* opCtx,
+                                              bool isExplain,
+                                              BonsaiEligibility eligibility) {
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+
+    // Explain is not currently supported but is allowed if the failpoint is set
+    // for testing purposes.
+    // TODO SERVER-77719: eventually explain should be permitted by default with tryBonsai, but
+    // we will still want to fall back on explain commands with tryBonsaiExperimental.
+    auto satisfiesExplainRequirements = [&]() {
+        return !isExplain || MONGO_unlikely(enableExplainInBonsai.shouldFail());
+    };
+    switch (frameworkControl) {
+        case QueryFrameworkControlEnum::kTryBonsai:
+            return eligibility.isFullyEligible() && satisfiesExplainRequirements();
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
+            return eligibility.isExperimentallyEligible() && satisfiesExplainRequirements();
+        case QueryFrameworkControlEnum::kForceBonsai:
+            return true;
+        default:
+            return false;
     }
-
-    return isEligibleForBonsai(cq, frameworkControl);
 }
 
-bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {
-    const auto frameworkControl =
-        QueryKnobConfiguration::decoration(cq.getOpCtx()).getInternalQueryFrameworkControlForOp();
-    return isEligibleForBonsai(cq, frameworkControl);
+bool isEligibleForBonsai(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         const AggregateCommandRequest& request,
+                         const Pipeline& pipeline) {
+    auto eligibility = determineBonsaiEligibility(opCtx, collection, request, pipeline);
+    return isEligibleForBonsaiUnderFrameworkControl(
+        opCtx, request.getExplain().has_value(), eligibility);
 }
 
-bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline) {
-    const auto frameworkControl = QueryKnobConfiguration::decoration(pipeline.getContext()->opCtx)
-                                      .getInternalQueryFrameworkControlForOp();
-    return isEligibleForBonsai(
-        serviceCtx, pipeline, frameworkControl, false /* queryHasNaturalHint */);
+bool isEligibleForBonsai(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         const CanonicalQuery& cq) {
+    auto eligibility = determineBonsaiEligibility(opCtx, collection, cq);
+    return isEligibleForBonsaiUnderFrameworkControl(opCtx, cq.getExplain(), eligibility);
+}
+
+BonsaiEligibility isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {
+    return checkSupportedFeatures(cq);
+}
+
+BonsaiEligibility isEligibleForBonsai_forTesting(ServiceContext* serviceCtx,
+                                                 const Pipeline& pipeline) {
+    return checkSupportedFeatures(serviceCtx, pipeline, false /* queryHasNaturalHint */);
 }
 
 }  // namespace mongo
 
 namespace mongo::optimizer {
-// Templated visit function to mark DocumentSources as ineligible for CQF.
+// Templated visit function to mark unsupported DocumentSources as ineligible for CQF.
 template <typename T>
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const T&) {
-    ctx->eligible = false;
+    ctx->eligibility.setIneligible();
 }
 
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const DocumentSourceMatch& source) {
-    ABTMatchExpressionVisitor visitor(
-        ctx->eligible, ctx->frameworkControl, ctx->queryHasNaturalHint);
+    ABTMatchExpressionVisitor visitor(ctx->queryHasNaturalHint);
     MatchExpressionWalker walker(nullptr, nullptr, &visitor);
     tree_walker::walk<true, MatchExpression>(source.getMatchExpression(), &walker);
+    ctx->eligibility.minOf(visitor.eligibility());
 }
 
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx,
            const DocumentSourceSingleDocumentTransformation& source) {
-    ABTTransformerVisitor visitor(ctx->eligible);
+    ABTTransformerVisitor visitor;
     TransformerInterfaceWalker walker(&visitor);
     walker.walk(&source.getTransformer());
+    ctx->eligibility.minOf(visitor.eligibility());
 }
 
 const ServiceContext::ConstructorActionRegisterer abtUnsupportedRegisterer{

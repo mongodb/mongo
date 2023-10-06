@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/opt_counter_info.h"
 #include "mongo/db/query/optimizer/defs.h"
@@ -101,6 +102,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     const MultipleCollectionAccessor& collections,
     optimizer::QueryHints queryHints,
     const boost::optional<BSONObj>& indexHint,
+    BonsaiEligibility eligibility,
     Pipeline* pipeline,
     const CanonicalQuery* = nullptr);
 
@@ -110,6 +112,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     const MultipleCollectionAccessor& collections,
     optimizer::QueryHints queryHints,
+    BonsaiEligibility eligibility,
     const CanonicalQuery* query);
 
 /**

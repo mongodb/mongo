@@ -65,8 +65,10 @@ public:
      * Optimize the CanonicalQuery and return the executor parameters.
      */
     boost::optional<ExecParams> optimize(const CanonicalQuery& query) {
-        return getSBEExecutorViaCascadesOptimizer(
-            MultipleCollectionAccessor{_collectionPtr}, _queryHints, &query);
+        return getSBEExecutorViaCascadesOptimizer(MultipleCollectionAccessor{_collectionPtr},
+                                                  _queryHints,
+                                                  BonsaiEligibility::FullyEligible,
+                                                  &query);
     }
 
 protected:

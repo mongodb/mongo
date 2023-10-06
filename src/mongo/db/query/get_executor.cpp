@@ -1709,7 +1709,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         const auto& mainColl = collections.getMainCollection();
         canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
 
-        if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
+        auto eligibility = determineBonsaiEligibility(opCtx, mainColl, *canonicalQuery);
+        if (isEligibleForBonsaiUnderFrameworkControl(
+                opCtx, canonicalQuery->getExplain(), eligibility)) {
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
 
@@ -1722,7 +1724,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                 }
 
                 return getSBEExecutorViaCascadesOptimizer(
-                    collections, std::move(queryHints), canonicalQuery.get());
+                    collections, std::move(queryHints), eligibility, canonicalQuery.get());
             }();
             if (maybeExec) {
                 auto exec = uassertStatusOK(makeExecFromParams(std::move(canonicalQuery),
@@ -2015,7 +2017,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "delete command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collectionPtr));
+            !isEligibleForBonsai(opCtx, collectionPtr, *cq));
 
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
@@ -2215,7 +2217,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "update command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collectionPtr));
+            !isEligibleForBonsai(opCtx, collectionPtr, *cq));
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -2589,7 +2591,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "count command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collection));
+            !isEligibleForBonsai(opCtx, collection, *cq));
 
     if (!collection) {
         // Treat collections that do not exist as empty collections. Note that the explain reporting
@@ -2991,7 +2993,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(*canonicalDistinct->getQuery(), opCtx, collectionPtr));
+            !isEligibleForBonsai(opCtx, collectionPtr, *canonicalDistinct->getQuery()));
 
     auto plannerParams = fillOutPlannerParamsForDistinct(
         opCtx, collectionPtr, plannerOptions, *canonicalDistinct, flipDistinctScanDirection);

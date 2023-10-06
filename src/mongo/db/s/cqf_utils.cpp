@@ -43,7 +43,7 @@ namespace mongo::optimizer {
 
 template <typename T>
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const T&) {
-    ctx->eligible = false;
+    ctx->eligibility.setIneligible();
 }
 
 const ServiceContext::ConstructorActionRegisterer abtUnsupportedRegisterer{

@@ -40,7 +40,7 @@
 namespace mongo::optimizer {
 
 void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const DocumentSourceMergeCursors&) {
-    ctx->eligible = false;
+    ctx->eligibility.setIneligible();
 }
 
 const ServiceContext::ConstructorActionRegisterer abtUnsupportedRegisterer{

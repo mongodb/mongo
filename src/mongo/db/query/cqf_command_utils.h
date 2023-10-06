@@ -49,18 +49,118 @@
 
 namespace mongo {
 
+/**
+ * Eligibility is a measure of increasingly smaller subsets of queries. We generally assume the
+ * query is in the smallest subset and evaluate a set of predicates which may prove query is not a
+ * member of the currently assumed subset causing the eligibility to be reduced to a larger set. The
+ * eligibility of a query is the smallest set which the query is a member of.
+ *
+ * The largest set, the set of all queries (aka Ineligible), includes not only those queries which
+ * are supported by Bonsai in some capacity, but those which are not supported by Bonsai at all. The
+ * next smaller set contains queries which are experimentally supported in Bonsai. They will not be
+ * executed by Bonsai in a release configuration but are eligible in test configurations.
+ * The smallest subset (aka FullyEligible) is the set of queries that execute correctly and
+ * efficiently.
+ *
+ * This structure is a mutable object representing an eligibility level. It provides a fluent style
+ * API which facilitates combining multiple constraints to compute the eligibility, eg.
+ *
+ * eligibility.setIneligibleIf(condition1)
+ *            .minOf([&]() { return expensiveCheck(); });
+ */
+struct BonsaiEligibility {
+    enum Eligibility {
+        // Ordered as increasingly smaller sets to facilitate comparisons.
+        /**
+         * "Ineligible": The complete set of all possible queries.
+         */
+        Ineligible = 0,
+        /**
+         * "Experimentally eligible": A level more constrained than "Ineligible" is the set of
+         * queries experimentally supported.
+         */
+        Experimental,
+        /**
+         * "Fully eligible": This is the smallest subset of queries including those which are
+         * eligible under all current constraints.
+         */
+        FullyEligible,
+    };
+
+    BonsaiEligibility(Eligibility e, Eligibility min = Ineligible)
+        : _eligibility(e), _minEligibility(min) {}
+
+    /**
+     * The max eligibility. This is typically the starting point for determining
+     * eligibility. We start with the max eligibility and downgrade it when some constraint is not
+     * satisfied.
+     */
+    static inline BonsaiEligibility fullyEligible() {
+        return {FullyEligible};
+    }
+
+    bool isFullyEligible() const {
+        return _eligibility >= FullyEligible;
+    }
+
+    bool isExperimentallyEligible() const {
+        return _eligibility >= Experimental;
+    }
+
+    /**
+     * Update this eligibility to "Ineligible" if the boolean value is true.
+     */
+    auto setIneligibleIf(bool b) {
+        _eligibility = b ? Ineligible : _eligibility;
+        return *this;
+    }
+
+    auto setIneligible() {
+        _eligibility = Ineligible;
+        return *this;
+    }
+
+    /**
+     * Update this eligibility to represent the lower eligibility level between `this` and `other`.
+     */
+    auto minOf(BonsaiEligibility other) {
+        _eligibility = std::min(_eligibility, other._eligibility);
+        return *this;
+    }
+
+    /**
+     * Update this eligibility to represent the lower eligibility level of `this` and another
+     * eligibility computed by `f`. If this instance's eligibility already represents the
+     * _minEligibility class, `f` will not be evaluated.
+     */
+    auto minOf(std::function<BonsaiEligibility()> f) {
+        if (_eligibility < _minEligibility) {
+            return *this;
+        }
+        this->minOf(f());
+        return *this;
+    }
+
+private:
+    Eligibility _eligibility;
+
+    /**
+     * Minimum eligibility required. This allows avoiding redundant constraint checks once this
+     * minimum cannot be maintained.
+     */
+    const Eligibility _minEligibility;
+};
+
 namespace optimizer {
 /**
  * Visitor that is responsible for indicating whether a DocumentSource is eligible for Bonsai by
- * setting the 'eligible' member variable. Stages which are "test-only" and not officially supported
- * should set 'eligible' to false.
+ * setting the '_eligibility' member variable. Stages which are "test-only" and not
+ * officially supported should set _eligibility to Ineligible.
  */
 struct ABTUnsupportedDocumentSourceVisitorContext : public DocumentSourceVisitorContextBase {
-    ABTUnsupportedDocumentSourceVisitorContext(QueryFrameworkControlEnum controlEnum,
-                                               bool hasNaturalHint)
-        : frameworkControl(controlEnum), queryHasNaturalHint(hasNaturalHint) {}
-    bool eligible{true};
-    const QueryFrameworkControlEnum frameworkControl;
+    ABTUnsupportedDocumentSourceVisitorContext(bool hasNaturalHint)
+        : eligibility(BonsaiEligibility::fullyEligible()), queryHasNaturalHint(hasNaturalHint) {}
+    BonsaiEligibility eligibility;
     const bool queryHasNaturalHint;
 };
 }  // namespace optimizer
@@ -90,28 +190,53 @@ void coutPrint(const std::string& msg, const logv2::detail::NamedArg<Args>&... a
         ::mongo::coutPrint(FMTSTR_MESSAGE, __VA_ARGS__);
 
 /**
- * Returns whether the given Pipeline and aggregate command is eligible to use the bonsai
- * optimizer.
+ * Determine eligibility of a query independent of the internalQueryFrameworkControl knob.
  */
-bool isEligibleForBonsai(const AggregateCommandRequest& request,
-                         const Pipeline& pipeline,
-                         OperationContext* opCtx,
-                         const CollectionPtr& collection);
+BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
+                                             const CollectionPtr& collection,
+                                             const CanonicalQuery& cq);
 
 /**
- * Returns whether the given find command is eligible to use the bonsai optimizer.
+ * Determine eligibility of a query independent of the internalQueryFrameworkControl knob.
  */
-bool isEligibleForBonsai(const CanonicalQuery& cq,
-                         OperationContext* opCtx,
-                         const CollectionPtr& collection);
+BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
+                                             const CollectionPtr& collection,
+                                             const AggregateCommandRequest& request,
+                                             const Pipeline& pipeline);
+
+/**
+ * Given a query's eligibility, determine whether it should be optimized using Bonsai taking into
+ * account the value of internalQueryFrameworkControl knob for the current operation.
+ */
+bool isEligibleForBonsaiUnderFrameworkControl(OperationContext* opCtx,
+                                              bool isExplain,
+                                              BonsaiEligibility eligibility);
+
+/**
+ * Returns whether the given query is eligible to use the Bonsai optimizer under the
+ * internalQueryFrameworkControl knob for the current operation.
+ */
+bool isEligibleForBonsai(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         const AggregateCommandRequest& request,
+                         const Pipeline& pipeline);
+
+/**
+ * Returns whether the given query is eligible to use the Bonsai optimizer under the
+ * internalQueryFrameworkControl knob for the current operation.
+ */
+bool isEligibleForBonsai(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         const CanonicalQuery& cq);
 
 /**
  * These functions are exposed only for testing; they only perform checks against the query
  * structure. Other callers should use the functions above, which check command and collection
  * options for further details.
  */
-bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq);
-bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline);
+BonsaiEligibility isEligibleForBonsai_forTesting(const CanonicalQuery& cq);
+BonsaiEligibility isEligibleForBonsai_forTesting(ServiceContext* serviceCtx,
+                                                 const Pipeline& pipeline);
 
 bool isBonsaiEnabled(OperationContext* opCtx);
 
