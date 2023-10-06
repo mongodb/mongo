@@ -170,11 +170,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
 
 // Establish the search query cursor and fill in the search slots.
 void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq) {
-    if (cq.cqPipeline().empty() || !cq.isSearchQuery()) {
+    if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->uuid) {
         return;
     }
     auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
     auto stage = cq.cqPipeline().front()->documentSource();
+    if (!searchHelper->isSearchStage(stage)) {
+        return;
+    }
 
     // Build a SearchNode in order to retrieve the search info.
     auto sn = searchHelper->getSearchNode(stage);
@@ -230,6 +233,71 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
             cq.getExpCtx()->variables.setReservedValue(
                 Variables::kSearchMetaId, mongo::Value(varsObj), true);
         }
+    }
+}
+
+// Fill in the search slots based on initial cursor response from mongot for $searchMeta.
+void prepareSearchMetaParameters(PlanStageData* data, const CanonicalQuery& cq) {
+    if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->uuid) {
+        return;
+    }
+    auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
+    auto stage = cq.cqPipeline().front()->documentSource();
+    if (!searchHelper->isSearchMetaStage(stage)) {
+        return;
+    }
+
+    // Build a SearchNode in order to retrieve the search info.
+    auto sn = searchHelper->getSearchNode(stage);
+    auto cursorResponse = searchHelper->establishSearchMetaCursor(cq.getExpCtx(), sn.get());
+    tassert(7856201, "searchMeta cursor is none", cursorResponse.has_value());
+    auto& env = data->env;
+
+    if (!cq.getExpCtx()->needsMerge) {
+        if (cursorResponse->getVarsField()) {
+            auto name = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
+            // Variables on the cursor must be an object.
+            auto varsObj = cursorResponse->getVarsField()->getField(name);
+            if (varsObj.ok()) {
+                auto [tag, val] = sbe::bson::convertFrom<false /* View */>(varsObj);
+                env->resetSlot(env->getSlot(name), tag, val, true /* owned */);
+                // Both the SBE and the classic portions of the query can reference the same value,
+                // and this is the only place to set the value if using SBE so we don't worry about
+                // inconsistency.
+                cq.getExpCtx()->variables.setReservedValue(
+                    Variables::kSearchMetaId, mongo::Value(varsObj), true /* isConstant */);
+            }
+        }
+        return;
+    }
+    auto firstBatch = cursorResponse->releaseBatch();
+    auto cursorId = cursorResponse->getCursorId();
+
+    // Set values for cursorId and first batch slots.
+    env->resetSlot(env->getSlot("searchCursorId"_sd),
+                   sbe::value::TypeTags::NumberInt64,
+                   cursorId,
+                   true /* owned */);
+
+    BSONArrayBuilder firstBatchBuilder;
+    for (const auto& obj : firstBatch) {
+        firstBatchBuilder.append(obj);
+    }
+
+    auto [firstBatchTag, firstBatchVal] = stage_builder::makeValue(firstBatchBuilder.arr());
+    env->resetSlot(
+        env->getSlot("searchFirstBatch"_sd), firstBatchTag, firstBatchVal, true /* owned */);
+
+    // Set value for search query.
+    auto [searchQueryTag, searchQueryVal] = stage_builder::makeValue(sn->searchQuery);
+    env->resetSlot(
+        env->getSlot("searchQuery"_sd), searchQueryTag, searchQueryVal, true /* owned */);
+
+    if (sn->intermediateResultsProtocolVersion) {
+        env->resetSlot(env->getSlot("searchProtocolVersion"_sd),
+                       sbe::value::TypeTags::NumberInt32,
+                       *sn->intermediateResultsProtocolVersion,
+                       true /* owned */);
     }
 }
 }  // namespace
@@ -352,6 +420,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     }
 
     prepareSearchQueryParameters(data, cq);
+    prepareSearchMetaParameters(data, cq);
 }  // prepareSlotBasedExecutableTree
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
@@ -4222,9 +4291,79 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
+    const SearchNode* root,
+    StageBuilderState& state,
+    const CanonicalQuery& cq,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    Environment& env,
+    PlanYieldPolicySBE* const yieldPolicy) {
+    auto expCtx = cq.getExpCtxRaw();
+    PlanStageSlots outputs;
+
+    if (!expCtx->needsMerge) {
+        auto searchMetaSlot = state.getBuiltinVarSlot(Variables::kSearchMetaId);
+        auto stage = sbe::makeS<sbe::FilterStage<true>>(
+            makeLimitCoScanTree(root->nodeId(), 1),
+            makeFunction("exists"_sd, makeVariable(*searchMetaSlot)),
+            root->nodeId());
+        outputs.set(PlanStageSlots::kResult, *searchMetaSlot);
+        return {std::move(stage), std::move(outputs)};
+    }
+
+    // Register search query parameter slots.
+    auto cursorIdSlot = env->registerSlot("searchCursorId"_sd,
+                                          sbe::value::TypeTags::Nothing,
+                                          0 /* val */,
+                                          false /* owned */,
+                                          slotIdGenerator);
+    auto firstBatchSlot = env->registerSlot("searchFirstBatch"_sd,
+                                            sbe::value::TypeTags::Nothing,
+                                            0 /* val */,
+                                            false /* owned */,
+                                            slotIdGenerator);
+    auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
+                                             sbe::value::TypeTags::Nothing,
+                                             0 /* val */,
+                                             false /* owned */,
+                                             slotIdGenerator);
+
+    auto protocolVersionSlot = env->registerSlot("searchProtocolVersion"_sd,
+                                                 sbe::value::TypeTags::Nothing,
+                                                 0 /* val */,
+                                                 false /* owned */,
+                                                 slotIdGenerator);
+
+    auto searchResultSlot = slotIdGenerator->generate();
+
+    auto stage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
+                                                    expCtx->uuid,
+                                                    searchResultSlot,
+                                                    std::vector<std::string>() /* metadataNames */,
+                                                    sbe::makeSV() /* metadataSlots */,
+                                                    std::vector<std::string>() /* fieldNames */,
+                                                    sbe::makeSV() /* fieldSlots */,
+                                                    cursorIdSlot,
+                                                    firstBatchSlot,
+                                                    searchQuerySlot,
+                                                    boost::none /* sortSpecSlot */,
+                                                    boost::none /* limitSlot */,
+                                                    protocolVersionSlot,
+                                                    expCtx->explain,
+                                                    yieldPolicy,
+                                                    root->nodeId());
+    outputs.set(PlanStageSlots::kResult, searchResultSlot);
+    state.data->cursorType = CursorTypeEnum::SearchMetaResult;
+    return {std::move(stage), std::move(outputs)};
+}
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSearch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto sn = static_cast<const SearchNode*>(root);
+    if (sn->isSearchMeta) {
+        return buildSearchMeta(sn, _state, _cq, &_slotIdGenerator, _env, _yieldPolicy);
+    }
+
     const auto& collection = getCurrentCollection(reqs);
     auto expCtx = _cq.getExpCtxRaw();
 
