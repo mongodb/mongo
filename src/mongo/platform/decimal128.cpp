@@ -58,22 +58,25 @@ namespace mongo {
 
 namespace {
 
-// Returns the number of characters consumed from input string. If unable to parse,
-// it returns 0.
+/**
+ * Returns the number of characters consumed from input string. If unable to parse,
+ * it returns 0.
+ *
+ * Input must be of these forms:
+ *  - Valid decimal (standard or scientific notation): /(?i)^[+-]?\d*(.\d+)?(e[+-]?\d+)?$/
+ *  - NaN: /(?i)^[+-]?nan$/
+ *  - Infinity: /(?i)^[+-]?inf(inity)?$)
+ */
 size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
-    // Input must be of these forms:
-    // * Valid decimal (standard or scientific notation):
-    //      /[-+]?\d*(.\d+)?([e][+\-]?\d+)?/
-    // * NaN: /[-+]?[[Nn][Aa][Nn]]/
-    // * Infinity: /[+\-]?(inf|infinity)
-
     bool isSigned = input[0] == '-' || input[0] == '+';
 
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
     size_t charsConsumed = start;
     StringData noSign = input.substr(start);
-    bool isNanOrInf = noSign == "nan" || noSign == "inf" || noSign == "infinity";
+    bool isNanOrInf = noSign.equalCaseInsensitive("nan") || noSign.equalCaseInsensitive("inf") ||
+        noSign.equalCaseInsensitive("infinity");
+
     if (isNanOrInf)
         return start + noSign.size();
 
@@ -131,7 +134,7 @@ size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
     // Check exponent
     StringData exponent = noSign.substr(i);
 
-    if (exponent[0] != 'e' || exponent.size() < 2) {
+    if ((exponent[0] != 'e' && exponent[0] != 'E') || exponent.size() < 2) {
         *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }
@@ -291,21 +294,22 @@ Decimal128::Decimal128(double doubleValue,
     invariant(getCoefficientLow() <= kLargest15DigitInt);
 }
 
-Decimal128::Decimal128(std::string stringValue, RoundingMode roundMode, size_t* charsConsumed) {
+Decimal128::Decimal128(const std::string& stringValue,
+                       RoundingMode roundMode,
+                       size_t* charsConsumed) {
     std::uint32_t throwAwayFlag = 0;
     *this = Decimal128(stringValue, &throwAwayFlag, roundMode, charsConsumed);
 }
 
-Decimal128::Decimal128(std::string stringValue,
+Decimal128::Decimal128(const std::string& stringValue,
                        std::uint32_t* signalingFlags,
                        RoundingMode roundMode,
                        size_t* charsConsumed) {
-    std::string lower = str::toLower(stringValue);
     BID_UINT128 dec128;
     // The intel library function requires a char * while c_str() returns a const char*.
     // We're using const_cast here since the library function should not modify the input.
-    dec128 = bid128_from_string(const_cast<char*>(lower.c_str()), roundMode, signalingFlags);
-    size_t consumed = validateInputString(lower, signalingFlags);
+    dec128 = bid128_from_string(const_cast<char*>(stringValue.c_str()), roundMode, signalingFlags);
+    size_t consumed = validateInputString(stringValue, signalingFlags);
     if (charsConsumed)
         *charsConsumed = consumed;
     _value = libraryTypeToValue(dec128);

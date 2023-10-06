@@ -207,11 +207,11 @@ public:
      * "200E9999999999" --> +Inf
      * "-200E9999999999" --> -Inf
      */
-    explicit Decimal128(std::string stringValue,
+    explicit Decimal128(const std::string& stringValue,
                         RoundingMode roundMode = kRoundTiesToEven,
                         size_t* charsConsumed = nullptr);
 
-    Decimal128(std::string stringValue,
+    Decimal128(const std::string& stringValue,
                std::uint32_t* signalingFlag,
                RoundingMode roundMode = kRoundTiesToEven,
                size_t* charsConsumed = nullptr);
