@@ -66,15 +66,11 @@ StringData reduceInt(StringData value) {
 
 }  // namespace
 
-JWKManager::JWKManager(std::unique_ptr<JWKSFetcher> fetcher, bool loadAtStartup)
-    : _fetcher(std::move(fetcher)), _isKeyModified(false) {
-    if (loadAtStartup) {
-        _setAndValidateKeys(_fetcher->fetch());
-    } else {
-        _keyMaterial = std::make_shared<KeyMap>();
-        _validators = std::make_shared<SharedValidatorMap>();
-    }
-}
+JWKManager::JWKManager(std::unique_ptr<JWKSFetcher> fetcher)
+    : _fetcher(std::move(fetcher)),
+      _keyMaterial(std::make_shared<KeyMap>()),
+      _validators(std::make_shared<SharedValidatorMap>()),
+      _isKeyModified(false) {}
 
 StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     auto currentValidators = _validators;
@@ -82,7 +78,20 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     if (it == currentValidators->end()) {
         // We were asked to handle an unknown keyId. Try refreshing, to see if the JWKS has been
         // updated.
-        _setAndValidateKeys(_fetcher->fetch());
+        LOGV2_DEBUG(7938400,
+                    3,
+                    "Could not locate key in key cache, refreshing key cache",
+                    "keyId"_attr = keyId.toString());
+        auto loadKeysStatus = loadKeys();
+        if (!loadKeysStatus.isOK()) {
+            LOGV2_WARNING(7938401,
+                          "Failed just-in-time key cache refresh",
+                          "error"_attr = loadKeysStatus.reason());
+            return {ErrorCodes::NoSuchKey,
+                    str::stream() << "Unknown key '" << keyId
+                                  << "': just-in-time refresh failed: " << loadKeysStatus.reason()};
+        }
+
         currentValidators = _validators;
         it = currentValidators->find(keyId.toString());
 
@@ -94,11 +103,12 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     return it->second;
 }
 
-void JWKManager::_setAndValidateKeys(const JWKSet& keysParsed) {
+Status JWKManager::loadKeys() try {
     auto newValidators = std::make_shared<SharedValidatorMap>();
     auto newKeyMaterial = std::make_shared<KeyMap>();
 
-    for (const auto& key : keysParsed.getKeys()) {
+    const auto& parsedKeys = _fetcher->fetch();
+    for (const auto& key : parsedKeys.getKeys()) {
         auto JWK = JWK::parse(IDLParserContext("JWK"), key);
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Only RSA key types are accepted at this time",
@@ -135,8 +145,8 @@ void JWKManager::_setAndValidateKeys(const JWKSet& keysParsed) {
         newValidators->insert({keyId, shValidator});
         LOGV2_DEBUG(7070202, 3, "Loaded JWK key", "kid"_attr = keyId, "typ"_attr = JWK.getType());
     }
-    // We compare the old keys from the new ones and return if any old key is not present in the new
-    // set of keys.
+    // We compare the old keys from the new ones and return if any old key has been removed or
+    // modified in the new set of keys.
     _isKeyModified |= _haveKeysBeenModified(*newKeyMaterial);
 
     // A mutex is not used here because no single thread consumes both _validators and _keyMaterial.
@@ -145,6 +155,12 @@ void JWKManager::_setAndValidateKeys(const JWKSet& keysParsed) {
     // atomically rather than both under a mutex.
     std::atomic_exchange(&_validators, std::move(newValidators));    // NOLINT
     std::atomic_exchange(&_keyMaterial, std::move(newKeyMaterial));  // NOLINT
+
+    return Status::OK();
+} catch (const DBException& ex) {
+    LOGV2_DEBUG(
+        7938402, 3, "Failed loading JWKManager with keys", "error"_attr = ex.toStatus().reason());
+    return ex.toStatus();
 }
 
 void JWKManager::serialize(BSONObjBuilder* bob) const {

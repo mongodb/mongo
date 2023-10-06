@@ -42,6 +42,7 @@
 #include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/str.h"

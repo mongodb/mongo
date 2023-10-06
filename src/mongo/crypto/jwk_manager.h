@@ -50,12 +50,7 @@ public:
     using SharedValidator = std::shared_ptr<JWSValidator>;
     using KeyMap = std::map<std::string, BSONObj>;
 
-    /**
-     * Fetch a JWKS file for the specified Issuer URL, parse them as keys, and instantiate
-     * JWSValidator instances if loadAtStartup is set as true. Otherwise the keys will be fetched
-     * from the source and JWSValidators initiated during the next JIT refresh.
-     */
-    explicit JWKManager(std::unique_ptr<JWKSFetcher> fetcher, bool loadAtStartup);
+    explicit JWKManager(std::unique_ptr<JWKSFetcher> fetcher);
 
     /**
      * Fetch a specific JWSValidator from the JWKManager by keyId.
@@ -67,6 +62,13 @@ public:
     std::size_t size() const {
         return _validators->size();
     }
+
+    /**
+     * Fetches a JWKS file for the specified Issuer URL using _fetcher, parses them as keys,
+     * and instantiates JWSValidator instances. If the fetch fails or the parsed keys are invalid,
+     * it leaves the validators and keyMaterial as-is and returns an error Status.
+     */
+    Status loadKeys();
 
     /**
      * Get current keys.
@@ -85,8 +87,6 @@ public:
     void serialize(BSONObjBuilder* bob) const;
 
 private:
-    void _setAndValidateKeys(const JWKSet& keys);
-
     bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
 
     std::unique_ptr<JWKSFetcher> _fetcher;
