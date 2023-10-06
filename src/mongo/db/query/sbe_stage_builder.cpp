@@ -4403,11 +4403,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
     auto nss = reqs.getTargetNamespace();
-    uassert(ErrorCodes::NamespaceNotFound,
+    const auto& coll = _collections.lookupCollection(nss);
+    tassert(7922500,
             str::stream() << "No collection found that matches namespace '"
                           << nss.toStringForErrorMsg() << "'",
-            _collections.lookupCollection(nss) != CollectionPtr::null);
-    return _collections.lookupCollection(nss);
+            coll != CollectionPtr::null);
+    return coll;
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
