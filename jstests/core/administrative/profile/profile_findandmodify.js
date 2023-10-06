@@ -17,7 +17,8 @@ import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 var testDB = db.getSiblingDB("profile_findandmodify");
 assert.commandWorked(testDB.dropDatabase());
-var coll = testDB.getCollection("test");
+const collName = jsTestName();
+var coll = testDB.getCollection(collName);
 
 assert.commandWorked(testDB.setProfilingLevel(2));
 

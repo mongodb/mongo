@@ -4,14 +4,15 @@
  */
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("validate_db_metadaba");
-const coll = testDB.getCollection("test");
+const collName = jsTestName();
+const coll = testDB.getCollection(collName);
 
 for (let i = 0; i < 100; i++) {
     // Create a large index name. As the index name is returned in the output validateDBMetadata
     // command, it can cause the output size to exceed max BSON size.
     let largeName = "a".repeat(200000);
     assert.commandWorked(testDB.runCommand(
-        {createIndexes: "test" + i, indexes: [{key: {p: 1}, name: largeName, sparse: true}]}));
+        {createIndexes: collName + i, indexes: [{key: {p: 1}, name: largeName, sparse: true}]}));
 }
 
 const res = assert.commandWorked(

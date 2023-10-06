@@ -1,13 +1,14 @@
 // Tests that a pipeline with a blend of variable-using expressions reports correct results.
 
 const testDB = db.getSiblingDB("layered_variables");
+const collName = jsTestName();
 assert.commandWorked(testDB.dropDatabase());
-const coll = testDB.getCollection("test");
+const coll = testDB.getCollection(collName);
 
 assert.commandWorked(coll.insert({_id: 1, has_permissions: 1, my_array: [2, 3]}));
 
 const res = assert.commandWorked(testDB.runCommand({
-        aggregate: "test",
+        aggregate: collName,
         pipeline: [
             {
               $addFields: {

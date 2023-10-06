@@ -23,12 +23,16 @@ const {
 
 // For this test to work, we expect the state of the connection to be maintained as:
 // One db: "testSetUserWriteBlockMode1"
-// Two collections: db.coll1, db.coll2
+// Three collections:
+//       * set_user_write_block_mode_coll1
+//       * set_user_write_block_mode_coll2
+//       * set_user_write_block_mode_coll3
 // One index: "index" w/ pattern {"b": 1} on db.coll1
 // One document: {a: 0, b: 0} on db.coll1
 const dbName = "testSetUserWriteBlockMode1";
-const coll1Name = "coll1";
-const coll2Name = "coll2";
+const coll1Name = jsTestName() + "_coll1";
+const coll2Name = jsTestName() + "_coll2";
+const coll3Name = jsTestName() + "_coll3";
 const indexName = "index";
 
 function setupForTesting(conn) {
@@ -205,8 +209,8 @@ function runTest(fixture) {
     // (i.e. non-internal) will cause the index build to fail.
     fixture.asUser(({conn}) => {
         const db = conn.getDB(jsTestName());
-        assert.commandWorked(db.createCollection("test"));
-        assert.commandWorked(db.test.insert({"a": 2}));
+        assert.commandWorked(db.createCollection(coll3Name));
+        assert.commandWorked(db[coll3Name].insert({"a": 2}));
     });
 
     fixture.asAdmin(({conn}) => {
@@ -236,13 +240,13 @@ function runTest(fixture) {
     testParallelShellWithFailpoint(() => fixture.runInParallelShell(false /* asAdmin */,
                                                                     `({conn}) => { 
         assert.commandFailedWithCode(
-            conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "${indexName}"}),
+            conn.getDB(jsTestName()).${coll3Name}.createIndex({"a": 1}, {"name": "${indexName}"}),
             ErrorCodes.IndexBuildAborted);
     }`));
     testParallelShellWithFailpoint(() => fixture.runInParallelShell(true /* asAdmin */,
                                                                     `({conn}) => {
         assert.commandFailedWithCode(
-            conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "${indexName}"}),
+            conn.getDB(jsTestName()).${coll3Name}.createIndex({"a": 1}, {"name": "${indexName}"}),
             ErrorCodes.IndexBuildAborted);
     }`));
 
@@ -258,7 +262,7 @@ function runTest(fixture) {
     // Ensure index was not successfully created on user db, but was on internal db.
     fixture.asAdmin(({conn}) => {
         assert.eq(undefined,
-                  conn.getDB(jsTestName()).test.getIndexes().find(i => i.name === indexName));
+                  conn.getDB(jsTestName()).coll3Name.getIndexes().find(i => i.name === indexName));
         assert.neq(
             undefined,
             conn.getDB('config').system.sessions.getIndexes().find(i => i.name === indexName));
@@ -271,7 +275,7 @@ function runTest(fixture) {
         const waitIndexBuild = fixture.runInParallelShell(true /* asAdmin */,
                                                                     `({conn}) => { 
             assert.commandWorked(
-                conn.getDB(jsTestName()).test.createIndex({"a": 1}, {"name": "${indexName}"}));
+                conn.getDB(jsTestName()).${coll3Name}.createIndex({"a": 1}, {"name": "${indexName}"}));
         }`);
         fp.wait();
 

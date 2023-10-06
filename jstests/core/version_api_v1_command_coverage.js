@@ -16,7 +16,8 @@ const counter_fun = function() {
 };
 
 const testDB = db.getSiblingDB(jsTestName());
-const testColl = testDB.getCollection("test");
+const collName = jsTestName();
+const testColl = testDB.getCollection(collName);
 
 function runTest({cmd, apiVersion1, apiStrict, apiDeprecationErrors}) {
     // Instantiate "cmd" so we can modify it.

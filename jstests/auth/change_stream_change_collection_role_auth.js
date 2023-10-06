@@ -269,10 +269,11 @@ createUsers();
 {
     // Connect with the 'test' user.
     let testDB = login("test");
+    const collName = jsTestName();
 
     // Create a collection, insert a document and logout.
-    assert.commandWorked(testDB.createCollection("test"));
-    assert.commandWorked(testDB.runCommand({insert: "test", documents: [{_id: 0, a: 1, b: 1}]}));
+    assert.commandWorked(testDB.createCollection(collName));
+    assert.commandWorked(testDB.runCommand({insert: collName, documents: [{_id: 0, a: 1, b: 1}]}));
 
     testDB.logout();
 }

@@ -7,7 +7,8 @@
  */
 
 const testDB = db.getSiblingDB(jsTestName());
-const testColl = testDB.getCollection("test");
+const collName = jsTestName();
+const testColl = testDB.getCollection(collName);
 testColl.drop();
 
 const nDocs = 2;

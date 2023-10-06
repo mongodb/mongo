@@ -25,8 +25,11 @@ import {getNLatestProfilerEntries} from "jstests/libs/profiler.js";
 var testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
-const coll1 = testDB.getCollection("test_1");
-const coll2 = testDB.getCollection("test_2");
+const collName1 = jsTestName() + "_1"
+const collName2 = jsTestName() + "_2"
+const coll1 = testDB.getCollection(collName1);
+const coll2 = testDB.getCollection(collName2);
+
 const isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(testDB);
 
 for (var i = 0; i < 10; ++i) {

@@ -17,7 +17,8 @@ if (!checkSBEEnabled(db)) {
 }
 const testDB = db.getSiblingDB("from_plan_cache_flag");
 assert.commandWorked(testDB.dropDatabase());
-const coll = testDB.getCollection("test");
+const collName = jsTestName();
+const coll = testDB.getCollection(collName);
 assert.commandWorked(testDB.setProfilingLevel(2));
 coll.drop();
 coll.getPlanCache().clear();

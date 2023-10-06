@@ -4,6 +4,7 @@
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB(jsTestName());
+const collName = jsTestName();
 
 function containsValidatorWarning(logLine) {
     return logLine.includes("3216000");
@@ -13,8 +14,8 @@ let validator = {
     validator: {$jsonSchema: {bsonType: "object", required: ["val"], additionalProperties: false}}
 };
 
-db.createCollection("test", validator);
-let coll = db.getCollection("test");
+db.createCollection(collName, validator);
+let coll = db.getCollection(collName);
 let log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
 const logLine = log.filter(containsValidatorWarning);
 // The warning appears in two lines.
@@ -29,8 +30,8 @@ validator = {
     }
 };
 
-db.createCollection("test", validator);
-coll = db.getCollection("test");
+db.createCollection(collName, validator);
+coll = db.getCollection(collName);
 log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
 // Should be the same as above.
 assert.eq(logLine.length, 2, logLine);
@@ -42,8 +43,8 @@ validator = {
         {$jsonSchema: {bsonType: "object", required: ["val", "_id"], additionalProperties: false}}
 };
 
-db.createCollection("test", validator);
-coll = db.getCollection("test");
+db.createCollection(collName, validator);
+coll = db.getCollection(collName);
 log = assert.commandWorked(db.adminCommand({getLog: "global"})).log;
 // Should be the same as above.
 assert.eq(logLine.length, 2, logLine);

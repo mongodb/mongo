@@ -30,7 +30,8 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const testDB = primary.getDB("test");
-const coll = testDB.getCollection("test");
+const collName = jsTestName();
+const coll = testDB.getCollection(collName);
 
 for (let i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({a: i}));

@@ -14,7 +14,8 @@ import {
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("profile_agg");
-const coll = testDB.getCollection("test");
+const collName = jsTestName();
+const coll = testDB.getCollection(collName);
 
 testDB.setProfilingLevel(2);
 

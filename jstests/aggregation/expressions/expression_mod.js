@@ -6,7 +6,8 @@ import {assertErrorCode, testExpression} from "jstests/aggregation/extras/utils.
 
 var testDB = db.getSiblingDB("expression_mod");
 assert.commandWorked(testDB.dropDatabase());
-var coll = testDB.getCollection("test");
+const collName = jsTestName();
+var coll = testDB.getCollection(collName);
 
 //
 // Confirm different input numeric types are evaluated correctly.
