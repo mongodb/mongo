@@ -32,6 +32,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -77,6 +78,7 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
 
         std::vector<BSONObj> stages;
         if (auto& nss = _spec.getNamespace()) {
+            uassertStatusOK(validateNamespace(*nss));
             stages.push_back(
                 BSON("$match" << BSON(SampledQueryDocument::kNsFieldName << nss->toString())));
         }
