@@ -86,18 +86,8 @@ BSONObj getTestJWKSet() {
     return set.obj();
 }
 
-TEST(JWKManager, parseJWKSetBasicFromSource) {
-    auto httpClient = HttpClient::createWithoutConnectionPool();
-    httpClient->setHeaders({"Accept: */*"});
-
-    auto data = getTestJWKSet();
-    JWKManager manager(std::make_unique<MockJWKSFetcher>(data), true /* loadAtStartup */);
-
-    BSONObjBuilder bob;
-    manager.serialize(&bob);
-    ASSERT_BSONOBJ_EQ(bob.obj(), data);
-
-    const auto& currentKeys = manager.getKeys();
+void assertCorrectKeys(JWKManager* manager, BSONObj data) {
+    const auto& currentKeys = manager->getKeys();
     for (const auto& key : data["keys"_sd].Obj()) {
         auto currentKey = currentKeys.find(key["kid"_sd].str());
         ASSERT(currentKey != currentKeys.end());
@@ -105,9 +95,45 @@ TEST(JWKManager, parseJWKSetBasicFromSource) {
     }
 
     for (const auto& key : data["keys"_sd].Obj()) {
-        auto validator = uassertStatusOK(manager.getValidator(key["kid"_sd].str()));
+        auto validator = uassertStatusOK(manager->getValidator(key["kid"_sd].str()));
         ASSERT(validator);
     }
+}
+
+TEST(JWKManager, parseJWKSetBasicFromSource) {
+    auto data = getTestJWKSet();
+    auto uniqueFetcher = std::make_unique<MockJWKSFetcher>(data);
+    auto* fetcher = uniqueFetcher.get();
+    JWKManager manager(std::move(uniqueFetcher));
+
+    // Initially, set the fetcher to fail. This should cause the JWKManager to contain no keys
+    // even after loadKeys() is called.
+    fetcher->setShouldFail(true);
+    ASSERT_EQ(manager.size(), 0);
+    ASSERT_NOT_OK(manager.loadKeys());
+    ASSERT_EQ(manager.size(), 0);
+
+    // Then, set the fetcher to succeed. The subsequent call to loadKeys() should result in the
+    // keys getting updated correctly.
+    fetcher->setShouldFail(false);
+    ASSERT_OK(manager.loadKeys());
+    ASSERT_EQ(manager.size(), 2);
+
+    BSONObjBuilder successfulLoadKeysBob;
+    manager.serialize(&successfulLoadKeysBob);
+    ASSERT_BSONOBJ_EQ(successfulLoadKeysBob.obj(), data);
+    assertCorrectKeys(&manager, data);
+
+    // Finally, set the fetcher to fail again. The subsequent call to loadKeys() should fail but
+    // leave the manager's keys untouched.
+    fetcher->setShouldFail(true);
+    ASSERT_NOT_OK(manager.loadKeys());
+    ASSERT_EQ(manager.size(), 2);
+
+    BSONObjBuilder failedLoadKeysBob;
+    manager.serialize(&failedLoadKeysBob);
+    ASSERT_BSONOBJ_EQ(failedLoadKeysBob.obj(), data);
+    assertCorrectKeys(&manager, data);
 }
 
 }  // namespace

@@ -41,11 +41,20 @@ public:
     MockJWKSFetcher(BSONObj keys) : _keys(std::move(keys)) {}
 
     JWKSet fetch() {
+        if (_shouldFail) {
+            uasserted(ErrorCodes::NetworkTimeout,
+                      "Mock JWKS fetcher configured to simulate timeout");
+        }
         return JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+    }
+
+    void setShouldFail(bool shouldFail) {
+        _shouldFail = shouldFail;
     }
 
 private:
     BSONObj _keys;
+    bool _shouldFail{false};
 };
 
 }  // namespace mongo::crypto

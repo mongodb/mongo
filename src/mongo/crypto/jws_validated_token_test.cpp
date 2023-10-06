@@ -135,7 +135,8 @@ TEST(JWKManager, validateTokenFromKeys) {
     auto validToken = validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys));
+    ASSERT_OK(manager.loadKeys());
     JWSValidatedToken validatedToken(&manager, validToken);
 
     auto headerString = base64url::decode(validTokenHeader);
@@ -158,7 +159,8 @@ TEST(JWKManager, failsWithExpiredToken) {
         expiredTokenHeader + "."_sd + expiredTokenBody + "."_sd + expiredTokenSignature;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys));
+    ASSERT_OK(manager.loadKeys());
     ASSERT_THROWS(JWSValidatedToken(&manager, expiredToken), DBException);
 }
 
@@ -167,7 +169,8 @@ TEST(JWKManager, failsWithModifiedToken) {
         validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature + "a"_sd;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys));
+    ASSERT_OK(manager.loadKeys());
     ASSERT_THROWS(JWSValidatedToken(&manager, modifiedToken), DBException);
 }
 
@@ -176,7 +179,8 @@ TEST(JWKManager, failsWithModifiedHeaderForADifferentKey) {
         modifiedTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys));
+    ASSERT_OK(manager.loadKeys());
     ASSERT_THROWS(JWSValidatedToken(&manager, modifiedToken), DBException);
 }
 #endif
