@@ -77,6 +77,7 @@ public:
 
     bool hasMaxLockTimeout() override {
         // MONGO_UNREACHABLE;
+        return false;
     }
 
     void unsetMaxLockTimeout() override {
@@ -168,7 +169,7 @@ public:
     }
 
     bool isLockHeldForMode(ResourceId resId, LockMode mode) const override {
-        return true;
+        return isModeCovered(mode, getLockMode(resId));
     }
 
     bool isDbLockedForMode(StringData dbName, LockMode mode) const override {

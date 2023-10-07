@@ -118,11 +118,11 @@ public:
 #endif
 
         // Set up the thread name
-        auto oldThreadName = getThreadName();
-        if (oldThreadName != _ssm->_threadName) {
-            _ssm->_oldThreadName = getThreadName().toString();
-            setThreadName(_ssm->_threadName);
-        }
+        // auto oldThreadName = getThreadName();
+        // if (oldThreadName != _ssm->_threadName) {
+        //     _ssm->_oldThreadName = getThreadName().toString();
+        //     setThreadName(_ssm->_threadName);
+        // }
 
         // Swap the current Client so calls to cc() work as expected
         Client::setCurrent(std::move(_ssm->_dbClient));
@@ -183,9 +183,9 @@ public:
                 _ssm->_dbClient = Client::releaseCurrent();
             }
 
-            if (!_ssm->_oldThreadName.empty()) {
-                setThreadName(_ssm->_oldThreadName);
-            }
+            // if (!_ssm->_oldThreadName.empty()) {
+            //     setThreadName(_ssm->_oldThreadName);
+            // }
         }
 
         // If the session has ended, then it's unsafe to do anything but call the cleanup hook.

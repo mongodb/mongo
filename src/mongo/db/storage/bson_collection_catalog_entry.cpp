@@ -337,10 +337,10 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             auto bgSecondary = BSONElement(idx["backgroundSecondary"]);
             // Opt-in to rebuilding behavior for old-format index catalog objects.
             imd.isBackgroundSecondaryBuild = bgSecondary.eoo() || bgSecondary.trueValue();
-            indexes.push_back(imd);
+            indexes.push_back(std::move(imd));
         }
     }
 
     prefix = KVPrefix::fromBSONElement(obj["prefix"]);
 }
-}
+}  // namespace mongo

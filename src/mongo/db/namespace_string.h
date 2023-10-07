@@ -194,6 +194,10 @@ public:
     const std::string& toString() const {
         return ns();
     }
+    
+    const StringData toStringData() const {
+        return StringData(_ns);
+    }
 
     size_t size() const {
         return _ns.size();

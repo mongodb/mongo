@@ -1,8 +1,9 @@
+#include "mongo/base/string_data.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kExecutor;
 
-#include "mongo/transport/service_executor_coroutine.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/service_executor_coroutine.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
@@ -65,7 +66,7 @@ void ThreadGroup::TrySleep() {
         _is_sleep.store(false, std::memory_order_relaxed);
         return;
     }
-    
+
     _sleep_cv.wait(lk, [this] { return !IsIdle(); });
 
     // Woken up from sleep.
@@ -106,10 +107,11 @@ Status ServiceExecutorCoroutine::start() {
 Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
     MONGO_LOG(0) << "Starting new worker thread for " << _name << " service executor. "
                  << " group id: " << groupId;
+
     return launchServiceWorkerThread([this, threadGroupId = groupId] {
-        std::string threadName("thread_group_");
-        threadName += std::to_string(threadGroupId);
-        setThreadName(threadName);
+        std::string threadName("thread_group_" + std::to_string(threadGroupId));
+        StringData threadNameSD(threadName);
+
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         _numRunningWorkerThreads.addAndFetch(1);
         auto numRunningGuard = MakeGuard([&] {
@@ -160,6 +162,7 @@ Status ServiceExecutorCoroutine::_startWorker(uint16_t groupId) {
             while (!_localWorkQueue.empty() && _stillRunning.load(std::memory_order_relaxed)) {
                 // _localRecursionDepth = 1;
                 // MONGO_LOG(1) << "thread " << threadGroupId << " do task";
+                setThreadName(threadNameSD);
                 _localWorkQueue.front()();
                 // MONGO_LOG(1) << "thread " << threadGroupId << " do task done";
                 _localWorkQueue.pop_front();

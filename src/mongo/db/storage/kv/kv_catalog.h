@@ -33,6 +33,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -144,7 +145,7 @@ private:
 
     struct Entry {
         Entry() {}
-        Entry(std::string i, RecordId l) : ident(i), storedLoc(l) {}
+        Entry(std::string i, RecordId l) : ident(std::move(i)), storedLoc(std::move(l)) {}
         std::string ident;
         RecordId storedLoc;
     };

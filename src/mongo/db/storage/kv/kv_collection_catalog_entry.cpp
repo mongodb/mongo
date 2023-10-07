@@ -292,6 +292,7 @@ void KVCollectionCatalogEntry::updateCappedSize(OperationContext* opCtx, long lo
 
 BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData(
     OperationContext* opCtx) const {
-    return _catalog->getMetaData(opCtx, ns().toString());
+    // return _catalog->getMetaData(opCtx, ns().toString());
+    return _catalog->getMetaData(opCtx, ns().toStringData());
 }
-}
+}  // namespace mongo
