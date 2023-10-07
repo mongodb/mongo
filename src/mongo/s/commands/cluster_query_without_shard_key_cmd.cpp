@@ -124,6 +124,7 @@ struct ParsedCommandInfo {
     NamespaceString nss;
     BSONObj query;
     BSONObj collation;
+    boost::optional<BSONObj> let;
     boost::optional<BSONObj> sort;
     bool upsert = false;
     int stmtId = kUninitializedStmtId;
@@ -167,7 +168,13 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
         collator = uassertStatusOK(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
+    auto expCtx =
+        makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                     nss,
+                                                     collation,
+                                                     boost::none,  // explain
+                                                     parsedInfo.let,
+                                                     boost::none /* legacyRuntimeConstants */);
     getShardIdsForQuery(
         expCtx, query, collation, cm, &allShardsContainingChunksForNs, nullptr /* info */);
 
@@ -233,6 +240,8 @@ BSONObj createAggregateCmdObj(
         aggregate.setHint(parsedInfo.hint);
     }
 
+    aggregate.setLet(parsedInfo.let);
+
     aggregate.setPipeline([&]() {
         std::vector<BSONObj> pipeline;
         if (timeseriesFields) {
@@ -280,6 +289,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
                 op.getType() == BulkWriteCRUDOp::kUpdate ||
                     op.getType() == BulkWriteCRUDOp::kDelete);
         parsedInfo.nss = bulkWriteRequest.getNsInfo()[op.getNsInfoIdx()].getNs();
+        parsedInfo.let = bulkWriteRequest.getLet();
         if (op.getType() == BulkWriteCRUDOp::kUpdate) {
             // The update case.
             auto updateOp = op.getUpdate();
@@ -310,6 +320,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
             IDLParserContext("_clusterQueryWithoutShardKeyForUpdate"), writeCmdObj);
         parsedInfo.query = updateRequest.getUpdates().front().getQ();
         parsedInfo.hint = updateRequest.getUpdates().front().getHint();
+        parsedInfo.let = updateRequest.getLet();
 
         // In the batch write path, when the request is reconstructed to be passed to
         // the two phase write protocol, only the stmtIds field is used.
@@ -330,6 +341,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
             IDLParserContext("_clusterQueryWithoutShardKeyForDelete"), writeCmdObj);
         parsedInfo.query = deleteRequest.getDeletes().front().getQ();
         parsedInfo.hint = deleteRequest.getDeletes().front().getHint();
+        parsedInfo.let = deleteRequest.getLet();
 
         // In the batch write path, when the request is reconstructed to be passed to
         // the two phase write protocol, only the stmtIds field is used.
@@ -353,7 +365,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
             findAndModifyRequest.getSort() && !findAndModifyRequest.getSort()->isEmpty()
             ? findAndModifyRequest.getSort()
             : boost::none;
-
+        parsedInfo.let = findAndModifyRequest.getLet();
         if ((parsedInfo.upsert = findAndModifyRequest.getUpsert().get_value_or(false))) {
             parsedInfo.updateRequest = UpdateRequest{};
             parsedInfo.updateRequest->setNamespaceString(findAndModifyRequest.getNamespace());
