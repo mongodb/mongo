@@ -18,7 +18,7 @@ function makeTestListSampledQueriesAggregateCmdObj(ns) {
     return {aggregate: 1, pipeline: [{$listSampledQueries: {namespace: ns}}], cursor: {}};
 }
 
-function makeAnalyzeShardKeyAggregateCmdObj(ns) {
+function makeTestAnalyzeShardKeyAggregateCmdObj(ns) {
     const splitNs = ns.split(".");
     return {
         aggregate: splitNs.length == 1 ? "" : splitNs[1],
@@ -78,7 +78,7 @@ function runTests(conn, rst) {
                   testCollName0,
                   false /* requiresCollectionToExist */);
     runTestForCmd(rst.getPrimary().getDB(testDbName),
-                  makeAnalyzeShardKeyAggregateCmdObj,
+                  makeTestAnalyzeShardKeyAggregateCmdObj,
                   testDbName,
                   testCollName0,
                   true /* requiresCollectionToExist */);
@@ -101,7 +101,7 @@ function runTests(conn, rst) {
                   testCollName0,
                   false /* requiresCollectionToExist */);
     runTestForCmd(rst.getPrimary().getDB(testDbName),
-                  makeAnalyzeShardKeyAggregateCmdObj,
+                  makeTestAnalyzeShardKeyAggregateCmdObj,
                   testDbName,
                   testCollName0,
                   true /* requiresCollectionToExist */);
