@@ -49,7 +49,7 @@ static const Seconds kMinMaxStaleness = ReadPreferenceSetting::kMinimalMaxStalen
 ReadPreferenceSetting parse(const BSONObj& rpsObj) {
     const auto swRps = ReadPreferenceSetting::fromInnerBSON(rpsObj);
     ASSERT_OK(swRps.getStatus());
-    return std::move(swRps.getValue());
+    return swRps.getValue();
 }
 
 void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {

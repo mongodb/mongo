@@ -179,7 +179,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::r
 rpc::UniqueReply DBClientConnection::parseCommandReplyMessage(const std::string& host,
                                                               const Message& replyMsg) {
     try {
-        return DBClientBase::parseCommandReplyMessage(host, std::move(replyMsg));
+        return DBClientBase::parseCommandReplyMessage(host, replyMsg);
     } catch (const DBException& ex) {
         if (ErrorCodes::isConnectionFatalMessageParseError(ex.code())) {
             _markFailed(kEndSession);

@@ -96,7 +96,7 @@ void RemoteCommandTargeterMock::markHostShuttingDown(const HostAndPort& host,
     _hostsMarkedDown.insert(host);
 }
 
-void RemoteCommandTargeterMock::setConnectionStringReturnValue(const ConnectionString returnValue) {
+void RemoteCommandTargeterMock::setConnectionStringReturnValue(ConnectionString returnValue) {
     _connectionStringReturnValue = std::move(returnValue);
 }
 

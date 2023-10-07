@@ -172,7 +172,7 @@ void SingleServerPingMonitor::_doServerPing() {
     request.sslMode = _setUri.getSSLMode();
 
     auto remotePingHandle = _executor->scheduleRemoteCommand(
-        std::move(request),
+        request,
         [anchor = shared_from_this(),
          timer = Timer()](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
             if (ErrorCodes::isCancellationError(result.response.status)) {

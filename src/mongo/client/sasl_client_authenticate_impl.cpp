@@ -269,9 +269,9 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
             static const BSONObj saslFollowupCommandPrefix = BSON(saslContinueCommandName << 1);
             return asyncSaslConversation(runCommand,
                                          session,
-                                         std::move(saslFollowupCommandPrefix),
-                                         std::move(serverResponse),
-                                         std::move(targetDatabase),
+                                         saslFollowupCommandPrefix,
+                                         serverResponse,
+                                         targetDatabase,
                                          saslLogLevel);
         });
 }
@@ -316,12 +316,8 @@ Future<void> saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
                                   << "options" << BSON(saslCommandOptionSkipEmptyExchange << true));
 
     BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
-    return asyncSaslConversation(runCommand,
-                                 session,
-                                 std::move(saslFirstCommandPrefix),
-                                 std::move(inputObj),
-                                 targetDatabase,
-                                 saslLogLevel);
+    return asyncSaslConversation(
+        runCommand, session, saslFirstCommandPrefix, inputObj, targetDatabase, saslLogLevel);
 }
 
 MONGO_INITIALIZER(SaslClientAuthenticateFunction)(InitializerContext* context) {

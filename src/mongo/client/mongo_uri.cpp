@@ -530,7 +530,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
                     username,
                     password,
                     database,
-                    std::move(retryWrites),
+                    retryWrites,
                     tlsMode,
                     helloOk,
 // TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants

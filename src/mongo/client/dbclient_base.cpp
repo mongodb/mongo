@@ -358,7 +358,7 @@ auth::RunCommandHook DBClientBase::_makeAuthRunCommandHook() {
             if (!status.isOK()) {
                 return status;
             }
-            return Future<BSONObj>::makeReady(std::move(ret->getCommandReply()));
+            return Future<BSONObj>::makeReady(ret->getCommandReply());
         } catch (const DBException& e) {
             return Future<BSONObj>::makeReady(e.toStatus());
         }

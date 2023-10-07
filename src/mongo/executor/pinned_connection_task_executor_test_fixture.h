@@ -200,7 +200,7 @@ private:
                      PinnedConnectionTaskExecutorTest* fixture)
             : _fixture{fixture} {
             invariant(session);
-            _client = std::make_shared<AsyncDBClient>(hp, std::move(session), nullptr);
+            _client = std::make_shared<AsyncDBClient>(std::move(hp), std::move(session), nullptr);
         }
         ~LeasedStream() {
             _fixture->_streamDestroyedCalls.fetchAndAdd(1);

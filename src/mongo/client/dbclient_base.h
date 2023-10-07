@@ -773,8 +773,8 @@ public:
                                   rpc::RequestMetadataWriter writer,
                                   rpc::ReplyMetadataReader reader)
         : _conn(conn),
-          _oldWriter(std::move(conn->getRequestMetadataWriter())),
-          _oldReader(std::move(conn->getReplyMetadataReader())) {
+          _oldWriter(conn->getRequestMetadataWriter()),
+          _oldReader(conn->getReplyMetadataReader()) {
         _conn->setRequestMetadataWriter(std::move(writer));
         _conn->setReplyMetadataReader(std::move(reader));
     }

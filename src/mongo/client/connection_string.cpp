@@ -41,8 +41,8 @@
 
 namespace mongo {
 
-ConnectionString::ConnectionString(const HostAndPort& server) : _type(ConnectionType::kStandalone) {
-    _servers.push_back(server);
+ConnectionString::ConnectionString(HostAndPort server) : _type(ConnectionType::kStandalone) {
+    _servers.push_back(std::move(server));
     _finishInit();
 }
 
@@ -54,25 +54,21 @@ ConnectionString::ConnectionString(StringData replicaSetName, std::vector<HostAn
 }
 
 // TODO: unify c-tors
-ConnectionString::ConnectionString(ConnectionType type,
-                                   const std::string& s,
-                                   const std::string& replicaSetName) {
-    _type = type;
-    _replicaSetName = replicaSetName;
-    _fillServers(s);
+ConnectionString::ConnectionString(ConnectionType type, std::string s, std::string replicaSetName)
+    : _type(type), _replicaSetName(std::move(replicaSetName)) {
+    _fillServers(std::move(s));
     _finishInit();
 }
 
 ConnectionString::ConnectionString(ConnectionType type,
                                    std::vector<HostAndPort> servers,
-                                   const std::string& replicaSetName)
-    : _type(type), _servers(std::move(servers)), _replicaSetName(replicaSetName) {
+                                   std::string replicaSetName)
+    : _type(type), _servers(std::move(servers)), _replicaSetName(std::move(replicaSetName)) {
     _finishInit();
 }
 
-ConnectionString::ConnectionString(const std::string& s, ConnectionType connType)
-    : _type(connType) {
-    _fillServers(s);
+ConnectionString::ConnectionString(std::string s, ConnectionType connType) : _type(connType) {
+    _fillServers(std::move(s));
     _finishInit();
 }
 
@@ -223,7 +219,7 @@ StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
             return status;
         }
 
-        return ConnectionString(singleHost);
+        return ConnectionString(std::move(singleHost));
     }
 
     if (numCommas == 2) {
