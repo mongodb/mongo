@@ -1405,7 +1405,10 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
     ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
 
     // Test BulkWriteOp::noteWriteOpFinalResponse with retriedStmtIds.
-    bulkWriteOp.noteWriteOpFinalResponse(2, BulkWriteReplyItem(2), std::vector<StmtId>{4});
+    bulkWriteOp.noteWriteOpFinalResponse(2,
+                                         BulkWriteReplyItem(2),
+                                         ShardWCError(shardIdB, WriteConcernErrorDetail()),
+                                         std::vector<StmtId>{4});
 
     ASSERT(bulkWriteOp.isFinished());
 
@@ -1416,6 +1419,118 @@ TEST_F(BulkWriteOpTest, NoteResponseRetriedStmtIds) {
     ASSERT(replyInfo.retriedStmtIds.has_value());
     std::vector<StmtId> expectedRetriedStmtIds = {2, 3, 4};
     ASSERT_EQ(replyInfo.retriedStmtIds.value(), expectedRetriedStmtIds);
+}
+
+
+TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_WriteConcernError) {
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    BulkWriteReplyItem reply(0);
+    WriteConcernErrorDetail wce;
+    wce.setStatus(Status(ErrorCodes::UnsatisfiableWriteConcern, "Dummy WCE!"));
+
+    bulkWriteOp.noteWriteOpFinalResponse(0, reply, ShardWCError(shardIdA, wce), boost::none);
+
+    ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors().size(), 1);
+    ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors()[0].error.toStatus().code(),
+                  ErrorCodes::UnsatisfiableWriteConcern);
+
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replyInfo.replyItems.size(), 1);
+    ASSERT_EQ(replyInfo.numErrors, 0);
+    ASSERT_EQ(replyInfo.wcErrors->getCode(), ErrorCodes::UnsatisfiableWriteConcern);
+}
+
+// Test a local CallbackCanceled error received during shutdown.
+// This isn't truly a death test but is written as one in order to isolate test execution in its
+// own process. This is needed because otherwise calling shutdownNoTerminate() would lead any
+// future tests run in the same process to also have the shutdown flag set.
+DEATH_TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_ShutdownError, "8100600") {
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    // We have to set the shutdown flag in order for a CallbackCanceled error to be treated as a
+    // shutdown error.
+    shutdownNoTerminate();
+
+    BulkWriteReplyItem reply(0, Status(ErrorCodes::CallbackCanceled, "shutting down"));
+
+    ASSERT_THROWS_CODE(
+        bulkWriteOp.noteWriteOpFinalResponse(
+            0, reply, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none),
+        DBException,
+        ErrorCodes::CallbackCanceled);
+
+    // Since we saw an execution-aborting error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // Trigger abnormal exit to satisfy the DEATH_TEST checks.
+    fassertFailed(8100600);
+}
+
+
+TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_TransientTransactionError) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    BulkWriteReplyItem reply(0, Status(ErrorCodes::NetworkTimeout, "network timeout"));
+
+    ASSERT_THROWS_CODE(
+        bulkWriteOp.noteWriteOpFinalResponse(
+            0, reply, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none),
+        DBException,
+        ErrorCodes::NetworkTimeout);
+
+    // Since we are in a txn and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+}
+
+TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponse_NonTransientTransactionError) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    ShardId shardIdA("shardA");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << 1))},
+                                    {NamespaceInfoEntry(nss)});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    BulkWriteReplyItem reply(0, Status(ErrorCodes::Interrupted, "interrupted"));
+
+    bulkWriteOp.noteWriteOpFinalResponse(
+        0, reply, ShardWCError(shardIdA, WriteConcernErrorDetail()), boost::none);
+
+    // Since we are in a txn and we saw an error, the command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replyInfo.replyItems.size(), 1);
+    ASSERT_EQ(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_EQ(replyInfo.numErrors, 1);
+    ASSERT_FALSE(replyInfo.wcErrors.has_value());
 }
 
 using BulkOp =
@@ -2855,19 +2970,6 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
         return reply.toBSON();
     });
     future.default_timed_get();
-}
-
-// Tests that WriteConcernErrors are captured properly when using retryable timeseries updates.
-TEST_F(BulkWriteOpTest, BulkWriteWriteConcernErrorRetryableTimeseriesUpdate) {
-    BulkWriteOp bulkWriteOp(_opCtx, BulkWriteCommandRequest());
-    WriteConcernErrorDetail wce;
-    wce.setStatus(Status(ErrorCodes::UnsatisfiableWriteConcern, "Dummy WCE!"));
-    StatusWith<mongo::txn_api::CommitResult> swResult({Status::OK(), wce});
-    bulkWriteOp.handleErrorsForRetryableTimeseriesUpdate(swResult, ShardId("dummy-shard"));
-
-    ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors().size(), 1);
-    ASSERT_EQUALS(bulkWriteOp.getWriteConcernErrors()[0].error.toStatus().code(),
-                  ErrorCodes::UnsatisfiableWriteConcern);
 }
 
 TEST(BulkWriteTest, getApproximateSize) {

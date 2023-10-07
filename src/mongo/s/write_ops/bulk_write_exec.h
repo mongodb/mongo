@@ -166,22 +166,25 @@ public:
      * be concatenated into a single error when mongos responds to the client.
      */
     void saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError);
-    void saveWriteConcernError(ShardId shardId, WriteConcernErrorDetail wce);
+    void saveWriteConcernError(ShardWCError shardWCError);
     std::vector<ShardWCError> getWriteConcernErrors() const {
         return _wcErrors;
     }
+
+    /**
+     * Marks this bulkWrite request as aborted if the error falls under one of the following cases:
+     * 1. A shutdown error and the router/mongos is shutting down.
+     * 2. The bulkWrite request is part of a transaction and we get an error.
+     *
+     * This may also throw if the bulkWrite request should fail with a top-level error code.
+     */
+    void abortIfNeeded(const Status& error);
 
     /**
      * Marks any further writes for this BulkWriteOp as failed with the provided error status. There
      * must be no pending ops awaiting results when this method is called.
      */
     void noteErrorForRemainingWrites(const Status& status);
-
-    /*
-     * Handles errors for the response from a retryable timeseries update child batch.
-     */
-    void handleErrorsForRetryableTimeseriesUpdate(
-        StatusWith<mongo::txn_api::CommitResult>& swResult, const ShardId& shardId);
 
     /**
      * Processes the response to a TargetedWriteBatch. Sharding related errors are then grouped
@@ -224,15 +227,17 @@ public:
 
     /**
      * Processes the response to a single WriteOp at index opIdx directly and cleans up all
-     * associated childOps. The response is captured by the BulkWriteReplyItem. We don't expect
-     * sharding related stale version/db errors because response set by this method should be final
-     * (i.e. not retryable).
+     * associated childOps. The response is captured by the BulkWriteReplyItem. It also captures the
+     * writeConcern from ShardWCError if the WriteConcernErrorDetail inside is non-OK. We don't
+     * expect sharding related stale version/db errors because response set by this method should be
+     * final (i.e. not retryable).
      *
      * This is currently used by retryable timeseries updates and writes without shard key because
      * those operations are processed individually with the use of internal transactions.
      */
     void noteWriteOpFinalResponse(size_t opIdx,
                                   const BulkWriteReplyItem& reply,
+                                  const ShardWCError& shardWCError,
                                   const boost::optional<std::vector<StmtId>>& retriedStmtIds);
 
     /**

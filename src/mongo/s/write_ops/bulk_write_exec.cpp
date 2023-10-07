@@ -384,7 +384,21 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                            return SemiFuture<void>::makeReady();
                        });
 
-    bulkWriteOp.handleErrorsForRetryableTimeseriesUpdate(swResult, childBatches.begin()->first);
+    Status responseStatus = swResult.getStatus();
+    WriteConcernErrorDetail wcError;
+    if (responseStatus.isOK()) {
+        if (!swResult.getValue().cmdStatus.isOK()) {
+            responseStatus = swResult.getValue().cmdStatus;
+        }
+        wcError = swResult.getValue().wcError;
+    }
+    if (!responseStatus.isOK()) {
+        // Set an error for the operation.
+        bulkWriteResponse.setCursor(BulkWriteCommandResponseCursor(
+            0,  // cursorId
+            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0, responseStatus)},
+            NamespaceString::makeBulkWriteNSS(boost::none)));
+    }
 
     // We should get back just one reply item for the single update we are running.
     const auto& replyItems = bulkWriteResponse.getCursor().getFirstBatch();
@@ -394,9 +408,12 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                 "Processing bulk write response for retryable timeseries update",
                 "opIdx"_attr = opIdx,
                 "singleUpdateRequest"_attr = redact(singleUpdateRequest.toBSON({})),
-                "replyItem"_attr = replyItems[0]);
-    bulkWriteOp.noteWriteOpFinalResponse(
-        opIdx, replyItems[0], bulkWriteResponse.getRetriedStmtIds());
+                "replyItem"_attr = replyItems[0],
+                "wcError"_attr = wcError.toString());
+    bulkWriteOp.noteWriteOpFinalResponse(opIdx,
+                                         replyItems[0],
+                                         ShardWCError(childBatches.begin()->first, wcError),
+                                         bulkWriteResponse.getRetriedStmtIds());
 }
 
 void executeWriteWithoutShardKey(
@@ -441,6 +458,8 @@ void executeWriteWithoutShardKey(
             opCtx, targeter->getNS(), std::move(cmdObj));
 
         BulkWriteCommandReply bulkWriteResponse;
+        // TODO (SERVER-81261): Handle writeConcernErrors.
+        WriteConcernErrorDetail wcError;
         Status responseStatus = swRes.getStatus();
         if (swRes.isOK()) {
             std::string errMsg;
@@ -480,27 +499,13 @@ void executeWriteWithoutShardKey(
                     4,
                     "Processing bulk write response for writes without shard key",
                     "opIdx"_attr = opIdx,
-                    "replyItem"_attr = replyItems[0]);
-        bulkWriteOp.noteWriteOpFinalResponse(
-            opIdx, replyItems[0], bulkWriteResponse.getRetriedStmtIds());
+                    "replyItem"_attr = replyItems[0],
+                    "wcError"_attr = wcError.toString());
+        bulkWriteOp.noteWriteOpFinalResponse(opIdx,
+                                             replyItems[0],
+                                             ShardWCError(childBatches.begin()->first, wcError),
+                                             bulkWriteResponse.getRetriedStmtIds());
     }
-}
-
-void BulkWriteOp::handleErrorsForRetryableTimeseriesUpdate(
-    StatusWith<mongo::txn_api::CommitResult>& swResult, const ShardId& shardId) {
-    Status responseStatus = Status::OK();
-    if (!swResult.isOK()) {
-        responseStatus = swResult.getStatus();
-    } else {
-        if (!swResult.getValue().cmdStatus.isOK()) {
-            responseStatus = swResult.getValue().cmdStatus;
-        }
-        if (auto wcError = swResult.getValue().wcError; !wcError.toStatus().isOK()) {
-            saveWriteConcernError(shardId, wcError);
-        }
-    }
-    // TODO (SERVER-81006): Handle local error correctly.
-    uassertStatusOK(responseStatus);
 }
 
 BulkWriteReplyInfo execute(OperationContext* opCtx,
@@ -983,6 +988,43 @@ void BulkWriteOp::processTargetingError(const StatusWith<WriteType>& targetStatu
     }
 }
 
+void BulkWriteOp::abortIfNeeded(const mongo::Status& error) {
+    invariant(!error.isOK());
+
+    // If we see a local shutdown error, it means mongos itself is shutting down. A remote shutdown
+    // error would have been returned with response.swResponse.getStatus() being OK.
+    // If we see a local CallbackCanceled error, it is likely also due to mongos shutting down,
+    // therefore shutting down executor thread pools and cancelling any work scheduled on them.
+    // While we don't currently know of any other cases we'd see CallbackCanceled here, we check
+    // the shutdown flag as well to ensure the cancellation is due to shutdown.
+    // While the shutdown flag check is deprecated, that is because modules shouldn't consult it
+    // to coordinate their own shutdowns. But it is OK to use here because we are only checking
+    // whether a shutdown has started.
+    if (ErrorCodes::isShutdownError(error) ||
+        (error == ErrorCodes::CallbackCanceled && globalInShutdownDeprecated())) {
+        // We shouldn't continue execution (even if unordered) if we are shutting down since
+        // further batches will fail to execute as well.
+        _aborted = true;
+
+        // We want to throw such an error at the top level so that it can be returned to the client
+        // directly with the appropriate error labels,  allowing them to retry it.
+        uassertStatusOK(error);
+    }
+
+    // If we are in a transaction, we must stop immediately (even for unordered).
+    if (_inTransaction) {
+        // Even if we aren't throwing a top-level error, we won't continue processing any
+        // outstanding writes after seeing this error since the transaction is aborted.
+        _aborted = true;
+
+        // Throw when there is a transient transaction error as those must be returned to the client
+        // at the top level to allow them to retry.
+        if (isTransientTransactionError(error.code(), false, false)) {
+            uassertStatusOK(error);
+        }
+    }
+}
+
 void BulkWriteOp::processLocalChildBatchError(const TargetedWriteBatch& batch,
                                               const AsyncRequestsSender::Response& response) {
     const auto& responseStatus = response.swResponse.getStatus();
@@ -1005,38 +1047,7 @@ void BulkWriteOp::processLocalChildBatchError(const TargetedWriteBatch& batch,
                 "shardInfo"_attr = shardInfo,
                 "error"_attr = redact(status));
 
-    // If we see a local shutdown error, it means mongos itself is shutting down. A remote shutdown
-    // error would have been returned with response.swResponse.getStatus() being OK.
-    // If we see a local CallbackCanceled error, it is likely also due to mongos shutting down,
-    // therefore shutting down executor thread pools and cancelling any work scheduled on them.
-    // While we don't currently know of any other cases we'd see CallbackCanceled here, we check
-    // the shutdown flag as well to ensure the cancellation is due to shutdown.
-    // While the shutdown flag check is deprecated, that is because modules shouldn't consult it
-    // to coordinate their own shutdowns. But it is OK to use here because we are only checking
-    // whether a shutdown has started.
-    if (ErrorCodes::isShutdownError(responseStatus) ||
-        (responseStatus == ErrorCodes::CallbackCanceled && globalInShutdownDeprecated())) {
-        // We shouldn't continue execution (even if unordered) if we are shutting down since
-        // further batches will fail to execute as well.
-        _aborted = true;
-
-        // We want to throw such an error at the top level so that it can be returned to the client
-        // directly with the appropriate error labels,  allowing them to retry it.
-        uassertStatusOK(responseStatus);
-    }
-
-    // If we are in a transaction, we must stop immediately (even for unordered).
-    if (_inTransaction) {
-        // Even if we aren't throwing a top-level error, we won't continue processing any
-        // outstanding writes after seeing this error since the transaction is aborted.
-        _aborted = true;
-
-        // Throw when there is a transient transaction error as those must be returned to the client
-        // at the top level to allow them to retry.
-        if (isTransientTransactionError(status.code(), false, false)) {
-            uassertStatusOK(status);
-        }
-    }
+    abortIfNeeded(responseStatus);
 }
 
 void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
@@ -1061,17 +1072,23 @@ void BulkWriteOp::noteChildBatchError(const TargetedWriteBatch& targetedBatch,
 void BulkWriteOp::noteWriteOpFinalResponse(
     size_t opIdx,
     const BulkWriteReplyItem& reply,
+    const ShardWCError& shardWCError,
     const boost::optional<std::vector<StmtId>>& retriedStmtIds) {
     WriteOp& writeOp = _writeOps[opIdx];
 
     // Cancel all childOps if any.
     writeOp.resetWriteToReady();
 
+    if (!shardWCError.error.toStatus().isOK()) {
+        saveWriteConcernError(shardWCError);
+    }
+
     if (reply.getStatus().isOK()) {
         writeOp.setOpComplete(reply);
     } else {
         auto writeError = write_ops::WriteError(opIdx, reply.getStatus());
         writeOp.setOpError(writeError);
+        abortIfNeeded(reply.getStatus());
     }
 
     if (retriedStmtIds && !retriedStmtIds->empty()) {
@@ -1126,8 +1143,8 @@ void BulkWriteOp::saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernEr
     _wcErrors.push_back(ShardWCError(shardId, wce));
 }
 
-void BulkWriteOp::saveWriteConcernError(ShardId shardId, WriteConcernErrorDetail wce) {
-    _wcErrors.push_back(ShardWCError(shardId, wce));
+void BulkWriteOp::saveWriteConcernError(ShardWCError shardWCError) {
+    _wcErrors.push_back(std::move(shardWCError));
 }
 
 boost::optional<BulkWriteWriteConcernError> BulkWriteOp::generateWriteConcernError() const {
