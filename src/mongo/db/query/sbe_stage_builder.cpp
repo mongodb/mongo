@@ -594,6 +594,12 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     // targeting.
     reqs.setTargetNamespace(_mainNss);
 
+    _state.env->registerSlot(kNothingEnvSlotName,
+                             sbe::value::TypeTags::Nothing,
+                             0,
+                             false /* owned */,
+                             &_slotIdGenerator);
+
     // Build the SBE plan stage tree.
     auto [stage, outputs] = build(root, reqs);
 

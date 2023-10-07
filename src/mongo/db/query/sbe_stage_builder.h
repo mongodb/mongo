@@ -486,6 +486,8 @@ public:
     static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
     static constexpr auto kMetadataSearchSortValues = PlanStageSlots::kMetadataSearchSortValues;
 
+    static constexpr auto kNothingEnvSlotName = "nothing"_sd;
+
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
                           const CanonicalQuery& cq,

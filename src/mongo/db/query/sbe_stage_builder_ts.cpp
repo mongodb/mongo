@@ -154,8 +154,9 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // if they are not requested explicitly by the parent stage. There is no harm in over-
     // publishing but it's convenient to use unified 'outputs' while building the tree.
     // The set of the fields visible to the parent stage is ultimately defined by the 'unpackNode'.
-    // If the parent stage requests fields that are not published (e.g. field "b" in pipeline like
-    // [{$project: {a: 1}}, {$project: {x: "$b"}}]), we simply ignore such requests.
+    // However, the parent stage might requests field that are not published (e.g. field "b" in
+    // pipeline like [{$project: {c: 1}},{$replaceRoot: {newRoot: {z: "$b"}}}]). We'll have to deal
+    // with this if we are not producing a 'kResult' (see later in this function).
     PlanStageSlots outputs;
 
     // Propagate the 'meta' and fields computed from 'meta' into the 'outputs'.
@@ -176,7 +177,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
     // The 'TsBucketToCellBlockStage' and 'BlockToRowStage' together transform a single bucket into
     // a sequence of "rows" with fields, extracted from the bucket's data. The stages between these
-    // two to do block processing over the cells.
+    // two do block processing over the cells.
     auto [topLevelReqs, traverseReqs] = getCellPathReqs(unpackNode);
     invariant(topLevelReqs.size() == traverseReqs.size());
     auto allReqs = topLevelReqs;
@@ -334,6 +335,15 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                                   true,                        // forceNewObject
                                                   false,                       // returnOldObject
                                                   unpackNode->nodeId());
+    } else {
+        // As we are not producing a result record, we must fulfill all reqs in a way that would be
+        // equivalent to fetching the same fields from 'kResult', that is, we'll map the fields to
+        // the environtment's 'Nothing' slot.
+        reqs.forEachReq([&](const std::pair<PlanStageReqs::Type, StringData>& name) {
+            if (!outputs.has(name)) {
+                outputs.set(name, _state.env->getSlot(kNothingEnvSlotName));
+            }
+        });
     }
 
     return {std::move(stage), std::move(outputs)};
