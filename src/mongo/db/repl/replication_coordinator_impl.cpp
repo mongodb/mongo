@@ -2131,7 +2131,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
               "allDurable"_attr = _storage->getAllDurableTimestamp(_service),
               "progress"_attr = _getReplicationProgress(lock));
     }
-    return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
+    return {status, duration_cast<Milliseconds>(timer.elapsed())};
 }
 
 SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeout(

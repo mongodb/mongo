@@ -805,14 +805,14 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
                    instance,
                    scopedExecutor = _scopedExecutor,
                    token = instanceSource.token(),
-                   instanceID] {
+                   instanceID]() mutable {
                 LOGV2_DEBUG(5123002,
                             3,
                             "Starting instance of PrimaryOnlyService",
                             "service"_attr = serviceName,
                             "instanceID"_attr = instanceID);
 
-                return instance->run(std::move(scopedExecutor), std::move(token));
+                return instance->run(std::move(scopedExecutor), token);
             })
             // TODO SERVER-61717 remove this error handler once instance are automatically released
             // at the end of run()

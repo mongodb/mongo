@@ -1223,7 +1223,7 @@ void ShardMergeRecipientService::Instance::_keepBackupCursorAlive(const Cancella
     executor::RemoteCommandRequest getMoreRequest(
         _client->getServerHostAndPort(),
         nss.dbName(),
-        std::move(BSON("getMore" << cursorId << "collection" << nss.coll().toString())),
+        BSON("getMore" << cursorId << "collection" << nss.coll().toString()),
         nullptr);
     getMoreRequest.options.fireAndForget = true;
 

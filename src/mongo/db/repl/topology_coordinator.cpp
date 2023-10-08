@@ -1135,7 +1135,7 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
                         "retriesElapsed"_attr = alreadyElapsed);
         }
     } else {
-        ReplSetHeartbeatResponse hbr = std::move(hbResponse.getValue());
+        ReplSetHeartbeatResponse hbr = hbResponse.getValue();
         LOGV2_DEBUG(
             21808, 3, "setUpValues: heartbeat response good", "memberId"_attr = member.getId());
         pingsInConfig++;

@@ -217,13 +217,13 @@ public:
 
     void setReplSetVersion(long long version);
 
-    void addHost(const HostAndPort& host);
+    void addHost(HostAndPort host);
 
-    void addPassive(const HostAndPort& passive);
+    void addPassive(HostAndPort passive);
 
-    void addArbiter(const HostAndPort& arbiter);
+    void addArbiter(HostAndPort arbiter);
 
-    void setPrimary(const HostAndPort& primary);
+    void setPrimary(HostAndPort primary);
 
     void setIsArbiterOnly(bool arbiterOnly);
 
@@ -239,7 +239,7 @@ public:
 
     void addTag(const std::string& tagKey, const std::string& tagValue);
 
-    void setMe(const HostAndPort& me);
+    void setMe(HostAndPort me);
 
     void setElectionId(const OID& electionId);
 

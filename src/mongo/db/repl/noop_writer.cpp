@@ -87,8 +87,10 @@ class NoopWriter::PeriodicNoopRunner {
     using NoopWriteFn = std::function<void(OperationContext*)>;
 
 public:
-    PeriodicNoopRunner(Seconds waitTime, NoopWriteFn noopWrite)
-        : _thread([this, noopWrite, waitTime] { run(waitTime, std::move(noopWrite)); }) {}
+    PeriodicNoopRunner(const Seconds& waitTime, NoopWriteFn&& noopWrite)
+        : _thread([this, noopWrite = std::move(noopWrite), waitTime]() mutable {
+              run(waitTime, std::move(noopWrite));
+          }) {}
 
     ~PeriodicNoopRunner() {
         stdx::unique_lock<Latch> lk(_mutex);
@@ -99,7 +101,7 @@ public:
     }
 
 private:
-    void run(Seconds waitTime, NoopWriteFn noopWrite) {
+    void run(const Seconds& waitTime, NoopWriteFn&& noopWrite) {
         Client::initThread("NoopWriter");
 
         while (true) {

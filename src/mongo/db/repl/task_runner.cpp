@@ -184,7 +184,7 @@ void TaskRunner::_runTasks() {
         lk.unlock();
         // Cancel remaining tasks with a CallbackCanceled status.
         for (auto&& task : tasks) {
-            runSingleTask(std::move(task),
+            runSingleTask(task,
                           nullptr,
                           Status(ErrorCodes::CallbackCanceled,
                                  "this task has been canceled by a previously invoked task"));

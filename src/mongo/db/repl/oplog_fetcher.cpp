@@ -594,7 +594,7 @@ AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long max
     BSONObjBuilder secondMatchBuilder(BSON("ts" << BSON("$gte" << startTs)));
     stages.emplace_back(DocumentSourceMatch::createFromBson(
         Document{{"$match", Document{secondMatchBuilder.obj()}}}.toBson().firstElement(), expCtx));
-    const auto serializedPipeline = Pipeline::create(std::move(stages), expCtx)->serializeToBson();
+    auto serializedPipeline = Pipeline::create(std::move(stages), expCtx)->serializeToBson();
 
     AggregateCommandRequest aggRequest(_nss, std::move(serializedPipeline));
     aggRequest.setReadConcern(_config.queryReadConcern.toBSONInner());

@@ -828,13 +828,13 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequ
 }
 
 OplogEntry makeInvalidateOp(OpTime opTime,
-                            NamespaceString nss,
+                            const NamespaceString& nss,
                             BSONObj document,
                             OperationSessionInfo sessionInfo,
                             mongo::UUID uuid) {
     return DurableOplogEntry(opTime,                     // optime
                              OpTypeEnum::kUpdate,        // opType
-                             std::move(nss),             // namespace
+                             nss,                        // namespace
                              uuid,                       // uuid
                              boost::none,                // fromMigrate
                              boost::none,                // checkExistenceForDiffInsert
