@@ -29,7 +29,9 @@
 #pragma once
 
 
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
+#include <map>
 #include <utility>
 
 namespace mongo {
@@ -228,7 +230,7 @@ public:
     }
 
     void dump() const override {
-        // MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE;
     }
 
     bool isW() const override {
@@ -260,13 +262,14 @@ public:
     }
 
     bool isGlobalLockedRecursively() override {
-        return false;
+        return true;
     }
 
     LockMode _lockMode{LockMode::MODE_NONE};
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel{0};
+    std::map<ResourceId, LockMode> _lockMap;
 };
 
 }  // namespace mongo

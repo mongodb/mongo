@@ -111,7 +111,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         }
     }
 
-    if (serverGlobalParams.enableCoroutine) {
+    if (_coroutineExecutor) {
         MONGO_LOG(0) << "use coroutine service executor";
         ssm->setServiceExecutor(_coroutineExecutor.get());
 

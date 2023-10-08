@@ -28,6 +28,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/transport/service_state_machine.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/client.h"
@@ -39,7 +40,6 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_task_names.h"
-#include "mongo/transport/service_state_machine.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
@@ -268,6 +268,7 @@ void ServiceStateMachine::Reset(ServiceContext* svcContext,
     _dbClient = svcContext->makeClient(_threadName, std::move(session));
     _dbClientPtr = _dbClient.get();
     _threadGroupId = group_id;
+    _owned.store(Ownership::kUnowned);
 }
 
 const transport::SessionHandle& ServiceStateMachine::_session() const {

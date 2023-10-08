@@ -86,7 +86,7 @@ private:
     AtomicWord<size_t> _currentConnections{0};
     AtomicWord<size_t> _createdConnections{0};
 
-    std::unique_ptr<transport::ServiceExecutorCoroutine> _coroutineExecutor;
+    std::unique_ptr<transport::ServiceExecutorCoroutine> _coroutineExecutor{nullptr};
 };
 
 }  // namespace mongo
