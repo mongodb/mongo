@@ -1003,7 +1003,7 @@ void visitPathTreeNodes(PathTreeNode<T>* treeRoot,
  * Simple tagged pointer to a projection AST node. This class provides some useful methods for
  * extracting information from the AST node.
  */
-class ProjectionNode {
+class ProjectNode {
 public:
     using ASTNode = projection_ast::ASTNode;
     using BooleanConstantASTNode = projection_ast::BooleanConstantASTNode;
@@ -1025,17 +1025,17 @@ public:
     struct Keep {};
     struct Drop {};
 
-    ProjectionNode() = default;
+    ProjectNode() = default;
 
-    ProjectionNode(Keep) : _data(Bool{true}) {}
-    ProjectionNode(Drop) : _data(Bool{false}) {}
-    ProjectionNode(Expression* expr) : _data(Expr{expr}) {}
-    ProjectionNode(SbExpr sbExpr) : _data(std::move(sbExpr)) {}
-    ProjectionNode(Slice slice) : _data(slice) {}
+    ProjectNode(Keep) : _data(Bool{true}) {}
+    ProjectNode(Drop) : _data(Bool{false}) {}
+    ProjectNode(Expression* expr) : _data(Expr{expr}) {}
+    ProjectNode(SbExpr sbExpr) : _data(std::move(sbExpr)) {}
+    ProjectNode(Slice slice) : _data(slice) {}
 
-    ProjectionNode(const BooleanConstantASTNode* n) : _data(Bool{n->value()}) {}
-    ProjectionNode(const ExpressionASTNode* n) : _data(Expr{n->expressionRaw()}) {}
-    ProjectionNode(const ProjectionSliceASTNode* n) : _data(Slice{n->limit(), n->skip()}) {}
+    ProjectNode(const BooleanConstantASTNode* n) : _data(Bool{n->value()}) {}
+    ProjectNode(const ExpressionASTNode* n) : _data(Expr{n->expressionRaw()}) {}
+    ProjectNode(const ProjectionSliceASTNode* n) : _data(Slice{n->limit(), n->skip()}) {}
 
     Type type() const {
         return stdx::visit(OverloadedVisitor{[](const Bool&) { return Type::kBool; },
@@ -1087,9 +1087,9 @@ private:
 
 /**
  * This function converts from projection AST to a pair of vectors: a vector of field paths and a
- * vector of ProjectionNodes.
+ * vector of ProjectNodes.
  */
-std::pair<std::vector<std::string>, std::vector<ProjectionNode>> getProjectionNodes(
+std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
     const projection_ast::Projection& projection);
 
 /**

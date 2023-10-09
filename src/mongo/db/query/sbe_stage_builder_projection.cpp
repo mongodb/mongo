@@ -272,7 +272,7 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
     return std::make_tuple(std::move(fields), std::move(fieldInfos), std::move(args));
 }
 
-void preVisitCommon(PathTreeNode<boost::optional<ProjectionNode>>* node,
+void preVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
                     ProjectionVisitorContext& ctx) {
     if (node->value) {
         if (node->value->isExpr() || node->value->isSbExpr()) {
@@ -308,7 +308,7 @@ sbe::MakeObjSpec::NonObjInputBehavior getNonObjInputBehavior(bool hasValueArgs, 
         : (isInclusion ? NonObjInputBehavior::kReturnNothing : NonObjInputBehavior::kReturnInput);
 }
 
-void postVisitCommon(PathTreeNode<boost::optional<ProjectionNode>>* node,
+void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
                      ProjectionVisitorContext& ctx,
                      boost::optional<int32_t> traversalDepth = boost::none) {
     using FieldBehavior = sbe::MakeObjSpec::FieldBehavior;
@@ -372,13 +372,13 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectionNode>>* node,
 SbExpr evaluateProjection(StageBuilderState& state,
                           projection_ast::ProjectType type,
                           std::vector<std::string> paths,
-                          std::vector<ProjectionNode> nodes,
+                          std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
                           boost::optional<TypedSlot> rootSlot,
                           const PlanStageSlots* slots) {
-    using Node = PathTreeNode<boost::optional<ProjectionNode>>;
+    using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
-    auto tree = buildPathTree<boost::optional<ProjectionNode>>(
+    auto tree = buildPathTree<boost::optional<ProjectNode>>(
         paths, std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
 
     ProjectionVisitorContext context{state, type, std::move(inputExpr), slots};
@@ -419,12 +419,12 @@ SbExpr evaluateProjection(StageBuilderState& state,
 // to deal with evaluating the $slice ops.
 SbExpr evaluateSliceOps(StageBuilderState& state,
                         std::vector<std::string> paths,
-                        std::vector<ProjectionNode> nodes,
+                        std::vector<ProjectNode> nodes,
                         SbExpr inputExpr,
                         const PlanStageSlots* slots) {
-    using Node = PathTreeNode<boost::optional<ProjectionNode>>;
+    using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
-    auto tree = buildPathTree<boost::optional<ProjectionNode>>(
+    auto tree = buildPathTree<boost::optional<ProjectNode>>(
         paths, std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
 
     // We want to keep the entire input document as-is except for applying the $slice ops, so
@@ -480,7 +480,7 @@ SbExpr generateProjection(StageBuilderState& state,
     const auto projType = projection->type();
 
     // Do a DFS on the projection AST and populate 'paths' and 'nodes'.
-    auto [paths, nodes] = getProjectionNodes(*projection);
+    auto [paths, nodes] = getProjectNodes(*projection);
 
     return generateProjection(
         state, projType, std::move(paths), std::move(nodes), std::move(inputExpr), rootSlot, slots);
@@ -489,7 +489,7 @@ SbExpr generateProjection(StageBuilderState& state,
 SbExpr generateProjection(StageBuilderState& state,
                           projection_ast::ProjectType projType,
                           std::vector<std::string> paths,
-                          std::vector<ProjectionNode> nodes,
+                          std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
                           boost::optional<TypedSlot> rootSlot,
                           const PlanStageSlots* slots) {
@@ -502,11 +502,11 @@ SbExpr generateProjection(StageBuilderState& state,
     // engine's implementation of $slice, see the 'ExpressionInternalFindSlice' class for
     // details.)
     std::vector<std::string> slicePaths;
-    std::vector<ProjectionNode> sliceNodes;
+    std::vector<ProjectNode> sliceNodes;
 
     if (std::any_of(nodes.begin(), nodes.end(), [&](auto&& n) { return n.isSlice(); })) {
         std::vector<std::string> newPaths;
-        std::vector<ProjectionNode> newNodes;
+        std::vector<ProjectNode> newNodes;
 
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto& path = paths[i];
@@ -521,7 +521,7 @@ SbExpr generateProjection(StageBuilderState& state,
                 // that the first pass doesn't drop 'path'.
                 if (isInclusion) {
                     newPaths.emplace_back(path);
-                    newNodes.emplace_back(ProjectionNode::Keep{});
+                    newNodes.emplace_back(ProjectNode::Keep{});
                 }
                 slicePaths.emplace_back(std::move(path));
                 sliceNodes.emplace_back(std::move(node));

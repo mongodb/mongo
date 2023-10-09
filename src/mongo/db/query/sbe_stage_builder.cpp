@@ -2125,7 +2125,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     // intentionally ignore any basic inclusions that are part of the projection (ex. {a:1})
     // for the purposes of populating 'fields'.
     DepsTracker deps;
-    auto [_, nodes] = getProjectionNodes(projection);
+    auto [_, nodes] = getProjectNodes(projection);
     for (auto&& node : nodes) {
         if (node.isExpr()) {
             expression::addDependencies(node.getExpr(), &deps);
@@ -2175,7 +2175,7 @@ SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* ro
     tassert(
         7055403, "buildProjectionDefaultCovered() expected 'pn' to not be fetched", !pn->fetched());
 
-    auto [paths, _] = getProjectionNodes(projection);
+    auto [paths, _] = getProjectNodes(projection);
     auto fields = std::move(paths);
     auto pathTreeRoot = buildPathTree<boost::optional<sbe::value::SlotId>>(
         fields, BuildPathTreeMode::AssertNoConflictingPaths);
@@ -4299,7 +4299,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Materialize kResult if needed.
     if (reqResult) {
-        std::vector<ProjectionNode> nodes;
+        std::vector<ProjectNode> nodes;
         for (size_t i = 0; i < windowFields.size(); ++i) {
             nodes.emplace_back(SbExpr{windowFinalSlots[i]});
         }

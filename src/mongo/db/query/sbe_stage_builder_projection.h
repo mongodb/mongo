@@ -54,7 +54,7 @@ SbExpr generateProjection(StageBuilderState& state,
 SbExpr generateProjection(StageBuilderState& state,
                           projection_ast::ProjectType type,
                           std::vector<std::string> paths,
-                          std::vector<ProjectionNode> nodes,
+                          std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
                           boost::optional<TypedSlot> rootSlot = boost::none,
                           const PlanStageSlots* slots = nullptr);

@@ -772,17 +772,16 @@ std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage
 }
 
 namespace {
-struct GetProjectionNodesData {
+struct GetProjectNodesData {
     projection_ast::ProjectType projectType = projection_ast::ProjectType::kInclusion;
     std::vector<std::string> paths;
-    std::vector<ProjectionNode> nodes;
+    std::vector<ProjectNode> nodes;
 };
-using GetProjectionNodesContext =
-    projection_ast::PathTrackingVisitorContext<GetProjectionNodesData>;
+using GetProjectNodesContext = projection_ast::PathTrackingVisitorContext<GetProjectNodesData>;
 
-class GetProjectionNodesVisitor final : public projection_ast::ProjectionASTConstVisitor {
+class GetProjectNodesVisitor final : public projection_ast::ProjectionASTConstVisitor {
 public:
-    explicit GetProjectionNodesVisitor(GetProjectionNodesContext* context) : _context{context} {}
+    explicit GetProjectNodesVisitor(GetProjectNodesContext* context) : _context{context} {}
 
     void visit(const projection_ast::BooleanConstantASTNode* node) final {
         bool isInclusion = _context->data().projectType == projection_ast::ProjectType::kInclusion;
@@ -821,16 +820,16 @@ private:
         return _context->fullPath().fullPath();
     }
 
-    GetProjectionNodesContext* _context;
+    GetProjectNodesContext* _context;
 };
 }  // namespace
 
-std::pair<std::vector<std::string>, std::vector<ProjectionNode>> getProjectionNodes(
+std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
     const projection_ast::Projection& projection) {
-    GetProjectionNodesContext ctx{{projection.type(), {}, {}}};
-    GetProjectionNodesVisitor visitor(&ctx);
+    GetProjectNodesContext ctx{{projection.type(), {}, {}}};
+    GetProjectNodesVisitor visitor(&ctx);
 
-    projection_ast::PathTrackingConstWalker<GetProjectionNodesData> walker{&ctx, {}, {&visitor}};
+    projection_ast::PathTrackingConstWalker<GetProjectNodesData> walker{&ctx, {}, {&visitor}};
 
     tree_walker::walk<true, projection_ast::ASTNode>(projection.root(), &walker);
 
