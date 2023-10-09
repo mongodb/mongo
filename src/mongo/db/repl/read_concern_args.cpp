@@ -211,6 +211,13 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
             if (!status.isOK()) {
                 return status;
             }
+        } else if (fieldName == kWaitLastStableRecoveryTimestamp) {
+            auto status = bsonExtractBooleanField(readConcernObj,
+                                                  kWaitLastStableRecoveryTimestamp,
+                                                  &_waitLastStableRecoveryTimestamp);
+            if (!status.isOK()) {
+                return status;
+            }
         } else if (fieldName == ReadWriteConcernProvenance::kSourceFieldName) {
             try {
                 _provenance = ReadWriteConcernProvenance::parse(
@@ -324,6 +331,10 @@ void ReadConcernArgs::_appendInfoInner(BSONObjBuilder* builder) const {
 
     if (_allowTransactionTableSnapshot) {
         builder->append(kAllowTransactionTableSnapshot, _allowTransactionTableSnapshot);
+    }
+
+    if (_waitLastStableRecoveryTimestamp) {
+        builder->append(kWaitLastStableRecoveryTimestamp, _waitLastStableRecoveryTimestamp);
     }
 
     _provenance.serialize(builder);

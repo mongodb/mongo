@@ -276,6 +276,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
                                 << repl::readConcernLevels::kSnapshotName
                                 << repl::ReadConcernArgs::kAtClusterTimeFieldName
                                 << _atClusterTime));
+
     // The read preference on the request is merely informational (e.g. for profiler entries) -- the
     // pipeline's opCtx setting is actually used when sending the request.
     auto readPref = ReadPreferenceSetting{ReadPreference::Nearest};
@@ -623,7 +624,8 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
     const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(request);
     auto readConcern = BSON(repl::ReadConcernArgs::kLevelFieldName
                             << repl::readConcernLevels::kSnapshotName
-                            << repl::ReadConcernArgs::kAtClusterTimeFieldName << _atClusterTime);
+                            << repl::ReadConcernArgs::kAtClusterTimeFieldName << _atClusterTime
+                            << repl::ReadConcernArgs::kWaitLastStableRecoveryTimestamp << true);
     request.setReadConcern(readConcern);
 
     // The read preference on the request is merely informational (e.g. for profiler entries) -- the

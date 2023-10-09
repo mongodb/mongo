@@ -66,6 +66,8 @@ public:
     static constexpr StringData kLevelFieldName = "level"_sd;
     static constexpr StringData kAllowTransactionTableSnapshot =
         "$_allowTransactionTableSnapshot"_sd;
+    static constexpr StringData kWaitLastStableRecoveryTimestamp =
+        "$_waitLastStableRecoveryTimestamp"_sd;
 
     static const BSONObj kImplicitDefault;
     static const BSONObj kLocal;
@@ -235,6 +237,14 @@ public:
         return _allowTransactionTableSnapshot;
     }
 
+    bool waitLastStableRecoveryTimestamp() const {
+        return _waitLastStableRecoveryTimestamp;
+    }
+
+    void setWaitLastStableRecoveryTimestamp(bool wait) {
+        _waitLastStableRecoveryTimestamp = wait;
+    }
+
 private:
     /**
      * Appends level, afterOpTime, and the other "inner" fields of the read concern args.
@@ -273,6 +283,8 @@ private:
     bool _atClusterTimeSelected = false;
 
     bool _allowTransactionTableSnapshot = false;
+
+    bool _waitLastStableRecoveryTimestamp = false;
 };
 
 }  // namespace repl

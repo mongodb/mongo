@@ -496,6 +496,43 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                     "Using 'committed' snapshot",
                     "operation_description"_attr = CurOp::get(opCtx)->opDescription());
     }
+
+    if (readConcernArgs.waitLastStableRecoveryTimestamp()) {
+        uassert(8138101,
+                "readConcern level 'snapshot' is required when specifying "
+                "$_waitLastStableRecoveryTimestamp",
+                readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+        uassert(ErrorCodes::InvalidOptions,
+                "atClusterTime is required for $_waitLastStableRecoveryTimestamp",
+                atClusterTime);
+        uassert(
+            ErrorCodes::Unauthorized,
+            "Unauthorized",
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal));
+        auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        Lock::GlobalLock global(opCtx, MODE_IS);
+        auto lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
+        if (!lastStableRecoveryTimestamp ||
+            *lastStableRecoveryTimestamp < atClusterTime->asTimestamp()) {
+            // If the lastStableRecoveryTimestamp hasn't passed atClusterTime, we invoke
+            // flushAllFiles explicitly here to push it. By default, fsync will run every minute to
+            // call flushAllFiles. The lastStableRecoveryTimestamp should already be updated after
+            // flushAllFiles return but we add a retry to make sure we wait until the timestamp gets
+            // advanced.
+            storageEngine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ true);
+            while (true) {
+                lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
+                if (lastStableRecoveryTimestamp &&
+                    *lastStableRecoveryTimestamp >= atClusterTime->asTimestamp()) {
+                    break;
+                }
+
+                opCtx->sleepFor(Milliseconds(100));
+            }
+        }
+    }
     return Status::OK();
 }
 
