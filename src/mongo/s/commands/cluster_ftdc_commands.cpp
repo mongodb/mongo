@@ -103,7 +103,8 @@ public:
 
         result.append(
             "data",
-            FTDCController::get(opCtx->getServiceContext())->getMostRecentPeriodicDocument());
+            FTDCController::get(opCtx->getServiceContext()->getService(ClusterRole::RouterServer))
+                ->getMostRecentPeriodicDocument());
 
         return true;
     }

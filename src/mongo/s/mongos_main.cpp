@@ -601,7 +601,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         // Shutdown Full-Time Data Capture
-        stopMongoSFTDC();
+        stopMongoSFTDC(serviceContext);
     }
 
     audit::logShutdown(Client::getCurrent());
@@ -841,7 +841,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     CommandInvocationHooks::set(serviceContext,
                                 std::make_unique<transport::IngressHandshakeMetricsCommandHooks>());
 
-    startMongoSFTDC();
+    startMongoSFTDC(serviceContext);
 
     if (mongosGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();

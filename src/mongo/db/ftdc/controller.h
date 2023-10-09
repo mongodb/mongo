@@ -41,14 +41,13 @@
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
-
-class ServiceContext;
 
 /**
  * Responsible for periodic collection of samples, writing them to disk,
@@ -138,9 +137,9 @@ public:
     void stop();
 
     /**
-     * Get the FTDCController from ServiceContext.
+     * Get the FTDCController from Service.
      */
-    static FTDCController* get(ServiceContext* serviceContext);
+    static FTDCController* get(Service* service);
 
     /**
      * Get a reference to most recent document from the periodic collectors.

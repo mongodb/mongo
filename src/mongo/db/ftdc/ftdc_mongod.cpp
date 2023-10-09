@@ -157,7 +157,7 @@ void registerMongoDCollectors(FTDCController* controller) {
 
 }  // namespace
 
-void startMongoDFTDC() {
+void startMongoDFTDC(ServiceContext* serviceContext) {
     auto dir = getFTDCDirectoryPathParameter();
 
     if (dir.empty()) {
@@ -165,11 +165,14 @@ void startMongoDFTDC() {
         dir /= kFTDCDefaultDirectory.toString();
     }
 
-    startFTDC(dir, FTDCStartMode::kStart, registerMongoDCollectors);
+    startFTDC(serviceContext->getService(ClusterRole::ShardServer),
+              dir,
+              FTDCStartMode::kStart,
+              registerMongoDCollectors);
 }
 
-void stopMongoDFTDC() {
-    stopFTDC();
+void stopMongoDFTDC(ServiceContext* serviceContext) {
+    stopFTDC(serviceContext->getService(ClusterRole::ShardServer));
 }
 
 }  // namespace mongo

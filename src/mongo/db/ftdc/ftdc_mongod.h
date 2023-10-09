@@ -43,12 +43,12 @@ namespace mongo {
  * Start Full Time Data Capture
  * Starts 1 thread.
  */
-void startMongoDFTDC();
+void startMongoDFTDC(ServiceContext* serviceContext);
 
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoDFTDC();
+void stopMongoDFTDC(ServiceContext* serviceContext);
 
 /**
  * Validation callback for setParameter

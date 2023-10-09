@@ -130,7 +130,7 @@ void registerMongoSCollectors(FTDCController* controller) {
         BSON("getDefaultRWConcern" << 1 << "inMemory" << true)));
 }
 
-void startMongoSFTDC() {
+void startMongoSFTDC(ServiceContext* serviceContext) {
     // Get the path to use for FTDC:
     // 1. Check if the user set one.
     // 2. If not, check if the user has a logpath and derive one.
@@ -156,11 +156,14 @@ void startMongoSFTDC() {
         }
     }
 
-    startFTDC(directory, startMode, registerMongoSCollectors);
+    startFTDC(serviceContext->getService(ClusterRole::RouterServer),
+              directory,
+              startMode,
+              registerMongoSCollectors);
 }
 
-void stopMongoSFTDC() {
-    stopFTDC();
+void stopMongoSFTDC(ServiceContext* serviceContext) {
+    stopFTDC(serviceContext->getService(ClusterRole::RouterServer));
 }
 
 }  // namespace mongo

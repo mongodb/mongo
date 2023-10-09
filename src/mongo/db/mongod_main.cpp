@@ -707,7 +707,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     BackupCursorHooks::initialize(serviceContext);
 
-    startMongoDFTDC();
+    startMongoDFTDC(serviceContext);
 
     if (mongodGlobalParams.scriptingEnabled) {
         uassert(ErrorCodes::InvalidOptions,
@@ -1866,7 +1866,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     ScriptEngine::dropScopeCache();
 
     // Shutdown Full-Time Data Capture
-    stopMongoDFTDC();
+    stopMongoDFTDC(serviceContext);
 
     LOGV2(20565, "Now exiting");
 

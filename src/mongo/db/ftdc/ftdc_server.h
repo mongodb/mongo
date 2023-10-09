@@ -74,18 +74,27 @@ enum class FTDCStartMode {
  * Start Full Time Data Capture
  * Starts 1 thread.
  *
+ * For each service registered under the service context, there is an instance of the
+ * FTDCController. It is required to run this function with a service to know which instance must
+ * start capturing full time data.
+ *
  * See MongoD and MongoS specific functions.
  */
-void startFTDC(boost::filesystem::path& path,
+void startFTDC(Service* service,
+               boost::filesystem::path& path,
                FTDCStartMode startupMode,
                RegisterCollectorsFunction registerCollectors);
 
 /**
  * Stop Full Time Data Capture
  *
+ * For each service registered under the service context, there is an instance of the
+ * FTDCController. It is required to run this function with a service to know which instance must
+ * be stopped.
+ *
  * See MongoD and MongoS specific functions.
  */
-void stopFTDC();
+void stopFTDC(Service* service);
 
 /**
  * A simple FTDC Collector that runs Commands.

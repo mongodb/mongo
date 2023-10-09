@@ -39,11 +39,11 @@ namespace mongo {
 /**
  * Start Full Time Data Capture
  */
-void startMongoSFTDC();
+void startMongoSFTDC(ServiceContext* serviceContext);
 
 /**
  * Stop Full Time Data Capture
  */
-void stopMongoSFTDC();
+void stopMongoSFTDC(ServiceContext* serviceContext);
 
 }  // namespace mongo
