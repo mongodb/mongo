@@ -136,7 +136,7 @@ def get_make_check_dirs():
     os.chdir(run('git rev-parse --show-toplevel'))
 
     # Find the build folder. It can be identified by the presence of the `CMakeFiles` file.
-    p = subprocess.Popen("find . -name CMakeFiles -maxdepth 2", stdout=subprocess.PIPE, shell=True, 
+    p = subprocess.Popen("find . -maxdepth 2 -name CMakeFiles", stdout=subprocess.PIPE, shell=True,
         universal_newlines=True)
     build_folder = os.path.dirname(p.stdout.read().strip())
 
@@ -271,8 +271,10 @@ def evg_cfg(action, test_type):
     #   - 'ssh://git@github.com/wiredtiger/wiredtiger.git' (if run through SSH)
     #   - 'git://github.com/wiredtiger/wiredtiger' (if cloned anonymously)
     output = run('git config remote.origin.url')
-    if not 'github.com' in output or (not 'wiredtiger.git' in output and output != 'git://github.com/wiredtiger/wiredtiger'):
-        sys.exit("ERROR [%s]: need to run this script inside a wiredtiger repo" % prog)
+    if not 'github.com' in output or not 'wiredtiger/wiredtiger' in output:
+        sys.exit(("ERROR [{prog}]: need to run this script inside a wiredtiger repo\n" +
+        "\t`git config remote.origin.url` returned \"{output}\""
+        ).format(prog=prog, output=output))
 
     # Change directory to repo top level
     os.chdir(run('git rev-parse --show-toplevel'))
