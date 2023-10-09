@@ -1,19 +1,14 @@
+# TODO: SERVER-75596 delete this suite and run aggregation through RunQueryStats hook as well.
 test_kind: js_test
 description: |
   This suite enables the collection of query stats metrics on a mongod server, then runs the tests in
-  aggregation as normal. This should cause each aggregation to compute a query
+  aggregation as normal. This should cause each query or aggregation to compute a query
   shape and query stats key, and record in-memory some metrics like execution time and number of
-  scanned documents. Then it uses the 'RunQueryStats' hook to collect the query stats at the end of
-  each test, once with HMAC application enabled and once without. It doesn't assert anything about
-  the collected query stats, it is just meant to make sure nothing is going seriously awry (e.g.
-  crashing).
+  scanned documents.
 
 selector:
   roots:
   - jstests/aggregation/**/*.js
-  exclude_files:
-  # TODO: Remove when SERVER-81917 is fixed.
-  - jstests/aggregation/sources/bucket/collation_bucket.js
 
 executor:
   archive:
@@ -22,7 +17,6 @@ executor:
   hooks:
   # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
   # That way the fixture restart can't cause any trouble for the other hooks.
-  - class: RunQueryStats
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
@@ -32,4 +26,3 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsRateLimit: -1
-        internalQueryStatsErrorsAreCommandFatal: true

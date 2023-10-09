@@ -1,7 +1,7 @@
 test_kind: js_test
 description: |
   This suite enables the collection of query stats metrics on a mongos server, then runs the tests in
-  core as normal. This should cause each query to compute a query
+  core and aggregation as normal. This should cause each query or aggregation to compute a query
   shape and query stats key, and record in-memory some metrics like execution time and number of
   scanned documents. Then it uses the 'RunQueryStats' hook to collect the query stats at the end of
   each test, once with HMAC application enabled and once without. It doesn't assert anything about
@@ -11,6 +11,7 @@ description: |
 selector:
   roots:
   - jstests/core/**/*.js
+  # - jstests/aggregation/**/*.js # TODO: SERVER-75596 enable aggregation tests in the full passthrough.
   exclude_files:
   - jstests/core/txns/**/*.js
   # The following tests fail because a certain command or functionality is not supported on

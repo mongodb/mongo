@@ -638,9 +638,8 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
   - name: query_stats_passthrough
-  - name: query_stats_aggregation_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
   - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
@@ -1213,9 +1212,8 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
   - name: query_stats_passthrough
-  - name: query_stats_aggregation_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
@@ -1455,9 +1453,8 @@ buildvariants:
   - name: streams
   - name: streams_auth
   - name: query_stats_passthrough
-  - name: query_stats_aggregation_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
 
 - <<: *linux_x86_dynamic_compile_variant_dependency
   name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
@@ -1850,9 +1847,8 @@ buildvariants:
   - name: vector_search_auth
   - name: vector_search_ssl
   - name: query_stats_passthrough
-  - name: query_stats_aggregation_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
 
 ###########################################
 #     Experimental buildvariants          #
@@ -2057,9 +2053,8 @@ buildvariants:
   - name: .serverless
   - name: .shard_split
   - name: query_stats_passthrough
-  - name: query_stats_aggregation_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
   - name: .updatefuzzer
   - name: .watchdog
 

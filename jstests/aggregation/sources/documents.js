@@ -95,30 +95,29 @@ assert(resultsEq([{x: null}, {x: 0}, {x: 1}, {x: 2}, {x: 3}, {x: 4}], docsUnionW
         res));
 }
 
-// TODO: SERVER-81502 fix the test for query_stats_aggregation_passthrough
-// {  // $documents with const objects inside $lookup (no "coll", + localField/foreignField).
-//     const res = lookup_coll.aggregate([
-//                 {
-//                     $lookup: {
-//                         localField: "id_name",
-//                         foreignField: "xx",
-//                         pipeline: [
-//                             {$documents: [{xx: 1}, {xx: 2}]}
-//                         ],
-//                         as: "names"
-//                     }
-//                 },
-//                 {$match: {"names": {"$ne": []}}},
-//                 {$project: {_id: 0}}
-//             ])
-//             .toArray();
-//     assert(resultsEq(
-//         [
-//             {id_name: 1, name: "name_1", names: [{"xx": 1}]},
-//             {id_name: 2, name: "name_2", names: [{"xx": 2}]}
-//         ],
-//         res));
-// }
+{  // $documents with const objects inside $lookup (no "coll", + localField/foreignField).
+    const res = lookup_coll.aggregate([
+                {
+                    $lookup: {
+                        localField: "id_name",
+                        foreignField: "xx",
+                        pipeline: [
+                            {$documents: [{xx: 1}, {xx: 2}]}
+                        ],
+                        as: "names"
+                    }
+                },
+                {$match: {"names": {"$ne": []}}},
+                {$project: {_id: 0}}
+            ])
+            .toArray();
+    assert(resultsEq(
+        [
+            {id_name: 1, name: "name_1", names: [{"xx": 1}]},
+            {id_name: 2, name: "name_2", names: [{"xx": 2}]}
+        ],
+        res));
+}
 
 // Must fail when $document appears in the top level collection pipeline.
 assert.throwsWithCode(() => {
