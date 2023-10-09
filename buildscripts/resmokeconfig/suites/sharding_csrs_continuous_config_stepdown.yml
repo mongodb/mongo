@@ -227,8 +227,7 @@ selector:
   # are resilient to config server primary failovers.
   - jstests/sharding/*reshard*.js
   - jstests/sharding/*move*collection*.js
-  - jstests/sharding/unshard_collection_basic.js
-  - jstests/sharding/abort_unshard_collection_basic.js
+  - jstests/sharding/*unshard_collection*.js
 
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js

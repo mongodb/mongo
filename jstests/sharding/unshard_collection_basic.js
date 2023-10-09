@@ -99,10 +99,28 @@ assert(st.rs1.getPrimary().getCollection(newCollNs).countDocuments({}) == 60 ||
 // Fail if command called on shard.
 assert.commandFailedWithCode(st.shard0.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
 
+assert.commandWorked(mongos.adminCommand({shardCollection: newCollNs, key: {_id: 1}}));
+assert.commandWorked(mongos.adminCommand({split: newCollNs, middle: {_id: 0}}));
+assert.commandWorked(mongos.adminCommand({moveChunk: newCollNs, find: {_id: -1}, to: shard0}));
+assert.commandWorked(mongos.adminCommand({moveChunk: newCollNs, find: {_id: 10}, to: shard1}));
+
+coll = mongos.getDB(dbName)[newCollName];
+for (let i = -30; i < 30; ++i) {
+    assert.commandWorked(coll.insert({_id: i}));
+}
+
+assert(st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 30)
+
+// Unshard collection should succeed when collection's original shard key is _id.
+assert.commandWorked(mongos.adminCommand({unshardCollection: newCollNs}));
+
+assert(st.rs1.getPrimary().getCollection(newCollNs).countDocuments({}) == 120 ||
+       st.rs0.getPrimary().getCollection(newCollNs).countDocuments({}) == 120);
+
 const metrics = st.config0.getDB('admin').serverStatus({}).shardingStatistics.unshardCollection;
 
-assert.eq(metrics.countStarted, 2);
-assert.eq(metrics.countSucceeded, 2);
+assert.eq(metrics.countStarted, 3);
+assert.eq(metrics.countSucceeded, 3);
 assert.eq(metrics.countFailed, 0);
 assert.eq(metrics.countCanceled, 0);
 
