@@ -45,6 +45,7 @@ var $config = (function() {
                     {configureCollectionBalancing: newColl, enableAutoSplitter: false}));
             } catch (e) {
                 if (e.code != ErrorCodes.NamespaceNotFound &&
+                    e.code != ErrorCodes.NamespaceNotSharded &&
                     e.code != ErrorCodes.IllegalOperation &&
                     e.code != ErrorCodes.ConflictingOperationInProgress) {
                     throw e;
