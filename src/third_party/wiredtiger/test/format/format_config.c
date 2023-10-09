@@ -496,6 +496,20 @@ config_run(void)
           REALLOC_MAX_TABLES);
     }
 
+    if (GV(RUNS_PREDICTABLE_REPLAY)) {
+        /*
+         * Predictable replays can get extremely slow with throttling.
+         *
+         * FIXME-WT-11782: Investigate why predictable replays get stuck with ops.throttling
+         * enabled. It can indicate a bug in predictable replay or in WiredTiger.
+         */
+        if (GV(OPS_THROTTLE)) {
+            if (config_explicit(NULL, "ops.throttle"))
+                WARN("%s", "turning off ops.throttle to work with predictable replay");
+            config_single(NULL, "ops.throttle=0", false);
+        }
+    }
+
     config_in_memory(); /* Periodically run in-memory. */
 
     tables_apply(config_table, NULL); /* Configure the tables. */

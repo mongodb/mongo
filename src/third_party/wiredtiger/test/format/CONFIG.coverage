@@ -4,6 +4,7 @@ cache.minimum=20
 checkpoints=1
 leak_memory=0
 mmap=1
+ops.throttle=0
 runs.rows=1000000:5000000
 runs.threads=4:32
 runs.timer=15
