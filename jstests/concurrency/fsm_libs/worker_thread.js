@@ -139,6 +139,17 @@ export const workerThread = (function() {
                     printArgs.unshift(prefix);
                     return printOriginal.apply(this, printArgs);
                 };
+
+                jsTestLog = function(msg) {
+                    if (typeof msg === "object") {
+                        msg = tojson(msg);
+                    }
+                    assert.eq(typeof (msg), "string", "Received: " + msg);
+                    let msgs = msg.split("\n");
+                    msgs = msgs.map(msg => '[tid:' + args.tid + '] ' + msg);
+                    const printMsgs = ["----", ...msgs, "----"].map(s => `[jsTest] ${s}`);
+                    printOriginal(`\n\n${printMsgs.join("\n")}\n\n`);
+                };
             }
 
             if (Cluster.isReplication(args.clusterOptions)) {
