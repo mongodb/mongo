@@ -68,7 +68,6 @@ bool RateLimiting::handleRequestFixedWindow() {
 }
 
 bool RateLimiting::handleRequestSlidingWindow() {
-    // TODO SERVER-80006: Determine the best RAII type to hold the lock.
     stdx::unique_lock windowLock{_windowMutex};
 
     Date_t currentTime = tickWindow();
