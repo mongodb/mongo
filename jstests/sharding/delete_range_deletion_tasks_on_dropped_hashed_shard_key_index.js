@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_50,
- *   featureFlagShardKeyIndexOptionalHashedSharding
  * ]
  */
 (function() {

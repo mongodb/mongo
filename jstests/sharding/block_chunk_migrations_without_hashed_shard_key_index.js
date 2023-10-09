@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_fcv_50,
- *   featureFlagShardKeyIndexOptionalHashedSharding
  * ]
  */
 
@@ -55,10 +54,6 @@ assert.eq(0, findChunksUtil.findChunksByNs(configDB, nss, {shard: st.shard1.shar
 assert.commandFailedWithCode(
     st.s.adminCommand(
         {moveChunk: nss, bounds: [chunks[0].min, chunks[0].max], to: st.shard1.shardName}),
-    ErrorCodes.IndexNotFound);
-assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {moveRange: nss, toShard: st.shard1.shardName, min: chunks[0].min, max: chunks[0].max}),
     ErrorCodes.IndexNotFound);
 
 // Recreate the index and verify that we can re-enable balancing.

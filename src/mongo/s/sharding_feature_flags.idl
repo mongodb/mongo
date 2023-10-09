@@ -40,4 +40,5 @@ feature_flags:
   featureFlagShardKeyIndexOptionalHashedSharding:
     description: "Feature flag to make a supporting shard key index for hashed sharding optional"
     cpp_varname: gFeatureFlagShardKeyIndexOptionalHashedSharding
-    default: false
+    default: true
+    version: 5.0
