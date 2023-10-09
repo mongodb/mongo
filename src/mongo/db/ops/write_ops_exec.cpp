@@ -2409,7 +2409,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         auto const output = performTimeseriesUpdate(opCtx, batch, metadata, op, request);
 
         if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
-            output.result.getStatus().code() == ErrorCodes::WriteConflict) {
+            output.result.getStatus().code() == ErrorCodes::WriteConflict ||
+            output.result.getStatus().code() == ErrorCodes::TemporarilyUnavailable) {
             abort(bucketCatalog,
                   batch,
                   output.result.isOK()
@@ -2708,7 +2709,8 @@ void getTimeseriesBatchResults(OperationContext* opCtx,
             docsToRetry->push_back(index);
             continue;
         }
-        if (swCommitInfo.getStatus() == ErrorCodes::WriteConflict) {
+        if (swCommitInfo.getStatus() == ErrorCodes::WriteConflict ||
+            swCommitInfo.getStatus() == ErrorCodes::TemporarilyUnavailable) {
             docsToRetry->push_back(index);
             opCtx->recoveryUnit()->abandonSnapshot();
             continue;
