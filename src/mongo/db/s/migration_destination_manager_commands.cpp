@@ -141,6 +141,12 @@ public:
         onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
         const auto shardId = ShardingState::get(opCtx)->shardId();
 
+        // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
+        // storage. This is not required for correctness, but helps mitigate stalls on secondaries
+        // when a shard receives the first chunk for a collection with a large routing table.
+        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
         const auto collectionEpoch = [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             const auto scopedCsr =
