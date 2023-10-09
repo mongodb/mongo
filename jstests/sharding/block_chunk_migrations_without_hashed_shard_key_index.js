@@ -2,8 +2,7 @@
  * Tests that chunk migrations are blocked when there is no index on a hashed shard key.
  *
  * @tags: [
- *   requires_fcv_60,
- *   featureFlagShardKeyIndexOptionalHashedSharding
+ *   requires_fcv_50,
  * ]
  */
 

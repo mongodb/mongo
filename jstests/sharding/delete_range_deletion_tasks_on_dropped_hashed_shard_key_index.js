@@ -3,8 +3,7 @@
  * deleted and allows other range deletion processes to continue.
  *
  * @tags: [
- *   requires_fcv_60,
- *   featureFlagShardKeyIndexOptionalHashedSharding
+ *   requires_fcv_50,
  * ]
  */
 (function() {

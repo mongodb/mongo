@@ -297,6 +297,10 @@ last-continuous:
     ticket: SERVER-66018
   - test_file: jstests/sharding/timeseries_insert_targeting_normalize_metadata.js
     ticket: SERVER-80203
+  - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js
+    ticket: SERVER-80947
+  - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
+    ticket: SERVER-80947
   suites: null
 last-lts:
   all:
@@ -640,4 +644,8 @@ last-lts:
     ticket: SERVER-66018
   - test_file: jstests/sharding/timeseries_insert_targeting_normalize_metadata.js
     ticket: SERVER-80203
+  - test_file: jstests/sharding/block_chunk_migrations_without_hashed_shard_key_index.js
+    ticket: SERVER-80947
+  - test_file: jstests/sharding/delete_range_deletion_tasks_on_dropped_hashed_shard_key_index.js
+    ticket: SERVER-80947
   suites: null
