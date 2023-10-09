@@ -125,6 +125,9 @@ function runTest({forcePooledConnectionsDropped, withUUID}) {
             expectedErrorCode: [
                 ErrorCodes.ReshardCollectionAborted,
                 ErrorCodes.Interrupted,
+                // The query feature used in resharding can be disallowed after FCV downgrade,
+                // resulting in an InvalidOptions error.
+                ErrorCodes.InvalidOptions,
             ]
         });
 
