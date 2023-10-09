@@ -730,8 +730,8 @@ restart:
                 /*
                  * Copy the flag for later closing.
                  */
-                if (F_ISSET(slot, WT_SLOT_CLOSEFH))
-                    F_SET(coalescing, WT_SLOT_CLOSEFH);
+                if (F_ISSET_ATOMIC_16(slot, WT_SLOT_CLOSEFH))
+                    F_SET_ATOMIC_16(coalescing, WT_SLOT_CLOSEFH);
             } else {
                 /*
                  * If this written slot is not the next LSN, try to start coalescing with later
@@ -761,7 +761,7 @@ restart:
                 /*
                  * Signal the close thread if needed.
                  */
-                if (F_ISSET(slot, WT_SLOT_CLOSEFH))
+                if (F_ISSET_ATOMIC_16(slot, WT_SLOT_CLOSEFH))
                     __wt_cond_signal(session, conn->log_file_cond);
             }
             __wt_log_slot_free(session, slot);
