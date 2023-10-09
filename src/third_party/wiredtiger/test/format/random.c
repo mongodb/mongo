@@ -76,7 +76,7 @@ random_kv(void *arg)
         wt_wrap_open_cursor(session, table->uri, config, &cursor);
 
         /* This is just a smoke-test, get some key/value pairs. */
-        for (i = mmrand(&g.extra_rnd, 0, WT_THOUSAND); i > 0; --i) {
+        for (i = mmrand(&g.extra_rnd, 0, WT_THOUSAND); i > 0 && !g.workers_finished; --i) {
             switch (ret = cursor->next(cursor)) {
             case 0:
                 break;
