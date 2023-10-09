@@ -32,19 +32,20 @@
 namespace test_harness {
 
 /* Component names. */
-const std::string OPERATION_TRACKER = "operation_tracker";
 const std::string METRICS_MONITOR = "metrics_monitor";
+const std::string OPERATION_TRACKER = "operation_tracker";
 const std::string TIMESTAMP_MANAGER = "timestamp_manager";
 const std::string WORKLOAD_MANAGER = "workload_manager";
 
 /* Configuration API consts. */
+const std::string BACKGROUND_COMPACT_DEBUG_MODE = "background_compact_debug_mode";
 const std::string BACKGROUND_COMPACT_OP_CONFIG = "background_compact_config";
 const std::string CACHE_HS_INSERT = "cache_hs_insert";
 const std::string CACHE_MAX_WAIT_MS = "cache_max_wait_ms";
 const std::string CACHE_SIZE_MB = "cache_size_mb";
 const std::string CC_PAGES_REMOVED = "cc_pages_removed";
-const std::string COLLECTION_COUNT = "collection_count";
 const std::string CHECKPOINT_OP_CONFIG = "checkpoint_config";
+const std::string COLLECTION_COUNT = "collection_count";
 const std::string COMPRESSION_ENABLED = "compression_enabled";
 const std::string CUSTOM_OP_CONFIG = "custom_config";
 const std::string DURATION_SECONDS = "duration_seconds";
@@ -88,8 +89,8 @@ const std::string STATISTICS_LOG = "statistics_log=(json,wait=1)";
 
 /* Test harness consts. */
 const std::string DEFAULT_FRAMEWORK_SCHEMA = "key_format=S,value_format=S,";
+const std::string STATISTICS_URI = "statistics:";
 const std::string TABLE_OPERATION_TRACKING = "table:operation_tracking";
 const std::string TABLE_SCHEMA_TRACKING = "table:schema_tracking";
-const std::string STATISTICS_URI = "statistics:";
 
 } // namespace test_harness

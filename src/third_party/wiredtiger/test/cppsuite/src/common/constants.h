@@ -35,19 +35,20 @@
 namespace test_harness {
 
 /* Component names. */
-extern const std::string OPERATION_TRACKER;
 extern const std::string METRICS_MONITOR;
+extern const std::string OPERATION_TRACKER;
 extern const std::string TIMESTAMP_MANAGER;
 extern const std::string WORKLOAD_MANAGER;
 
 /* Configuration API consts. */
+extern const std::string BACKGROUND_COMPACT_DEBUG_MODE;
 extern const std::string BACKGROUND_COMPACT_OP_CONFIG;
 extern const std::string CACHE_HS_INSERT;
 extern const std::string CACHE_MAX_WAIT_MS;
 extern const std::string CACHE_SIZE_MB;
 extern const std::string CC_PAGES_REMOVED;
-extern const std::string COLLECTION_COUNT;
 extern const std::string CHECKPOINT_OP_CONFIG;
+extern const std::string COLLECTION_COUNT;
 extern const std::string COMPRESSION_ENABLED;
 extern const std::string CUSTOM_OP_CONFIG;
 extern const std::string DURATION_SECONDS;
@@ -110,9 +111,9 @@ extern const std::string STATISTICS_LOG;
 
 /* Test harness consts. */
 extern const std::string DEFAULT_FRAMEWORK_SCHEMA;
+extern const std::string STATISTICS_URI;
 extern const std::string TABLE_OPERATION_TRACKING;
 extern const std::string TABLE_SCHEMA_TRACKING;
-extern const std::string STATISTICS_URI;
 
 } // namespace test_harness
 

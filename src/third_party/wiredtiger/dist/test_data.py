@@ -126,7 +126,7 @@ checkpoint_operation_thread_config = [
         The rate at which checkpoint is executed.''')
 ]
 
-background_compact_thread_config = [
+background_compact_thread_config = throttle_config + [
     Config('thread_count', 0, r'''
         Specifies the number of threads that will be used to perform background compaction
            operation.''',
@@ -228,6 +228,9 @@ test_config = [
         type='category', subconfig=operation_tracker),
 
 # Non component top level configuration.
+    Config('background_compact_debug_mode', 'false', r'''
+        If true, background compact aggressively removes compact statistics for a file and decreases
+        the max amount of time a file can be skipped for.''', type='boolean'),
     Config('cache_max_wait_ms', 0, r'''
         The strict equivalent of cache_max_wait_ms defined in wiredtiger.''', min=0),
     Config('cache_size_mb', 0, r'''
@@ -258,6 +261,7 @@ test_config = [
 # Test and their respective configuration sorted alphabetically.
 #
 methods = {
+    'background_compact' : Method(test_config),
     'bounded_cursor_perf' : Method(test_config),
     'bounded_cursor_prefix_indices' : Method(test_config),
     'bounded_cursor_prefix_search_near' : Method(test_config),
