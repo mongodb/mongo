@@ -76,6 +76,7 @@ const std::string TRACKING_KEY_FORMAT = "tracking_key_format";
 const std::string TRACKING_VALUE_FORMAT = "tracking_value_format";
 const std::string TYPE = "type";
 const std::string UPDATE_OP_CONFIG = "update_config";
+const std::string VALIDATE = "validate";
 const std::string VALUE_SIZE = "value_size";
 
 /* WiredTiger API consts. */

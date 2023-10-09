@@ -234,12 +234,12 @@ test_config = [
         The cache size that wiredtiger will be configured to run with''', min=0, max=100000000000),
     Config('compression_enabled', 'false', r'''
         Whether the database files will use snappy compression or not.''', type='boolean'),
-    Config('reverse_collator', 'false', r'''
-        Configure the database files to use the reverse collator.''', type='boolean'),
     Config('duration_seconds', 0, r'''
         The duration that the test run will last''', min=0, max=1000000),
     Config('enable_logging', 'false', r'''
         Enables write ahead logs''', type='boolean'),
+    Config('reverse_collator', 'false', r'''
+        Configure the database files to use the reverse collator.''', type='boolean'),
     Config('statistics_config', '', r'''
         Statistic configuration that is passed into wiredtiger on open.''',
         type='category', subconfig=[
@@ -250,6 +250,8 @@ test_config = [
             Configuration enabling or disabling statistics logging in the form of json logging.''',
             type='boolean')
         ]),
+    Config('validate', 'true', r'''
+        Enables the validation stage.''', type='boolean'),
 ]
 
 #

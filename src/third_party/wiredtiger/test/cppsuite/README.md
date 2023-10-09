@@ -33,10 +33,10 @@ There is no default implementation as this function is intended to be user-defin
 A checkpoint operation executes a checkpoint on the database every 60 seconds. Checkpoints are enabled or disabled by assigning one or zero threads in the configuration file, and are enabled by default. The checkpoint frequency is defined in the configuration file.
 
 ### Validate
-The default validation algorithm requires the default [operation tracker](#operation-tracker) configuration. If the operation tracker is reconfigured, the default validation is skipped. The default validator checks if the WiredTiger tables are consistent with the tables tracked by the operation tracker by comparing their content. The validation (and hence the test) fails if there is any mismatch.
+The default validation algorithm requires the default [operation tracker](#operation-tracker) configuration. If the operation tracker is reconfigured, the default validation is skipped. The default validator checks if the WiredTiger tables are consistent with the tables tracked by the operation tracker by comparing their content. The validation (and hence the test) fails if there is any mismatch. The validation stage can be disabled in the configuration file.
 
 ## Components
-The framework provides built-in components that each offer a set of features to enhance the testing experience. Their behavior is customized through a configuration file.  A component has a life cycle made of three stages: *load*, *run*, and *finish*. Each of these stages is described for each component below.
+The framework provides built-in components that each offer a set of features to enhance the testing experience. Their behavior is customized through a configuration file. A component has a life cycle made of three stages: *load*, *run*, and *finish*. Each of these stages is described for each component below.
 
 
 ### Workload manager

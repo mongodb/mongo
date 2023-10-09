@@ -168,8 +168,10 @@ test::run()
         it->finish();
 
     /* Validation stage. */
-    this->validate(_operation_tracker->enabled(), _operation_tracker->get_operation_table_name(),
-      _operation_tracker->get_schema_table_name(), _workload_manager->get_database());
+    if (_config->get_bool(VALIDATE))
+        this->validate(_operation_tracker->enabled(),
+          _operation_tracker->get_operation_table_name(),
+          _operation_tracker->get_schema_table_name(), _workload_manager->get_database());
 
     /* Log perf stats. */
     metrics_writer::instance().output_perf_file(_args.test_name);

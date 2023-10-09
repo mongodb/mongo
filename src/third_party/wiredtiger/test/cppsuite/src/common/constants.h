@@ -79,6 +79,7 @@ extern const std::string TRACKING_KEY_FORMAT;
 extern const std::string TRACKING_VALUE_FORMAT;
 extern const std::string TYPE;
 extern const std::string UPDATE_OP_CONFIG;
+extern const std::string VALIDATE;
 extern const std::string VALUE_SIZE;
 
 /* WiredTiger API consts. */
