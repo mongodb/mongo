@@ -38,8 +38,8 @@
 
 namespace mongo::query_stats {
 
-struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
-    FindCmdQueryStatsStoreKeyComponents(const FindCommandRequest* findCmd)
+struct FindCmdComponents : public SpecificKeyComponents {
+    FindCmdComponents(const FindCommandRequest* findCmd)
         : _allowPartialResults(findCmd->getAllowPartialResults().value_or(false)),
           _noCursorTimeout(findCmd->getNoCursorTimeout().value_or(false)),
           _hasField{
@@ -61,7 +61,7 @@ struct FindCmdQueryStatsStoreKeyComponents : public SpecificKeyComponents {
     void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
 
     // Avoid using boost::optional here because it creates extra padding at the beginning of the
-    // struct. Since each QueryStatsEntry can have its own FindKeyGenerator, it's better to
+    // struct. Since each QueryStatsEntry can have its own FindKey, it's better to
     // minimize the struct's size as much as possible.
 
     // Preserved literal.
@@ -93,36 +93,35 @@ static_assert(
     // Expecting a BSONObj and two bytes for allowPartialResults and noCursorTimeout, and another
     // byte for _hasField. For alignment reasons (alignment is 8 bytes here), this means the trailer
     // will bring up the total bytecount to a multiple of 8.
-    sizeof(FindCmdQueryStatsStoreKeyComponents) <= sizeof(BSONObj) + 8,
-    "Size of FindCmdQueryStatsStoreKeyComponents is too large! "
+    sizeof(FindCmdComponents) <= sizeof(BSONObj) + 8,
+    "Size of FindCmdComponents is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new "
     "value.");
 
-class FindKeyGenerator final : public KeyGenerator {
+class FindKey final : public Key {
 public:
-    FindKeyGenerator(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const ParsedFindCommand& request,
-        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
-        : KeyGenerator(expCtx->opCtx,
-                       std::make_unique<query_shape::FindCmdShape>(request, expCtx),
-                       request.findCommandRequest->getHint(),
-                       request.findCommandRequest->getReadConcern(),
-                       request.findCommandRequest->getMaxTimeMS().has_value(),
-                       collectionType),
+    FindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const ParsedFindCommand& request,
+            query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
+        : Key(expCtx->opCtx,
+              std::make_unique<query_shape::FindCmdShape>(request, expCtx),
+              request.findCommandRequest->getHint(),
+              request.findCommandRequest->getReadConcern(),
+              request.findCommandRequest->getMaxTimeMS().has_value(),
+              collectionType),
           _components(request.findCommandRequest.get()) {}
 
     // The default implementation of hashing for smart pointers is not a good one for our purposes.
     // Here we overload them to actually take the hash of the object, rather than hashing the
     // pointer itself.
     template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const FindKeyGenerator>& keyGenerator) {
-        return H::combine(std::move(h), *keyGenerator);
+    friend H AbslHashValue(H h, const std::unique_ptr<const FindKey>& key) {
+        return H::combine(std::move(h), *key);
     }
     template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const FindKeyGenerator>& keyGenerator) {
-        return H::combine(std::move(h), *keyGenerator);
+    friend H AbslHashValue(H h, const std::shared_ptr<const FindKey>& key) {
+        return H::combine(std::move(h), *key);
     }
 
 protected:
@@ -138,14 +137,14 @@ private:
 
     std::unique_ptr<FindCommandRequest> reparse(OperationContext* opCtx) const;
 
-    FindCmdQueryStatsStoreKeyComponents _components;
+    FindCmdComponents _components;
 };
 
 // This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
 // or otherwise changing the members, this assert may be updated with care.
 static_assert(
-    sizeof(FindKeyGenerator) <= sizeof(KeyGenerator) + sizeof(BSONObj) + 2 * sizeof(int64_t),
-    "Size of FindKeyGenerator is too large! "
+    sizeof(FindKey) <= sizeof(Key) + sizeof(BSONObj) + 2 * sizeof(int64_t),
+    "Size of FindKey is too large! "
     "Make sure that the struct has been align- and padding-optimized. "
     "If the struct's members have changed, this assert may need to be updated with a new value.");
 

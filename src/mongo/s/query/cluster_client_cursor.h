@@ -218,7 +218,7 @@ public:
      */
     virtual boost::optional<uint32_t> getQueryHash() const = 0;
 
-    virtual boost::optional<std::size_t> getQueryStatsStoreKeyHash() const = 0;
+    virtual boost::optional<std::size_t> getQueryStatsKeyHash() const = 0;
     /**
      * Returns the number of batches returned by this cursor.
      */
@@ -271,10 +271,10 @@ public:
     virtual bool shouldOmitDiagnosticInformation() const = 0;
 
     /**
-     * Returns and releases ownership of the KeyGenerator associated with the request this
+     * Returns and releases ownership of the Key associated with the request this
      * cursor is handling.
      */
-    virtual std::unique_ptr<query_stats::KeyGenerator> getKeyGenerator() = 0;
+    virtual std::unique_ptr<query_stats::Key> getKey() = 0;
 
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.

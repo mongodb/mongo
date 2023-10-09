@@ -262,7 +262,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     cursorGuard->reattachToOperationContext(opCtx);
 
     CurOp::get(opCtx)->debug().queryHash = cursorGuard->getQueryHash();
-    CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = cursorGuard->getQueryStatsStoreKeyHash();
+    CurOp::get(opCtx)->debug().queryStatsKeyHash = cursorGuard->getQueryStatsKeyHash();
 
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }
@@ -605,15 +605,14 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     return std::move(cursor);
 }
 
-void collectQueryStatsMongos(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::KeyGenerator> keyGenerator) {
+void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key) {
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // queryStats directly.
     auto&& opDebug = CurOp::get(opCtx)->debug();
     int64_t execTime = opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count();
     query_stats::writeQueryStats(opCtx,
-                                 opDebug.queryStatsStoreKeyHash,
-                                 std::move(keyGenerator),
+                                 opDebug.queryStatsKeyHash,
+                                 std::move(key),
                                  execTime,
                                  execTime,
                                  opDebug.additiveMetrics.nreturned.value_or(0));

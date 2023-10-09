@@ -84,12 +84,12 @@ static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static std::unique_ptr<const KeyGenerator> makeFindKeyGeneratorFromQuery(BSONObj filter) {
+    static std::unique_ptr<const Key> makeFindKeyFromQuery(BSONObj filter) {
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(filter.getOwned());
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
-        return std::make_unique<FindKeyGenerator>(expCtx, *parsedFind, collectionType);
+        return std::make_unique<FindKey>(expCtx, *parsedFind, collectionType);
     }
 
     static constexpr auto collectionType = query_shape::CollectionType::kCollection;
@@ -98,13 +98,13 @@ public:
                                          bool applyHmac) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
-        FindKeyGenerator findKeyGenerator(expCtx, *parsedFind, collectionType);
+        FindKey findKey(expCtx, *parsedFind, collectionType);
         SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
         if (!applyHmac) {
             opts.transformIdentifiers = false;
             opts.transformIdentifiersCallback = defaultHmacStrategy;
         }
-        return findKeyGenerator.generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
+        return findKey.toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
 
     BSONObj makeQueryStatsKeyAggregateRequest(AggregateCommandRequest acr,
@@ -112,12 +112,13 @@ public:
                                               const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               LiteralSerializationPolicy literalPolicy,
                                               bool applyHmac = false) {
-        auto aggKeyGenerator = std::make_unique<AggKeyGenerator>(acr,
-                                                                 pipeline,
-                                                                 expCtx,
-                                                                 pipeline.getInvolvedCollections(),
-                                                                 acr.getNamespace(),
-                                                                 collectionType);
+
+        auto aggKey = std::make_unique<AggKey>(acr,
+                                               pipeline,
+                                               expCtx,
+                                               pipeline.getInvolvedCollections(),
+                                               acr.getNamespace(),
+                                               collectionType);
 
         // SerializationOptions opts{.literalPolicy = literalPolicy};
         SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
@@ -126,7 +127,7 @@ public:
             opts.transformIdentifiers = false;
             opts.transformIdentifiersCallback = defaultHmacStrategy;
         }
-        return aggKeyGenerator->generate(expCtx->opCtx, opts, SerializationContext::stateDefault());
+        return aggKey->toBson(expCtx->opCtx, opts, SerializationContext::stateDefault());
     }
 };
 
@@ -134,14 +135,14 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
     QueryStatsStore queryStatsStore{5000000, 1000};
 
     auto getMetrics = [&](BSONObj query) {
-        auto key = makeFindKeyGeneratorFromQuery(query);
+        auto key = makeFindKeyFromQuery(query);
         auto lookupResult = queryStatsStore.lookup(absl::HashOf(key));
         ASSERT_OK(lookupResult);
         return *lookupResult.getValue();
     };
 
     auto collectMetrics = [&](BSONObj query) {
-        auto key = makeFindKeyGeneratorFromQuery(query);
+        auto key = makeFindKeyFromQuery(query);
         auto lookupHash = absl::HashOf(key);
         auto lookupResult = queryStatsStore.lookup(lookupHash);
         if (!lookupResult.isOK()) {
@@ -168,7 +169,7 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
     ASSERT_EQ(getMetrics(query2).execCount, 1);
 
     auto collectMetricsWithLock = [&](BSONObj& filter) {
-        auto key = makeFindKeyGeneratorFromQuery(filter);
+        auto key = makeFindKeyFromQuery(filter);
         auto [lookupResult, lock] = queryStatsStore.getWithPartitionLock(absl::HashOf(key));
         ASSERT_OK(lookupResult);
         auto& metrics = *lookupResult.getValue();
@@ -191,14 +192,14 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
     // behavior with very large queries.
     // Add an entry that is smaller than the max partition size.
     auto query = BSON("query" << 1 << "xEquals" << 42);
-    auto keyGenerator = makeFindKeyGeneratorFromQuery(query);
+    auto key = makeFindKeyFromQuery(query);
 
-    const size_t cacheSize = keyGenerator->size() + sizeof(QueryStatsEntry) + 100;
+    const size_t cacheSize = key->size() + sizeof(QueryStatsEntry) + 100;
     const auto numPartitions = 1;
     QueryStatsStore queryStatsStore{cacheSize, numPartitions};
 
-    auto hash = absl::HashOf(keyGenerator);
-    queryStatsStore.put(hash, QueryStatsEntry{std::move(keyGenerator)});
+    auto hash = absl::HashOf(key);
+    queryStatsStore.put(hash, QueryStatsEntry{std::move(key)});
     ASSERT_EQ(countAllEntries(queryStatsStore), 1);
 
     // We'll do this again later so save this as a helper function.
@@ -235,10 +236,9 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         auto&& [expCtx, parsedFind] =
             uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
 
-        keyGenerator =
-            std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind, collectionType);
-        auto lookupHash = absl::HashOf(keyGenerator);
-        QueryStatsEntry testMetrics{std::move(keyGenerator)};
+        key = std::make_unique<query_stats::FindKey>(expCtx, *parsedFind, collectionType);
+        auto lookupHash = absl::HashOf(key);
+        QueryStatsEntry testMetrics{std::move(key)};
         queryStatsStore.put(lookupHash, testMetrics);
     };
 
@@ -285,14 +285,13 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
         opCtx.get(),
         nss,
         [&]() {
-            return std::make_unique<query_stats::FindKeyGenerator>(
-                parsedFindPair.first,
-                *parsedFindPair.second,
-                query_shape::CollectionType::kCollection);
+            return std::make_unique<query_stats::FindKey>(parsedFindPair.first,
+                                                          *parsedFindPair.second,
+                                                          query_shape::CollectionType::kCollection);
         },
         /*requiresFullQueryStatsFeatureFlag*/ false));
     auto& opDebug = CurOp::get(*opCtx)->debug();
-    ASSERT_EQ(opDebug.queryStatsStoreKeyHash, boost::none);
+    ASSERT_EQ(opDebug.queryStatsKeyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {

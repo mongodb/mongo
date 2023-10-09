@@ -85,15 +85,14 @@ struct AggCmdComponents : public SpecificKeyComponents {
  * avoid parsing the raw pipeline multiple times, but users should be sure to provide a
  * non-optimized pipeline.
  */
-class AggKeyGenerator final : public KeyGenerator {
+class AggKey final : public Key {
 public:
-    AggKeyGenerator(
-        AggregateCommandRequest request,
-        const Pipeline& pipeline,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        stdx::unordered_set<NamespaceString> involvedNamespaces,
-        const NamespaceString& origNss,
-        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
+    AggKey(AggregateCommandRequest request,
+           const Pipeline& pipeline,
+           const boost::intrusive_ptr<ExpressionContext>& expCtx,
+           stdx::unordered_set<NamespaceString> involvedNamespaces,
+           const NamespaceString& origNss,
+           query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown);
 
     const SpecificKeyComponents& specificComponents() const final {
         return _components;
@@ -103,12 +102,12 @@ public:
     // Here we overload them to actually take the hash of the object, rather than hashing the
     // pointer itself.
     template <typename H>
-    friend H AbslHashValue(H h, const std::unique_ptr<const AggKeyGenerator>& keyGenerator) {
-        return H::combine(std::move(h), *keyGenerator);
+    friend H AbslHashValue(H h, const std::unique_ptr<const AggKey>& key) {
+        return H::combine(std::move(h), *key);
     }
     template <typename H>
-    friend H AbslHashValue(H h, const std::shared_ptr<const AggKeyGenerator>& keyGenerator) {
-        return H::combine(std::move(h), *keyGenerator);
+    friend H AbslHashValue(H h, const std::shared_ptr<const AggKey>& key) {
+        return H::combine(std::move(h), *key);
     }
 
 

@@ -87,8 +87,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
-      _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
-      _queryStatsKeyGenerator(std::move(CurOp::get(opCtx)->debug().queryStatsKeyGenerator)) {
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsKeyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsKey)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -107,8 +107,8 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _lastUseDate(_createdDate),
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
-      _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
-      _queryStatsKeyGenerator(std::move(CurOp::get(opCtx)->debug().queryStatsKeyGenerator)) {
+      _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsKeyHash),
+      _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsKey)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -150,10 +150,10 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
-    if (_queryStatsStoreKeyHash && opCtx) {
+    if (_queryStatsKeyHash && opCtx) {
         query_stats::writeQueryStats(opCtx,
-                                     _queryStatsStoreKeyHash,
-                                     std::move(_queryStatsKeyGenerator),
+                                     _queryStatsKeyHash,
+                                     std::move(_queryStatsKey),
                                      _metrics.executionTime.value_or(Microseconds{0}).count(),
                                      _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
                                      _metrics.nreturned.value_or(0));
@@ -254,8 +254,8 @@ boost::optional<uint32_t> ClusterClientCursorImpl::getQueryHash() const {
     return _queryHash;
 }
 
-boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsStoreKeyHash() const {
-    return _queryStatsStoreKeyHash;
+boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() const {
+    return _queryStatsKeyHash;
 }
 
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {
@@ -302,8 +302,8 @@ bool ClusterClientCursorImpl::shouldOmitDiagnosticInformation() const {
     return _shouldOmitDiagnosticInformation;
 }
 
-std::unique_ptr<query_stats::KeyGenerator> ClusterClientCursorImpl::getKeyGenerator() {
-    return std::move(_queryStatsKeyGenerator);
+std::unique_ptr<query_stats::Key> ClusterClientCursorImpl::getKey() {
+    return std::move(_queryStatsKey);
 }
 
 }  // namespace mongo

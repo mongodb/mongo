@@ -69,7 +69,7 @@ struct QueryStatsPartitioner {
 
 struct QueryStatsStoreEntryBudgetor {
     size_t operator()(const std::size_t hash, const QueryStatsEntry& value) {
-        return sizeof(decltype(value)) + sizeof(decltype(hash)) + value.keyGenerator->size();
+        return sizeof(decltype(value)) + sizeof(decltype(hash)) + value.key->size();
     }
 };
 
@@ -182,7 +182,7 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
  *   optimizing it, in order to preserve the user's input for the query shape.
  * - Calling this affects internal state. It should be called exactly once for each request for
  *   which query stats may be collected.
- * - The std::function argument to construct an abstracted KeyGenerator is provided to break
+ * - The std::function argument to construct an abstracted Key is provided to break
  *   library cycles so this library does not need to know how to parse everything. It is done as a
  *   deferred construction callback to ensure that this feature does not impact performance if
  *   collecting stats is not needed due to the feature being disabled or the request being rate
@@ -194,7 +194,7 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag);
  */
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator,
+                     std::function<std::unique_ptr<Key>(void)> makeKey,
                      bool requiresFullQueryStatsFeatureFlag = true);
 
 /**
@@ -209,7 +209,7 @@ void registerRequest(OperationContext* opCtx,
  */
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<KeyGenerator> keyGenerator,
+                     std::unique_ptr<Key> key,
                      uint64_t queryExecMicros,
                      uint64_t firstResponseExecMicros,
                      uint64_t docsReturned);

@@ -227,7 +227,7 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator,
+                     std::function<std::unique_ptr<Key>(void)> makeKey,
                      bool requiresFullQueryStatsFeatureFlag) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
         return;
@@ -243,7 +243,7 @@ void registerRequest(OperationContext* opCtx,
     }
     auto& opDebug = CurOp::get(opCtx)->debug();
 
-    if (opDebug.queryStatsKeyGenerator) {
+    if (opDebug.queryStatsKey) {
         // A find() request may have already registered the shapifier. Ie, it's a find command over
         // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
         LOGV2_DEBUG(7198700,
@@ -258,7 +258,7 @@ void registerRequest(OperationContext* opCtx,
     // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
     // original query from queryStats metrics collection and let it execute normally.
     try {
-        opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+        opDebug.queryStatsKey = makeKey();
     } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
         LOGV2_DEBUG(7979400,
                     1,
@@ -267,7 +267,7 @@ void registerRequest(OperationContext* opCtx,
         queryStatsStoreWriteErrorsMetric.increment();
         return;
     }
-    opDebug.queryStatsStoreKeyHash = absl::HashOf(*opDebug.queryStatsKeyGenerator);
+    opDebug.queryStatsKeyHash = absl::HashOf(*opDebug.queryStatsKey);
     // TODO look up this query shape (sub-component of query stats store key) in some new shared
     // data structure that the query settings component could share. See if the query SHAPE hash has
     // been computed before. If so, record the query shape hash on the opDebug. If not, compute the
@@ -285,7 +285,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<KeyGenerator> keyGenerator,
+                     std::unique_ptr<Key> key,
                      const uint64_t queryExecMicros,
                      const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
@@ -306,10 +306,10 @@ void writeQueryStats(OperationContext* opCtx,
 
     // Otherwise we didn't find an existing entry. Try to create one.
     tassert(7315200,
-            "keyGenerator cannot be null when writing a new entry to the telemetry store",
-            keyGenerator != nullptr);
-    size_t numEvicted = queryStatsStore.put(
-        *queryStatsKeyHash, QueryStatsEntry(std::move(keyGenerator)), partitionLock);
+            "key cannot be null when writing a new entry to the telemetry store",
+            key != nullptr);
+    size_t numEvicted =
+        queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), partitionLock);
     queryStatsEvictedMetric.increment(numEvicted);
     auto newMetrics = partitionLock->get(*queryStatsKeyHash);
     if (!newMetrics.isOK()) {

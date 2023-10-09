@@ -124,7 +124,7 @@ public:
 
     boost::optional<uint32_t> getQueryHash() const final;
 
-    boost::optional<std::size_t> getQueryStatsStoreKeyHash() const final;
+    boost::optional<std::size_t> getQueryStatsKeyHash() const final;
     /**
      * Returns false unless the mock cursor has been fully iterated.
      */
@@ -139,7 +139,7 @@ public:
 
     bool shouldOmitDiagnosticInformation() const final;
 
-    std::unique_ptr<query_stats::KeyGenerator> getKeyGenerator() final;
+    std::unique_ptr<query_stats::Key> getKey() final;
 
 private:
     bool _killed = false;

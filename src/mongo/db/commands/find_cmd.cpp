@@ -212,8 +212,8 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     auto& manager = query_settings::QuerySettingsManager::get(opCtx);
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
-        if (opDebug.queryStatsKeyGenerator) {
-            return opDebug.queryStatsKeyGenerator->getQueryShapeHash(
+        if (opDebug.queryStatsKey) {
+            return opDebug.queryStatsKey->getQueryShapeHash(
                 opCtx, parsedRequest.findCommandRequest->getSerializationContext());
         }
 
@@ -265,7 +265,7 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             opCtx,
             nss,
             [&]() {
-                return std::make_unique<query_stats::FindKeyGenerator>(
+                return std::make_unique<query_stats::FindKey>(
                     expCtx, *parsedRequest, collOrViewAcquisition.getCollectionType());
             },
             /*requiresFullQueryStatsFeatureFlag*/ false);

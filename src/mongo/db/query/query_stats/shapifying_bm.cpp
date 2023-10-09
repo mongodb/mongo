@@ -77,16 +77,15 @@ const auto kMetadataWrapper = fromjson(R"({metadata: {
     }})");
 auto kMockClientMetadataElem = kMetadataWrapper["metadata"];
 
-auto makeFindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ParsedFindCommand& parsedFind) {
-    return std::make_unique<const query_stats::FindKeyGenerator>(
-        expCtx, parsedFind, kCollectionType);
+auto makeFindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                 const ParsedFindCommand& parsedFind) {
+    return std::make_unique<const query_stats::FindKey>(expCtx, parsedFind, kCollectionType);
 }
 
 int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const ParsedFindCommand& parsedFind) {
-    auto keyGenerator = makeFindKeyGenerator(expCtx, parsedFind);
-    [[maybe_unused]] auto hash = absl::HashOf(keyGenerator);
+    auto key = makeFindKey(expCtx, parsedFind);
+    [[maybe_unused]] auto hash = absl::HashOf(key);
     return 0;
 }
 

@@ -385,7 +385,7 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
     // set with the final executionTime in completeAndLogOperation, but for query stats collection
     // we want it set before incrementing cursor metrics using OpDebug's AdditiveMetrics. The value
     // set here will be overwritten later in completeAndLogOperation.
-    if (_debug.queryStatsStoreKeyHash) {
+    if (_debug.queryStatsKeyHash) {
         _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
     }
 }

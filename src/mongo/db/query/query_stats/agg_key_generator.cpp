@@ -115,24 +115,24 @@ int64_t AggCmdComponents::size() const {
                         [](int64_t total, const auto& nss) { return total + nss.size(); });
 }
 
-void AggKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
-                                                      const SerializationOptions& opts) const {
+void AggKey::appendCommandSpecificComponents(BSONObjBuilder& bob,
+                                             const SerializationOptions& opts) const {
     return _components.appendTo(bob, opts);
 }
 
-AggKeyGenerator::AggKeyGenerator(AggregateCommandRequest request,
-                                 const Pipeline& pipeline,
-                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                 stdx::unordered_set<NamespaceString> involvedNamespaces,
-                                 const NamespaceString& origNss,
-                                 query_shape::CollectionType collectionType)
-    : KeyGenerator(expCtx->opCtx,
-                   std::make_unique<query_shape::AggCmdShape>(
-                       request, origNss, involvedNamespaces, pipeline, expCtx),
-                   request.getHint(),
-                   request.getReadConcern(),
-                   request.getMaxTimeMS().has_value(),
-                   collectionType),
+AggKey::AggKey(AggregateCommandRequest request,
+               const Pipeline& pipeline,
+               const boost::intrusive_ptr<ExpressionContext>& expCtx,
+               stdx::unordered_set<NamespaceString> involvedNamespaces,
+               const NamespaceString& origNss,
+               query_shape::CollectionType collectionType)
+    : Key(expCtx->opCtx,
+          std::make_unique<query_shape::AggCmdShape>(
+              request, origNss, involvedNamespaces, pipeline, expCtx),
+          request.getHint(),
+          request.getReadConcern(),
+          request.getMaxTimeMS().has_value(),
+          collectionType),
       _components(request, std::move(involvedNamespaces)) {}
 
 }  // namespace mongo::query_stats

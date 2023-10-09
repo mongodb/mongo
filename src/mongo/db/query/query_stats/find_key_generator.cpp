@@ -31,9 +31,7 @@
 
 namespace mongo::query_stats {
 
-
-void FindCmdQueryStatsStoreKeyComponents::appendTo(BSONObjBuilder& bob,
-                                                   const SerializationOptions& opts) const {
+void FindCmdComponents::appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const {
 
     if (_hasField.allowPartialResults) {
         bob.append(FindCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);
@@ -55,7 +53,8 @@ void FindCmdQueryStatsStoreKeyComponents::appendTo(BSONObjBuilder& bob,
         opts.appendLiteral(&bob, FindCommandRequest::kBatchSizeFieldName, 0ll);
     }
 }
-std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* opCtx) const {
+
+std::unique_ptr<FindCommandRequest> FindKey::reparse(OperationContext* opCtx) const {
     auto fcr =
         static_cast<const query_shape::FindCmdShape*>(universalComponents()._queryShape.get())
             ->toFindCommandRequest();

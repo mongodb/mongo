@@ -140,13 +140,12 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
         opts.appendLiteral(&bob, "maxTimeMS", 0ll);
     }
 }
-
-KeyGenerator::KeyGenerator(OperationContext* opCtx,
-                           std::unique_ptr<query_shape::Shape> queryShape,
-                           boost::optional<BSONObj> hint,
-                           boost::optional<BSONObj> readConcern,
-                           bool maxTimeMS,
-                           query_shape::CollectionType collectionType)
+Key::Key(OperationContext* opCtx,
+         std::unique_ptr<query_shape::Shape> queryShape,
+         boost::optional<BSONObj> hint,
+         boost::optional<BSONObj> readConcern,
+         bool maxTimeMS,
+         query_shape::CollectionType collectionType)
     : _universalComponents(
           std::move(queryShape),
           ClientMetadata::get(opCtx->getClient()),
@@ -163,9 +162,9 @@ KeyGenerator::KeyGenerator(OperationContext* opCtx,
           collectionType,
           maxTimeMS) {}
 
-BSONObj KeyGenerator::generate(OperationContext* opCtx,
-                               const SerializationOptions& opts,
-                               const SerializationContext& serializationContext) const {
+BSONObj Key::toBson(OperationContext* opCtx,
+                    const SerializationOptions& opts,
+                    const SerializationContext& serializationContext) const {
     BSONObjBuilder bob;
 
     // We'll take care of appending this one outside of the appendTo() call below since it needs

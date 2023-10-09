@@ -224,7 +224,7 @@ public:
                     [&]() {
                         // This callback is either never invoked or invoked immediately within
                         // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        return std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind);
+                        return std::make_unique<query_stats::FindKey>(expCtx, *parsedFind);
                     },
                     /*requiresFullQueryStatsFeatureFlag*/ false);
             }

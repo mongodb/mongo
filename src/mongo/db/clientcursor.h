@@ -493,12 +493,12 @@ private:
     boost::optional<uint32_t> _queryHash;
 
     // If boost::none, query stats should not be collected for this cursor.
-    boost::optional<std::size_t> _queryStatsStoreKeyHash;
+    boost::optional<std::size_t> _queryStatsKeyHash;
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like queryStats.
     OpDebug::AdditiveMetrics _metrics;
-    // The KeyGenerator used by query stats to generate the query stats store key.
-    std::unique_ptr<query_stats::KeyGenerator> _queryStatsKeyGenerator;
+    // The Key used by query stats to generate the query stats store key.
+    std::unique_ptr<query_stats::Key> _queryStatsKey;
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};
@@ -644,6 +644,5 @@ void startClientCursorMonitor();
  * getMore requests), so these should only be called from those request paths.
  */
 void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectQueryStatsMongod(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::KeyGenerator> keyGenerator);
+void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stats::Key> key);
 }  // namespace mongo

@@ -42,15 +42,15 @@
 namespace mongo::query_stats {
 
 /**
- * The value stored in the query stats store. It contains a KeyGenerator representing this "kind" of
+ * The value stored in the query stats store. It contains a Key representing this "kind" of
  * query, and some metrics about that shape. This class is responsible for knowing its size and
  * updating our server status metrics about the size of the query stats store accordingly. At the
  * time of this writing, the LRUCache utility does not easily expose its size in a way we could use
  * as server status metrics.
  */
 struct QueryStatsEntry {
-    QueryStatsEntry(std::unique_ptr<const KeyGenerator> keyGenerator_)
-        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator_)) {}
+    QueryStatsEntry(std::unique_ptr<const Key> key_)
+        : firstSeenTimestamp(Date_t::now()), key(std::move(key_)) {}
 
     BSONObj toBSON() const;
 
@@ -87,9 +87,9 @@ struct QueryStatsEntry {
     AggregatedMetric docsReturned;
 
     /**
-     * The KeyGenerator that can generate the query stats key for this request.
+     * The Key that can generate the query stats key for this request.
      */
-    std::shared_ptr<const KeyGenerator> keyGenerator;
+    std::shared_ptr<const Key> key;
 };
 
 }  // namespace mongo::query_stats

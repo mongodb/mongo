@@ -113,7 +113,7 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
 std::vector<QueryStatsEntry> copyPartition(const QueryStatsStore::Partition& partition) {
     // Note the intentional copy of QueryStatsEntry and intentional additional shared pointer
     // reference to the key generator. This will give us a snapshot of all the metrics we want to
-    // report, and keep the keyGenerator around even if the entry gets evicted.
+    // report, and keep the key around even if the entry gets evicted.
     std::vector<QueryStatsEntry> currKeyMetrics;
     for (auto&& [hash, metrics] : *partition) {
         currKeyMetrics.push_back(metrics);
@@ -124,8 +124,7 @@ std::vector<QueryStatsEntry> copyPartition(const QueryStatsStore::Partition& par
 }  // namespace
 
 BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
-    std::shared_ptr<const KeyGenerator> keyGenerator,
-    const SerializationContext& serializationContext) const {
+    std::shared_ptr<const Key> key, const SerializationContext& serializationContext) const {
     static const auto sha256HmacStringDataHasher = [](std::string key, const StringData& sd) {
         auto hashed = SHA256Block::computeHmac(
             (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
@@ -140,7 +139,7 @@ BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
             return sha256HmacStringDataHasher(_hmacKey, sd);
         };
     }
-    return keyGenerator->generate(pExpCtx->opCtx, opts, serializationContext);
+    return key->toBson(pExpCtx->opCtx, opts, serializationContext);
 }
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
@@ -258,17 +257,17 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
         auto currKeyMetrics = copyPartition(_queryStatsStore.getPartition(_currentPartition));
 
         for (auto&& metrics : currKeyMetrics) {
-            const auto& keyGenerator = metrics.keyGenerator;
-            const auto& hash = absl::HashOf(keyGenerator);
+            const auto& key = metrics.key;
+            const auto& hash = absl::HashOf(key);
             try {
                 auto queryStatsKey =
-                    computeQueryStatsKey(keyGenerator, SerializationContext::stateDefault());
+                    computeQueryStatsKey(key, SerializationContext::stateDefault());
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics.toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
                 queryStatsHmacApplicationErrors.increment();
-                const auto queryShape = keyGenerator->universalComponents()._queryShape->toBson(
+                const auto queryShape = key->universalComponents()._queryShape->toBson(
                     pExpCtx->opCtx,
                     SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
                     SerializationContext::stateDefault());

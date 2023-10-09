@@ -1169,13 +1169,12 @@ Status runAggregate(OperationContext* opCtx,
                     auto&& [expCtx, pipeline] = parsePipeline(
                         *collatorToUse == nullptr ? nullptr : (*collatorToUse)->clone());
 
-                    return std::make_unique<query_stats::AggKeyGenerator>(
-                        request,
-                        *pipeline,
-                        expCtx,
-                        pipelineInvolvedNamespaces,
-                        origNss,
-                        collectionType);
+                    return std::make_unique<query_stats::AggKey>(request,
+                                                                 *pipeline,
+                                                                 expCtx,
+                                                                 pipelineInvolvedNamespaces,
+                                                                 origNss,
+                                                                 collectionType);
                 });
             } catch (const DBException& ex) {
                 if (ex.code() == 6347902) {
@@ -1231,12 +1230,12 @@ Status runAggregate(OperationContext* opCtx,
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
             query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
-                return std::make_unique<query_stats::AggKeyGenerator>(request,
-                                                                      *pipeline,
-                                                                      expCtx,
-                                                                      pipelineInvolvedNamespaces,
-                                                                      request.getNamespace(),
-                                                                      collectionType);
+                return std::make_unique<query_stats::AggKey>(request,
+                                                             *pipeline,
+                                                             expCtx,
+                                                             pipelineInvolvedNamespaces,
+                                                             request.getNamespace(),
+                                                             collectionType);
             });
         }
 
@@ -1396,7 +1395,7 @@ Status runAggregate(OperationContext* opCtx,
                 query_settings::QuerySettings(),
                 &bodyBuilder);
         }
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKeyGenerator));
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKey));
     } else {
         auto maybePinnedCursor = executeUntilFirstBatch(
             opCtx, expCtx, request, cmdObj, privileges, origNss, extDataSrcGuard, execs, result);
@@ -1413,7 +1412,7 @@ Status runAggregate(OperationContext* opCtx,
         if (maybePinnedCursor) {
             collectQueryStatsMongod(opCtx, *maybePinnedCursor);
         } else {
-            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKeyGenerator));
+            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKey));
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

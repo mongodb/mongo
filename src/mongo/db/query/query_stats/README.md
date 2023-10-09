@@ -26,6 +26,6 @@ There are two distinct query stats store entries here - both the examples which 
 size will be treated separately from the example which does not specify a batch size.
 
 The dimensions considered will depend on the command, but can generally be found in the
-`KeyGenerator` iterface, which will generate the query stats store keys by which we accumulate
-statistics. As one example, you can find the `FindKeyGenerator` which will include all the things
-tracked in the `FindCmdQueryStatsStoreKeyComponents` (including batchSize shown in this example).
+`Key` iterface, which will generate the query stats store keys by which we accumulate
+statistics. As one example, you can find the `FindKey` which will include all the things
+tracked in the `FindCmdComponents` (including batchSize shown in this example).

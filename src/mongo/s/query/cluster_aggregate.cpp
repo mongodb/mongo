@@ -326,7 +326,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(opCtx, executionNss, [&]() {
-            return std::make_unique<query_stats::AggKeyGenerator>(
+            return std::make_unique<query_stats::AggKey>(
                 request, *pipeline, expCtx, involvedNamespaces, executionNss);
         });
     }
@@ -517,7 +517,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // query_stats::registerRequest.
             query_stats::registerRequest(opCtx, namespaces.executionNss, [&]() {
                 auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-                return std::make_unique<query_stats::AggKeyGenerator>(
+                return std::make_unique<query_stats::AggKey>(
                     request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
             });
         }
