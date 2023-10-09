@@ -106,6 +106,44 @@ std::vector<std::shared_ptr<ChunkInfo>> toChunkInfoPtrVector(
     return chunkPtrs;
 }
 
+void validateChunkMap(const ChunkMap& chunkMap,
+                      const std::vector<std::shared_ptr<ChunkInfo>>& chunkInfoVector) {
+
+    // The chunkMap should contain all the chunks
+    ASSERT_EQ(chunkInfoVector.size(), chunkMap.size());
+
+    // Check collection version
+    const auto expectedShardVersions = calculateShardVersions(chunkInfoVector);
+    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
+    ASSERT_EQ(expectedCollVersion, chunkMap.getVersion());
+
+    size_t i = 0;
+    chunkMap.forEach([&](const auto& chunkPtr) {
+        const auto& expectedChunkPtr = chunkInfoVector[i++];
+        // Check that the chunk pointer is valid
+        ASSERT_NOT_EQUALS(chunkPtr.get(), nullptr);
+        assertEqualChunkInfo(*expectedChunkPtr, *chunkPtr);
+        return true;
+    });
+
+    // Validate all shard versions
+    const auto shardVersions = getShardVersionMap(chunkMap);
+    ASSERT_EQ(expectedShardVersions.size(), shardVersions.size());
+    for (const auto& mapIt : shardVersions) {
+        ASSERT_EQ(expectedShardVersions.at(mapIt.first), mapIt.second.placementVersion);
+    }
+
+    // Check that vectors are balanced in size
+    auto maxVectorSize = static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() * 1.5));
+    auto minVectorSize = std::min(
+        chunkMap.size(), static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() / 2)));
+
+    for (const auto& [maxKeyString, chunkVectorPtr] : chunkMap.getChunkVectorMap()) {
+        ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
+        ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
+    }
+}
+
 class ChunkMapTest : public unittest::Test {
 public:
     const KeyPattern& getShardKeyPattern() const {
@@ -156,44 +194,16 @@ TEST_F(ChunkMapTest, TestAddChunk) {
     auto newChunkMap = makeChunkMap({chunk});
 
     ASSERT_EQ(newChunkMap.size(), 1);
+
+    validateChunkMap(newChunkMap, {chunk});
 }
 
 TEST_F(ChunkMapTest, ConstructChunkMapRandom) {
     auto chunkVector = toChunkInfoPtrVector(genRandomChunkVector());
 
-    const auto expectedShardVersions = calculateShardVersions(chunkVector);
-    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
-
     const auto chunkMap = makeChunkMap(chunkVector);
 
-    // Check that it contains all the chunks
-    ASSERT_EQ(chunkVector.size(), chunkMap.size());
-    // Check collection version
-    ASSERT_EQ(expectedCollVersion, chunkMap.getVersion());
-
-    size_t i = 0;
-    chunkMap.forEach([&](const auto& chunkPtr) {
-        const auto& expectedChunkPtr = chunkVector[i++];
-        assertEqualChunkInfo(*expectedChunkPtr, *chunkPtr);
-        return true;
-    });
-
-    // Validate all shard versions
-    const auto shardVersions = getShardVersionMap(chunkMap);
-    ASSERT_EQ(expectedShardVersions.size(), shardVersions.size());
-    for (const auto& mapIt : shardVersions) {
-        ASSERT_EQ(expectedShardVersions.at(mapIt.first), mapIt.second.placementVersion);
-    }
-
-    // Check that vectors are balanced in size
-    auto maxVectorSize = static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() * 1.5));
-    auto minVectorSize = std::min(
-        chunkMap.size(), static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() / 2)));
-
-    for (const auto& [maxKeyString, chunkVectorPtr] : chunkMap.getChunkVectorMap()) {
-        ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
-        ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
-    }
+    validateChunkMap(chunkMap, chunkVector);
 }
 
 TEST_F(ChunkMapTest, ConstructChunkMapRandomAllChunksSameVersion) {
@@ -212,25 +222,7 @@ TEST_F(ChunkMapTest, ConstructChunkMapRandomAllChunksSameVersion) {
     ASSERT_EQ(commonVersion, expectedCollVersion);
 
     const auto chunkMap = makeChunkMap(chunkInfoVector);
-
-    // Check that it contains all the chunks
-    ASSERT_EQ(chunkInfoVector.size(), chunkMap.size());
-    // Check collection version
-    ASSERT_EQ(expectedCollVersion, chunkMap.getVersion());
-
-    size_t i = 0;
-    chunkMap.forEach([&](const auto& chunkPtr) {
-        const auto& expectedChunkPtr = chunkInfoVector[i++];
-        assertEqualChunkInfo(*expectedChunkPtr, *chunkPtr);
-        return true;
-    });
-
-    // Validate all shard versions
-    const auto shardVersions = getShardVersionMap(chunkMap);
-    ASSERT_EQ(expectedShardVersions.size(), shardVersions.size());
-    for (const auto& mapIt : shardVersions) {
-        ASSERT_EQ(expectedShardVersions.at(mapIt.first), mapIt.second.placementVersion);
-    }
+    validateChunkMap(chunkMap, chunkInfoVector);
 }
 
 /*
@@ -286,7 +278,11 @@ TEST_F(ChunkMapTest, UpdateMapNotLeaveSmallVectors) {
         ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
         ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
     }
+
+    // Check original map is sitll valid
+    validateChunkMap(initialChunkMap, chunkVector);
 }
+
 
 /*
  * Check that updating a ChunkMap with chunks that have mismatching timestamp fails.
@@ -355,38 +351,12 @@ TEST_F(ChunkMapTest, UpdateChunkMapRandom) {
         }
     }
 
-    const auto expectedShardVersions = calculateShardVersions(chunksInfo);
-    const auto expectedCollVersion = calculateCollVersion(expectedShardVersions);
+    // Create updated chunk map and validate it
     auto chunkMap = initialChunkMap.createMerged(updatedChunksInfo);
+    validateChunkMap(chunkMap, chunksInfo);
 
-    // Check that it contains all the chunks
-    ASSERT_EQ(chunksInfo.size(), chunkMap.size());
-    // Check collection version
-    ASSERT_EQ(expectedCollVersion, chunkMap.getVersion());
-
-    size_t i = 0;
-    chunkMap.forEach([&](const auto& chunkPtr) {
-        const auto& expectedChunkPtr = chunksInfo[i++];
-        assertEqualChunkInfo(*expectedChunkPtr, *chunkPtr);
-        return true;
-    });
-
-    // Validate all shard versions
-    const auto shardVersions = getShardVersionMap(chunkMap);
-    ASSERT_EQ(expectedShardVersions.size(), shardVersions.size());
-    for (const auto& mapIt : shardVersions) {
-        ASSERT_EQ(expectedShardVersions.at(mapIt.first), mapIt.second.placementVersion);
-    }
-
-    // Check that vectors are balanced in size
-    auto maxVectorSize = static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() * 1.5));
-    auto minVectorSize = std::min(
-        chunkMap.size(), static_cast<size_t>(std::lround(chunkMap.getMaxChunkVectorSize() / 2)));
-
-    for (const auto& [maxKeyString, chunkVectorPtr] : chunkMap.getChunkVectorMap()) {
-        ASSERT_GTE(chunkVectorPtr->size(), minVectorSize);
-        ASSERT_LTE(chunkVectorPtr->size(), maxVectorSize);
-    }
+    // Check that the initialChunkMap is still valid and usable
+    validateChunkMap(initialChunkMap, initialChunksInfo);
 }
 
 TEST_F(ChunkMapTest, TestEnumerateAllChunks) {

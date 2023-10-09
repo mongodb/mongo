@@ -238,13 +238,17 @@ void ChunkMap::_mergeAndCommitUpdatedChunkVector(ChunkVectorMap::const_iterator 
     auto prevVectorPtr = _chunkVectorMap.extract(std::prev(pos)).mapped();
     auto mergeVectorPtr = std::make_shared<ChunkVector>();
     mergeVectorPtr->reserve(prevVectorPtr->size() + smallVectorPtr->size());
-    // fill initial part of merged vector with a copy of oldVector
-    mergeVectorPtr->insert(mergeVectorPtr->end(),
-                           std::make_move_iterator(prevVectorPtr->begin()),
-                           std::make_move_iterator(prevVectorPtr->end()));
+
+    // Fill initial part of merged vector with a copy of old vector (prevVectorPtr)
+    // Note that the old vector is potentially shared with previous ChunkMap instances,
+    // thus we copy rather than moving elements to maintain its integrity.
+    mergeVectorPtr->insert(mergeVectorPtr->end(), prevVectorPtr->begin(), prevVectorPtr->end());
+
+    // Fill the rest of merged vector with the small updated vector
     mergeVectorPtr->insert(mergeVectorPtr->end(),
                            std::make_move_iterator(smallVectorPtr->begin()),
                            std::make_move_iterator(smallVectorPtr->end()));
+
     _chunkVectorMap.emplace_hint(
         pos, mergeVectorPtr->back()->getMaxKeyString(), std::move(mergeVectorPtr));
 }
