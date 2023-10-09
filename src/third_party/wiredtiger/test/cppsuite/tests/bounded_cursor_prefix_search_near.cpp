@@ -211,7 +211,8 @@ public:
                   ret, exact_prefix, key_prefix_str, cursor_default, generated_prefix);
 
                 tc->txn.add_op();
-                tc->txn.try_rollback();
+                if (tc->txn.get_op_count() >= tc->txn.get_target_op_count())
+                    tc->txn.rollback();
                 tc->sleep();
             }
             testutil_check(cursor_prefix->reset(cursor_prefix.get()));

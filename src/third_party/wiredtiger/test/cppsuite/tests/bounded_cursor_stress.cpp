@@ -763,7 +763,8 @@ public:
                     testutil_assert(ret == 0 || ret == WT_ROLLBACK);
                 }
                 tc->txn.add_op();
-                tc->txn.try_rollback();
+                if (tc->txn.get_op_count() >= tc->txn.get_target_op_count())
+                    tc->txn.rollback();
                 tc->sleep();
             }
             normal_cursor->reset(normal_cursor.get());
