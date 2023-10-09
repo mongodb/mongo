@@ -26,7 +26,10 @@ const sessionColl = sessionDb[collName];
 
 sessionDb.runCommand({dropDatabase: 1, writeConcern: {w: "majority"}});
 assert.commandWorked(sessionColl.insert({_id: "doc"}, {w: "majority"}));
-assert.commandWorked(sessionDb.runCommand({profile: 1, slowms: 1}));
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(sessionDb.runCommand(
+    {profile: 1, filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 jsTest.log("Test read profiling with operation holding database X lock.");
 

@@ -17,7 +17,10 @@ var conn = testDB.getMongo();
 const collName = jsTestName();
 var coll = testDB.getCollection(collName);
 
-testDB.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 //
 // Confirm metrics for distinct with query.

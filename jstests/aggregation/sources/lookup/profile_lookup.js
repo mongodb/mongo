@@ -16,7 +16,10 @@ assert.commandWorked(foreignColl.insert({a: 1}));
 
 db.setProfilingLevel(0);
 db.system.profile.drop();
-db.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(db.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 let oldTop = db.adminCommand("top");
 const pipeline =

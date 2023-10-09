@@ -62,7 +62,10 @@ testDB.system.profile.drop();
 // original query.
 assert.commandWorked(
     testDB.createCollection("system.profile", {capped: true, size: 4 * 1024 * 1024}));
-testDB.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 for (var j = 0; j < initialAdvance; j++) {
     assert(cursor.hasNext());

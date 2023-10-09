@@ -78,7 +78,10 @@ assert.commandWorked(testColl.runCommand({
 
 // Enable the profiler to log slow queries. We expect a 'find' to hang until the prepare
 // conflict is resolved.
-assert.commandWorked(testDB.runCommand({profile: 1, slowms: 100}));
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.runCommand(
+    {profile: 1, filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 const session = db.getMongo().startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);

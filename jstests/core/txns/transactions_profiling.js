@@ -15,7 +15,10 @@ const collName = "transactions_profiling";
 const testDB = db.getSiblingDB(dbName);
 testDB[collName].drop({writeConcern: {w: "majority"}});
 
-testDB.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 const sessionOptions = {
     causalConsistency: false

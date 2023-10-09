@@ -12,7 +12,10 @@ var coll = db.getSiblingDB("profile2").profile2;
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.drop();
 coll.getDB().system.profile.drop();
-assert.commandWorked(coll.getDB().runCommand({profile: 2}));
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(coll.getDB().setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 /**
  * Asserts that array 'results' contains a profiler generated document that corresponds to a
@@ -42,7 +45,8 @@ assertContainsTruncatedCommand(results,
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
-assert.commandWorked(coll.getDB().runCommand({profile: 2}));
+assert.commandWorked(coll.getDB().setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 // Test update with large string element in query portion.
 assert.commandWorked(coll.update({a: hugeStr}, {}));
@@ -54,7 +58,8 @@ assertContainsTruncatedCommand(
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
-assert.commandWorked(coll.getDB().runCommand({profile: 2}));
+assert.commandWorked(coll.getDB().setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 // Test update with large string element in update portion.
 assert.commandWorked(coll.update({}, {a: hugeStr}));
@@ -66,7 +71,8 @@ assertContainsTruncatedCommand(
 
 assert.commandWorked(coll.getDB().runCommand({profile: 0}));
 coll.getDB().system.profile.drop();
-assert.commandWorked(coll.getDB().runCommand({profile: 2}));
+assert.commandWorked(coll.getDB().setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 // Test query with many elements in query portion.
 var doc = {};

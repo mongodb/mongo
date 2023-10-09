@@ -21,7 +21,10 @@ const conn = testDB.getMongo();
 const collName = jsTestName();
 const coll = testDB.getCollection(collName);
 
-testDB.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 const mapFunction = function() {
     emit(this.a, this.b);

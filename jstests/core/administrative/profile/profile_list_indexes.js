@@ -20,7 +20,10 @@ for (let i = 0; i < numIndexes; ++i) {
     assert.commandWorked(testColl.createIndex(indexSpec));
 }
 
-testDB.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 const listIndexesCommand = {
     listIndexes: testColl.getName(),

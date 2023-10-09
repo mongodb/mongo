@@ -30,7 +30,10 @@ assert.commandWorked(coll.insert({a: 2, b: 2}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
-assert.commandWorked(testDB.setProfilingLevel(2));
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDB.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 // Executes query0 and gets the corresponding system.profile entry.
 assert.eq(1,

@@ -35,7 +35,12 @@ for (var i = 0; i < 10; ++i) {
 }
 assert.commandWorked(coll2.createIndex({a: 1}));
 
-testDB.setProfilingLevel(1, {filter: {ns: {$in: [coll1.getFullName(), coll2.getFullName()]}}});
+testDB.setProfilingLevel(1, {
+    filter: {
+        ns: {$in: [coll1.getFullName(), coll2.getFullName()]},
+        'command.setFeatureCompatibilityVersion': {'$exists': false}
+    }
+});
 
 assert.commandWorked(testDB.adminCommand({
     bulkWrite: 1,

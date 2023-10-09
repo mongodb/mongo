@@ -71,7 +71,11 @@ function runTestQuery(comment) {
         .itcount();
 }
 
-testDb.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDb.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
+
 let lastComment;
 for (let i = 0; i < 3; i++) {
     lastComment = `test query: ${i}`;

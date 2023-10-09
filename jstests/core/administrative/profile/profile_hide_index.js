@@ -102,7 +102,10 @@ testHiddenFlagInCurrentOp({
 // Should turn off profiling before dropping system.profile collection.
 testDb.setProfilingLevel(0);
 testDb.system.profile.drop();
-testDb.setProfilingLevel(2);
+// Don't profile the setFCV command, which could be run during this test in the
+// fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+assert.commandWorked(testDb.setProfilingLevel(
+    1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
 assert.commandWorked(coll.createIndex({b: 1}, {hidden: true}));
 profilerHasSingleMatchingEntryOrThrow({

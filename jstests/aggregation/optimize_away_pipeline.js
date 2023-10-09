@@ -834,7 +834,10 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
     // Should turn off profiling before dropping system.profile collection.
     db.setProfilingLevel(0);
     db.system.profile.drop();
-    db.setProfilingLevel(2);
+    // Don't profile the setFCV command, which could be run during this test in the
+    // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+    assert.commandWorked(db.setProfilingLevel(
+        1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
     testGetMore({
         command: {
             aggregate: coll.getName(),
@@ -853,7 +856,10 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
     // pipeline.
     if (!FixtureHelpers.isSharded(coll)) {
         db.system.profile.drop();
-        db.setProfilingLevel(2);
+        // Don't profile the setFCV command, which could be run in the
+        // fcv_upgrade_downgrade_replica_sets_jscore_passthrough.
+        assert.commandWorked(db.setProfilingLevel(
+            1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
         testGetMore({
             command: {
                 find: view.getName(),

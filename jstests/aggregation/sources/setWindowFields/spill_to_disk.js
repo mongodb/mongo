@@ -47,7 +47,12 @@ function checkProfilerForDiskWrite(dbToCheck, expectedFirstStage) {
 function resetProfiler(db) {
     FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 0}});
     db.system.profile.drop();
-    FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 2}});
+    // Don't profile the setFCV command, which could be run during this test in the
+    // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+    FixtureHelpers.runCommandOnEachPrimary({
+        db: db,
+        cmdObj: {profile: 1, filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}
+    });
 }
 
 function changeSpillLimit({mode, maxDocs}) {

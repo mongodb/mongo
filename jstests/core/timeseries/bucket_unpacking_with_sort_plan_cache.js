@@ -116,7 +116,10 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     addDocs(coll, numNewDocs, [0, 1]);
 
     // Turn on profiling.
-    db.setProfilingLevel(2);
+    // Don't profile the setFCV command, which could be run during this test in the
+    // fcv_upgrade_downgrade_replica_sets_jscore_passthrough suite.
+    assert.commandWorked(db.setProfilingLevel(
+        1, {filter: {'command.setFeatureCompatibilityVersion': {'$exists': false}}}));
 
     // Rerun command with replanning.
     const comment = jsTestName();
