@@ -244,6 +244,19 @@ public:
         }
     }
 
+    void clearFieldAndAllPrefixes(StringData path) {
+        for (;;) {
+            clear(std::pair(PlanStageSlots::kField, path));
+
+            size_t pos = path.rfind('.');
+            if (pos == std::string::npos) {
+                break;
+            }
+
+            path = path.substr(0, pos);
+        }
+    }
+
     /**
      * This method applies an action to some/all of the slots within this struct. For each slot in
      * this struct, the action is will be applied to the slot if (and only if) the corresponding
@@ -407,6 +420,21 @@ public:
     }
     PlanStageReqs& clearAllSortKeys() {
         return clearAllOfType(kSortKey);
+    }
+
+    PlanStageReqs& clearFieldAndAllPrefixes(StringData path) {
+        for (;;) {
+            clear(std::pair(PlanStageSlots::kField, path));
+
+            size_t pos = path.rfind('.');
+            if (pos == std::string::npos) {
+                break;
+            }
+
+            path = path.substr(0, pos);
+        }
+
+        return *this;
     }
 
     friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,

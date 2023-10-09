@@ -252,29 +252,28 @@ assertExplainBehaviorAndCorrectResults(
         {_id: 5, sensorsSoFar: ["S2"]},
     ]);
 
-// TODO: re-enable after SERVER-81516 is fixed
-// assertExplainBehaviorAndCorrectResults(
-//     [
-//         {
-//             $setWindowFields:
-//                 {partitionBy: "$attributes.sensor", output: {total: {$sum: "$contributions"}}}
-//         },
-//         {$project: {percentOfTotal: {$divide: ["$contributions", "$total"]}}}
-//     ],
-//     // $_internalUnpackBucket can use dependency analysis to unpack only certain needed fields.
-//     {
-//         bucketSort: {"meta.sensor": 1},
-//         inExcludeSpec: {include: ["_id", "attributes", "contributions"]}
-//     },
-//     [
-//         {_id: 2, percentOfTotal: 20 / 40},
-//         {_id: 0, percentOfTotal: 10 / 40},
-//         {_id: 4, percentOfTotal: 10 / 40},
-//         {_id: 1, percentOfTotal: 150 / 185},
-//         {_id: 5, percentOfTotal: 35 / 185},
-//         {_id: 3, percentOfTotal: null},
-//         {_id: 6, percentOfTotal: 40 / 40},
-//     ]);
+assertExplainBehaviorAndCorrectResults(
+    [
+        {
+            $setWindowFields:
+                {partitionBy: "$attributes.sensor", output: {total: {$sum: "$contributions"}}}
+        },
+        {$project: {percentOfTotal: {$divide: ["$contributions", "$total"]}}}
+    ],
+    // $_internalUnpackBucket can use dependency analysis to unpack only certain needed fields.
+    {
+        bucketSort: {"meta.sensor": 1},
+        inExcludeSpec: {include: ["_id", "attributes", "contributions"]}
+    },
+    [
+        {_id: 2, percentOfTotal: 20 / 40},
+        {_id: 0, percentOfTotal: 10 / 40},
+        {_id: 4, percentOfTotal: 10 / 40},
+        {_id: 1, percentOfTotal: 150 / 185},
+        {_id: 5, percentOfTotal: 35 / 185},
+        {_id: 3, percentOfTotal: null},
+        {_id: 6, percentOfTotal: 40 / 40},
+    ]);
 
 // $setWindowFields that uses sort on a metaField and a measurement: {attributes.sensor: 1,
 // contributions: -1} and computes over a different measurement, followed by $match on a metaField.

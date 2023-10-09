@@ -3598,11 +3598,39 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto windowNode = static_cast<const WindowNode*>(root);
 
     auto child = root->children[0].get();
-    auto childReqs = reqs.copy();
+    auto childReqs = reqs.copy().clear(kResult);
+
     childReqs.setFields(getTopLevelFields(windowNode->partitionByRequiredFields));
     childReqs.setFields(getTopLevelFields(windowNode->sortByRequiredFields));
     auto outputRequiredFields = getTopLevelFields(windowNode->outputRequiredFields);
     childReqs.setFields(outputRequiredFields);
+
+    // 'reqFields' shouldn't contain any dotted paths for this stage, but if it does then we
+    // set 'reqResult' to true and remove all the dotted paths from 'reqFields'.
+    bool reqResult = reqs.has(kResult);
+    auto reqFields = reqs.getFields();
+    if (std::any_of(reqFields.begin(), reqFields.end(), [](auto&& f) {
+            return f.find('.') != std::string::npos;
+        })) {
+        reqResult = true;
+        reqFields = filterVector(std::move(reqFields),
+                                 [](auto&& f) { return f.find('.') == std::string::npos; });
+    }
+    // If 'windowNode->outputFields' contains a dotted path P where 'getTopLevelField(P)' is
+    // in 'reqFieldSet', then we need to materialize kResult.
+    if (!reqResult) {
+        auto reqFieldSet = StringDataSet(reqFields.begin(), reqFields.end());
+        for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
+            const auto& windowFieldPath = windowNode->outputFields[i].fieldName;
+            bool isDottedPath = windowFieldPath.find('.') != std::string::npos;
+            if (isDottedPath && reqFieldSet.count(getTopLevelField(windowFieldPath))) {
+                reqResult = true;
+                break;
+            }
+        }
+    }
+    // Set the kResult requirement on 'childReqs' if 'reqResult' is true.
+    childReqs.setIf(kResult, reqResult);
 
     auto childStageOutput = build(child, childReqs);
     auto stage = std::move(childStageOutput.first);
@@ -3677,6 +3705,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // Calculate list of forward slots.
+    if (reqResult) {
+        ensureSlotInBuffer(outputs.get(kResult).slotId);
+    }
     for (auto forwardSlot : getSlotsOrderedByName(reqs, outputs)) {
         ensureSlotInBuffer(forwardSlot);
     }
@@ -3833,6 +3864,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::SlotExprPairVector windowFinalProjects;
     std::vector<boost::optional<size_t>> windowFrameFirstSlotIdx;
     std::vector<boost::optional<size_t>> windowFrameLastSlotIdx;
+    StringMap<sbe::value::SlotId> outputPathMap;
+
     for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
         sbe::WindowStage::Window window{};
         auto& outputField = windowNode->outputFields[i];
@@ -4221,6 +4254,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         windowFinalProjects.emplace_back(finalSlot, std::move(finalExpr));
         windowFinalSlots.push_back(finalSlot);
         windows.emplace_back(std::move(window));
+
+        // If 'outputField' is not a dotted path, add 'outputField' and its corresponding slot
+        // to 'outputPathMap'.
+        if (outputField.fieldName.find('.') == std::string::npos) {
+            outputPathMap.emplace(outputField.fieldName, finalSlot);
+        }
     }
 
     // Assign frame first/last slots to window definitions.
@@ -4249,7 +4288,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     stage = sbe::makeS<sbe::ProjectStage>(
         std::move(stage), std::move(windowFinalProjects), windowNode->nodeId());
 
-    if (reqs.has(kResult)) {
+    // Now that we're done generating all the expressions we need to generate, we can finally
+    // update the kField slots in 'outputs' to reflect the effects of this stage.
+    for (auto&& windowField : windowFields) {
+        outputs.clearFieldAndAllPrefixes(windowField);
+    }
+    for (const auto& [field, slot] : outputPathMap) {
+        outputs.set(std::make_pair(PlanStageSlots::kField, field), slot);
+    }
+
+    // Materialize kResult if needed.
+    if (reqResult) {
         std::vector<ProjectionNode> nodes;
         for (size_t i = 0; i < windowFields.size(); ++i) {
             nodes.emplace_back(SbExpr{windowFinalSlots[i]});
