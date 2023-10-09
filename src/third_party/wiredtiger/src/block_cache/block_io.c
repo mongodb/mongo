@@ -70,6 +70,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
     blkcache_found = found = false;
     skip_cache_put = (blkcache->type == WT_BLKCACHE_UNCONFIGURED);
 
+    WT_ASSERT_ALWAYS(session, session->dhandle != NULL, "The block cache requires a dhandle");
     /*
      * If anticipating a compressed or encrypted block, start with a scratch buffer and convert into
      * the caller's buffer. Else, start with the caller's buffer.

@@ -122,6 +122,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: pages read into cache after truncate",
   "cache: pages read into cache after truncate in prepare state",
   "cache: pages requested from the cache",
+  "cache: pages requested from the cache due to pre-fetch",
   "cache: pages seen by eviction walk",
   "cache: pages written from cache",
   "cache: pages written requiring in-memory restoration",
@@ -453,6 +454,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_read_deleted = 0;
     stats->cache_read_deleted_prepared = 0;
     stats->cache_pages_requested = 0;
+    stats->cache_pages_prefetch = 0;
     stats->cache_eviction_pages_seen = 0;
     stats->cache_write = 0;
     stats->cache_write_restore = 0;
@@ -767,6 +769,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_read_deleted += from->cache_read_deleted;
     to->cache_read_deleted_prepared += from->cache_read_deleted_prepared;
     to->cache_pages_requested += from->cache_pages_requested;
+    to->cache_pages_prefetch += from->cache_pages_prefetch;
     to->cache_eviction_pages_seen += from->cache_eviction_pages_seen;
     to->cache_write += from->cache_write;
     to->cache_write_restore += from->cache_write_restore;
@@ -1086,6 +1089,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cache_read_deleted += WT_STAT_READ(from, cache_read_deleted);
     to->cache_read_deleted_prepared += WT_STAT_READ(from, cache_read_deleted_prepared);
     to->cache_pages_requested += WT_STAT_READ(from, cache_pages_requested);
+    to->cache_pages_prefetch += WT_STAT_READ(from, cache_pages_prefetch);
     to->cache_eviction_pages_seen += WT_STAT_READ(from, cache_eviction_pages_seen);
     to->cache_write += WT_STAT_READ(from, cache_write);
     to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
@@ -1313,6 +1317,12 @@ static const char *const __stats_connection_desc[] = {
   "block-cache: number of hits",
   "block-cache: number of misses",
   "block-cache: number of put bypasses on checkpoint I/O",
+  "block-cache: pre-fetch not triggered after single disk read",
+  "block-cache: pre-fetch not triggered by page read",
+  "block-cache: pre-fetch page not on disk when reading",
+  "block-cache: pre-fetch pages queued",
+  "block-cache: pre-fetch pages read in background",
+  "block-cache: pre-fetch triggered by page read",
   "block-cache: removed blocks",
   "block-cache: time sleeping to remove block (usecs)",
   "block-cache: total blocks",
@@ -1465,6 +1475,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: overflow pages read into cache",
   "cache: page split during eviction deepened the tree",
   "cache: page written requiring history store records",
+  "cache: pages considered for eviction that were brought in by pre-fetch",
   "cache: pages currently held in the cache",
   "cache: pages evicted by application threads",
   "cache: pages evicted in parallel with checkpoint",
@@ -1478,6 +1489,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: pages read into cache after truncate in prepare state",
   "cache: pages removed from the ordinary queue to be queued for urgent eviction",
   "cache: pages requested from the cache",
+  "cache: pages requested from the cache due to pre-fetch",
   "cache: pages seen by eviction walk",
   "cache: pages seen by eviction walk that are already queued",
   "cache: pages selected for eviction unable to be evicted",
@@ -1996,6 +2008,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_cache_hits = 0;
     stats->block_cache_misses = 0;
     stats->block_cache_bypass_chkpt = 0;
+    stats->block_prefetch_disk_one = 0;
+    stats->block_prefetch_skipped = 0;
+    stats->block_prefetch_pages_fail = 0;
+    stats->block_prefetch_pages_queued = 0;
+    stats->block_prefetch_pages_read = 0;
+    stats->block_prefetch_attempts = 0;
     stats->block_cache_blocks_removed = 0;
     stats->block_cache_blocks_removed_blocked = 0;
     stats->block_cache_blocks = 0;
@@ -2132,6 +2150,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_read_overflow = 0;
     stats->cache_eviction_deepen = 0;
     stats->cache_write_hs = 0;
+    /* not clearing cache_eviction_consider_prefetch */
     /* not clearing cache_pages_inuse */
     stats->cache_eviction_app = 0;
     stats->cache_eviction_pages_in_parallel_with_checkpoint = 0;
@@ -2145,6 +2164,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_read_deleted_prepared = 0;
     stats->cache_eviction_clear_ordinary = 0;
     stats->cache_pages_requested = 0;
+    stats->cache_pages_prefetch = 0;
     stats->cache_eviction_pages_seen = 0;
     stats->cache_eviction_pages_already_queued = 0;
     stats->cache_eviction_fail = 0;
@@ -2630,6 +2650,12 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_cache_hits += WT_STAT_READ(from, block_cache_hits);
     to->block_cache_misses += WT_STAT_READ(from, block_cache_misses);
     to->block_cache_bypass_chkpt += WT_STAT_READ(from, block_cache_bypass_chkpt);
+    to->block_prefetch_disk_one += WT_STAT_READ(from, block_prefetch_disk_one);
+    to->block_prefetch_skipped += WT_STAT_READ(from, block_prefetch_skipped);
+    to->block_prefetch_pages_fail += WT_STAT_READ(from, block_prefetch_pages_fail);
+    to->block_prefetch_pages_queued += WT_STAT_READ(from, block_prefetch_pages_queued);
+    to->block_prefetch_pages_read += WT_STAT_READ(from, block_prefetch_pages_read);
+    to->block_prefetch_attempts += WT_STAT_READ(from, block_prefetch_attempts);
     to->block_cache_blocks_removed += WT_STAT_READ(from, block_cache_blocks_removed);
     to->block_cache_blocks_removed_blocked +=
       WT_STAT_READ(from, block_cache_blocks_removed_blocked);
@@ -2792,6 +2818,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_read_overflow += WT_STAT_READ(from, cache_read_overflow);
     to->cache_eviction_deepen += WT_STAT_READ(from, cache_eviction_deepen);
     to->cache_write_hs += WT_STAT_READ(from, cache_write_hs);
+    to->cache_eviction_consider_prefetch += WT_STAT_READ(from, cache_eviction_consider_prefetch);
     to->cache_pages_inuse += WT_STAT_READ(from, cache_pages_inuse);
     to->cache_eviction_app += WT_STAT_READ(from, cache_eviction_app);
     to->cache_eviction_pages_in_parallel_with_checkpoint +=
@@ -2810,6 +2837,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_read_deleted_prepared += WT_STAT_READ(from, cache_read_deleted_prepared);
     to->cache_eviction_clear_ordinary += WT_STAT_READ(from, cache_eviction_clear_ordinary);
     to->cache_pages_requested += WT_STAT_READ(from, cache_pages_requested);
+    to->cache_pages_prefetch += WT_STAT_READ(from, cache_pages_prefetch);
     to->cache_eviction_pages_seen += WT_STAT_READ(from, cache_eviction_pages_seen);
     to->cache_eviction_pages_already_queued +=
       WT_STAT_READ(from, cache_eviction_pages_already_queued);

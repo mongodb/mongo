@@ -111,15 +111,13 @@ uint64_t
 sum_scan_ops(WTPERF *wtperf)
 {
     CONFIG_OPTS *opts;
-    uint64_t total;
 
     opts = wtperf->opts;
 
-    if (opts->scan_interval > 0)
-        total = wtperf->scanthreads->scan.ops;
-    else
-        total = 0;
-    return (total);
+    if (opts->scan_interval == 0)
+        return (0);
+
+    return (wtperf->scanthreads->scan.ops);
 }
 
 /*

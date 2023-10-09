@@ -236,6 +236,13 @@ conn_stats = [
     BlockCacheStat('block_cache_misses', 'number of misses'),
     BlockCacheStat('block_cache_not_evicted_overhead', 'number of blocks not evicted due to overhead'),
 
+    BlockCacheStat('block_prefetch_attempts', 'pre-fetch triggered by page read'),
+    BlockCacheStat('block_prefetch_disk_one', 'pre-fetch not triggered after single disk read'),
+    BlockCacheStat('block_prefetch_pages_queued', 'pre-fetch pages queued'),
+    BlockCacheStat('block_prefetch_pages_read', 'pre-fetch pages read in background'),
+    BlockCacheStat('block_prefetch_skipped', 'pre-fetch not triggered by page read'),
+    BlockCacheStat('block_prefetch_pages_fail', 'pre-fetch page not on disk when reading'),
+
     ##########################################
     # Block manager statistics
     ##########################################
@@ -270,6 +277,7 @@ conn_stats = [
     CacheStat('cache_eviction_app', 'pages evicted by application threads'),
     CacheStat('cache_eviction_app_dirty', 'modified pages evicted by application threads'),
     CacheStat('cache_eviction_clear_ordinary', 'pages removed from the ordinary queue to be queued for urgent eviction'),
+    CacheStat('cache_eviction_consider_prefetch', 'pages considered for eviction that were brought in by pre-fetch', 'no_clear,no_scale'),
     CacheStat('cache_eviction_empty_score', 'eviction empty score', 'no_clear,no_scale'),
     CacheStat('cache_eviction_fail', 'pages selected for eviction unable to be evicted'),
     CacheStat('cache_eviction_fail_active_children_on_an_internal_page', 'pages selected for eviction unable to be evicted because of active children on an internal page'),
@@ -940,6 +948,7 @@ conn_dsrc_stats = [
     CacheStat('cache_hs_write_squash', 'history store table writes requiring squashed modifies'),
     CacheStat('cache_inmem_split', 'in-memory page splits'),
     CacheStat('cache_inmem_splittable', 'in-memory page passed criteria to be split'),
+    CacheStat('cache_pages_prefetch', 'pages requested from the cache due to pre-fetch'),
     CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_read', 'pages read into cache'),
     CacheStat('cache_read_deleted', 'pages read into cache after truncate'),

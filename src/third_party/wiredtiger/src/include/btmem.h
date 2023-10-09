@@ -15,14 +15,15 @@
 #define WT_READ_NO_GEN 0x0008u
 #define WT_READ_NO_SPLIT 0x0010u
 #define WT_READ_NO_WAIT 0x0020u
-#define WT_READ_PREV 0x0040u
-#define WT_READ_RESTART_OK 0x0080u
-#define WT_READ_SEE_DELETED 0x0100u
-#define WT_READ_SKIP_DELETED 0x0200u
-#define WT_READ_SKIP_INTL 0x0400u
-#define WT_READ_TRUNCATE 0x0800u
-#define WT_READ_VISIBLE_ALL 0x1000u
-#define WT_READ_WONT_NEED 0x2000u
+#define WT_READ_PREFETCH 0x0040u
+#define WT_READ_PREV 0x0080u
+#define WT_READ_RESTART_OK 0x0100u
+#define WT_READ_SEE_DELETED 0x0200u
+#define WT_READ_SKIP_DELETED 0x0400u
+#define WT_READ_SKIP_INTL 0x0800u
+#define WT_READ_TRUNCATE 0x1000u
+#define WT_READ_VISIBLE_ALL 0x2000u
+#define WT_READ_WONT_NEED 0x4000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -695,8 +696,9 @@ struct __wt_page {
 #define WT_PAGE_EVICT_LRU_URGENT 0x020u   /* Page is in the urgent queue */
 #define WT_PAGE_EVICT_NO_PROGRESS 0x040u  /* Eviction doesn't count as progress */
 #define WT_PAGE_INTL_OVERFLOW_KEYS 0x080u /* Internal page has overflow keys (historic only) */
-#define WT_PAGE_SPLIT_INSERT 0x100u       /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x200u      /* Ignore updates on page discard */
+#define WT_PAGE_PREFETCH 0x100u           /* The page is being pre-fetched */
+#define WT_PAGE_SPLIT_INSERT 0x200u       /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x400u      /* Ignore updates on page discard */
                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t flags_atomic;                /* Atomic flags, use F_*_ATOMIC_16 */
 
@@ -935,6 +937,17 @@ struct __wt_ref_hist {
 };
 
 /*
+ * WT_PREFETCH --
+ *	Queue entry for pages queued for pre-fetch.
+ */
+struct __wt_prefetch {
+    WT_REF *ref;
+    WT_PAGE *first_home;
+    WT_DATA_HANDLE *dhandle;
+    TAILQ_ENTRY(__wt_prefetch) q; /* List of pages queued for pre-fetch. */
+};
+
+/*
  * WT_REF --
  *	A single in-memory page and state information.
  */
@@ -959,7 +972,8 @@ struct __wt_ref {
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_REF_FLAG_INTERNAL 0x1u /* Page is an internal page */
 #define WT_REF_FLAG_LEAF 0x2u     /* Page is a leaf page */
-#define WT_REF_FLAG_READING 0x4u  /* Page is being read in */
+#define WT_REF_FLAG_PREFETCH 0x4u /* Page is on the pre-fetch queue */
+#define WT_REF_FLAG_READING 0x8u  /* Page is being read in */
                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 

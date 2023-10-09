@@ -252,6 +252,9 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         __wt_evict_list_clear_page(session, ref);
     }
 
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_PREFETCH))
+        WT_STAT_CONN_INCR(session, cache_eviction_consider_prefetch);
+
     /*
      * Review the page for conditions that would block its eviction. If the check fails (for
      * example, we find a page with active children), quit. Make this check for clean pages, too:
@@ -546,7 +549,11 @@ static int
 __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 {
     WT_REF *child;
-    bool visible;
+    bool busy, visible;
+
+    busy = false;
+    /* Pre-fetch queue flags on a ref need to be checked while holding the pre-fetch lock. */
+    __wt_spin_lock(session, &S2C(session)->prefetch_lock);
 
     /*
      * There may be cursors in the tree walking the list of child pages. The parent is locked, so
@@ -557,15 +564,27 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
      * opposite direction from our check.
      */
     WT_INTL_FOREACH_BEGIN (session, parent->page, child) {
+        /* It isn't safe to evict if there is a child on the pre-fetch queue. */
+        if (F_ISSET(child, WT_REF_FLAG_PREFETCH)) {
+            busy = true;
+            break;
+        }
+
         switch (child->state) {
         case WT_REF_DISK:    /* On-disk */
         case WT_REF_DELETED: /* On-disk, deleted */
             break;
         default:
-            return (__wt_set_return(session, EBUSY));
+            busy = true;
         }
+        if (busy)
+            break;
     }
     WT_INTL_FOREACH_END;
+    __wt_spin_unlock(session, &S2C(session)->prefetch_lock);
+    if (busy)
+        return (__wt_set_return(session, EBUSY));
+
     WT_INTL_FOREACH_REVERSE_BEGIN (session, parent->page, child) {
         switch (child->state) {
         case WT_REF_DISK:    /* On-disk */
@@ -590,6 +609,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
      * WT_REF structures pages can be discarded.
      */
     WT_INTL_FOREACH_BEGIN (session, parent->page, child) {
+
         switch (child->state) {
         case WT_REF_DISK: /* On-disk */
             break;

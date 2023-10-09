@@ -194,6 +194,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     page_flags = WT_DATA_IN_ITEM(&tmp) ? WT_PAGE_DISK_ALLOC : WT_PAGE_DISK_MAPPED;
     if (LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
         FLD_SET(page_flags, WT_PAGE_EVICT_NO_PROGRESS);
+    if (LF_ISSET(WT_READ_PREFETCH))
+        FLD_SET(page_flags, WT_PAGE_PREFETCH);
     WT_ERR(__wt_page_inmem(session, ref, tmp.data, page_flags, &notused, &prepare));
     tmp.mem = NULL;
     if (prepare)
@@ -282,6 +284,9 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
     if (!LF_ISSET(WT_READ_CACHE))
         WT_STAT_CONN_DATA_INCR(session, cache_pages_requested);
 
+    if (LF_ISSET(WT_READ_PREFETCH))
+        WT_STAT_CONN_INCR(session, cache_pages_prefetch);
+
     /*
      * If configured, free stashed memory more aggressively to encourage finding bugs in generation
      * tracking code.
@@ -321,11 +326,12 @@ read:
              * If configured to not trash the cache, leave the page generation unset, we'll set it
              * before returning to the oldest read generation, so the page is forcibly evicted as
              * soon as possible. We don't do that set here because we don't want to evict the page
-             * before we "acquire" it.
+             * before we "acquire" it. Also avoid queuing a pre-fetch page for forced eviction
+             * before it has a chance of being used. Otherwise the work we've just done is wasted.
              */
             wont_need = LF_ISSET(WT_READ_WONT_NEED) ||
               F_ISSET(session, WT_SESSION_READ_WONT_NEED) ||
-              F_ISSET(S2C(session)->cache, WT_CACHE_EVICT_NOKEEP);
+              (!LF_ISSET(WT_READ_PREFETCH) && F_ISSET(S2C(session)->cache, WT_CACHE_EVICT_NOKEEP));
             continue;
         case WT_REF_LOCKED:
             if (LF_ISSET(WT_READ_NO_WAIT))
@@ -434,6 +440,25 @@ read:
             }
 
 skip_evict:
+            page = ref->page;
+            /*
+             * Keep track of whether a session is reading leaf pages into the cache. This allows for
+             * the session to decide whether pre-fetch would be helpful. It might not work if a
+             * session has multiple cursors on different tables open, since the operations on
+             * different tables get in the way of the heuristic. That isn't super likely - this is
+             * to catch traversals through a btree, not complex multi-table user transactions.
+             */
+            if (!LF_ISSET(WT_READ_PREFETCH) && F_ISSET(ref, WT_REF_FLAG_LEAF)) {
+                /*
+                 * If the page was read by this retrieval or was pulled into the cache via the
+                 * pre-fetch mechanism, count that as a page read directly from disk.
+                 */
+                if (F_ISSET_ATOMIC_16(page, WT_PAGE_PREFETCH) ||
+                  page->read_gen == WT_READGEN_NOTSET)
+                    ++session->prefetch_disk_read_count;
+                else
+                    session->prefetch_disk_read_count = 0;
+            }
             /*
              * If we read the page and are configured to not trash the cache, and no other thread
              * has already used the page, set the read generation so the page is evicted soon.
@@ -442,7 +467,6 @@ skip_evict:
              * generation and the page isn't already flagged for forced eviction, update the page
              * read generation.
              */
-            page = ref->page;
             if (page->read_gen == WT_READGEN_NOTSET) {
                 if (wont_need)
                     page->read_gen = WT_READGEN_WONT_NEED;

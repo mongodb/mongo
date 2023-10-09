@@ -32,6 +32,7 @@ src/btree/bt_import.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
+src/btree/bt_prefetch.c
 src/btree/bt_random.c
 src/btree/bt_read.c
 src/btree/bt_ret.c
@@ -80,6 +81,7 @@ src/conn/conn_dhandle.c
 src/conn/conn_handle.c
 src/conn/conn_log.c
 src/conn/conn_open.c
+src/conn/conn_prefetch.c
 src/conn/conn_reconfig.c
 src/conn/conn_stat.c
 src/conn/conn_sweep.c
@@ -199,6 +201,7 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_compact.c
 src/session/session_dhandle.c
+src/session/session_prefetch.c
 src/rollback_to_stable/rts_api.c
 src/rollback_to_stable/rts_btree.c
 src/rollback_to_stable/rts_btree_walk.c
