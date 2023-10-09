@@ -42,18 +42,14 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/internal_rename_if_options_and_indexes_match_gen.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/ddl_lock_manager.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -63,15 +59,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameAndBeforeTakingDDLLocks);
-MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameAndAfterTakingDDLLocks);
-
-bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForRead lock(opCtx, nss);
-    return opCtx->writesAreReplicated() &&
-        CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-            ->getCollectionDescription(opCtx)
-            .isSharded();
-}
 
 /**
  * Rename a collection while checking collection option and indexes.
@@ -101,36 +88,29 @@ public:
             if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
                 // No need to acquire additional locks in a non-sharded environment
                 _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
-                return;
+            } else {
+                // Sharded environment. Run the _shardsvrRenameCollection command, which will use
+                // the RenameCollectionCoordinator.
+                RenameCollectionRequest renameCollectionRequest(toNss);
+                renameCollectionRequest.setDropTarget(true);
+                renameCollectionRequest.setExpectedIndexes(originalIndexes);
+                renameCollectionRequest.setExpectedCollectionOptions(collectionOptions);
+                // TODO: SERVER-81975 (PM-1931) remove this once we enable support for $out to
+                // sharded collections.
+                renameCollectionRequest.setTargetMustNotBeSharded(true);
+
+                ShardsvrRenameCollection shardsvrRenameCollectionRequest(fromNss);
+                shardsvrRenameCollectionRequest.setRenameCollectionRequest(renameCollectionRequest);
+
+                // _shardsvrRenameCollecion requires majority write concern.
+                const auto cmd = CommandHelpers::appendMajorityWriteConcern(
+                    shardsvrRenameCollectionRequest.toBSON({}));
+
+                DBDirectClient client(opCtx);
+                BSONObj cmdResult;
+                client.runCommand(fromNss.dbName(), cmd, cmdResult);
+                uassertStatusOK(getStatusFromCommandResult(cmdResult));
             }
-
-            /**
-             * Acquiring the DDL lock for involved namespaces allows to:
-             * - Serialize with sharded DDLs, ensuring no concurrent modifications of the
-             * collections.
-             * - Check safely if the target collection is sharded or not.
-             * - Check if the current shard is still the primary for the database.
-             */
-            static constexpr StringData lockReason{"internalRenameCollection"_sd};
-            const DDLLockManager::ScopedCollectionDDLLock fromCollDDLLock{
-                opCtx, fromNss, lockReason, MODE_X};
-
-            // If we are renaming a buckets collection in the $out stage, we must acquire a lock on
-            // the view namespace, instead of the buckets namespace. This lock avoids concurrent
-            // modifications, since users run operations on the view and not the buckets namespace
-            // and all time-series DDL operations take a lock on the view namespace.
-            const DDLLockManager::ScopedCollectionDDLLock toCollDDLLock{
-                opCtx,
-                fromNss.isOutTmpBucketsCollection() ? toNss.getTimeseriesViewNamespace() : toNss,
-                lockReason,
-                MODE_X};
-
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "cannot rename to sharded collection '"
-                                  << toNss.toStringForErrorMsg() << "'",
-                    !isCollectionSharded(opCtx, toNss));
-
-            _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
         }
 
     private:
@@ -139,9 +119,6 @@ public:
                                  const NamespaceString& toNss,
                                  const std::list<BSONObj>& indexList,
                                  const BSONObj& collectionOptions) {
-            if (MONGO_unlikely(blockBeforeInternalRenameAndAfterTakingDDLLocks.shouldFail())) {
-                blockBeforeInternalRenameAndAfterTakingDDLLocks.pauseWhileSet();
-            }
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;

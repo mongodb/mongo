@@ -72,6 +72,25 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     std::list<BSONObj> originalIndexes,
                                                     BSONObj collectionOptions);
 
+/**
+ * Checks that CollectionOptions 'expectedOptions' and 'currentOptions' are equal, except for the
+ * 'uuid' field. Throws CommandFailed otherwise.
+ * To be used by doLocalRenameIfOptionsAndIndexesHaveNotChanged and also its sharding-aware
+ * equivalent in RenameCollectionCoordinator.
+ */
+void checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
+                                       const BSONObj& expectedOptions,
+                                       const BSONObj& currentOptions);
+
+/**
+ * Checks that the lists of index specs 'expectedIndexes' and 'currentIndexes' are equal.
+ * To be used by doLocalRenameIfOptionsAndIndexesHaveNotChanged and also its sharding-aware
+ * equivalent in RenameCollectionCoordinator.
+ */
+void checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
+                                       const std::list<BSONObj>& expectedIndexes,
+                                       const std::list<BSONObj>& currentIndexes);
+
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,

@@ -800,41 +800,52 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     std::list<BSONObj> originalIndexes,
                                                     BSONObj originalCollectionOptions) {
     AutoGetDb dbLock(opCtx, targetNs.dbName(), MODE_X);
+
+    // Check target collection options match expected.
     auto collection = dbLock.getDb()
         ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, targetNs)
         : nullptr;
-    BSONObj collectionOptions = {};
-    if (collection) {
-        // We do not include the UUID field in the options comparison. It is ok if the target
-        // collection was dropped and recreated, as long as the new target collection has the same
-        // options and indexes as the original one did. This is mainly to support concurrent $out
-        // to the same collection.
-        collectionOptions = collection->getCollectionOptions().toBSON().removeField("uuid");
-    }
+    const BSONObj collectionOptions =
+        collection ? collection->getCollectionOptions().toBSON() : BSONObj();
+    checkTargetCollectionOptionsMatch(targetNs, originalCollectionOptions, collectionOptions);
 
+    // Check target collection indexes match expected.
+    const auto currentIndexes =
+        listIndexesEmptyListIfMissing(opCtx, targetNs, ListIndexesInclude::Nothing);
+    checkTargetCollectionIndexesMatch(targetNs, originalIndexes, currentIndexes);
+
+    validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
+}
+
+void checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
+                                       const BSONObj& expectedOptions,
+                                       const BSONObj& currentOptions) {
+    // We do not include the UUID field in the options comparison. It is ok if the target collection
+    // was dropped and recreated, as long as the new target collection has the same options and
+    // indexes as the original one did. This is mainly to support concurrent $out to the same
+    // collection.
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "collection options of target collection "
-                          << targetNs.toStringForErrorMsg()
-                          << " changed during processing. Original options: "
-                          << originalCollectionOptions << ", new options: " << collectionOptions,
-            SimpleBSONObjComparator::kInstance.evaluate(
-                originalCollectionOptions.removeField("uuid") == collectionOptions));
+                          << targetNss.toStringForErrorMsg()
+                          << " changed during processing. Original options: " << expectedOptions
+                          << ", new options: " << currentOptions,
+            SimpleBSONObjComparator::kInstance.evaluate(expectedOptions.removeField("uuid") ==
+                                                        currentOptions.removeField("uuid")));
+}
 
-    auto currentIndexes =
-        listIndexesEmptyListIfMissing(opCtx, targetNs, ListIndexesInclude::Nothing);
-
+void checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
+                                       const std::list<BSONObj>& expectedIndexes,
+                                       const std::list<BSONObj>& currentIndexes) {
     UnorderedFieldsBSONObjComparator comparator;
     uassert(
         ErrorCodes::CommandFailed,
-        str::stream() << "indexes of target collection " << targetNs.toStringForErrorMsg()
+        str::stream() << "indexes of target collection " << targetNss.toStringForErrorMsg()
                       << " changed during processing.",
-        originalIndexes.size() == currentIndexes.size() &&
-            std::equal(originalIndexes.begin(),
-                       originalIndexes.end(),
+        expectedIndexes.size() == currentIndexes.size() &&
+            std::equal(expectedIndexes.begin(),
+                       expectedIndexes.end(),
                        currentIndexes.begin(),
                        [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }));
-
-    validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
 
 void validateNamespacesForRenameCollection(OperationContext* opCtx,

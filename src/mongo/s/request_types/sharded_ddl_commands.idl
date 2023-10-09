@@ -108,6 +108,23 @@ structs:
                 type: uuid
                 description: "The expected UUID of the target collection."
                 optional: true
+            expectedIndexes:
+                type: array<object>
+                description: "The expected indexes on the target collection. Rename will fail if
+                              they don't match. An array in the form
+                              {indexName: {spec}, indexName: {spec}, ...}."
+                optional: true
+            expectedCollectionOptions:
+                type: object
+                description: "The expected collection options on the target collection. Rename will
+                              fail if they don't match. Same format as the options from the
+                              listCollections command."
+                optional: true
+            targetMustNotBeSharded:
+                type: bool
+                description: "If true, then the command will error out if the target collection is 
+                              sharded. If false or not set, no restriction is imposed."
+                optional: true
 
     RenameCollectionResponse:
         description: "Response for the rename collection command"

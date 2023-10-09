@@ -52,6 +52,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -96,8 +97,10 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -591,6 +594,42 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
             Grid::get(opCtx)->catalogClient());
     }
 }
+
+void checkExpectedTargetCollectionOptionsMatch(OperationContext* opCtx,
+                                               const NamespaceString targetNss,
+                                               const BSONObj& expectedOptions) {
+    const auto collectionOptions = [&]() {
+        // Collection options can be read from the local shard even if it doesn't own any chunks,
+        // because the dbPrimary shard is kept consistent with the data-owning chunks.
+        AutoGetCollection coll(opCtx, targetNss, MODE_IS);
+        return coll ? coll->getCollectionOptions().toBSON() : BSONObj();
+    }();
+
+    checkTargetCollectionOptionsMatch(targetNss, expectedOptions, collectionOptions);
+}
+
+void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
+                                     const NamespaceString targetNss,
+                                     const std::vector<BSONObj>& expectedIndexes) {
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), targetNss);
+    const auto currentIndexes =
+        router.route(opCtx,
+                     "checking indexes prerequisites within rename collection coordinator",
+                     [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                         const auto response =
+                             loadIndexesFromAuthoritativeShard(opCtx, targetNss, cri);
+                         if (response.getStatus() == ErrorCodes::NamespaceNotFound) {
+                             // Collection does not exist. Consider as no index exist.
+                             return std::vector<BSONObj>();
+                         }
+                         return uassertStatusOK(response).docs;
+                     });
+
+    checkTargetCollectionIndexesMatch(
+        targetNss,
+        std::list<BSONObj>{expectedIndexes.begin(), expectedIndexes.end()},
+        std::list<BSONObj>{currentIndexes.begin(), currentIndexes.end()});
+}
 }  // namespace
 
 RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
@@ -625,6 +664,23 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
+        .then([this, executor = executor, anchor = shared_from_this()]() {
+            // Check expected target collection indexes, if necessary.
+            // Done only before having advanced into or past the kCheckPreconditions phase. It
+            // cannot be done within the kCheckPreconditions phase because that phase takes the
+            // critical section on the destination namespace, which makes it impossible to send
+            // a versioned command to the participant shards to get the current indexes.
+            if (_doc.getPhase() < Phase::kCheckPreconditions &&
+                _doc.getRenameCollectionRequest().getExpectedIndexes()) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+                checkExpectedTargetIndexesMatch(
+                    opCtx,
+                    _request.getTo(),
+                    *_doc.getRenameCollectionRequest().getExpectedIndexes());
+            }
+        })
         .then(_buildPhaseHandler(
             Phase::kCheckPreconditions,
             [this, executor = executor, anchor = shared_from_this()] {
@@ -739,6 +795,23 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     sharding_ddl_util::checkCatalogConsistencyAcrossShardsForRename(
                         opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
+
+                    // Check that the target collection is not sharded, if requested.
+                    if (_doc.getRenameCollectionRequest().getTargetMustNotBeSharded().get_value_or(
+                            false)) {
+                        uassert(ErrorCodes::IllegalOperation,
+                                str::stream() << "cannot rename to sharded collection '"
+                                              << toNss.toStringForErrorMsg() << "'",
+                                !_doc.getTargetIsSharded());
+                    }
+
+                    // Check expected target collection options, if necessary.
+                    if (_doc.getRenameCollectionRequest().getExpectedCollectionOptions()) {
+                        checkExpectedTargetCollectionOptionsMatch(
+                            opCtx,
+                            toNss,
+                            *_doc.getRenameCollectionRequest().getExpectedCollectionOptions());
+                    }
 
                     {
                         AutoGetCollection coll{

@@ -109,8 +109,8 @@ public:
     using Phase = RenameCollectionParticipantPhaseEnum;
 
     explicit RenameParticipantInstance(const BSONObj& participantDoc)
-        : _doc(RenameCollectionParticipantDocument::parse(
-              IDLParserContext("RenameCollectionParticipantDocument"), participantDoc)),
+        : _doc(RenameCollectionParticipantDocument::parseOwned(
+              IDLParserContext("RenameCollectionParticipantDocument"), participantDoc.getOwned())),
           _request(_doc.getRenameCollectionRequest()) {}
 
     ~RenameParticipantInstance();
