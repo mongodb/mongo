@@ -37,6 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/migration_destination_manager.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/assert_util.h"
@@ -110,6 +112,12 @@ public:
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.
         const auto shardVersion = forceShardFilteringMetadataRefresh(opCtx, nss);
+
+        // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
+        // storage. This is not required for correctness, but helps mitigate stalls on secondaries
+        // when a shard receives the first chunk for a collection with a large routing table.
+        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
         uassertStatusOK(
             MigrationDestinationManager::get(opCtx)->start(opCtx,
