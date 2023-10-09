@@ -1854,8 +1854,8 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
 
     WiredTigerSession session(_conn);
 
-    int ret = session.getSession()->drop(
-        session.getSession(), uri.c_str(), "force,checkpoint_wait=false");
+    int ret =
+        session.getSession()->drop(session.getSession(), uri.c_str(), "checkpoint_wait=false");
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "ret"_attr = ret);
 
     if (ret == EBUSY) {
@@ -1873,6 +1873,7 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
     }
 
     if (ret == ENOENT) {
+        // Ident doesn't exist, it is effectively dropped.
         return Status::OK();
     }
 
@@ -1892,7 +1893,7 @@ void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData 
     // cursor is open. In short, using "checkpoint_wait=false" and "lock_wait=true" means that we
     // can potentially be waiting for a short period of time for WT_SESSION::drop() to run, but
     // would rather get EBUSY than wait a long time for a checkpoint to complete.
-    const std::string config = "force=true,checkpoint_wait=false,lock_wait=true,remove_files=false";
+    const std::string config = "checkpoint_wait=false,lock_wait=true,remove_files=false";
     int ret = 0;
     size_t attempt = 0;
     do {
@@ -1913,6 +1914,10 @@ void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData 
                       "config"_attr = config,
                       "ret"_attr = ret);
     } while (ret == EBUSY);
+    if (ret == ENOENT) {
+        // If the ident doesn't exist then it has already been dropped.
+        return;
+    }
     invariantWTOK(ret, session.getSession());
 }
 
@@ -1989,14 +1994,17 @@ void WiredTigerKVEngine::dropSomeQueuedIdents() {
             _identToDrop.pop_front();
         }
         int ret = session.getSession()->drop(
-            session.getSession(), identToDrop.uri.c_str(), "force,checkpoint_wait=false");
+            session.getSession(), identToDrop.uri.c_str(), "checkpoint_wait=false");
         LOGV2_DEBUG(22340, 1, "WT queued drop", "uri"_attr = identToDrop.uri, "ret"_attr = ret);
 
         if (ret == EBUSY) {
             stdx::lock_guard<Latch> lk(_identToDropMutex);
             _identToDrop.push_back(std::move(identToDrop));
         } else {
-            invariantWTOK(ret, session.getSession());
+            if (ret != ENOENT) {
+                // Ident doesn't exist, it is effectively dropped. The error is safe to ignore.
+                invariantWTOK(ret, session.getSession());
+            }
             if (identToDrop.callback) {
                 identToDrop.callback();
             }

@@ -323,6 +323,9 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
         ASSERT_EQUALS(1U, all.size());
         ASSERT_EQUALS(ident, all[0]);
 
+        // Dropping a collection might fail if we haven't checkpointed the data
+        engine->checkpoint();
+
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(engine->dropIdent(opCtx->recoveryUnit(), ident));
         wuow.commit();
