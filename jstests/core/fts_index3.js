@@ -3,6 +3,7 @@
 // key.
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_fcv_60,
 // ]
 
 // Test that updates to fields in a text-indexed document are correctly reflected in the text index.
