@@ -395,13 +395,6 @@ bool useUnreplicatedTruncatesForChangeStreamCollections() {
 
 void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
                                                  const TenantId& tenantId) {
-    AutoGetChangeCollection tenantChangeCollection{
-        opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
-
-    if (!tenantChangeCollection) {
-        return;
-    }
-
     auto currentTime =
         change_stream_serverless_helpers::getCurrentTimeForChangeCollectionRemoval(opCtx);
     auto expireAfterSeconds =
@@ -423,68 +416,56 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
     auto baseExpirationTime = currentTime - expireAfterSeconds;
     auto adjustedExpirationTime = baseExpirationTime +
         Seconds(startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
-    LOGV2_DEBUG(7842800,
+    auto expirationTSEstimate = Timestamp(adjustedExpirationTime.toMillisSinceEpoch() / 1000.0,
+                                          std::numeric_limits<unsigned>::max());
+    RecordId maxExpiredRecordIdEstimate =
+        record_id_helpers::keyForOptime(expirationTSEstimate, KeyFormat::String).getValue();
+
+    writeConflictRetry(
+        opCtx,
+        "truncate change collection by approximate timestamp expiration",
+        NamespaceString::makeChangeCollectionNSS(tenantId),
+        [&] {
+            AutoGetChangeCollection tenantChangeCollection{
+                opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+
+            if (!tenantChangeCollection) {
+                return;
+            }
+
+            LOGV2_DEBUG(
+                8148800,
                 0,
-                "Extending truncate range for change collection",
+                "About to truncate change collection entries for tenant after unclean shutdown",
                 "originalExpirationDate"_attr = baseExpirationTime,
                 "newExpirationDate"_attr = adjustedExpirationTime,
                 "expiryRangeExtensionSeconds"_attr =
                     startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds,
-                "tenantId"_attr = tenantId);
-
-    auto expirationTSEstimate = Timestamp(adjustedExpirationTime.toMillisSinceEpoch() / 1000.0,
-                                          std::numeric_limits<unsigned>::max());
-    LOGV2_DEBUG(7842801,
-                0,
-                "About to truncate change collection entries for tenant after unclean shutdown",
                 "truncateAtTimestamp"_attr = expirationTSEstimate,
                 "tenantId"_attr = tenantId);
-    RecordId maxExpiredRecordIdEstimate =
-        record_id_helpers::keyForOptime(expirationTSEstimate, KeyFormat::String).getValue();
 
-    writeConflictRetry(opCtx,
-                       "truncate change collection by approximate timestamp expiration",
-                       tenantChangeCollection->ns(),
-                       [&] {
-                           // Exclusively truncate based on the most recent WT snapshot.
-                           opCtx->recoveryUnit()->abandonSnapshot();
-                           opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+            // Exclusively truncate based on the most recent WT snapshot.
+            opCtx->recoveryUnit()->abandonSnapshot();
+            opCtx->recoveryUnit()->allowOneUntimestampedWrite();
 
-                           WriteUnitOfWork wuow(opCtx);
+            WriteUnitOfWork wuow(opCtx);
 
-                           // Truncation is based on Timestamp expiration approximation -
-                           // meaning there isn't a good estimate of the number of bytes and
-                           // documents to be truncated, so default to 0.
-                           auto rs = tenantChangeCollection->getRecordStore();
-                           auto status = rs->rangeTruncate(
-                               opCtx, RecordId(), maxExpiredRecordIdEstimate, 0, 0);
-                           invariantStatusOK(status);
-                           wuow.commit();
-                       });
+            // Truncation is based on Timestamp expiration approximation -
+            // meaning there isn't a good estimate of the number of bytes and
+            // documents to be truncated, so default to 0.
+            auto rs = tenantChangeCollection->getRecordStore();
+            auto status = rs->rangeTruncate(opCtx, RecordId(), maxExpiredRecordIdEstimate, 0, 0);
+            invariantStatusOK(status);
+            wuow.commit();
+        });
 }
 void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
                                                     boost::optional<TenantId> tenantId) {
-    const auto preImagesColl = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    if (!preImagesColl.exists()) {
-        LOGV2_DEBUG(
-            7803702,
-            3,
-            "Bypassing truncation of pre-images collection on startup recovery because it does "
-            "not exist");
-        return;
-    }
-
     auto currentTime = change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
-    auto operationTimeExpirationDate =
+    auto originalExpirationDate =
         change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx, tenantId, currentTime);
-    if (operationTimeExpirationDate) {
+    boost::optional<Date_t> operationTimeExpirationDate = boost::none;
+    if (originalExpirationDate) {
         // Pre-image expiration is based on either 'operationTime', or '_id.ts'. However, after
         // unclean shutdown, initial truncation must be based on RecordId (which only encodes
         // '_id.ts') since truncate markers haven't been created yet. A pre-image's
@@ -496,17 +477,8 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
         // To account for oplog holes, and a loss of precision converting Date_t to Timestamp,
         // truncate up to a few seconds past the expiration date to guarantee only consistent
         // data survives post crash.
-        auto newOperationTimeExpirationDate = *operationTimeExpirationDate +
+        operationTimeExpirationDate = *originalExpirationDate +
             Seconds(startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
-        LOGV2_DEBUG(7803700,
-                    0,
-                    "Extending truncate range for pre-images expired by 'operationTime'",
-                    "originalExpirationDate"_attr = *operationTimeExpirationDate,
-                    "newExpirationDate"_attr = newOperationTimeExpirationDate,
-                    "expiryRangeExtensionSeconds"_attr =
-                        startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
-
-        operationTimeExpirationDate = newOperationTimeExpirationDate;
     }
 
     auto operationTimeExpirationTSEstimate = operationTimeExpirationDate
@@ -514,32 +486,67 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
                               std::numeric_limits<unsigned>::max())}
         : Timestamp();
 
-    if (tenantId) {
-        // Multi-tenant environment, pre-images only expire by 'operationTime'.
-        invariant(operationTimeExpirationDate);
-        LOGV2_DEBUG(7803701,
-                    0,
-                    "About to truncate pre-images for tenant after unclean shutdown",
-                    "truncateAtTimestamp"_attr = *operationTimeExpirationDate,
-                    "tenantId"_attr = tenantId);
-        change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
-            opCtx, preImagesColl.getCollectionPtr(), operationTimeExpirationTSEstimate);
-        return;
-    }
+    writeConflictRetry(
+        opCtx,
+        "cleanupPreImagesCollectionAfterUncleanShutdown",
+        NamespaceString::makePreImageCollectionNSS(tenantId),
+        [&] {
+            const auto preImagesColl =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::makePreImageCollectionNSS(tenantId),
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
 
-    // Pre-images expired when "_id.ts" < oldest oplog timestamp OR "_id.ts" <= the estimated
-    // timestamp for the 'operationTime' expiration date.
-    const auto oldestOplogTimestamp =
-        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
-    const auto expirationTimestamp =
-        std::max(oldestOplogTimestamp, operationTimeExpirationTSEstimate);
-    LOGV2_DEBUG(7803703,
-                0,
-                "About to truncate pre-images after unclean shutdown",
-                "truncateAtTimestamp"_attr = expirationTimestamp,
-                "oldestOplogEntryTimestamp"_attr = oldestOplogTimestamp);
-    change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
-        opCtx, preImagesColl.getCollectionPtr(), expirationTimestamp);
+            if (!preImagesColl.exists()) {
+                LOGV2_DEBUG(7803702,
+                            3,
+                            "Bypassing truncation of pre-images collection on startup recovery "
+                            "because it does not exist");
+                return;
+            }
+
+            if (originalExpirationDate) {
+                LOGV2_DEBUG(
+                    7803700,
+                    0,
+                    "Extending truncate range for pre-images expired by 'operationTime'",
+                    "originalExpirationDate"_attr = *originalExpirationDate,
+                    "newExpirationDate"_attr = *operationTimeExpirationDate,
+                    "expiryRangeExtensionSeconds"_attr =
+                        startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
+            }
+
+            if (tenantId) {
+                // Multi-tenant environment, pre-images only expire by 'operationTime'.
+                invariant(operationTimeExpirationDate);
+                LOGV2_DEBUG(7803701,
+                            0,
+                            "About to truncate pre-images for tenant after unclean shutdown",
+                            "truncateAtTimestamp"_attr = operationTimeExpirationTSEstimate,
+                            "tenantId"_attr = tenantId);
+                change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
+                    opCtx, preImagesColl.getCollectionPtr(), operationTimeExpirationTSEstimate);
+                return;
+            }
+
+            // Pre-images expired when "_id.ts" < oldest oplog timestamp OR "_id.ts" <= the
+            // estimated timestamp for the 'operationTime' expiration date.
+            const auto oldestOplogTimestamp =
+                repl::StorageInterface::get(opCtx->getServiceContext())
+                    ->getEarliestOplogTimestamp(opCtx);
+            const auto expirationTimestamp =
+                std::max(oldestOplogTimestamp, operationTimeExpirationTSEstimate);
+            LOGV2_DEBUG(7803703,
+                        0,
+                        "About to truncate pre-images after unclean shutdown",
+                        "truncateAtTimestamp"_attr = expirationTimestamp,
+                        "oldestOplogEntryTimestamp"_attr = oldestOplogTimestamp);
+            change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
+                opCtx, preImagesColl.getCollectionPtr(), expirationTimestamp);
+        });
 }
 
 void reconcileCatalogAndRebuildUnfinishedIndexes(
