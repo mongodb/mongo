@@ -56,6 +56,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -774,6 +775,28 @@ int Balancer::_moveChunks(OperationContext* opCtx,
             continue;
         }
 
+        if (status == ErrorCodes::IndexNotFound &&
+            gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+
+            const auto cm = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+                    opCtx, requestIt->nss));
+
+            if (cm.getShardKeyPattern().isHashedPattern()) {
+                LOGV2(78252,
+                      "Turning off balancing for hashed collection because migration failed due to "
+                      "missing shardkey index",
+                      "migrateInfo"_attr = redact(requestIt->toString()),
+                      "error"_attr = redact(status),
+                      "collection"_attr = requestIt->nss);
+
+                // Write to config.collections to turn off the balancer.
+                _disableBalancer(opCtx, requestIt->nss);
+                continue;
+            }
+        }
+
         LOGV2(21872,
               "Migration {migrateInfo} failed with {error}",
               "Migration failed",
@@ -787,6 +810,30 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 void Balancer::notifyPersistedBalancerSettingsChanged() {
     stdx::unique_lock<Latch> lock(_mutex);
     _condVar.notify_all();
+}
+
+void Balancer::_disableBalancer(OperationContext* opCtx, NamespaceString nss) {
+    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    BatchedCommandRequest updateRequest([&]() {
+        write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(BSON(CollectionType::kNssFieldName << nss.ns()));
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$set" << BSON("noBalance" << true))));
+            entry.setMulti(false);
+            entry.setUpsert(false);
+            return entry;
+        }()});
+        return updateOp;
+    }());
+
+    updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Shard::kDefaultConfigCommandTimeout, updateRequest, Shard::RetryPolicy::kIdempotent);
+    uassertStatusOK(response.toStatus());
 }
 
 Balancer::BalancerStatus Balancer::getBalancerStatusForNs(OperationContext* opCtx,
