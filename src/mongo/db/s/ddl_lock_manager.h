@@ -112,7 +112,7 @@ public:
     static const Milliseconds kSingleLockAttemptTimeout;
 
     // RAII-style class to acquire a DDL lock on the given database
-    class ScopedDatabaseDDLLock : public ScopedBaseDDLLock {
+    class ScopedDatabaseDDLLock {
     public:
         /**
          * Constructs a ScopedDatabaseDDLLock object
@@ -135,6 +135,9 @@ public:
                               const DatabaseName& db,
                               StringData reason,
                               LockMode mode);
+
+    private:
+        ScopedBaseDDLLock _dbLock;
     };
 
     // RAII-style class to acquire a DDL lock on the given collection. The database DDL lock will

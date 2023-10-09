@@ -197,8 +197,7 @@ DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* o
                                                              const DatabaseName& db,
                                                              StringData reason,
                                                              LockMode mode)
-    : DDLLockManager::ScopedBaseDDLLock(
-          opCtx, opCtx->lockState(), db, reason, mode, true /*waitForRecovery*/) {
+    : _dbLock{opCtx, opCtx->lockState(), db, reason, mode, true /*waitForRecovery*/} {
 
     // Check under the DDL dbLock if this is the primary shard for the database
     DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, db);

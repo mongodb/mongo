@@ -109,6 +109,8 @@
 namespace mongo {
 namespace {
 
+constexpr StringData kDDLLockReason = "checkMetadataConsistency"_sd;
+
 /*
  * Retrieve from config server the list of databases for which this shard is primary for.
  */
@@ -217,6 +219,9 @@ public:
                                                       boost::none /* shardVersion */,
                                                       db.getVersion() /* databaseVersion */);
                 try {
+                    DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                        opCtx, dbNss.dbName(), kDDLLockReason, MODE_S};
+
                     auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
                     cursors.insert(cursors.end(),
                                    std::make_move_iterator(dbCursors.begin()),
@@ -235,11 +240,23 @@ public:
         }
 
         Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            return _mergeCursors(opCtx, nss, _establishCursorOnParticipants(opCtx, nss));
+            auto dbCursors = [&]() {
+                DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                    opCtx, nss.dbName(), kDDLLockReason, MODE_S};
+                return _establishCursorOnParticipants(opCtx, nss);
+            }();
+
+            return _mergeCursors(opCtx, nss, std::move(dbCursors));
         }
 
         Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            return _mergeCursors(opCtx, nss, _establishCursorOnParticipants(opCtx, nss));
+            auto collCursors = [&]() {
+                DDLLockManager::ScopedCollectionDDLLock dbDDLLock{
+                    opCtx, nss, kDDLLockReason, MODE_S};
+                return _establishCursorOnParticipants(opCtx, nss);
+            }();
+
+            return _mergeCursors(opCtx, nss, std::move(collCursors));
         }
 
         /*
@@ -269,10 +286,6 @@ public:
             participantRequest.setCursor(request().getCursor());
             requests.emplace_back(ShardId::kConfigServerId,
                                   appendOpKey(configOpKey, configRequest.toBSON({})));
-
-            // Take a DDL lock on the database
-            const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                opCtx, nss.dbName(), "checkMetadataConsistency", MODE_S};
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
