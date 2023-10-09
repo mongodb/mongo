@@ -306,12 +306,12 @@ public:
                                   const std::list<FieldPath>& partitions,
                                   const RangeStatement& range)
         : DocumentSource(kStageName, pExpCtx),
+          _memTracker(internalDocumentSourceDensifyMaxMemoryBytes.load()),
           _field(std::move(field)),
           _partitions(std::move(partitions)),
           _range(std::move(range)),
-          _partitionTable(pExpCtx->getValueComparator().makeUnorderedValueMap<DensifyValue>()),
-          _memTracker(
-              MemoryUsageTracker(false, internalDocumentSourceDensifyMaxMemoryBytes.load())) {
+          _partitionTable(pExpCtx->getValueComparator()
+                              .makeUnorderedValueMap<SimpleMemoryTokenWith<DensifyValue>>()) {
         _maxDocs = internalQueryMaxAllowedDensifyDocs.load();
     };
 
@@ -511,22 +511,14 @@ private:
         if (_partitionExpr) {
             auto partitionKey = getDensifyPartition(doc);
             auto partitionVal = getDensifyValue(doc);
-            auto lastValForPartitionIt = _partitionTable.find(partitionKey);
-            if (lastValForPartitionIt == _partitionTable.end()) {
-                // If this is a new partition, store the size of the key and the value.
-                _memTracker.update(partitionKey.getApproximateSize() +
-                                   partitionVal.getApproximateSize());
-            } else {
-                // Subtract the size of the previous value and add the new one.
-                _memTracker.update(partitionVal.getApproximateSize() -
-                                   lastValForPartitionIt->second.getApproximateSize());
-            }
+            SimpleMemoryToken memoryToken{partitionKey.getApproximateSize() +
+                                              partitionVal.getApproximateSize(),
+                                          &_memTracker};
+            _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
             uassert(6007200,
                     str::stream() << "$densify exceeded memory limit of "
-                                  << _memTracker._maxAllowedMemoryUsageBytes,
+                                  << _memTracker.maxAllowedMemoryUsageBytes(),
                     _memTracker.withinMemoryLimit());
-
-            _partitionTable[partitionKey] = partitionVal;
         }
     }
 
@@ -581,16 +573,16 @@ private:
         kDensifyDone
     };
 
+    // Keep track of documents generated, error if it goes above the limit.
+    size_t _docsGenerated = 0;
+    size_t _maxDocs = 0;
+    SimpleMemoryUsageTracker _memTracker;
+
     DensifyState _densifyState = DensifyState::kUninitializedOrBelowRange;
     FieldPath _field;
     std::list<FieldPath> _partitions;
     RangeStatement _range;
     // Store of the value we've seen for each partition.
-    ValueUnorderedMap<DensifyValue> _partitionTable;
-
-    // Keep track of documents generated, error if it goes above the limit.
-    size_t _docsGenerated = 0;
-    size_t _maxDocs = 0;
-    MemoryUsageTracker _memTracker;
+    ValueUnorderedMap<SimpleMemoryTokenWith<DensifyValue>> _partitionTable;
 };
 }  // namespace mongo

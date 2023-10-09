@@ -89,7 +89,7 @@ PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
       _sortExpr(exprFromSort(_expCtx, sortPattern)),
       _state(IteratorState::kNotInitialized),
       _cache(std::make_unique<SpillableCache>(_expCtx, tracker)),
-      _tracker(tracker) {}
+      _memoryToken(0, &(*tracker)["PartitionIterator"]) {}
 
 optional<Document> PartitionIterator::operator[](int index) {
     auto docDesired = _indexOfCurrentInPartition + index;
@@ -214,6 +214,18 @@ Value decimalAdd(const Value& left, const Value& right) {
 
 
 }  // namespace
+
+void PartitionIterator::advanceToNextPartition() {
+    tassert(5340101,
+            "Invalid call to PartitionIterator::advanceToNextPartition",
+            _nextPartitionDoc != boost::none);
+    resetCache();
+    // Cache is cleared, and we are moving the _nextPartitionDoc value to different positions.
+    _cache->addDocument(std::move(*_nextPartitionDoc));
+    _nextPartitionDoc.reset();
+    _state = IteratorState::kIntraPartition;
+    updateNextPartitionStateSize();
+}
 
 optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
     const WindowBounds::RangeBased& range, const optional<std::pair<int, int>>& hint) {
@@ -468,6 +480,10 @@ optional<std::pair<int, int>> PartitionIterator::getEndpoints(
                        bounds.bounds);
 }
 
+void PartitionIterator::updateNextPartitionStateSize() {
+    _memoryToken = MemoryToken{getNextPartitionStateSize(), _memoryToken.tracker()};
+}
+
 void PartitionIterator::getNextDocument() {
     tassert(5340103,
             "Invalid call to PartitionIterator::getNextDocument",
@@ -496,12 +512,11 @@ void PartitionIterator::getNextDocument() {
             _partitionComparator =
                 std::make_unique<PartitionKeyComparator>(_expCtx, *_partitionExpr, doc);
             _nextPartitionDoc = std::move(doc);
-            _tracker->update(getNextPartitionStateSize());
             advanceToNextPartition();
         } else if (_partitionComparator->isDocumentNewPartition(doc)) {
             _nextPartitionDoc = std::move(doc);
-            _tracker->update(getNextPartitionStateSize());
             _state = IteratorState::kAwaitingAdvanceToNext;
+            updateNextPartitionStateSize();
         } else {
             _cache->addDocument(std::move(doc));
         }

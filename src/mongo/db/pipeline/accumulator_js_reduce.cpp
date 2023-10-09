@@ -113,7 +113,7 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 
     _key = kField;
 
-    _memUsageBytes += vField.getApproximateSize();
+    _memUsageTracker.update(vField.getApproximateSize());
     _values.push_back(std::move(vField));
 }
 
@@ -189,7 +189,7 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorInternalJsReduce::create(
 
 void AccumulatorInternalJsReduce::reset() {
     _values.clear();
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
     _key = Value{};
 }
 
@@ -371,13 +371,11 @@ Value AccumulatorJs::getValue(bool toBeMerged) {
 }
 
 void AccumulatorJs::resetMemUsageBytes() {
-    _memUsageBytes = sizeof(*this) + _init.capacity() + _accumulate.capacity() + _merge.capacity();
+    _memUsageTracker.set(sizeof(*this) + _init.capacity() + _accumulate.capacity() +
+                         _merge.capacity());
     if (_finalize) {
-        _memUsageBytes += _finalize->capacity();
+        _memUsageTracker.update(_finalize->capacity());
     }
-}
-void AccumulatorJs::incrementMemUsageBytes(size_t bytes) {
-    _memUsageBytes += bytes;
 }
 
 void AccumulatorJs::startNewGroup(Value const& input) {
@@ -405,7 +403,7 @@ void AccumulatorJs::startNewGroup(Value const& input) {
 
     // getApproximateSize includes sizeof(Value), but we already counted that in resetMemUsageBytes
     // as part of sizeof(*this).
-    incrementMemUsageBytes(_state->getApproximateSize() - sizeof(Value));
+    _memUsageTracker.update(_state->getApproximateSize() - sizeof(Value));
 }
 
 void AccumulatorJs::reset() {
@@ -432,8 +430,8 @@ void AccumulatorJs::processInternal(const Value& input, bool merging) {
 
     // getApproximateSize includes sizeof(Value), but we already counted that in resetMemUsageBytes
     // as part of sizeof(*this).
-    incrementMemUsageBytes(input.getApproximateSize() - sizeof(Value) +
-                           sizeof(std::pair<Value, bool>));
+    _memUsageTracker.update(input.getApproximateSize() - sizeof(Value) +
+                            sizeof(std::pair<Value, bool>));
 }
 
 void AccumulatorJs::reduceMemoryConsumptionIfAble() {
@@ -515,7 +513,7 @@ void AccumulatorJs::reduceMemoryConsumptionIfAble() {
     _pendingCalls.clear();
 
     resetMemUsageBytes();
-    incrementMemUsageBytes(_state->getApproximateSize());
+    _memUsageTracker.update(_state->getApproximateSize());
 }
 
 }  // namespace mongo

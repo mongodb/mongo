@@ -45,7 +45,7 @@ REGISTER_WINDOW_FUNCTION(
 
 AccumulatorLocf::AccumulatorLocf(ExpressionContext* const expCtx)
     : AccumulatorForWindowFunctions(expCtx) {
-    _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
+    _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
 }
 
 void AccumulatorLocf::processInternal(const Value& input, bool merging) {
@@ -53,7 +53,7 @@ void AccumulatorLocf::processInternal(const Value& input, bool merging) {
 
     if (!input.nullish()) {
         _lastNonNull = input;
-        _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
+        _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
     }
 }
 
@@ -64,7 +64,7 @@ Value AccumulatorLocf::getValue(bool toBeMerged) {
 
 void AccumulatorLocf::reset() {
     _lastNonNull = Value(BSONNULL);
-    _memUsageBytes = sizeof(*this) + _lastNonNull.getApproximateSize();
+    _memUsageTracker.set(sizeof(*this) + _lastNonNull.getApproximateSize());
 }
 
 boost::intrusive_ptr<AccumulatorState> AccumulatorLocf::create(ExpressionContext* const expCtx) {

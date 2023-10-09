@@ -385,7 +385,7 @@ protected:
         }
     }
 
-    virtual boost::optional<size_t> getMaxMemoryUsageBytes() {
+    virtual boost::optional<int64_t> getMaxMemoryUsageBytes() {
         return boost::none;
     }
 
@@ -1085,7 +1085,7 @@ private:
         }
     }
 
-    boost::optional<size_t> getMaxMemoryUsageBytes() final {
+    boost::optional<int64_t> getMaxMemoryUsageBytes() final {
         return 10 * kBigStringSize;
     }
 
@@ -1129,7 +1129,7 @@ private:
                           << "$monotonicIdFields" << BSON_ARRAY("x"));
     }
 
-    boost::optional<size_t> getMaxMemoryUsageBytes() final {
+    boost::optional<int64_t> getMaxMemoryUsageBytes() final {
         return 10 * kBigStringSize;
     }
 
@@ -1172,7 +1172,7 @@ private:
                     << "$monotonicIdFields" << BSON_ARRAY("_id"));
     }
 
-    boost::optional<size_t> getMaxMemoryUsageBytes() final {
+    boost::optional<int64_t> getMaxMemoryUsageBytes() final {
         return (25 * kBigStringSize) / 10;
     }
 
@@ -1219,7 +1219,7 @@ private:
                           << "$monotonicIdFields" << BSON_ARRAY("x"));
     }
 
-    boost::optional<size_t> getMaxMemoryUsageBytes() final {
+    boost::optional<int64_t> getMaxMemoryUsageBytes() final {
         return 10 * kBigStringSize;
     }
 
@@ -1256,7 +1256,7 @@ private:
             "{_id: {x: '$x', y: '$y'}, sum: {$sum: '$z'}, $monotonicIdFields: ['x', 'y']}");
     }
 
-    boost::optional<size_t> getMaxMemoryUsageBytes() final {
+    boost::optional<int64_t> getMaxMemoryUsageBytes() final {
         return 10 * kBigStringSize;
     }
 

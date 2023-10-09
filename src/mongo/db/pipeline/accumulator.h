@@ -43,6 +43,8 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/stdx/unordered_set.h"
@@ -70,7 +72,9 @@ class AccumulatorState : public RefCountable {
 public:
     using Factory = std::function<boost::intrusive_ptr<AccumulatorState>()>;
 
-    AccumulatorState(ExpressionContext* const expCtx) : _expCtx(expCtx) {}
+    AccumulatorState(ExpressionContext* const expCtx,
+                     int64_t maxAllowedMemoryUsageBytes = std::numeric_limits<int64_t>::max())
+        : _memUsageTracker(maxAllowedMemoryUsageBytes), _expCtx(expCtx) {}
 
     /** Marks the beginning of a new group. The input is the result of evaluating
      *  AccumulatorExpression::initializer, which can read from the group key.
@@ -100,9 +104,8 @@ public:
     /// The name of the op as used in a serialization of the pipeline.
     virtual const char* getOpName() const = 0;
 
-    int getMemUsage() const {
-        dassert(_memUsageBytes != 0);  // This would mean subclass didn't set it
-        return _memUsageBytes;
+    int64_t getMemUsage() const {
+        return _memUsageTracker.currentMemoryBytes();
     }
 
     /// Reset this accumulator to a fresh state, ready for a new call to startNewGroup.
@@ -158,7 +161,7 @@ protected:
     }
 
     /// subclasses are expected to update this as necessary
-    int _memUsageBytes = 0;
+    SimpleMemoryUsageTracker _memUsageTracker;
 
     /// Member which tracks if this accumulator requires any more input values to compute its final
     /// result. In general, most accumulators require all input values, however, some accumulators
@@ -201,7 +204,6 @@ public:
 
 private:
     ValueUnorderedSet _set;
-    int _maxMemUsageBytes;
 };
 
 class AccumulatorFirst final : public AccumulatorState {
@@ -387,7 +389,6 @@ public:
 
 private:
     std::vector<Value> _array;
-    int _maxMemUsageBytes;
 };
 
 class AccumulatorAvg final : public AccumulatorState {

@@ -46,7 +46,7 @@ protected:
           _nanCount(0),
           _doubleCount(0),
           _decimalCount(0) {
-        _memUsageBytes = sizeof(*this) + _sumAcc->getMemUsage();
+        _memUsageTracker.set(sizeof(*this) + _sumAcc->getMemUsage());
     }
 
 public:
@@ -71,7 +71,7 @@ public:
         _nanCount = 0;
         _doubleCount = 0;
         _decimalCount = 0;
-        _memUsageBytes = sizeof(*this) + _sumAcc->getMemUsage();
+        _memUsageTracker.set(sizeof(*this) + _sumAcc->getMemUsage());
     }
 
 private:

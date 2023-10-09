@@ -51,11 +51,11 @@ intrusive_ptr<AccumulatorState> AccumulatorMergeObjects::create(ExpressionContex
 
 AccumulatorMergeObjects::AccumulatorMergeObjects(ExpressionContext* const expCtx)
     : AccumulatorState(expCtx) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorMergeObjects::reset() {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
     _output.reset();
 }
 
@@ -78,7 +78,7 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
 
         _output.setField(pair.first, std::move(pair.second));
     }
-    _memUsageBytes = sizeof(*this) + _output.getApproximateSize();
+    _memUsageTracker.set(sizeof(*this));
 }
 
 Value AccumulatorMergeObjects::getValue(bool toBeMerged) {

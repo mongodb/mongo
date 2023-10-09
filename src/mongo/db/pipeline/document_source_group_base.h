@@ -162,7 +162,7 @@ public:
 protected:
     DocumentSourceGroupBase(StringData stageName,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            boost::optional<size_t> maxMemoryUsageBytes = boost::none);
+                            boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
     virtual ~DocumentSourceGroupBase();
 

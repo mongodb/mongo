@@ -80,7 +80,7 @@ DocumentSource::GetNextResult DocumentSourceStreamingGroup::doGetNext() {
 
 DocumentSourceStreamingGroup::DocumentSourceStreamingGroup(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<size_t> maxMemoryUsageBytes)
+    boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes), _sourceDepleted(false) {}
 
 boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup::create(
@@ -88,7 +88,7 @@ boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup:
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<size_t> monotonicExpressionIndexes,
     std::vector<AccumulationStatement> accumulationStatements,
-    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceStreamingGroup> groupStage =
         new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
     groupStage->setIdExpression(groupByExpression);
@@ -115,7 +115,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBso
 boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBsonWithMaxMemoryUsage(
     BSONElement elem,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::optional<int64_t> maxMemoryUsageBytes) {
     boost::intrusive_ptr<DocumentSourceStreamingGroup> groupStage =
         new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
     groupStage->initializeFromBson(elem);

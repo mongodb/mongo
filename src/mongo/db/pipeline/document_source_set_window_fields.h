@@ -114,7 +114,7 @@ public:
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
         const boost::optional<SortPattern>& sortBy,
         std::vector<WindowFunctionStatement> outputFields,
-        size_t maxMemoryBytes)
+        int64_t maxMemoryBytes)
         : DocumentSource(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
@@ -202,7 +202,11 @@ private:
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
+
+    // Memory tracker is not updated directly by this class, but it is passed down to
+    // PartitionIterator and WindowFunctionExec's that update their memory consumption.
     MemoryUsageTracker _memoryTracker;
+
     PartitionIterator _iterator;
     StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
     bool _init = false;

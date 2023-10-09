@@ -40,67 +40,82 @@ namespace mongo {
 
 /**
  * This is a utility class for tracking memory usage across multiple arbitrary operators or
- * functions, which are identified by their string names.
+ * functions, which are identified by their string names. Tracks both current and highest
+ * encountered memory consumption,
+ *
+ * It can be used directly by calling MemoryUsageTracker::update(int64_t diff), or by creating a
+ * dependent tracker via MemoryUsageTracker::operator[].
+ *
+ * Dependent tracker will update both it's own memory and the total. It is used to tracker the
+ * consumption of individual parts, such as different accumulators in $group, while simulaniously
+ * keeping track of the total.
+ *
+ * TODO SERVER-80007: move implementation to .cpp to save on compilation time.
  */
 class MemoryUsageTracker {
 public:
-    class PerFunctionMemoryTracker {
+    /**
+     * The class that does the tracking. Instances should be created via
+     * MemoryUsageTracker::operator[].
+     */
+    class Impl {
     public:
-        explicit PerFunctionMemoryTracker(MemoryUsageTracker* base) : base(base){};
-        PerFunctionMemoryTracker() = delete;
+        Impl(Impl* base, int64_t maxAllowedMemoryUsageBytes)
+            : _base(base), _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes){};
 
-        void update(long long diff) {
-            // TODO SERVER-61281: Check for memory underflow.
-            set(std::max(_currentMemoryBytes + diff, 0ll));
+        void update(int64_t diff) {
+            _currentMemoryBytes += diff;
+            tassert(6128100,
+                    str::stream() << "Underflow in memory tracking, attempting to add " << diff
+                                  << " but only " << _currentMemoryBytes - diff << " available",
+                    _currentMemoryBytes >= 0);
+            if (_currentMemoryBytes > _maxMemoryBytes) {
+                _maxMemoryBytes = _currentMemoryBytes;
+            }
+            if (_base) {
+                _base->update(diff);
+            }
         }
 
-        void set(long long total) {
-            if (total > _maxMemoryBytes)
-                _maxMemoryBytes = total;
-            long long prior = _currentMemoryBytes;
-            _currentMemoryBytes = total;
-            base->update(total - prior);
+        void set(int64_t total) {
+            update(total - _currentMemoryBytes);
         }
 
-        auto currentMemoryBytes() const {
+        int64_t currentMemoryBytes() const {
             return _currentMemoryBytes;
         }
 
-        auto maxMemoryBytes() const {
+        int64_t maxMemoryBytes() const {
             return _maxMemoryBytes;
         }
 
         bool withinMemoryLimit() const {
-            return _currentMemoryBytes <= static_cast<long long>(base->_maxAllowedMemoryUsageBytes);
+            return _currentMemoryBytes <= _maxAllowedMemoryUsageBytes;
         }
 
-        MemoryUsageTracker* base = nullptr;
+        int64_t maxAllowedMemoryUsageBytes() const {
+            return _maxAllowedMemoryUsageBytes;
+        }
 
     private:
+        Impl* _base = nullptr;
+
         // Maximum memory consumption thus far observed for this function.
-        long long _maxMemoryBytes = 0;
+        int64_t _maxMemoryBytes = 0;
         // Tracks the current memory footprint.
-        long long _currentMemoryBytes = 0;
+        int64_t _currentMemoryBytes = 0;
+
+        int64_t _maxAllowedMemoryUsageBytes;
     };
 
-    MemoryUsageTracker(bool allowDiskUse = false, size_t maxMemoryUsageBytes = 0)
-        : _allowDiskUse(allowDiskUse), _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes) {}
+    MemoryUsageTracker(bool allowDiskUse = false, int64_t maxMemoryUsageBytes = 0)
+        : _allowDiskUse(allowDiskUse), _baseTracker(nullptr, maxMemoryUsageBytes) {}
 
     /**
      * Sets the new total for 'name', and updates the current total memory usage.
      */
-    void set(StringData name, long long total) {
+    void set(StringData name, int64_t total) {
         (*this)[name].set(total);
-    }
-
-    /**
-     * Sets the new current memory usage in bytes.
-     */
-    void set(long long total) {
-        _memoryUsageBytes = total;
-        if (_memoryUsageBytes > _maxMemoryUsageBytes) {
-            _maxMemoryUsageBytes = _memoryUsageBytes;
-        }
     }
 
     /**
@@ -111,13 +126,13 @@ public:
         for (auto& [_, funcTracker] : _functionMemoryTracker) {
             funcTracker.set(0);
         }
-        _memoryUsageBytes = 0;
+        _baseTracker.set(0);
     }
 
     /**
      * Provides read-only access to the function memory tracker for 'name'.
      */
-    const PerFunctionMemoryTracker& operator[](StringData name) const {
+    const Impl& operator[](StringData name) const {
         auto it = _functionMemoryTracker.find(_key(name));
         tassert(5466400,
                 str::stream() << "Invalid call to memory usage tracker, could not find function "
@@ -129,8 +144,9 @@ public:
     /**
      * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
      */
-    PerFunctionMemoryTracker& operator[](StringData name) {
-        auto [it, _] = _functionMemoryTracker.try_emplace(_key(name), this);
+    Impl& operator[](StringData name) {
+        auto [it, _] = _functionMemoryTracker.try_emplace(
+            _key(name), &_baseTracker, _baseTracker.maxAllowedMemoryUsageBytes());
         return it->second;
     }
 
@@ -138,43 +154,180 @@ public:
      * Updates the memory usage for 'name' by adding 'diff' to the current memory usage for
      * that function. Also updates the total memory usage.
      */
-    void update(StringData name, long long diff) {
+    void update(StringData name, int64_t diff) {
         (*this)[name].update(diff);
     }
 
     /**
      * Updates total memory usage.
      */
-    void update(long long diff) {
-        // TODO SERVER-61281: Check for memory underflow.
-        set(std::max(_memoryUsageBytes + diff, 0ll));
+    void update(int64_t diff) {
+        _baseTracker.update(diff);
     }
 
     auto currentMemoryBytes() const {
-        return _memoryUsageBytes;
+        return _baseTracker.currentMemoryBytes();
     }
     auto maxMemoryBytes() const {
-        return _maxMemoryUsageBytes;
+        return _baseTracker.maxMemoryBytes();
     }
 
     bool withinMemoryLimit() const {
-        return _memoryUsageBytes <= static_cast<long long>(_maxAllowedMemoryUsageBytes);
+        return _baseTracker.withinMemoryLimit();
     }
 
-    const bool _allowDiskUse;
-    const size_t _maxAllowedMemoryUsageBytes;
+    bool allowDiskUse() const {
+        return _allowDiskUse;
+    }
+
+    int64_t maxAllowedMemoryUsageBytes() const {
+        return _baseTracker.maxAllowedMemoryUsageBytes();
+    }
 
 private:
+    Impl& _impl() {
+        return _baseTracker;
+    }
+
     static absl::string_view _key(StringData s) {
         return {s.rawData(), s.size()};
     }
 
+    bool _allowDiskUse;
     // Tracks current memory used.
-    long long _memoryUsageBytes = 0;
-    long long _maxMemoryUsageBytes = 0;
-
+    Impl _baseTracker;
     // Tracks memory consumption per function using the output field name as a key.
-    stdx::unordered_map<std::string, PerFunctionMemoryTracker> _functionMemoryTracker;
+    stdx::unordered_map<std::string, Impl> _functionMemoryTracker;
 };
+
+// Lightweight version of memory usage tracker for use cases where we don't need historical maximum
+// and per-function memory tracking.
+class SimpleMemoryUsageTracker {
+public:
+    SimpleMemoryUsageTracker(int64_t maxAllowedMemoryUsageBytes)
+        : _maxAllowedMemoryUsageBytes(maxAllowedMemoryUsageBytes){};
+
+    void set(int64_t value) {
+        _currentMemoryBytes = value;
+    }
+
+    void update(int64_t diff) {
+        _currentMemoryBytes += diff;
+        tassert(6128101,
+                str::stream() << "Underflow in memory tracking, attempting to add " << diff
+                              << " but only " << _currentMemoryBytes - diff << " available",
+                _currentMemoryBytes >= 0);
+    }
+
+    int64_t currentMemoryBytes() const {
+        return _currentMemoryBytes;
+    }
+
+    int64_t maxAllowedMemoryUsageBytes() const {
+        return _maxAllowedMemoryUsageBytes;
+    }
+
+    bool withinMemoryLimit() const {
+        return _currentMemoryBytes <= _maxAllowedMemoryUsageBytes;
+    }
+
+private:
+    int64_t _currentMemoryBytes = 0;
+    const int64_t _maxAllowedMemoryUsageBytes;
+};
+
+/**
+ * An RAII utility class which can make it easy to account for some new allocation in a given
+ * 'MemoryUsageTracker' for the entire lifetime of the object.
+ */
+template <typename Tracker>
+class MemoryTokenImpl {
+public:
+    // Default constructor is only present to support ease of use for some containers.
+    MemoryTokenImpl() : _size(0), _tracker(nullptr) {}
+
+    MemoryTokenImpl(size_t size, Tracker* tracker) : _size(size), _tracker(tracker) {
+        _tracker->update(_size);
+    }
+
+    MemoryTokenImpl(const MemoryTokenImpl&) = delete;
+    MemoryTokenImpl& operator=(const MemoryTokenImpl&) = delete;
+
+    MemoryTokenImpl(MemoryTokenImpl&& other) : _size(other._size), _tracker(other._tracker) {
+        other._tracker = nullptr;
+    }
+
+    MemoryTokenImpl& operator=(MemoryTokenImpl&& other) {
+        if (this == &other) {
+            return *this;
+        }
+        releaseMemory();
+        _size = other._size;
+        _tracker = other._tracker;
+        other._tracker = nullptr;
+        return *this;
+    }
+
+    const Tracker* tracker() const {
+        return _tracker;
+    }
+    Tracker* tracker() {
+        return _tracker;
+    }
+
+    ~MemoryTokenImpl() {
+        releaseMemory();
+    }
+
+private:
+    void releaseMemory() {
+        if (_tracker) {
+            _tracker->update(-static_cast<int64_t>(_size));
+        }
+    }
+
+    size_t _size;
+    Tracker* _tracker;
+};
+
+using MemoryToken = MemoryTokenImpl<MemoryUsageTracker::Impl>;
+using SimpleMemoryToken = MemoryTokenImpl<SimpleMemoryUsageTracker>;
+
+/**
+ * Template to easy couple MemoryTokens with stored data.
+ */
+template <typename Tracker, typename T>
+class MemoryTokenWithImpl {
+public:
+    template <std::enable_if_t<std::is_default_constructible_v<T>, bool> = true>
+    MemoryTokenWithImpl() : _token(), _value() {}
+
+    template <typename... Args>
+    MemoryTokenWithImpl(MemoryTokenImpl<Tracker> token, Args&&... args)
+        : _token(std::move(token)), _value(std::forward<Args>(args)...) {}
+
+    MemoryTokenWithImpl(const MemoryTokenWithImpl&) = delete;
+    MemoryTokenWithImpl& operator=(const MemoryTokenWithImpl&) = delete;
+
+    MemoryTokenWithImpl(MemoryTokenWithImpl&& other) = default;
+    MemoryTokenWithImpl& operator=(MemoryTokenWithImpl&& other) = default;
+
+    const T& value() const {
+        return _value;
+    }
+    T& value() {
+        return _value;
+    }
+
+private:
+    MemoryTokenImpl<Tracker> _token;
+    T _value;
+};
+
+template <typename T>
+using MemoryTokenWith = MemoryTokenWithImpl<MemoryUsageTracker::Impl, T>;
+
+template <typename T>
+using SimpleMemoryTokenWith = MemoryTokenWithImpl<SimpleMemoryUsageTracker, T>;
 
 }  // namespace mongo

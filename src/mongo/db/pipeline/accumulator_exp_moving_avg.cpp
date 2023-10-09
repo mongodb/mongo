@@ -82,11 +82,11 @@ Value AccumulatorExpMovingAvg::getValue(bool toBeMerged) {
 
 AccumulatorExpMovingAvg::AccumulatorExpMovingAvg(ExpressionContext* const expCtx, Decimal128 alpha)
     : AccumulatorState(expCtx), _alpha(alpha) {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 void AccumulatorExpMovingAvg::reset() {
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
     _init = false;
 }
 }  // namespace mongo

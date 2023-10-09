@@ -149,7 +149,7 @@ Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
 
 
 bool DocumentSourceGroupBase::shouldSpillWithAttemptToSaveMemory() {
-    if (!_memoryTracker._allowDiskUse && !_memoryTracker.withinMemoryLimit()) {
+    if (!_memoryTracker.allowDiskUse() && !_memoryTracker.withinMemoryLimit()) {
         freeMemory();
     }
 
@@ -157,7 +157,7 @@ bool DocumentSourceGroupBase::shouldSpillWithAttemptToSaveMemory() {
         uassert(ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed,
                 "Exceeded memory limit for $group, but didn't allow external sort."
                 " Pass allowDiskUse:true to opt in.",
-                _memoryTracker._allowDiskUse);
+                _memoryTracker.allowDiskUse());
         return true;
     }
     return false;
@@ -355,13 +355,12 @@ std::vector<AccumulationStatement>& DocumentSourceGroupBase::getMutableAccumulat
 
 DocumentSourceGroupBase::DocumentSourceGroupBase(StringData stageName,
                                                  const intrusive_ptr<ExpressionContext>& expCtx,
-                                                 boost::optional<size_t> maxMemoryUsageBytes)
+                                                 boost::optional<int64_t> maxMemoryUsageBytes)
     : DocumentSource(stageName, expCtx),
       _doingMerge(false),
       _memoryTracker{expCtx->allowDiskUse && !expCtx->inMongos,
-                     maxMemoryUsageBytes
-                         ? *maxMemoryUsageBytes
-                         : static_cast<size_t>(internalDocumentSourceGroupMaxMemoryBytes.load())},
+                     maxMemoryUsageBytes ? *maxMemoryUsageBytes
+                                         : internalDocumentSourceGroupMaxMemoryBytes.load()},
       _executionStarted(false),
       _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
@@ -513,7 +512,7 @@ void DocumentSourceGroupBase::processDocument(const Value& id, const Document& r
     const bool inserted = _groups->size() != oldSize;
 
     if (inserted) {
-        _memoryTracker.set(_memoryTracker.currentMemoryBytes() + id.getApproximateSize());
+        _memoryTracker.update(id.getApproximateSize());
 
         // Initialize and add the accumulators
         Value expandedId = expandId(id);
@@ -547,10 +546,10 @@ void DocumentSourceGroupBase::processDocument(const Value& id, const Document& r
 
     if (kDebugBuild && !pExpCtx->opCtx->readOnly()) {
         // In debug mode, spill every time we have a duplicate id to stress merge logic.
-        if (!inserted &&                      // is a dup
-            !pExpCtx->inMongos &&             // can't spill to disk in mongos
-            !_memoryTracker._allowDiskUse &&  // don't change behavior when testing external sort
-            _sortedFiles.size() < 20) {       // don't open too many FDs
+        if (!inserted &&                       // is a dup
+            !pExpCtx->inMongos &&              // can't spill to disk in mongos
+            !_memoryTracker.allowDiskUse() &&  // don't change behavior when testing external sort
+            _sortedFiles.size() < 20) {        // don't open too many FDs
             spill();
         }
     }
@@ -810,7 +809,7 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
 }
 
 size_t DocumentSourceGroupBase::getMaxMemoryUsageBytes() const {
-    return _memoryTracker._maxAllowedMemoryUsageBytes;
+    return _memoryTracker.maxAllowedMemoryUsageBytes();
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>

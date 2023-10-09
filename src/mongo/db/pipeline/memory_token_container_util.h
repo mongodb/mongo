@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,52 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/accumulator.h"
+#pragma once
 
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 
 namespace mongo {
 
-using boost::intrusive_ptr;
+class MemoryTokenValueComparator {
+public:
+    using is_transparent = std::true_type;
 
-REGISTER_ACCUMULATOR(first, genericParseSingleExpressionAccumulator<AccumulatorFirst>);
+    explicit MemoryTokenValueComparator(const ValueComparator* comparator)
+        : _comparator(comparator) {}
 
-void AccumulatorFirst::processInternal(const Value& input, bool merging) {
-    /* only remember the first value seen */
-    if (!_haveFirst) {
-        // can't use pValue.missing() since we want the first value even if missing
-        _haveFirst = true;
-        _first = input;
-        _memUsageTracker.set(sizeof(*this) + input.getApproximateSize() - sizeof(Value));
-        _needsInput = false;
+    template <typename LHS, typename RHS>
+    bool operator()(const LHS& lhs, const RHS& rhs) const {
+        return _comparator->compare(_getValue(lhs), _getValue(rhs)) < 0;
     }
+
+private:
+    const Value& _getValue(const Value& v) const {
+        return v;
+    }
+
+    template <typename Tracker>
+    const Value& _getValue(const MemoryTokenWithImpl<Tracker, Value>& v) const {
+        return v.value();
+    }
+
+    const ValueComparator* _comparator;
+};
+
+/**
+ * Helper function to convert container of MemoryTokenWith<Value> to a Value, containing an array of
+ * Values.
+ */
+template <typename Iterator>
+Value convertToValueFromMemoryTokenWithValue(Iterator begin, Iterator end, size_t size) {
+    std::vector<Value> result;
+    result.reserve(size);
+    while (begin != end) {
+        result.emplace_back(begin->value());
+        ++begin;
+    }
+    return Value{std::move(result)};
 }
 
-Value AccumulatorFirst::getValue(bool toBeMerged) {
-    return _first;
-}
-
-AccumulatorFirst::AccumulatorFirst(ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx), _haveFirst(false) {
-    _memUsageTracker.set(sizeof(*this));
-}
-
-void AccumulatorFirst::reset() {
-    _haveFirst = false;
-    _first = Value();
-    _memUsageTracker.set(sizeof(*this));
-}
-
-
-intrusive_ptr<AccumulatorState> AccumulatorFirst::create(ExpressionContext* const expCtx) {
-    return new AccumulatorFirst(expCtx);
-}
 }  // namespace mongo

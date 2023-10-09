@@ -73,7 +73,7 @@ public:
         const boost::intrusive_ptr<Expression>& groupByExpression,
         std::vector<size_t> monotonicExpressionIndexes,
         std::vector<AccumulationStatement> accumulationStatements,
-        boost::optional<size_t> maxMemoryUsageBytes = boost::none);
+        boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
     /**
      * Parses 'elem' into a $_internalStreamingGroup stage, or throws a AssertionException if 'elem'
@@ -84,7 +84,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBsonWithMaxMemoryUsage(
         BSONElement elem,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::optional<size_t> maxMemoryUsageBytes);
+        boost::optional<int64_t> maxMemoryUsageBytes);
 
 protected:
     GetNextResult doGetNext() final;
@@ -98,7 +98,7 @@ private:
 
     explicit DocumentSourceStreamingGroup(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        boost::optional<size_t> maxMemoryUsageBytes = boost::none);
+        boost::optional<int64_t> maxMemoryUsageBytes = boost::none);
 
 
     GetNextResult getNextDocument();

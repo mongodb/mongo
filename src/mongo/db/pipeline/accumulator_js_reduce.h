@@ -55,7 +55,7 @@ public:
 
     AccumulatorInternalJsReduce(ExpressionContext* const expCtx, StringData funcSource)
         : AccumulatorState(expCtx), _funcSource(funcSource) {
-        _memUsageBytes = sizeof(*this);
+        _memUsageTracker.set(sizeof(*this));
     }
 
     void processInternal(const Value& input, bool merging) final;

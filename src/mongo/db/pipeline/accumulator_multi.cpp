@@ -52,7 +52,7 @@ REGISTER_ACCUMULATOR(bottom,
                      (AccumulatorTopBottomN<TopBottomSense::kBottom, true>::parseTopBottomN));
 
 AccumulatorN::AccumulatorN(ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx), _maxMemUsageBytes(internalQueryTopNAccumulatorBytes.load()) {}
+    : AccumulatorState(expCtx, internalQueryTopNAccumulatorBytes.load()) {}
 
 long long AccumulatorN::validateN(const Value& input) {
     // Obtain the value for 'n' and error if it's not a positive integral.
@@ -90,10 +90,8 @@ void AccumulatorN::processInternal(const Value& input, bool merging) {
 }
 
 AccumulatorMinMaxN::AccumulatorMinMaxN(ExpressionContext* const expCtx, MinMaxSense sense)
-    : AccumulatorN(expCtx),
-      _set(expCtx->getValueComparator().makeOrderedValueMultiset()),
-      _sense(sense) {
-    _memUsageBytes = sizeof(*this);
+    : AccumulatorN(expCtx), _set(createMultiSet()), _sense(sense) {
+    _memUsageTracker.set(sizeof(*this));
 }
 
 const char* AccumulatorMinMaxN::getOpName() const {
@@ -146,14 +144,14 @@ AccumulatorN::parseArgs(ExpressionContext* const expCtx,
     return std::make_tuple(n, input);
 }
 
-void AccumulatorN::updateAndCheckMemUsage(size_t memAdded) {
-    _memUsageBytes += memAdded;
+void AccumulatorN::checkMemUsage() {
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream() << getOpName()
                           << " used too much memory and spilling to disk cannot reduce memory "
-                             "consumption any further. Memory limit: "
-                          << _maxMemUsageBytes << " bytes",
-            _memUsageBytes < _maxMemUsageBytes);
+                             "consumption any further. Used: "
+                          << _memUsageTracker.currentMemoryBytes() << " bytes. Memory limit: "
+                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+            _memUsageTracker.withinMemoryLimit());
 }
 
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
@@ -197,36 +195,43 @@ AccumulationExpression AccumulatorMinMaxN::parseMinMaxN(ExpressionContext* const
 
 void AccumulatorMinMaxN::_processValue(const Value& val) {
     // Ignore nullish values.
-    if (val.nullish())
+    if (val.nullish()) {
         return;
+    }
 
     // Only compare if we have 'n' elements.
     if (static_cast<long long>(_set.size()) == *_n) {
         // Get an iterator to the element we want to compare against.
         auto cmpElem = _sense == MinMaxSense::kMin ? std::prev(_set.end()) : _set.begin();
 
-        auto cmp = getExpressionContext()->getValueComparator().compare(*cmpElem, val) * _sense;
+        auto cmp =
+            getExpressionContext()->getValueComparator().compare(cmpElem->value(), val) * _sense;
         if (cmp > 0) {
-            _memUsageBytes -= cmpElem->getApproximateSize();
             _set.erase(cmpElem);
         } else {
             return;
         }
     }
 
-    updateAndCheckMemUsage(val.getApproximateSize());
-    _set.emplace(val);
+    _set.emplace(SimpleMemoryToken{val.getApproximateSize(), &_memUsageTracker}, val);
+    checkMemUsage();
+}
+
+AccumulatorMinMaxN::MultiSet AccumulatorMinMaxN::createMultiSet() const {
+    return MultiSet(MemoryTokenValueComparator(&getExpressionContext()->getValueComparator()));
 }
 
 Value AccumulatorMinMaxN::getValue(bool toBeMerged) {
     // Return the values in ascending order for 'kMin' and descending order for 'kMax'.
-    return Value(_sense == MinMaxSense::kMin ? std::vector<Value>(_set.begin(), _set.end())
-                                             : std::vector<Value>(_set.rbegin(), _set.rend()));
+    if (_sense == MinMaxSense::kMin) {
+        return convertToValueFromMemoryTokenWithValue(_set.begin(), _set.end(), _set.size());
+    } else {
+        return convertToValueFromMemoryTokenWithValue(_set.rbegin(), _set.rend(), _set.size());
+    }
 }
 
 void AccumulatorMinMaxN::reset() {
-    _set = getExpressionContext()->getValueComparator().makeOrderedValueMultiset();
-    _memUsageBytes = sizeof(*this);
+    _set = createMultiSet();
 }
 
 const char* AccumulatorMinN::getName() {
@@ -246,8 +251,8 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorMaxN::create(ExpressionContext
 }
 
 AccumulatorFirstLastN::AccumulatorFirstLastN(ExpressionContext* const expCtx, FirstLastSense sense)
-    : AccumulatorN(expCtx), _deque(std::deque<Value>()), _variant(sense) {
-    _memUsageBytes = sizeof(*this);
+    : AccumulatorN(expCtx), _deque(), _variant(sense) {
+    _memUsageTracker.set(sizeof(*this));
 }
 
 // TODO SERVER-59327 Deduplicate with the block in 'AccumulatorMinMaxN::parseMinMaxN'
@@ -289,7 +294,6 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
     // Only insert in the lastN case if we have 'n' elements.
     if (static_cast<long long>(_deque.size()) == *_n) {
         if (_variant == Sense::kLast) {
-            _memUsageBytes -= _deque.front().getApproximateSize();
             _deque.pop_front();
         } else {
             // If our deque has 'n' elements and this is $firstN, we don't need to call process
@@ -299,8 +303,9 @@ void AccumulatorFirstLastN::_processValue(const Value& val) {
         }
     }
 
-    updateAndCheckMemUsage(valToProcess.getApproximateSize());
-    _deque.push_back(valToProcess);
+    _deque.emplace_back(SimpleMemoryToken{valToProcess.getApproximateSize(), &_memUsageTracker},
+                        std::move(valToProcess));
+    checkMemUsage();
 }
 
 const char* AccumulatorFirstLastN::getOpName() const {
@@ -333,12 +338,11 @@ boost::intrusive_ptr<Expression> AccumulatorFirstLastN::parseExpression(
 }
 
 void AccumulatorFirstLastN::reset() {
-    _deque = std::deque<Value>();
-    _memUsageBytes = sizeof(*this);
+    _deque = std::deque<SimpleMemoryTokenWith<Value>>();
 }
 
 Value AccumulatorFirstLastN::getValue(bool toBeMerged) {
-    return Value(std::vector<Value>(_deque.begin(), _deque.end()));
+    return convertToValueFromMemoryTokenWithValue(_deque.begin(), _deque.end(), _deque.size());
 }
 
 const char* AccumulatorFirstN::getName() {
@@ -442,7 +446,7 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
     _sortKeyComparator.emplace(internalSortPattern);
     _sortKeyGenerator.emplace(std::move(internalSortPattern), expCtx->getCollator());
 
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 
     // STL expects a less-than function not a 3-way compare function so this lambda wraps
     // SortKeyComparator.
@@ -591,8 +595,6 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
 
         // When the sort key produces a tie we keep the first value seen.
         if (cmp > 0) {
-            _memUsageBytes -= cmpElem->first.getApproximateSize() +
-                cmpElem->second.getApproximateSize() + sizeof(KeyOutPair);
             _map->erase(cmpElem);
         } else {
             return;
@@ -602,8 +604,10 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
     keyOutPair.first.fillCache();
     const auto memUsage = keyOutPair.first.getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
-    updateAndCheckMemUsage(memUsage);
-    _map->emplace(keyOutPair);
+    _map->emplace(keyOutPair.first,
+                  SimpleMemoryTokenWith<Value>{SimpleMemoryToken{memUsage, &_memUsageTracker},
+                                               keyOutPair.second});
+    checkMemUsage();
 }
 
 template <TopBottomSense sense, bool single>
@@ -619,9 +623,6 @@ void AccumulatorTopBottomN<sense, single>::remove(const Value& val) {
     // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
     auto it = _map->lower_bound(keyOutPair.first);
     _map->erase(it);
-
-    _memUsageBytes -= keyOutPair.first.getApproximateSize() +
-        keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
 }
 
 template <TopBottomSense sense, bool single>
@@ -672,10 +673,11 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
     for (auto inserted = 0; inserted < *_n && it != end; ++inserted, ++it) {
         const auto& keyOutPair = *it;
         if (toBeMerged) {
-            result.emplace_back(BSON(kFieldNameGeneratedSortKey
-                                     << keyOutPair.first << kFieldNameOutput << keyOutPair.second));
+            result.emplace_back(BSON(kFieldNameGeneratedSortKey << keyOutPair.first
+                                                                << kFieldNameOutput
+                                                                << keyOutPair.second.value()));
         } else {
-            result.push_back(keyOutPair.second);
+            result.push_back(keyOutPair.second.value());
         }
     };
 
@@ -698,7 +700,6 @@ Value AccumulatorTopBottomN<sense, single>::getValueConst(bool toBeMerged) const
 template <TopBottomSense sense, bool single>
 void AccumulatorTopBottomN<sense, single>::reset() {
     _map->clear();
-    _memUsageBytes = sizeof(*this);
 }
 
 // Explicitly specify the following classes should generated and should live in this compilation

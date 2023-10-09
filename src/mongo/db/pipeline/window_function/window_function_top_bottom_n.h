@@ -80,7 +80,7 @@ public:
 
 private:
     void updateMemUsage() {
-        _memUsageBytes = sizeof(*this) + _acc.getMemUsage();
+        _memUsageTracker.set(sizeof(*this) + _acc.getMemUsage());
     }
 
     AccumulatorTopBottomN<sense, single> _acc;

@@ -73,7 +73,7 @@ AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
     : AccumulatorState(expCtx), _count(0.0), _params(params) {
     assertAllowedInternalIfRequired(
         expCtx->opCtx, "_internalConstructStats", AllowedWithClientType::kInternal);
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 intrusive_ptr<AccumulatorState> AccumulatorInternalConstructStats::create(
@@ -97,7 +97,7 @@ void AccumulatorInternalConstructStats::processInternal(const Value& input, bool
     _values.emplace_back(stats::SBEValue(sbe::value::makeValue(val)));
 
     _count++;
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
@@ -113,7 +113,7 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
 void AccumulatorInternalConstructStats::reset() {
     _count = 0.0;
     _values.clear();
-    _memUsageBytes = sizeof(*this);
+    _memUsageTracker.set(sizeof(*this));
 }
 
 }  // namespace mongo
