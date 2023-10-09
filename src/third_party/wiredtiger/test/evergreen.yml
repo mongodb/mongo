@@ -4698,6 +4698,20 @@ tasks:
           NONSTANDALONE: -DWT_STANDALONE_BUILD=0
       - func: "split stress test"
 
+  - name: model-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/model/test"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            ./test_model_basic
+
   - name: format-stress-zseries-test
     tags: ["stress-test-zseries-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
@@ -6320,6 +6334,7 @@ buildvariants:
     - name: chunkcache-test
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
+    - name: model-test
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
@@ -6695,6 +6710,7 @@ buildvariants:
       batchtime: 40320 # 28 days
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
+    - name: model-test
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
