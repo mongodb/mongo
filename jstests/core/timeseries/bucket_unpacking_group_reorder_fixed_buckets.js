@@ -18,65 +18,59 @@
  * ]
  */
 
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {getAggPlanStage, getEngine, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 (function() {
 "use strict";
 
 const coll = db.bucket_unpack_group_reorder_fixed_buckets;
+// For sanity check of the results, we'll use as oracle a collection that contains the same data but
+// isn't time-series.
+const collNonTs = db.bucket_unpack_group_reorder_fixed_buckets_non_ts;
+
 const timeField = "time";
-const accField = "b";
+const measurementField = "b";
 const metaField = "mt";
 
-function checkResults({
-    pipeline,
-    expectedDocs,
-    checkExplain = true,
-    rewriteExpected = true,
-}) {
-    if (checkExplain) {
-        validateExplain(pipeline, rewriteExpected);
-    }
-    let results = coll.aggregate(pipeline).toArray();
-    if (expectedDocs) {
-        assert.sameMembers(results, expectedDocs);
-    }
-    // Run the pipeline with and without optimizations and assert the same results are returned.
-    let noOptResults = coll.aggregate([{$_internalInhibitOptimization: {}}, pipeline[0]]).toArray();
-    assert.sameMembers(
-        results,
-        noOptResults,
-        "Results differ with and without the optimization. Results with the optimization are: " +
-            results);
-}
-
-function validateExplain(pipeline, rewriteExpected) {
-    // We don't verify yet explain output on mongos due to complication with $_internalUnpackBucket
-    // lowered to SBE.
-    // TODO SERVER-80395: Reenable explain output verification on mongos.
-    if (FixtureHelpers.isMongos(db)) {
-        return;
-    }
-
-    // Since we have unit tests that validate the specific output of the rewrite, we can just
-    // validate if the rewrite occurred or not.
-    const explain = coll.explain().aggregate(pipeline);
-    const unpack = (() => {
-        // The 'explainVersion' being 1 means that the $_internalUnpackBucket stage is not pushed
-        // down to the SBE. Otherwise, it is pushed down to the SBE.
-        if (explain.explainVersion === "1") {
-            return getAggPlanStages(explain, "$_internalUnpackBucket");
+function checkResults({pipeline, expectedDocs, rewriteExpected}) {
+    // Check in explain that whether the rewrite has happened.
+    {
+        const explain = coll.explain().aggregate(pipeline);
+        const unpack = (getEngine(explain) === "classic")
+            ? getAggPlanStage(explain, "$_internalUnpackBucket")
+            : getPlanStage(explain, "UNPACK_TS_BUCKET");
+        // The rewrite should remove the unpack stage and replace it with a $group over the buckets
+        // collection.
+        if (rewriteExpected) {
+            assert(!unpack,
+                   `Expected to find no unpack stage for pipeline ${tojson(pipeline)} but got ${
+                       tojson(explain)}`);
         } else {
-            return getAggPlanStages(explain, "UNPACK_TS_BUCKET");
+            assert(unpack,
+                   `Expected to have the unpack stage for pipeline ${tojson(pipeline)} but got ${
+                       tojson(explain)}`);
         }
-    })();
-    const expectedStageCount = rewriteExpected ? 0 : 1;
-    assert.eq(unpack.length, expectedStageCount, tojson(explain));
+    }
+
+    const results = coll.aggregate(pipeline).toArray();
+    const nonTsResults = collNonTs.aggregate(pipeline).toArray();
+    if (expectedDocs) {
+        assert.sameMembers(
+            nonTsResults, expectedDocs, `Results for pipeline ${tojson(pipeline)} over non-TS`);
+        assert.sameMembers(results, expectedDocs, `Results for pipeline ${tojson(pipeline)}`);
+    } else {
+        // In randomized tests we cannot provide the oracle for expected docs but we can compare
+        // the results against TS and non-TS collections.
+        assert.sameMembers(
+            results,
+            nonTsResults,
+            `Results for pipeline ${tojson(pipeline)} over TS(left) vs non-TS(right) collections.`);
+    }
 }
 
 let b, times = [];
 function setUpSmallCollection({roundingParam, startingTime}) {
+    collNonTs.drop();
     coll.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {
@@ -105,229 +99,243 @@ function setUpSmallCollection({roundingParam, startingTime}) {
             _id: index,
             [timeField]: time,
             [metaField]: "MDB",
-            [accField]: b[index],
+            [measurementField]: b[index],
             "otherTime": time
         });
     });
     assert.commandWorked(coll.insertMany(docs));
+    assert.commandWorked(collNonTs.insertMany(docs));
 }
 
-setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
+(function basicTests() {
+    setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
 
-///
-// These tests will validate the group stage is rewritten when the '_id' field has a $dateTrunc
-// expression.
-///
+    ///
+    // These tests will validate the group stage is rewritten when the '_id' field has a $dateTrunc
+    // expression.
+    ///
 
-// Validate the rewrite occurs with a simple case, where the bucket boundary and 'unit' are the
-// same.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "hour"}}},
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [
-        {_id: {t: ISODate("2022-09-30T15:00:00Z")}, accmin: 3, accmax: 6},
-        {_id: {t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7},
-        {_id: {t: ISODate("2022-09-30T14:00:00Z")}, accmin: 1, accmax: 4}
-    ],
-});
+    // Validate the rewrite occurs with a simple case, where the bucket boundary and 'unit' are the
+    // same.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "hour"}}},
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [
+            {_id: {t: ISODate("2022-09-30T15:00:00Z")}, accmin: 3, accmax: 6},
+            {_id: {t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7},
+            {_id: {t: ISODate("2022-09-30T14:00:00Z")}, accmin: 1, accmax: 4}
+        ],
+        rewriteExpected: true,
+    });
 
-// Validate the rewrite occurs with all the optional fields present.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {
-                t: {
-                    $dateTrunc: {
-                        date: `$${timeField}`,
-                        unit: "day",
-                        timezone: "+0500",
-                        binSize: 2,
-                        startOfWeek: "friday"
+    // Validate the rewrite occurs with all the optional fields present.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {
+                    t: {
+                        $dateTrunc: {
+                            date: `$${timeField}`,
+                            unit: "day",
+                            timezone: "+0500",
+                            binSize: 2,
+                            startOfWeek: "friday"
+                        }
                     }
-                }
-            },
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [{_id: {t: ISODate("2022-09-29T19:00:00Z")}, accmin: 1, accmax: 7}],
-});
+                },
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [{_id: {t: ISODate("2022-09-29T19:00:00Z")}, accmin: 1, accmax: 7}],
+        rewriteExpected: true,
+    });
 
-// Validate the rewrite occurs with multiple expressions in the '_id' field.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {
-                constant: "hello",
-                m: `$${metaField}`,
-                t: {$dateTrunc: {date: `$${timeField}`, unit: "day"}}
-            },
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [{
-        _id: {t: ISODate("2022-09-30T00:00:00Z"), m: "MDB", constant: "hello"},
-        accmin: 1,
-        accmax: 7
-    }],
-});
+    // Validate the rewrite occurs with multiple expressions in the '_id' field.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {
+                    constant: "hello",
+                    m: `$${metaField}`,
+                    t: {$dateTrunc: {date: `$${timeField}`, unit: "day"}}
+                },
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [{
+            _id: {t: ISODate("2022-09-30T00:00:00Z"), m: "MDB", constant: "hello"},
+            accmin: 1,
+            accmax: 7
+        }],
+        rewriteExpected: true,
+    });
 
-// Validate the rewrite occurs with a timezone with the same hourly boundaries, and
-// bucketMaxSpanSeconds == 3600.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {
-                m: `$${metaField}`,
-                t: {$dateTrunc: {date: `$${timeField}`, unit: "day", timezone: "+0800"}}
-            },
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [
-        {_id: {"m": "MDB", t: ISODate("2022-09-29T16:00:00Z")}, accmin: 1, accmax: 6},
-        {_id: {"m": "MDB", t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7}
-    ],
-});
+    // Validate the rewrite occurs with a timezone with the same hourly boundaries, and
+    // bucketMaxSpanSeconds == 3600.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {
+                    m: `$${metaField}`,
+                    t: {$dateTrunc: {date: `$${timeField}`, unit: "day", timezone: "+0800"}}
+                },
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [
+            {_id: {"m": "MDB", t: ISODate("2022-09-29T16:00:00Z")}, accmin: 1, accmax: 6},
+            {_id: {"m": "MDB", t: ISODate("2022-09-30T16:00:00Z")}, accmin: 7, accmax: 7}
+        ],
+        rewriteExpected: true,
+    });
 
-// The 'unit' field in $dateTrunc is larger than 'week', but 'bucketMaxSpanSeconds' is less than 1
-// day. The rewrite applies.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "year"}}},
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [{_id: {t: ISODate("2022-01-01T00:00:00Z")}, accmin: 1, accmax: 7}],
-});
+    // The 'unit' field in $dateTrunc is larger than 'week', but 'bucketMaxSpanSeconds' is less than
+    // 1 day. The rewrite applies.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "year"}}},
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [{_id: {t: ISODate("2022-01-01T00:00:00Z")}, accmin: 1, accmax: 7}],
+        rewriteExpected: true,
+    });
 
-// Validate the rewrite occurs with the $count accumulator.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {c: "string", t: {$dateTrunc: {date: `$${timeField}`, unit: "month"}}},
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`},
-            count: {$count: {}},
-        }
-    }],
-    expectedDocs: [
-        {_id: {"c": "string", t: ISODate("2022-09-01T00:00:00Z")}, accmin: 1, accmax: 7, count: 7}
-    ],
-});
+    // Validate the rewrite occurs with the $count accumulator.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {c: "string", t: {$dateTrunc: {date: `$${timeField}`, unit: "month"}}},
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`},
+                count: {$count: {}},
+            }
+        }],
+        expectedDocs: [{
+            _id: {"c": "string", t: ISODate("2022-09-01T00:00:00Z")},
+            accmin: 1,
+            accmax: 7,
+            count: 7
+        }],
+        rewriteExpected: true,
+    });
 
-///
-// These tests will validate the optimization did not occur.
-///
+    ///
+    // These tests will validate the optimization did not occur.
+    ///
 
-// There is a timezone with different hourly boundaries that causes the boundaries to not align.
-// Asia/Kathmandu has a UTC offset of +05:45.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {
-                t: {
-                    $dateTrunc: {
-                        date: `$${timeField}`,
-                        unit: "hour",
-                        binSize: 24,
-                        timezone: "Asia/Kathmandu"
+    // There is a timezone with different hourly boundaries that causes the boundaries to not align.
+    // Asia/Kathmandu has a UTC offset of +05:45.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {
+                    t: {
+                        $dateTrunc: {
+                            date: `$${timeField}`,
+                            unit: "hour",
+                            binSize: 24,
+                            timezone: "Asia/Kathmandu"
+                        }
                     }
-                }
-            },
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [{_id: {t: ISODate("2022-09-29T18:15:00Z")}, accmin: b[1], accmax: b[6]}],
-    rewriteExpected: false
-});
+                },
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [{_id: {t: ISODate("2022-09-29T18:15:00Z")}, accmin: b[1], accmax: b[6]}],
+        rewriteExpected: false
+    });
 
-// The $dateTrunc expression doesn't align with bucket boundaries.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "second"}}},
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`},
-        }
-    }],
-    expectedDocs: [
-        {_id: {t: times[0]}, accmin: b[0], accmax: b[0]},
-        {_id: {t: times[1]}, accmin: b[1], accmax: b[1]},
-        {_id: {t: times[2]}, accmin: b[2], accmax: b[2]},
-        {_id: {t: times[3]}, accmin: b[3], accmax: b[3]},
-        {_id: {t: times[4]}, accmin: b[4], accmax: b[4]},
-        {_id: {t: times[5]}, accmin: b[5], accmax: b[5]},
-        {_id: {t: times[6]}, accmin: b[6], accmax: b[6]}
-    ],
-    rewriteExpected: false
-});
+    // The $dateTrunc expression doesn't align with bucket boundaries.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "second"}}},
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`},
+            }
+        }],
+        expectedDocs: [
+            {_id: {t: times[0]}, accmin: b[0], accmax: b[0]},
+            {_id: {t: times[1]}, accmin: b[1], accmax: b[1]},
+            {_id: {t: times[2]}, accmin: b[2], accmax: b[2]},
+            {_id: {t: times[3]}, accmin: b[3], accmax: b[3]},
+            {_id: {t: times[4]}, accmin: b[4], accmax: b[4]},
+            {_id: {t: times[5]}, accmin: b[5], accmax: b[5]},
+            {_id: {t: times[6]}, accmin: b[6], accmax: b[6]}
+        ],
+        rewriteExpected: false
+    });
 
-// The $dateTrunc expression is not on the timeField.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {t: {$dateTrunc: {date: "$otherTime", unit: "day"}}},
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`},
-        }
-    }],
-    expectedDocs: [{_id: {t: ISODate("2022-09-30T00:00:00Z")}, accmax: 7, accmin: 1}],
-    rewriteExpected: false
-});
+    // The $dateTrunc expression is not on the timeField.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {t: {$dateTrunc: {date: "$otherTime", unit: "day"}}},
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`},
+            }
+        }],
+        expectedDocs: [{_id: {t: ISODate("2022-09-30T00:00:00Z")}, accmax: 7, accmin: 1}],
+        rewriteExpected: false
+    });
 
-// There are other expressions in the '_id' field that are not on the meta nor time fields.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {m: `$${metaField}`, t: {$dateTrunc: {date: "$otherTime", unit: "day"}}},
-            accmax: {$max: `$${accField}`},
-        }
-    }],
-    expectedDocs: [{_id: {"m": "MDB", t: ISODate("2022-09-30T00:00:00Z")}, accmax: 7}],
-    rewriteExpected: false
-});
+    // There are other expressions in the '_id' field that are not on the meta nor time fields.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {m: `$${metaField}`, t: {$dateTrunc: {date: "$otherTime", unit: "day"}}},
+                accmax: {$max: `$${measurementField}`},
+            }
+        }],
+        expectedDocs: [{_id: {"m": "MDB", t: ISODate("2022-09-30T00:00:00Z")}, accmax: 7}],
+        rewriteExpected: false
+    });
 
-// The fields in the $dateTrunc expression are not constant.
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "hour", binSize: "$a"}}},
-            accmax: {$max: `$${accField}`},
-            accmin: {$min: `$${accField}`},
-        }
-    }],
-    expectedDocs: [{_id: {t: null}, accmax: 7, accmin: 1}],
-    rewriteExpected: false
-});
+    // The fields in the $dateTrunc expression are not constant.
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "hour", binSize: "$a"}}},
+                accmax: {$max: `$${measurementField}`},
+                accmin: {$min: `$${measurementField}`},
+            }
+        }],
+        expectedDocs: [{_id: {t: null}, accmax: 7, accmin: 1}],
+        rewriteExpected: false
+    });
+})();
 
-// The parameters have changed, and thus the buckets are not fixed. This test must be run last,
-// since the collection will never be considered fixed, unless it is dropped.
-assert.commandWorked(db.runCommand({
-    "collMod": coll.getName(),
-    "timeseries": {bucketMaxSpanSeconds: 100000, bucketRoundingSeconds: 100000}
-}));
-checkResults({
-    pipeline: [{
-        $group: {
-            _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "day"}}},
-            accmin: {$min: `$${accField}`},
-            accmax: {$max: `$${accField}`}
-        }
-    }],
-    expectedDocs: [{_id: {t: ISODate("2022-09-30T00:00:00Z")}, accmin: 1, accmax: 7}],
-    rewriteExpected: false
-});
+(function testCollMod() {
+    setUpSmallCollection({roundingParam: 3600, startingTime: ISODate("2022-09-30T15:00:00.000Z")});
+    // The parameters have changed, and thus the buckets are not fixed.
+    assert.commandWorked(db.runCommand({
+        "collMod": coll.getName(),
+        "timeseries": {bucketMaxSpanSeconds: 100000, bucketRoundingSeconds: 100000}
+    }));
+    checkResults({
+        pipeline: [{
+            $group: {
+                _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "day"}}},
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
+            }
+        }],
+        expectedDocs: [{_id: {t: ISODate("2022-09-30T00:00:00Z")}, accmin: 1, accmax: 7}],
+        rewriteExpected: false
+    });
+})();
 
 // Validate the rewrite does not apply for fixed buckets with a 'bucketMaxSpanSeconds' set to
 // greater than one day. This is because the bucket rounding logic and $dateTrunc rounding is
@@ -342,8 +350,8 @@ checkResults({
             pipeline: [{
                 $group: {
                     _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: timeUnit}}},
-                    accmin: {$min: `$${accField}`},
-                    accmax: {$max: `$${accField}`}
+                    accmin: {$min: `$${measurementField}`},
+                    accmax: {$max: `$${measurementField}`}
                 }
             }],
             rewriteExpected: false
@@ -367,11 +375,11 @@ checkResults({
             pipeline: [{
                 $group: {
                     _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: timeUnit}}},
-                    accmin: {$min: `$${accField}`},
-                    accmax: {$max: `$${accField}`}
+                    accmin: {$min: `$${measurementField}`},
+                    accmax: {$max: `$${measurementField}`}
                 }
             }],
-            checkExplain: false,
+            rewriteExpected: false,
         });
     });
 })();
@@ -392,12 +400,14 @@ checkResults({
         {[timeField]: ISODate("2012-07-01T00:00:05.000Z"), [metaField]: "MDB", b: 15}
     ];
     assert.commandWorked(coll.insertMany(leapSecondDocs));
+    assert.commandWorked(collNonTs.insertMany(leapSecondDocs));
+
     checkResults({
         pipeline: [{
             $group: {
                 _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: "minute"}}},
-                accmin: {$min: `$${accField}`},
-                accmax: {$max: `$${accField}`}
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
             }
         }],
         expectedDocs: [
@@ -407,6 +417,7 @@ checkResults({
             {_id: {t: ISODate("2012-06-30T23:01:00Z")}, accmin: 7, accmax: 7},
             {_id: {t: ISODate("2012-06-30T23:00:00Z")}, accmin: 3, accmax: 6},
         ],
+        rewriteExpected: true,
     });
 })();
 
@@ -420,7 +431,6 @@ checkResults({
     // that document to still be valid and exist. To double check that document will have the
     // minimum value.
     const startTime = ISODate("2022-03-13T05:30:00.000Z");
-    let inc = 0;
     let dayLightDocs = [];
     for (let i = 0; i < 23; i++) {
         const accValue = i == 2 ? -1 : i + 8;  // set the "skipped" hour to the minimum value.
@@ -428,10 +438,11 @@ checkResults({
         dayLightDocs.push({
             [timeField]: newTime,
             [metaField]: 1,
-            [accField]: accValue  // avoid duplicates 'b' values in the original set.
+            [measurementField]: accValue  // avoid duplicates 'b' values in the original set.
         });
     }
     assert.commandWorked(coll.insertMany(dayLightDocs));
+    assert.commandWorked(collNonTs.insertMany(dayLightDocs));
     checkResults({
         pipeline: [{
             $group: {
@@ -445,11 +456,12 @@ checkResults({
                         }
                     }
                 },
-                accmin: {$min: `$${accField}`},
-                accmax: {$max: `$${accField}`}
+                accmin: {$min: `$${measurementField}`},
+                accmax: {$max: `$${measurementField}`}
             }
         }],
-        expectedDocs: [{_id: {t: ISODate("2022-03-13T05:00:00Z")}, accmin: -1, accmax: 30}]
+        expectedDocs: [{_id: {t: ISODate("2022-03-13T05:00:00Z")}, accmin: -1, accmax: 30}],
+        rewriteExpected: true,
     });
 })();
 
@@ -460,6 +472,7 @@ checkResults({
     jsTestLog("In testRandomizedInput using seed value: " + seedVal);
     Random.setRandomSeed(seedVal);
     coll.drop();
+    collNonTs.drop();
     assert.commandWorked(db.createCollection(coll.getName(), {
         timeseries: {
             timeField: timeField,
@@ -480,6 +493,7 @@ checkResults({
         docs.push({[timeField]: randomTime, [metaField]: "location"});
     }
     assert.commandWorked(coll.insertMany(docs));
+    assert.commandWorked(collNonTs.insertMany(docs));
 
     const timeUnits = ["day", "week", "month", "quarter", "year"];
     timeUnits.forEach(timeUnit => {
@@ -487,10 +501,11 @@ checkResults({
             pipeline: [{
                 $group: {
                     _id: {t: {$dateTrunc: {date: `$${timeField}`, unit: timeUnit}}},
-                    accmin: {$min: `$${accField}`},
-                    accmax: {$max: `$${accField}`}
+                    accmin: {$min: `$${measurementField}`},
+                    accmax: {$max: `$${measurementField}`}
                 }
-            }]
+            }],
+            rewriteExpected: true,
         });
     });
 })();
