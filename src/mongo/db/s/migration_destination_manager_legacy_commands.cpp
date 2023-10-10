@@ -112,6 +112,12 @@ public:
         // shard will not receive a chunk after refreshing.
         onShardVersionMismatch(opCtx, nss, boost::none);
 
+        // Wait for the ShardServerCatalogCacheLoader to finish flushing the metadata to the
+        // storage. This is not required for correctness, but helps mitigate stalls on secondaries
+        // when a shard receives the first chunk for a collection with a large routing table.
+        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
         const auto collectionEpoch = [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
             auto const optMetadata =
