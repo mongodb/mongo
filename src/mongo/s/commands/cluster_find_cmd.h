@@ -203,6 +203,21 @@ public:
                                  // are only checked on getMore and explain will not open a cursor.
                                  {},
                                  verbosity);
+
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                auto bodyBuilder = result->getBodyBuilder();
+                auto findRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+                auto expCtx = make_intrusive<ExpressionContext>(
+                    opCtx, *findRequest, nullptr, true /* mayDbProfile */);
+                auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
+                    expCtx,
+                    {.findCommand = std::move(findRequest),
+                     .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
+                auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+                    .expCtx = std::move(expCtx),
+                    .parsedFind = std::move(parsedFindResult),
+                });
+                ClusterExplain::buildEOFExplainResult(opCtx, cq.get(), _request.body, &bodyBuilder);
             }
         }
 
@@ -217,8 +232,8 @@ public:
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
 
             try {
-                // Do the work to generate the first batch of results. This blocks waiting to get
-                // responses from the shard(s).
+                // Do the work to generate the first batch of results. This blocks waiting to
+                // get responses from the shard(s).
                 bool partialResultsReturned = false;
                 std::vector<BSONObj> batch;
                 auto cursorId = ClusterFind::runQuery(
@@ -249,9 +264,9 @@ public:
 
     private:
         /**
-         * Parses the command object to a FindCommandRequest, validates that no runtime constants
-         * were supplied with the command, and sets the constant runtime values that will be
-         * forwarded to each shard.
+         * Parses the command object to a FindCommandRequest, validates that no runtime
+         * constants were supplied with the command, and sets the constant runtime values that
+         * will be forwarded to each shard.
          */
         std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
             OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
@@ -264,8 +279,8 @@ public:
                 if (opCtx->isStartingMultiDocumentTransaction() ||
                     !opCtx->inMultiDocumentTransaction()) {
                     // If there is no explicit readConcern in the cmdObj, and this is either the
-                    // first operation in a transaction, or not running in a transaction, then use
-                    // the readConcern from the opCtx (which may be a cluster-wide default).
+                    // first operation in a transaction, or not running in a transaction, then
+                    // use the readConcern from the opCtx (which may be a cluster-wide default).
                     const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
                     findCommand->setReadConcern(readConcernArgs.toBSONInner());
                 }

@@ -37,3 +37,23 @@ error = assert.throws(function() {
     t.find().explain("foobar");
 });
 assert.commandFailedWithCode(error, ErrorCodes.BadValue);
+
+const serverVer = db.version().split('.');
+if ((serverVer[0] == 7 && serverVer[1] >= 3) || serverVer[0] > 7) {
+    // Starting in 7.3 running explain() against a non-existent database should result in
+    // an EOF plan against mongos or mongod.
+    let dbdne = db.getSiblingDB("does_not_exist_hopefully");
+    var explain = dbdne.runCommand(
+        {explain: {find: collName, filter: {a: {$lte: 2}}}, verbosity: "executionStats"});
+    assert.commandWorked(explain);
+
+    // Explain output differs slightly under SBE versus classic engine
+    if (explain.queryPlanner.winningPlan.queryPlan) {
+        assert.eq("EOF", explain.queryPlanner.winningPlan.queryPlan.stage)
+    } else {
+        assert.eq("EOF", explain.queryPlanner.winningPlan.stage)
+    }
+
+    assert.eq("does_not_exist_hopefully.jstests_explain_find", explain.queryPlanner.namespace)
+    assert.eq({"a": {"$lte": 2}}, explain.queryPlanner.parsedQuery)
+}
