@@ -137,6 +137,15 @@ struct __wt_addr {
 #define WT_ADDR_LEAF 2    /* Leaf page */
 #define WT_ADDR_LEAF_NO 3 /* Leaf page, no overflow */
     uint8_t type;
+
+    /*
+     * If an address is both as an address for the previous and the current multi-block
+     * reconciliations, that is, a block we're writing matches the block written the last time, it
+     * will appear in both the current boundary points as well as the page modification's list of
+     * previous blocks. The reuse flag is how we know that's happening so the block is treated
+     * correctly (not free'd on error, for example).
+     */
+    uint8_t reuse;
 };
 
 /*
@@ -280,7 +289,14 @@ struct __wt_multi {
     uint32_t supd_entries;
     bool supd_restore; /* Whether to restore saved update chains to this page */
 
-    WT_ADDR addr; /* Disk image written address */
+    /*
+     * Disk image was written: address, size and checksum. On subsequent reconciliations of this
+     * page, we avoid writing the block if it's unchanged by comparing size and checksum; the reuse
+     * flag is set when the block is unchanged and we're reusing a previous address.
+     */
+    WT_ADDR addr;
+    uint32_t size;
+    uint32_t checksum;
 };
 
 /*
@@ -644,19 +660,18 @@ struct __wt_page {
     uint8_t type;               /* Page type */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_PAGE_BUILD_KEYS 0x001u        /* Keys have been built in memory */
-#define WT_PAGE_DISK_ALLOC 0x002u        /* Disk image in allocated memory */
-#define WT_PAGE_DISK_MAPPED 0x004u       /* Disk image in mapped memory */
-#define WT_PAGE_EVICT_LRU 0x008u         /* Page is on the LRU queue */
-#define WT_PAGE_EVICT_LRU_URGENT 0x010u  /* Page is in the urgent queue */
-#define WT_PAGE_EVICT_NO_PROGRESS 0x020u /* Eviction doesn't count as progress */
-#define WT_PAGE_OVERFLOW_KEYS 0x040u     /* Page has overflow keys */
-#define WT_PAGE_SPLIT_INSERT 0x080u      /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x100u     /* Ignore updates on page discard */
-                                         /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
-    uint16_t flags_atomic;               /* Atomic flags, use F_*_ATOMIC_16 */
+#define WT_PAGE_BUILD_KEYS 0x01u        /* Keys have been built in memory */
+#define WT_PAGE_DISK_ALLOC 0x02u        /* Disk image in allocated memory */
+#define WT_PAGE_DISK_MAPPED 0x04u       /* Disk image in mapped memory */
+#define WT_PAGE_EVICT_LRU 0x08u         /* Page is on the LRU queue */
+#define WT_PAGE_EVICT_NO_PROGRESS 0x10u /* Eviction doesn't count as progress */
+#define WT_PAGE_OVERFLOW_KEYS 0x20u     /* Page has overflow keys */
+#define WT_PAGE_SPLIT_INSERT 0x40u      /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x80u     /* Ignore updates on page discard */
+                                        /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t flags_atomic;               /* Atomic flags, use F_*_ATOMIC */
 
-    uint8_t unused; /* Unused padding */
+    uint8_t unused[2]; /* Unused padding */
 
     size_t memory_footprint; /* Memory attached to the page */
 

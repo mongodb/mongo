@@ -102,9 +102,7 @@ public:
                       "Routing metadata flushed for collection {namespace}",
                       "Routing metadata flushed for collection",
                       "namespace"_attr = nss);
-                // resetCollection marks the collection as "needs to refresh" instead of erasing it
-                // from memory. This will force a refresh at the next getCollectionRoutingInfoAt.
-                catalogCache->resetCollection(nss);
+                catalogCache->purgeCollection(nss);
             }
         }
 
