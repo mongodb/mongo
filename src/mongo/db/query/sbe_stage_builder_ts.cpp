@@ -223,30 +223,46 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             auto abt = abt::unwrap(eventFilterSbExpr.extractABT());
             constantFold(abt, _state);
 
-            Vectorizer vectorizer(_state.frameIdGenerator, Vectorizer::Purpose::Filter);
-            Vectorizer::VariableTypes bindings;
-            outputs.forEachSlot([&bindings](const TypedSlot& slot) {
-                bindings.emplace(getABTVariableName(slot.slotId), slot.typeSignature);
-            });
-            Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings);
+            if (abt.is<optimizer::Constant>()) {
+                auto [tag, val] = abt.cast<optimizer::Constant>()->get();
+                tassert(7969850,
+                        "Expected true or false value for filter",
+                        tag == sbe::value::TypeTags::Boolean);
+                if (sbe::value::bitcastTo<bool>(val)) {
+                    eventFilter = nullptr;
+                } else {
+                    stage = makeS<sbe::FilterStage<true>>(
+                        std::move(stage),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                   sbe::value::bitcastFrom<bool>(false)),
+                        unpackNode->nodeId());
+                }
+            } else {
+                Vectorizer vectorizer(_state.frameIdGenerator, Vectorizer::Purpose::Filter);
+                Vectorizer::VariableTypes bindings;
+                outputs.forEachSlot([&bindings](const TypedSlot& slot) {
+                    bindings.emplace(getABTVariableName(slot.slotId), slot.typeSignature);
+                });
+                Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings);
 
-            if (blockABT.expr.has_value()) {
-                // We successfully created an expression working on the block values and
-                // returning a block of boolean values; attach it to a project stage and use
-                // the result as the bitmap for the BlockToRow stage.
-                auto projExpr = abtToExpr(*blockABT.expr, _state);
+                if (blockABT.expr.has_value()) {
+                    // We successfully created an expression working on the block values and
+                    // returning a block of boolean values; attach it to a project stage and use
+                    // the result as the bitmap for the BlockToRow stage.
+                    auto projExpr = abtToExpr(*blockABT.expr, _state);
 
-                bitmapSlotId = _state.slotId();
-                sbe::SlotExprPairVector projects;
-                projects.emplace_back(*bitmapSlotId, std::move(projExpr.expr));
+                    bitmapSlotId = _state.slotId();
+                    sbe::SlotExprPairVector projects;
+                    projects.emplace_back(*bitmapSlotId, std::move(projExpr.expr));
 
-                stage = sbe::makeS<sbe::ProjectStage>(
-                    std::move(stage), std::move(projects), unpackNode->nodeId());
-                printPlan(*stage);
+                    stage = sbe::makeS<sbe::ProjectStage>(
+                        std::move(stage), std::move(projects), unpackNode->nodeId());
+                    printPlan(*stage);
 
-                // Reset the variable so that the filter is not generated as a stage in the
-                // scalar section of the pipeline.
-                eventFilter = nullptr;
+                    // Reset the variable so that the filter is not generated as a stage in the
+                    // scalar section of the pipeline.
+                    eventFilter = nullptr;
+                }
             }
         }
     }
