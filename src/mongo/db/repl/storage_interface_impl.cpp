@@ -1284,8 +1284,14 @@ Timestamp StorageInterfaceImpl::getEarliestOplogTimestamp(OperationContext* opCt
         return optime.getValue().getTimestamp();
     }
 
+    // The oplog can be empty when an initial syncing node crashes before the oplog application
+    // phase.
+    if (statusWithTimestamp.getStatus() == ErrorCodes::CollectionIsEmpty) {
+        return Timestamp::min();
+    }
+
     tassert(5869102,
-            str::stream() << "Expected oplog entries to exist: " << statusWithTimestamp.getStatus(),
+            str::stream() << "Unexpected status: " << statusWithTimestamp.getStatus(),
             statusWithTimestamp.isOK());
 
     return statusWithTimestamp.getValue();

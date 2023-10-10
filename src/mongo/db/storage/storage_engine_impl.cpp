@@ -813,15 +813,12 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
             }
 
             // The last anomaly is when the index build did not complete. This implies the index
-            // build was on a standalone and the `createIndexes` command never successfully
-            // returned. In this case the index entry in the catalog should be dropped.
+            // build was on:
+            // (1) a standalone and the `createIndexes` command never successfully returned, or
+            // (2) an initial syncing node bulk building indexes during a collection clone.
+            // In both cases the index entry in the catalog should be dropped.
             if (!indexMetaData.ready) {
-                // Index builds on a secondary node are built using the two-phase protocol on
-                // non-empty collections. On empty collections, the index is built atomically during
-                // oplog application so we should never see an index with {ready: false} in this
-                // case.
                 invariant(!indexMetaData.isBackgroundSecondaryBuild);
-                invariant(!getGlobalReplSettings().isReplSet());
 
                 LOGV2(22256,
                       "Dropping unfinished index",
