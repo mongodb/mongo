@@ -6,6 +6,14 @@
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export var BalancerHelper = (function() {
+    function stopBalancer(db) {
+        return assertAlways.commandWorked(db.adminCommand({balancerStop: 1}));
+    }
+
+    function startBalancer(db) {
+        return assertAlways.commandWorked(db.adminCommand({balancerStart: 1}));
+    }
+
     // Disables balancing for a given collection.
     function disableBalancerForCollection(db, ns) {
         assertAlways.commandWorked(
@@ -45,6 +53,8 @@ export var BalancerHelper = (function() {
     }
 
     return {
+        stopBalancer: stopBalancer,
+        startBalancer: startBalancer,
         disableBalancerForCollection: disableBalancerForCollection,
         enableBalancerForCollection: enableBalancerForCollection,
         joinBalancerRound: joinBalancerRound,
