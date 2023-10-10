@@ -1,0 +1,28 @@
+# This configuration is for migrating code from one Git repository to another using Copybara.
+# It selectively copies content, excluding specific paths and preserving authorship.
+sourceUrl = "git@github.com:10gen/mongo.git"
+destinationUrl = "git@github.com:mongodb/mongo.git"
+
+core.workflow(
+    name = "default",
+    origin = git.origin(
+        url = sourceUrl,
+        ref = "master",
+        # VersionSelector
+    ),
+    destination = git.destination(
+        url = destinationUrl,
+        fetch = "master",
+        push = "master",
+    ),
+    # Change path to the folder you want to publish publicly
+    origin_files = glob(["**"], exclude=["src/mongo/db/modules/**"]),
+
+    authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
+
+    mode = "ITERATIVE",
+    # Change the path here to the folder you want to publish publicly
+    # transformations = [
+	#     core.move("path/to/folder/you/want/exported", ""),
+	# ],
+)
