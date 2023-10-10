@@ -455,7 +455,6 @@ struct __wt_connection_stats {
     int64_t cache_read;
     int64_t cache_read_deleted;
     int64_t cache_read_deleted_prepared;
-    int64_t cache_eviction_clear_ordinary;
     int64_t cache_pages_requested;
     int64_t cache_eviction_pages_seen;
     int64_t cache_eviction_pages_already_queued;
@@ -1006,6 +1005,7 @@ struct __wt_dsrc_stats {
     int64_t rec_overflow_key_leaf;
     int64_t rec_multiblock_max;
     int64_t rec_overflow_value;
+    int64_t rec_page_match;
     int64_t rec_pages;
     int64_t rec_pages_eviction;
     int64_t rec_page_delete;
