@@ -350,6 +350,33 @@ bool pushDownPipelineStageIfCompatible(
     return false;
 }
 
+/**
+ * After copying as many pipeline stages as possible into the 'stagesForPushdown' pipeline, this
+ * second pass takes off any stages that may not benefit from execution in SBE.
+ */
+void reconsiderStagesForPushdown(
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& stagesForPushdown) {
+    // Always push down the entire pipeline when possible.
+    if (stagesForPushdown.empty() || stagesForPushdown.back()->isLastSource()) {
+        return;
+    }
+
+    // When splitting a pipeline between SBE and Classic DocumentSource stages, there is often a
+    // performance penalty for executing an $addFields in SBE only to immediately translate its
+    // output to MutableDocument form for the Classic DocumentSource execution phase. Instead, we
+    // keep the $addFields as a DocumentSource.
+    do {
+        auto projectionStage = dynamic_cast<DocumentSourceInternalProjection*>(
+            stagesForPushdown.back()->documentSource());
+        if (!projectionStage ||
+            projectionStage->projection().type() != projection_ast::ProjectType::kAddition) {
+            return;
+        }
+
+        stagesForPushdown.pop_back();
+    } while (!stagesForPushdown.empty());
+}
+
 // Limit the number of aggregation pipeline stages that can be "pushed down" to the SBE stage
 // builders. Compiling too many pipeline stages during stage building would overflow the call stack.
 // The limit is higher for optimized builds, because optimization reduces the size of stack frames.
@@ -483,6 +510,12 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
             break;
         }
     }
+
+    // TODO (SERVER-72549): Once $addFields stages can be pushed down without 'featureFlagSbeFull'
+    // being enabled, enabling 'featureFlagFull` will disable this step so that $addFields will
+    // _always_ be pushed down when possible.
+    reconsiderStagesForPushdown(stagesForPushdown);
+
     return stagesForPushdown;
 }
 
