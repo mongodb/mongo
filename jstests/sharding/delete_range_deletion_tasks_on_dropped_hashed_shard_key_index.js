@@ -3,7 +3,7 @@
  * deleted and allows other range deletion processes to continue.
  *
  * @tags: [
- *   requires_fcv_70,
+ *   requires_fcv_60,
  * ]
  */
 (function() {
