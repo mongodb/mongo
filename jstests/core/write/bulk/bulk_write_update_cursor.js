@@ -209,8 +209,7 @@ res = db.adminCommand({
         {insert: 0, document: {_id: 2, skey: "MongoDB3"}},
         {
             update: 0,
-            // TODO SERVER-81952: Remove shard key from the filter
-            filter: {_id: 0, $expr: {$eq: ["$skey", "$$targetKey"]}},
+            filter: {$expr: {$eq: ["$skey", "$$targetKey"]}},
             updateMods: {skey: "MongoDB2"}
         },
     ],

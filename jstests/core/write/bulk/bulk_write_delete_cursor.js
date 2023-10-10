@@ -110,8 +110,7 @@ res = db.adminCommand({
         {insert: 0, document: {_id: 0, skey: "MongoDB"}},
         {insert: 0, document: {_id: 1, skey: "MongoDB2"}},
         {insert: 0, document: {_id: 2, skey: "MongoDB3"}},
-        // TODO SERVER-81952: Remove shard key from the filter
-        {delete: 0, filter: {_id: 0, $expr: {$eq: ["$skey", "$$targetKey"]}}},
+        {delete: 0, filter: {$expr: {$eq: ["$skey", "$$targetKey"]}}},
     ],
     nsInfo: [{ns: "test.coll"}],
     let : {targetKey: "MongoDB"}

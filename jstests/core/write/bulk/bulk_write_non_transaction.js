@@ -359,14 +359,14 @@ cursorEntryValidator(res.cursor.firstBatch[2],
 assert(!res.cursor.firstBatch[3]);
 coll.drop();
 
+coll.insert({skey: "MongoDB"});
 // Test constants is not supported on non-pipeline update.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
         {
             update: 0,
-            // TODO SERVER-81952: Remove shard key from the filter
-            filter: {_id: 0, $expr: {$eq: ["$skey", "MongoDB"]}},
+            filter: {$expr: {$eq: ["$skey", "MongoDB"]}},
             updateMods: {skey: "$$targetKey"},
             constants: {targetKey: "MongoDB2"}
         },
