@@ -7,12 +7,14 @@ from typing import List, NamedTuple, Optional
 
 from packaging.version import Version
 from pydantic import BaseModel, Field
+import structlog
 import yaml
 
 # These values must match the include paths for artifacts.tgz in evergreen.yml.
 MONGO_VERSION_YAML = ".resmoke_mongo_version.yml"
 RELEASES_YAML = ".resmoke_mongo_release_values.yml"
 VERSION_RE = re.compile(r'^[0-9]+\.[0-9]+')
+LOGGER = structlog.getLogger(__name__)
 
 
 def tag_str(version: Version) -> str:
@@ -158,8 +160,17 @@ class MongoReleases(BaseModel):
         :return: MongoReleases read from file.
         """
 
-        mongo_releases_file = open(yaml_file, 'r')
-        return cls(**yaml.safe_load(mongo_releases_file))
+        with open(yaml_file, 'r') as mongo_releases_file:
+            yaml_contents = mongo_releases_file.read()
+        safe_load_result = yaml.safe_load(yaml_contents)
+        try:
+            return cls(**safe_load_result)
+        except:
+            LOGGER.info("MongoReleases.from_yaml_file() failed\n"
+                        f"yaml_file = {yaml_file}\n"
+                        f"yaml_contents = {yaml_contents}\n"
+                        f"safe_load_result = {safe_load_result}")
+            raise
 
     def get_fcv_versions(self) -> List[Version]:
         """Get the Version representation of all fcv versions."""
