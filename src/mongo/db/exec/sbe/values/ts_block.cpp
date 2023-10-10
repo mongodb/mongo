@@ -284,13 +284,12 @@ void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
     for (size_t i = 0; i < _count; ++i) {
         // BSONColumn::Iterator decompresses values into its own buffer which is invalidated
         // whenever the iterator advances, so we need to copy them out.
-        auto [tag, val] = bson::convertFrom</*View*/ false>(*it);
+        auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
+        auto [cpyTag, cpyVal] = value::copyValue(tag, val);
         ++it;
 
-        ValueGuard guard(tag, val);
-        deblockedTags.push_back(tag);
-        deblockedVals.push_back(val);
-        guard.reset();
+        deblockedTags.push_back(cpyTag);
+        deblockedVals.push_back(cpyVal);
     }
 }
 

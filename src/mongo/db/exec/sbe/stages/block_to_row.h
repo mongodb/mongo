@@ -61,6 +61,8 @@ public:
                     bool participateInTrialRunTracking = true);
     ~BlockToRowStage();
 
+    void freeDeblockedValueRuns();
+
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;

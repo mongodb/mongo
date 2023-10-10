@@ -53,12 +53,16 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
     invariant(_blockSlotIds.size() == _valsOutSlotIds.size());
 }
 
-BlockToRowStage::~BlockToRowStage() {
+void BlockToRowStage::freeDeblockedValueRuns() {
     for (auto& run : _deblockedValueRuns) {
         for (auto [t, v] : run) {
             value::releaseValue(t, v);
         }
     }
+}
+
+BlockToRowStage::~BlockToRowStage() {
+    freeDeblockedValueRuns();
 }
 
 std::unique_ptr<PlanStage> BlockToRowStage::clone() const {
@@ -119,6 +123,7 @@ PlanState BlockToRowStage::getNextFromDeblockedValues() {
 // The underlying buffer for blocks has been updated after getNext() on the child, so we need to
 // prepare deblocking the new blocks.
 void BlockToRowStage::prepareDeblock() {
+    freeDeblockedValueRuns();
     _deblockedValueRuns.clear();
 
     // Extract the value in the bitmap slot into a selectivity vector, to determine which indexes
