@@ -81,7 +81,7 @@ ServiceExecutorReserved::ServiceExecutorReserved(ServiceContext* ctx,
                                                  size_t reservedThreads)
     : _name(std::move(name)), _reservedThreads(reservedThreads) {}
 
-void ServiceExecutorReserved::start() {
+Status ServiceExecutorReserved::start() {
     {
         stdx::unique_lock<Latch> lk(_mutex);
         _stillRunning.store(true);
@@ -89,8 +89,13 @@ void ServiceExecutorReserved::start() {
     }
 
     for (size_t i = 0; i < _reservedThreads; i++) {
-        uassertStatusOK(_startWorker());
+        auto status = _startWorker();
+        if (!status.isOK()) {
+            return status;
+        }
     }
+
+    return Status::OK();
 }
 
 Status ServiceExecutorReserved::_startWorker() {

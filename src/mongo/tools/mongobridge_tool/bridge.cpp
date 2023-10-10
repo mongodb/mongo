@@ -70,7 +70,6 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
@@ -537,11 +536,8 @@ int bridgeMain(int argc, char** argv) {
         serviceContext->setTransportLayer(std::move(tl));
     }
 
-    transport::ServiceExecutor::startupAll(serviceContext);
-
     if (auto status = serviceContext->getSessionManager()->start(); !status.isOK()) {
-        LOGV2(4907203, "Error starting session manager", "error"_attr = status);
-        return static_cast<int>(ExitCode::netError);
+        LOGV2(4907203, "Error starting service entry point", "error"_attr = status);
     }
 
     if (auto status = serviceContext->getTransportLayer()->setup(); !status.isOK()) {

@@ -168,8 +168,9 @@ ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext*)
 
 ServiceExecutorSynchronous::~ServiceExecutorSynchronous() = default;
 
-void ServiceExecutorSynchronous::start() {
+Status ServiceExecutorSynchronous::start() {
     _sharedState->setIsRunning(true);
+    return Status::OK();
 }
 
 Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {

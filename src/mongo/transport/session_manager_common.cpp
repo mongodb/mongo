@@ -290,6 +290,24 @@ void SessionManagerCommon::endAllSessionsNoTagMask() {
     _sessions->sync().forEach([&](auto&& workflow) { workflow.terminate(); });
 }
 
+Status SessionManagerCommon::start() {
+    if (auto status = ServiceExecutorSynchronous::get(_svcCtx)->start(); !status.isOK()) {
+        return status;
+    }
+
+    if (auto exec = ServiceExecutorReserved::get(_svcCtx)) {
+        if (auto status = exec->start(); !status.isOK()) {
+            return status;
+        }
+    }
+
+    if (auto status = ServiceExecutorFixed::get(_svcCtx)->start(); !status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 bool SessionManagerCommon::shutdown(Milliseconds timeout) {
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     static constexpr bool kSanitizerBuild = true;
@@ -331,6 +349,8 @@ bool SessionManagerCommon::shutdownAndWait(Milliseconds timeout) {
             LOGV2(22946, "Shutdown: all sessions drained");
         }
     }
+
+    transport::ServiceExecutor::shutdownAll(_svcCtx, deadline);
 
     return drainedAll;
 }

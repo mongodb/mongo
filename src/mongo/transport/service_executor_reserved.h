@@ -64,7 +64,7 @@ public:
 
     static ServiceExecutorReserved* get(ServiceContext* ctx);
 
-    void start() override;
+    Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
     size_t getRunningThreads() const override {
@@ -74,10 +74,6 @@ public:
     void appendStats(BSONObjBuilder* bob) const override;
 
     std::unique_ptr<TaskRunner> makeTaskRunner() override;
-
-    StringData getName() const override {
-        return "ServiceExecutorReserved"_sd;
-    }
 
 private:
     Status _startWorker();

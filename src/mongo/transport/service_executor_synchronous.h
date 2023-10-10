@@ -68,7 +68,7 @@ public:
 
     ~ServiceExecutorSynchronous();
 
-    void start() override;
+    Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
     std::unique_ptr<TaskRunner> makeTaskRunner() override;
@@ -76,10 +76,6 @@ public:
     size_t getRunningThreads() const override;
 
     void appendStats(BSONObjBuilder* bob) const override;
-
-    StringData getName() const override {
-        return "ServiceExecutorSynchronous"_sd;
-    }
 
 private:
     class SharedState;

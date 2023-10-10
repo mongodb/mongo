@@ -77,7 +77,7 @@ public:
 
     static ServiceExecutorFixed* get(ServiceContext* ctx);
 
-    void start() override;
+    Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
     size_t getRunningThreads() const override;
@@ -91,10 +91,6 @@ public:
     int getRecursionDepthForExecutorThread() const;
 
     std::unique_ptr<TaskRunner> makeTaskRunner() override;
-
-    StringData getName() const override {
-        return "ServiceExecutorFixed"_sd;
-    }
 
 private:
     enum class State { kNotStarted, kRunning, kStopping, kStopped };
