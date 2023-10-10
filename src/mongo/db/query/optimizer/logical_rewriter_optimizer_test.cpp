@@ -2765,7 +2765,7 @@ TEST(LogicalRewriter, IsArrayConstantFolding) {
         "|   FunctionCall [traverseF]\n"
         "|   |   |   Const [false]\n"
         "|   |   LambdaAbstraction [valCmp_0]\n"
-        "|   |   FunctionCall [isMember]\n"
+        "|   |   BinaryOp [EqMember]\n"
         "|   |   |   Const [[17, 19, 23, 34, 35, 42, \"abc\"]]\n"
         "|   |   Variable [valCmp_0]\n"
         "|   FunctionCall [getField]\n"

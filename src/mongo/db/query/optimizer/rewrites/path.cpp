@@ -113,18 +113,29 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
 
     if (auto rhsConst = rhs.cast<PathConstant>(); rhsConst != nullptr) {
         if (auto lhsCmp = lhs.cast<PathCompare>(); lhsCmp != nullptr) {
-            // TODO SERVER-81243: Allow EqMember to go through this rewrite.
-            if (lhsCmp->op() != Operations::EqMember) {
-                // We can directly inline the comparison since we know it is a comparison to a
-                // constant.
-                auto result = make<PathConstant>(make<BinaryOp>(
-                    lhsCmp->op(),
-                    make<BinaryOp>(Operations::Cmp3w, rhsConst->getConstant(), lhsCmp->getVal()),
-                    Constant::int64(0)));
+            // We can directly inline the comparison since we know it is a comparison to a
+            // constant.
+            if (lhsCmp->op() == Operations::EqMember) {
+                auto result = make<PathConstant>(make<If>(
+                    make<FunctionCall>("isArray", makeSeq(lhsCmp->getVal())),
+                    make<BinaryOp>(Operations::EqMember, rhsConst->getConstant(), lhsCmp->getVal()),
+                    make<BinaryOp>(Operations::Eq,
+                                   make<BinaryOp>(Operations::Cmp3w,
+                                                  rhsConst->getConstant(),
+                                                  lhsCmp->getVal()),
+                                   Constant::int64(0))));
 
                 std::swap(lhs, result);
                 return true;
             }
+
+            auto result = make<PathConstant>(make<BinaryOp>(
+                lhsCmp->op(),
+                make<BinaryOp>(Operations::Cmp3w, rhsConst->getConstant(), lhsCmp->getVal()),
+                Constant::int64(0)));
+
+            std::swap(lhs, result);
+            return true;
         }
 
         switch (_kindCtx.back()) {

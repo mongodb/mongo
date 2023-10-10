@@ -1614,5 +1614,159 @@ TEST(Path, PathDefaultObjectInput) {
         tree);
 }
 
+TEST(Path, PathCompareEqMemberArrayLower) {
+    // This ABT sets the field 'a' to "hello" and then checks if the value of the field 'a' is a
+    // member of the array [1, 2, 3].
+    ABT tree =
+        NodeBuilder{}
+            .root("x")
+            .filter(_evalf(
+                _get("a",
+                     _traverse1(_cmp("EqMember",
+                                     _carray(std::pair{sbe::value::TypeTags::NumberDouble,
+                                                       sbe::value::bitcastFrom<double>(1)},
+                                             std::pair{sbe::value::TypeTags::NumberDouble,
+                                                       sbe::value::bitcastFrom<double>(2)},
+                                             std::pair{sbe::value::TypeTags::NumberDouble,
+                                                       sbe::value::bitcastFrom<double>(3)})))),
+                "x"_var))
+            .eval("x", _evalp(_field("a", _pconst("hello"_cstr)), "root"_var))
+            .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathGet [a] PathTraverse [1] PathCompare [EqMember] Const [[1, 2, 3]]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+    while (PathFusion{env}.optimize(tree) || ConstEval{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrites removes the PathTraverse and transforms the
+    // PathCompare [EqMember] to an expression checking if the value under the PathCompare is an
+    // array. If so, we rewrite it as BinaryOp [EqMember] and if not, we rewrite it as BinaryOp [Eq]
+    // + BinaryOp [Cmp3w]. ConstEval will simplify the prior expression to just have the BinaryOp
+    // [EqMember] branch since the value of the PathCompare is a constant array.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   BinaryOp [EqMember]\n"
+        "|   |   Const [[1, 2, 3]]\n"
+        "|   Const [\"hello\"]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathCompareEqMemberNonArrayLower) {
+    // This ABT sets the field 'a' to "hello" and then checks if the value of the field 'a' "is a
+    // member" of the string "world". Note, this is a weird example, but it is one that tests the
+    // rewrites in the situation where the value below PathCompare [EqMember] is not an array, but
+    // some other constant.
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("EqMember", "world"_cstr))), "x"_var))
+                   .eval("x", _evalp(_field("a", _pconst("hello"_cstr)), "root"_var))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathGet [a] PathTraverse [1] PathCompare [EqMember] Const [\"world\"]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+    while (PathFusion{env}.optimize(tree) || ConstEval{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrites removes the PathTraverse and transforms the
+    // PathCompare [EqMember] to an expression checking if the value under the PathCompare is an
+    // array. If so, we rewrite it as BinaryOp [EqMember] and if not, we rewrite it as BinaryOp [Eq]
+    // + BinaryOp [Cmp3w]. ConstEval will simplify the prior expression to just have the BinaryOp
+    // [Eq] + BinaryOp [Cmp3w] branch since the value of the PathCompare is NOT a constant array.
+    // ConstEval will further simplify the tree since both "hello" and "world" are constants, so the
+    // check of their equality will always be false.
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   Const [false]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, PathCompareEqMemberUnknownTypeLower) {
+    // This ABT sets the field 'a' to "hello" and then checks if the value of the field 'a' is a
+    // member of the value stored by the variable "a".
+    ABT tree = NodeBuilder{}
+                   .root("x")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("EqMember", "a"_var))), "x"_var))
+                   .eval("x", _evalp(_field("a", _pconst("hello"_cstr)), "root"_var))
+                   .finish(_scan("root", "test"));
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [x]\n"
+        "|   PathGet [a] PathTraverse [1] PathCompare [EqMember] Variable [a]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+    while (PathFusion{env}.optimize(tree))
+        ;
+
+    // We expect that the PathFusion rewrites removes the PathTraverse and transforms the
+    // PathCompare [EqMember] to an expression checking if the value under the PathCompare is an
+    // array. If so, we rewrite it as BinaryOp [EqMember] and if not, we rewrite it as BinaryOp [Eq]
+    // + BinaryOp [Cmp3w]. There are no further simplifications for ConstEval to do here since we do
+    // not know the type of the value stored by the variable "a".
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{x}]\n"
+        "Filter []\n"
+        "|   If []\n"
+        "|   |   |   BinaryOp [Eq]\n"
+        "|   |   |   |   Const [0]\n"
+        "|   |   |   BinaryOp [Cmp3w]\n"
+        "|   |   |   |   Variable [a]\n"
+        "|   |   |   Const [\"hello\"]\n"
+        "|   |   BinaryOp [EqMember]\n"
+        "|   |   |   Variable [a]\n"
+        "|   |   Const [\"hello\"]\n"
+        "|   FunctionCall [isArray] Variable [a]\n"
+        "Evaluation [{x}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

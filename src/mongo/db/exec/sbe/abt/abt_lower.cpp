@@ -208,6 +208,15 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     std::unique_ptr<sbe::EExpression> lhs,
     std::unique_ptr<sbe::EExpression> rhs) {
 
+    if (op.op() == Operations::EqMember) {
+        // We directly translate BinaryOp [EqMember] to the SBE function isMember.
+        sbe::EExpression::Vector isMemberArgs;
+        isMemberArgs.push_back(std::move(lhs));
+        isMemberArgs.push_back(std::move(rhs));
+
+        return sbe::makeE<sbe::EFunction>("isMember", std::move(isMemberArgs));
+    }
+
     sbe::EPrimBinary::Op sbeOp = getEPrimBinaryOp(op.op());
 
     if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {

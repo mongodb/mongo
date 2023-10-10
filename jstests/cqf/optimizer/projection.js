@@ -1,5 +1,5 @@
 /**
- * Testing simple inclusion/exclusion projections with dotted path fields while forcing CQF.
+ * Testing simple projections with dotted path fields while forcing CQF.
  * Many of these tests are similar/repeats of core/projection_semantics.js
  */
 
@@ -30,6 +30,33 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
 
     const explain = assert.commandWorked(db.runCommand(
         {explain: {aggregate: coll.getName(), pipeline: [{$project: projection}], cursor: {}}}));
+    assert(usedBonsaiOptimizer(explain), tojson(explain));
+}
+
+// Same as above, except takes in a general pipeline.
+function testInputOutputPipeline({input, pipeline, expectedOutput, interestingIndexes = []}) {
+    coll.drop();
+    assert.commandWorked(coll.insert(input));
+    const result = coll.aggregate(pipeline).toArray();
+    assertArrayEq({
+        actual: result,
+        expected: expectedOutput,
+        extraErrorMsg: tojson({aggregation_pipeline: pipeline})
+    });
+
+    for (let indexSpec of interestingIndexes) {
+        assert.commandWorked(coll.createIndex(indexSpec));
+        const result = coll.aggregate(pipeline).toArray();
+        assertArrayEq({
+            actual: result,
+            expected: expectedOutput,
+            extraErrorMsg: tojson({aggregation_pipeline: pipeline})
+        });
+        assert.commandWorked(coll.dropIndex(indexSpec));
+    }
+
+    const explain = assert.commandWorked(
+        db.runCommand({explain: {aggregate: coll.getName(), pipeline: pipeline, cursor: {}}}));
     assert(usedBonsaiOptimizer(explain), tojson(explain));
 }
 
@@ -185,4 +212,36 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
             [{_id: 0, b: {c: 1, d: 1}}, {_id: 1, b: {c: 2, d: 2}}, {_id: 2, b: {c: 3, d: 3}}],
         interestingIndexes: [],
     });
+}());
+
+// Tests computed projections.
+(function testComputed() {
+    const docs = [
+        {_id: 0},
+        {_id: 1, a: 0},
+        {_id: 2, a: [1, 2, 3]},
+        {_id: 3, a: {c: 1}},
+        {_id: 4, a: {b: 1}}
+    ];
+
+    testInputOutputPipeline({
+        input: docs,
+        pipeline: [{$addFields: {a: {$literal: 2}}}, {$match: {a: {$in: [1, 2, 3]}}}],
+        expectedOutput:
+            [{_id: 0, a: 2}, {_id: 1, a: 2}, {_id: 2, a: 2}, {_id: 3, a: 2}, {_id: 4, a: 2}],
+        interestingIndexes: []
+    })
+
+    testInputOutputPipeline({
+        input: docs,
+        pipeline: [{$addFields: {a: {b: {$literal: 2}}}}, {$match: {'a.b': {$in: [1, 2, 3]}}}],
+        expectedOutput: [
+            {_id: 0, a: {b: 2}},
+            {_id: 1, a: {b: 2}},
+            {_id: 2, a: [{b: 2}, {b: 2}, {b: 2}]},
+            {_id: 3, a: {c: 1, b: 2}},
+            {_id: 4, a: {b: 2}}
+        ],
+        interestingIndexes: []
+    })
 }());

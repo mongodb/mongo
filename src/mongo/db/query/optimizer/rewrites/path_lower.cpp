@@ -292,7 +292,7 @@ void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
         n = make<LambdaAbstraction>(
             name,
             make<If>(make<FunctionCall>("isArray", makeSeq(c)),
-                     make<FunctionCall>("isMember", makeSeq(make<Variable>(name), c)),
+                     make<BinaryOp>(Operations::EqMember, make<Variable>(name), c),
                      make<BinaryOp>(Operations::Eq,
                                     make<BinaryOp>(Operations::Cmp3w, make<Variable>(name), c),
                                     Constant::int64(0))));

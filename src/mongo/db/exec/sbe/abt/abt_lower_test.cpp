@@ -180,6 +180,20 @@ protected:
         runNodeVariation(gctx, name, n, &runtimeEnv, &ids, collIndexDefs, scanDefs);
     }
 
+    std::string autoUpdateExpressionVariation(const ABT& n) {
+        auto env = VariableEnvironment::build(n);
+        SlotVarMap map;
+        sbe::RuntimeEnvironment runtimeEnv;
+        sbe::value::SlotIdGenerator ids;
+        Metadata metadata;
+        NodeProps np;
+        auto expr =
+            optimizer::SBEExpressionLowering{
+                env, map, runtimeEnv, ids, inputParamToSlotMap, &metadata, &np}
+                .optimize(n);
+        return expr->toString();
+    }
+
     ScanDefinition buildScanDefinition(
         opt::unordered_map<std::string, IndexDefinition> indexDefs = {},
         DistributionAndPaths dnp = DistributionAndPaths(DistributionType::Centralized),
@@ -1271,6 +1285,21 @@ DEATH_TEST_F(ABTPlanGeneration,
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
     runNodeVariation(ctx, "Do not lower scan node", _node(make<ScanNode>("proj0", "scan0")));
+}
+
+TEST_F(ABTPlanGeneration, LowerBinaryOpEqMemberRHSArray) {
+    // Lower BinaryOp [EqMember] where the type of RHS is array.
+    std::string output = autoUpdateExpressionVariation(make<BinaryOp>(
+        Operations::EqMember,
+        Constant::str("hello"),
+        Constant::array(
+            std::pair{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(1)},
+            std::pair{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(2)},
+            std::pair{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(3)})));
+
+    ASSERT_STR_EQ_AUTO(  // NOLINT
+        "isMember(\"hello\", [1L, 2L, 3L]) ",
+        output);
 }
 
 }  // namespace
