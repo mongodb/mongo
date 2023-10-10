@@ -341,10 +341,8 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
     CollectionQueryInfo& info = CollectionQueryInfo::get(collection);
     if (isPointInTimeRead) {
         info.clearQueryCache(opCtx, CollectionPtr(collection));
-        info.rebuildIndexData(opCtx, CollectionPtr(collection));
-    } else {
-        info.init(opCtx, CollectionPtr(collection));
     }
+    info.init(opCtx, collection);
 }
 
 std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(
@@ -670,17 +668,6 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         _frozenIndexes.add(std::move(entry));
     } else {
         _buildingIndexes.add(std::move(entry));
-    }
-
-    bool initFromDisk = CreateIndexEntryFlags::kInitFromDisk & flags;
-    if (!initFromDisk && !UncommittedCatalogUpdates::isCreatedCollection(opCtx, collection->ns())) {
-        const std::string indexName = desc->indexName();
-        opCtx->recoveryUnit()->onRollback(
-            [collectionDecorations = collection->getSharedDecorations(),
-             indexName = std::move(indexName)](OperationContext*) {
-                CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
-                    .unregisterIndex(indexName);
-            });
     }
 
     return save;
@@ -1408,37 +1395,6 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
     return dropIndexEntry(opCtx, collection, entry);
 }
 
-namespace {
-class IndexRemoveChange final : public RecoveryUnit::Change {
-public:
-    IndexRemoveChange(const NamespaceString& nss,
-                      const IndexDescriptor* desc,
-                      SharedCollectionDecorations* collectionDecorations)
-        : _indexName(desc->indexName()),
-          _keyPattern(desc->keyPattern().getOwned()),
-          _indexFeatures(IndexFeatures::make(desc, nss.isOnInternalDb())),
-          _collectionDecorations(collectionDecorations) {}
-
-    // Index entries use copy-on-write, so we can modify the instance in-place as it isn't published
-    // yet. This is done by calling setDropped() on the copied index entry. There is no need to do
-    // this in a commit handler.
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {}
-
-    void rollback(OperationContext* opCtx) final {
-        // Refresh the CollectionIndexUsageTrackerDecoration's knowledge of what indices are
-        // present as it is shared state across Collection copies.
-        CollectionIndexUsageTrackerDecoration::get(_collectionDecorations)
-            .registerIndex(_indexName, _keyPattern, _indexFeatures);
-    }
-
-private:
-    const std::string _indexName;
-    const BSONObj _keyPattern;
-    const IndexFeatures _indexFeatures;
-    SharedCollectionDecorations* _collectionDecorations;
-};
-}  // namespace
-
 Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
                                         Collection* collection,
                                         IndexCatalogEntry* entry) {
@@ -1467,12 +1423,9 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     // This index entry is uniquely owned, so it is safe to modify this flag outside of a commit
     // handler. The index entry is discarded on rollback.
     entry->setDropped();
-    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        collection->ns(), entry->descriptor(), collection->getSharedDecorations()));
 
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
-    CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-        .unregisterIndex(indexName);
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, collection, indexName, entry->shared_from_this());
 
     return Status::OK();
@@ -1703,10 +1656,8 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // This index entry is uniquely owned, so it is safe to modify this flag outside of a commit
     // handler. The index entry is discarded on rollback.
     writableEntry->setDropped();
-    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        collection->ns(), writableEntry->descriptor(), collection->getSharedDecorations()));
-    CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-        .unregisterIndex(indexName);
+    auto& indexUsageTracker = CollectionIndexUsageTrackerDecoration::write(collection);
+    indexUsageTracker.unregisterIndex(indexName);
 
     // Ask the CollectionCatalogEntry for the new index spec.
     BSONObj spec = collection->getIndexSpec(indexName).getOwned();
@@ -1718,13 +1669,12 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     auto newEntry = createIndexEntry(opCtx, collection, std::move(newDesc), flags);
     invariant(newEntry->isReady());
     auto desc = newEntry->descriptor();
-    CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
-        .registerIndex(desc->indexName(),
-                       desc->keyPattern(),
-                       IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
+    indexUsageTracker.registerIndex(desc->indexName(),
+                                    desc->keyPattern(),
+                                    IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
 
     // Last rebuild index data for CollectionQueryInfo for this Collection.
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
 
     // Return the new descriptor.
     return newEntry->descriptor();

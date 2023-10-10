@@ -86,16 +86,11 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
     auto desc = getEntry(opCtx, CollectionPtr(collection))->descriptor();
-    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
-    CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionIndexUsageTrackerDecoration::write(collection)
         .registerIndex(desc->indexName(),
                        desc->keyPattern(),
                        IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
-    opCtx->recoveryUnit()->onRollback([collectionDecorations = collection->getSharedDecorations(),
-                                       indexName = _indexName](OperationContext*) {
-        CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
-            .unregisterIndex(indexName);
-    });
 }
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,

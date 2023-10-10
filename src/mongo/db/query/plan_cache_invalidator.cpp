@@ -54,7 +54,7 @@ const auto getCollectionVersionNumber =
     SharedCollectionDecorations::declareDecoration<AtomicWord<size_t>>();
 }  // namespace
 
-PlanCacheInvalidator::PlanCacheInvalidator(const CollectionPtr& collection,
+PlanCacheInvalidator::PlanCacheInvalidator(const Collection* collection,
                                            ServiceContext* serviceContext)
     : _version{getCollectionVersionNumber(collection->getSharedDecorations()).fetchAndAdd(1u)},
       _uuid{collection->uuid()},

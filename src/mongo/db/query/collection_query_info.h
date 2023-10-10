@@ -104,7 +104,7 @@ public:
     /**
      * Builds internal cache state based on the current state of the Collection's IndexCatalog.
      */
-    void init(OperationContext* opCtx, const CollectionPtr& coll);
+    void init(OperationContext* opCtx, Collection* coll);
 
     /**
      * Rebuilds cached index information. Must be called when an index is modified or an index is
@@ -112,7 +112,7 @@ public:
      *
      * Must be called under exclusive collection lock.
      */
-    void rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll);
+    void rebuildIndexData(OperationContext* opCtx, const Collection* coll);
 
     /**
      * Removes all cached query plans after ensuring that the PlanCache is uniquely owned. The
@@ -142,7 +142,7 @@ private:
     struct PlanCacheState {
         PlanCacheState();
 
-        PlanCacheState(OperationContext* opCtx, const CollectionPtr& collection);
+        PlanCacheState(OperationContext* opCtx, const Collection* collection);
 
         /**
          * Clears classic and SBE cache entries with the current collection version.
@@ -161,8 +161,8 @@ private:
         PlanCacheIndexabilityState planCacheIndexabilityState;
     };
 
-    void computeUpdateIndexData(OperationContext* opCtx, const CollectionPtr& coll);
-    void updatePlanCacheIndexEntries(OperationContext* opCtx, const CollectionPtr& coll);
+    void computeUpdateIndexData(OperationContext* opCtx, const Collection* coll);
+    void updatePlanCacheIndexEntries(OperationContext* opCtx, const Collection* coll);
 
     // ---  index keys cache
     bool _keysComputed;

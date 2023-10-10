@@ -44,17 +44,32 @@ namespace mongo {
 namespace {
 
 const auto getCollectionIndexUsageTrackerDecoration =
-    SharedCollectionDecorations::declareDecoration<CollectionIndexUsageTrackerDecoration>();
+    Collection::declareDecoration<CollectionIndexUsageTrackerDecoration>();
 
 }  // namespace
 
-CollectionIndexUsageTracker& CollectionIndexUsageTrackerDecoration::get(
-    SharedCollectionDecorations* decorations) {
-    return getCollectionIndexUsageTrackerDecoration(decorations)._indexUsageTracker;
+const CollectionIndexUsageTracker& CollectionIndexUsageTrackerDecoration::get(
+    const Collection* collection) {
+    return *getCollectionIndexUsageTrackerDecoration(collection)._indexUsageTracker;
+}
+CollectionIndexUsageTracker& CollectionIndexUsageTrackerDecoration::write(Collection* collection) {
+    auto& decoration = getCollectionIndexUsageTrackerDecoration(collection);
+
+    // Make copy of existing CollectionIndexUsageTracker and store it in our writable Collection
+    // instance.
+    decoration._indexUsageTracker = new CollectionIndexUsageTracker(*decoration._indexUsageTracker);
+
+    return *decoration._indexUsageTracker;
 }
 
-CollectionIndexUsageTrackerDecoration::CollectionIndexUsageTrackerDecoration()
-    : _indexUsageTracker(AggregatedIndexUsageTracker::get(getGlobalServiceContext()),
-                         getGlobalServiceContext()->getPreciseClockSource()) {}
+CollectionIndexUsageTrackerDecoration::CollectionIndexUsageTrackerDecoration() {
+    // This can get instantiated in unittests that doesn't set a global service context.
+    if (!hasGlobalServiceContext())
+        return;
+
+    _indexUsageTracker =
+        new CollectionIndexUsageTracker(AggregatedIndexUsageTracker::get(getGlobalServiceContext()),
+                                        getGlobalServiceContext()->getPreciseClockSource());
+}
 
 }  // namespace mongo

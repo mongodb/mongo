@@ -100,7 +100,7 @@ CollectionQueryInfo::PlanCacheState::PlanCacheState()
     : classicPlanCache{static_cast<size_t>(internalQueryCacheMaxEntriesPerCollection.load())} {}
 
 CollectionQueryInfo::PlanCacheState::PlanCacheState(OperationContext* opCtx,
-                                                    const CollectionPtr& collection)
+                                                    const Collection* collection)
     : classicPlanCache{static_cast<size_t>(internalQueryCacheMaxEntriesPerCollection.load())},
       planCacheInvalidator{collection, opCtx->getServiceContext()} {
     std::vector<CoreIndexInfo> indexCores;
@@ -212,8 +212,7 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
     }
 }
 
-void CollectionQueryInfo::computeUpdateIndexData(OperationContext* opCtx,
-                                                 const CollectionPtr& coll) {
+void CollectionQueryInfo::computeUpdateIndexData(OperationContext* opCtx, const Collection* coll) {
     _indexedPaths.clear();
 
     auto it = coll->getIndexCatalog()->getIndexIterator(
@@ -229,8 +228,8 @@ void CollectionQueryInfo::computeUpdateIndexData(OperationContext* opCtx,
 void CollectionQueryInfo::notifyOfQuery(OperationContext* opCtx,
                                         const CollectionPtr& coll,
                                         const PlanSummaryStats& summaryStats) const {
-    auto& collectionIndexUsageTracker =
-        CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations());
+    const auto& collectionIndexUsageTracker =
+        CollectionIndexUsageTrackerDecoration::get(coll.get());
 
     collectionIndexUsageTracker.recordCollectionScans(summaryStats.collectionScans);
     collectionIndexUsageTracker.recordCollectionScansNonTailable(
@@ -260,7 +259,7 @@ void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const Collect
                     "Clearing plan cache - collection info cache reinstantiated",
                     logAttrs(coll->ns()));
 
-        updatePlanCacheIndexEntries(opCtx, coll);
+        updatePlanCacheIndexEntries(opCtx, coll.get());
     }
 }
 
@@ -273,11 +272,11 @@ void CollectionQueryInfo::clearQueryCacheForSetMultikey(const CollectionPtr& col
 }
 
 void CollectionQueryInfo::updatePlanCacheIndexEntries(OperationContext* opCtx,
-                                                      const CollectionPtr& coll) {
+                                                      const Collection* coll) {
     _planCacheState = std::make_shared<PlanCacheState>(opCtx, coll);
 }
 
-void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& coll) {
+void CollectionQueryInfo::init(OperationContext* opCtx, Collection* coll) {
     // Skip registering the index in a --repair, as the server will terminate after
     // the repair operation completes.
     if (storageGlobalParams.repair) {
@@ -287,18 +286,19 @@ void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& col
 
     auto ii =
         coll->getIndexCatalog()->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto& collectionIndexUsageTracker = CollectionIndexUsageTrackerDecoration::write(coll);
     while (ii->more()) {
         const IndexDescriptor* desc = ii->next()->descriptor();
-        CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
-            .registerIndex(desc->indexName(),
-                           desc->keyPattern(),
-                           IndexFeatures::make(desc, coll->ns().isOnInternalDb()));
+        collectionIndexUsageTracker.registerIndex(
+            desc->indexName(),
+            desc->keyPattern(),
+            IndexFeatures::make(desc, coll->ns().isOnInternalDb()));
     }
 
     rebuildIndexData(opCtx, coll);
 }
 
-void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll) {
+void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const Collection* coll) {
     _keysComputed = false;
     computeUpdateIndexData(opCtx, coll);
     updatePlanCacheIndexEntries(opCtx, coll);

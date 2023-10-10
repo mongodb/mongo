@@ -50,7 +50,7 @@ namespace mongo {
 class PlanCacheInvalidator {
 public:
     PlanCacheInvalidator() = default;
-    PlanCacheInvalidator(const CollectionPtr& collection, ServiceContext* serviceContext);
+    PlanCacheInvalidator(const Collection* collection, ServiceContext* serviceContext);
 
     ~PlanCacheInvalidator();
 

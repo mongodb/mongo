@@ -225,10 +225,10 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         return indexStats;
     }
 
-    auto indexStatsMap =
-        CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+    const auto& indexStatsMap =
+        CollectionIndexUsageTrackerDecoration::get(collection.getCollection().get())
             .getUsageStats();
-    for (auto&& indexStatsMapIter : *indexStatsMap) {
+    for (auto&& indexStatsMapIter : indexStatsMap) {
         auto indexName = indexStatsMapIter.first;
         auto stats = indexStatsMapIter.second;
         MutableDocument doc;
@@ -432,7 +432,7 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
         collection->getCollectionOptions().encryptedFieldConfig || nss.isFLE2StateCollection();
     if (!redactForQE) {
         auto collectionScanStats =
-            CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+            CollectionIndexUsageTrackerDecoration::get(collection.getCollection().get())
                 .getCollectionScanStats();
 
         dassert(collectionScanStats.collectionScans <=

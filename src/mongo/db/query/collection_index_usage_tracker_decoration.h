@@ -31,9 +31,9 @@
 
 #include "mongo/db/collection_index_usage_tracker.h"
 
-namespace mongo {
+#include <boost/intrusive_ptr.hpp>
 
-class SharedCollectionDecorations;
+namespace mongo {
 
 /**
  * All Collection instances for the same collection share the same CollectionIndexUsageTracker
@@ -47,9 +47,16 @@ class SharedCollectionDecorations;
 class CollectionIndexUsageTrackerDecoration {
 public:
     /**
-     * Fetches a reference to the CollectionIndexUsageTracker from the collection's 'decorations'.
+     * Fetches a const reference to the CollectionIndexUsageTracker from the collection.
      */
-    static CollectionIndexUsageTracker& get(SharedCollectionDecorations* decorations);
+    static const CollectionIndexUsageTracker& get(const Collection* collection);
+
+    /**
+     * Performs a copy of the CollectionIndexUsageTracker and stores the new instance in the
+     * writable collection. Returns this uniquely owned instance that is safe to perform
+     * modifications on.
+     */
+    static CollectionIndexUsageTracker& write(Collection* collection);
 
     /**
      * Initializes the CollectionIndexUsageTracker.
@@ -57,8 +64,9 @@ public:
     CollectionIndexUsageTrackerDecoration();
 
 private:
-    // Tracks index usage statistics for a collection.
-    CollectionIndexUsageTracker _indexUsageTracker;
+    // Tracks index usage statistics for a collection. This is shared between versions of the same
+    // Collection instance until a change is made.
+    boost::intrusive_ptr<CollectionIndexUsageTracker> _indexUsageTracker;
 };
 
 }  // namespace mongo

@@ -51,24 +51,19 @@ CounterMetric collectionScansNonTailableCounter("queryExecutor.collectionScans.n
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(
     AggregatedIndexUsageTracker* aggregatedIndexUsageTracker, ClockSource* clockSource)
-    : _indexUsageStatsMap(std::make_shared<CollectionIndexUsageMap>()),
-      _clockSource(clockSource),
-      _aggregatedIndexUsageTracker(aggregatedIndexUsageTracker) {
+    : _clockSource(clockSource),
+      _aggregatedIndexUsageTracker(aggregatedIndexUsageTracker),
+      _sharedStats(new CollectionScanStatsStorage()) {
     invariant(_clockSource);
 }
 
-void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
+void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) const {
     invariant(!indexName.empty());
 
-    // The following update after fetching the map can race with the removal of this index entry
-    // from the map. However, that race is inconsequential and remains memory safe.
-    auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
+    auto it = _indexUsageStatsMap.find(indexName);
 
-    auto it = mapSharedPtr->find(indexName);
-    if (it == mapSharedPtr->end()) {
-        // We are using an index that has been removed from the catalog, no need to track usage
-        return;
-    }
+    // The index is guaranteed to be tracked
+    invariant(it != _indexUsageStatsMap.end());
 
     _aggregatedIndexUsageTracker->onAccess(it->second->features);
 
@@ -76,14 +71,14 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
     it->second->accesses.fetchAndAdd(1);
 }
 
-void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) {
-    _collectionScans.fetchAndAdd(collectionScans);
+void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) const {
+    _sharedStats->_collectionScans.fetchAndAdd(collectionScans);
     collectionScansCounter.increment(collectionScans);
 }
 
 void CollectionIndexUsageTracker::recordCollectionScansNonTailable(
-    unsigned long long collectionScansNonTailable) {
-    _collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
+    unsigned long long collectionScansNonTailable) const {
+    _sharedStats->_collectionScansNonTailable.fetchAndAdd(collectionScansNonTailable);
     collectionScansNonTailableCounter.increment(collectionScansNonTailable);
 }
 
@@ -92,49 +87,38 @@ void CollectionIndexUsageTracker::registerIndex(StringData indexName,
                                                 const IndexFeatures& features) {
     invariant(!indexName.empty());
 
-    // Create a copy of the map to modify.
-    auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
-    auto mapCopy = std::make_shared<CollectionIndexUsageMap>(*mapSharedPtr);
-
-    dassert(mapCopy->find(indexName) == mapCopy->end());
-
     // Create the map entry.
-    auto inserted = mapCopy->try_emplace(
+    auto inserted = _indexUsageStatsMap.try_emplace(
         indexName, make_intrusive<IndexUsageStats>(_clockSource->now(), indexKey, features));
     invariant(inserted.second);
 
     _aggregatedIndexUsageTracker->onRegister(inserted.first->second->features);
-
-    // Swap the modified map into place atomically.
-    atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
 }
 
 void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {
     invariant(!indexName.empty());
 
-    // Create a copy of the map to modify.
-    auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
-    auto mapCopy = std::make_shared<CollectionIndexUsageMap>(*mapSharedPtr);
-
-    auto it = mapCopy->find(indexName);
-    if (it != mapCopy->end()) {
-        _aggregatedIndexUsageTracker->onUnregister(it->second->features);
-
-        // Remove the map entry.
-        mapCopy->erase(it);
-
-        // Swap the modified map into place atomically.
-        atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
+    auto it = _indexUsageStatsMap.find(indexName);
+    // Only finished/ready indexes are tracked and this function may be called for an unfinished
+    // index. When that happens there is nothing we need to do.
+    if (it == _indexUsageStatsMap.end()) {
+        return;
     }
+
+    _aggregatedIndexUsageTracker->onUnregister(it->second->features);
+
+    // Remove the map entry.
+    _indexUsageStatsMap.erase(it);
 }
 
-std::shared_ptr<CollectionIndexUsageTracker::CollectionIndexUsageMap>
+const CollectionIndexUsageTracker::CollectionIndexUsageMap&
 CollectionIndexUsageTracker::getUsageStats() const {
-    return atomic_load(&_indexUsageStatsMap);
+    return _indexUsageStatsMap;
 }
 
 CollectionIndexUsageTracker::CollectionScanStats
 CollectionIndexUsageTracker::getCollectionScanStats() const {
-    return {_collectionScans.load(), _collectionScansNonTailable.load()};
+    return {_sharedStats->_collectionScans.load(),
+            _sharedStats->_collectionScansNonTailable.load()};
 }
 }  // namespace mongo
