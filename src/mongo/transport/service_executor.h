@@ -66,7 +66,17 @@ public:
         virtual void runOnDataAvailable(std::shared_ptr<Session> session, Task task) = 0;
     };
 
-    static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
+    /**
+     * Starts up all executors registered as ServiceContext decorations.
+     * If an executor fails to start up, it will throw and that exception will bubble up here.
+     */
+    static void startupAll(ServiceContext* svcCtx);
+
+    /**
+     * Shuts downa ll executors registered as ServiceContext decorations.
+     * If an executor fails to shut down, a warning will be logged, but shutdowns will continue.
+     */
+    static void shutdownAll(ServiceContext* svcCtx, Milliseconds timeout);
 
     virtual ~ServiceExecutor() = default;
 
@@ -75,7 +85,7 @@ public:
     /*
      * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
      */
-    virtual Status start() = 0;
+    virtual void start() = 0;
 
     /*
      * Stops and joins the ServiceExecutor. Any outstanding tasks will not be executed, and any
@@ -92,6 +102,12 @@ public:
 
     /** Yield if this executor controls more threads than we have cores. */
     void yieldIfAppropriate() const;
+
+    /**
+     * Returns the class name of this service executor.
+     * Used in logging and exception messaging.
+     */
+    virtual StringData getName() const = 0;
 };
 
 /**

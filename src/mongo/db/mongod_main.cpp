@@ -1007,6 +1007,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // operation context anymore
     startupOpCtx.reset();
 
+    transport::ServiceExecutor::startupAll(serviceContext);
+
     auto start = serviceContext->getSessionManager()->start();
     if (!start.isOK()) {
         LOGV2_ERROR(20571, "Error starting transport session manager", "error"_attr = start);

@@ -231,7 +231,7 @@ void ServiceExecutorFixed::_finalize() noexcept {
     invariant(_stats->tasksWaiting() == 0);
 }
 
-Status ServiceExecutorFixed::start() {
+void ServiceExecutorFixed::start() {
     {
         auto lk = stdx::lock_guard(_mutex);
         switch (_state) {
@@ -239,11 +239,11 @@ Status ServiceExecutorFixed::start() {
                 _state = State::kRunning;
                 break;
             case State::kRunning:
-                return Status::OK();
+                return;
             case State::kStopping:
             case State::kStopped:
-                return {ErrorCodes::ServiceExecutorInShutdown,
-                        "ServiceExecutorFixed is already stopping or stopped"};
+                uasserted(ErrorCodes::ServiceExecutorInShutdown,
+                          "ServiceExecutorFixed is already stopping or stopped");
         }
     }
 
@@ -257,14 +257,14 @@ Status ServiceExecutorFixed::start() {
     if (!_svcCtx) {
         // For some tests, we do not have a ServiceContext.
         invariant(TestingProctor::instance().isEnabled());
-        return Status::OK();
+        return;
     }
 
     auto tl = _svcCtx->getTransportLayer();
     if (!tl) {
         // For some tests, we do not have a TransportLayer.
         invariant(TestingProctor::instance().isEnabled());
-        return Status::OK();
+        return;
     }
 
     auto reactor = tl->getReactor(TransportLayer::WhichReactor::kIngress);
@@ -283,8 +283,6 @@ Status ServiceExecutorFixed::start() {
         // Start running on the reactor immediately.
         reactor->run();
     });
-
-    return Status::OK();
 }
 
 ServiceExecutorFixed* ServiceExecutorFixed::get(ServiceContext* ctx) {

@@ -173,7 +173,7 @@ public:
 
 TEST_F(ServiceExecutorSynchronousTest, BasicTaskRuns) {
     ServiceExecutorSynchronous executor(getGlobalServiceContext());
-    ASSERT_OK(executor.start());
+    executor.start();
     PromiseAndFuture<void> pf;
     auto runner = executor.makeTaskRunner();
     runner->schedule([&](Status st) { pf.promise.setFrom(st); });
@@ -205,7 +205,7 @@ public:
         }
 
         void start() {
-            ASSERT_OK(_executor->start());
+            _executor->start();
         }
 
         ServiceExecutorFixed* operator->() const noexcept {

@@ -234,6 +234,7 @@ public:
         sc->setSessionManager(_makeSessionManager(sc));
         initializeNewSession();
         invariant(sessionManager()->start());
+        ServiceExecutor::startupAll(sc);
         _threadPool->startup();
     }
 
@@ -245,6 +246,7 @@ public:
         invariant(sessionManager()->shutdownAndWait(Seconds{10}));
         _threadPool->shutdown();
         _threadPool->join();
+        ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
     }
 
     void initializeNewSession() {

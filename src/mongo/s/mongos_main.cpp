@@ -888,6 +888,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                                                   std::make_unique<SessionsCollectionSharded>(),
                                                   RouterSessionCatalog::reapSessionsOlderThan));
 
+    transport::ServiceExecutor::startupAll(serviceContext);
+
     status = serviceContext->getSessionManager()->start();
     if (!status.isOK()) {
         LOGV2_ERROR(22860, "Error starting session manager", "error"_attr = redact(status));
