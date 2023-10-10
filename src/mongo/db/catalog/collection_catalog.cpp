@@ -118,7 +118,12 @@ const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
 // batched write is ongoing without having to take locks.
 std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
 AtomicWord<bool> ongoingBatchedWrite{false};
-absl::flat_hash_set<Collection*> batchedCatalogClonedCollections;
+// Set to keep track of all collection instances cloned in this batched writer that do not currently
+// need to be re-cloned.
+absl::flat_hash_set<const Collection*> batchedCatalogClonedCollections;
+// Set to keep track of all collection instances that have been cloned in a WUOW that needs to be
+// restored in case of rollback.
+CollectionCatalog::BatchedCollectionWrite* ongoingBatchedWOUWCollectionWrite = nullptr;
 
 const RecoveryUnit::Snapshot::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
     RecoveryUnit::Snapshot::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
@@ -484,6 +489,97 @@ public:
 
 private:
     UncommittedCatalogUpdates& _uncommittedCatalogUpdates;
+};
+
+/**
+ * Helper to manage the lifetime of cloned collection instances during batch writes.
+ *
+ * Batched writes and writes under the exclusive global lock are special in the way that they do not
+ * require a WUOW to perform the writes. However, WUOW may be used and they may roll back for any
+ * reason even when the global lock is held in exclusive mode. The copy-on-write semantics on the
+ * Collection type should behave as close in this case as regular Collection writes under exclusive
+ * Collection lock.
+ *
+ * The first request for a writable Collection should make a clone that may be used for writes until
+ * any of the following:
+ * 1. The WUOW commits
+ * 2. The WUOW rolls back
+ * 3. The batched catalog write ends (the case when no WUOW is used)
+ *
+ * If the WUOW rolls back, the cloned collection instance should be discarded and the original
+ * instance should be stored in the catalog instance used for the batched write.
+ *
+ * If further writes to this collection is needed within the same batched write but after the WUOW
+ * has committed or rolled back a new clone is needed.
+ */
+class CollectionCatalog::BatchedCollectionWrite : public RecoveryUnit::Change {
+public:
+    static void setup(OperationContext* opCtx,
+                      std::shared_ptr<Collection> original,
+                      std::shared_ptr<Collection> clone) {
+        const Collection* clonePtr = clone.get();
+        // Mark this instance as cloned for the batched writer, this will prevent further clones for
+        // this Collection.
+        batchedCatalogClonedCollections.emplace(clonePtr);
+
+        // Do not update min valid timestamp in batched write as the write is not corresponding to
+        // an oplog entry. If the write require an update to this timestamp it is the responsibility
+        // of the user.
+        PublishCatalogUpdates::setCollectionInCatalog(
+            *batchedCatalogWriteInstance, std::move(clone), boost::none);
+
+        // Nothing more to do if we are not in a WUOW.
+        if (!opCtx->lockState()->inAWriteUnitOfWork()) {
+            return;
+        }
+
+        // Register one change to the recovery unit, as we are in a batched write it is likely that
+        // we will clone multiple collections. This allows all of them to re-use a single recovery
+        // unit change.
+        if (!ongoingBatchedWOUWCollectionWrite) {
+            std::unique_ptr<BatchedCollectionWrite> batchedWrite(new BatchedCollectionWrite());
+
+            ongoingBatchedWOUWCollectionWrite = batchedWrite.get();
+
+            // Register commit/rollback handlers _if_ we are in an WUOW.
+            opCtx->recoveryUnit()->registerChange(std::move(batchedWrite));
+        }
+
+        // Push this instance to the set of collections cloned in this WUOW.
+        ongoingBatchedWOUWCollectionWrite->addManagedClone(clonePtr, std::move(original));
+    }
+
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> ts) override {
+        for (auto&& [clone, original] : _clones) {
+            // Clear the flag that this instance is used for batch write, this will trigger new
+            // copy-on-write next time it is needed.
+            batchedCatalogClonedCollections.erase(clone);
+        }
+
+        // Mark that this WUOW is finished.
+        ongoingBatchedWOUWCollectionWrite = nullptr;
+    }
+    void rollback(OperationContext* opCtx) override {
+        for (auto&& [clone, original] : _clones) {
+            // Restore the original collection instances to the batched catalog
+            PublishCatalogUpdates::setCollectionInCatalog(
+                *batchedCatalogWriteInstance, std::move(original), boost::none);
+
+            // Clear the flag that this instance is used for batch write, this will trigger new
+            // copy-on-write next time it is needed.
+            batchedCatalogClonedCollections.erase(clone);
+        }
+
+        // Mark that this WUOW is finished.
+        ongoingBatchedWOUWCollectionWrite = nullptr;
+    }
+
+    void addManagedClone(const Collection* clone, std::shared_ptr<Collection> original) {
+        _clones[clone] = std::move(original);
+    }
+
+private:
+    absl::flat_hash_map<const Collection*, std::shared_ptr<Collection>> _clones;
 };
 
 CollectionCatalog::iterator::iterator(const DatabaseName& dbName,
@@ -1531,12 +1627,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     // on the thread doing the batch write and it would trigger the regular path where we do a
     // copy-on-write on the catalog when committing.
     if (_isCatalogBatchWriter()) {
-        batchedCatalogClonedCollections.emplace(cloned.get());
-        // Do not update min valid timestamp in batched write as the write is not corresponding to
-        // an oplog entry. If the write require an update to this timestamp it is the responsibility
-        // of the user.
-        PublishCatalogUpdates::setCollectionInCatalog(
-            *batchedCatalogWriteInstance, std::move(cloned), boost::none);
+        BatchedCollectionWrite::setup(opCtx, std::move(coll), std::move(cloned));
         return ptr;
     }
 
@@ -1655,12 +1746,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     // on the thread doing the batch write and it would trigger the regular path where we do a
     // copy-on-write on the catalog when committing.
     if (_isCatalogBatchWriter()) {
-        batchedCatalogClonedCollections.emplace(cloned.get());
-        // Do not update min valid timestamp in batched write as the write is not corresponding to
-        // an oplog entry. If the write require an update to this timestamp it is the responsibility
-        // of the user.
-        PublishCatalogUpdates::setCollectionInCatalog(
-            *batchedCatalogWriteInstance, std::move(cloned), boost::none);
+        BatchedCollectionWrite::setup(opCtx, std::move(coll), std::move(cloned));
         return ptr;
     }
 

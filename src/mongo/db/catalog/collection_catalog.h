@@ -660,6 +660,8 @@ public:
     const HistoricalCatalogIdTracker& catalogIdTracker() const;
     HistoricalCatalogIdTracker& catalogIdTracker();
 
+    class BatchedCollectionWrite;
+
 private:
     friend class CollectionCatalog::iterator;
     class PublishCatalogUpdates;

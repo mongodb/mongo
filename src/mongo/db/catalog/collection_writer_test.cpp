@@ -74,7 +74,11 @@ protected:
         CatalogTestFixture::setUp();
         Lock::GlobalWrite lk(operationContext());
 
-        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(kNss);
+        createCollection(kNss);
+    }
+
+    void createCollection(const NamespaceString& nss) {
+        std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
         CollectionCatalog::write(getServiceContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
                 operationContext(), std::move(collection), /*ts=*/boost::none);
@@ -87,8 +91,12 @@ protected:
     }
 
     const Collection* lookupCollectionFromCatalogForRead() {
+        return lookupCollectionFromCatalogForRead(kNss);
+    }
+
+    const Collection* lookupCollectionFromCatalogForRead(const NamespaceString& nss) {
         return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByNamespace(operationContext(), kNss);
+            ->lookupCollectionByNamespace(operationContext(), nss);
     }
 
     void verifyCollectionInCatalogUsingDifferentClient(const Collection* expected) {
@@ -312,34 +320,71 @@ TEST_F(CatalogReadCopyUpdateTest, ConcurrentCatalogWriteBatchingMayThrow) {
 
 class BatchedCollectionCatalogWriterTest : public CollectionWriterTest {
 public:
-    Collection* lookupCollectionFromCatalogForMetadataWrite() {
+    Collection* lookupCollectionFromCatalogForMetadataWrite(const NamespaceString& nss) {
         return CollectionCatalog::get(operationContext())
-            ->lookupCollectionByNamespaceForMetadataWrite(operationContext(), kNss);
+            ->lookupCollectionByNamespaceForMetadataWrite(operationContext(), nss);
     }
 };
 
 TEST_F(BatchedCollectionCatalogWriterTest, BatchedTest) {
+    const NamespaceString other = NamespaceString::createNamespaceString_forTest("testdb", "other");
 
-    const Collection* before = lookupCollectionFromCatalogForRead();
+    const Collection* before = lookupCollectionFromCatalogForRead(kNss);
     const Collection* after = nullptr;
     {
         Lock::GlobalWrite lock(operationContext());
+        createCollection(other);
+
         BatchedCollectionCatalogWriter batched(operationContext());
 
         // We should get a unique clone the first time we request a writable collection
-        Collection* firstWritable = lookupCollectionFromCatalogForMetadataWrite();
+        Collection* firstWritable = lookupCollectionFromCatalogForMetadataWrite(kNss);
         ASSERT_NE(firstWritable, before);
 
         // Subsequent requests should return the same instance.
-        Collection* secondWritable = lookupCollectionFromCatalogForMetadataWrite();
+        Collection* secondWritable = lookupCollectionFromCatalogForMetadataWrite(kNss);
         ASSERT_EQ(secondWritable, firstWritable);
+
+        // Check behavior with WUOW
+        const Collection* otherBefore = lookupCollectionFromCatalogForRead(other);
+        const Collection* otherInWUOW = nullptr;
+
+        // Behavior for WUOW that commits
+        {
+            WriteUnitOfWork wuow(operationContext());
+
+            // Lookup for write and record the instance, we should find it in the catalog after the
+            // WOUW commits
+            Collection* otherWritable = lookupCollectionFromCatalogForMetadataWrite(other);
+            otherInWUOW = otherWritable;
+            ASSERT_NE(otherBefore, otherInWUOW);
+
+            wuow.commit();
+        }
+        ASSERT_EQ(lookupCollectionFromCatalogForRead(other), otherInWUOW);
+
+        // Behavior for WUOW that rollback
+        {
+            WriteUnitOfWork wuow(operationContext());
+
+            // Another WUOW, check that that we will re-clone the collection
+            Collection* otherWritable = lookupCollectionFromCatalogForMetadataWrite(other);
+            ASSERT_NE(otherWritable, otherInWUOW);
+        }
+
+        // After rollback we restored the original instance
+        ASSERT_EQ(lookupCollectionFromCatalogForRead(other), otherInWUOW);
+
+        // Make sure we did not restore the instance for the collection that write was requested for
+        // outside of a WUOW.
+        ASSERT_EQ(lookupCollectionFromCatalogForRead(kNss), firstWritable);
 
         after = firstWritable;
     }
 
     // When the batched writer commits our collection instance should be replaced.
-    ASSERT_NE(lookupCollectionFromCatalogForRead(), before);
-    ASSERT_EQ(lookupCollectionFromCatalogForRead(), after);
+    ASSERT_NE(lookupCollectionFromCatalogForRead(kNss), before);
+    ASSERT_EQ(lookupCollectionFromCatalogForRead(kNss), after);
 }
 
 }  // namespace

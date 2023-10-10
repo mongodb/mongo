@@ -113,6 +113,8 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
                     catalogWriter.value()->lookupCollectionByUUIDForMetadataWrite(
                         opCtx, collection->uuid());
                 writableCollection->setMinimumValidSnapshot(minValid);
+                // Update the pointer in the outer scope as we just requested a writable instance
+                collection = writableCollection;
             }
 
             if (collection->getTimeseriesOptions()) {
