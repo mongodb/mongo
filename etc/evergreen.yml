@@ -3721,7 +3721,7 @@ functions:
           set -o errexit
 
           ${activate_virtualenv}
-          $python buildscripts/sync_repo_with_copybara.py --expansion-file expansions.yml
+          $python buildscripts/sync_repo_with_copybara.py
 
 # Pre task steps
 pre:
@@ -5339,9 +5339,6 @@ tasks:
   - *git_get_project
   - *set_task_expansion_macros
   - *set_up_virtualenv
-  - command: expansions.write
-    params:
-      file: src/expansions.yml
   - func: "sync repo with copybara"
 
 ## integration test suites ##

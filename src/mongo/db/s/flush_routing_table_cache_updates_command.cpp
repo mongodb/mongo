@@ -112,10 +112,6 @@ public:
                                   << " if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "Can only call " << Request::kCommandName << " on collections",
-                    !ns().coll().empty());
-
             auto& oss = OperationShardingState::get(opCtx);
 
             {
