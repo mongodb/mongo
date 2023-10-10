@@ -20,23 +20,26 @@ export class TestDefinition extends SelinuxBaseTest {
                 // we will not be fixing what is not working, and instead exclude them from running
                 // as "known" to not work. This is done by the means of "no_selinux" tag
                 const HAS_TAG = 0;
-                if (HAS_TAG ==
-                    runNonMongoProgram(python,
-                                       "buildscripts/resmokelib/utils/check_has_tag.py",
-                                       t,
-                                       "^no_selinux$")) {
+                const NO_TAG = 1;
+                let checkTagRc = runNonMongoProgram(
+                    python, "buildscripts/resmokelib/utils/check_has_tag.py", t, "^no_selinux$")
+                if (HAS_TAG == checkTagRc) {
                     jsTest.log("Skipping test due to no_selinux tag: " + t);
                     continue;
                 }
+                if (NO_TAG != checkTagRc) {
+                    throw ("Failure occurred while checking tags of test: " + t);
+                }
 
                 // Tests relying on featureFlagXXX will not work
-                if (HAS_TAG ==
-                    runNonMongoProgram(python,
-                                       "buildscripts/resmokelib/utils/check_has_tag.py",
-                                       t,
-                                       "^featureFlag.+$")) {
+                checkTagRc = runNonMongoProgram(
+                    python, "buildscripts/resmokelib/utils/check_has_tag.py", t, "^featureFlag.+$")
+                if (HAS_TAG == checkTagRc) {
                     jsTest.log("Skipping test due to feature flag tag: " + t);
                     continue;
+                }
+                if (NO_TAG != checkTagRc) {
+                    throw ("Failure occurred while checking tags of test: " + t);
                 }
 
                 jsTest.log("Running test: " + t);
