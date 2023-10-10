@@ -94,7 +94,7 @@ generate_test_prefix()
 
 TEST_CASE("Testing class gcpConnection", "gcp-connection")
 {
-    std::string test_bucket_name = "unit_testing_gcp";
+    std::string test_bucket_name = "gcptestext-us";
 
     // Set up the test environment.
     std::string test_bucket_prefix = generate_test_prefix();

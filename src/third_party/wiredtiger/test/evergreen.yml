@@ -4054,6 +4054,9 @@ tasks:
             # Run Azure extension unit testing.
             ext/storage_sources/azure_store/test/run_azure_unit_tests
 
+            # Run GCP extension unit testing.
+            ext/storage_sources/gcp_store/test/run_gcp_unit_tests
+
   - name: azure-gcp-tiered-test-small
     tags: ["pull_request", "python"]
     commands:
