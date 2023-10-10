@@ -254,11 +254,11 @@ public:
     }
 
     const CollatorInterface* getCollator() const {
-        return _collator.get();
+        return _collator.getCollator();
     }
 
     std::shared_ptr<CollatorInterface> getCollatorShared() const {
-        return _collator;
+        return _collator.getCollatorShared();
     }
 
     /**
@@ -278,7 +278,11 @@ public:
      * the ExpressionContext.
      */
     BSONObj getCollatorBSON() const {
-        return _collator ? _collator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
+        if (_collator.getIgnore()) {
+            return BSONObj();
+        }
+        auto* collator = _collator.getCollator();
+        return collator ? collator->getSpec().toBSON() : CollationSpec::kSimpleSpec;
     }
 
     /**
@@ -288,11 +292,12 @@ public:
      * to change the collation once a Pipeline has been parsed with this ExpressionContext.
      */
     void setCollator(std::shared_ptr<CollatorInterface> collator) {
-        _collator = std::move(collator);
+        _collator.setCollator(std::move(collator));
 
         // Document/Value comparisons must be aware of the collation.
-        _documentComparator = DocumentComparator(_collator.get());
-        _valueComparator = ValueComparator(_collator.get());
+        auto* ptr = _collator.getCollator();
+        _documentComparator = DocumentComparator(ptr);
+        _valueComparator = ValueComparator(ptr);
     }
 
     const DocumentComparator& getDocumentComparator() const {
@@ -673,6 +678,14 @@ public:
         long long _docsReturnedByIdLookup = 0;
     } sharedSearchState;
 
+    void setIgnoreCollator() {
+        _collator.setIgnore();
+    }
+
+    bool getIgnoreCollator() {
+        return _collator.getIgnore();
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -682,8 +695,50 @@ protected:
     // when _interruptCounter has been decremented to zero.
     void checkForInterruptSlow();
 
-    // Collator used for comparisons.
-    std::shared_ptr<CollatorInterface> _collator;
+    // Class responsible for tracking the collator used for comparisons. Specifically, this
+    // collator enforces the following contract:
+    // - When used in a replica set or a standalone, '_collator' will have the correct collation.
+    // - When routing to a tracked collection, '_collator' will have the correct collation according
+    // to the ChunkManager and can use it.
+    // - When routing to an untracked collection, '_collator' will be set incorrectly as there is
+    // no way to know the collation of an untracked collection on the router. However,
+    // 'ignore' will be set to 'true', which indicates that we will not attach '_collator' when
+    // routing commands to the target collection.
+    // TODO SERVER-81991: Delete this class once we branch for 8.0.
+    class RoutingCollator {
+    public:
+        RoutingCollator(std::shared_ptr<CollatorInterface> collator) : _ptr(std::move(collator)) {}
+        void setIgnore() {
+            _ignore = true;
+        }
+
+        bool getIgnore() const {
+            return _ignore;
+        }
+
+        void setCollator(std::shared_ptr<CollatorInterface> collator) {
+            _ptr = collator;
+            // If we are manually setting the collator, we shouldn't ignore it.
+            _ignore = false;
+        }
+        std::shared_ptr<CollatorInterface> getCollatorShared() const {
+            if (_ignore) {
+                return nullptr;
+            }
+            return _ptr;
+        }
+
+        CollatorInterface* getCollator() const {
+            if (_ignore) {
+                return nullptr;
+            }
+            return _ptr.get();
+        }
+
+    private:
+        std::shared_ptr<CollatorInterface> _ptr = nullptr;
+        bool _ignore = false;
+    } _collator;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
     // Must not be changed after parsing a Pipeline with this ExpressionContext.

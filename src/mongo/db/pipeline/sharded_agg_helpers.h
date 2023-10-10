@@ -187,7 +187,6 @@ BSONObj createPassthroughCommandForShard(
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj,
     boost::optional<BSONObj> readConcern,
     boost::optional<int> overrideBatchSize);
 

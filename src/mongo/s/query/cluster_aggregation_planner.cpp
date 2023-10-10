@@ -870,13 +870,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
 
     // Format the command for the shard. This wraps the command as an explain if necessary, and
     // rewrites the result into a format safe to forward to shards.
-    BSONObj cmdObj = sharded_agg_helpers::createPassthroughCommandForShard(expCtx,
-                                                                           serializedCommand,
-                                                                           explain,
-                                                                           nullptr, /* pipeline */
-                                                                           BSONObj(),
-                                                                           boost::none,
-                                                                           overrideBatchSize);
+    BSONObj cmdObj = sharded_agg_helpers::createPassthroughCommandForShard(
+        expCtx, serializedCommand, explain, nullptr /* pipeline */, boost::none, overrideBatchSize);
 
     if (eligibleForSampling) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(

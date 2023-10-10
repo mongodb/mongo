@@ -161,8 +161,8 @@ ExpressionContext::ExpressionContext(
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()),
+      _documentComparator(_collator.getCollator()),
+      _valueComparator(_collator.getCollator()),
       _resolvedNamespaces(std::move(resolvedNamespaces)) {
 
     if (runtimeConstants && runtimeConstants->getClusterTime().isNull()) {
@@ -205,8 +205,8 @@ ExpressionContext::ExpressionContext(
       variablesParseState(variables.useIdGenerator()),
       mayDbProfile(mayDbProfile),
       _collator(std::move(collator)),
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()) {
+      _documentComparator(_collator.getCollator()),
+      _valueComparator(_collator.getCollator()) {
     if (runtimeConstants) {
         variables.setLegacyRuntimeConstants(*runtimeConstants);
     }
@@ -233,8 +233,8 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
       mayDbProfile(true),
       _collator(
           nullptr),  // TODO SERVER-81604 Instantiate collator for makeBlankExpressionContext()
-      _documentComparator(_collator.get()),
-      _valueComparator(_collator.get()) {
+      _documentComparator(_collator.getCollator()),
+      _valueComparator(_collator.getCollator()) {
     variables.setDefaultRuntimeConstants(opCtx);
     // Expression counters are reported in serverStatus to indicate how often clients use certain
     // expressions/stages, so it's a side effect tied to parsing. We must stop expression counters
@@ -264,7 +264,7 @@ void ExpressionContext::checkForInterruptSlow() {
 
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,
                                                 std::unique_ptr<CollatorInterface> newCollator)
-    : _expCtx(expCtx), _originalCollator(std::move(_expCtx->_collator)) {
+    : _expCtx(expCtx), _originalCollator(_expCtx->_collator.getCollatorShared()) {
     _expCtx->setCollator(std::move(newCollator));
 }
 
@@ -282,10 +282,15 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     NamespaceString ns,
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {
-
-    auto collator = updatedCollator
-        ? std::move(*updatedCollator)
-        : (_collator ? _collator->clone() : std::unique_ptr<CollatorInterface>{});
+    auto collator = [&]() {
+        if (updatedCollator) {
+            return std::move(*updatedCollator);
+        } else if (_collator.getCollator()) {
+            return _collator.getCollator()->clone();
+        } else {
+            return std::unique_ptr<CollatorInterface>();
+        }
+    }();
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,
@@ -303,6 +308,10 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
                                                     boost::none /* letParameters */,
                                                     mayDbProfile,
                                                     SerializationContext());
+
+    if (_collator.getIgnore()) {
+        expCtx->setIgnoreCollator();
+    }
 
     expCtx->inMongos = inMongos;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;

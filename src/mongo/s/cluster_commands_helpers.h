@@ -96,6 +96,7 @@ std::unique_ptr<WriteConcernErrorDetail> getWriteConcernErrorDetailFromBSONObj(c
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
     const BSONObj& collation,
     const boost::optional<ExplainOptions::Verbosity>& verbosity,
     const boost::optional<BSONObj>& letParameters,

@@ -100,6 +100,9 @@ auto makeExpressionContext(OperationContext* opCtx,
                            boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collection UUID and the appropriate collation to use.
     auto nss = parsedMr.getNamespace();
+
+    // TODO SERVER-80145: Verify that, in the event of no user-specified collation, we get an empty
+    // collation object and boost::none UUID for unsplittable collections.
     auto [collationObj, uuid] = cluster_aggregation_planner::getCollationAndUUID(
         opCtx, cm, nss, parsedMr.getCollation().get_value_or(BSONObj()));
 
@@ -147,6 +150,9 @@ auto makeExpressionContext(OperationContext* opCtx,
         false  // mayDbProfile: false because mongos has no profile collection.
     );
     expCtx->inMongos = true;
+    if (!cm.hasRoutingTable() && collationObj.isEmpty()) {
+        expCtx->setIgnoreCollator();
+    }
     return expCtx;
 }
 

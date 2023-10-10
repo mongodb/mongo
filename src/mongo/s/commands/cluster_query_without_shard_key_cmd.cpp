@@ -94,6 +94,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
@@ -155,22 +156,19 @@ BSONObj parseSortPattern(OperationContext* opCtx,
 }
 
 std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
-                                    const ChunkManager& cm,
+                                    const CollectionRoutingInfo& cri,
                                     NamespaceString nss,
                                     const ParsedCommandInfo& parsedInfo) {
+    const auto& cm = cri.cm;
     std::set<ShardId> allShardsContainingChunksForNs;
-    uassert(ErrorCodes::NamespaceNotSharded, "The collection was dropped.", cm.isSharded());
+    uassert(ErrorCodes::NamespaceNotSharded, "The collection was dropped", cm.isSharded());
 
     auto query = parsedInfo.query;
     auto collation = parsedInfo.collation;
-    std::unique_ptr<CollatorInterface> collator;
-    if (!collation.isEmpty()) {
-        collator = uassertStatusOK(
-            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
-    }
     auto expCtx =
         makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                      nss,
+                                                     cri,
                                                      collation,
                                                      boost::none,  // explain
                                                      parsedInfo.let,
@@ -415,7 +413,7 @@ public:
             const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
             auto allShardsContainingChunksForNs =
-                getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
+                getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
 
             // If the request omits the collation use the collection default collation. If
             // the collection just has the simple collation, we can leave the collation as
@@ -565,7 +563,7 @@ public:
             const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
 
             auto allShardsContainingChunksForNs =
-                getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
+                getShardsToTarget(opCtx, cri, nss, parsedInfoFromRequest);
             auto cmdObj = createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, boost::none);
 
             const auto aggExplainCmdObj = ClusterExplain::wrapAsExplain(cmdObj, verbosity);

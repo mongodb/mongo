@@ -198,17 +198,6 @@ BSONObj getQueryForShardKey(boost::intrusive_ptr<ExpressionContext> expCtx,
 }
 }  // namespace
 
-BSONObj getShardKey(boost::intrusive_ptr<ExpressionContext> expCtx,
-                    const ChunkManager& chunkMgr,
-                    const BSONObj& query) {
-    BSONObj shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
-        expCtx, chunkMgr.getShardKeyPattern(), getQueryForShardKey(expCtx, chunkMgr, query)));
-    uassert(ErrorCodes::ShardKeyNotFound,
-            "Query for sharded findAndModify must contain the shard key",
-            !shardKey.isEmpty());
-    return shardKey;
-}
-
 void handleWouldChangeOwningShardErrorNonTransaction(
     OperationContext* opCtx,
     const ShardId& shardId,
@@ -537,17 +526,6 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
     return bucketCollCri;
 }
 
-boost::intrusive_ptr<ExpressionContext> makeExpCtx(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& collation,
-    const boost::optional<ExplainOptions::Verbosity> verbosity,
-    const boost::optional<BSONObj>& let,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
-    return makeExpressionContextWithDefaultsForTargeter(
-        opCtx, nss, collation, verbosity, let, runtimeConstants);
-}
-
 /**
  * Returns the shard id if the 'query' can be targeted to a single shard. Otherwise, returns
  * boost::none.
@@ -645,7 +623,8 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const auto let = getLet(cmdObj);
     const auto rc = getLegacyRuntimeConstants(cmdObj);
     if (cm.isSharded()) {
-        auto expCtx = makeExpCtx(opCtx, nss, collation, boost::none, let, rc);
+        auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+            opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
         if (write_without_shard_key::useTwoPhaseProtocol(
                 opCtx, nss, false /* isUpdateOrDelete */, isUpsert, query, collation, let, rc)) {
             shardId = targetPotentiallySingleShard(expCtx, cm, query, collation);
@@ -739,7 +718,9 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
         const BSONObj collation = getCollation(cmdObjForShard);
         const auto letParams = getLet(cmdObjForShard);
         const auto runtimeConstants = getLegacyRuntimeConstants(cmdObjForShard);
-        auto expCtx = makeExpCtx(opCtx, nss, collation, boost::none, letParams, runtimeConstants);
+        auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+            opCtx, nss, cri, collation, boost::none /* verbosity */, letParams, runtimeConstants);
+
 
         if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
                                                          nss,

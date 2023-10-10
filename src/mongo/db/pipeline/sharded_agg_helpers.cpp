@@ -207,14 +207,14 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
 BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                   boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                                  BSONObj collationObj,
                                   boost::optional<BSONObj> readConcern) {
     cmdForShards[AggregateCommandRequest::kLetFieldName] =
         Value(expCtx->variablesParseState.serialize(expCtx->variables));
 
     cmdForShards[AggregateCommandRequest::kFromMongosFieldName] = Value(expCtx->inMongos);
 
-    if (!collationObj.isEmpty()) {
+    if (auto collationObj = expCtx->getCollatorBSON();
+        !collationObj.isEmpty() && !expCtx->getIgnoreCollator()) {
         cmdForShards[AggregateCommandRequest::kCollationFieldName] = Value(collationObj);
     }
 
@@ -980,7 +980,6 @@ BSONObj createPassthroughCommandForShard(
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj,
     boost::optional<BSONObj> readConcern,
     boost::optional<int> overrideBatchSize) {
     // Create the command for the shards.
@@ -999,11 +998,8 @@ BSONObj createPassthroughCommandForShard(
         }
     }
 
-    auto shardCommand = genericTransformForShards(std::move(targetedCmd),
-                                                  expCtx,
-                                                  explainVerbosity,
-                                                  std::move(collationObj),
-                                                  std::move(readConcern));
+    auto shardCommand = genericTransformForShards(
+        std::move(targetedCmd), expCtx, explainVerbosity, std::move(readConcern));
 
     // Apply filter and RW concern to the final shard command.
     return CommandHelpers::filterCommandRequestForPassthrough(
@@ -1050,8 +1046,8 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     targetedCmd[AggregateCommandRequest::kExchangeFieldName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
-    auto shardCommand = genericTransformForShards(
-        std::move(targetedCmd), expCtx, explain, expCtx->getCollatorBSON(), std::move(readConcern));
+    auto shardCommand =
+        genericTransformForShards(std::move(targetedCmd), expCtx, explain, std::move(readConcern));
 
     // Apply RW concern to the final shard command.
     return applyReadWriteConcern(expCtx->opCtx,
@@ -1201,7 +1197,6 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                                            serializedCommand,
                                                            explain,
                                                            pipeline.get(),
-                                                           expCtx->getCollatorBSON(),
                                                            std::move(readConcern),
                                                            boost::none));
     const auto targetedSampleId = eligibleForSampling

@@ -109,13 +109,15 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTargeter(
     OperationContext* opCtx,
     const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
     const BSONObj& collation,
     const boost::optional<ExplainOptions::Verbosity>& verbosity,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
 
+    const auto noCollationSpecified = collation.isEmpty();
     auto&& cif = [&]() {
-        if (collation.isEmpty()) {
+        if (noCollationSpecified) {
             return std::unique_ptr<CollatorInterface>{};
         } else {
             return uassertStatusOK(
@@ -127,7 +129,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     resolvedNamespaces.emplace(nss.coll(),
                                ExpressionContext::ResolvedNamespace(nss, std::vector<BSONObj>{}));
 
-    return make_intrusive<ExpressionContext>(
+    auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         verbosity,
         true,   // fromMongos
@@ -144,6 +146,12 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
         letParameters,
         false  // mongos has no profile collection
     );
+
+    // Ignore the collator if the collection is untracked and the user did not specify a collator.
+    if (!cri.cm.hasRoutingTable() && noCollationSpecified) {
+        expCtx->setIgnoreCollator();
+    }
+    return expCtx;
 }
 
 namespace {
@@ -175,6 +183,8 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     if (!cm.hasRoutingTable()) {
         // The collection does not have a routing table. Target only the primary shard for the
         // database.
+        // TODO SERVER-80145: Consider removing this call to 'dbPrimary()', or at least allowing the
+        // generic code to target an unsharded collection.
         auto primaryShardId = cm.dbPrimary();
 
         if (shardsToSkip.find(primaryShardId) != shardsToSkip.end()) {
@@ -471,8 +481,13 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     bool eligibleForSampling) {
-    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-        opCtx, nss, collation, boost::none /*explainVerbosity*/, letParameters, runtimeConstants);
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               nss,
+                                                               cri,
+                                                               collation,
+                                                               boost::none /*explainVerbosity*/,
+                                                               letParameters,
+                                                               runtimeConstants);
     return scatterGatherVersionedTargetByRoutingTable(expCtx,
                                                       dbName,
                                                       nss,
@@ -515,8 +530,13 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
-    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-        opCtx, nss, collation, boost::none /*explainVerbosity*/, letParameters, runtimeConstants);
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               nss,
+                                                               cri,
+                                                               collation,
+                                                               boost::none /*explainVerbosity*/,
+                                                               letParameters,
+                                                               runtimeConstants);
     const auto requests = buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, shardsToSkip, cmdObj, query, collation);
 
@@ -555,6 +575,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     Shard::RetryPolicy retryPolicy) {
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
+                                                               cri,
                                                                BSONObj() /*collation*/,
                                                                boost::none /*explainVerbosity*/,
                                                                boost::none /*letParameters*/,
@@ -757,8 +778,14 @@ std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
-    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
-        opCtx, nss, collation, boost::none /*explainVerbosity*/, letParameters, runtimeConstants);
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               nss,
+                                                               cri,
+                                                               collation,
+                                                               boost::none /*explainVerbosity*/,
+                                                               letParameters,
+                                                               runtimeConstants);
+
     std::vector<std::pair<ShardId, BSONObj>> requests;
     auto ars_requests = buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation);

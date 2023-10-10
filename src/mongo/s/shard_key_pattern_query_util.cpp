@@ -470,6 +470,10 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
         expCtx->setCollator(defaultCollator->clone());
     }
 
+    if (!cm.hasRoutingTable() && collation.isEmpty()) {
+        expCtx->setIgnoreCollator();
+    }
+
     auto cq = uassertStatusOK(
         CanonicalQuery::canonicalize(expCtx->opCtx,
                                      std::move(findCommand),

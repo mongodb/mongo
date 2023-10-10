@@ -232,6 +232,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
 
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                nss,
+                                                               cri,
                                                                collation,
                                                                boost::none,  // explain
                                                                let,

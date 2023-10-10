@@ -458,6 +458,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
 
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                _nss,
+                                                               _cri,
                                                                collation,
                                                                boost::none,  // explain
                                                                itemRef.getLet(),
@@ -632,6 +633,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     // Collection is sharded
     auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
                                                                _nss,
+                                                               _cri,
                                                                collation,
                                                                boost::none,  // explain
                                                                itemRef.getLet(),

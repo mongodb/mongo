@@ -127,6 +127,7 @@ auto resolveInvolvedNamespaces(const stdx::unordered_set<NamespaceString>& invol
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
+    const boost::optional<CollectionRoutingInfo>& cri,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
@@ -151,6 +152,10 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         uuid);
 
     mergeCtx->inMongos = true;
+
+    if ((!cri || !cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
+        mergeCtx->setIgnoreCollator();
+    }
 
     // Serialize the 'AggregateCommandRequest' and save it so that the original command can be
     // reconstructed for dispatch to a new shard, which is sometimes necessary for change streams
@@ -317,6 +322,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     boost::intrusive_ptr<ExpressionContext> expCtx =
         makeExpressionContext(opCtx,
                               request,
+                              cri,
                               collationObj,
                               uuid,
                               resolveInvolvedNamespaces(involvedNamespaces),
@@ -506,8 +512,18 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 targeter.policy ==
                     cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
 
-        expCtx = make_intrusive<ExpressionContext>(
-            opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
+        std::unique_ptr<CollatorInterface> collation = nullptr;
+        if (auto collationObj = request.getCollation()) {
+            // This will be null if attempting to build an interface for the simple collator.
+            collation = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                            ->makeFromBSON(*collationObj));
+        }
+
+        expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                   std::move(collation),
+                                                   namespaces.executionNss,
+                                                   boost::none /* runtimeConstants */,
+                                                   request.getLet());
         expCtx->addResolvedNamespaces(involvedNamespaces);
 
         // Skip query stats recording for queryable encryption queries.
