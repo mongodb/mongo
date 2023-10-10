@@ -60,7 +60,7 @@ def main():
 
     docker_cmd = [
         "docker run", "-v ~/.ssh:/root/.ssh", "-v ~/mongodb-bot.gitconfig:/root/.gitconfig",
-        f'-v "{current_dir}/copybara.staging.sky":/usr/src/app/copy.bara.sky',
+        f'-v "{current_dir}/copybara.sky":/usr/src/app/copy.bara.sky',
         "-e COPYBARA_CONFIG='copy.bara.sky'", "-e COPYBARA_SUBCOMMAND='migrate'",
         "-e COPYBARA_OPTIONS='-v'", "copybara copybara"
     ]
