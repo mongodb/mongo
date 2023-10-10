@@ -27,6 +27,7 @@ Config = namedtuple("config", [
 def make_config(expansions_file: Any) -> Config:
     """Group expansions into config."""
     expansions = read_config_file(expansions_file)
+    private_key_file = "src/powercycle.pem"
     current_task_name = expansions.get("task_name", "powercycle")
     task_names = expansions.get("task_names", "powercycle_smoke_skip_compile")
     # Avoid duplicated task names
@@ -37,11 +38,12 @@ def make_config(expansions_file: Any) -> Config:
         "timeout_secs": int(expansions.get("timeout_secs", 1800)),
     }
     remote_credentials_vars = {
-        "private_key_file": "src/powercycle.pem",
+        "private_key_file": private_key_file,
         "private_key_remote": "${__project_aws_ssh_key_value}",
     }
     set_up_ec2_instance_vars = {
         "set_up_retry_count": int(expansions.get("set_up_retry_count", 2)),
+        "private_key_file": private_key_file,
     }
     run_powercycle_vars = {
         "run_powercycle_args": expansions.get("run_powercycle_args"),
