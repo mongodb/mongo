@@ -44,6 +44,9 @@ COMMON_PUBLIC_PATTERN = r'''
     '''
 """Common Public pattern format."""
 
+COMMON_10GENREPO_COMMIT_QUEUE_PATTERN = r' ^\'(?P<repo>10gen/mongo)\'\s.*commit\squeue\smerge.*SERVER-[0-9]+'
+"""Common commit queue format."""
+
 COMMON_LINT_PATTERN = r'(?P<lint>Fix\slint)'
 """Common Lint pattern format."""
 
@@ -102,6 +105,12 @@ def old_patch_description(pattern: str) -> str:
 VALID_PATTERNS = [
     re.compile(new_patch_description(COMMON_PUBLIC_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
     re.compile(old_patch_description(COMMON_PUBLIC_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
+    re.compile(
+        new_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
+        re.MULTILINE | re.DOTALL | re.VERBOSE),
+    re.compile(
+        old_patch_description(COMMON_10GENREPO_COMMIT_QUEUE_PATTERN),
+        re.MULTILINE | re.DOTALL | re.VERBOSE),
     re.compile(new_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
     re.compile(old_patch_description(COMMON_LINT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
     re.compile(new_patch_description(COMMON_IMPORT_PATTERN), re.MULTILINE | re.DOTALL | re.VERBOSE),
