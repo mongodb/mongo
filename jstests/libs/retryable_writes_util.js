@@ -86,6 +86,7 @@ export var RetryableWritesUtil = (function() {
         } else {
             assert.commandFailedWithCode(res, expectedErrorCode);
         }
+        return res;
     }
 
     return {
