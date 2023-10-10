@@ -6,13 +6,13 @@
  *  requires_fcv_71,
  *  requires_sharding,
  *  uses_transactions,
+ *  assumes_balancer_off,
  * ]
  */
 import "jstests/libs/parallelTester.js";
 
 import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/write_without_shard_key_base.js";
@@ -41,10 +41,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.newShardKeyFields = ["a", "b"];
 
     $config.setup = function setup(db, collName, cluster) {
-        // Disable balancer during setup to avoid it issuing concurrent chunks migrations
-        // that would conflict with the ones issued in this setup procedure.
-        BalancerHelper.stopBalancer(db);
-
         // Proactively create and shard all possible collections suffixed with this.latch.getCount()
         // that could receive CRUD operations over the course of the FSM workload. This prevents the
         // race that could occur between sharding a collection and creating an index on the new
@@ -57,8 +53,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             assertAlways.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }
-
-        BalancerHelper.startBalancer(db);
     };
 
     // Occasionally flush the router's cached metadata to verify the metadata for the refined

@@ -12,8 +12,8 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 // This workload does not make use of random moveChunks, but other workloads that extend this base
 // workload may.
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
+import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
-import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 10;
@@ -438,23 +438,37 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         BalancerHelper.disableBalancerForCollection(db, nss);
         BalancerHelper.joinBalancerRound(db);
 
-        let shards = Object.keys(cluster.getSerializedCluster().shards);
-        const chunks = findChunksUtil.findChunksByNs(db.getSiblingDB('config'), nss).toArray();
-        assert.eq(1, chunks.length);
-        let initialShard = chunks[0].shard;
-        delete shards[initialShard];
+        const shards = Object.keys(cluster.getSerializedCluster().shards);
+        ChunkHelper.moveChunk(
+            db,
+            collName,
+            [{[this.defaultShardKeyField]: MinKey}, {[this.defaultShardKeyField]: MaxKey}],
+            shards[0]);
 
         for (let tid = 0; tid < this.threadCount; ++tid) {
             const partition = this.makePartition(nss, tid, this.partitionSize);
 
             // Create two chunks for the partition assigned to this thread:
             // [partition.lower, partition.mid] and [partition.mid, partition.upper].
-            assert.commandWorked(db.adminCommand({
-                moveRange: nss,
-                min: {[this.defaultShardKeyField]: partition.chunkLower},
-                max: {[this.defaultShardKeyField]: partition.mid},
-                toShard: shards[this.generateRandomInt(0, shards.length - 1)]
-            }));
+
+            // The lower bound for a low chunk partition is minKey, so a split is not necessary.
+            if (!partition.isLowChunk) {
+                assert.commandWorked(db.adminCommand(
+                    {split: nss, middle: {[this.defaultShardKeyField]: partition.lower}}));
+            }
+
+            assert.commandWorked(db.adminCommand(
+                {split: nss, middle: {[this.defaultShardKeyField]: partition.mid}}));
+
+            // Move one of the two chunks assigned to this thread to one of the other shards.
+            ChunkHelper.moveChunk(
+                db,
+                collName,
+                [
+                    {[this.defaultShardKeyField]: partition.isLowChunk ? MinKey : partition.lower},
+                    {[this.defaultShardKeyField]: partition.mid}
+                ],
+                shards[this.generateRandomInt(1, shards.length - 1)]);
         }
 
         // There isn't a way to determine what the thread ids are in setup phase so just assume
