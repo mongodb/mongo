@@ -351,6 +351,18 @@ public:
     }
 
     /**
+     * Sets the error code that operations associated with this client will be killed with if the
+     * underlying ingress session disconnects.
+     */
+    void setDisconnectErrorCode(ErrorCodes::Error code) {
+        _disconnectErrorCode = code;
+    }
+
+    ErrorCodes::Error getDisconnectErrorCode() {
+        return _disconnectErrorCode;
+    }
+
+    /**
      * Atomically set all of the connection tags specified in the 'tagsToSet' bit field. If the
      * 'kPending' tag is set, indicating that no tags have yet been specified for the connection,
      * this function also clears that tag as part of the same atomic operation.
@@ -426,6 +438,8 @@ private:
 
     // Indicates that this client is internal to the cluster.
     bool _isInternalClient{false};
+
+    ErrorCodes::Error _disconnectErrorCode = ErrorCodes::ClientDisconnect;
 
     AtomicWord<TagMask> _tags;
 };

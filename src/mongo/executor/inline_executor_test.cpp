@@ -329,6 +329,9 @@ TEST_F(SleepableExecutorTest, WithNetworkingBaton) {
         void detachImpl() noexcept override {
             MONGO_UNIMPLEMENTED;
         }
+        transport::TransportLayer* getTransportLayer() const override {
+            MONGO_UNIMPLEMENTED
+        }
 
     private:
         std::shared_ptr<TaskExecutor> _executor;

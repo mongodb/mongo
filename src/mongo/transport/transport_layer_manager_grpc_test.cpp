@@ -45,9 +45,12 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/scopeguard.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::transport {
 namespace {
@@ -83,20 +86,20 @@ public:
         _grpcTL = grpcTL.get();
         layers.push_back(std::move(grpcTL));
 
-        _tlManager = std::make_unique<TransportLayerManager>(std::move(layers), _asioTL);
-        uassertStatusOK(_tlManager->setup());
-        uassertStatusOK(_tlManager->start());
+        getServiceContext()->setTransportLayer(
+            std::make_unique<TransportLayerManager>(std::move(layers), _asioTL));
+        uassertStatusOK(getServiceContext()->getTransportLayer()->setup());
+        uassertStatusOK(getServiceContext()->getTransportLayer()->start());
     }
 
     void tearDown() override {
         getServiceContext()->getSessionManager()->endAllSessions({});
-        _tlManager->shutdown();
-        _tlManager.reset();
+        getServiceContext()->getTransportLayer()->shutdown();
         ServiceContextTest::tearDown();
     }
 
     TransportLayerManager& getTransportLayerManager() {
-        return *_tlManager;
+        return checked_cast<TransportLayerManager&>(*getServiceContext()->getTransportLayer());
     }
 
     AsioTransportLayer& getAsioTransportLayer() {
@@ -131,7 +134,6 @@ private:
         return grpcLayer;
     }
 
-    std::unique_ptr<TransportLayerManager> _tlManager;
     AsioTransportLayer* _asioTL;
     grpc::GRPCTransportLayer* _grpcTL;
     ServerCb _serverCb;
@@ -201,6 +203,71 @@ TEST_F(AsioGRPCTransportLayerManagerTest, EgressAsio) {
     ASSERT_OK(swSession);
     ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
     grpc::assertEchoSucceeds(*swSession.getValue());
+}
+
+TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
+    // When set with a value, the client side thread will disconnect the gRPC session.
+    auto killSessionPf = makePromiseFuture<void>();
+
+    // Set with a value once the server's callback has completed fully.
+    auto serverCbCompletePf = makePromiseFuture<void>();
+
+    setServerCallback([&](auto& session) mutable {
+        try {
+            ON_BLOCK_EXIT([&] { session.end(); });
+            ASSERT_TRUE(dynamic_cast<grpc::IngressSession*>(&session));
+
+            auto newClient = getServiceContext()->getService()->makeClient(
+                "MyClient", session.shared_from_this());
+            newClient->setDisconnectErrorCode(ErrorCodes::StreamTerminated);
+            AlternativeClientRegion acr(newClient);
+            auto opCtx = cc().makeOperationContext();
+
+            auto baton = opCtx->getBaton();
+            ASSERT_TRUE(baton);
+            ASSERT_TRUE(baton->networking());
+
+            opCtx->markKillOnClientDisconnect();
+
+            ASSERT_DOES_NOT_THROW(opCtx->sleepFor(Milliseconds(10)));
+
+            auto clkSource = getServiceContext()->getFastClockSource();
+            auto start = clkSource->now();
+            killSessionPf.promise.emplaceValue();
+            ASSERT_THROWS_CODE(
+                opCtx->sleepFor(Seconds(10)), DBException, cc().getDisconnectErrorCode());
+            ASSERT_LT(clkSource->now() - start, Seconds(5)) << "sleep did not wake up early enough";
+
+            serverCbCompletePf.promise.emplaceValue();
+        } catch (...) {  // Need to catch all errors so we can wake up the main test thread if this
+                         // handler failed.
+            auto error = Status(ErrorCodes::UnknownError,
+                                "server handler failed, see logs for offending exception");
+            if (!killSessionPf.future.isReady()) {
+                killSessionPf.promise.setError(std::move(error));
+            } else {
+                serverCbCompletePf.promise.setError(std::move(error));
+            }
+            throw;
+        }
+    });
+
+    {
+        auto client = std::make_shared<grpc::GRPCClient>(
+            nullptr,
+            grpc::makeClientMetadataDocument(),
+            grpc::CommandServiceTestFixtures::makeClientOptions());
+        client->start(getServiceContext());
+        ON_BLOCK_EXIT([&] { client->shutdown(); });
+        auto session = client->connect(grpc::CommandServiceTestFixtures::defaultServerAddress(),
+                                       grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                       {});
+        ON_BLOCK_EXIT([&] { session->end(); });
+        ASSERT_OK(killSessionPf.future.getNoThrow());
+        sleepFor(Milliseconds(100));
+    }
+
+    ASSERT_OK(serverCbCompletePf.future.getNoThrow());
 }
 
 }  // namespace

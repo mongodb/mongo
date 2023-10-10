@@ -674,6 +674,20 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='default_baton_test',
+    source=[
+        'default_baton_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
+        '$BUILD_DIR/mongo/util/clock_source_mock',
+        'service_context',
+        'service_context_test_fixture',
+    ],
+)
+
 env.Library(
     target='prepare_conflict_tracker',
     source=[

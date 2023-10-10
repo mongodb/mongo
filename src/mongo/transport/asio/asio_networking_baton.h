@@ -47,6 +47,8 @@
 namespace mongo {
 namespace transport {
 
+class TransportLayer;
+
 /**
  * AsioTransportLayer Baton implementation for linux.
  *
@@ -54,7 +56,8 @@ namespace transport {
  */
 class AsioNetworkingBaton : public NetworkingBaton {
 public:
-    AsioNetworkingBaton(OperationContext* opCtx) : _opCtx(opCtx) {}
+    AsioNetworkingBaton(const TransportLayer* tl, OperationContext* opCtx)
+        : _opCtx(opCtx), _tl(tl) {}
 
     ~AsioNetworkingBaton() {
         invariant(!_opCtx);
@@ -81,13 +84,17 @@ public:
 
     Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) noexcept override;
 
-    Future<void> waitUntil(Date_t expiration, const CancellationToken&) noexcept override;
+    Future<void> waitUntil(Date_t expiration, const CancellationToken&) override;
 
     bool cancelSession(Session& session) noexcept override;
 
     bool cancelTimer(const ReactorTimer& timer) noexcept override;
 
     bool canWait() noexcept override;
+
+    const TransportLayer* getTransportLayer() const override {
+        return _tl;
+    }
 
 private:
     struct Timer {
@@ -168,6 +175,8 @@ private:
      */
     std::vector<::pollfd> _pollSet;
     std::vector<decltype(_sessions)::iterator> _pollSessions;
+
+    const TransportLayer* _tl;
 };
 
 }  // namespace transport

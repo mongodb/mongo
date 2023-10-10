@@ -33,15 +33,16 @@
 #include <mutex>
 #include <utility>
 
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/default_baton.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/future.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -61,14 +62,9 @@ DefaultBaton::~DefaultBaton() {
     invariant(_scheduled.empty());
 }
 
-void DefaultBaton::markKillOnClientDisconnect() noexcept {
-    if (_opCtx->getClient() && _opCtx->getClient()->session()) {
-        _hasIngressSocket = true;
-    }
-}
-
 void DefaultBaton::detachImpl() noexcept {
     decltype(_scheduled) scheduled;
+    decltype(_timers) timers;
 
     {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -77,10 +73,15 @@ void DefaultBaton::detachImpl() noexcept {
         _opCtx->setBaton(nullptr);
 
         _opCtx = nullptr;
-        _hasIngressSocket = false;
 
         using std::swap;
         swap(_scheduled, scheduled);
+        swap(_timers, timers);
+        _timersById.clear();
+    }
+
+    for (auto& timer : timers) {
+        timer.second.promise.setError(kDetached);
     }
 
     for (auto& job : scheduled) {
@@ -114,10 +115,25 @@ void DefaultBaton::notify() noexcept {
 
 Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
                                                Date_t oldDeadline) noexcept {
-    stdx::unique_lock<Latch> lk(_mutex);
-
     // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
     const ScopeGuard guard([&] {
+        stdx::unique_lock<Latch> lk(_mutex);
+
+        // Fire expired timers
+        std::vector<Timer> expiredTimers;
+        const auto now = clkSource->now();
+        for (auto it = _timers.begin(); it != _timers.end() && it->first <= now;
+             it = _timers.erase(it)) {
+            _timersById.erase(it->second.id);
+            expiredTimers.push_back(std::move(it->second));
+        }
+
+        lk.unlock();
+        for (auto& timer : expiredTimers) {
+            timer.promise.emplaceValue();
+        }
+        lk.lock();
+
         // While we have scheduled work, keep running jobs
         while (_scheduled.size()) {
             auto toRun = std::exchange(_scheduled, {});
@@ -130,6 +146,8 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
         }
     });
 
+    stdx::unique_lock<Latch> lk(_mutex);
+
     // If anything was scheduled, run it now.
     if (_scheduled.size()) {
         return Waitable::TimeoutState::NoTimeout;
@@ -137,10 +155,8 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
 
     auto newDeadline = oldDeadline;
 
-    // If we have an ingress socket, sleep no more than 1 second (so we poll for closure in the
-    // outside opCtx waitForConditionOrInterruptUntil implementation)
-    if (_hasIngressSocket) {
-        newDeadline = std::min(oldDeadline, clkSource->now() + Seconds(1));
+    if (!_timers.empty()) {
+        newDeadline = std::min(oldDeadline, _timers.begin()->first);
     }
 
     // we mark sleeping, so that we receive notifications
@@ -161,6 +177,61 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
 
 void DefaultBaton::run(ClockSource* clkSource) noexcept {
     run_until(clkSource, Date_t::max());
+}
+
+void DefaultBaton::_safeExecute(stdx::unique_lock<Mutex> lk, Job job) {
+    if (!_opCtx) {
+        // If we're detached, no job can safely execute.
+        iasserted(kDetached);
+    }
+
+    if (_sleeping) {
+        _scheduled.push_back([this, job = std::move(job)](auto status) mutable {
+            if (status.isOK()) {
+                job(stdx::unique_lock<Mutex>(_mutex));
+            }
+        });
+        lk.unlock();
+        notify();
+    } else {
+        job(std::move(lk));
+    }
+}
+
+Future<void> DefaultBaton::waitUntil(Date_t expiration, const CancellationToken& token) try {
+    auto pf = makePromiseFuture<void>();
+    auto id = _nextTimerId.fetchAndAdd(1);
+    _safeExecute(stdx::unique_lock(_mutex),
+                 [this, id, expiration, promise = std::move(pf.promise)](auto lk) mutable {
+                     auto iter = _timers.emplace(expiration, Timer{id, std::move(promise)});
+                     _timersById[iter->second.id] = iter;
+                 });
+
+    token.onCancel().thenRunOn(shared_from_this()).getAsync([this, id](Status s) {
+        if (s.isOK()) {
+            stdx::unique_lock lk(_mutex);
+            if (_timersById.find(id) == _timersById.end()) {
+                return;
+            }
+
+            _safeExecute(std::move(lk), [this, id](auto lk) {
+                auto it = _timersById.find(id);
+                if (it == _timersById.end()) {
+                    return;
+                }
+                auto timer = std::exchange(it->second->second, {});
+                _timers.erase(it->second);
+                _timersById.erase(it);
+                lk.unlock();
+
+                timer.promise.setError(
+                    Status(ErrorCodes::CallbackCanceled, "Baton wait cancelled"));
+            });
+        }
+    });
+    return std::move(pf.future);
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 }  // namespace mongo

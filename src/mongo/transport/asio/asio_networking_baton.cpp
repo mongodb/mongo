@@ -222,9 +222,10 @@ void AsioNetworkingBaton::markKillOnClientDisconnect() noexcept {
     auto client = _opCtx->getClient();
     invariant(client);
     if (auto session = client->session()) {
-        _addSession(*session, POLLRDHUP).getAsync([this](Status status) {
+        auto code = client->getDisconnectErrorCode();
+        _addSession(*session, POLLRDHUP).getAsync([this, code](Status status) {
             if (status.isOK())
-                _opCtx->markKilled(ErrorCodes::ClientDisconnect);
+                _opCtx->markKilled(code);
         });
     }
 }
@@ -247,8 +248,7 @@ Future<void> AsioNetworkingBaton::waitUntil(const ReactorTimer& reactorTimer,
     return ex.toStatus();
 }
 
-Future<void> AsioNetworkingBaton::waitUntil(Date_t expiration,
-                                            const CancellationToken& token) noexcept try {
+Future<void> AsioNetworkingBaton::waitUntil(Date_t expiration, const CancellationToken& token) try {
     auto pf = makePromiseFuture<void>();
     DummyTimer dummy;
     const size_t timerId = dummy.id();

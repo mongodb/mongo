@@ -70,12 +70,11 @@ public:
     };
     virtual Future<void> addSession(Session& session, Type type) noexcept = 0;
 
+    using Baton::waitUntil;
     /**
      * Adds a timer, returning a future which activates after a deadline.
      */
     virtual Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) noexcept = 0;
-
-    virtual Future<void> waitUntil(Date_t expiration, const CancellationToken& token) noexcept = 0;
 
     /**
      * Cancels waiting on a session.
@@ -91,11 +90,20 @@ public:
      */
     virtual bool cancelTimer(const ReactorTimer& timer) noexcept = 0;
 
+    /**
+     * Marks the baton to wake up on client session disconnect and mark the associated operation as
+     * killed.
+     */
+    virtual void markKillOnClientDisconnect() noexcept = 0;
+
+
     NetworkingBaton* networking() noexcept final {
         return this;
     }
 
     virtual bool canWait() noexcept = 0;
+
+    virtual const TransportLayer* getTransportLayer() const = 0;
 };
 
 }  // namespace transport

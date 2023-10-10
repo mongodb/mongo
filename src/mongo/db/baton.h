@@ -32,6 +32,7 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -101,10 +102,7 @@ public:
         return nullptr;
     }
 
-    /**
-     * Marks the baton to wake up on client socket disconnect
-     */
-    virtual void markKillOnClientDisconnect() noexcept = 0;
+    virtual Future<void> waitUntil(Date_t expiration, const CancellationToken& token) = 0;
 
     /**
      * Holder for a SubBaton, detaches on destruction
