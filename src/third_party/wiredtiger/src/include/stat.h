@@ -1061,7 +1061,6 @@ struct __wt_dsrc_stats {
     int64_t rec_overflow_key_leaf;
     int64_t rec_multiblock_max;
     int64_t rec_overflow_value;
-    int64_t rec_page_match;
     int64_t rec_pages;
     int64_t rec_pages_eviction;
     int64_t rec_page_delete;
