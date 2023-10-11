@@ -191,8 +191,11 @@ void checkTimeseriesBucketsCollectionOptions(OperationContext* opCtx,
                                              CollectionOptions& options) {
     auto coll = acquireCollectionMaybeLockFree(
         opCtx,
-        CollectionAcquisitionRequest::fromOpCtx(
-            opCtx, bucketsNs, AcquisitionPrerequisites::OperationType::kRead));
+        // TODO (SERVER-82072): Do not skip shard version checks.
+        CollectionAcquisitionRequest{bucketsNs,
+                                     PlacementConcern{},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::OperationType::kRead});
     uassert(error.code(), error.reason(), coll.exists());
 
     auto existingOptions = coll.getCollectionPtr()->getCollectionOptions();

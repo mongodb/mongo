@@ -485,6 +485,8 @@ last-continuous:
     ticket: SERVER-81939
   - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_let_parameters.js
     ticket: SERVER-81057
+  - test_file: jstests/core/timeseries/timeseries_create.js
+    ticket: SERVER-80776
   suites: null
 last-lts:
   all:

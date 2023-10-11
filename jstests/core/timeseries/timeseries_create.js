@@ -34,11 +34,12 @@ const testOptions = function({
     const collName = 'timeseries_' + collCount++;
     const bucketsCollName = 'system.buckets.' + collName;
 
+    assert.commandWorked(testDB.runCommand({drop: collName}));
     fixture.setUp(testDB, collName);
 
     const create = function() {
-        return testDB.runCommand(
-            Object.extend({create: collName, timeseries: timeseriesOptions}, createOptions));
+        return testDB.createCollection(
+            collName, Object.extend({timeseries: timeseriesOptions}, createOptions));
     };
     const res = create();
 
@@ -76,8 +77,8 @@ const testOptions = function({
         if (optionsAffectStorage &&
             (Object.entries(createOptions).length > 0 ||
              Object.entries(timeseriesOptions).length > 1)) {
-            assert.commandWorked(testDB.runCommand(
-                {create: collName, timeseries: {timeField: timeseriesOptions["timeField"]}}));
+            assert.commandWorked(testDB.createCollection(
+                collName, {timeseries: {timeField: timeseriesOptions["timeField"]}}));
             assert.commandFailedWithCode(create(), ErrorCodes.NamespaceExists);
 
             assert.commandWorked(testDB.runCommand({drop: collName}));
