@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Build a WiredTiger release package.
 
 set -e
@@ -60,7 +60,7 @@ if [ $OLD_VERSION_MINOR != $WIREDTIGER_VERSION_MINOR ]; then
 fi
 
 echo "Rebuild documentation root"
-(cd "$TOPDIR/dist" && sh s_docs -l > /dev/null)
+(cd "$TOPDIR/dist" && bash s_docs -l > /dev/null)
 
 # Copy the new files into the documentation repository
 (cd $TOPDIR && cp -r docs/top/* $DOC_DIR/)

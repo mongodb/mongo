@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Check various WiredTiger function behaviors.
 t=__wt.$$
@@ -14,7 +14,7 @@ case "$1" in
             echo "Usage: $0 [-F]"
             echo "-F only run function validation on modified soure files."
         fi
-        break;;
+        ;;
 esac
 
 cd ..

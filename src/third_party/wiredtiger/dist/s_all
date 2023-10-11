@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Run standard scripts.
 t=__wt.$$
@@ -40,7 +40,7 @@ while :
 done
 
 echo "Updating files that include the package version" &&
-    sh ./s_version $force
+    bash ./s_version $force
 
 errchk()
 {
@@ -69,19 +69,19 @@ run()
 
 # Non parallelizable scripts. The following scripts either modify files or
 # already parallelize internally.
-run "sh ./s_readme $force"
-run "sh ./s_install $force"
+run "bash ./s_readme $force"
+run "bash ./s_install $force"
 run "python3 api_config_gen.py"
 run "python3 api_err.py"
 run "python3 flags.py"
 run "python3 log.py"
 run "python3 stat.py"
 run "python3 verbose.py"
-run "sh ./s_copyright"
-run "sh ./s_style ${fast}"
+run "bash ./s_copyright"
+run "bash ./s_style ${fast}"
 run "./s_clang_format ${fast}"
 run "python3 prototypes.py"
-run "sh ./s_typedef -b"
+run "bash ./s_typedef -b"
 run "python3 test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
@@ -118,7 +118,7 @@ echo date | xargs -P 20 >/dev/null 2>&1
 if test $? -eq 0; then
     xp="-P 20"
 fi
-echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
+echo "$COMMANDS" | xargs $xp -I{} /bin/bash -c {}
 
 # For each command check if an output file has been generated. If it has, report the contents and
 # the command used to populate it.

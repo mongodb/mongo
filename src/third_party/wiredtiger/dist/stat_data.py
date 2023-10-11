@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Auto-generate statistics #defines, with initialization, clear and aggregate
 # functions.
 #

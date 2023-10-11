@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Examine WT_WITH_* macros and complain if an early exit out of the
 # macro is done.  These macros potentially restore state after they execute
 # an expression, and an early exit, like a return/goto means the state

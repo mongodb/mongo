@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Output C #defines for errors into wiredtiger.in and the associated error
 # message code in strerror.c.
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # A simple python script to build a file that can be bulk-loaded into a
 # WiredTiger database for smoke-testing.
 

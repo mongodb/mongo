@@ -1,4 +1,4 @@
-#!/bin/sh -
+#!/bin/bash -
 #
 # Check spelling in comments and quoted strings from the source files.
 

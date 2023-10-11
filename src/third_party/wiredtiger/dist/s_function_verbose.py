@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # When calling '__wt_verbose', the second parameter can only be a single verbose
 # category definition i.e. can't treat the parameter as a flag/mask value.
 # Iterate over uses of '__wt_verbose' and detect any invalid uses where multiple

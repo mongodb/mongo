@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Check lang directories for potential name conflicts
 t=__wt.$$

@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 t=__wt.$$
 t_pfx=__s_clang_tidy_tmp_

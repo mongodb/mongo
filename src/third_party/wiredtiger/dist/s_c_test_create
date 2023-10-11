@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 #
 # Usage: s_c_test_create test_name

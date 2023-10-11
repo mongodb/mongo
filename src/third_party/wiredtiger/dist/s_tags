@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Build tags files.
 trap 'rm -f tags' 0 1 2 3 13 15

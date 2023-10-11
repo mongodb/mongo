@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # This file is a python script that describes the WiredTiger API.
 
 class Method:

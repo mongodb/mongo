@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Propagate version changes to the necessary files.
 . ../RELEASE_INFO

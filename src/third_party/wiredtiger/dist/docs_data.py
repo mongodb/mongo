@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Create entries used by our doxygen filter to expand the arch_page
 # macros in the documentation.
 

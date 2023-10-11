@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Complain about unused #defines.
 t=__wt.$$

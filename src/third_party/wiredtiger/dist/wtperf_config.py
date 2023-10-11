@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 ''' Output a doxgen version of the wtperf configuration options. '''
 import sys
 

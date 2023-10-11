@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Data for log.py, describes the format of log records
 
 # There are a small number of main log record types.

@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # General style correction and cleanup.
 t=__wt.$$
@@ -36,7 +36,7 @@ if [ "$single_file" -ne 1 ]; then
         -e '/test\/checksum\/power8/d' \
         -e '/bench\/workgen\/workgen_wrap.cxx/d' \
         -e '/checksum\/zseries/d' |
-    xargs $xp -I{} sh ./dist/s_style {}
+    xargs $xp -I{} bash ./dist/s_style {}
 else
     # General style correction and cleanup for a single file
     f=$1

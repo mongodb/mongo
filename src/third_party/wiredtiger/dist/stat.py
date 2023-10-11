@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Read the source files and output the statistics #defines plus the
 # initialize and refresh code.
 

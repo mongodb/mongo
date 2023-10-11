@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 t_out=__wt.$$.out
 t_err=__wt.$$.err

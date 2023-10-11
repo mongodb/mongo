@@ -1,2 +1,2 @@
-#!/bin/sh
+#!/bin/bash
 ./s_all -F

@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Single space, newline at the end of file, and remove trailing whitespace from source files.
 t=__wt.$$

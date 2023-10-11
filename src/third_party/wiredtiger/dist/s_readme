@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 t=__wt.$$
 trap 'rm -f $t' 0 1 2 3 13 15

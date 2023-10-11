@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Mark outer loop boundaries with {@ and }@ .  Nested loops are not marked.
 # Each input line is the content of a C function.
 import re, sys

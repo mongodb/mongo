@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import filecmp, fnmatch, glob, os, re, shutil, subprocess
 from contextlib import contextmanager
 

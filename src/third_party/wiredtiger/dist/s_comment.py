@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Fill out block comments to the full line length (currently 100).
 #
 # We're defining a "block comment" to be a multiline comment where each line

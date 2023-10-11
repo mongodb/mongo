@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 # Only run when building a release
 test -z "$WT_RELEASE_BUILD" && exit 0
@@ -119,10 +119,10 @@ fi
     -e '/\/node_modules\//d' \
     -e '/dist\/__/d' \
     -e 's/^\.\///' |
-    xargs $xp -n 1 -I{} sh dist/s_copyright {})
+    xargs $xp -n 1 -I{} bash dist/s_copyright {})
 
 # One-offs.
-(cd .. && sh dist/s_copyright test/syscall/wt2336_base/base.run)
+(cd .. && bash dist/s_copyright test/syscall/wt2336_base/base.run)
 
 # A few special cases: LICENSE, documentation, wt utility, some of which have
 # more than one copyright notice in the file. For files that have only a single

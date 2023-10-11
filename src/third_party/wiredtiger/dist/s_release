@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Build a WiredTiger release package.
 
 set -e
@@ -26,10 +26,10 @@ else
 fi
 
 echo "Running 'dist/s_all' in the release tree"
-(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
+(cd "$DEST/dist" && env WT_RELEASE_BUILD=yes bash s_all -A > /dev/null)
 
 echo "Building documentation"
-(cd "$DEST/dist" && sh s_docs > /dev/null)
+(cd "$DEST/dist" && bash s_docs > /dev/null)
 
 echo "Packing release into $RELEASE_DIR/$PKG.tar.bz2"
 (cd "$RELEASE_DIR" && tar cf - $PKG | bzip2 -9 > $PKG.tar.bz2)
