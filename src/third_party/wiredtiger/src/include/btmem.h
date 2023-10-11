@@ -1337,6 +1337,12 @@ struct __wt_update {
 #define WT_UPDATE_SIZE 47
 
 /*
+ * If there is no value, ensure that the memory allocation size matches that returned by sizeof().
+ * Otherwise bit-exact tools like MSan may infer the structure is not completely initialized.
+ */
+#define WT_UPDATE_SIZE_NOVALUE (sizeof(struct __wt_update))
+
+/*
  * The memory size of an update: include some padding because this is such a common case that
  * overhead of tiny allocations can swamp our cache overhead calculation.
  */

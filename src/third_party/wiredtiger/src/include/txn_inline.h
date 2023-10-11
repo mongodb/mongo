@@ -895,6 +895,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
   size_t *sizep)
 {
     WT_UPDATE *upd;
+    size_t allocsz; /* Allocation size in bytes. */
 
     *updp = NULL;
 
@@ -909,6 +910,11 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
         (value != NULL &&
           !(modify_type == WT_UPDATE_RESERVE || modify_type == WT_UPDATE_TOMBSTONE)));
 
+    if (value == NULL || value->size == 0)
+        allocsz = WT_UPDATE_SIZE_NOVALUE;
+    else
+        allocsz = WT_UPDATE_SIZE + value->size;
+
     /*
      * Allocate the WT_UPDATE structure and room for the value, then copy any value into place.
      * Memory is cleared, which is the equivalent of setting:
@@ -918,7 +924,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
      *    WT_UPDATE.prepare_state = WT_PREPARE_INIT;
      *    WT_UPDATE.flags = 0;
      */
-    WT_RET(__wt_calloc(session, 1, WT_UPDATE_SIZE + (value == NULL ? 0 : value->size), &upd));
+    WT_RET(__wt_calloc(session, 1, allocsz, &upd));
     if (value != NULL && value->size != 0) {
         upd->size = WT_STORE_SIZE(value->size);
         memcpy(upd->data, value->data, value->size);

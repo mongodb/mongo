@@ -60,6 +60,14 @@ __wt_verify_build(void)
     WT_SIZE_CHECK(WT_UPDATE, WT_ALIGN(WT_UPDATE_SIZE, 8));
     WT_STATIC_ASSERT(offsetof(WT_UPDATE, data) == WT_UPDATE_SIZE);
 
+    /*
+     * WT_UPDATE: Validate expected sum of field sizes compared to compiler determined structure
+     * size. If the fields WT_UPDATE these assertions should be revised to match the trailing
+     * padding of the updated structure.
+     */
+    WT_STATIC_ASSERT(WT_UPDATE_SIZE_NOVALUE == sizeof(WT_UPDATE));
+    WT_STATIC_ASSERT((WT_UPDATE_SIZE_NOVALUE - WT_UPDATE_SIZE) == 1);
+
 /* Check specific structures were padded. */
 #define WT_PADDING_CHECK(s) \
     WT_STATIC_ASSERT(       \
