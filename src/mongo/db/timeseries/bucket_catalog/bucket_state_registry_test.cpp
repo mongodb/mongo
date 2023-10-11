@@ -629,7 +629,7 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
     auto batch = std::make_shared<WriteBatch>(
-        BucketHandle{bucketId, info1.stripe}, 0, stats, bucket.timeField);
+        BucketHandle{bucketId, info1.stripe}, info1.key, 0, stats, bucket.timeField);
 
     internal::abort(*this, stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
     ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
@@ -643,7 +643,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
     auto batch = std::make_shared<WriteBatch>(
-        BucketHandle{bucketId, info1.stripe}, 0, stats, bucket.timeField);
+        BucketHandle{bucketId, info1.stripe}, info1.key, 0, stats, bucket.timeField);
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*this, batch));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
@@ -653,7 +653,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         // this and closes the bucket.
         bucket.rolloverAction = RolloverAction::kHardClose;
         CommitInfo commitInfo{};
-        auto closedBucket = finish(*this, batch, commitInfo);
+        auto closedBucket = finish(nullptr, *this, batch, commitInfo);
         ASSERT(closedBucket.has_value());
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 

@@ -30,6 +30,11 @@
 
 #include "mongo/db/timeseries/timeseries_write_util.h"
 
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
+
 #include <absl/container/flat_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <boost/container/small_vector.hpp>
@@ -38,12 +43,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <cstdint>
-#include <string>
-#include <type_traits>
-#include <utility>
-
-#include "timeseries_index_schema_conversion_functions.h"
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
@@ -72,6 +71,7 @@
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
@@ -81,6 +81,7 @@
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
@@ -612,21 +613,19 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                                                  combine);
 
             if (swResult.isOK()) {
-                const auto& insertResult = swResult.getValue();
+                auto& insertResult = swResult.getValue();
 
-                // If the InsertResult doesn't contain a batch, we failed to insert the
-                // measurement into an open bucket and need to create/reopen a bucket.
-                if (!insertResult.batch) {
-                    bucket_catalog::BucketFindResult bucketFindResult;
+                if (auto* reopeningContext =
+                        stdx::get_if<bucket_catalog::ReopeningContext>(&insertResult)) {
                     BSONObj suitableBucket;
 
-                    if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
+                    if (auto* bucketId = stdx::get_if<OID>(&reopeningContext->candidate)) {
                         DBDirectClient client{opCtx};
                         suitableBucket =
                             client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
-                        bucketFindResult.fetchedBucket = true;
-                    } else if (auto* pipeline =
-                                   stdx::get_if<std::vector<BSONObj>>(&insertResult.candidate)) {
+                        reopeningContext->fetchedBucket = true;
+                    } else if (auto* pipeline = stdx::get_if<std::vector<BSONObj>>(
+                                   &reopeningContext->candidate)) {
                         // Resort to Query-Based reopening approach.
                         DBDirectClient client{opCtx};
 
@@ -650,19 +649,17 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                             if (cursor->more()) {
                                 suitableBucket = cursor->next();
                             }
-                            bucketFindResult.queriedBucket = true;
+                            reopeningContext->queriedBucket = true;
                         }
                     }
 
-                    boost::optional<bucket_catalog::BucketToReopen> bucketToReopen = boost::none;
                     if (!suitableBucket.isEmpty()) {
                         auto validator = [&](OperationContext * opCtx,
                                              const BSONObj& bucketDoc) -> auto {
                             return bucketsColl->checkValidation(opCtx, bucketDoc);
                         };
-                        auto bucketToReopen = bucket_catalog::BucketToReopen{
-                            suitableBucket, validator, insertResult.catalogEra};
-                        bucketFindResult.bucketToReopen = std::move(bucketToReopen);
+                        reopeningContext->bucketToReopen =
+                            bucket_catalog::BucketToReopen{suitableBucket, validator};
                     }
 
                     swResult = bucket_catalog::insert(opCtx,
@@ -672,19 +669,25 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                                                       timeSeriesOptions,
                                                       measurementDoc,
                                                       combine,
-                                                      std::move(bucketFindResult));
+                                                      reopeningContext);
+                } else if (auto* waiter =
+                               stdx::get_if<bucket_catalog::InsertWaiter>(&insertResult)) {
+                    // Need to wait for another operation to finish, then retry. This could be
+                    // another reopening request or a previously prepared write batch for the same
+                    // series (metaField value). The easiest way to retry here is to reset swResult
+                    // to a WriteConflict, which will automatically re-run the while loop.
+                    bucket_catalog::waitToInsert(waiter);
+                    swResult = Status{ErrorCodes::WriteConflict, "waited to retry"};
                 }
             }
         } else {
-            bucket_catalog::BucketFindResult bucketFindResult;
             swResult = bucket_catalog::insert(opCtx,
                                               bucketCatalog,
                                               viewNs,
                                               bucketsColl->getDefaultCollator(),
                                               timeSeriesOptions,
                                               measurementDoc,
-                                              combine,
-                                              bucketFindResult);
+                                              combine);
         }
 
         // If there is an era offset (between the bucket we want to reopen and the
@@ -733,7 +736,7 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(OperationContext* opCtx,
     auto viewNs = bucketsNs.getTimeseriesViewNamespace();
 
     for (const auto& measurement : measurements) {
-        auto insertResult = uassertStatusOK(
+        auto result = uassertStatusOK(
             attemptInsertIntoBucket(opCtx,
                                     bucketCatalog,
                                     viewNs,
@@ -742,7 +745,9 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(OperationContext* opCtx,
                                     measurement,
                                     bucket_catalog::CombineWithInsertsFromOtherClients::kDisallow,
                                     /*fromUpdates=*/true));
-        batches.emplace_back(std::move(insertResult.batch));
+        auto* insertResult = stdx::get_if<bucket_catalog::SuccessfulInsertion>(&result);
+        invariant(insertResult);
+        batches.emplace_back(std::move(insertResult->batch));
     }
 
     return batches;
@@ -881,7 +886,7 @@ void commitTimeseriesBucketsAtomically(
         getOpTimeAndElectionId(opCtx, &opTime, &electionId);
 
         for (auto batch : batchesToCommit) {
-            finish(sideBucketCatalog, batch, bucket_catalog::CommitInfo{opTime, electionId});
+            finish(opCtx, sideBucketCatalog, batch, bucket_catalog::CommitInfo{opTime, electionId});
             batch.get().reset();
         }
     } catch (const DBException& ex) {

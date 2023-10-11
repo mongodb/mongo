@@ -135,10 +135,12 @@ std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
     auto it = bucket.batches.find(opId);
     if (it == bucket.batches.end()) {
         it = bucket.batches
-                 .try_emplace(
-                     opId,
-                     std::make_shared<WriteBatch>(
-                         BucketHandle{bucket.bucketId, stripe}, opId, stats, bucket.timeField))
+                 .try_emplace(opId,
+                              std::make_shared<WriteBatch>(BucketHandle{bucket.bucketId, stripe},
+                                                           bucket.key,
+                                                           opId,
+                                                           stats,
+                                                           bucket.timeField))
                  .first;
     }
     return it->second;
