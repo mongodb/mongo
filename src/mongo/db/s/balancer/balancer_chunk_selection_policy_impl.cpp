@@ -366,8 +366,15 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         return MigrateInfoVector{};
     }
 
+    stdx::unordered_set<ShardId> availableShards;
+    std::transform(shardStats.begin(),
+                   shardStats.end(),
+                   std::inserter(availableShards, availableShards.end()),
+                   [](const ClusterStatistics::ShardStatistics& shardStatistics) -> ShardId {
+                       return shardStatistics.shardId;
+                   });
+
     MigrateInfoVector candidateChunks;
-    std::set<ShardId> usedShards;
 
     std::shuffle(collections.begin(), collections.end(), _random);
 
@@ -384,7 +391,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         }
 
         auto candidatesStatus =
-            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, &usedShards);
+            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, &availableShards);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
@@ -397,6 +404,10 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         candidateChunks.insert(candidateChunks.end(),
                                std::make_move_iterator(candidatesStatus.getValue().begin()),
                                std::make_move_iterator(candidatesStatus.getValue().end()));
+
+        if (availableShards.size() < 2) {
+            return candidateChunks;
+        }
     }
 
     return candidateChunks;
@@ -516,7 +527,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
-    std::set<ShardId>* usedShards) {
+    stdx::unordered_set<ShardId>* availableShards) {
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
     if (!routingInfoStatus.isOK()) {
@@ -569,7 +580,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         }
     }
 
-    return BalancerPolicy::balance(shardStats, distribution, usedShards);
+    return BalancerPolicy::balance(shardStats, distribution, availableShards);
 }
 
 }  // namespace mongo

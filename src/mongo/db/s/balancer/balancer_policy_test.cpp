@@ -114,8 +114,14 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
 std::vector<MigrateInfo> balanceChunks(const ShardStatisticsVector& shardStats,
                                        const DistributionStatus& distribution,
                                        bool shouldAggressivelyBalance) {
-    std::set<ShardId> usedShards;
-    return BalancerPolicy::balance(shardStats, distribution, &usedShards);
+    stdx::unordered_set<ShardId> availableShards;
+    std::transform(shardStats.begin(),
+                   shardStats.end(),
+                   std::inserter(availableShards, availableShards.end()),
+                   [](const ClusterStatistics::ShardStatistics& shardStatistics) -> ShardId {
+                       return shardStatistics.shardId;
+                   });
+    return BalancerPolicy::balance(shardStats, distribution, &availableShards);
 }
 
 TEST(BalancerPolicy, Basic) {
@@ -247,9 +253,11 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNe
          {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
-    std::set<ShardId> usedShards{kShardId0};
-    const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second, ZoneInfo()), &usedShards));
+    stdx::unordered_set<ShardId> availableShards{kShardId1, kShardId2, kShardId3};
+    const auto migrations(
+        BalancerPolicy::balance(cluster.first,
+                                DistributionStatus(kNamespace, cluster.second, ZoneInfo()),
+                                &availableShards));
     ASSERT_EQ(1U, migrations.size());
 
     ASSERT_EQ(kShardId1, migrations[0].from);
@@ -266,9 +274,11 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseSourceShardsWithMoveNo
          {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
 
     // Here kShardId0 would have been selected as a donor
-    std::set<ShardId> usedShards{kShardId0};
-    const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second, ZoneInfo()), &usedShards));
+    stdx::unordered_set<ShardId> availableShards{kShardId1, kShardId2, kShardId3};
+    const auto migrations(
+        BalancerPolicy::balance(cluster.first,
+                                DistributionStatus(kNamespace, cluster.second, ZoneInfo()),
+                                &availableShards));
     ASSERT_EQ(0U, migrations.size());
 }
 
@@ -280,9 +290,11 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
          {ShardStatistics(kShardId3, kNoMaxSize, 1, false, emptyTagSet, emptyShardVersion), 1}});
 
     // Here kShardId2 would have been selected as a recipient
-    std::set<ShardId> usedShards{kShardId2};
-    const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second, ZoneInfo()), &usedShards));
+    stdx::unordered_set<ShardId> availableShards{kShardId0, kShardId1, kShardId3};
+    const auto migrations(
+        BalancerPolicy::balance(cluster.first,
+                                DistributionStatus(kNamespace, cluster.second, ZoneInfo()),
+                                &availableShards));
     ASSERT_EQ(1U, migrations.size());
 
     ASSERT_EQ(kShardId0, migrations[0].from);
