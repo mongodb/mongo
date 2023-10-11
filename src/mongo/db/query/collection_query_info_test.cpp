@@ -127,13 +127,6 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    void setDropped() override {
-        MONGO_UNIMPLEMENTED;
-    }
-    bool isDropped() const override {
-        MONGO_UNIMPLEMENTED;
-    }
-
     bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const override {
         MONGO_UNIMPLEMENTED;
     }

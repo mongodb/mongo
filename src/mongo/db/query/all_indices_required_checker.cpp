@@ -78,7 +78,7 @@ void AllIndicesRequiredChecker::checkIndicesForCollection(OperationContext* opCt
         uassert(ErrorCodes::QueryPlanKilled,
                 str::stream() << "query plan killed :: index '" << nameRef << "' for collection '"
                               << collection->ns().toStringForErrorMsg() << "' dropped",
-                indexDesc && !indexDesc->getEntry()->isDropped());
+                indexDesc);
     }
 }
 

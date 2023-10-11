@@ -186,7 +186,7 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
     auto desc = _coll.getPtr()->getIndexCatalog()->findIndexByIdent(_opCtx, indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            desc && !desc->getEntry()->isDropped());
+            desc);
 
     // Re-obtain the index entry pointer that was set to null during yield preparation. It is safe
     // to access the index entry when the query is active, as its validity is protected by at least

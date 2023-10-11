@@ -221,7 +221,6 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
                     << _nss.toStringForErrorMsg() << " (" << *_uuid
                     << "), index ident: " << indexIdent,
                 desc);
-        invariant(!desc->getEntry()->isDropped());
     }
 };
 

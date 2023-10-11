@@ -97,7 +97,6 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
       _isReady(false),
       _isFrozen(isFrozen),
       _shouldValidateDocument(false),
-      _isDropped(false),
       _indexOffset(invariantStatusOK(
           collection->checkMetaDataForIndex(_descriptor.indexName(), _descriptor.infoObj()))) {
     _descriptor._entry = this;

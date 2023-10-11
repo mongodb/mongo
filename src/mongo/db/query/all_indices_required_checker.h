@@ -70,8 +70,7 @@ private:
     // This map of map holds index idents to all of the index catalog entries known at the time of
     // construction, grouped first by collection UUID then by index name. Later, we can attempt to
     // lookup the index entry by its ident in order to determine whether an index in the list has
-    // been dropped. If the index entry is found, we need to check the 'isDropped()' flag on the
-    // index catalog entry.
+    // been dropped.
     std::map<UUID, StringMap<std::string>> _identEntries;
 };
 

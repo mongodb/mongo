@@ -264,8 +264,8 @@ private:
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;
     const std::string _columnIndexName;
+    std::string _columnIndexIdent;
     CollectionRef _coll;
-    std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
 
     // Paths to be read from the index. '_includeInOutput' defines which of the fields should be
     // included into the reconstructed record and the order of paths in '_paths' defines the

@@ -133,53 +133,6 @@ public:
     }
 };
 
-class IndexCatalogEntryDroppedTest : IndexCatalogTestBase {
-public:
-    IndexCatalogEntryDroppedTest() {
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        Lock::DBLock lk(&opCtx, _nss.dbName(), MODE_X);
-        OldClientContext ctx(&opCtx, _nss);
-        WriteUnitOfWork wuow(&opCtx);
-
-        ctx.db()->createCollection(&opCtx, _nss);
-        wuow.commit();
-    }
-
-    void run() {
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        dbtests::WriteContextForTests ctx(&opCtx, _nss.ns_forTest());
-
-        const IndexDescriptor* idDesc = indexCatalog(&opCtx)->findIdIndex(&opCtx);
-        std::shared_ptr<const IndexCatalogEntry> entry =
-            indexCatalog(&opCtx)->getEntryShared(idDesc);
-
-        ASSERT_FALSE(entry->isDropped());
-
-        {
-            AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
-            WriteUnitOfWork wuow(&opCtx);
-            ASSERT_OK(autoColl.getDb()->dropCollection(&opCtx, _nss));
-            ASSERT_FALSE(entry->isDropped());
-        }
-
-        ASSERT_FALSE(entry->isDropped());
-
-        {
-            AutoGetCollection autoColl(&opCtx, _nss, MODE_X);
-            WriteUnitOfWork wuow(&opCtx);
-            ASSERT_OK(autoColl.getDb()->dropCollection(&opCtx, _nss));
-            wuow.commit();
-        }
-
-        // The original index entry is not marked as dropped. When dropping the collection, a
-        // copy-on-write is performed on the index entry and the previous index entry is left
-        // untouched.
-        ASSERT_FALSE(entry->isDropped());
-    }
-};
-
 /**
  * Test for IndexCatalog::refreshEntry().
  */
@@ -259,7 +212,6 @@ public:
     IndexCatalogTests() : OldStyleSuiteSpecification("indexcatalogtests") {}
     void setupTests() {
         add<IndexIteratorTests>();
-        add<IndexCatalogEntryDroppedTest>();
         add<RefreshEntry>();
     }
 };

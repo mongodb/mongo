@@ -614,7 +614,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                 // (or if the index is dropped).
                 uassert(ErrorCodes::QueryPlanKilled,
                         str::stream() << "query plan killed :: index dropped: " << indexIdent,
-                        indexDesc && entry && !entry->isDropped());
+                        indexDesc && entry);
 
                 auto [newIt, _] = entryMap.emplace(indexIdent, entry);
 

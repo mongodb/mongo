@@ -1420,10 +1420,6 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
 
     invariant(released.get() == entry);
 
-    // This index entry is uniquely owned, so it is safe to modify this flag outside of a commit
-    // handler. The index entry is discarded on rollback.
-    entry->setDropped();
-
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
     CollectionIndexUsageTrackerDecoration::write(collection).unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, collection, indexName, entry->shared_from_this());
@@ -1653,9 +1649,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
         _readyIndexes.release(writableEntry->descriptor());
     invariant(writableEntry == deletedEntry.get());
 
-    // This index entry is uniquely owned, so it is safe to modify this flag outside of a commit
-    // handler. The index entry is discarded on rollback.
-    writableEntry->setDropped();
     auto& indexUsageTracker = CollectionIndexUsageTrackerDecoration::write(collection);
     indexUsageTracker.unregisterIndex(indexName);
 
