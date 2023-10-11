@@ -205,7 +205,7 @@ struct __wt_logslot {
 #define WT_SLOT_SYNC_DIR 0x08u   /* Directory sync on release */
 #define WT_SLOT_SYNC_DIRTY 0x10u /* Sync system buffers on release */
                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
+    uint16_t flags_atomic;       /* Atomic flags, use F_*_ATOMIC_16 */
     WT_CACHE_LINE_PAD_END
 };
 
