@@ -110,6 +110,11 @@ class test_cursor_random(wttest.WiredTigerTestCase):
             list.append(cursor.get_key())
         self.assertGreater(len(set(list)), 80)
 
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        self.ignoreStdoutPatternIfExists('evict generation drain waited')
+
     def test_cursor_random_multiple_insert_records_small(self):
         self.cursor_random_multiple_insert_records(2000)
     def test_cursor_random_multiple_insert_records_large(self):
@@ -136,6 +141,11 @@ class test_cursor_random(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.next(), 0)
             list.append(cursor.get_key())
         self.assertGreater(len(set(list)), 80)
+
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        self.ignoreStdoutPatternIfExists('evict generation drain waited')
 
     def test_cursor_random_multiple_page_records_reopen_small(self):
         self.cursor_random_multiple_page_records(2000, True)
@@ -169,6 +179,11 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         for i in range(1,10):
             self.assertEqual(cursor.next(), 0)
 
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        self.ignoreStdoutPatternIfExists('evict generation drain waited')
+
     # Check that next_random fails in the presence of a set of values, all of
     # which are deleted.
     def test_cursor_random_deleted_all(self):
@@ -185,6 +200,11 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None, self.config)
         for i in range(1,10):
             self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
+
+        # Ignore the eviction generation drain warning as it is possible for eviction to
+        # take longer to evict pages due to overflow items on the page.
+        self.conn.close()
+        self.ignoreStdoutPatternIfExists('evict generation drain waited')
 
 # Check that opening a random cursor on column-store returns not-supported.
 class test_cursor_random_column(wttest.WiredTigerTestCase):
