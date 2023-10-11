@@ -155,6 +155,7 @@ public:
     static constexpr Name kMetadataSearchHighlights = {kMeta, "metadataSearchHighlights"_sd};
     static constexpr Name kMetadataSearchDetails = {kMeta, "metadataSearchDetails"_sd};
     static constexpr Name kMetadataSearchSortValues = {kMeta, "metadataSearchSortValues"_sd};
+    static constexpr Name kMetadataSearchSequenceToken = {kMeta, "metadataSearchSequenceToken"_sd};
 
     PlanStageSlots() = default;
 
@@ -485,6 +486,8 @@ public:
     static constexpr auto kMetadataSearchHighlights = PlanStageSlots::kMetadataSearchHighlights;
     static constexpr auto kMetadataSearchDetails = PlanStageSlots::kMetadataSearchDetails;
     static constexpr auto kMetadataSearchSortValues = PlanStageSlots::kMetadataSearchSortValues;
+    static constexpr auto kMetadataSearchSequenceToken =
+        PlanStageSlots::kMetadataSearchSequenceToken;
 
     static constexpr auto kNothingEnvSlotName = "nothing"_sd;
 

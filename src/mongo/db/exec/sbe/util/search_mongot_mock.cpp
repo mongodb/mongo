@@ -54,7 +54,8 @@ boost::optional<executor::TaskExecutorCursor> SearchMockHelperFunctions::establi
     CursorResponse&& response,
     boost::optional<long long> docsRequested,
     std::function<boost::optional<long long>()> calcDocsNeeded,
-    const boost::optional<int>& protocolVersion) {
+    const boost::optional<int>& protocolVersion,
+    bool requiresSearchSequenceToken) {
     auto networkInterface = std::make_unique<executor::NetworkInterfaceMock>();
     auto testExecutor = executor::makeSharedThreadPoolTestExecutor(std::move(networkInterface));
     executor::RemoteCommandRequest req = executor::RemoteCommandRequest();

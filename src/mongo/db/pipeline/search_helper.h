@@ -133,7 +133,8 @@ public:
         CursorResponse&& response,
         boost::optional<long long> docsRequested = boost::none,
         std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
-        const boost::optional<int>& protocolVersion = boost::none) {
+        const boost::optional<int>& protocolVersion = boost::none,
+        bool requiresSearchSequenceToken = false) {
         return boost::none;
     }
 

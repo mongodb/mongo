@@ -51,7 +51,8 @@ public:
         CursorResponse&& response,
         boost::optional<long long> docsRequested = boost::none,
         std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
-        const boost::optional<int>& protocolVersion = boost::none) override;
+        const boost::optional<int>& protocolVersion = boost::none,
+        bool requiresSearchSequenceToken = false) override;
 };
 
 }  // namespace mongo::search_mongot_mock

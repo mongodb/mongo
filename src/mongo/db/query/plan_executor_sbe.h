@@ -76,6 +76,7 @@ public:
         sbe::value::SlotAccessor* metadataSearchHighlights{nullptr};
         sbe::value::SlotAccessor* metadataSearchDetails{nullptr};
         sbe::value::SlotAccessor* metadataSearchSortValues{nullptr};
+        sbe::value::SlotAccessor* metadataSearchSequenceToken{nullptr};
     };
 
     PlanExecutorSBE(OperationContext* opCtx,

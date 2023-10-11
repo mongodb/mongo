@@ -1779,11 +1779,13 @@ struct SearchNode : public QuerySolutionNode {
     SearchNode(bool isSearchMeta,
                BSONObj searchQuery,
                boost::optional<long long> limit,
-               boost::optional<int> intermediateResultsProtocolVersion)
+               boost::optional<int> intermediateResultsProtocolVersion,
+               bool requiresSearchSequenceToken = false)
         : isSearchMeta(isSearchMeta),
           searchQuery(searchQuery),
           limit(limit),
-          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion) {}
+          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion),
+          requiresSearchSequenceToken(requiresSearchSequenceToken) {}
 
     StageType getType() const override {
         return STAGE_SEARCH;
@@ -1829,6 +1831,8 @@ struct SearchNode : public QuerySolutionNode {
      * protocol version even though it should not be sent to mongot.
      */
     boost::optional<int> intermediateResultsProtocolVersion;
+
+    bool requiresSearchSequenceToken = false;
 };
 
 /**

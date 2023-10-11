@@ -4423,7 +4423,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<std::string> metadataNames = {Document::metaFieldSearchScore.toString(),
                                               Document::metaFieldSearchHighlights.toString(),
                                               Document::metaFieldSearchScoreDetails.toString(),
-                                              Document::metaFieldSearchSortValues.toString()};
+                                              Document::metaFieldSearchSortValues.toString(),
+                                              Document::metaFieldSearchSequenceToken.toString()};
     auto metadataSlots = _slotIdGenerator.generateMultiple(metadataNames.size());
     // We have to generate all search metadata slots until we have migrate everything to SBE, this
     // is because the metadata usage may depends on post-SBE DocumentSources in the pipeline, the
@@ -4432,6 +4433,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     _data->metadataSlots.searchHighlightsSlot = metadataSlots[1];
     _data->metadataSlots.searchDetailsSlot = metadataSlots[2];
     _data->metadataSlots.searchSortValuesSlot = metadataSlots[3];
+    _data->metadataSlots.searchSequenceToken = metadataSlots[4];
 
     std::vector<std::string> fieldNames =
         isStoredSource ? topLevelFields : std::vector<std::string>{"_id"};
