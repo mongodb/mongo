@@ -92,7 +92,8 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     NamespaceString nss,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false);
+    bool apiStrict = false,
+    const SerializationContext& serializationContext = SerializationContext());
 
 /**
  * Convenience overload which constructs the request's NamespaceString from the given database
@@ -110,7 +111,8 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
-    bool apiStrict = false);
+    bool apiStrict = false,
+    const SerializationContext& serializationContext = SerializationContext());
 
 /*
  * The first field in 'cmdObj' must be a string representing a valid collection name, or the

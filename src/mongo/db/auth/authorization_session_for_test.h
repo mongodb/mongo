@@ -38,6 +38,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/database_name.h"
 
 namespace mongo {
 
@@ -48,18 +49,14 @@ class AuthorizationSessionForTest : public AuthorizationSessionImpl {
 public:
     using AuthorizationSessionImpl::AuthorizationSessionImpl;
 
-    // A database name used for testing purposes, deliberately named to minimize collisions with
-    // other test users.
-    static constexpr StringData kTestDBName = "authorizationSessionForTestDB"_sd;
-
     /**
      * Grants this session all privileges in 'privileges' for the database named 'dbName'. Any prior
      * privileges granted on 'dbName' via a call to this method are erased.
      *
      * Do not use this method if also adding users via addAndAuthorizeUser() in the same database.
      */
-    void assumePrivilegesForDB(PrivilegeVector privilege, StringData dbName = kTestDBName);
-    void assumePrivilegesForDB(Privilege privilege, StringData dbName = kTestDBName);
+    void assumePrivilegesForDB(PrivilegeVector privileges, const DatabaseName& dbName);
+    void assumePrivilegesForDB(Privilege privilege, const DatabaseName& dbName);
 
     /**
      * Grants this session all privileges for the given builtin role. Do not mix with other methods.

@@ -43,14 +43,13 @@
 #include "mongo/util/read_through_cache.h"
 
 namespace mongo {
-constexpr StringData AuthorizationSessionForTest::kTestDBName;
-
-void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege, StringData dbName) {
+void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege,
+                                                        const DatabaseName& dbName) {
     assumePrivilegesForDB(std::vector<Privilege>{privilege}, dbName);
 }
 
 void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileges,
-                                                        StringData dbName) {
+                                                        const DatabaseName& dbName) {
     UserRequest request(UserName("authorizationSessionForTestUser"_sd, dbName), boost::none);
     _authenticatedUser = UserHandle(User(request));
     _authenticatedUser.value()->addPrivileges(privileges);
@@ -58,13 +57,12 @@ void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileg
     _updateInternalAuthorizationState();
 }
 
-
 void AuthorizationSessionForTest::assumePrivilegesForBuiltinRole(const RoleName& roleName) {
     PrivilegeVector privileges;
     auth::addPrivilegesForBuiltinRole(roleName, &privileges);
-    StringData db = roleName.getDB();
-    if (db.empty()) {
-        db = "admin"_sd;
+    auto db = roleName.getDatabaseName();
+    if (db.isEmpty()) {
+        db = DatabaseName::kAdmin;
     }
 
     assumePrivilegesForDB(privileges, db);

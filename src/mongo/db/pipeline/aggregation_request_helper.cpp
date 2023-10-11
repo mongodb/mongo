@@ -85,10 +85,11 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     NamespaceString nss,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict) {
+    bool apiStrict,
+    const SerializationContext& serializationContext) {
     try {
         return parseFromBSON(
-            /*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict, SerializationContext());
+            /*opCtx=*/nullptr, nss, cmdObj, explainVerbosity, apiStrict, serializationContext);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
@@ -98,11 +99,12 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const DatabaseName& dbName,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-    bool apiStrict) {
+    bool apiStrict,
+    const SerializationContext& serializationContext) {
     try {
         // TODO SERVER-75930: pass serializationContext in
         return parseFromBSON(
-            /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict, SerializationContext());
+            /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict, serializationContext);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }

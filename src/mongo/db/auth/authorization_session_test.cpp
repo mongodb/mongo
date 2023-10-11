@@ -151,6 +151,13 @@ public:
                                << "SCRAM-SHA-256"
                                << scram::Secrets<SHA256Block>::generateCredentials(
                                       "a", saslGlobalParams.scramSHA256IterationCount.load()));
+
+        // assume tenantId is from security token with no expectPrefix
+        _sc = SerializationContext(SerializationContext::Source::Command,
+                                   SerializationContext::CallerType::Request,
+                                   SerializationContext::Prefix::Default,
+                                   true /* nonPrefixedTenantId */,
+                                   false /* authExpectTenantPrefix */);
     }
 
     void tearDown() override {
@@ -218,6 +225,29 @@ public:
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(resource, action));
     }
 
+    AggregateCommandRequest buildAggReq(const NamespaceString& nss, const BSONArray& pipeline) {
+        return uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
+            nss,
+            BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
+                             << "$db" << nss.db_forTest()),
+            boost::none,
+            false /* apiStrict */,
+            _sc));
+    }
+
+    AggregateCommandRequest buildAggReq(const NamespaceString& nss,
+                                        const BSONArray& pipeline,
+                                        bool bypassDocValidation) {
+        return uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
+            nss,
+            BSON("aggregate" << nss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
+                             << "bypassDocumentValidation" << bypassDocValidation << "$db"
+                             << nss.db_forTest()),
+            boost::none,
+            false /* apiStrict */,
+            _sc));
+    }
+
 private:
     static Options createServiceContextOptions() {
         Options o;
@@ -246,6 +276,7 @@ protected:
     AuthorizationManager* authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
     BSONObj credentials;
+    SerializationContext _sc;
 };
 
 const TenantId kTenantId1(OID("12345678901234567890aaaa"));
@@ -256,42 +287,34 @@ const NamespaceString testBarNss = NamespaceString::createNamespaceString_forTes
 const NamespaceString testQuxNss = NamespaceString::createNamespaceString_forTest("test.qux");
 const NamespaceString testTenant1FooNss =
     NamespaceString::createNamespaceString_forTest(kTenantId1, "test", "foo");
+const NamespaceString testTenant1BarNss =
+    NamespaceString::createNamespaceString_forTest(kTenantId1, "test", "bar");
+const NamespaceString testTenant1QuxNss =
+    NamespaceString::createNamespaceString_forTest(kTenantId1, "test", "qux");
 const NamespaceString testTenant2FooNss =
     NamespaceString::createNamespaceString_forTest(kTenantId2, "test", "foo");
 
 const DatabaseName testDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
 const DatabaseName otherDB = DatabaseName::createDatabaseName_forTest(boost::none, "other"_sd);
-const DatabaseName adminDB = DatabaseName::createDatabaseName_forTest(boost::none, "admin"_sd);
 const DatabaseName ignoredDB = DatabaseName::createDatabaseName_forTest(boost::none, "ignored"_sd);
 
 const ResourcePattern testDBResource = ResourcePattern::forDatabaseName(testDB);
 const ResourcePattern otherDBResource = ResourcePattern::forDatabaseName(otherDB);
-const ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(adminDB);
 const ResourcePattern testFooCollResource(ResourcePattern::forExactNamespace(testFooNss));
-const ResourcePattern testBarCollResource(ResourcePattern::forExactNamespace(testBarNss));
-const ResourcePattern testQuxCollResource(ResourcePattern::forExactNamespace(testQuxNss));
 const ResourcePattern testTenant1FooCollResource(
     ResourcePattern::forExactNamespace(testTenant1FooNss));
 const ResourcePattern testTenant2FooCollResource(
     ResourcePattern::forExactNamespace(testTenant2FooNss));
 const ResourcePattern otherFooCollResource(ResourcePattern::forExactNamespace(
     NamespaceString::createNamespaceString_forTest("other.foo")));
-const ResourcePattern thirdFooCollResource(ResourcePattern::forExactNamespace(
-    NamespaceString::createNamespaceString_forTest("third.foo")));
-const ResourcePattern adminFooCollResource(ResourcePattern::forExactNamespace(
-    NamespaceString::createNamespaceString_forTest("admin.foo")));
 const ResourcePattern testUsersCollResource(ResourcePattern::forExactNamespace(
     NamespaceString::createNamespaceString_forTest("test.system.users")));
 const ResourcePattern otherUsersCollResource(ResourcePattern::forExactNamespace(
     NamespaceString::createNamespaceString_forTest("other.system.users")));
-const ResourcePattern thirdUsersCollResource(ResourcePattern::forExactNamespace(
-    NamespaceString::createNamespaceString_forTest("third.system.users")));
 const ResourcePattern testProfileCollResource(ResourcePattern::forExactNamespace(
     NamespaceString::createNamespaceString_forTest("test.system.profile")));
 const ResourcePattern otherProfileCollResource(ResourcePattern::forExactNamespace(
     NamespaceString::createNamespaceString_forTest("other.system.profile")));
-const ResourcePattern thirdProfileCollResource(ResourcePattern::forExactNamespace(
-    NamespaceString::createNamespaceString_forTest("third.system.profile")));
 
 const UserName kUser1Test("user1"_sd, "test"_sd);
 const UserRequest kUser1TestRequest(kUser1Test, boost::none);
@@ -687,517 +710,711 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) {
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+
+        auto aggReq = buildAggReq(nss, BSONArray());
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateEmptyPipelineWithFindAction) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        auto aggReq = buildAggReq(nss, BSONArray());
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateWithoutFindActionIfFirstStageNotIndexOrCollStats) {
-    authzSession->assumePrivilegesForDB(
-        Privilege(testFooCollResource, {ActionType::indexStats, ActionType::collStats}));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
-                                                        << BSON("$indexStats" << BSONObj()));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        authzSession->assumePrivilegesForDB(
+            Privilege(rsrc, {ActionType::indexStats, ActionType::collStats}), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
+                                                            << BSON("$indexStats" << BSONObj()));
+
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateWithFindActionIfPipelineContainsIndexOrCollStats) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
-    BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
-                                                        << BSON("$indexStats" << BSONObj()));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+        BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
+                                                            << BSON("$indexStats" << BSONObj()));
+
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCollStatsWithoutCollStatsAction) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateCollStatsWithCollStatsAction) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::collStats));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::collStats), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateIndexStatsWithoutIndexStatsAction) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::indexStats));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::indexStats), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoD) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseWithoutInprogActionOnMongoS) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges =
+            uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, true));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoD) {
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    ASSERT_FALSE(authzSession->isAuthenticated());
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
+
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        ASSERT_FALSE(authzSession->isAuthenticated());
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersFalseIfNotAuthenticatedOnMongoS) {
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false)));
+        auto aggReq = buildAggReq(nss, pipeline);
+
+        PrivilegeVector privileges =
+            uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, true));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoD) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInprogActionOnMongoS) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges =
+            uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, true));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoD) {
-    authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::inprog));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(
+            Privilege(ResourcePattern::forClusterResource(nss.tenantId()), ActionType::inprog),
+            nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoS) {
-    authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::inprog));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(
+            Privilege(ResourcePattern::forClusterResource(nss.tenantId()), ActionType::inprog),
+            nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges =
+            uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, true));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoD) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline =
-        BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline =
+            BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotSpoofAllUsersTrueWithoutInprogActionOnMongoS) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline =
-        BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline =
+            BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << false << "allUsers" << true)));
+        auto aggReq = buildAggReq(nss, pipeline);
+        PrivilegeVector privileges =
+            uassertStatusOK(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, true));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotValid) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$out"
-                                         << ""));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    ASSERT_THROWS_CODE(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false),
-        AssertionException,
-        ErrorCodes::InvalidNamespace);
+        auto nss = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrc = ResourcePattern::forExactNamespace(nss);
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrc, ActionType::find), nss.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$out"
+                                             << ""));
+        auto aggReq = buildAggReq(nss, pipeline);
+        ASSERT_THROWS_CODE(auth::getPrivilegesForAggregate(authzSession.get(), nss, aggReq, false),
+                           AssertionException,
+                           ErrorCodes::InvalidNamespace);
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTargetNamespace) {
-    // We only have find on the aggregation namespace.
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
 
-    // We have insert but not remove on the $out namespace.
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::insert)});
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        // We only have find on the aggregation namespace.
+        authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
 
-    // We have remove but not insert on the $out namespace.
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::remove)});
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+
+        // We have insert but not remove on the $out namespace.
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::insert)},
+            nssBar.dbName());
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+
+        // We have remove but not insert on the $out namespace.
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::remove)},
+            nssBar.dbName());
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNamespace) {
-    authzSession->assumePrivilegesForDB(
-        {Privilege(testFooCollResource, ActionType::find),
-         Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
 
-    auto aggNoBypassDocumentValidationReq =
-        uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-            testFooNss,
-            BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline
-                             << "bypassDocumentValidation" << false << "cursor" << BSONObj()
-                             << "$db" << testFooNss.db_forTest())));
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find),
+             Privilege(rsrcBar, {ActionType::insert, ActionType::remove})},
+            nssFoo.dbName());
 
-    privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
-        authzSession.get(), testFooNss, aggNoBypassDocumentValidationReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+
+        auto aggNoBypassDocumentValidationReq =
+            buildAggReq(nssFoo, pipeline, false /* bypassDocValidation*/);
+
+        privileges = uassertStatusOK(auth::getPrivilegesForAggregate(
+            authzSession.get(), nssFoo, aggNoBypassDocumentValidationReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest,
        CannotAggregateOutBypassingValidationWithoutBypassDocumentValidationOnTargetNamespace) {
-    authzSession->assumePrivilegesForDB(
-        {Privilege(testFooCollResource, ActionType::find),
-         Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "bypassDocumentValidation" << true << "$db"
-                         << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find),
+             Privilege(rsrcBar, {ActionType::insert, ActionType::remove})},
+            nssFoo.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
+        auto aggReq = buildAggReq(nssFoo, pipeline, true /* bypassDocValidation*/);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest,
        CanAggregateOutBypassingValidationWithBypassDocumentValidationOnTargetNamespace) {
-    authzSession->assumePrivilegesForDB(
-        {Privilege(testFooCollResource, ActionType::find),
-         Privilege(
-             testBarCollResource,
-             {ActionType::insert, ActionType::remove, ActionType::bypassDocumentValidation})});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "bypassDocumentValidation" << true << "$db"
-                         << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find),
+             Privilege(
+                 rsrcBar,
+                 {ActionType::insert, ActionType::remove, ActionType::bypassDocumentValidation})},
+            nssFoo.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$out" << nssBar.coll()));
+        auto aggReq = buildAggReq(nssFoo, pipeline, true /* bypassDocValidation*/);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, true));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespace) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssBar.coll())));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::find)});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
+            nssFoo.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssBar.coll())));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, true));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 
 TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnNestedJoinedNamespace) {
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::find)});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
-    BSONArray pipeline = BSON_ARRAY(
-        BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+        auto nssQux = multitenancy ? testTenant1QuxNss : testQuxNss;
+
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
+            nssFoo.dbName());
+
+        BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssQux.coll())));
+        BSONArray pipeline = BSON_ARRAY(
+            BSON("$lookup" << BSON("from" << nssBar.coll() << "pipeline" << nestedPipeline)));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnNestedJoinedNamespace) {
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::find),
-                                         Privilege(testQuxCollResource, ActionType::find)});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testQuxNss.coll())));
-    BSONArray pipeline = BSON_ARRAY(
-        BSON("$lookup" << BSON("from" << testBarNss.coll() << "pipeline" << nestedPipeline)));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+        auto nssQux = multitenancy ? testTenant1QuxNss : testQuxNss;
+        auto rsrcQux = ResourcePattern::forExactNamespace(nssQux);
+
+        authzSession->assumePrivilegesForDB({Privilege(rsrcFoo, ActionType::find),
+                                             Privilege(rsrcBar, ActionType::find),
+                                             Privilege(rsrcQux, ActionType::find)},
+                                            nssFoo.dbName());
+
+        BSONArray nestedPipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << nssQux.coll())));
+        BSONArray pipeline = BSON_ARRAY(
+            BSON("$lookup" << BSON("from" << nssBar.coll() << "pipeline" << nestedPipeline)));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CheckAuthForAggregateWithDeeplyNestedLookup) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    // Recursively adds nested $lookup stages to 'pipelineBob', building a pipeline with
-    // 'levelsToGo' deep $lookup stages.
-    std::function<void(BSONArrayBuilder*, int)> addNestedPipeline;
-    addNestedPipeline = [&addNestedPipeline](BSONArrayBuilder* pipelineBob, int levelsToGo) {
-        if (levelsToGo == 0) {
-            return;
-        }
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
 
-        BSONObjBuilder objectBob(pipelineBob->subobjStart());
-        BSONObjBuilder lookupBob(objectBob.subobjStart("$lookup"));
-        lookupBob << "from" << testFooNss.coll() << "as"
-                  << "as";
-        BSONArrayBuilder subPipelineBob(lookupBob.subarrayStart("pipeline"));
-        addNestedPipeline(&subPipelineBob, --levelsToGo);
-        subPipelineBob.doneFast();
-        lookupBob.doneFast();
-        objectBob.doneFast();
-    };
+        authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
 
-    // checkAuthForAggregate() should succeed for an aggregate command that has a deeply nested
-    // $lookup sub-pipeline chain. Each nested $lookup stage adds 3 to the depth of the command
-    // object. We set 'maxLookupDepth' depth to allow for a command object that is at or just under
-    // max BSONDepth.
-    const uint32_t aggregateCommandDepth = 1;
-    const uint32_t lookupDepth = 3;
-    const uint32_t maxLookupDepth =
-        (BSONDepth::getMaxAllowableDepth() - aggregateCommandDepth) / lookupDepth;
+        // Recursively adds nested $lookup stages to 'pipelineBob', building a pipeline with
+        // 'levelsToGo' deep $lookup stages.
+        std::function<void(BSONArrayBuilder*, int)> addNestedPipeline;
+        addNestedPipeline = [&addNestedPipeline, &nssFoo](BSONArrayBuilder* pipelineBob,
+                                                          int levelsToGo) {
+            if (levelsToGo == 0) {
+                return;
+            }
 
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder << "aggregate" << testFooNss.coll();
-    BSONArrayBuilder pipelineBuilder(cmdBuilder.subarrayStart("pipeline"));
-    addNestedPipeline(&pipelineBuilder, maxLookupDepth);
-    pipelineBuilder.doneFast();
-    cmdBuilder << "cursor" << BSONObj() << "$db" << testFooNss.db_forTest();
+            BSONObjBuilder objectBob(pipelineBob->subobjStart());
+            BSONObjBuilder lookupBob(objectBob.subobjStart("$lookup"));
+            lookupBob << "from" << nssFoo.coll() << "as"
+                      << "as";
+            BSONArrayBuilder subPipelineBob(lookupBob.subarrayStart("pipeline"));
+            addNestedPipeline(&subPipelineBob, --levelsToGo);
+            subPipelineBob.doneFast();
+            lookupBob.doneFast();
+            objectBob.doneFast();
+        };
 
-    auto aggReq = uassertStatusOK(
-        aggregation_request_helper::parseFromBSONForTests(testFooNss, cmdBuilder.obj()));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        // checkAuthForAggregate() should succeed for an aggregate command that has a deeply nested
+        // $lookup sub-pipeline chain. Each nested $lookup stage adds 3 to the depth of the command
+        // object. We set 'maxLookupDepth' depth to allow for a command object that is at or just
+        // under max BSONDepth.
+        const uint32_t aggregateCommandDepth = 1;
+        const uint32_t lookupDepth = 3;
+        const uint32_t maxLookupDepth =
+            (BSONDepth::getMaxAllowableDepth() - aggregateCommandDepth) / lookupDepth;
+
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder << "aggregate" << nssFoo.coll();
+        BSONArrayBuilder pipelineBuilder(cmdBuilder.subarrayStart("pipeline"));
+        addNestedPipeline(&pipelineBuilder, maxLookupDepth);
+        pipelineBuilder.doneFast();
+        cmdBuilder << "cursor" << BSONObj() << "$db" << nssFoo.db_forTest();
+
+        auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
+            nssFoo, cmdBuilder.obj(), boost::none, false /* apiStrict */, _sc));
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 
 TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNamespace) {
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+
+        authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << nssBar.coll())));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, CanAggregateGraphLookupWithFindOnJoinedNamespace) {
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::find)});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
+            nssFoo.dbName());
+
+        BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << nssBar.coll())));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest,
        CannotAggregateFacetWithLookupAndGraphLookupWithoutFindOnJoinedNamespaces) {
-    // We only have find on the aggregation namespace.
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline =
-        BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
-                            "[{$graphLookup: {from: 'qux'}}]}}"));
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, false));
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
 
-    // We have find on the $lookup namespace but not on the $graphLookup namespace.
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::find)});
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        // We only have find on the aggregation namespace.
+        authzSession->assumePrivilegesForDB(Privilege(rsrcFoo, ActionType::find), nssFoo.dbName());
 
-    // We have find on the $graphLookup namespace but not on the $lookup namespace.
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testQuxCollResource, ActionType::find)});
-    ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+        BSONArray pipeline =
+            BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
+                                "[{$graphLookup: {from: 'qux'}}]}}"));
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, false));
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+
+        // We have find on the $lookup namespace but not on the $graphLookup namespace.
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
+            nssFoo.dbName());
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+
+        // We have find on the $graphLookup namespace but not on the $lookup namespace.
+        authzSession->assumePrivilegesForDB(
+            {Privilege(rsrcFoo, ActionType::find), Privilege(rsrcBar, ActionType::find)},
+            nssFoo.dbName());
+        ASSERT_FALSE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest,
        CanAggregateFacetWithLookupAndGraphLookupWithFindOnJoinedNamespaces) {
-    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, ActionType::find),
-                                         Privilege(testBarCollResource, ActionType::find),
-                                         Privilege(testQuxCollResource, ActionType::find)});
+    for (auto multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
 
-    BSONArray pipeline =
-        BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
-                            "[{$graphLookup: {from: 'qux'}}]}}"));
+        auto nssFoo = multitenancy ? testTenant1FooNss : testFooNss;
+        auto rsrcFoo = ResourcePattern::forExactNamespace(nssFoo);
+        auto nssBar = multitenancy ? testTenant1BarNss : testBarNss;
+        auto rsrcBar = ResourcePattern::forExactNamespace(nssBar);
+        auto nssQux = multitenancy ? testTenant1QuxNss : testQuxNss;
+        auto rsrcQux = ResourcePattern::forExactNamespace(nssQux);
 
-    auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
-        testFooNss,
-        BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline << "cursor" << BSONObj()
-                         << "$db" << testFooNss.db_forTest())));
-    PrivilegeVector privileges = uassertStatusOK(
-        auth::getPrivilegesForAggregate(authzSession.get(), testFooNss, aggReq, true));
-    ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+        authzSession->assumePrivilegesForDB({Privilege(rsrcFoo, ActionType::find),
+                                             Privilege(rsrcBar, ActionType::find),
+                                             Privilege(rsrcQux, ActionType::find)},
+                                            nssFoo.dbName());
+
+        BSONArray pipeline =
+            BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
+                                "[{$graphLookup: {from: 'qux'}}]}}"));
+
+        auto aggReq = buildAggReq(nssFoo, pipeline);
+        PrivilegeVector privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(authzSession.get(), nssFoo, aggReq, true));
+        ASSERT_TRUE(authzSession->isAuthorizedForPrivileges(privileges));
+    }
 }
 
 TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithNobody) {
@@ -1254,7 +1471,8 @@ TEST_F(AuthorizationSessionTest, CannotListCollectionsWithoutListCollectionsPriv
 TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege) {
     // The listCollections privilege authorizes the list collections command on the named database
     // only.
-    authzSession->assumePrivilegesForDB(Privilege(testDBResource, ActionType::listCollections));
+    authzSession->assumePrivilegesForDB(Privilege(testDBResource, ActionType::listCollections),
+                                        testDB);
 
     // "test" DB is okay.
     ASSERT_OK(authzSession->checkAuthorizedToListCollections(listTestCollectionsCmd).getStatus());
@@ -1266,7 +1484,7 @@ TEST_F(AuthorizationSessionTest, CanListCollectionsWithListCollectionsPrivilege)
 
 TEST_F(AuthorizationSessionTest, CanListOwnCollectionsWithPrivilege) {
     // Any privilege on a DB implies authorization to list one's own collections.
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find), testDB);
 
     // Just own collections is okay.
     ASSERT_OK(
@@ -1284,7 +1502,7 @@ TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
 
     // If we have a collection privilege, we have actions on that collection
-    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
     ASSERT_FALSE(
         authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));
@@ -1294,7 +1512,7 @@ TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
     // If we have a database privilege, we have actions on that database and all collections it
     // contains
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forDatabaseName(testDB), ActionType::find));
+        Privilege(ResourcePattern::forDatabaseName(testDB), ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
     ASSERT_TRUE(
         authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));
@@ -1303,7 +1521,7 @@ TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
 
     // If we have a privilege on anyNormalResource, we have actions on all databases and all
     // collections they contain
-    authzSession->assumePrivilegesForDB(Privilege(kAnyNormalResource, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(kAnyNormalResource, ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
     ASSERT_TRUE(
         authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));
@@ -1330,7 +1548,7 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
 
     // The useUUID privilege allows UUIDs to be parsed
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID), testDB);
 
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
@@ -1767,7 +1985,7 @@ const ResourcePattern SystemBucketsTest::sbCollTestInAnyDB(
 
 TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
     // If we have a system_buckets exact priv
-    authzSession->assumePrivilegesForDB(Privilege(testBucketResource, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(testBucketResource, ActionType::find), testDB);
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
                                                                 ActionType::insert));
@@ -1792,7 +2010,7 @@ TEST_F(SystemBucketsTest, CheckExactSystemBucketsCollection) {
 TEST_F(SystemBucketsTest, CheckAnySystemBuckets) {
     // If we have an any system_buckets priv
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBuckets(boost::none), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBuckets(boost::none), ActionType::find), testDB);
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
                                                                 ActionType::insert));
@@ -1817,7 +2035,8 @@ TEST_F(SystemBucketsTest, CheckAnySystemBuckets) {
 TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
     // If we have a system_buckets in a db priv
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find),
+        testDB);
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
                                                                 ActionType::insert));
@@ -1841,7 +2060,7 @@ TEST_F(SystemBucketsTest, CheckAnySystemBucketsInDatabase) {
 
 TEST_F(SystemBucketsTest, CheckforAnySystemBucketsInAnyDatabase) {
     // If we have a system_buckets for a coll in any db priv
-    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find), testDB);
 
 
     ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(testSystemBucketResource,
@@ -1866,7 +2085,7 @@ TEST_F(SystemBucketsTest, CheckforAnySystemBucketsInAnyDatabase) {
 
 TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
     // If we have a system.buckets collection privilege, we have actions on that collection
-    authzSession->assumePrivilegesForDB(Privilege(testBucketResource, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(testBucketResource, ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
@@ -1876,7 +2095,8 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
     // If we have any buckets in a database privilege, we have actions on that database and all
     // system.buckets collections it contains
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find),
+        testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test)));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
@@ -1887,7 +2107,7 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeOnResourceForSystemBuckets) {
 
     // If we have a privilege on any systems buckets in any db, we have actions on all databases and
     // system.buckets.<coll> they contain
-    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testSystemBucketResource));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnResource(
         ResourcePattern::forDatabaseName(sb_db_test)));
@@ -1949,21 +2169,22 @@ TEST_F(SystemBucketsTest, CheckBuiltinRolesForSystemBuckets) {
 }
 
 TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets) {
-    authzSession->assumePrivilegesForDB(Privilege(testBucketResource, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(testBucketResource, ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBucketsInDatabase(sb_db_test), ActionType::find),
+        testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_FALSE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
-    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(sbCollTestInAnyDB, ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnySystemBuckets(boost::none), ActionType::find));
+        Privilege(ResourcePattern::forAnySystemBuckets(boost::none), ActionType::find), testDB);
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_test));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 }
