@@ -52,8 +52,10 @@
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -129,6 +131,9 @@ void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
 }
 }  // namespace
 
+SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, ClosedBuckets&& c)
+    : batch{std::move(b)}, closedBuckets{std::move(c)} {}
+
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
 }
@@ -168,7 +173,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,
-                                BucketFindResult bucketFindResult) {
+                                ReopeningContext* reopeningContext) {
     return internal::insert(opCtx,
                             catalog,
                             ns,
@@ -177,7 +182,15 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                             doc,
                             combine,
                             internal::AllowBucketCreation::kYes,
-                            bucketFindResult);
+                            reopeningContext);
+}
+
+void waitToInsert(InsertWaiter* waiter) {
+    if (auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(waiter)) {
+        getWriteBatchResult(**batch).getStatus().ignore();
+    } else if (auto* request = stdx::get_if<std::shared_ptr<ReopeningRequest>>(waiter)) {
+        waitForReopeningRequest(**request);
+    }
 }
 
 Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
@@ -226,7 +239,8 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
     return Status::OK();
 }
 
-boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
+boost::optional<ClosedBucket> finish(OperationContext* opCtx,
+                                     BucketCatalog& catalog,
                                      std::shared_ptr<WriteBatch> batch,
                                      const CommitInfo& info) {
     invariant(!isWriteBatchFinished(*batch));

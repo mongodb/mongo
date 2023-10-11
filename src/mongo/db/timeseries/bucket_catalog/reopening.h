@@ -42,8 +42,12 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 
 namespace mongo::timeseries::bucket_catalog {
+
+struct Stripe;
+class BucketCatalog;
 
 /**
  * Whether to include the memory overhead of the map data structure when calculating marginal memory
@@ -64,17 +68,6 @@ using BucketDocumentValidator = std::function<std::pair<Collection::SchemaValida
 struct BucketToReopen {
     BSONObj bucketDocument;
     BucketDocumentValidator validator;
-    uint64_t catalogEra = 0;
-};
-
-/**
- * Communicates to the BucketCatalog whether an attempt was made to fetch a query or bucket, and
- * the resulting bucket document that was found, if any.
- */
-struct BucketFindResult {
-    bool fetchedBucket{false};
-    bool queriedBucket{false};
-    boost::optional<BucketToReopen> bucketToReopen{boost::none};
 };
 
 /**
@@ -96,5 +89,84 @@ struct ArchivedBucket {
  */
 long long marginalMemoryUsageForArchivedBucket(
     const ArchivedBucket& bucket, IncludeMemoryOverheadFromMap includeMemoryOverheadFromMap);
+
+/**
+ * RAII type that tracks the state needed to coordinate the reopening of closed buckets between
+ * reentrant 'tryInsert'/'insert' calls.
+ *
+ * The constructor initializes all the private state necessary for the RAII-behavior, while the
+ * public members are used to pass information between the bucket catalog and the caller about the
+ * actual reopening attempt.
+ */
+class ReopeningContext {
+public:
+    // A reopening candidate can be an OID for archive-based reopening, or an aggregation pipeline
+    // for query-based reopening.
+    using CandidateType = stdx::variant<std::monostate, OID, std::vector<BSONObj>>;
+
+    ReopeningContext() = delete;
+    ~ReopeningContext();
+    ReopeningContext(const ReopeningContext&) = delete;
+    ReopeningContext& operator=(const ReopeningContext&) = delete;
+
+    /**
+     * Must save all state needed by 'clear()' due to its requirements.
+     */
+    ReopeningContext(BucketCatalog& catalog,
+                     Stripe& stripe,
+                     WithLock stripeLock,
+                     const BucketKey& key,
+                     uint64_t era,
+                     CandidateType&& candidate);
+
+    /**
+     * Move-only type to ensure we do release state exactly once.
+     */
+    ReopeningContext(ReopeningContext&&);
+    ReopeningContext& operator=(ReopeningContext&&);
+
+    /**
+     * Should only be called by the bucket catalog when the stripe lock has been acquired and will
+     * be held through the duration of the remaining bucket reopening operations.
+     */
+    void clear(WithLock stripeLock);
+
+    // Set by the bucket catalog to ensure proper synchronization of reopening attempt.
+    const uint64_t catalogEra;
+
+    // Information needed for the caller to locate a candidate bucket to reopen from disk, populated
+    // by the bucket catalog.
+    const CandidateType candidate;
+
+    // Communicates to the BucketCatalog whether an attempt was made to fetch a query or bucket, and
+    // the resulting bucket document that was found, if any. Populated by the caller.
+    bool fetchedBucket{false};
+    bool queriedBucket{false};
+    boost::optional<BucketToReopen> bucketToReopen{boost::none};
+
+private:
+    Stripe* _stripe;
+    BucketKey _key;
+    bool _cleared;
+
+    void clear();
+};
+
+/**
+ * A light wrapper around a promise type to allow potentially conflicting operations to ensure
+ * orderly waiting and observability. Equivalent functionality exists in 'WriteBatch'.
+ */
+struct ReopeningRequest {
+    ReopeningRequest() = delete;
+    explicit ReopeningRequest(ExecutionStatsController&& stats);
+
+    ExecutionStatsController stats;
+    SharedPromise<void> promise;
+};
+
+/**
+ * Waits for the specified ReopeningRequest to be completed. Blocking.
+ */
+void waitForReopeningRequest(ReopeningRequest& request);
 
 }  // namespace mongo::timeseries::bucket_catalog

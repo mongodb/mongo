@@ -34,9 +34,68 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::timeseries::bucket_catalog {
+
+ReopeningContext::~ReopeningContext() {
+    if (!_cleared) {
+        clear();
+    }
+}
+
+ReopeningContext::ReopeningContext(BucketCatalog& catalog,
+                                   Stripe& s,
+                                   WithLock,
+                                   const BucketKey& k,
+                                   uint64_t era,
+                                   CandidateType&& c)
+    : catalogEra{era}, candidate{std::move(c)}, _stripe(&s), _key(k), _cleared(false) {
+    invariant(!_stripe->outstandingReopeningRequests.contains(_key));
+    _stripe->outstandingReopeningRequests.emplace(
+        _key,
+        std::make_shared<ReopeningRequest>(
+            ExecutionStatsController{internal::getOrInitializeExecutionStats(catalog, _key.ns)}));
+}
+
+ReopeningContext::ReopeningContext(ReopeningContext&& other)
+    : catalogEra{other.catalogEra},
+      candidate{std::move(other.candidate)},
+      fetchedBucket{other.fetchedBucket},
+      queriedBucket{other.queriedBucket},
+      bucketToReopen{std::move(other.bucketToReopen)},
+      _stripe(other._stripe),
+      _key(std::move(other._key)),
+      _cleared(other._cleared) {
+    other._cleared = true;
+}
+
+ReopeningContext& ReopeningContext::operator=(ReopeningContext&& other) {
+    if (this != &other) {
+        _stripe = other._stripe;
+        _key = other._key;
+        _cleared = other._cleared;
+        other._cleared = true;
+    }
+    return *this;
+}
+
+void ReopeningContext::clear() {
+    stdx::lock_guard stripeLock{_stripe->mutex};
+    clear(stripeLock);
+}
+
+void ReopeningContext::clear(WithLock) {
+    auto it = _stripe->outstandingReopeningRequests.find(_key);
+    invariant(it != _stripe->outstandingReopeningRequests.end());
+
+    // Notify any waiters and clean up state.
+    it->second->promise.emplaceValue();
+    _stripe->outstandingReopeningRequests.erase(it);
+    _cleared = true;
+}
 
 ArchivedBucket::ArchivedBucket(const BucketId& b, const std::string& t)
     : bucketId{b}, timeField{t} {}
@@ -50,6 +109,15 @@ long long marginalMemoryUsageForArchivedBucket(
              ? sizeof(std::size_t) +                                    // key in set (meta hash)
                  sizeof(decltype(Stripe::archivedBuckets)::value_type)  // set container
              : 0);
+}
+
+ReopeningRequest::ReopeningRequest(ExecutionStatsController&& s) : stats{std::move(s)} {}
+
+void waitForReopeningRequest(ReopeningRequest& request) {
+    if (!request.promise.getFuture().isReady()) {
+        request.stats.incNumWaits();
+    }
+    request.promise.getFuture().getNoThrow().ignore();
 }
 
 }  // namespace mongo::timeseries::bucket_catalog

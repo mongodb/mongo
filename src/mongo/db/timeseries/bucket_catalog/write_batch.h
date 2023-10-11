@@ -71,6 +71,7 @@ struct CommitInfo {
 struct WriteBatch {
     WriteBatch() = delete;
     WriteBatch(const BucketHandle& bucketHandle,
+               const BucketKey& bucketKey,
                OperationId opId,
                ExecutionStatsController& stats,
                StringData timeField);
@@ -78,6 +79,7 @@ struct WriteBatch {
     BSONObj toBSON() const;
 
     const BucketHandle bucketHandle;
+    const BucketKey bucketKey;
     const OperationId opId;
     ExecutionStatsController stats;
     StringData timeField;  // Necessary so we can compress on writes, since the compression

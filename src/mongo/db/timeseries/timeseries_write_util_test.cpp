@@ -78,6 +78,7 @@ protected:
         bucket_catalog::ExecutionStatsController stats(collectionStats, globalStats);
         return std::make_shared<bucket_catalog::WriteBatch>(
             bucket_catalog::BucketHandle{bucketId, stripe},
+            bucket_catalog::BucketKey{ns, {}},
             opId,
             stats,
             kTimeseriesOptions.getTimeField());

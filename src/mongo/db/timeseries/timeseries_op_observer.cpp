@@ -51,7 +51,6 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
-
 namespace mongo {
 
 void TimeSeriesOpObserver::onInserts(OperationContext* opCtx,
