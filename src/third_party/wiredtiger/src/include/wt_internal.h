@@ -311,6 +311,8 @@ struct __wt_reconcile;
 typedef struct __wt_reconcile WT_RECONCILE;
 struct __wt_reconcile_timeline;
 typedef struct __wt_reconcile_timeline WT_RECONCILE_TIMELINE;
+struct __wt_recovery_timeline;
+typedef struct __wt_recovery_timeline WT_RECOVERY_TIMELINE;
 struct __wt_ref;
 typedef struct __wt_ref WT_REF;
 struct __wt_ref_hist;
@@ -333,6 +335,8 @@ struct __wt_session_stash;
 typedef struct __wt_session_stash WT_SESSION_STASH;
 struct __wt_session_stats;
 typedef struct __wt_session_stats WT_SESSION_STATS;
+struct __wt_shutdown_timeline;
+typedef struct __wt_shutdown_timeline WT_SHUTDOWN_TIMELINE;
 struct __wt_size;
 typedef struct __wt_size WT_SIZE;
 struct __wt_spinlock;
@@ -388,6 +392,7 @@ typedef union __wt_lsn WT_LSN;
 union __wt_rand_state;
 typedef union __wt_rand_state WT_RAND_STATE;
 
+typedef struct timespec WT_TIMER;
 typedef uint64_t wt_timestamp_t;
 
 /*

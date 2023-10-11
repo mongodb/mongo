@@ -402,6 +402,20 @@ struct __wt_connection_impl {
     uint64_t ckpt_write_bytes;
     uint64_t ckpt_write_pages;
 
+    /* Record the important timestamps of each stage in recovery. */
+    struct __wt_recovery_timeline {
+        uint64_t log_replay_ms;
+        uint64_t rts_ms;
+        uint64_t checkpoint_ms;
+        uint64_t recovery_ms;
+    } recovery_timeline;
+
+    /* Record the important timestamps of each stage in shutdown. */
+    struct __wt_shutdown_timeline {
+        uint64_t rts_ms;
+        uint64_t checkpoint_ms;
+        uint64_t shutdown_ms;
+    } shutdown_timeline;
     /* Checkpoint and incremental backup data */
     uint64_t incr_granularity;
     WT_BLKINCR incr_backups[WT_BLKINCR_MAX];
