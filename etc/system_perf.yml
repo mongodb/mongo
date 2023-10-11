@@ -2954,6 +2954,10 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
 
   - name: linux-shard-lite-fle.2022-11
     display_name: Linux Shard Lite FLE 2022-11
@@ -4004,6 +4008,11 @@ buildvariants:
       # TODO: Enable in SERVER-66572.
       # - name: tpch_10_normalized
       # - name: tpch_10_denormalized
+      - name: tsbs_query
+        cron: *high-value-workload-cron
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+      - name: tsbs_query_fixed_bucketing
 
   - name: linux-3-node-replSet-250mbwtcache.2023-05
     display_name: Linux 3-Node ReplSet 250 MB WiredTiger Cache 2023-05
