@@ -3236,7 +3236,22 @@ tasks:
           wtarg: -ops ['"load"']
       - func: "upload-perf-test-stats"
         vars:
-          perf-test-name: parallel-pop-btree
+          perf-test-name: parallel-pop-btree.wtperf
+  
+  - name: perf-test-parallel-pop-btree-long
+    tags: ["btree-perf"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "run-perf-test"
+        vars:
+          perf-test-name: parallel-pop-btree-long.wtperf
+          maxruns: 1
+          wtarg: -ops ['"load"']
+      - func: "upload-perf-test-stats"
+        vars:
+          perf-test-name: parallel-pop-btree-long.wtperf
 
   - name: perf-test-update-only-btree
     tags: ["btree-perf"]
