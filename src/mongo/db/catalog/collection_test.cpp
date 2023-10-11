@@ -172,7 +172,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
 
     auto before = Date_t::now();
     stdx::thread thread([this, before, prevVersion, &notifier] {
-        ThreadClient client(getServiceContext());
+        ThreadClient client(getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
         notifier->waitUntil(opCtx.get(), prevVersion, before + Milliseconds(25));
         auto after = Date_t::now();
@@ -197,7 +197,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
 
     auto before = Date_t::now();
     stdx::thread thread([this, before, prevVersion, &notifier] {
-        ThreadClient client(getServiceContext());
+        ThreadClient client(getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
         notifier->waitUntil(opCtx.get(), prevVersion, before + Milliseconds(25));
         auto after = Date_t::now();
@@ -224,7 +224,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilInterrupt) {
     auto& clientToInterrupt = cc();
     auto before = Date_t::now();
     stdx::thread thread([this, before, prevVersion, &notifier, &clientToInterrupt] {
-        ThreadClient client(getServiceContext());
+        ThreadClient client(getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
         notifier->waitUntil(opCtx.get(), prevVersion, before + Milliseconds(25));
         auto after = Date_t::now();

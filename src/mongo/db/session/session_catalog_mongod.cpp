@@ -146,7 +146,7 @@ void killSessionTokens(OperationContext* opCtx,
          sessionKillTokens = std::move(sessionKillTokens)](auto status) mutable {
             invariant(status);
 
-            ThreadClient tc("Kill-Sessions", service);
+            ThreadClient tc("Kill-Sessions", service->getService());
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {

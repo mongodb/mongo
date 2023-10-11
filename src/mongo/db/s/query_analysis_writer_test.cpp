@@ -1209,7 +1209,7 @@ TEST_F(QueryAnalysisWriterTest, AddQueriesBackAfterWriteError) {
     auto hangTimesEntered = hangFp->setMode(FailPoint::alwaysOn, 0);
 
     auto future = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = makeOperationContext();
         writer.flushQueriesForTest(opCtx.get());
     });
@@ -1304,7 +1304,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
     auto hangTimesEntered = hangFp->setMode(FailPoint::alwaysOn, 0);
 
     auto future = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = makeOperationContext();
         writer.flushQueriesForTest(opCtx.get());
     });

@@ -429,7 +429,7 @@ void clearFilteringMetadata(OperationContext* opCtx,
         }
 
         AsyncTry([svcCtx = opCtx->getServiceContext(), nss] {
-            ThreadClient tc("TriggerReshardingRecovery", svcCtx);
+            ThreadClient tc("TriggerReshardingRecovery", svcCtx->getService());
             auto opCtx = tc->makeOperationContext();
             onCollectionPlacementVersionMismatch(
                 opCtx.get(), nss, boost::none /* chunkVersionReceived */);

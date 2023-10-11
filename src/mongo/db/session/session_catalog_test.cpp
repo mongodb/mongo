@@ -79,7 +79,7 @@ protected:
 
     void assertConcurrentCheckoutTimesOut(const LogicalSessionId& lsid) {
         auto future = stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);
             sideOpCtx->setDeadlineAfterNowBy(Milliseconds(10), ErrorCodes::MaxTimeMSExpired);
@@ -94,7 +94,7 @@ protected:
      */
     void createSession(const LogicalSessionId& lsid) {
         stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = makeOperationContext();
             opCtx->setLogicalSessionId(lsid);
             OperationContextSession ocs(opCtx.get());
@@ -192,7 +192,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutParentSessionOfCheckedO
         // Verify that the parent session cannot be checked out until the child session is checked
         // back in.
         auto future = stdx::async(stdx::launch::async, [this, parentLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = cc().makeOperationContext();
             opCtx->setLogicalSessionId(parentLsid);
             OperationContextSession ocs(opCtx.get());
@@ -217,7 +217,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckOutChildSessionOfCheckedOu
         // Verify that the child session cannot be checked out until the parent session is checked
         // back in.
         auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = cc().makeOperationContext();
             opCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(opCtx.get());
@@ -242,7 +242,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, CannotCheckoutMultipleChildSessionsCo
         // Verify that another child session cannot be checked out until both the child session
         // above and the parent session are checked back in.
         auto future = stdx::async(stdx::launch::async, [this, childLsid1] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto childSessionOpCtx1 = cc().makeOperationContext();
             childSessionOpCtx1->setLogicalSessionId(childLsid1);
             OperationContextSession ocs(childSessionOpCtx1.get());
@@ -317,7 +317,7 @@ TEST_F(SessionCatalogTest, ScanSession) {
     }();
     for (const auto& lsid : lsids) {
         stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = makeOperationContext();
             opCtx->setLogicalSessionId(lsid);
             OperationContextSession ocs(opCtx.get());
@@ -478,7 +478,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessions) {
     }();
     for (const auto& lsid : lsids) {
         stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = makeOperationContext();
             opCtx->setLogicalSessionId(lsid);
             OperationContextSession ocs(opCtx.get());
@@ -531,7 +531,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenParentSessionI
 
         // Check out parentSession.
         auto future = stdx::async(stdx::launch::async, [&] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = makeOperationContext();
 
             if (hangAfterIncrementingNumWaitingToCheckOut) {
@@ -540,7 +540,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenParentSessionI
                 auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
 
                 auto innerFuture = stdx::async(stdx::launch::async, [&] {
-                    ThreadClient innerTc(getServiceContext());
+                    ThreadClient innerTc(getServiceContext()->getService());
                     auto innerOpCtx = makeOperationContext();
                     innerOpCtx->setLogicalSessionId(parentLsid);
                     OperationContextSession ocs(innerOpCtx.get());
@@ -664,7 +664,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIs
 
         // Check out childSession2.
         auto future = stdx::async(stdx::launch::async, [&] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = makeOperationContext();
 
             if (hangAfterIncrementingNumWaitingToCheckOut) {
@@ -673,7 +673,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ScanSessionsForReapWhenChildSessionIs
                 auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn);
 
                 auto innerFuture = stdx::async(stdx::launch::async, [&] {
-                    ThreadClient innerTc(getServiceContext());
+                    ThreadClient innerTc(getServiceContext()->getService());
                     auto innerOpCtx = makeOperationContext();
                     innerOpCtx->setLogicalSessionId(childLsid2);
                     OperationContextSession ocs(innerOpCtx.get());
@@ -801,7 +801,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsNotCheckedOut) {
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
         auto future = stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -862,7 +862,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenSessionIsCheckedOut) {
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
         auto future = stdx::async(stdx::launch::async, [this, lsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(lsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -923,7 +923,7 @@ TEST_F(SessionCatalogTest, KillParentSessionWhenChildSessionIsCheckedOut) {
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
         auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -982,7 +982,7 @@ TEST_F(SessionCatalogTest, KillParentSessionWhenChildSessionIsNotCheckedOut) {
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
         auto future = stdx::async(stdx::launch::async, [this, childLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -1047,7 +1047,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsCheckedOut) {
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
         auto childFuture = stdx::async(stdx::launch::async, [this, childLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -1056,7 +1056,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsCheckedOut) {
                childFuture.wait_for(Milliseconds(10).toSystemDuration()));
 
         auto parentFuture = stdx::async(stdx::launch::async, [this, parentLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(parentLsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -1117,7 +1117,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
         // session, which we will use to confirm that session kill completion actually unblocks
         // check-out
         auto childFuture = stdx::async(stdx::launch::async, [this, childLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(childLsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -1126,7 +1126,7 @@ TEST_F(SessionCatalogTest, KillSessionWhenChildSessionIsNotCheckedOut) {
                childFuture.wait_for(Milliseconds(10).toSystemDuration()));
 
         auto parentFuture = stdx::async(stdx::launch::async, [this, parentLsid] {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto sideOpCtx = Client::getCurrent()->makeOperationContext();
             sideOpCtx->setLogicalSessionId(parentLsid);
             OperationContextSession ocs(sideOpCtx.get());
@@ -1523,7 +1523,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     for (const auto& lsid : lsids) {
         futures.emplace_back(
             stdx::async(stdx::launch::async, [this, lsid, &firstUseOfTheSessionReachedBarrier] {
-                ThreadClient tc(getServiceContext());
+                ThreadClient tc(getServiceContext()->getService());
 
                 {
                     auto sideOpCtx = Client::getCurrent()->makeOperationContext();
@@ -1606,7 +1606,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
 
             // Normal check out should start after kill.
             normalCheckOutFinish = stdx::async(stdx::launch::async, [&] {
-                ThreadClient tc(getServiceContext());
+                ThreadClient tc(getServiceContext()->getService());
                 auto sideOpCtx = Client::getCurrent()->makeOperationContext();
                 sideOpCtx->setLogicalSessionId(lsid);
                 OperationContextSession normalCheckOut(sideOpCtx.get());
@@ -1616,7 +1616,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
 
             // Kill will short-cut the queue and be the next one to check out.
             killCheckOutFinish = stdx::async(stdx::launch::async, [&] {
-                ThreadClient tc(getServiceContext());
+                ThreadClient tc(getServiceContext()->getService());
                 auto sideOpCtx = Client::getCurrent()->makeOperationContext();
                 sideOpCtx->setLogicalSessionId(lsid);
 

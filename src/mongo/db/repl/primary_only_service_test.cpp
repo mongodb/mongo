@@ -1181,14 +1181,14 @@ TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditio
     {
         FailPointEnableBlock stepUpFailpoint("PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic");
         stepUpThread = stdx::thread([this] {
-            ThreadClient tc("StepUpThread", getServiceContext());
+            ThreadClient tc("StepUpThread", getServiceContext()->getService());
             stepUp();
         });
 
         stepUpFailpoint->waitForTimesEntered(stepUpFailpoint.initialTimesEntered() + 1);
 
         lookUpInstanceThread = stdx::thread([this] {
-            ThreadClient tc("LookUpInstanceThread", getServiceContext());
+            ThreadClient tc("LookUpInstanceThread", getServiceContext()->getService());
             auto opCtx = makeOperationContext();
             TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
         });
@@ -1285,7 +1285,7 @@ TEST_F(PrimaryOnlyServiceTest, RebuildServiceFailsShouldSetStateFromRebuilding) 
     {
         FailPointEnableBlock stepUpFailpoint("PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic");
         stepUpThread = stdx::thread([this] {
-            ThreadClient tc("StepUpThread", getServiceContext());
+            ThreadClient tc("StepUpThread", getServiceContext()->getService());
             stepUp();
         });
 
@@ -1293,7 +1293,7 @@ TEST_F(PrimaryOnlyServiceTest, RebuildServiceFailsShouldSetStateFromRebuilding) 
 
         lookUpInstanceThread = stdx::thread([this, &lookupError] {
             try {
-                ThreadClient tc("LookUpInstanceThread", getServiceContext());
+                ThreadClient tc("LookUpInstanceThread", getServiceContext()->getService());
                 auto opCtx = makeOperationContext();
                 TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
             } catch (DBException& ex) {

@@ -81,7 +81,7 @@ void createCollections(OperationContext* opCtx, int numCollections) {
 
 void BM_CollectionCatalogWrite(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext);
+    ThreadClient threadClient(serviceContext->getService());
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     createCollections(opCtx.get(), state.range(0));
@@ -96,7 +96,7 @@ void BM_CollectionCatalogWrite(benchmark::State& state) {
 
 void BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext);
+    ThreadClient threadClient(serviceContext->getService());
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     // TODO(SERVER-74657): Please revisit if this thread could be made killable.
@@ -118,7 +118,7 @@ void BM_CollectionCatalogWriteBatchedWithGlobalExclusiveLock(benchmark::State& s
 
 void BM_CollectionCatalogCreateDropCollection(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext);
+    ThreadClient threadClient(serviceContext->getService());
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
     Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
 
@@ -142,7 +142,7 @@ void BM_CollectionCatalogCreateNCollectionsBatched(benchmark::State& state) {
         benchmark::ClobberMemory();
 
         auto serviceContext = setupServiceContext();
-        ThreadClient threadClient(serviceContext);
+        ThreadClient threadClient(serviceContext->getService());
         ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
@@ -165,7 +165,7 @@ void BM_CollectionCatalogCreateNCollections(benchmark::State& state) {
         benchmark::ClobberMemory();
 
         auto serviceContext = setupServiceContext();
-        ThreadClient threadClient(serviceContext);
+        ThreadClient threadClient(serviceContext->getService());
         ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
 
@@ -183,7 +183,7 @@ void BM_CollectionCatalogCreateNCollections(benchmark::State& state) {
 
 void BM_CollectionCatalogLookupCollectionByNamespace(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext);
+    ThreadClient threadClient(serviceContext->getService());
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     createCollections(opCtx.get(), state.range(0));
@@ -200,7 +200,7 @@ void BM_CollectionCatalogLookupCollectionByNamespace(benchmark::State& state) {
 
 void BM_CollectionCatalogLookupCollectionByUUID(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext);
+    ThreadClient threadClient(serviceContext->getService());
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     createCollections(opCtx.get(), state.range(0));
@@ -219,7 +219,7 @@ void BM_CollectionCatalogLookupCollectionByUUID(benchmark::State& state) {
 
 void BM_CollectionCatalogIterateCollections(benchmark::State& state) {
     auto serviceContext = setupServiceContext();
-    ThreadClient threadClient(serviceContext);
+    ThreadClient threadClient(serviceContext->getService());
     ServiceContext::UniqueOperationContext opCtx = threadClient->makeOperationContext();
 
     createCollections(opCtx.get(), state.range(0));

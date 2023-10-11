@@ -133,7 +133,7 @@ auto shardVersionRetry(ServiceContext* service,
                  cancelToken] {
         boost::optional<ThreadClient> threadClient;
         if (!haveClient()) {
-            threadClient.emplace(taskDescription, service);
+            threadClient.emplace(taskDescription, service->getService());
         }
 
         CancelableOperationContextFactory opCtxFactory(cancelToken, executor);

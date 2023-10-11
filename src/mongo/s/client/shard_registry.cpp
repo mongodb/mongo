@@ -493,7 +493,7 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync(
 
 void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContext,
                                                    const ConnectionString& connStr) noexcept {
-    ThreadClient tc("UpdateReplicaSetOnConfigServer", serviceContext);
+    ThreadClient tc("UpdateReplicaSetOnConfigServer", serviceContext->getService());
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {

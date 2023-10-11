@@ -73,7 +73,7 @@ void CatalogControlTest::setUp() {
         setGlobalServiceContext(std::move(serviceContext));
     }
 
-    _tc = std::make_unique<ThreadClient>(getGlobalServiceContext());
+    _tc = std::make_unique<ThreadClient>(getGlobalServiceContext()->getService());
 }
 
 void CatalogControlTest::tearDown() {

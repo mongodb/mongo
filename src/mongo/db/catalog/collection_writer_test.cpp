@@ -101,7 +101,7 @@ protected:
 
     void verifyCollectionInCatalogUsingDifferentClient(const Collection* expected) {
         stdx::thread t([this, expected]() {
-            ThreadClient client(getServiceContext());
+            ThreadClient client(getServiceContext()->getService());
             auto opCtx = client->makeOperationContext();
             ASSERT_EQ(expected,
                       CollectionCatalog::get(opCtx.get())

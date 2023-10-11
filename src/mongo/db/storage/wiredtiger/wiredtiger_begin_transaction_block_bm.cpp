@@ -80,7 +80,8 @@ private:
 class WiredTigerTestHelper : public ScopedGlobalServiceContextForTest {
 public:
     WiredTigerTestHelper()
-        : _threadClient(getServiceContext()), _opCtxHolder(_threadClient->makeOperationContext()) {
+        : _threadClient(getServiceContext()->getService()),
+          _opCtxHolder(_threadClient->makeOperationContext()) {
         _opCtxHolder->setRecoveryUnit(
             std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);

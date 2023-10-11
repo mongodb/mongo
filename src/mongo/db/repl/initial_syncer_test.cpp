@@ -184,7 +184,7 @@ class InitialSyncerTest : public executor::ThreadPoolExecutorTest,
                           public SyncSourceSelector,
                           public ScopedGlobalServiceContextForTest {
 public:
-    InitialSyncerTest() : _threadClient(getGlobalServiceContext()) {}
+    InitialSyncerTest() : _threadClient(getGlobalServiceContext()->getService()) {}
 
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override;
     executor::ThreadPoolMock::Options makeClonerThreadPoolMockOptions() const;

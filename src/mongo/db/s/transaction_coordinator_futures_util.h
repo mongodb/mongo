@@ -120,7 +120,7 @@ public:
                             uassertStatusOK(args.status);
                         }
 
-                        ThreadClient tc("TransactionCoordinator", _serviceContext);
+                        ThreadClient tc("TransactionCoordinator", _serviceContext->getService());
 
                         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
                         {

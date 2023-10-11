@@ -381,7 +381,7 @@ TEST_F(BalancerChunkSelectionTest, ZoneRangesOverlap) {
             setUpZones(kNamespace, zoneChunkRanges);
 
             auto future = launchAsync([this, &chunk] {
-                ThreadClient tc(getServiceContext());
+                ThreadClient tc(getServiceContext()->getService());
                 auto opCtx = Client::getCurrent()->makeOperationContext();
 
                 auto migrateInfoStatus = _chunkSelectionPolicy.get()->selectSpecificChunkToMove(
@@ -427,7 +427,7 @@ TEST_F(BalancerChunkSelectionTest, ZoneRangeMaxNotAlignedWithChunkMax) {
             }
 
             auto future = launchAsync([this] {
-                ThreadClient tc(getServiceContext());
+                ThreadClient tc(getServiceContext()->getService());
                 auto opCtx = Client::getCurrent()->makeOperationContext();
 
                 _imbalancedCollectionsCache.clear();
@@ -479,7 +479,7 @@ TEST_F(BalancerChunkSelectionTest, AllImbalancedCollectionsShouldEventuallyBeSel
     for (; i < maxIterations; ++i) {
 
         auto future = launchAsync([this, &collectionsSelected]() {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = Client::getCurrent()->makeOperationContext();
 
             const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -531,7 +531,7 @@ TEST_F(BalancerChunkSelectionTest, CollectionsSelectedShouldBeCached) {
     for (auto i = 0; i < 5; ++i) {
 
         auto future = launchAsync([this, &collectionsSelected]() {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = Client::getCurrent()->makeOperationContext();
 
 
@@ -583,7 +583,7 @@ TEST_F(BalancerChunkSelectionTest, CachedCollectionsShouldBeSelected) {
     for (auto i = 0; i < 1000; ++i) {
 
         auto future = launchAsync([this, &collectionsSelected]() {
-            ThreadClient tc(getServiceContext());
+            ThreadClient tc(getServiceContext()->getService());
             auto opCtx = Client::getCurrent()->makeOperationContext();
 
             const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -631,7 +631,7 @@ TEST_F(BalancerChunkSelectionTest, MaxTimeToScheduleBalancingOperationsExceeded)
     }
 
     auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         // Forcing timeout to exceed by setting it to 0
@@ -673,7 +673,7 @@ TEST_F(BalancerChunkSelectionTest, MoreThanOneBatchIsProcessedIfNeeded) {
     }
 
     auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -710,7 +710,7 @@ TEST_F(BalancerChunkSelectionTest, StopChunksSelectionIfThereAreNoMoreShardsAvai
     }
 
     auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -748,7 +748,7 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithDefragment
         false));
 
     auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -782,7 +782,7 @@ TEST_F(BalancerChunkSelectionTest, DontSelectChunksFromCollectionsWithBalancingD
                                        false));
 
     auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -814,7 +814,7 @@ TEST_F(BalancerChunkSelectionTest, DontGetMigrationCandidatesIfAllCollectionsAre
     }
 
     auto future = launchAsync([&] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         const auto& chunksToMove = selectChunksToMove(opCtx.get());
@@ -863,7 +863,7 @@ TEST_F(BalancerChunkSelectionTest, SelectChunksToSplit) {
             LOGV2(7381300, "Getting split points", "zoneChunkRanges"_attr = zoneChunkRanges);
 
             auto future = launchAsync([&] {
-                ThreadClient tc(getServiceContext());
+                ThreadClient tc(getServiceContext()->getService());
                 auto opCtx = Client::getCurrent()->makeOperationContext();
 
                 const auto& swSplitInfo =
@@ -871,7 +871,6 @@ TEST_F(BalancerChunkSelectionTest, SelectChunksToSplit) {
                 ASSERT_OK(swSplitInfo.getStatus());
 
                 for (const auto& [chunkMin, splitPoints] : expectedSplitPointsPerChunk) {
-
                     bool found = false;
                     for (const auto& splitInfo : swSplitInfo.getValue()) {
                         if (splitInfo.minKey.woCompare(chunkMin) == 0 && splitInfo.nss == nss) {

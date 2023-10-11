@@ -49,7 +49,7 @@ TEST(DiagnosticInfo, BasicSingleThread) {
     serviceContext->setFastClockSource(std::move(clockSource));
     setGlobalServiceContext(std::move(serviceContext));
 
-    ThreadClient tc("DiagnosticInfoTest", getGlobalServiceContext());
+    ThreadClient tc("DiagnosticInfoTest", getGlobalServiceContext()->getService());
 
     // take the initial diagnostic info
     DiagnosticInfo capture1 = DiagnosticInfo::capture(tc.get(), "capture1"_sd);

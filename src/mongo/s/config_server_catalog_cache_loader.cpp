@@ -147,7 +147,7 @@ SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunks
     return ExecutorFuture<void>(_executor)
         .then([=]() {
             ThreadClient tc("ConfigServerCatalogCacheLoader::getChunksSince",
-                            getGlobalServiceContext());
+                            getGlobalServiceContext()->getService());
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {
@@ -166,7 +166,7 @@ SemiFuture<DatabaseType> ConfigServerCatalogCacheLoader::getDatabase(const Datab
     return ExecutorFuture<void>(_executor)
         .then([dbName] {
             ThreadClient tc("ConfigServerCatalogCacheLoader::getDatabase",
-                            getGlobalServiceContext());
+                            getGlobalServiceContext()->getService());
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {

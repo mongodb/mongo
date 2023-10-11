@@ -193,7 +193,7 @@ TEST_F(ReshardingDataReplicationTest,
 
     for (int t = 0; t < kThreads; ++t) {
         stdx::thread thread([&]() {
-            ThreadClient threadClient(getGlobalServiceContext());
+            ThreadClient threadClient(getGlobalServiceContext()->getService());
             Timer timer;
             while (timer.elapsed() < Seconds(2)) {
                 CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);

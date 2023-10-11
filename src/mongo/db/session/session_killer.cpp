@@ -58,7 +58,7 @@ SessionKiller::SessionKiller(ServiceContext* sc, KillFunc killer)
     _thread = stdx::thread([this, sc] {
         // This is the background killing thread
 
-        ThreadClient tc("SessionKiller", sc);
+        ThreadClient tc("SessionKiller", sc->getService());
 
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
         {

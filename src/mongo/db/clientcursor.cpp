@@ -366,7 +366,7 @@ public:
     }
 
     void run() {
-        ThreadClient tc("clientcursormon", getGlobalServiceContext());
+        ThreadClient tc("clientcursormon", getGlobalServiceContext()->getService());
 
         while (!globalInShutdownDeprecated()) {
             {

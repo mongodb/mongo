@@ -945,7 +945,8 @@ void Balancer::_applyStreamingActionResponseToPolicy(const BalancerStreamAction&
                                                      const BalancerStreamActionResponse& response,
                                                      ActionsStreamPolicy* policy) {
     invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
-    ThreadClient tc("BalancerSecondaryThread::applyActionResponse", getGlobalServiceContext());
+    ThreadClient tc("BalancerSecondaryThread::applyActionResponse",
+                    getGlobalServiceContext()->getService());
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {

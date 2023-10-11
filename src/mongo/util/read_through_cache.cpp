@@ -81,7 +81,7 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
                 return;
             }
 
-            ThreadClient tc(taskInfo->service);
+            ThreadClient tc(taskInfo->service->getService());
 
             // TODO(SERVER-74659): Please revisit if this thread could be made killable.
             {

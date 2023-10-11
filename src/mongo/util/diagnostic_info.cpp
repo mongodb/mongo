@@ -111,7 +111,7 @@ void BlockedOp::start(ServiceContext* serviceContext) {
 
     _latchState.mutex.lock();
     _latchState.thread = stdx::thread([this, serviceContext]() mutable {
-        ThreadClient tc("DiagnosticCaptureTestLatch", serviceContext);
+        ThreadClient tc("DiagnosticCaptureTestLatch", serviceContext->getService());
 
         // TODO(SERVER-74659): Please revisit if this thread could be made killable.
         {
@@ -127,7 +127,7 @@ void BlockedOp::start(ServiceContext* serviceContext) {
     });
 
     _interruptibleState.thread = stdx::thread([this, serviceContext]() mutable {
-        ThreadClient tc("DiagnosticCaptureTestInterruptible", serviceContext);
+        ThreadClient tc("DiagnosticCaptureTestInterruptible", serviceContext->getService());
 
         // TODO(SERVER-74659): Please revisit if this thread could be made killable.
         {

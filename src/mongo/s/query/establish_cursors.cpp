@@ -362,7 +362,7 @@ void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        std::vector<OperationKey> opKeys,
                                        std::set<HostAndPort> remotes) noexcept try {
-    ThreadClient tc("establishCursors cleanup", srvCtx);
+    ThreadClient tc("establishCursors cleanup", srvCtx->getService());
     auto opCtx = tc->makeOperationContext();
 
     for (auto&& host : remotes) {

@@ -1993,7 +1993,7 @@ TEST_F(TxnParticipantTest, InterruptedSessionsCannotBePrepared) {
     unittest::Barrier barrier(2);
 
     auto future = stdx::async(stdx::launch::async, [this, &barrier] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         auto sideOpCtx = tc->makeOperationContext();
         auto killToken = catalog()->killSession(_sessionId);
         barrier.countDownAndWait();

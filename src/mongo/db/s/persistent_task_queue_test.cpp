@@ -257,7 +257,7 @@ TEST_F(PersistentTaskQueueTest, TestWakeupOnEmptyQueue) {
     PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
     auto result = stdx::async(stdx::launch::async, [this, &q] {
-        ThreadClient tc("TestWakeupOnEmptyQueue", getServiceContext());
+        ThreadClient tc("TestWakeupOnEmptyQueue", getServiceContext()->getService());
         auto opCtx = tc->makeOperationContext();
 
         stdx::this_thread::sleep_for(stdx::chrono::milliseconds(500));
@@ -277,7 +277,7 @@ TEST_F(PersistentTaskQueueTest, TestInterruptedWhileWaitingOnCV) {
     unittest::Barrier barrier(2);
 
     auto result = stdx::async(stdx::launch::async, [this, &q, &barrier] {
-        ThreadClient tc("TestInterruptedWhileWaitingOnCV", getServiceContext());
+        ThreadClient tc("TestInterruptedWhileWaitingOnCV", getServiceContext()->getService());
         auto opCtx = tc->makeOperationContext();
 
         barrier.countDownAndWait();
@@ -301,7 +301,8 @@ TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
     unittest::Barrier barrier(2);
 
     auto result = stdx::async(stdx::launch::async, [this, &q, &barrier] {
-        ThreadClient tc("TestKilledOperationContextWhileWaitingOnCV", getServiceContext());
+        ThreadClient tc("TestKilledOperationContextWhileWaitingOnCV",
+                        getServiceContext()->getService());
         auto opCtx = tc->makeOperationContext();
 
         barrier.countDownAndWait();

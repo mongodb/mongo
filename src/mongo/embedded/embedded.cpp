@@ -190,7 +190,7 @@ using logv2::LogComponent;
 
 void shutdown(ServiceContext* srvContext) {
     {
-        ThreadClient tc(srvContext);
+        ThreadClient tc(srvContext->getService());
         auto const client = Client::getCurrent();
         auto const serviceContext = client->getServiceContext();
 

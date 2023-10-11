@@ -1242,7 +1242,7 @@ private:
         int numCalls = 0;
 
         stdx::thread t([&, svcCtx = getServiceContext()] {
-            ThreadClient client(svcCtx);
+            ThreadClient client(svcCtx->getService());
             auto newOpCtx = client->makeOperationContext();
             _setupDDLOperation(newOpCtx.get(), timestamp);
 

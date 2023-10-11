@@ -407,7 +407,7 @@ void TTLMonitor::updateSleepSeconds(Seconds newSeconds) {
 }
 
 void TTLMonitor::run() {
-    ThreadClient tc(name(), getGlobalServiceContext());
+    ThreadClient tc(name(), getGlobalServiceContext()->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
     while (true) {
@@ -664,7 +664,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
             ExecutorFuture<void>(executor)
                 .then([serviceContext = opCtx->getServiceContext(), nss, staleInfo] {
-                    ThreadClient tc("TTLShardVersionRecovery", serviceContext);
+                    ThreadClient tc("TTLShardVersionRecovery", serviceContext->getService());
                     auto uniqueOpCtx = tc->makeOperationContext();
                     auto opCtx = uniqueOpCtx.get();
 

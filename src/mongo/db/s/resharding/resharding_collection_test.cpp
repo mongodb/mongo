@@ -129,7 +129,7 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollectionStressTest)
         stdx::thread thread([&]() {
             Timer timer;
             while (timer.elapsed() < Seconds(2)) {
-                ThreadClient threadClient(getGlobalServiceContext());
+                ThreadClient threadClient(getGlobalServiceContext()->getService());
                 auto opCtx = Client::getCurrent()->makeOperationContext();
                 invariant(opCtx);
                 SimpleClient client(opCtx.get());

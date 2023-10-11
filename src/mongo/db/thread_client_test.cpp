@@ -46,45 +46,45 @@ class ThreadClientTest : public unittest::Test, public ScopedGlobalServiceContex
 
 TEST_F(ThreadClientTest, TestNoAssignment) {
     ASSERT_FALSE(haveClient());
-    { ThreadClient tc(getThreadName(), getGlobalServiceContext()); }
+    { ThreadClient tc(getThreadName(), getGlobalServiceContext()->getService()); }
     ASSERT_FALSE(haveClient());
 }
 
 TEST_F(ThreadClientTest, TestAssignment) {
     ASSERT_FALSE(haveClient());
-    ThreadClient threadClient(getThreadName(), getGlobalServiceContext());
+    ThreadClient threadClient(getThreadName(), getGlobalServiceContext()->getService());
     ASSERT_TRUE(haveClient());
 }
 
 TEST_F(ThreadClientTest, TestDifferentArgs) {
     {
         ASSERT_FALSE(haveClient());
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getGlobalServiceContext()->getService());
         ASSERT_TRUE(haveClient());
     }
     {
         ASSERT_FALSE(haveClient());
-        ThreadClient tc("Test", getGlobalServiceContext());
+        ThreadClient tc("Test", getGlobalServiceContext()->getService());
         ASSERT_TRUE(haveClient());
     }
     {
         ASSERT_FALSE(haveClient());
         transport::TransportLayerMock mock;
         std::shared_ptr<transport::Session> handle = mock.createSession();
-        ThreadClient tc(getThreadName(), getGlobalServiceContext(), handle);
+        ThreadClient tc(getThreadName(), getGlobalServiceContext()->getService(), handle);
         ASSERT_TRUE(haveClient());
     }
     {
         ASSERT_FALSE(haveClient());
         auto sc = ServiceContext::make();
-        ThreadClient tc("Test", sc.get(), nullptr);
+        ThreadClient tc("Test", sc.get()->getService(), nullptr);
         ASSERT_TRUE(haveClient());
     }
 }
 
 TEST_F(ThreadClientTest, TestAlternativeClientRegion) {
     ASSERT_FALSE(haveClient());
-    ThreadClient threadClient(getThreadName(), getGlobalServiceContext());
+    ThreadClient threadClient(getThreadName(), getGlobalServiceContext()->getService());
 
     ServiceContext::UniqueClient swapClient =
         getGlobalServiceContext()->getService()->makeClient("swapClient");
@@ -102,7 +102,7 @@ TEST_F(ThreadClientTest, TestThreadName) {
     const auto originalThreadName = getThreadName();
 
     {
-        ThreadClient threadClient("MyThreadClient", getGlobalServiceContext());
+        ThreadClient threadClient("MyThreadClient", getGlobalServiceContext()->getService());
         ASSERT_TRUE(haveClient());
         // The instatiation of ThreadClient should have changed this thread name
         ASSERT_NE(originalThreadName, getThreadName());

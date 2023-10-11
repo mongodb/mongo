@@ -744,7 +744,7 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 }
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
-    ThreadClient tc("mongosMain", serviceContext);
+    ThreadClient tc("mongosMain", serviceContext->getService());
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {

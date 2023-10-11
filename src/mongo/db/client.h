@@ -464,14 +464,11 @@ public:
      *     Service* service
      *     std::shared_ptr<transport::Session> session
      *
-     * However, a full set of 3 variations on this constructor are accepted.
+     * However, a full set of 2 variations on this constructor are accepted.
      *
      * A) The `desc` can be omitted, and will default to `getThreadName()`.
      *
-     * B) A `ServiceContext* sc` can be given instead of `Service*`. In
-     *    that case it behaves as if `sc->getService()` was given.
-     *
-     * C) The `session` can be omitted, and will default to `Client::noSession()`.
+     * B) The `session` can be omitted, and will default to `Client::noSession()`.
      */
     ThreadClient(StringData desc, Service* service, std::shared_ptr<transport::Session> session);
 
@@ -479,19 +476,10 @@ public:
     ThreadClient(Service* service, std::shared_ptr<transport::Session> session)
         : ThreadClient(getThreadName(), service, std::move(session)) {}
 
-    /** B) Repeat all previous constructors, accepting ServiceContext instead of Service. */
-    ThreadClient(StringData desc, ServiceContext* sc, std::shared_ptr<transport::Session> session)
-        : ThreadClient{desc, sc->getService(), std::move(session)} {}
-    ThreadClient(ServiceContext* sc, std::shared_ptr<transport::Session> session)
-        : ThreadClient(sc->getService(), std::move(session)) {}
-
-    /** C) Repeat all previous constructors, with `session` omitted. */
+    /** B) Repeat all previous constructors, with `session` omitted. */
     ThreadClient(StringData desc, Service* service)
         : ThreadClient{desc, service, Client::noSession()} {}
     explicit ThreadClient(Service* service) : ThreadClient{service, Client::noSession()} {}
-    ThreadClient(StringData desc, ServiceContext* sc)
-        : ThreadClient{desc, sc, Client::noSession()} {}
-    explicit ThreadClient(ServiceContext* sc) : ThreadClient{sc, Client::noSession()} {}
 
     ~ThreadClient();
     ThreadClient(const ThreadClient&) = delete;

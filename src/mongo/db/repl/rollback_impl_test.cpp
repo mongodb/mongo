@@ -646,7 +646,7 @@ TEST_F(RollbackImplTest, RollbackKillsNecessaryOperations) {
     // Run rollback in a separate thread so the locking threads can check for interrupt.
     Status status(ErrorCodes::InternalError, "Not set");
     stdx::thread rollbackThread([&] {
-        ThreadClient tc(getGlobalServiceContext());
+        ThreadClient tc(getGlobalServiceContext()->getService());
         auto opCtx = tc.get()->makeOperationContext();
         status = _rollback->runRollback(opCtx.get());
     });

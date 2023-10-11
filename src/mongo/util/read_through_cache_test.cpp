@@ -552,7 +552,7 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireObservesOperationContextDeadline) {
     });
 
     {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         const ServiceContext::UniqueOperationContext opCtxHolder{tc->makeOperationContext()};
         OperationContext* const opCtx{opCtxHolder.get()};
 
@@ -566,7 +566,7 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireObservesOperationContextDeadline) {
     completeLookupBarrier.countDownAndWait();
 
     {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         const ServiceContext::UniqueOperationContext opCtxHolder{tc->makeOperationContext()};
         OperationContext* const opCtx{opCtxHolder.get()};
 
@@ -576,7 +576,7 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireObservesOperationContextDeadline) {
     }
 
     {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         const ServiceContext::UniqueOperationContext opCtxHolder{tc->makeOperationContext()};
         OperationContext* const opCtx{opCtxHolder.get()};
 

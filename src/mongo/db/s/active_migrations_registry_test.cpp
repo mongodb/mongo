@@ -160,7 +160,7 @@ TEST_F(MoveChunkRegistration, TestBlockingDonateChunk) {
     // Registry thread.
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Lock the registry so that starting to donate will block.
-        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
         opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
@@ -178,7 +178,7 @@ TEST_F(MoveChunkRegistration, TestBlockingDonateChunk) {
 
     // Donate thread.
     auto lockReleased = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc("donate thread", getGlobalServiceContext());
+        ThreadClient tc("donate thread", getGlobalServiceContext()->getService());
         auto opCtx = tc->makeOperationContext();
 
         auto baton = opCtx->getBaton();
@@ -224,7 +224,7 @@ TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
     // Registry thread.
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Lock the registry so that starting to receive will block.
-        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
         opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
@@ -242,7 +242,7 @@ TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
 
     // Receive thread.
     auto lockReleased = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc("receive thread", getGlobalServiceContext());
+        ThreadClient tc("receive thread", getGlobalServiceContext()->getService());
         auto opCtx = tc->makeOperationContext();
 
         auto baton = opCtx->getBaton();
@@ -311,7 +311,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
 
     // Registry locking thread.
     auto lockReleased = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
         opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
@@ -375,7 +375,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
 
     // Registry locking thread.
     auto lockReleased = stdx::async(stdx::launch::async, [&] {
-        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext()->getService());
         auto opCtxHolder = tc->makeOperationContext();
         opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 

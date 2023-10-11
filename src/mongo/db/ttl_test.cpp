@@ -209,7 +209,7 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the current
         // client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext());
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
         doTTLPassForTest();
     });
     thread.join();
@@ -251,7 +251,7 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
     stdx::thread thread([&]() {
         // TTLMonitor::doTTLPass creates a new OperationContext, which cannot be done on the
         // current client because the OperationContext already exists.
-        ThreadClient threadClient(getGlobalServiceContext());
+        ThreadClient threadClient(getGlobalServiceContext()->getService());
         doTTLPassForTest();
     });
     thread.join();

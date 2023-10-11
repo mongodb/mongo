@@ -252,7 +252,7 @@ void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) 
 void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* service,
                                                                std::string threadName,
                                                                Milliseconds refreshInterval) {
-    ThreadClient tc(threadName, service);
+    ThreadClient tc(threadName, service->getService());
     ON_BLOCK_EXIT([this]() mutable { _hasSeenKeys.store(false); });
 
     unsigned errorCount = 0;

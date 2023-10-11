@@ -645,7 +645,7 @@ public:
                         &mutex,
                         &cv,
                         &numMultikeyCalls] {
-            ThreadClient client(svcCtx);
+            ThreadClient client(svcCtx->getService());
             auto opCtx = client->makeOperationContext();
 
             Lock::GlobalLock globalLock{opCtx.get(), MODE_IX};

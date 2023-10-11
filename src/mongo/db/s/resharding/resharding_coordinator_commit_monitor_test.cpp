@@ -283,7 +283,7 @@ void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients
 
 TEST_F(CoordinatorCommitMonitorTest, ComputesMinAndMaxRemainingTimes) {
     auto future = launchAsync([this] {
-        ThreadClient tc(getServiceContext());
+        ThreadClient tc(getServiceContext()->getService());
         return getCommitMonitor()->queryRemainingOperationTimeForRecipients();
     });
 

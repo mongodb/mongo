@@ -126,7 +126,7 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
     }
 
     auto future = launchAsync([&] {
-        ThreadClient tc("Test", getServiceContext());
+        ThreadClient tc("Test", getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
 
         ShardsvrCreateCollectionRequest request;
@@ -202,7 +202,7 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
     shardRegistry()->reload(operationContext());
 
     auto future = launchAsync([&] {
-        ThreadClient tc("Test", getServiceContext());
+        ThreadClient tc("Test", getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
 
         std::vector<TagsType> zones{};
@@ -249,7 +249,7 @@ TEST_F(CreateFirstChunksTest, Unsplittable_OneChunkToPrimary) {
     shardRegistry()->reload(operationContext());
 
     auto future = launchAsync([&] {
-        ThreadClient tc("Test", getServiceContext());
+        ThreadClient tc("Test", getServiceContext()->getService());
         auto opCtx = cc().makeOperationContext();
 
         std::vector<TagsType> zones{};

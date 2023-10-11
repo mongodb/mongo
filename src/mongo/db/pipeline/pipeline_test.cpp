@@ -3763,7 +3763,7 @@ protected:
     std::unique_ptr<Pipeline, PipelineDeleter> shardPipe;
 
 private:
-    ThreadClient _threadClient{getServiceContext()};
+    ThreadClient _threadClient{getServiceContext()->getService()};
     ServiceContext::UniqueOperationContext _opCtx{_threadClient->makeOperationContext()};
 };
 
