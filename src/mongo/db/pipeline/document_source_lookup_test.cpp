@@ -710,6 +710,52 @@ TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithCollation) {
     ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
 }
 
+// Tests that $lookup with '$documents' can be round tripped.
+TEST_F(DocumentSourceLookUpTest, LookupReParseSerializedStageWithDocumentsPipelineStage) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs =
+        NamespaceString::createNamespaceString_forTest(boost::none, "unittest", "$cmd.aggregate");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {fromNs.coll().toString(), {fromNs, std::vector<BSONObj>()}}});
+    auto originalBSON =
+        BSON("$lookup" << BSON("localField"
+                               << "y"
+                               << "foreignField"
+                               << "x"
+                               << "pipeline"
+                               << BSON_ARRAY(BSON("$documents"
+                                                  << BSON_ARRAY(BSON("x" << 5) << BSON("y" << 15))))
+                               << "as"
+                               << "as"));
+    auto lookupStage = DocumentSourceLookUp::createFromBson(originalBSON.firstElement(), expCtx);
+
+    //
+    // Serialize the $lookup stage and confirm contents.
+    //
+    vector<Value> serialization;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    lookupStage->serializeToArray(serialization, opts);
+    auto serializedDoc = serialization[0].getDocument();
+    ASSERT_EQ(serializedDoc["$lookup"].getType(), BSONType::Object);
+
+    // Ensure the $documents desugared to $queue properly.
+    auto serializedStage = serializedDoc["$lookup"].getDocument();
+    ASSERT_EQ(serializedStage["pipeline"].getType(), BSONType::Array);
+    ASSERT_EQ(serializedStage["pipeline"].getArrayLength(), 4UL);
+
+    ASSERT_EQ(serializedStage["pipeline"][0].getType(), BSONType::Object);
+    ASSERT_EQ(serializedStage["pipeline"][0]["$queue"].getType(), BSONType::Array);
+
+    auto roundTripped =
+        DocumentSourceLookUp::createFromBson(serializedDoc.toBson().firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    roundTripped->serializeToArray(newSerialization, opts);
+
+    ASSERT_EQ(newSerialization.size(), 1UL);
+    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+}
+
 
 // $lookup : {from : {db: <>, coll: <>}} syntax doesn't work for a namespace that isn't
 // config.cache.chunks*.

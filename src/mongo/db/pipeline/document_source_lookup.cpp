@@ -61,6 +61,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_documents.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -274,6 +275,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 std::vector<BSONObj> extractSourceStage(const std::vector<BSONObj>& pipeline) {
     if (!pipeline.empty() &&
         (pipeline[0].hasField(DocumentSourceDocuments::kStageName) ||
+         pipeline[0].hasField(DocumentSourceQueue::kStageName) ||
          pipeline[0].hasField("$search"_sd))) {
         return {pipeline[0]};
     }
