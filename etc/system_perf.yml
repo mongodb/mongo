@@ -1785,6 +1785,11 @@ tasks:
              exclude_filter: none,
              threads: "1 2 4 8",
              read_cmd: 'true'}
+  - name: stream_workloads
+    commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: streams.2023-10
 
 buildvariants:
   - name: task_generation
@@ -2418,16 +2423,17 @@ buildvariants:
       - name: column_store_tpch_10_denormalized_unindexed
       - name: ssb_column_store_comparison
 
-  - name: linux-standalone-streams.2023-09
-    display_name: Linux Standalone (Streams) 2023-09
+  - name: streams-single.intel.2023-10
+    display_name: Streams-Single Intel 2023-10
     cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
     modules: *modules
     expansions:
       compile_variant: -stream-x86_64
+      requires_mongostream: true
       mongodb_setup_release: 2022-11
-      mongodb_setup: standalone-streams
+      mongodb_setup: streams-single.2023-10
       infrastructure_provisioning_release: 2022-11
-      infrastructure_provisioning: single-intel
+      infrastructure_provisioning: streams-single.intel.2023-10
       workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
@@ -2439,6 +2445,7 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: stream_workloads
 
   - name: linux-standalone-classic-query-engine.2022-11
     display_name: Linux Standalone (Classic Query Engine) 2022-11
