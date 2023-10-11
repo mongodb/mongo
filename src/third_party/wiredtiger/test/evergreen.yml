@@ -31,7 +31,7 @@ exec_timeout_secs: 21600 # 6 hrs
 functions:
   "setup environment":
     - command: expansions.update
-      type: setup 
+      type: setup
       params:
         updates:
         # The expansion is used for each task that runs a WiredTiger test. The expansions are
@@ -81,12 +81,12 @@ functions:
 
   "get project":
     command: git.get_project
-    type: setup 
+    type: setup
     params:
       directory: wiredtiger
   "fetch artifacts": &fetch_artifacts
     command: s3.get
-    type: setup 
+    type: setup
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
@@ -95,7 +95,7 @@ functions:
       extract_to: ${destination|wiredtiger}
   "fetch endian format artifacts" :
     - command: s3.get
-      type: setup 
+      type: setup
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
@@ -104,7 +104,7 @@ functions:
         extract_to: wiredtiger/cmake_build/test/format
   "fetch mongo-tests repo" :
     command: shell.exec
-    type: setup 
+    type: setup
     params:
       shell: bash
       script: |
@@ -113,7 +113,7 @@ functions:
         git clone https://github.com/wiredtiger/mongo-tests
   "fetch mongo repo" :
     command: shell.exec
-    type: setup 
+    type: setup
     params:
       shell: bash
       script: |
@@ -129,7 +129,7 @@ functions:
         git clone $mongo_repo -b $mongo_branch
   "import wiredtiger into mongo" :
     command: shell.exec
-    type: setup 
+    type: setup
     params:
       shell: bash
       script: |
@@ -300,7 +300,7 @@ functions:
         ${python_binary|python3} ../test/evergreen/print_stack_trace.py
   "upload stacktraces": &upload_stacktraces
     command: s3.put
-    type: setup 
+    type: setup
     params:
       aws_secret: ${aws_secret}
       aws_key: ${aws_key}
@@ -337,8 +337,8 @@ functions:
           export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
 
           # GCP requires a path to a credentials file for authorization. To not expose the private
-          # information within the file, we use a placeholder private variable which are replaced 
-          # in the command line with the evergreen expansion variables and stored in a temporary 
+          # information within the file, we use a placeholder private variable which are replaced
+          # in the command line with the evergreen expansion variables and stored in a temporary
           # file.
           file=$(mktemp --suffix ".json")
 
@@ -457,7 +457,7 @@ functions:
 
           done
     - command: shell.exec
-      type: setup 
+      type: setup
       params:
         shell: bash
         silent: true
@@ -596,7 +596,7 @@ functions:
     - *dump_stacktraces
     - *upload_stacktraces
     - command: perf.send
-      type: setup 
+      type: setup
       params:
         file: ./wiredtiger/cmake_build/test/cppsuite/${test_name}.json
     # Cleanup tasks.
@@ -671,7 +671,7 @@ functions:
 
   "code coverage publish report":
     command: s3.put
-    type: setup 
+    type: setup
     params:
       aws_secret: ${aws_secret}
       aws_key: ${aws_key}
@@ -683,7 +683,7 @@ functions:
 
   "code coverage publish main page":
     command: s3.put
-    type: setup 
+    type: setup
     params:
       aws_secret: ${aws_secret}
       aws_key: ${aws_key}
@@ -919,14 +919,14 @@ functions:
         done
   "upload artifact":
     - command: archive.targz_pack
-      type: setup 
+      type: setup
       params:
         target: ${upload_filename|wiredtiger.tgz}
         source_dir: ${upload_source_dir|wiredtiger}
         include:
           - "./**"
     - command: s3.put
-      type: setup 
+      type: setup
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
@@ -938,7 +938,7 @@ functions:
         remote_file: wiredtiger/${build_variant}/${revision}/artifacts/${task_name}_${build_id}${postfix|}.tgz
   "upload endian format artifacts":
     - command: s3.put
-      type: setup 
+      type: setup
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
@@ -950,7 +950,7 @@ functions:
         remote_file: wiredtiger/${endian_format}/${revision}/artifacts/${remote_file}
   "cleanup":
     command: shell.exec
-    type: setup 
+    type: setup
     params:
       shell: bash
       script: |
@@ -974,7 +974,7 @@ functions:
 
   "save wt hang analyzer core/debugger files":
     - command: archive.targz_pack
-      type: setup 
+      type: setup
       params:
         target: "wt-hang-analyzer.tgz"
         source_dir: "wiredtiger/cmake_build"
@@ -982,7 +982,7 @@ functions:
           - "./*core*"
           - "./debugger*.*"
     - command: s3.put
-      type: setup 
+      type: setup
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
@@ -1141,7 +1141,7 @@ functions:
 
   "upload test stats":
     - command: perf.send
-      type: setup 
+      type: setup
       params:
         file: ./wiredtiger/cmake_build/${test_path}.json
 
@@ -1174,13 +1174,13 @@ functions:
 
   "upload stats to evergreen":
     - command: perf.send
-      type: setup 
+      type: setup
       params:
         file: ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/evergreen_out_${test-name}.json
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'test-name' variable
     - command: s3.put
-      type: setup 
+      type: setup
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
@@ -1211,10 +1211,10 @@ functions:
           set -o errexit
           set -o verbose
           ./test/evergreen/verify_wt_datafiles.sh 2>&1
-  
+
   "install gcp dependencies":
     - command: shell.exec
-      type: setup 
+      type: setup
       params:
         working_dir: "wiredtiger"
         shell: bash
@@ -1289,12 +1289,12 @@ variables:
   - &configure_flags_tiered_storage_azure
     ENABLE_AZURE: -DENABLE_AZURE=1
     IMPORT_AZURE_SDK: -DIMPORT_AZURE_SDK=external
-  
+
   # Configure flags for tiered storage GCP extension.
   - &configure_flags_tiered_storage_gcp
     ENABLE_GCP: -DENABLE_GCP=1
     IMPORT_GCP_SDK: -DIMPORT_GCP_SDK=external
-  
+
   # Configure flags for tiered storage S3 extension.
   - &configure_flags_tiered_storage_s3
     ENABLE_S3: -DENABLE_S3=1
@@ -2977,7 +2977,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 -b 11/12
-  
+
   - name: unit-test-nonstandalone-bucket00
     tags: ["python", "pull_request"]
     depends_on:
@@ -2989,7 +2989,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 0/12
-    
+
   - name: unit-test-nonstandalone-bucket01
     tags: ["python", "pull_request"]
     depends_on:
@@ -3001,7 +3001,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 1/12
-    
+
   - name: unit-test-nonstandalone-bucket02
     tags: ["python", "pull_request"]
     depends_on:
@@ -3013,7 +3013,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 2/12
-            
+
   - name: unit-test-nonstandalone-bucket03
     tags: ["python", "pull_request"]
     depends_on:
@@ -3026,7 +3026,7 @@ tasks:
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 3/12
 
-            
+
   - name: unit-test-nonstandalone-bucket04
     tags: ["python", "pull_request"]
     depends_on:
@@ -3038,7 +3038,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 4/12
-            
+
   - name: unit-test-nonstandalone-bucket05
     tags: ["python", "pull_request"]
     depends_on:
@@ -3050,7 +3050,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 5/12
-            
+
   - name: unit-test-nonstandalone-bucket06
     tags: ["python", "pull_request"]
     depends_on:
@@ -3062,7 +3062,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 6/12
-            
+
   - name: unit-test-nonstandalone-bucket07
     tags: ["python", "pull_request"]
     depends_on:
@@ -3074,7 +3074,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 7/12
-            
+
   - name: unit-test-nonstandalone-bucket08
     tags: ["python", "pull_request"]
     depends_on:
@@ -3086,7 +3086,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 8/12
-            
+
   - name: unit-test-nonstandalone-bucket09
     tags: ["python", "pull_request"]
     depends_on:
@@ -3098,7 +3098,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 9/12
-            
+
   - name: unit-test-nonstandalone-bucket10
     tags: ["python", "pull_request"]
     depends_on:
@@ -3122,7 +3122,7 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: --hook nonstandalone -v 2 -b 11/12
-                      
+
   - name: unit-test-long-bucket00
     tags: ["python", "unit_test_long"]
     patch_only: true
@@ -3273,14 +3273,14 @@ tasks:
             set -o verbose
             sh -x s_all -A -E 2>&1
             # Run s_string with the "-r" option to remove no-longer-needed words from s_string.ok
-            # This is run separately from s_all as it can be too proactive when run as part of 
+            # This is run separately from s_all as it can be too proactive when run as part of
             # developers local workflow, but needs to be run in PR builds before the code is merged.
             sh s_string -r 2>&1
 
   - name: s-outdated-fixmes
-    # Detect any FIXME comments in the codebase tied to closed Jira tickets. 
-    # This will send a GET request to JIRA for each FIXME ticket so we don't 
-    # want to run it too frequently. 
+    # Detect any FIXME comments in the codebase tied to closed Jira tickets.
+    # This will send a GET request to JIRA for each FIXME ticket so we don't
+    # want to run it too frequently.
     commands:
       - func: "get project"
       - command: shell.exec
@@ -3653,9 +3653,9 @@ tasks:
           script: |
             # The set of tests below were selected from entries to the Aug 2023 WiredTiger Code Coverage Competition.
             # The tests were selected to achieve just over 50% branch coverage and do so in about 30 minutes.
-            # While 50% coverage is not sufficient, this selection of tests forms a useful basis for future 
-            # improvements to code coverage. 
-            
+            # While 50% coverage is not sufficient, this selection of tests forms a useful basis for future
+            # improvements to code coverage.
+
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
@@ -3663,7 +3663,7 @@ tasks:
             date +%s > ../time.txt
             # Perform the tests to get code coverage metrics for
             . ../test/evergreen/find_cmake.sh
-            
+
             test/unittest/unittests
 
             $CTEST -R '(ex_|lsm_workload|filesys|metadata_salvage|col_efficiency|dup_index_collator|compact_quick|test_checkpoint_4_mixed_timestamps|test_checkpoint_6_row_named_prepare|random_directio|scope|join_main_table_row|pad_byte_collator|meta_ckptlist_get_alloc)'
@@ -3926,15 +3926,15 @@ tasks:
             virtualenv -p ${python_binary|python3} venv
             source venv/bin/activate
             pip3 install pygit2==1.10.1
-            
+
             EXTRA_CODE_CHANGE_PARAMETERS=''
-             
+
             if [ ${is_patch|false} = true ]; then
               echo "This is a patch build"
               # Obtain the diff for the changes in this patch
               git diff `git merge-base develop HEAD` > coverage_report/diff.txt
               EXTRA_CODE_CHANGE_PARAMETERS='-d coverage_report/diff.txt'
-              # Generate an HTML friendly version of the diff for 
+              # Generate an HTML friendly version of the diff for
               sed 's/$/<br>/' coverage_report/diff.txt > coverage_report/diff.html
               # Logging for debugging
               ls -l coverage_report
@@ -3942,10 +3942,10 @@ tasks:
             fi
 
             ${python_binary|python3} test/evergreen/code_change_report/code_change_info.py -v -c coverage_report/full_coverage_report.json -g . $EXTRA_CODE_CHANGE_PARAMETERS -o coverage_report/code_change_info.json
-            
+
             # Log the contents of the change info file
             cat coverage_report/code_change_info.json
-            
+
             # Generate the Code Change Report
             ${python_binary|python3} test/evergreen/code_change_report/code_change_report.py -v -c coverage_report/code_change_info.json -o coverage_report/code_change_report.html
       - func: "code coverage publish report"
@@ -4032,10 +4032,10 @@ tasks:
             set -o errexit
             # Set the Azure credentials using config variable.
             export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
-            
+
             # GCP requires a path to a credentials file for authorization. To not expose the private
-            # information within the file, we use a placeholder private variable which are replaced 
-            # in the command line with the evergreen expansion variables and stored in a temporary 
+            # information within the file, we use a placeholder private variable which are replaced
+            # in the command line with the evergreen expansion variables and stored in a temporary
             # file.
             file=$(mktemp --suffix ".json")
 
@@ -4668,7 +4668,7 @@ tasks:
             for i in $(seq 5); do
                 ${python_binary|python3} skiplist_stress.py
             done
-  
+
   - name: chunkcache-test
     exec_timeout_secs: 1200 # 20 minutes
     commands:
@@ -6372,7 +6372,7 @@ buildvariants:
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
     additional_env_vars: |
       export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-      export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"  
+      export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest"
@@ -6386,7 +6386,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0 
+    ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
     posix_configure_flags: -DENABLE_PYTHON=0 -DENABLE_LZ4=0 -DENABLE_SNAPPY=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -6404,14 +6404,14 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=MSan
-    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release 
-    # builds) as -O1, making test binaries more difficult to debug. 
+    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
     additional_env_vars: |
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
-    # some csuite tests to take an extended amount of time. These are excluded from the 
+    # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
     check_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
@@ -6436,8 +6436,8 @@ buildvariants:
   expansions:
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=UBSan
-    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release 
-    # builds) as -O1, making test binaries more difficult to debug. 
+    # Use optimisation level -O0 since Clang treats -Og (our default optimisation for non-release
+    # builds) as -O1, making test binaries more difficult to debug.
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O0
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=1
     additional_env_vars: export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
@@ -6776,7 +6776,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0 
+    ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
     posix_configure_flags: -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
