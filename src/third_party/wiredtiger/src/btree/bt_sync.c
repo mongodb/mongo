@@ -147,11 +147,16 @@ __sync_ref_obsolete_check(WT_SESSION_IMPL *session, WT_REF *ref)
         return (0);
     }
 
-    /* Fast-check, ignore deleted pages. */
-    if (ref->state == WT_REF_DELETED) {
-        __wt_verbose(session, WT_VERB_CHECKPOINT_CLEANUP, "%p: skipping deleted page", (void *)ref);
-        return (0);
-    }
+    /*
+     * Mark the parent page as dirty to remove a fast-deleted child page.
+     *
+     * Ignoring these fast-deleted child pages may result in a disk leak if we downgraded from a
+     * version that writes out fast-delete information. Fast-delete information is ignored in
+     * versions 6.0 and prior, and so the fast-delete operation on these pages is considered
+     * globally visible. Therefore, clean up these pages.
+     */
+    if (ref->state == WT_REF_DELETED)
+        WT_RET(__wt_page_parent_modify_set(session, ref, true));
 
     /* Lock the WT_REF. */
     WT_REF_LOCK(session, ref, &previous_state);
