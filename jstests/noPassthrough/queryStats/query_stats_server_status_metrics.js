@@ -1,6 +1,6 @@
 /**
  * Test the telemetry related serverStatus metrics.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_72]
  */
 (function() {
 "use strict";

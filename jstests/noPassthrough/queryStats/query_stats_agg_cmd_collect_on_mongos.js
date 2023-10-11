@@ -1,6 +1,6 @@
 /**
  * Test that mongos is collecting query stats metrics for agg queries.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_72]
  */
 
 import {

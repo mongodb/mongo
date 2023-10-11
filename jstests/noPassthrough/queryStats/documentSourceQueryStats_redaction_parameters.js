@@ -102,7 +102,6 @@ function runTest(conn) {
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
-        featureFlagQueryStats: true,
     }
 });
 runTest(conn);

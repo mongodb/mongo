@@ -3,7 +3,7 @@
 //   uses_change_streams,
 //   requires_replication,
 //   requires_sharding,
-//   featureFlagQueryStats
+//   requires_fcv_72
 // ]
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

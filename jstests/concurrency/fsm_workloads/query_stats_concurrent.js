@@ -4,7 +4,7 @@
  * Stresses $queryStats running concurrently with queries.
  *
  * @tags: [
- *  featureFlagQueryStats,
+ *  requires_fcv_72,
  *  does_not_support_causal_consistency,
  * ]
  *

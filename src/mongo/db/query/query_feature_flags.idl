@@ -64,7 +64,8 @@ feature_flags:
     featureFlagQueryStats:
       description: "Feature flag for enabling full queryStats collection."
       cpp_varname: gFeatureFlagQueryStats
-      default: false
+      default: true
+      version: 7.2
       shouldBeFCVGated: true
 
     featureFlagQueryStatsFindCommand:

@@ -1,6 +1,6 @@
 /**
  * Test logging of $queryStats.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_72]
  */
 
 let options = {

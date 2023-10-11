@@ -1,6 +1,6 @@
 /**
  * Test that $queryStats properly tokenizes aggregation commands, on mongod and mongos.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_72]
  */
 import {
     asFieldPath,

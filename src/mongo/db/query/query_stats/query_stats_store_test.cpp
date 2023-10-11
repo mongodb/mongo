@@ -272,7 +272,6 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     auto opCtx = makeOperationContext();
     auto parsedFindPair =
         uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcrCopy)));
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
     RAIIServerParameterControllerForTest queryKnobController{"internalQueryStatsRateLimit", -1};
 
     auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());

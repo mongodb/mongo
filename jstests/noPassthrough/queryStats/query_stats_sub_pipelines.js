@@ -1,7 +1,7 @@
 /**
  * Test that shapification for queries with sub-pipelines happens before view resolution and
  * pipeline optimization.
- * @tags: [featureFlagQueryStats]
+ * @tags: [requires_fcv_72]
  */
 import {
     getLatestQueryStatsEntry,
