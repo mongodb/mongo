@@ -501,18 +501,22 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         BSONObj oldObj = member->doc.value().toBson();
         invariant(oldObj.isOwned());
 
-        // Save state before making changes.
-        handlePlanStageYield(
+        const auto saveRet = handlePlanStageYield(
             expCtx(),
             "UpdateStage saveState",
             [&] {
                 child()->saveState();
-                return PlanStage::NEED_TIME /* unused */;
+                return PlanStage::NEED_TIME;
             },
             [&] {
                 // yieldHandler
-                std::terminate();
+                memberFreer.dismiss();
+                prepareToRetryWSM(id, out);
             });
+        if (saveRet != PlanStage::NEED_TIME) {
+            return saveRet;
+        }
+
         // If we care about the pre-updated version of the doc, save it out here.
         SnapshotId oldSnapshot = member->doc.snapshotId();
 

@@ -513,17 +513,22 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
         return {true, PlanStage::NEED_TIME, getMeasurementToReturn()};
     }
 
-    handlePlanStageYield(
+    const auto saveRet = handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage saveState",
         [&] {
             child()->saveState();
-            return PlanStage::NEED_TIME /* unused */;
+            return PlanStage::NEED_TIME;
         },
         [&] {
             // yieldHandler
-            std::terminate();
+            // We need to retry the bucket, so we should not free the current bucket.
+            bucketFreer.dismiss();
+            _retryBucket(bucketWsmId);
         });
+    if (saveRet != PlanStage::NEED_TIME) {
+        return {false, saveRet, boost::none};
+    }
 
     auto recordId = _ws->get(bucketWsmId)->recordId;
     try {

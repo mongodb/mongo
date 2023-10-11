@@ -105,10 +105,6 @@ WiredTigerCursor::~WiredTigerCursor() {
     }
 }
 
-void WiredTigerCursor::reset() {
-    invariantWTOK(_cursor->reset(_cursor), _cursor->session);
-}
-
 WiredTigerBulkLoadCursor::WiredTigerBulkLoadCursor(const std::string& indexUri,
                                                    OperationContext* opCtx)
     : _session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->getSession()) {

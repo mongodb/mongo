@@ -69,8 +69,6 @@ public:
         return _session;
     }
 
-    void reset();
-
     void assertInActiveTxn() const {
         _ru->assertInActiveTxn();
     }

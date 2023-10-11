@@ -236,17 +236,21 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     Snapshotted<Document> memberDoc = member->doc;
     BSONObj bsonObjDoc = memberDoc.value().toBson();
 
-    handlePlanStageYield(
+    const auto saveRet = handlePlanStageYield(
         expCtx(),
         "DeleteStage saveState",
         [&] {
             child()->saveState();
-            return PlanStage::NEED_TIME /* unused */;
+            return PlanStage::NEED_TIME;
         },
         [&] {
             // yieldHandler
-            std::terminate();
+            memberFreer.dismiss();
+            prepareToRetryWSM(id, out);
         });
+    if (saveRet != PlanStage::NEED_TIME) {
+        return saveRet;
+    }
 
     // Do the write, unless this is an explain.
     if (!_params->isExplain) {

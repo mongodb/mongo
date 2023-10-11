@@ -75,7 +75,8 @@ namespace mongo {
  * WriteConflictException.
  */
 template <typename F, typename H>
-auto handlePlanStageYield(ExpressionContext* expCtx, StringData opStr, F&& f, H&& yieldHandler) {
+MONGO_WARN_UNUSED_RESULT_FUNCTION PlanStage::StageState handlePlanStageYield(
+    ExpressionContext* expCtx, StringData opStr, F&& f, H&& yieldHandler) {
     auto opCtx = expCtx->opCtx;
     invariant(opCtx);
     invariant(opCtx->lockState());

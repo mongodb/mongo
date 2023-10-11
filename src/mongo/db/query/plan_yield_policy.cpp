@@ -139,11 +139,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             // Saving and restoring can modify '_yieldable', so we make a copy before we start.
             const auto yieldable = _yieldable;
 
-            try {
-                saveState(opCtx);
-            } catch (const StorageUnavailableException&) {
-                MONGO_UNREACHABLE;
-            }
+            saveState(opCtx);
 
             boost::optional<ScopeGuard<std::function<void()>>> exitGuard;
             if (useExperimentalCommitTxnBehavior()) {

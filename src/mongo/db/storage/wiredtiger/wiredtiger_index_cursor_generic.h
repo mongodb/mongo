@@ -44,12 +44,9 @@ public:
     virtual ~WiredTigerIndexCursorGeneric() = default;
 
     void resetCursor() {
-        try {
-            if (_cursor)
-                _cursor->reset();
-        } catch (const StorageUnavailableException&) {
-            // Ignore since this is only called when we are about to kill our transaction
-            // anyway.
+        if (_cursor) {
+            WT_CURSOR* wtCur = _cursor->get();
+            invariantWTOK(WT_READ_CHECK(wtCur->reset(wtCur)), wtCur->session);
         }
     }
 

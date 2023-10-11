@@ -462,12 +462,7 @@ public:
 
     void save() final {
         if (_cursor) {
-            try {
-                _cursor->reset(_cursor);
-            } catch (const StorageUnavailableException&) {
-                // Ignore since this is only called when we are about to kill our transaction
-                // anyway.
-            }
+            invariantWTOK(WT_READ_CHECK(_cursor->reset(_cursor)), _cursor->session);
         }
     }
 
@@ -2275,16 +2270,14 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
 }
 
 void WiredTigerRecordStoreCursorBase::save() {
-    try {
-        if (_cursor)
-            _cursor->reset();
-        _oplogVisibleTs = boost::none;
-        _cappedSnapshot = boost::none;
-        _readTimestampForOplog = boost::none;
-        _hasRestored = false;
-    } catch (const StorageUnavailableException&) {
-        // Ignore since this is only called when we are about to kill our transaction anyway.
+    if (_cursor) {
+        WT_CURSOR* wtCur = _cursor->get();
+        invariantWTOK(WT_READ_CHECK(wtCur->reset(wtCur)), wtCur->session);
     }
+    _oplogVisibleTs = boost::none;
+    _cappedSnapshot = boost::none;
+    _readTimestampForOplog = boost::none;
+    _hasRestored = false;
 }
 
 bool WiredTigerRecordStoreCursorBase::isVisible(const RecordId& id) {
