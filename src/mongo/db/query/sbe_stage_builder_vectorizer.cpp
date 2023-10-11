@@ -285,31 +285,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
         return {
             makeABTFunction(op.name(), std::move(functionArgs)), TypeSignature::kAnyScalarType, {}};
     }
-    if (numOfBlockArgs == 1) {
-        // This is a function that doesn't have a block-enabled counterpart, but it is applied to a
-        // single block argument; we can support it by adding a loop on the block argument and
-        // invoking the function on top of the current scalar value.
-        sbe::FrameId frameId = _frameGenerator->generate();
-        auto blockArgVar = getABTLocalVariableName(frameId, 0);
-        size_t blockArgPos = -1;
-        optimizer::ABTVector functionArgs;
-        functionArgs.reserve(arity);
-        for (size_t i = 0; i < arity; i++) {
-            if (TypeSignature::kBlockType.isSubset(args[i].typeSignature)) {
-                blockArgPos = i;
-                functionArgs.emplace_back(makeVariable(blockArgVar));
-            } else {
-                functionArgs.emplace_back(std::move(*args[i].expr));
-            }
-        }
-        return {makeABTFunction(
-                    "valueBlockApplyLambda"_sd,
-                    generateMaskArg(),
-                    std::move(*args[blockArgPos].expr),
-                    makeLocalLambda(frameId, makeABTFunction(op.name(), std::move(functionArgs)))),
-                TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
-                args[blockArgPos].sourceCell};
-    }
+
     // We don't support this function applied to multiple blocks at the same time.
     return {{}, TypeSignature::kAnyScalarType, {}};
 }
