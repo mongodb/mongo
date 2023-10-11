@@ -2,7 +2,7 @@
 // different binary versions, and the behaviour after upgrading to latest.
 //
 // @tags: [
-//  featureFlagUseUnreplicatedTruncatesForDeletions,
+//  requires_fcv_72,
 //  requires_replication,
 // ]
 import "jstests/multiVersion/libs/multi_rs.js";

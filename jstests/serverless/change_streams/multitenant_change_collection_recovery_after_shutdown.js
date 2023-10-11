@@ -2,8 +2,9 @@
 // Ensures the periodic change collection entry remover is disabled for the duration of the test to
 // isolate startup recovery behavior.
 // @tags: [
-//   requires_fcv_71,
-//   featureFlagUseUnreplicatedTruncatesForDeletions,
+//  requires_fcv_72,
+//  # Not suitable for inMemory variants given data must persist across shutdowns.
+//  requires_persistence,
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

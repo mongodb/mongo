@@ -4,7 +4,9 @@
 // 'PreImageTruncateAfterShutdownTest'.
 //
 // @tags: [
-//  featureFlagUseUnreplicatedTruncatesForDeletions,
+//  requires_fcv_72,
+//  # Not suitable for inMemory variants given data must persist across shutdowns.
+//  requires_persistence,
 //  assumes_against_mongod_not_mongos,
 //  requires_replication,
 // ]

@@ -79,7 +79,7 @@ feature_flags:
         using unreplicated truncates instead of normal document deletions replicated from the
         primary."
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagTTLIndexesOnCappedCollections:
         description: "Enables support for capped collections having a TTL index."
