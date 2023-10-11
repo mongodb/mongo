@@ -34,6 +34,9 @@ def get_parser(usage=None):
     subparsers = parser.add_subparsers(dest="command")
     parser.add_argument("--configDir", dest="config_dir", metavar="CONFIG_DIR",
                         help="Directory to search for resmoke configuration files")
+    parser.add_argument(
+        "--jstestsDir", dest="jstests_dir", metavar="CONFIG_DIR",
+        help="Directory to search for jstests files existence while suite validation")
 
     # Add sub-commands.
     for plugin in _PLUGINS:

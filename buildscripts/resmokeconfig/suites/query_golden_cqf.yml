@@ -4,7 +4,7 @@ selector:
   roots:
   - jstests/query_golden/**/*.js
   exclude_files:
-  - jstests/query_golden/libs/**
+  - jstests/query_golden/libs/**/*.js
 executor:
   archive:
     hooks:

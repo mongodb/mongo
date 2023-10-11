@@ -10,7 +10,6 @@ selector:
   - jstests/sharding/*[aA]uth*.js
   - jstests/sharding/analyze_shard_key/*[aA]uth*.js
   - jstests/sharding/query/*[aA]uth*.js
-  - jstests/sharding/change_streams/*[aA]uth*.js
   - jstests/sharding/cluster_time_across_add_shard.js
 
   - jstests/sharding/internal_txns/internal_client_restrictions.js

@@ -98,3 +98,15 @@ class RequiresForceRemove(ResmokeError):
     """Exception raised when a directory cannot be removed."""
 
     pass
+
+
+class TestExcludedFromSuiteError(ResmokeError):
+    """Exception raised when an excluded from suite test passed as positional argument to resmoke."""
+
+    pass
+
+
+class SuiteSelectorConfigurationError(ResmokeError):
+    """Exceptions raised when selector section in suite configuration has errors."""
+
+    pass

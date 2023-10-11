@@ -37,7 +37,7 @@ BASE_16_TO_INT = 16
 def validate_and_update_config(parser, args):
     """Validate inputs and update config module."""
     _validate_options(parser, args)
-    _update_config_vars(args)
+    _update_config_vars(parser, args)
     _update_symbolizer_secrets()
     _validate_config(parser)
     _set_logging_config()
@@ -223,7 +223,7 @@ def _set_up_tracing(
     return success
 
 
-def _update_config_vars(values):
+def _update_config_vars(parser, values):
     """Update the variables of the config module."""
 
     config = _config.DEFAULTS.copy()
@@ -308,8 +308,8 @@ be invoked as either:
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
 
-    force_disabled_flags = yaml.safe_load(
-        open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"))
+    with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
+        force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     _config.EXCLUDE_WITH_ANY_TAGS.extend(force_disabled_flags)
 
@@ -537,6 +537,9 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     # Config Dir options.
     _config.CONFIG_DIR = config.pop("config_dir")
 
+    # Directory with jstests option
+    _config.JSTESTS_DIR = config.pop("jstests_dir")
+
     # Configure evergreen task documentation
     if _config.EVERGREEN_TASK_NAME:
         task_name = utils.get_task_name_without_suffix(_config.EVERGREEN_TASK_NAME,
@@ -560,6 +563,10 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
         # Treat `resmoke run @to_replay` as `resmoke run --replayFile to_replay`
         if len(test_files) == 1 and test_files[0].startswith("@"):
             to_replay = test_files[0][1:]
+        elif len(test_files) > 1 and any(test_file.startswith("@") for test_file in test_files):
+            parser.error(
+                "Cannot use @replay with additional test files listed on the command line invocation."
+            )
         elif replay_file:
             to_replay = replay_file
 

@@ -317,15 +317,16 @@ class TestTestSelection(_ResmokeSelftest):
         # Additionally can assert on the error message.
         self.assertEqual(
             2,
-            self.execute_resmoke([f"--replay={self.test_dir}/replay",
-                                  "jstests/filename.js"]).wait())
+            self.execute_resmoke(
+                [f"--replay={self.test_dir}/replay", f"{self.testfiles_root}/one.js"]).wait())
 
-        # When multiple positional arguments are presented, they're all treated as test files. Technically errors on file `@<testdir>/replay` not existing. It's not a requirement that this invocation errors in this less specific way.
+        # When multiple positional arguments are presented, they're all treated as test files.
         self.assertEqual(
-            1,
-            self.execute_resmoke([f"@{self.test_dir}/replay", "jstests/filename.js"]).wait())
+            2,
+            self.execute_resmoke([f"@{self.test_dir}/replay",
+                                  f"{self.testfiles_root}/one.js"]).wait())
         self.assertEqual(
-            1,
+            2,
             self.execute_resmoke([f"{self.testfiles_root}/one.js",
                                   f"@{self.test_dir}/replay"]).wait())
 
@@ -372,10 +373,10 @@ class TestSetParameters(_ResmokeSelftest):
             "Running test. Template suite: %s Rewritten suite: %s Resmoke Args: %s Test output file: %s.",
             suite_template, suite_file, resmoke_args, self.shell_output_file)
 
-        resmoke_process = core.programs.make_process(self.logger, [
-            sys.executable, "buildscripts/resmoke.py", "run", f"--suites={suite_file}",
-            f"{self.testfiles_root}/fixture_info.js"
-        ] + resmoke_args)
+        resmoke_process = core.programs.make_process(
+            self.logger,
+            [sys.executable, "buildscripts/resmoke.py", "run", f"--suites={suite_file}"
+             ] + resmoke_args)
         resmoke_process.start()
 
         return resmoke_process

@@ -11,6 +11,7 @@ import os.path
 import random
 import subprocess
 import sys
+from typing import List, NamedTuple
 
 import buildscripts.resmokelib.testing.tags as _tags
 from buildscripts.resmokelib import config
@@ -22,6 +23,13 @@ from buildscripts.resmokelib.utils import jscomment
 ########################
 #  Test file explorer  #
 ########################
+
+_DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE = (
+    "Pattern(s) and/or filename(s) in `{config_section}`"
+    " do not match any existing test files: {not_matching_paths}")
+_DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE = (
+    "Pattern(s) and/or filename(s) in `{config_section}`"
+    " do not match any test files from `roots`: {not_matching_paths}")
 
 
 class TestFileExplorer(object):
@@ -147,6 +155,18 @@ class TestFileExplorer(object):
 
         return tagged_tests
 
+    @staticmethod
+    def get_jstests_dir() -> str:
+        """Get directory where jstests files are located."""
+        return config.JSTESTS_DIR
+
+
+class _EvaluatePathsResult(NamedTuple):
+    """Results of paths evaluation."""
+
+    evaluated: List[str]
+    unrecognized: List[str]
+
 
 class _TestList(object):
     """
@@ -160,73 +180,97 @@ class _TestList(object):
             'include_files()' or 'exclude_files()' will raise an TypeError.
     """
 
-    def __init__(self, test_file_explorer, roots, tests_are_files=True):
+    def __init__(self, test_file_explorer: TestFileExplorer, roots: List[str],
+                 tests_are_files: bool = True) -> None:
         """Initialize the _TestList with a TestFileExplorer component and a list of root tests."""
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
-        self._roots = self._expand_files(roots) if tests_are_files else roots
+        self._roots = self._expand_roots(roots) if tests_are_files else roots
         self._filtered = set(self._roots)
 
-    def _expand_files(self, tests):
-        expanded_tests = []
-        for test in tests:
-            if self._test_file_explorer.is_glob_pattern(test):
-                expanded_tests.extend(self._test_file_explorer.iglob(test))
-            else:
-                if not self._test_file_explorer.isfile(test):
-                    raise ValueError("Unrecognized test file: {}".format(test))
-                expanded_tests.append(os.path.normpath(test))
-        return expanded_tests
+    def _evaluate_paths(self, paths: List[str]) -> _EvaluatePathsResult:
+        evaluated = []
+        unrecognized = []
 
-    def include_files(self, include_files, force=False):
-        """Filter the test list so that it only includes files matching 'include_files'.
+        for path in paths:
+            if self._test_file_explorer.is_glob_pattern(path):
+                expanded_paths = self._test_file_explorer.iglob(path)
+                len_before = len(evaluated)
+                evaluated.extend(expanded_paths)
+                len_after = len(evaluated)
 
-        Args:
-            include_files: a list of paths or glob patterns that match the files to include.
-            force: if True include the matching files that were previously excluded, otherwise only
-                   include files that match and were not previously excluded from this _TestList.
+                if len_after == len_before and path.startswith(
+                        self._test_file_explorer.get_jstests_dir()):
+                    unrecognized.append(path)
+
+            elif self._test_file_explorer.isfile(path):
+                evaluated.append(os.path.normpath(path))
+
+            elif path.startswith(self._test_file_explorer.get_jstests_dir()):
+                unrecognized.append(path)
+
+        return _EvaluatePathsResult(evaluated, unrecognized)
+
+    def _expand_roots(self, tests: List[str]) -> List[str]:
+        paths = self._evaluate_paths(tests)
+        if len(paths.unrecognized) > 0:
+            raise errors.SuiteSelectorConfigurationError(
+                _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
+                    config_section="roots", not_matching_paths=paths.unrecognized))
+        return paths.evaluated
+
+    def include_files(self, include_files: List[str]) -> None:
+        """
+        Filter the test list so that it only includes files matching 'include_files'.
+
+        :param include_files: List of paths or glob patterns that match the files to include.
         """
         if not self._tests_are_files:
             raise TypeError("_TestList does not contain files.")
-        expanded_include_files = set()
-        for path in include_files:
-            if self._test_file_explorer.is_glob_pattern(path):
-                expanded_include_files.update(set(self._test_file_explorer.iglob(path)))
-            else:
-                expanded_include_files.add(os.path.normpath(path))
-        self._filtered = self._filtered & expanded_include_files
-        if force:
-            self._filtered |= set(self._roots) & expanded_include_files
 
-    def exclude_files(self, exclude_files):  # noqa: D406,D407,D411,D413
-        """Exclude from the test list the files that match elements from 'exclude_files'.
+        paths = self._evaluate_paths(include_files)
+        if len(paths.unrecognized) > 0:
+            raise errors.SuiteSelectorConfigurationError(
+                _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
+                    config_section="include_files", not_matching_paths=paths.unrecognized))
 
-        Args:
-            exclude_files: a list of paths or glob patterns that match the files to exclude.
-        Raises:
-            ValueError: if exclude_files contains a non-globbed path that does not correspond to
-                an existing file.
+        paths_missing_from_roots = [
+            path for path in paths.evaluated if
+            path.startswith(self._test_file_explorer.get_jstests_dir()) and path not in self._roots
+        ]
+        if len(paths_missing_from_roots) > 0:
+            raise errors.SuiteSelectorConfigurationError(
+                _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
+                    config_section="include_files", not_matching_paths=paths_missing_from_roots))
+
+        self._filtered = set(paths.evaluated)
+
+    def exclude_files(self, exclude_files: List[str]) -> None:
+        """
+        Exclude from the test list the files that match elements from 'exclude_files'.
+
+        :param exclude_files: List of paths or glob patterns that match the files to exclude.
         """
         if not self._tests_are_files:
             raise TypeError("_TestList does not contain files.")
-        for path in exclude_files:
-            if self._test_file_explorer.is_glob_pattern(path):
-                paths = self._test_file_explorer.iglob(path)
-                for expanded_path in paths:
-                    self._filtered.discard(expanded_path)
-            else:
-                path = os.path.normpath(path)
-                path_missing_from_roots = path not in self._roots
-                # TODO(SERVER-80441): Remove the "enterprise" custom logic.
-                # `src/...` path is hard-coded since we are quite certain that's the enterprise module path
-                path_is_not_in_enterprise_module = not path.startswith(
-                    'src/mongo/db/modules/enterprise')
-                if path_missing_from_roots and path_is_not_in_enterprise_module:
-                    raise ValueError(
-                        ("Excluded test file {} does not exist, perhaps it was renamed or removed"
-                         " , and should be modified in, or removed from, the exclude_files list.".
-                         format(path)))
-                self._filtered.discard(path)
+
+        paths = self._evaluate_paths(exclude_files)
+        if len(paths.unrecognized) > 0:
+            raise errors.SuiteSelectorConfigurationError(
+                _DO_NOT_MATCH_ANY_EXISTING_TEST_FILES_MESSAGE.format(
+                    config_section="exclude_files", not_matching_paths=paths.unrecognized))
+
+        paths_missing_from_roots = [
+            path for path in paths.evaluated if
+            path.startswith(self._test_file_explorer.get_jstests_dir()) and path not in self._roots
+        ]
+        if len(paths_missing_from_roots) > 0:
+            raise errors.SuiteSelectorConfigurationError(
+                _DO_NOT_MATCH_ANY_TEST_FILES_FROM_ROOTS_MESSAGE.format(
+                    config_section="exclude_files", not_matching_paths=paths_missing_from_roots))
+
+        for path in paths.evaluated:
+            self._filtered.discard(path)
 
     def match_tag_expression(self, tag_expression, get_tags):
         """Filter the test list to only include tests that match the tag expression.
@@ -466,7 +510,7 @@ class _Selector(object):
             test_list.match_tag_expression(selector_config.tags_expression, self.get_tags)
         # 5. Apply the include files last with force=True to take precedence over the tags.
         if self._tests_are_files and selector_config.include_files:
-            test_list.include_files(selector_config.include_files, force=True)
+            test_list.include_files(selector_config.include_files)
 
         return self.sort_tests(*test_list.get_tests())
 

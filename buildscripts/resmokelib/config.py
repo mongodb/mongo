@@ -151,6 +151,9 @@ DEFAULTS = {
     # Config Dir
     "config_dir": "buildscripts/resmokeconfig",
 
+    # Directory with jstests
+    "jstests_dir": "jstests",
+
     # UndoDB options
     "undo_recorder_path": None,
 
@@ -615,6 +618,9 @@ EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
 # Where to look for logging and suite configuration files
 CONFIG_DIR = None
 LOGGER_DIR = None
+
+# Where to look for jstests existence
+JSTESTS_DIR = None
 
 # Generated logging config for the current invocation.
 LOGGING_CONFIG: dict = {}

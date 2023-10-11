@@ -68,13 +68,14 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
         for idl_path in sorted(lib.list_idls(idl_dir)):
             if is_third_party_idl(idl_path):
                 continue
-            doc = parser.parse_file(open(idl_path), idl_path)
+            with open(idl_path) as idl_file:
+                doc = parser.parse_file(idl_file, idl_path)
             for feature_flag in doc.spec.feature_flags:
                 if feature_flag.default.literal != "true":
                     all_flags.append(feature_flag.name)
 
-    force_disabled_flags = yaml.safe_load(
-        open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml"))
+    with open("buildscripts/resmokeconfig/fully_disabled_feature_flags.yml") as fully_disabled_ffs:
+        force_disabled_flags = yaml.safe_load(fully_disabled_ffs)
 
     return list(set(all_flags) - set(force_disabled_flags))
 

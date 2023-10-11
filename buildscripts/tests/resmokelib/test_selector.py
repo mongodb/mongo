@@ -2,12 +2,13 @@
 
 import fnmatch
 import os.path
+import re
 import sys
 import unittest
 import collections
 
 import buildscripts.resmokelib.config
-from buildscripts.resmokelib import parser
+from buildscripts.resmokelib import parser, errors
 from buildscripts.resmokelib import selector
 from buildscripts.resmokelib.utils import globstar
 
@@ -190,6 +191,10 @@ class MockTestFileExplorer(object):
             return self.jstest_tag_file
         return None
 
+    def get_jstests_dir(self):
+        """Get directory where jstests files are located."""
+        return "dir"
+
 
 class TestTestList(unittest.TestCase):
     @classmethod
@@ -221,15 +226,19 @@ class TestTestList(unittest.TestCase):
         self.assertEqual([], excluded)
 
     def test_roots_with_unmatching_glob(self):
-        glob_roots = ["unknown/subdir1/*.js"]
-        test_list = selector._TestList(self.test_file_explorer, glob_roots)
-        selected, excluded = test_list.get_tests()
-        self.assertEqual([], selected)
-        self.assertEqual([], excluded)
+        glob_roots = ["dir/unknown_subdir1/*.js"]
+        with self.assertRaisesRegex(
+                errors.SuiteSelectorConfigurationError,
+                re.escape("Pattern(s) and/or filename(s) in `roots`"
+                          " do not match any existing test files: ['dir/unknown_subdir1/*.js']")):
+            selector._TestList(self.test_file_explorer, glob_roots)
 
     def test_roots_unknown_file(self):
         roots = ["dir/subdir1/unknown"]
-        with self.assertRaisesRegex(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
+        with self.assertRaisesRegex(
+                errors.SuiteSelectorConfigurationError,
+                re.escape("Pattern(s) and/or filename(s) in `roots`"
+                          " do not match any existing test files: ['dir/subdir1/unknown']")):
             selector._TestList(self.test_file_explorer, roots, tests_are_files=True)
 
     def test_include_files(self):
@@ -243,11 +252,11 @@ class TestTestList(unittest.TestCase):
     def test_include_files_no_match(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
         test_list = selector._TestList(self.test_file_explorer, roots)
-        test_list.include_files(["dir/subdir2/test26.js"])
-        selected, excluded = test_list.get_tests()
-        self.assertEqual([], selected)
-        self.assertEqual(
-            ["dir/subdir1/test11.js", "dir/subdir1/test12.js", "dir/subdir2/test21.js"], excluded)
+        with self.assertRaisesRegex(
+                errors.SuiteSelectorConfigurationError,
+                re.escape("Pattern(s) and/or filename(s) in `include_files`"
+                          " do not match any existing test files: ['dir/subdir2/test26.js']")):
+            test_list.include_files(["dir/subdir2/test26.js"])
 
     def test_exclude_files(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
@@ -329,21 +338,11 @@ class TestTestList(unittest.TestCase):
             selected)
         self.assertEqual(["dir/subdir1/test12.js"], excluded)
 
-    def test_include_tests_no_force(self):
+    def test_include_tests(self):
         roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
         test_list = selector._TestList(self.test_file_explorer, roots)
         test_list.exclude_files(["dir/subdir1/test11.js"])
-        test_list.include_files(["dir/subdir1/test11.js"], force=False)
-        selected, excluded = test_list.get_tests()
-        self.assertEqual([], selected)
-        self.assertEqual(
-            ["dir/subdir1/test11.js", "dir/subdir1/test12.js", "dir/subdir2/test21.js"], excluded)
-
-    def test_include_tests_force(self):
-        roots = ["dir/subdir1/*.js", "dir/subdir2/test21.*"]
-        test_list = selector._TestList(self.test_file_explorer, roots)
-        test_list.exclude_files(["dir/subdir1/test11.js"])
-        test_list.include_files(["dir/subdir1/test11.js"], force=True)
+        test_list.include_files(["dir/subdir1/test11.js"])
         selected, excluded = test_list.get_tests()
         self.assertEqual(["dir/subdir1/test11.js"], selected)
         self.assertEqual(["dir/subdir1/test12.js", "dir/subdir2/test21.js"], excluded)
@@ -561,7 +560,7 @@ class TestFilterTests(unittest.TestCase):
         self.assertEqual(["dir/subdir1/test11.js"], excluded)
         self.assertEqual(["dir/subdir1/test12.js", "dir/subdir2/test21.js"], selected)
 
-    def test_jstest_force_include(self):
+    def test_jstest_include(self):
         config = {
             "roots": ["dir/subdir1/*.js", "dir/subdir2/*.js", "dir/subdir3/a/*.js"],
             "include_files": ["dir/subdir1/*.js"], "exclude_tags": "tag1"
@@ -590,7 +589,10 @@ class TestFilterTests(unittest.TestCase):
 
     def test_jstest_unknown_file(self):
         config = {"roots": ["dir/subdir1/*.js", "dir/subdir1/unknown"]}
-        with self.assertRaisesRegex(ValueError, "Unrecognized test file: dir/subdir1/unknown"):
+        with self.assertRaisesRegex(
+                errors.SuiteSelectorConfigurationError,
+                re.escape("Pattern(s) and/or filename(s) in `roots`"
+                          " do not match any existing test files: ['dir/subdir1/unknown']")):
             selector.filter_tests("js_test", config, self.test_file_explorer)
 
     def test_json_schema_exclude_files(self):

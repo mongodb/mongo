@@ -118,7 +118,8 @@ def get_suites(suite_names_or_paths, test_files) -> List[_suite.Suite]:
                         loggers.ROOT_EXECUTOR_LOGGER.warning("Will forcibly run excluded test: %s",
                                                              test)
                     else:
-                        raise errors.ResmokeError(f"'{test}' excluded in '{suite.get_name()}'")
+                        raise errors.TestExcludedFromSuiteError(
+                            f"'{test}' excluded in '{suite.get_name()}'")
             suite = override_suite
         suites.append(suite)
     return suites

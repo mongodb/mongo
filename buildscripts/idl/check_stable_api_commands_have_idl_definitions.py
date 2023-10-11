@@ -184,7 +184,7 @@ def main():
             self.command = ""
 
     # pylint: disable=protected-access
-    configure_resmoke._update_config_vars(FakeArgs())
+    configure_resmoke._update_config_vars(arg_parser, FakeArgs())
     configure_resmoke._set_logging_config()
 
     # Configure Fixture logging.
