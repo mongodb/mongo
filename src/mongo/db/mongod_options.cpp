@@ -34,6 +34,7 @@
 #include <boost/filesystem.hpp>  // IWYU pragma: keep
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <filesystem>
 #include <fmt/format.h>
 #include <initializer_list>
 #include <iostream>
@@ -419,6 +420,15 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     return Status::OK();
 }
 
+namespace {
+void removeTrailingPathSeparator(std::string& path, char separator) {
+    while (path.size() > 1 && path.ends_with(separator)) {
+        // size() check is for the unlikely possibility of --dbpath "/"
+        path.pop_back();
+    }
+}
+}  // namespace
+
 Status storeMongodOptions(const moe::Environment& params) {
     Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
@@ -469,14 +479,10 @@ Status storeMongodOptions(const moe::Environment& params) {
             storageGlobalParams.dbpath = serverGlobalParams.cwd + "/" + storageGlobalParams.dbpath;
         }
     }
-#ifdef _WIN32
-    if (storageGlobalParams.dbpath.size() > 1 &&
-        storageGlobalParams.dbpath[storageGlobalParams.dbpath.size() - 1] == '/') {
-        // size() check is for the unlikely possibility of --dbpath "/"
-        storageGlobalParams.dbpath =
-            storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size() - 1);
-    }
+    removeTrailingPathSeparator(storageGlobalParams.dbpath,
+                                std::filesystem::path::preferred_separator);
 
+#ifdef _WIN32
     StringData dbpath(storageGlobalParams.dbpath);
     if (dbpath.size() >= 2 && dbpath.startsWith("\\\\")) {
         // Check if the dbpath is on a Windows network share (eg. \\myserver\myshare)
