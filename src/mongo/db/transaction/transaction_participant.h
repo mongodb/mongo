@@ -847,7 +847,7 @@ public:
         // Commits the storage-transaction on the OperationContext.
         //
         // This should be called *without* the Client being locked.
-        void _commitStorageTransaction(OperationContext* opCtx);
+        void _commitStorageTransaction(OperationContext* opCtx, bool isSplitPreparedTxn = false);
 
         // Commits a "split prepared" transaction. Prepared transactions processed on secondaries
         // may split the storage writes into multiple RecoveryUnits. This method will be invoked by
@@ -859,7 +859,7 @@ public:
         void _commitSplitPreparedTxnOnPrimary(OperationContext* opCtx,
                                               repl::SplitPrepareSessionManager* splitPrepareManager,
                                               const Timestamp& commitTimestamp,
-                                              const Timestamp& durableTimestamp);
+                                              const Timestamp& durableTimestamp) noexcept;
 
         // Stash transaction resources.
         void _stashActiveTransaction(OperationContext* opCtx);
@@ -873,8 +873,9 @@ public:
         // Aborts a "split prepared" transaction. Prepared transactions processed on secondaries may
         // split the storage writes into multiple RecoveryUnits. This method will be invoked by a
         // primary such that it looks for all recovery units and aborts them.
-        void _abortSplitPreparedTxnOnPrimary(OperationContext* opCtx,
-                                             repl::SplitPrepareSessionManager* splitPrepareManager);
+        void _abortSplitPreparedTxnOnPrimary(
+            OperationContext* opCtx,
+            repl::SplitPrepareSessionManager* splitPrepareManager) noexcept;
 
         // Factors out code for clarity from _abortActiveTransaction.
         void _finishAbortingActiveTransaction(OperationContext* opCtx,
@@ -887,7 +888,9 @@ public:
         void _abortTransactionOnSession(OperationContext* opCtx);
 
         // Clean up the transaction resources unstashed on operation context.
-        void _cleanUpTxnResourceOnOpCtx(OperationContext* opCtx, TerminationCause terminationCause);
+        void _cleanUpTxnResourceOnOpCtx(OperationContext* opCtx,
+                                        TerminationCause terminationCause,
+                                        bool isSplitPreparedTxn = false);
 
         // Checks if the command can be run on this transaction based on the state of the
         // transaction.
