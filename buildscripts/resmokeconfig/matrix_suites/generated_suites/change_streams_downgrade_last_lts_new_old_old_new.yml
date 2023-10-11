@@ -44,6 +44,7 @@ executor:
         enableElectionHandoff: 0
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        skipDroppingHashedShardKeyIndex: true
       syncdelay: 5
     mongos_options:
       set_parameters:

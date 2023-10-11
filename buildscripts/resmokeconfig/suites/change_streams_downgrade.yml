@@ -418,6 +418,7 @@ executor:
         enableTestCommands: 1
         enableElectionHandoff: 0
         numInitialSyncAttempts: 1
+        skipDroppingHashedShardKeyIndex: true
     num_shards: 2
     num_rs_nodes_per_shard: 2
     configsvr_options:
