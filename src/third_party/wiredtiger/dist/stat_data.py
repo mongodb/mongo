@@ -416,7 +416,6 @@ conn_stats = [
     ChunkCacheStat('chunk_cache_misses', 'number of misses'),
     ChunkCacheStat('chunk_cache_retries', 'retried accessing a chunk while I/O was in progress'),
     ChunkCacheStat('chunk_cache_spans_chunks_read', 'aggregate number of spanned chunks on read'),
-    ChunkCacheStat('chunk_cache_spans_chunks_remove', 'aggregate number of spanned chunks on remove'),
     ChunkCacheStat('chunk_cache_toomany_retries', 'timed out due to too many retries'),
 
     ##########################################

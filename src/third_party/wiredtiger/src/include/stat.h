@@ -607,7 +607,6 @@ struct __wt_connection_stats {
     int64_t checkpoint_obsolete_applied;
     int64_t checkpoint_wait_reduce_dirty;
     int64_t chunk_cache_spans_chunks_read;
-    int64_t chunk_cache_spans_chunks_remove;
     int64_t chunk_cache_chunks_evicted;
     int64_t chunk_cache_exceeded_capacity;
     int64_t chunk_cache_lookups;
