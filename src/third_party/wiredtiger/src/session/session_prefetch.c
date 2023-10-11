@@ -33,16 +33,16 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         return (false);
 
-    if (session->prefetch_disk_read_count == 1)
+    if (session->pf.prefetch_disk_read_count == 1)
         WT_STAT_CONN_INCR(session, block_prefetch_disk_one);
 
     /* A single read from disk is common - don't use it to guide pre-fetch behavior. */
-    if (session->prefetch_disk_read_count < 2) {
+    if (session->pf.prefetch_disk_read_count < 2) {
         WT_STAT_CONN_INCR(session, block_prefetch_skipped);
         return (false);
     }
 
-    if (session->prefetch_prev_ref == NULL) {
+    if (session->pf.prefetch_prev_ref == NULL) {
         WT_STAT_CONN_INCR(session, block_prefetch_attempts);
         return (true);
     }
@@ -51,13 +51,13 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
      * If the previous pre-fetch was using the same home ref, pre-fetch for approximately the number
      * of pages that were added to the queue.
      */
-    if (session->prefetch_prev_ref->page == ref->home &&
-      session->prefetch_skipped_with_parent < WT_PREFETCH_QUEUE_PER_TRIGGER) {
-        ++session->prefetch_skipped_with_parent;
+    if (session->pf.prefetch_prev_ref->page == ref->home &&
+      session->pf.prefetch_skipped_with_parent < WT_PREFETCH_QUEUE_PER_TRIGGER) {
+        ++session->pf.prefetch_skipped_with_parent;
         WT_STAT_CONN_INCR(session, block_prefetch_skipped);
         return (false);
     }
-    session->prefetch_skipped_with_parent = 0;
+    session->pf.prefetch_skipped_with_parent = 0;
 
     WT_STAT_CONN_INCR(session, block_prefetch_attempts);
     return (true);

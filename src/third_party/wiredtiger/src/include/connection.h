@@ -521,7 +521,7 @@ struct __wt_connection_impl {
     WT_THREAD_GROUP prefetch_threads;
     uint64_t prefetch_queue_count;
     /* Queue of refs to pre-fetch from */
-    TAILQ_HEAD(__wt_pf_qh, __wt_prefetch) pfqh; /* Locked: prefetch_lock */
+    TAILQ_HEAD(__wt_pf_qh, __wt_prefetch_queue_entry) pfqh; /* Locked: prefetch_lock */
     bool prefetch_auto_on;
 
 #define WT_STATLOG_FILENAME "WiredTigerStat.%d.%H"

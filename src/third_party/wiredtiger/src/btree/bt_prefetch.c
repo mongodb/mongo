@@ -35,7 +35,7 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     WT_ASSERT_ALWAYS(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0,
       "Pre-fetch requires a split generation to traverse internal page(s)");
 
-    session->prefetch_prev_ref = ref;
+    session->pf.prefetch_prev_ref = ref;
     /* Load and decompress a set of pages into the block cache. */
     WT_INTL_FOREACH_BEGIN (session, ref->home, next_ref) {
         /* Don't let the pre-fetch queue get overwhelmed. */
@@ -72,11 +72,11 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
  *     reading it in is the useful side effect here. Must be called while holding a dhandle.
  */
 int
-__wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH *pf)
+__wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH_QUEUE_ENTRY *pe)
 {
     WT_ADDR_COPY addr;
 
-    if (pf->ref->home != pf->first_home)
+    if (pe->ref->home != pe->first_home)
         __wt_verbose(
           session, WT_VERB_PREFETCH, "The home changed while queued for pre-fetch %s", "");
 
@@ -84,20 +84,20 @@ __wt_prefetch_page_in(WT_SESSION_IMPL *session, WT_PREFETCH *pf)
      * FIXME-WT-11759 Consider whether we should have these asserts here or swallow up the errors
      * instead.
      */
-    WT_ASSERT_ALWAYS(session, pf->dhandle != NULL, "Pre-fetch needs to save a valid dhandle");
+    WT_ASSERT_ALWAYS(session, pe->dhandle != NULL, "Pre-fetch needs to save a valid dhandle");
     WT_ASSERT_ALWAYS(
-      session, !F_ISSET(pf->ref, WT_REF_FLAG_INTERNAL), "Pre-fetch should only see leaf pages");
+      session, !F_ISSET(pe->ref, WT_REF_FLAG_INTERNAL), "Pre-fetch should only see leaf pages");
 
-    if (pf->ref->state != WT_REF_DISK) {
+    if (pe->ref->state != WT_REF_DISK) {
         WT_STAT_CONN_INCR(session, block_prefetch_pages_fail);
         return (0);
     }
 
     WT_STAT_CONN_INCR(session, block_prefetch_pages_read);
 
-    if (__wt_ref_addr_copy(session, pf->ref, &addr)) {
-        WT_RET(__wt_page_in(session, pf->ref, WT_READ_PREFETCH));
-        WT_RET(__wt_page_release(session, pf->ref, 0));
+    if (__wt_ref_addr_copy(session, pe->ref, &addr)) {
+        WT_RET(__wt_page_in(session, pe->ref, WT_READ_PREFETCH));
+        WT_RET(__wt_page_release(session, pe->ref, 0));
     } else
         return (WT_ERROR);
 

@@ -317,6 +317,8 @@ struct __wt_page_modify;
 typedef struct __wt_page_modify WT_PAGE_MODIFY;
 struct __wt_prefetch;
 typedef struct __wt_prefetch WT_PREFETCH;
+struct __wt_prefetch_queue_entry;
+typedef struct __wt_prefetch_queue_entry WT_PREFETCH_QUEUE_ENTRY;
 struct __wt_process;
 typedef struct __wt_process WT_PROCESS;
 struct __wt_rec_chunk;

@@ -455,9 +455,9 @@ skip_evict:
                  */
                 if (F_ISSET_ATOMIC_16(page, WT_PAGE_PREFETCH) ||
                   page->read_gen == WT_READGEN_NOTSET)
-                    ++session->prefetch_disk_read_count;
+                    ++session->pf.prefetch_disk_read_count;
                 else
-                    session->prefetch_disk_read_count = 0;
+                    session->pf.prefetch_disk_read_count = 0;
             }
             /*
              * If we read the page and are configured to not trash the cache, and no other thread

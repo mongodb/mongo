@@ -70,7 +70,7 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    WT_PREFETCH *pf;
+    WT_PREFETCH_QUEUE_ENTRY *pe;
     bool locked;
 
     WT_UNUSED(thread);
@@ -92,30 +92,30 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
         }
         __wt_spin_lock(session, &conn->prefetch_lock);
         locked = true;
-        pf = TAILQ_FIRST(&conn->pfqh);
+        pe = TAILQ_FIRST(&conn->pfqh);
 
         /* If there is no work for the thread to do - return back to the thread pool */
-        if (pf == NULL)
+        if (pe == NULL)
             break;
 
-        TAILQ_REMOVE(&conn->pfqh, pf, q);
+        TAILQ_REMOVE(&conn->pfqh, pe, q);
         --conn->prefetch_queue_count;
-        WT_ASSERT_ALWAYS(session, F_ISSET(pf->ref, WT_REF_FLAG_PREFETCH),
+        WT_ASSERT_ALWAYS(session, F_ISSET(pe->ref, WT_REF_FLAG_PREFETCH),
           "Any ref on the pre-fetch queue needs to have the pre-fetch flag set");
         __wt_spin_unlock(session, &conn->prefetch_lock);
         locked = false;
 
-        WT_WITH_DHANDLE(session, pf->dhandle, ret = __wt_prefetch_page_in(session, pf));
+        WT_WITH_DHANDLE(session, pe->dhandle, ret = __wt_prefetch_page_in(session, pe));
         /*
          * It probably isn't strictly necessary to re-acquire the lock to reset the flag, but other
          * flag accesses do need to lock, so it's better to be consistent.
          */
         __wt_spin_lock(session, &conn->prefetch_lock);
-        F_CLR(pf->ref, WT_REF_FLAG_PREFETCH);
+        F_CLR(pe->ref, WT_REF_FLAG_PREFETCH);
         __wt_spin_unlock(session, &conn->prefetch_lock);
         WT_ERR(ret);
 
-        __wt_free(session, pf);
+        __wt_free(session, pe);
     }
 
 err:
@@ -134,26 +134,26 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_PREFETCH *pf;
+    WT_PREFETCH_QUEUE_ENTRY *pe;
 
     conn = S2C(session);
 
-    WT_RET(__wt_calloc_one(session, &pf));
-    pf->ref = ref;
-    pf->first_home = ref->home;
-    pf->dhandle = session->dhandle;
+    WT_RET(__wt_calloc_one(session, &pe));
+    pe->ref = ref;
+    pe->first_home = ref->home;
+    pe->dhandle = session->dhandle;
     __wt_spin_lock(session, &conn->prefetch_lock);
     if (F_ISSET(ref, WT_REF_FLAG_PREFETCH))
         ret = EBUSY;
     else {
         F_SET(ref, WT_REF_FLAG_PREFETCH);
-        TAILQ_INSERT_TAIL(&conn->pfqh, pf, q);
+        TAILQ_INSERT_TAIL(&conn->pfqh, pe, q);
         ++conn->prefetch_queue_count;
     }
     __wt_spin_unlock(session, &conn->prefetch_lock);
 
     if (ret != 0)
-        __wt_free(session, pf);
+        __wt_free(session, pe);
     return (ret);
 }
 
