@@ -27,28 +27,37 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <iterator>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-
-#include <algorithm>
-#include <boost/iterator/transform_iterator.hpp>
-
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -120,6 +129,9 @@ void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
 }
 }  // namespace
 
+SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, ClosedBuckets&& c)
+    : batch{std::move(b)}, closedBuckets{std::move(c)} {}
+
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
 }
@@ -159,7 +171,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,
-                                BucketFindResult bucketFindResult) {
+                                ReopeningContext* reopeningContext) {
     return internal::insert(opCtx,
                             catalog,
                             ns,
@@ -168,7 +180,15 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                             doc,
                             combine,
                             internal::AllowBucketCreation::kYes,
-                            bucketFindResult);
+                            reopeningContext);
+}
+
+void waitToInsert(InsertWaiter* waiter) {
+    if (auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(waiter)) {
+        getWriteBatchResult(**batch).getStatus().ignore();
+    } else if (auto* request = stdx::get_if<std::shared_ptr<ReopeningRequest>>(waiter)) {
+        waitForReopeningRequest(**request);
+    }
 }
 
 Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) {
@@ -185,6 +205,14 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
+
+    if (isWriteBatchFinished(*batch)) {
+        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
+        // should now be able to fully abort the bucket.
+        internal::abort(catalog, stripe, stripeLock, batch, getBatchStatus());
+        return getBatchStatus();
+    }
+
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
@@ -192,14 +220,7 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
                                                   batch->bucketHandle.bucketId,
                                                   internal::BucketPrepareAction::kPrepare);
 
-    if (isWriteBatchFinished(*batch)) {
-        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
-        // should now be able to fully abort the bucket.
-        if (bucket) {
-            internal::abort(catalog, stripe, stripeLock, batch, getBatchStatus());
-        }
-        return getBatchStatus();
-    } else if (!bucket) {
+    if (!bucket) {
         internal::abort(catalog,
                         stripe,
                         stripeLock,
@@ -216,7 +237,8 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
     return Status::OK();
 }
 
-boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
+boost::optional<ClosedBucket> finish(OperationContext* opCtx,
+                                     BucketCatalog& catalog,
                                      std::shared_ptr<WriteBatch> batch,
                                      const CommitInfo& info) {
     invariant(!isWriteBatchFinished(*batch));
@@ -236,6 +258,25 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
                                                   internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
         bucket->preparedBatch.reset();
+
+        auto prevMemoryUsage = bucket->memoryUsage;
+
+        // Clear the compression state and memory usage from the previous operation as we're about
+        // to replace it with the compression state from the user operation that committed.
+        if (bucket->decompressed) {
+            bucket->memoryUsage -=
+                (bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize());
+            bucket->decompressed = boost::none;
+        }
+
+        // Take ownership of the committed batch's decompressed image.
+        if (batch->decompressed) {
+            bucket->decompressed = std::move(batch->decompressed);
+            bucket->memoryUsage +=
+                bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize();
+        }
+
+        catalog.memoryUsage.fetchAndAdd(bucket->memoryUsage - prevMemoryUsage);
     }
 
     auto& stats = batch->stats;
@@ -244,6 +285,10 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
         stats.incNumBucketInserts();
     } else {
         stats.incNumBucketUpdates();
+    }
+
+    if (batch->openedDueToMetadata) {
+        stats.incNumBucketsOpenedDueToMetadata();
     }
 
     stats.incNumMeasurementsCommitted(batch->measurements.size());
@@ -328,34 +373,7 @@ void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns,
 }
 
 void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {
-    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        clearSetOfBuckets(catalog.bucketStateRegistry, std::move(shouldClear));
-        return;
-    }
-    for (auto& stripe : catalog.stripes) {
-        stdx::lock_guard stripeLock{stripe.mutex};
-        for (auto it = stripe.openBucketsById.begin(); it != stripe.openBucketsById.end();) {
-            auto nextIt = std::next(it);
-
-            const auto& bucket = it->second;
-            if (shouldClear(bucket->bucketId.ns)) {
-                {
-                    stdx::lock_guard catalogLock{catalog.mutex};
-                    catalog.executionStats.erase(bucket->bucketId.ns);
-                }
-                internal::abort(catalog,
-                                stripe,
-                                stripeLock,
-                                *bucket,
-                                nullptr,
-                                internal::getTimeseriesBucketClearedError(bucket->bucketId.ns,
-                                                                          bucket->bucketId.oid));
-            }
-
-            it = nextIt;
-        }
-    }
+    clearSetOfBuckets(catalog.bucketStateRegistry, std::move(shouldClear));
 }
 
 void clear(BucketCatalog& catalog, const NamespaceString& ns) {
@@ -363,10 +381,9 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns) {
     clear(catalog, [ns](const NamespaceString& bucketNs) { return bucketNs == ns; });
 }
 
-void clear(BucketCatalog& catalog, StringData dbName) {
-    clear(catalog, [dbName = dbName.toString()](const NamespaceString& bucketNs) {
-        return bucketNs.db() == dbName;
-    });
+void clear(BucketCatalog& catalog, const DatabaseName& dbName) {
+    clear(catalog,
+          [dbName](const NamespaceString& bucketNs) { return bucketNs.dbName() == dbName; });
 }
 
 void resetBucketOIDCounter() {

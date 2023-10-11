@@ -2407,8 +2407,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-    auto closedBucket =
-        finish(bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+    auto closedBucket = finish(
+        opCtx, bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
@@ -2509,8 +2509,11 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
         getOpTimeAndElectionId(opCtx, opTime, electionId);
 
         for (auto batch : batchesToCommit) {
-            auto closedBucket = finish(
-                bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+            auto closedBucket =
+                finish(opCtx,
+                       bucketCatalog,
+                       batch,
+                       timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
             batch.get().reset();
 
             if (!closedBucket) {
@@ -2753,8 +2756,10 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
             return false;
         }
 
-        auto& insertResult = swResult.getValue();
-        batches.emplace_back(std::move(insertResult.batch), index);
+        auto& result = swResult.getValue();
+        auto* insertResult = stdx::get_if<timeseries::bucket_catalog::SuccessfulInsertion>(&result);
+        invariant(insertResult);
+        batches.emplace_back(std::move(insertResult->batch), index);
         const auto& batch = batches.back().first;
         if (isTimeseriesWriteRetryable(opCtx)) {
             stmtIds[batch->bucketHandle.bucketId.oid].push_back(stmtId);
@@ -2762,7 +2767,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
 
         // If this insert closed buckets, rewrite to be a compressed column. If we cannot
         // perform write operations at this point the bucket will be left uncompressed.
-        for (const auto& closedBucket : insertResult.closedBuckets) {
+        for (const auto& closedBucket : insertResult->closedBuckets) {
             tryPerformTimeseriesBucketCompression(opCtx, closedBucket, request);
         }
 

@@ -29,7 +29,35 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
+#include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/reopening.h"
+#include "mongo/db/timeseries/bucket_catalog/rollover.h"
+#include "mongo/db/timeseries/bucket_catalog/write_batch.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::timeseries::bucket_catalog::internal {
 
@@ -75,9 +103,15 @@ enum class IgnoreBucketState { kYes, kNo };
 enum class BucketPrepareAction { kPrepare, kUnprepare };
 
 /**
+ * Mode enum to control whether getReopeningCandidate() will allow query-based
+ * reopening of buckets when attempting to accommodate a new measurement.
+ */
+enum class AllowQueryBasedReopening { kAllow, kDisallow };
+
+/**
  * Maps bucket key to the stripe that is responsible for it.
  */
-StripeNumber getStripeNumber(const BucketKey& key);
+StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes);
 
 /**
  * Extracts the information from the input 'doc' that is used to map the document to a bucket.
@@ -143,6 +177,7 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     const StringData::ComparatorInterface* comparator,
     const TimeseriesOptions& options,
     const BucketToReopen& bucketToReopen,
+    uint64_t catalogEra,
     const BucketKey* expectedKey);
 
 /**
@@ -200,7 +235,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,
                                 AllowBucketCreation mode,
-                                BucketFindResult bucketFindResult = {});
+                                ReopeningContext* reopeningContext = nullptr);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -226,7 +261,7 @@ void archiveBucket(BucketCatalog& catalog,
                    ClosedBuckets& closedBuckets);
 
 /**
- * Identifies a previously archived bucket that may be able to accomodate the measurement
+ * Identifies a previously archived bucket that may be able to accommodate the measurement
  * represented by 'info', if one exists.
  */
 boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
@@ -235,16 +270,17 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                                            const CreationInfo& info);
 
 /**
- * Identifies a previously archived bucket that may be able to accomodate the measurement
- * represented by 'info', if one exists.
+ * Identifies a previously archived bucket that may be able to accommodate the measurement
+ * represented by 'info', if one exists. Otherwise returns a pipeline to use for query-based
+ * reopening if allowed.
  */
-stdx::variant<std::monostate, OID, std::vector<BSONObj>> getReopeningCandidate(
-    OperationContext* opCtx,
-    BucketCatalog& catalog,
-    Stripe& stripe,
-    WithLock stripeLock,
-    const CreationInfo& info,
-    bool allowQueryBasedReopening);
+ReopeningContext getReopeningContext(OperationContext* opCtx,
+                                     BucketCatalog& catalog,
+                                     Stripe& stripe,
+                                     WithLock stripeLock,
+                                     const CreationInfo& info,
+                                     uint64_t catalogEra,
+                                     AllowQueryBasedReopening allowQueryBasedReopening);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
@@ -320,7 +356,7 @@ Bucket& rollover(BucketCatalog& catalog,
                  RolloverAction action);
 
 /**
- * Determines if 'bucket' needs to be rolled over to accomodate 'doc'. If so, determines whether
+ * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
  * to archive or close 'bucket'.
  */
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
@@ -344,6 +380,20 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
  */
 std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
                                                   const NamespaceString& ns);
+
+/**
+ * Retrieves the execution stats from the side bucket catalog.
+ * Assumes the side bucket catalog has the stats of one collection.
+ */
+std::pair<NamespaceString, std::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+    BucketCatalog& sideBucketCatalog);
+
+/**
+ * Merges the execution stats of a collection into the bucket catalog.
+ */
+void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
+                                        std::shared_ptr<ExecutionStats> collStats,
+                                        const NamespaceString& viewNs);
 
 /**
  * Generates a status with code TimeseriesBucketCleared and an appropriate error message.
@@ -372,4 +422,16 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketStateRegistry& registry,
                          ArchivedBucket& bucket,
                          ClosedBuckets& closedBuckets);
+
+/**
+ * Runs (slow) post commit debug checks to ensure we maintain expected invariants about the bucket
+ * contents.
+ *
+ * Set of checks:
+ *  - Measurement count on-disk matches in-memory state. (Helpful for detecting race conditions.)
+ */
+void runPostCommitDebugChecks(OperationContext* opCtx,
+                              const Bucket& bucket,
+                              const WriteBatch& batch);
+
 }  // namespace mongo::timeseries::bucket_catalog::internal
