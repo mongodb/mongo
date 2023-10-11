@@ -78,10 +78,12 @@ public:
                  uint64_t limit,
                  uint64_t maxMemoryUsageBytes,
                  std::string tempDir,
-                 bool allowDiskUse)
+                 bool allowDiskUse,
+                 bool moveSortedDataIntoIterator = false)
         : _sortPattern(std::move(sortPattern)),
           _tempDir(std::move(tempDir)),
-          _diskUseAllowed(allowDiskUse) {
+          _diskUseAllowed(allowDiskUse),
+          _moveSortedDataIntoIterator(moveSortedDataIntoIterator) {
         _stats.sortPattern =
             _sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
         _stats.limit = limit;
@@ -203,6 +205,7 @@ public:
 private:
     SortOptions makeSortOptions() const {
         SortOptions opts;
+        opts.moveSortedDataIntoIterator = _moveSortedDataIntoIterator;
         if (_stats.limit) {
             opts.limit = _stats.limit;
         }
@@ -220,6 +223,7 @@ private:
     const SortPattern _sortPattern;
     const std::string _tempDir;
     const bool _diskUseAllowed;
+    const bool _moveSortedDataIntoIterator;
 
     std::unique_ptr<SorterFileStats> _sorterFileStats;
     std::unique_ptr<DocumentSorter> _sorter;
