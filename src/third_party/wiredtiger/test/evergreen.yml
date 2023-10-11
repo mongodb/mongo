@@ -2280,10 +2280,11 @@ tasks:
         vars:
           posix_configure_flags: -DENABLE_PYTHON=1 -DSPINLOCK_TYPE=gcc -DENABLE_STRICT=1
       - func: "make check all"
+      - func: "unit test"
       - func: "format test"
         vars:
           times: 3
-      - func: "unit test"
+          extra_args: runs.rows=1000000:2500000
 
   - name: spinlock-pthread-adaptive-test
     commands:
@@ -2292,10 +2293,11 @@ tasks:
         vars:
           posix_configure_flags: -DENABLE_PYTHON=1 -DSPINLOCK_TYPE=pthread_adaptive -DENABLE_STRICT=1
       - func: "make check all"
+      - func: "unit test"
       - func: "format test"
         vars:
           times: 3
-      - func: "unit test"
+          extra_args: runs.rows=1000000:2500000
 
   - name: wtperf-test
     depends_on:
