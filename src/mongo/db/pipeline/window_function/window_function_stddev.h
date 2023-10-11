@@ -63,7 +63,7 @@ public:
         if (_nonfiniteValueCount > 0)
             return Value(BSONNULL);
         const long long adjustedCount = _isSamp ? _count - 1 : _count;
-        if (adjustedCount == 0)
+        if (adjustedCount <= 0)
             return getDefault();
         double squaredDifferences = _m2->getValue(false).coerceToDouble();
         if (squaredDifferences < 0 || (!_isSamp && _count == 1)) {
