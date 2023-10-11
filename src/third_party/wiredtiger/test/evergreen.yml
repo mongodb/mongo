@@ -3903,6 +3903,8 @@ tasks:
             echo ". remote path   =  wiredtiger/${build_variant}/${revision}/${dependent_task}_${build_id}-${execution}/full_coverage_report.json"
             mkdir -p coverage_report
       - command: s3.get
+        vars:
+          dependent_task: coverage-report
         params:
           aws_key: ${aws_key}
           aws_secret: ${aws_secret}
