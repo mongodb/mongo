@@ -25,4 +25,5 @@ core.workflow(
     # transformations = [
 	#     core.move("path/to/folder/you/want/exported", ""),
 	# ],
+    #testonly
 )
