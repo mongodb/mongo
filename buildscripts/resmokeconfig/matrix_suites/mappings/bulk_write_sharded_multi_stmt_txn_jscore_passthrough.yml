@@ -1,0 +1,7 @@
+base_suite: sharded_multi_stmt_txn_jscore_passthrough
+eval:
+  - "bulk_write.single_op_override"
+excludes:
+  - "bulk_write.single_op_core_excluded_files"
+  - "bulk_write.single_op_txns_excluded_files"
+  - "bulk_write.single_op_fle_excluded_files"

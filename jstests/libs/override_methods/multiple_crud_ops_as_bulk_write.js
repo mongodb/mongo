@@ -238,7 +238,12 @@ function runCommandMultiOpBulkWriteOverride(
     cmdCopy.lsid = bulkSessionId;
 
     // Execute the command against the bulkWrite cluster.
-    originalRunCommand.apply(bulkWriteCluster, makeRunCommandArgs(cmdCopy, dbName));
+    let res = originalRunCommand.apply(bulkWriteCluster, makeRunCommandArgs(cmdCopy, dbName));
+
+    // Cannot run enableSharding against normal cluster since we always set it up as a replica set.
+    if (cmdNameLower == "enablesharding") {
+        return res;
+    }
 
     return normalClusterRunCommand.apply(normalCluster, makeRunCommandArgs(cmdObj, dbName));
 }

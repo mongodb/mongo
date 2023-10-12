@@ -6358,7 +6358,47 @@ tasks:
         use_large_distro: "true"
 
 - <<: *gen_task_template
+  name: bulk_write_sharded_collections_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_sharded_causally_consistent_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_sharded_multi_stmt_txn_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: bulk_write_multi_op_sharded_collections_jscore_passthrough_gen
+  tags: ["bulk_write"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
+- <<: *gen_task_template
   name: concurrency_replication_bulk_write_gen
+  tags: ["bulk_write"]
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: concurrency_sharded_replication_bulk_write_gen
   tags: ["bulk_write"]
   commands:
     - func: "generate resmoke tasks"

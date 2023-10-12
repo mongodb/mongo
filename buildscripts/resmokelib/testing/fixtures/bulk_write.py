@@ -25,16 +25,17 @@ class BulkWriteFixture(interface.MultiClusterFixture):
             or cluster_options["settings"]["preserve_dbpath"] is None:
             cluster_options["settings"]["preserve_dbpath"] = preserve_dbpath
 
+        # The "dbpath_prefix" needs to be under "settings" for replicasets
+        # but also under "mongod_options" for sharded clusters.
+        cluster_options["settings"]["dbpath_prefix"] = os.path.join(self._dbpath_prefix,
+                                                                    "bulkWriteCluster")
+
         if cluster_options["class"] == "ReplicaSetFixture":
             cluster_options["settings"]["replicaset_logging_prefix"] = "bw"
             cluster_options["settings"]["dbpath_prefix"] = os.path.join(
                 self._dbpath_prefix, "bulkWriteCluster")
         elif cluster_options["class"] == "ShardedClusterFixture":
             cluster_options["settings"]["cluster_logging_prefix"] = "bw"
-            if "mongod_options" not in cluster_options["settings"]:
-                cluster_options["settings"]["mongod_options"] = {}
-            cluster_options["settings"]["mongod_options"]["dbpath_prefix"] = cluster_options[
-                "settings"]["dbpath_prefix"]
         else:
             raise ValueError(f"Illegal fixture class: {cluster_options['class']}")
 
