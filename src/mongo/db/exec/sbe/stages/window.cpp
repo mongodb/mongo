@@ -543,7 +543,7 @@ void WindowStage::open(bool reOpen) {
 
 PlanState WindowStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
-    checkForInterrupt(_opCtx);
+    checkForInterruptAndYield(_opCtx);
 
     // Fetch at least the current document into cache.
     _currId++;

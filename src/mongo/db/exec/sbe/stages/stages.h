@@ -505,7 +505,7 @@ public:
      * Checks for interrupt if necessary. If yielding has been enabled for this object, then also
      * performs a yield if necessary.
      */
-    void checkForInterrupt(OperationContext* opCtx) {
+    void checkForInterruptAndYield(OperationContext* opCtx) {
         invariant(opCtx);
 
         if (!_yieldPolicy) {
@@ -518,6 +518,19 @@ public:
             }
         } else if (_yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
             uassertStatusOK(_yieldPolicy->yieldOrInterrupt(opCtx));
+        }
+    }
+
+    /**
+     * Checks for interrupt if necessary. Will never yield regardless of the yielding policy.
+     * Should only be used for ValueBlock stages.
+     */
+    void checkForInterrupt(OperationContext* opCtx) {
+        invariant(opCtx);
+
+        if (--_interruptCounter == 0) {
+            _interruptCounter = kInterruptCheckPeriod;
+            opCtx->checkForInterrupt();
         }
     }
 

@@ -298,7 +298,7 @@ PlanState IndexScanStageBase::getNext() {
     // state in case it yields as the state will be completely overwritten after the call.
     disableSlotAccess();
 
-    checkForInterrupt(_opCtx);
+    checkForInterruptAndYield(_opCtx);
 
     do {
         switch (_scanState) {

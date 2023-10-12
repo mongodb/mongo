@@ -559,7 +559,7 @@ PlanState ColumnScanStage::getNext() {
     // call.
     disableSlotAccess();
 
-    checkForInterrupt(_opCtx);
+    checkForInterruptAndYield(_opCtx);
 
     if (_scanTracker.isScanningRowstore()) {
         _scanTracker.track();

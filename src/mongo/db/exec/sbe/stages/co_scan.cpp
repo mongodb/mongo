@@ -55,7 +55,7 @@ void CoScanStage::open(bool reOpen) {
 PlanState CoScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    checkForInterrupt(_opCtx);
+    checkForInterruptAndYield(_opCtx);
 
     // Run forever.
     return trackPlanState(PlanState::ADVANCED);

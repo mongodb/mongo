@@ -457,7 +457,7 @@ PlanState ScanStage::getNext() {
     // PlanStage tree if a yield occurs. It's important that we call checkForInterrupt() before
     // checking '_needsToCheckCappedPositionLost' since a call to restoreState() may set
     // '_needsToCheckCappedPositionLost'.
-    checkForInterrupt(_opCtx);
+    checkForInterruptAndYield(_opCtx);
 
     if (_needsToCheckCappedPositionLost) {
         _cursor->save();
@@ -1097,7 +1097,7 @@ PlanState ParallelScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    checkForInterrupt(_opCtx);
+    checkForInterruptAndYield(_opCtx);
 
     boost::optional<Record> nextRecord;
 
