@@ -611,6 +611,7 @@ struct __wt_connection_stats {
     int64_t chunk_cache_exceeded_capacity;
     int64_t chunk_cache_lookups;
     int64_t chunk_cache_misses;
+    int64_t chunk_cache_newly_inserted;
     int64_t chunk_cache_io_failed;
     int64_t chunk_cache_retries;
     int64_t chunk_cache_toomany_retries;
