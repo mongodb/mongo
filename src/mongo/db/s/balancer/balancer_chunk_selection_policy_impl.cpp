@@ -44,11 +44,11 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/str.h"
-
 namespace mongo {
 
 using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
@@ -89,27 +89,6 @@ StatusWith<ZoneInfo> createCollectionZoneInfo(OperationContext* opCtx,
  */
 StatusWith<DistributionStatus> createCollectionDistributionStatus(
     OperationContext* opCtx, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
-    ShardToChunksMap shardToChunksMap;
-
-    // Makes sure there is an entry in shardToChunksMap for every shard, so empty shards will also
-    // be accounted for
-    for (const auto& stat : allShards) {
-        shardToChunksMap[stat.shardId];
-    }
-
-    chunkMgr->forEachChunk([&](const auto& chunkEntry) {
-        ChunkType chunk;
-        chunk.setNS(chunkMgr->getns());
-        chunk.setMin(chunkEntry.getMin());
-        chunk.setMax(chunkEntry.getMax());
-        chunk.setJumbo(chunkEntry.isJumbo());
-        chunk.setShard(chunkEntry.getShardId());
-        chunk.setVersion(chunkEntry.getLastmod());
-
-        shardToChunksMap[chunkEntry.getShardId()].push_back(chunk);
-
-        return true;
-    });
 
     auto swZoneInfo = createCollectionZoneInfo(
         opCtx, chunkMgr->getns(), chunkMgr->getShardKeyPattern().getKeyPattern());
@@ -117,8 +96,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         return swZoneInfo.getStatus();
     }
 
-    return {DistributionStatus{
-        chunkMgr->getns(), std::move(shardToChunksMap), std::move(swZoneInfo.getValue())}};
+    return {DistributionStatus{chunkMgr->getns(), std::move(swZoneInfo.getValue()), chunkMgr}};
 }
 
 /**
@@ -481,7 +459,7 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
     }
 
     return BalancerPolicy::isShardSuitableReceiver(*newShardIterator,
-                                                   distribution.getTagForChunk(chunk));
+                                                   distribution.getTagForRange(chunk.getRange()));
 }
 
 StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidatesForCollection(
@@ -545,7 +523,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
 
     const DistributionStatus& distribution = collInfoStatus.getValue();
 
-    for (const auto& tagRangeEntry : distribution.tagRanges()) {
+    for (const auto& tagRangeEntry : distribution.getZoneInfo().zoneRanges()) {
         const auto& tagRange = tagRangeEntry.second;
 
         const auto chunkAtZoneMin = cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
