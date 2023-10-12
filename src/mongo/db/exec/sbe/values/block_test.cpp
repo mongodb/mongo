@@ -634,4 +634,66 @@ TEST_F(ValueBlockTest, TestBlockMap) {
     ASSERT_BSONOBJ_EQ(output4, fromjson("{result: [null, null, 7.0, 21.0, null]}"));
 }
 
+// Test ValueBlock::tokenize().
+TEST_F(ValueBlockTest, TestTokenize) {
+    auto block = std::make_unique<TestBlock>();
+
+    auto [tag1, val1] = value::makeNewString("foofoofoo"_sd);
+    block->push_back(tag1, val1);
+    auto [tag2, val2] = value::makeNewString("bar"_sd);  // StringSmall
+    block->push_back(tag2, val2);
+    auto [tag3, val3] = value::makeNewString("bazbazbaz"_sd);
+    block->push_back(tag3, val3);
+    auto [tag4, val4] = value::makeNewString("bar"_sd);  // StringSmall
+    block->push_back(tag4, val4);
+    auto [tag5, val5] = value::makeNewString("bar"_sd);  // StringSmall
+    block->push_back(tag5, val5);
+    block->push_back(TypeTags::NumberInt32, value::bitcastFrom<int32_t>(999));
+    block->push_back(TypeTags::Nothing, Value{0u});
+    auto [tag6, val6] = value::makeNewString("foofoofoo"_sd);
+    block->push_back(tag6, val6);
+    block->push_back(TypeTags::Nothing, Value{0u});
+
+    auto [outTokens, outIdxs] = block->tokenize();
+    ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(5));
+
+    auto outTokensBson = blockToBsonArr(*outTokens);
+    ASSERT_BSONOBJ_EQ(outTokensBson,
+                      fromjson("{result: [\"foofoofoo\", \"bar\", \"bazbazbaz\", 999, null]}"));
+
+    std::vector<size_t> expIdxs{0, 1, 2, 1, 1, 3, 4, 0, 4};
+    ASSERT_EQ(outIdxs, expIdxs);
+}
+
+// Test MonoBlock::Tokenize().
+TEST_F(ValueBlockTest, MonoBlockTokenize) {
+    {
+        auto [strTag, strVal] = value::makeNewString("not a small string"_sd);
+        value::ValueGuard strGuard(strTag, strVal);
+        auto block = std::make_unique<value::MonoBlock>(4, strTag, strVal);
+
+        auto [outTokens, outIdxs] = block->tokenize();
+        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(1));
+
+        auto outTokensBson = blockToBsonArr(*outTokens);
+        ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [\"not a small string\"]}"));
+
+        std::vector<size_t> expIdxs{0, 0, 0, 0};
+        ASSERT_EQ(outIdxs, expIdxs);
+    }
+
+    {
+        auto block = std::make_unique<value::MonoBlock>(4, TypeTags::Nothing, Value{0u});
+
+        auto [outTokens, outIdxs] = block->tokenize();
+        ASSERT_EQ(outTokens->tryCount(), boost::optional<size_t>(1));
+
+        auto outTokensBson = blockToBsonArr(*outTokens);
+        ASSERT_BSONOBJ_EQ(outTokensBson, fromjson("{result: [null]}"));
+
+        std::vector<size_t> expIdxs{0, 0, 0, 0};
+        ASSERT_EQ(outIdxs, expIdxs);
+    }
+}
+
 }  // namespace mongo::sbe

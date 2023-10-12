@@ -93,6 +93,36 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
     return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
 }
 
+
+TokenizedBlock ValueBlock::tokenize() {
+    auto extracted = extract();
+    std::vector<TypeTags> tokenTags;
+    std::vector<Value> tokenVals;
+    std::vector<size_t> idxs(extracted.count, 0);
+
+    size_t unique_cnt = 0;
+    auto tokenMap = ValueMapType<size_t>{0, value::ValueHash(), value::ValueEq()};
+    for (size_t i = 0; i < extracted.count; ++i) {
+        auto [it, inserted] = tokenMap.insert({extracted.tags[i], extracted.vals[i]}, unique_cnt);
+        if (inserted) {
+            unique_cnt++;
+            auto [cpyTag, cpyVal] = value::copyValue(extracted.tags[i], extracted.vals[i]);
+            tokenTags.push_back(cpyTag), tokenVals.push_back(cpyVal);
+        }
+        idxs[i] = it->second;
+    }
+    return {std::make_unique<HeterogeneousBlock>(std::move(tokenTags), std::move(tokenVals)), idxs};
+}
+
+TokenizedBlock MonoBlock::tokenize() {
+    auto [tag, val] = value::copyValue(_tag, _val);
+    std::vector<TypeTags> tokenTags{tag};
+    std::vector<Value> tokenVals{val};
+
+    return {std::make_unique<HeterogeneousBlock>(std::move(tokenTags), std::move(tokenVals)),
+            std::vector<size_t>(_count, 0)};
+}
+
 std::unique_ptr<ValueBlock> HeterogeneousBlock::map(const ColumnOp& op) {
     auto outBlock = std::make_unique<HeterogeneousBlock>();
 

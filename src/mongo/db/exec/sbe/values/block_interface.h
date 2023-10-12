@@ -60,6 +60,15 @@ struct DeblockedTagVals {
     const Value* const vals;
 };
 
+/**
+ * Tokens representing unique values in a block and indexes that represent the location of these
+ * values in the original block.
+ */
+struct TokenizedBlock {
+    std::unique_ptr<ValueBlock> tokens;
+    std::vector<size_t> idxs;
+};
+
 std::ostream& operator<<(std::ostream& s, const DeblockedTagVals& deblocked);
 str::stream& operator<<(str::stream& str, const DeblockedTagVals& deblocked);
 
@@ -166,6 +175,8 @@ struct ValueBlock {
 
     virtual std::unique_ptr<ValueBlock> map(const ColumnOp& op);
 
+    virtual TokenizedBlock tokenize();
+
 protected:
     virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const = 0;
 
@@ -225,6 +236,8 @@ public:
         auto [tag, val] = op.processSingle(_tag, _val);
         return std::make_unique<MonoBlock>(_count, tag, val);
     }
+
+    TokenizedBlock tokenize() override;
 
 private:
     // Always owned.
