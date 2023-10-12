@@ -93,7 +93,19 @@ def generate(env):
         base_dir_from_scons = env.Dictionary()['IDLCFLAGS'][
             env.Dictionary()['IDLCFLAGS'].index('--base_dir') + 1]
         scons_outfile_relpath = bazel_dir.replace('src/', f'{base_dir_from_scons}/')
-        scons_outfile_base = cwd.replace(bazel_dir, f'{scons_outfile_relpath}/lib{target_to_build}')
+        workspace_root = env.Dir('#').abspath
+        scons_outfile_base = f"{workspace_root}/{scons_outfile_relpath}/lib{target_to_build}"
+        # TODO(PM-3332): Remove this debugging info once Bazel adoption is complete
+        print(f"Bazel debugging info:")
+        print(f"\tworkspace_root: {workspace_root}")
+        print(f"\ttarget_to_build: {target_to_build}")
+        print(f"\tcwd: {cwd}")
+        print(f"\tbazel_dir: {bazel_dir}")
+        print(f"\tbazel_target: {bazel_target}")
+        print(f"\tbazel_outfile_base: {bazel_outfile_base}")
+        print(f"\tbase_dir_from_scons: {base_dir_from_scons}")
+        print(f"\tscons_outfile_relpath: {scons_outfile_relpath}")
+        print(f"\tscons_outfile_base: {scons_outfile_base}")
 
         # Add this target to the global Bazel runner:
         global BAZEL_RUNNER
