@@ -461,7 +461,6 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
     if (matchedMeasurements.empty()) {
         return {false, PlanStage::NEED_TIME, boost::none};
     }
-    _specificStats.nMeasurementsMatched += matchedMeasurements.size();
 
     bool isUpdate = _params.isUpdate;
 
@@ -581,7 +580,6 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
         throw;
     }
     _specificStats.nMeasurementsModified += modifiedMeasurements.size();
-
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
     // outside of the WriteUnitOfWork.
@@ -753,6 +751,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 
     auto isWriteSuccessful = false;
     boost::optional<BSONObj> measurementToReturn = boost::none;
+    auto numMatchedMeasurements = matchedMeasurements.size();
     std::tie(isWriteSuccessful, status, measurementToReturn) =
         _writeToTimeseriesBuckets(bucketFreer,
                                   id,
@@ -761,11 +760,14 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
                                   bucketFromMigrate);
     if (status != PlanStage::NEED_TIME) {
         *out = WorkingSet::INVALID_ID;
-    } else if (isWriteSuccessful && measurementToReturn) {
-        // If the write was successful and if asked to return the old or new measurement, then
-        // 'measurementToReturn' must have been filled out and we can return it immediately.
-        _prepareToReturnMeasurement(*out, std::move(*measurementToReturn));
-        status = PlanStage::ADVANCED;
+    } else if (isWriteSuccessful) {
+        _specificStats.nMeasurementsMatched += numMatchedMeasurements;
+        if (measurementToReturn) {
+            // If the write was successful and if asked to return the old or new measurement, then
+            // 'measurementToReturn' must have been filled out and we can return it immediately.
+            _prepareToReturnMeasurement(*out, std::move(*measurementToReturn));
+            status = PlanStage::ADVANCED;
+        }
     }
 
     if (status == PlanStage::NEED_TIME && isEOF()) {
