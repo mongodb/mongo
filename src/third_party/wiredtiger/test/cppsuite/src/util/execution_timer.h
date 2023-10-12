@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef EXECUTION_TIMER_H
-#define EXECUTION_TIMER_H
+#pragma once
 
 #include <string>
 
@@ -58,5 +57,3 @@ private:
     uint64_t _total_time_taken;
 };
 } // namespace test_harness
-
-#endif

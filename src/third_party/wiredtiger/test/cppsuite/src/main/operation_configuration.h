@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef OPERATION_CONFIGURATION_H
-#define OPERATION_CONFIGURATION_H
+#pragma once
 
 #include <functional>
 
@@ -52,4 +51,3 @@ public:
     const int64_t thread_count;
 };
 } // namespace test_harness
-#endif

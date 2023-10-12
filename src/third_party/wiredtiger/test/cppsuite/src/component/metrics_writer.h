@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef METRICS_WRITER_H
-#define METRICS_WRITER_H
+#pragma once
 
 #include <fstream>
 #include <mutex>
@@ -54,5 +53,3 @@ private:
     std::mutex _stat_mutex;
 };
 } // namespace test_harness
-
-#endif

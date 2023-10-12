@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef CONFIGURATION_H
-#define CONFIGURATION_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -111,5 +110,3 @@ private:
     WT_CONFIG_PARSER *_config_parser = nullptr;
 };
 } // namespace test_harness
-
-#endif

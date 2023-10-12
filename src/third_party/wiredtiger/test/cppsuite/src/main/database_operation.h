@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DATABASE_OPERATION_H
-#define DATABASE_OPERATION_H
+#pragma once
 
 #include "database.h"
 #include "thread_worker.h"
@@ -74,4 +73,3 @@ public:
     virtual ~database_operation() = default;
 };
 } // namespace test_harness
-#endif

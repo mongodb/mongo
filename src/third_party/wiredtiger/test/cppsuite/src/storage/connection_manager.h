@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef CONN_API_H
-#define CONN_API_H
+#pragma once
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
 #ifndef __STDC_LIMIT_MACROS
@@ -75,5 +74,3 @@ private:
     std::mutex _conn_mutex;
 };
 } // namespace test_harness
-
-#endif

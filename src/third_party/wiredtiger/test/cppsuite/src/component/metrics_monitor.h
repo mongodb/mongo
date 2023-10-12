@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef METRICS_MONITOR_H
-#define METRICS_MONITOR_H
+#pragma once
 
 #include <memory>
 #include <string>
@@ -69,5 +68,3 @@ private:
     database &_database;
 };
 } // namespace test_harness
-
-#endif

@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DATABASE_H
-#define DATABASE_H
+#pragma once
 
 #include <string>
 #include <map>
@@ -81,5 +80,3 @@ private:
     std::mutex _mtx;
 };
 } // namespace test_harness
-
-#endif

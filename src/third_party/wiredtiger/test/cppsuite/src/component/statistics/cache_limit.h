@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef CACHE_LIMIT_H
-#define CACHE_LIMIT_H
+#pragma once
 
 #include <string>
 
@@ -49,5 +48,3 @@ private:
     double get_cache_value(scoped_cursor &cursor);
 };
 } // namespace test_harness
-
-#endif

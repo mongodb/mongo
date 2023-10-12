@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef WORKLOAD_MANAGER_H
-#define WORKLOAD_MANAGER_H
+#pragma once
 
 #include <functional>
 
@@ -57,6 +56,7 @@ public:
 
     database &get_database();
     bool db_populated() const;
+    void do_work() override final;
 
     /* Set the tracking component. */
     void set_operation_tracker(operation_tracker *op_tracker);
@@ -71,5 +71,3 @@ private:
     bool _db_populated = false;
 };
 } // namespace test_harness
-
-#endif

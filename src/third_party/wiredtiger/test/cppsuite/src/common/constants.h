@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef API_CONST_H
-#define API_CONST_H
+#pragma once
 
 #include <string>
 
@@ -116,5 +115,3 @@ extern const std::string TABLE_OPERATION_TRACKING;
 extern const std::string TABLE_SCHEMA_TRACKING;
 
 } // namespace test_harness
-
-#endif

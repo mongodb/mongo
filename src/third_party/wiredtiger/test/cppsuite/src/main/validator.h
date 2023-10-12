@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef VALIDATOR_H
-#define VALIDATOR_H
+#pragma once
 
 #include <map>
 #include <string>
@@ -87,5 +86,3 @@ private:
       const std::string &key, const key_state &key_state);
 };
 } // namespace test_harness
-
-#endif

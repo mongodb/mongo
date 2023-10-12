@@ -154,8 +154,8 @@ main(int argc, char *argv[])
     t.add_thread(read_op, read_cursor, key_size);
 
     /* Sleep for the test duration. */
-    int test_duration_s = 5;
-    std::this_thread::sleep_for(std::chrono::seconds(test_duration_s));
+    std::chrono::seconds test_duration_s(5);
+    std::this_thread::sleep_for(test_duration_s);
 
     /* Stop the threads. */
     do_reads = false;

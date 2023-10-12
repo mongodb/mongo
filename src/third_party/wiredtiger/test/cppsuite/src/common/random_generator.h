@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef RANDOM_GENERATOR_H
-#define RANDOM_GENERATOR_H
+#pragma once
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
 #ifndef __STDC_LIMIT_MACROS
@@ -90,5 +89,3 @@ private:
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 };
 } // namespace test_harness
-
-#endif

@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef OPERATION_TRACKER_H
-#define OPERATION_TRACKER_H
+#pragma once
 
 #include "component.h"
 #include "src/storage/scoped_cursor.h"
@@ -96,5 +95,3 @@ private:
     timestamp_manager &_tsm;
 };
 } // namespace test_harness
-
-#endif

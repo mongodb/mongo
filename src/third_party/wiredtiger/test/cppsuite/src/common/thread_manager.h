@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_MANAGER_H
-#define THREAD_MANAGER_H
+#pragma once
 
 #include <thread>
 #include <vector>
@@ -58,5 +57,3 @@ private:
     std::vector<std::thread *> _workers;
 };
 } // namespace test_harness
-
-#endif

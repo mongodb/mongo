@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef STATISTICS_H
-#define STATISTICS_H
+#pragma once
 
 #include <string>
 
@@ -67,5 +66,3 @@ protected:
     bool save;
 };
 } // namespace test_harness
-
-#endif

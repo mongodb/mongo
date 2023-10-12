@@ -60,9 +60,6 @@ operation_tracker::load()
 {
     component::load();
 
-    if (!_enabled)
-        return;
-
     /* Initiate schema tracking. */
     _session = connection_manager::instance().create_session();
     testutil_check(
@@ -176,8 +173,6 @@ void
 operation_tracker::save_schema_operation(
   const tracking_operation &operation, const uint64_t &collection_id, wt_timestamp_t ts)
 {
-    std::string error_message;
-
     if (!_enabled)
         return;
 
@@ -187,7 +182,7 @@ operation_tracker::save_schema_operation(
         _schema_track_cursor->set_value(_schema_track_cursor.get(), static_cast<int>(operation));
         testutil_check(_schema_track_cursor->insert(_schema_track_cursor.get()));
     } else {
-        error_message =
+        const std::string error_message =
           "save_schema_operation: invalid operation " + std::to_string(static_cast<int>(operation));
         testutil_die(EINVAL, error_message.c_str());
     }
@@ -198,13 +193,12 @@ operation_tracker::save_operation(WT_SESSION *session, const tracking_operation 
   const uint64_t &collection_id, const std::string &key, const std::string &value,
   wt_timestamp_t ts, scoped_cursor &op_track_cursor)
 {
-    WT_DECL_RET;
-
     if (!_enabled)
         return (0);
 
     testutil_assert(op_track_cursor.get() != nullptr);
 
+    int ret;
     if (operation == tracking_operation::CREATE_COLLECTION ||
       operation == tracking_operation::DELETE_COLLECTION) {
         const std::string error_message =

@@ -28,6 +28,7 @@
 
 #include "component.h"
 
+#include <cassert>
 #include <thread>
 
 #include "src/common/constants.h"
@@ -36,6 +37,8 @@
 namespace test_harness {
 component::component(const std::string &name, configuration *config) : _config(config), _name(name)
 {
+    _enabled = _config->get_bool(ENABLED);
+    _sleep_time_ms = std::chrono::milliseconds(_config->get_throttle_ms());
 }
 
 component::~component()
@@ -47,30 +50,19 @@ void
 component::load()
 {
     logger::log_msg(LOG_INFO, "Loading component: " + _name);
-    _enabled = _config->get_optional_bool(ENABLED, true);
-    /* If we're not enabled we shouldn't be running. */
-    _running = _enabled;
-
-    if (!_enabled)
-        return;
-
-    _sleep_time_ms = _config->get_throttle_ms();
+    assert(_enabled);
 }
 
 void
 component::run()
 {
+    assert(_enabled);
     logger::log_msg(LOG_INFO, "Running component: " + _name);
-    while (_enabled && _running) {
+    _running = true;
+    while (_running) {
         do_work();
-        std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_time_ms));
+        std::this_thread::sleep_for(_sleep_time_ms);
     }
-}
-
-void
-component::do_work()
-{
-    /* Not implemented. */
 }
 
 bool
@@ -82,12 +74,15 @@ component::enabled() const
 void
 component::end_run()
 {
+    assert(_running);
     _running = false;
 }
 
 void
 component::finish()
 {
+    assert(!_running);
     logger::log_msg(LOG_INFO, "Running finish stage of component: " + _name);
 }
+
 } // namespace test_harness

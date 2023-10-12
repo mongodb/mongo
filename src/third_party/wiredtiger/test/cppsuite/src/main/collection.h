@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef COLLECTION_H
-#define COLLECTION_H
+#pragma once
 
 #include <atomic>
 #include <string>
@@ -68,5 +67,3 @@ private:
     std::atomic<uint64_t> _key_count{0};
 };
 } // namespace test_harness
-
-#endif

@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SCOPED_SESSION_H
-#define SCOPED_SESSION_H
+#pragma once
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
 #ifndef __STDC_LIMIT_MACROS
@@ -79,4 +78,3 @@ private:
 };
 
 } // namespace test_harness
-#endif

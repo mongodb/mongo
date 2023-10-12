@@ -36,37 +36,53 @@ namespace test_harness {
 test::test(const test_args &args) : _args(args)
 {
     _config = new configuration(args.test_name, args.test_config);
-    _metrics_monitor =
-      new metrics_monitor(args.test_name, _config->get_subconfig(METRICS_MONITOR), _database);
     _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
     _workload_manager = new workload_manager(
       _config->get_subconfig(WORKLOAD_MANAGER), this, _timestamp_manager, _database);
     _thread_manager = new thread_manager();
 
+    /* Only create the metrics monitor if enabled. */
+    auto metrics_monitor_cfg = _config->get_subconfig(METRICS_MONITOR);
+    if (metrics_monitor_cfg->get_bool(ENABLED))
+        _metrics_monitor = new metrics_monitor(args.test_name, metrics_monitor_cfg, _database);
+    else
+        delete metrics_monitor_cfg;
+
     _database.set_timestamp_manager(_timestamp_manager);
     _database.set_create_config(
       _config->get_bool(COMPRESSION_ENABLED), _config->get_bool(REVERSE_COLLATOR));
 
-    /*
-     * Ordering is not important here, any dependencies between components should be resolved
-     * internally by the components.
-     */
-    _components = {_workload_manager, _timestamp_manager, _metrics_monitor};
+    /* Update the component list with the enabled ones. */
+    _components.push_back(_workload_manager);
+    if (_timestamp_manager->enabled())
+        _components.push_back(_timestamp_manager);
+    if (_metrics_monitor != nullptr && _metrics_monitor->enabled())
+        _components.push_back(_metrics_monitor);
 }
 
 void
 test::init_operation_tracker(operation_tracker *op_tracker)
 {
     delete _operation_tracker;
+    std::unique_ptr<configuration> operation_tracker_cfg(_config->get_subconfig(OPERATION_TRACKER));
+    bool tracking_enabled = operation_tracker_cfg->get_bool(ENABLED);
     if (op_tracker == nullptr) {
         /* Fallback to default behavior. */
         op_tracker = new operation_tracker(_config->get_subconfig(OPERATION_TRACKER),
           _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager);
+    } else {
+        /*
+         * If a custom tracker has been given, make sure it has been enabled in the test
+         * configuration.
+         */
+        testutil_assert(tracking_enabled);
     }
     _operation_tracker = op_tracker;
     _workload_manager->set_operation_tracker(_operation_tracker);
     _database.set_operation_tracker(_operation_tracker);
-    _components.push_back(_operation_tracker);
+
+    if (tracking_enabled)
+        _components.push_back(_operation_tracker);
 }
 
 test::~test()
@@ -90,7 +106,9 @@ test::~test()
 void
 test::run()
 {
-    int64_t cache_max_wait_ms, cache_size_mb, duration_seconds;
+    int64_t cache_size_mb;
+    std::chrono::milliseconds cache_max_wait_ms;
+    std::chrono::seconds duration_seconds;
     bool enable_logging, statistics_logging;
     configuration *statistics_config;
     std::string statistics_type;
@@ -128,8 +146,8 @@ test::run()
         db_create_config += ",debug_mode=(background_compact)";
 
     /* Maximum waiting time for the cache to get unstuck. */
-    cache_max_wait_ms = _config->get_int(CACHE_MAX_WAIT_MS);
-    db_create_config += ",cache_max_wait_ms=" + std::to_string(cache_max_wait_ms);
+    cache_max_wait_ms = std::chrono::milliseconds(_config->get_int(CACHE_MAX_WAIT_MS));
+    db_create_config += ",cache_max_wait_ms=" + std::to_string(cache_max_wait_ms.count());
 
     /* Add the user supplied wiredtiger open config. */
     db_create_config += "," + _args.wt_open_config;
@@ -138,26 +156,27 @@ test::run()
     connection_manager::instance().create(
       db_create_config, _args.home.empty() ? DEFAULT_DIR : _args.home);
 
-    /* Initiate the load stage of each component. */
+    /* Load each component. They have to be all loaded first before being able to run. */
     for (const auto &it : _components)
         it->load();
 
-    /* Spawn threads for all component::run() functions. */
+    /* Run each component. */
     for (const auto &it : _components)
         _thread_manager->add_thread(&component::run, it);
 
     /* The initial population phase needs to be finished before starting the actual test. */
-    while (_workload_manager->enabled() && !_workload_manager->db_populated())
+    while (!_workload_manager->db_populated())
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     /* The test will run for the duration as defined in the config. */
-    duration_seconds = _config->get_int(DURATION_SECONDS);
-    testutil_assert(duration_seconds >= 0);
+    duration_seconds = std::chrono::seconds(_config->get_int(DURATION_SECONDS));
+    testutil_assert(duration_seconds.count() >= 0);
     logger::log_msg(LOG_INFO,
-      "Waiting {" + std::to_string(duration_seconds) + "} seconds for testing to complete.");
-    std::this_thread::sleep_for(std::chrono::seconds(duration_seconds));
+      "Waiting {" + std::to_string(duration_seconds.count()) +
+        "} seconds for testing to complete.");
+    std::this_thread::sleep_for(duration_seconds);
 
-    /* Notify components that they should complete their last iteration. */
+    /* Notify components that they should stop. */
     for (const auto &it : _components)
         it->end_run();
 

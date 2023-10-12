@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TIMESTAMP_MANAGER_H
-#define TIMESTAMP_MANAGER_H
+#pragma once
 
 #include <atomic>
 
@@ -90,5 +89,3 @@ private:
     uint64_t _oldest_lag = 0U, _stable_lag = 0U;
 };
 } // namespace test_harness
-
-#endif

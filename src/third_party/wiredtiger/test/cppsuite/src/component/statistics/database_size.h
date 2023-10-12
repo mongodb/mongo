@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DATABASE_SIZE_H
-#define DATABASE_SIZE_H
+#pragma once
 
 #include <string>
 #include "src/main/configuration.h"
@@ -54,5 +53,3 @@ private:
     database &_database;
 };
 } // namespace test_harness
-
-#endif

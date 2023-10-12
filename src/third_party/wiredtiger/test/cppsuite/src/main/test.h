@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TEST_H
-#define TEST_H
+#pragma once
 
 #include <string>
 
@@ -71,6 +70,7 @@ protected:
     operation_tracker *_operation_tracker = nullptr;
 
 private:
+    /* All the components enabled for the test. */
     std::vector<component *> _components;
     metrics_monitor *_metrics_monitor = nullptr;
     thread_manager *_thread_manager = nullptr;
@@ -78,5 +78,3 @@ private:
     database _database;
 };
 } // namespace test_harness
-
-#endif

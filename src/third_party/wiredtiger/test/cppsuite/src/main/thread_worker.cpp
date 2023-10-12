@@ -79,7 +79,7 @@ thread_worker::thread_worker(uint64_t id, thread_type type, configuration *confi
       thread_count(config->get_int(THREAD_COUNT)), type(type), id(id), db(dbase),
       session(std::move(created_session)), tsm(timestamp_manager),
       txn(transaction(config, timestamp_manager, session.get())), op_tracker(op_tracker),
-      _sleep_time_ms(config->get_throttle_ms()), _barrier(barrier_ptr)
+      _sleep_time_ms(std::chrono::milliseconds(config->get_throttle_ms())), _barrier(barrier_ptr)
 {
     if (op_tracker->enabled())
         op_track_cursor = session.open_scoped_cursor(op_tracker->get_operation_table_name());
@@ -268,7 +268,7 @@ thread_worker::truncate(uint64_t collection_id, std::optional<std::string> start
 void
 thread_worker::sleep()
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_time_ms));
+    std::this_thread::sleep_for(_sleep_time_ms);
 }
 
 void

@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef LOGGER_H
-#define LOGGER_H
+#pragma once
 
 /* Following definitions are required in order to use printing format specifiers in C++. */
 #ifndef __STDC_LIMIT_MACROS
@@ -71,5 +70,3 @@ public:
     logger() = delete;
 };
 } // namespace test_harness
-
-#endif
