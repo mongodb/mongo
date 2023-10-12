@@ -1659,14 +1659,11 @@ var ShardingTest = function ShardingTest(params) {
         // TODO: SERVER-80100 Remove assert.soon.
         if (useAutoBootstrapProcedure) {
             assert.soonNoExcept(() => {
-                let getConfigShardDoc = function() {
-                    return csrsPrimary.getDB('config').shards.findOne({_id: 'config'});
-                };
-
-                let configShardDoc = this.keyFile
-                    ? authutil.asCluster(csrsPrimary, this.keyFile, getConfigShardDoc)
-                    : getConfigShardDoc();
-                return configShardDoc != null;
+                function isShardingReady() {
+                    return csrsPrimary.adminCommand({getShardingReady: 1}).isReady;
+                }
+                return this.keyFile ? authutil.asCluster(csrsPrimary, this.keyFile, isShardingReady)
+                                    : isShardingReady();
             });
         }
 
