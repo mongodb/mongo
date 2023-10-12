@@ -580,6 +580,7 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
         throw;
     }
     _specificStats.nMeasurementsModified += modifiedMeasurements.size();
+
     // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
     // outside of the WriteUnitOfWork.
