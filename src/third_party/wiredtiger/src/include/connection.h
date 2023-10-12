@@ -42,10 +42,10 @@ struct __wt_process {
 };
 extern WT_PROCESS __wt_process;
 
-typedef enum __wt_bg_compact_cleanup_type {
+typedef enum __wt_background_compact_cleanup_stat_type {
     BACKGROUND_CLEANUP_ALL_STAT,
     BACKGROUND_CLEANUP_STALE_STAT
-} WT_BACKGROUND_COMPACT_CLEANUP_TYPE;
+} WT_BACKGROUND_COMPACT_CLEANUP_STAT_TYPE;
 
 /*
  * WT_BACKGROUND_COMPACT_STAT --
@@ -91,7 +91,7 @@ struct __wt_background_compact {
     uint64_t full_iteration_wait_time; /* Time in seconds to wait after a full iteration */
 
     /* List of files to track compaction statistics across background server iterations. */
-    TAILQ_HEAD(__wt_bg_compacthash, __wt_background_compact_stat) * compacthash;
+    TAILQ_HEAD(__wt_background_compactstathash, __wt_background_compact_stat) * stat_hash;
 };
 
 /*

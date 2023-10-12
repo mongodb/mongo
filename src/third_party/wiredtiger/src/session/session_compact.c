@@ -421,7 +421,7 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
                   "compaction server.");
         }
 
-        WT_ERR(__wt_compact_signal(session, config));
+        WT_ERR(__wt_background_compact_signal(session, config));
 
         goto done;
     } else
