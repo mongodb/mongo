@@ -33,6 +33,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/s/resharding/common_types.idl"
 
 commands:
   abortReshardCollection:
@@ -51,6 +52,11 @@ commands:
     namespace: type
     api_version: ""
     type: namespacestring
+    fields:
+      provenance:
+        type: Provenance
+        description: "The source operation that called this resharding operation."
+        optional: true
 
   _shardsvrAbortReshardCollection:
     command_name: _shardsvrAbortReshardCollection

@@ -1344,11 +1344,15 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
             typedInstance->getMetadata().getReshardingKey().toBSON() ==
             coordinatorDoc.getReshardingKey().toBSON());
 
+        const bool isProvenanceSame =
+            (typedInstance->getMetadata().getProvenance() ==
+             coordinatorDoc.getCommonReshardingMetadata().getProvenance());
+
         iassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Only one resharding operation is allowed to be active at a "
                                  "time, aborting resharding op for "
                               << coordinatorDoc.getSourceNss().toStringForErrorMsg(),
-                isUserReshardingUUIDSame && isNssSame && isReshardingKeySame);
+                isUserReshardingUUIDSame && isNssSame && isReshardingKeySame && isProvenanceSame);
 
         std::string userReshardingIdMsg;
         if (coordinatorDoc.getUserReshardingUUID()) {

@@ -64,6 +64,7 @@ public:
 
             ConfigsvrAbortReshardCollection configsvrAbortReshardCollection(nss);
             configsvrAbortReshardCollection.setDbName(request().getDbName());
+            configsvrAbortReshardCollection.setProvenance(ProvenanceEnum::kMoveCollection);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(

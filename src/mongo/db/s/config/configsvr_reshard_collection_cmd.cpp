@@ -184,15 +184,13 @@ public:
                 uassert(ErrorCodes::InvalidOptions,
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !request().getReshardingUUID().has_value());
-                if (!resharding::gFeatureFlagMoveCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                    !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    uassert(ErrorCodes::InvalidOptions,
-                            "Feature flag move collection or unshard collection is not enabled, "
-                            "reject provenance parameter",
-                            !request().getProvenance().has_value());
-                }
+                uassert(ErrorCodes::InvalidOptions,
+                        "Resharding improvements is not enabled, reject feature flag "
+                        "moveCollection or unshardCollection",
+                        !resharding::gFeatureFlagMoveCollection.isEnabled(
+                            serverGlobalParams.featureCompatibility) &&
+                            !resharding::gFeatureFlagUnshardCollection.isEnabled(
+                                serverGlobalParams.featureCompatibility));
             }
 
             if (const auto& shardDistribution = request().getShardDistribution()) {
@@ -201,67 +199,89 @@ public:
             }
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
-            auto instance =
-                ([&]() -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
-                    FixedFCVRegion fixedFcv(opCtx);
+            auto instance = ([&]()
+                                 -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
+                FixedFCVRegion fixedFcv(opCtx);
 
-                    // (Generic FCV reference): To run this command and ensure the consistency of
-                    // the metadata we need to make sure we are on a stable state.
-                    uassert(
-                        ErrorCodes::CommandNotSupported,
+                // (Generic FCV reference): To run this command and ensure the consistency of
+                // the metadata we need to make sure we are on a stable state.
+                uassert(ErrorCodes::CommandNotSupported,
                         "Resharding is not supported for this version, please update the FCV to "
                         "latest.",
                         !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
-                    const auto [cm, _] = uassertStatusOK(
-                        Grid::get(opCtx)
-                            ->catalogCache()
-                            ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
-
-                    auto tempReshardingNss = resharding::constructTemporaryReshardingNss(
-                        nss.db_forSharding(), cm.getUUID());
-
-
-                    if (auto zones = request().getZones()) {
-                        resharding::checkForOverlappingZones(*zones);
+                // We only want to use provenance in resharding if FCV is latest but it's still
+                // possible for a mongos on a higher fcv to send a reshard collection request to a
+                // configsvr on a lower fcv. We ignore the reshardCollection provenance in this
+                // case.
+                bool setProvenance = true;
+                if (resharding::gFeatureFlagMoveCollection.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                    resharding::gFeatureFlagUnshardCollection.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            "Expected provenance to be specified",
+                            request().getProvenance().has_value());
+                } else if (request().getProvenance().has_value()) {
+                    if (request().getProvenance().get() == ProvenanceEnum::kReshardCollection) {
+                        setProvenance = false;
+                    } else {
+                        uassert(
+                            ErrorCodes::CommandNotSupported,
+                            "Unexpected moveCollection or unshardCollection provenance specified",
+                            true);
                     }
+                }
 
-                    auto coordinatorDoc =
-                        ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                                      {} /* donorShards */,
-                                                      {} /* recipientShards */);
+                const auto [cm, _] = uassertStatusOK(
+                    Grid::get(opCtx)
+                        ->catalogCache()
+                        ->getTrackedCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
 
-                    // Generate the resharding metadata for the ReshardingCoordinatorDocument.
-                    auto reshardingUUID = UUID::gen();
-                    auto existingUUID = cm.getUUID();
-                    auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
-                                                                   ns(),
-                                                                   std::move(existingUUID),
-                                                                   std::move(tempReshardingNss),
-                                                                   request().getKey());
-                    commonMetadata.setStartTime(
-                        opCtx->getServiceContext()->getFastClockSource()->now());
-                    if (request().getReshardingUUID()) {
-                        commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
-                    }
-                    if (request().getProvenance()) {
-                        commonMetadata.setProvenance(*request().getProvenance());
-                    }
+                auto tempReshardingNss =
+                    resharding::constructTemporaryReshardingNss(nss.db_forSharding(), cm.getUUID());
 
-                    coordinatorDoc.setSourceKey(cm.getShardKeyPattern().getKeyPattern().toBSON());
-                    coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-                    coordinatorDoc.setZones(request().getZones());
-                    coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
-                    coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
-                    coordinatorDoc.setShardDistribution(request().getShardDistribution());
-                    coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
-                    coordinatorDoc.setUnique(request().getUnique());
-                    coordinatorDoc.setCollation(request().getCollation());
 
-                    auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
-                    instance->getCoordinatorDocWrittenFuture().get(opCtx);
-                    return instance;
-                })();
+                if (auto zones = request().getZones()) {
+                    resharding::checkForOverlappingZones(*zones);
+                }
+
+                auto coordinatorDoc =
+                    ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
+                                                  {} /* donorShards */,
+                                                  {} /* recipientShards */);
+
+                // Generate the resharding metadata for the ReshardingCoordinatorDocument.
+                auto reshardingUUID = UUID::gen();
+                auto existingUUID = cm.getUUID();
+                auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
+                                                               ns(),
+                                                               std::move(existingUUID),
+                                                               std::move(tempReshardingNss),
+                                                               request().getKey());
+                commonMetadata.setStartTime(
+                    opCtx->getServiceContext()->getFastClockSource()->now());
+                if (request().getReshardingUUID()) {
+                    commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
+                }
+                if (setProvenance && request().getProvenance()) {
+                    commonMetadata.setProvenance(*request().getProvenance());
+                }
+
+                coordinatorDoc.setSourceKey(cm.getShardKeyPattern().getKeyPattern().toBSON());
+                coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
+                coordinatorDoc.setZones(request().getZones());
+                coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
+                coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
+                coordinatorDoc.setShardDistribution(request().getShardDistribution());
+                coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
+                coordinatorDoc.setUnique(request().getUnique());
+                coordinatorDoc.setCollation(request().getCollation());
+
+                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
+                instance->getCoordinatorDocWrittenFuture().get(opCtx);
+                return instance;
+            })();
 
             if (instance) {
                 // There is work to be done in order to have the collection's shard key match the

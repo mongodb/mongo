@@ -107,10 +107,23 @@ public:
                 uassert(ErrorCodes::InvalidOptions,
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !request().getReshardingUUID().has_value());
+                uassert(ErrorCodes::InvalidOptions,
+                        "Resharding improvements is not enabled, reject feature flag "
+                        "moveCollection or unshardCollection",
+                        !resharding::gFeatureFlagMoveCollection.isEnabled(
+                            serverGlobalParams.featureCompatibility) &&
+                            !resharding::gFeatureFlagUnshardCollection.isEnabled(
+                                serverGlobalParams.featureCompatibility));
             }
             reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
             reshardCollectionRequest.setForceRedistribution(request().getForceRedistribution());
             reshardCollectionRequest.setReshardingUUID(request().getReshardingUUID());
+            if (resharding::gFeatureFlagMoveCollection.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                resharding::gFeatureFlagUnshardCollection.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
+            }
 
             shardsvrReshardCollection.setReshardCollectionRequest(
                 std::move(reshardCollectionRequest));

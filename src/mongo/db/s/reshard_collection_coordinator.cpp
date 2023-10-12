@@ -160,16 +160,26 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 uassert(ErrorCodes::InvalidOptions,
                         "Resharding improvements is not enabled, reject reshardingUUID parameter",
                         !_doc.getReshardingUUID().has_value());
-                if (!resharding::gFeatureFlagMoveCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                    !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    uassert(ErrorCodes::InvalidOptions,
-                            "Feature flag move collection or unshard collection is not enabled, "
-                            "reject provenance parameter",
-                            !_doc.getProvenance().has_value());
-                }
+                uassert(ErrorCodes::InvalidOptions,
+                        "Resharding improvements is not enabled, reject feature flag "
+                        "moveCollection or unshardCollection",
+                        !resharding::gFeatureFlagMoveCollection.isEnabled(
+                            serverGlobalParams.featureCompatibility) &&
+                            !resharding::gFeatureFlagUnshardCollection.isEnabled(
+                                serverGlobalParams.featureCompatibility));
             }
+
+            if (!resharding::gFeatureFlagMoveCollection.isEnabled(
+                    serverGlobalParams.featureCompatibility) &&
+                !resharding::gFeatureFlagUnshardCollection.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Feature flag move collection or unshard collection is not enabled, reject "
+                        "provenance",
+                        !_doc.getProvenance().has_value() ||
+                            _doc.getProvenance().get() == ProvenanceEnum::kReshardCollection);
+            }
+
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());

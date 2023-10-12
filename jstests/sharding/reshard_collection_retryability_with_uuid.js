@@ -108,7 +108,8 @@ reshardingTest.withReshardingInBackground(
             _configsvrReshardCollection: sourceCollection.getFullName(),
             reshardingUUID: UUID(),
             key: {newKey: 1},
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
+            provenance: "reshardCollection"
         }),
                                      ErrorCodes.ReshardCollectionInProgress);
 
@@ -116,7 +117,8 @@ reshardingTest.withReshardingInBackground(
         assert.commandFailedWithCode(configsvr.adminCommand({
             _configsvrReshardCollection: sourceCollection.getFullName(),
             key: {newKey: 1},
-            writeConcern: {w: "majority"}
+            writeConcern: {w: "majority"},
+            provenance: "reshardCollection"
         }),
                                      ErrorCodes.ReshardCollectionInProgress);
 

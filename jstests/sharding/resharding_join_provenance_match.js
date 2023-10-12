@@ -1,16 +1,19 @@
 /**
- * Tests that if a _configsvrReshardCollection command is issued while there is an ongoing
- * resharding operation for the same collection with the same resharding key, the command joins with
- * the ongoing resharding instance.
+ * Tests that provenances are matched when a _configsvrReshardCollection command is issued while
+ * there is an ongoing unshard collection operation for the same collection with the same resharding
+ * key,
  *
- * Use _configsvrReshardCollection instead of reshardCollection to exercise the behavior of the
- * config server in the absence of the DDL lock taken by _shardsvrReshardCollection on the
- * primary shard for the database.
  *
  * @tags: [
- *   uses_atclustertime,
+ *  uses_atclustertime,
+ *  requires_fcv_72,
+ *  featureFlagReshardingImprovements,
+ *  featureFlagUnshardCollection,
+ *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  multiversion_incompatible,
  * ]
  */
+
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
@@ -21,12 +24,13 @@ import {ReshardingTest} from "jstests/sharding/libs/resharding_test_fixture.js";
 const makeConfigsvrReshardCollectionThread = (configsvrConnString, ns) => {
     return new Thread((configsvrConnString, ns) => {
         const configsvr = new Mongo(configsvrConnString);
-        assert.commandWorked(configsvr.adminCommand({
+        assert.commandFailedWithCode(configsvr.adminCommand({
             _configsvrReshardCollection: ns,
-            key: {newKey: 1},
+            key: {_id: 1},
             writeConcern: {w: "majority"},
             provenance: "reshardCollection"
-        }));
+        }),
+                                     ErrorCodes.ReshardCollectionInProgress);
     }, configsvrConnString, ns);
 };
 
@@ -35,7 +39,7 @@ const getTempUUID = (tempNs) => {
     return getUUIDFromConfigCollections(mongos, tempCollection.getFullName());
 };
 
-const reshardingTest = new ReshardingTest({numDonors: 1});
+const reshardingTest = new ReshardingTest({numDonors: 1, numRecipients: 1});
 reshardingTest.setup();
 const donorShardNames = reshardingTest.donorShardNames;
 const recipientShardNames = reshardingTest.recipientShardNames;
@@ -55,34 +59,19 @@ const pauseBeforeCloningFP =
 const configsvrReshardCollectionThread = makeConfigsvrReshardCollectionThread(
     topology.configsvr.nodes[0], sourceCollection.getFullName());
 
-// Fulfilled once the first reshardCollection command creates the temporary collection.
+// Fulfilled once the unshardCollection command creates the temporary collection.
 let expectedUUIDAfterReshardingCompletes = undefined;
 
-reshardingTest.withReshardingInBackground(
-    {
-        newShardKeyPattern: {newKey: 1},
-        newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
-    },
-    (tempNs) => {
-        pauseBeforeCloningFP.wait();
+reshardingTest.withUnshardCollectionInBackground({toShard: recipientShardNames[0]}, (tempNs) => {
+    pauseBeforeCloningFP.wait();
 
-        // The UUID of the temporary resharding collection should become the UUID of the original
-        // collection once resharding has completed.
-        expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
+    // The UUID of the temporary resharding collection should become the UUID of the original
+    // collection once resharding has completed.
 
-        const reshardCollectionJoinedFP =
-            configureFailPoint(configsvr, "reshardCollectionJoinedExistingOperation");
-
-        configsvrReshardCollectionThread.start();
-
-        // Hitting the reshardCollectionJoinedFP is additional confirmation that
-        // _configsvrReshardCollection command (identical resharding key and collection as the
-        // ongoing operation) gets joined with the ongoing resharding operation.
-        reshardCollectionJoinedFP.wait();
-
-        reshardCollectionJoinedFP.off();
-        pauseBeforeCloningFP.off();
-    });
+    expectedUUIDAfterReshardingCompletes = getTempUUID(tempNs);
+    configsvrReshardCollectionThread.start();
+    pauseBeforeCloningFP.off();
+});
 
 configsvrReshardCollectionThread.join();
 

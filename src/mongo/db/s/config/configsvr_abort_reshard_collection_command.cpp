@@ -42,6 +42,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
@@ -60,6 +61,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
@@ -101,7 +103,9 @@ void assertExistsReshardingDocument(OperationContext* opCtx, UUID reshardingUUID
             !!docOptional);
 }
 
-auto assertGetReshardingMachine(OperationContext* opCtx, UUID reshardingUUID) {
+auto assertGetReshardingMachine(OperationContext* opCtx,
+                                UUID reshardingUUID,
+                                boost::optional<mongo::ProvenanceEnum> provenance) {
     auto machine = resharding::tryGetReshardingStateMachineAndThrowIfShuttingDown<
         ReshardingCoordinatorService,
         ReshardingCoordinator,
@@ -110,6 +114,15 @@ auto assertGetReshardingMachine(OperationContext* opCtx, UUID reshardingUUID) {
     uassert(ErrorCodes::NoSuchReshardCollection,
             "Could not find in-progress resharding operation to abort",
             machine);
+
+    if (resharding::gFeatureFlagMoveCollection.isEnabled(serverGlobalParams.featureCompatibility) ||
+        resharding::gFeatureFlagUnshardCollection.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Could not find in-progress resharding operation with matching provenance",
+                provenance && (*machine)->getMetadata().getProvenance() == provenance.get());
+    }
+
     return *machine;
 }
 
@@ -140,7 +153,8 @@ public:
 
             assertExistsReshardingDocument(opCtx, reshardingUUID);
 
-            auto machine = assertGetReshardingMachine(opCtx, reshardingUUID);
+            auto machine =
+                assertGetReshardingMachine(opCtx, reshardingUUID, request().getProvenance());
             auto future = machine->getCompletionFuture();
             machine->abort();
 
