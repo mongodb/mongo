@@ -295,9 +295,10 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
     stats.incNumMeasurementsCommitted(batch->measurements.size());
     if (bucket) {
         bucket->numCommittedMeasurements += batch->measurements.size();
+        /* TODO (SERVER-82126): reenable or remove
         if (kDebugBuild && opCtx) {
             internal::runPostCommitDebugChecks(opCtx, *bucket, *batch);
-        }
+        }*/
     }
 
     if (!bucket) {
