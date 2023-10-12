@@ -216,6 +216,20 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
     boost::optional<sbe::value::SlotId> bitmapSlotId;
     MatchExpression* eventFilter = unpackNode->eventFilter.get();
+
+    // It's possible for the event filter to be applied on fields that aren't being unpacked (the
+    // simplest case of such pipeline: [{$project: {x: 1}},{$match: {y: 42}}]). We'll stub out the
+    // non-produced fields with the 'Nothing' slot.
+    DepsTracker eventFilterDeps = {};
+    match_expression::addDependencies(eventFilter, &eventFilterDeps);
+    for (const std::string& eventFilterPath : eventFilterDeps.fields) {
+        const auto& name =
+            std::pair(PlanStageSlots::kField, FieldPath(eventFilterPath).front().toString());
+        if (!outputs.has(name)) {
+            outputs.set(name, _state.env->getSlot(kNothingEnvSlotName));
+        }
+    }
+
     if (eventFilter) {
         auto eventFilterSbExpr =
             generateFilter(_state, eventFilter, /*rootSlot*/ boost::none, &outputs);

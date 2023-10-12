@@ -1038,6 +1038,12 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     }
 
     // Check for a viable inclusion $project after the $_internalUnpackBucket.
+    // Note: an $_internalUnpackBucket stage with a set of 'kInclude' fields and an event filter is
+    // equivalent to [{$_internalUnpackBucket}{$project}{$match}] -- in _this_ order. That is, if
+    // the $match is on a field that is not included by $project, the result must be an empty set.
+    // But if the stage already has an '_eventFilter', it means we started with pipeline like
+    // [{$_internalUnpackBucket}{$match}{$project}], which might return non-empty set of results, so
+    // we cannot internalize the $project.
     auto [existingProj, isInclusion] = getIncludeExcludeProjectAndType(std::next(itr)->get());
     if (!_eventFilter && isInclusion && !existingProj.isEmpty() &&
         canInternalizeProjectObj(existingProj)) {
@@ -1743,8 +1749,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
 
         container->erase(std::next(itr));
-        // If the $match is not followed by other stages referencing fields (e.g. $count), we can
-        // unpack directly to BSON so that data doesn't need to be materialized to Document.
         auto deps = getRestPipelineDependencies(itr, container, false /* includeEventFilter */);
         if (deps.fields.empty()) {
             _unpackToBson = true;
@@ -1840,17 +1844,6 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
                     std::all_of(fieldSet.begin(), fieldSet.end(), [](auto&& field) {
                         return FieldPath(field).getPathLength() == 1;
                     }));
-            // If any top-level field of the 'eventFilter' is not in the bucketSpec's fieldSet, then
-            // it's a discarded field and we cannot push down the stage because the SBE filter
-            // generator cannot refer to slot(s) for the discarded field(s) which are not returned
-            // from 'block_to_row' stage.
-            //
-            // TODO SERVER-80324: Remove this restriction.
-            for (auto&& eventFilterPath : _eventFilterDeps.fields) {
-                if (!fieldSet.contains(FieldPath(eventFilterPath).front().toString())) {
-                    return false;
-                }
-            }
 
             for (auto&& computedMeta : _bucketUnpacker.bucketSpec().computedMetaProjFields()) {
                 fieldSet.erase(computedMeta);

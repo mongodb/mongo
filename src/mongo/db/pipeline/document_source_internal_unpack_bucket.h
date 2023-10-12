@@ -337,14 +337,16 @@ private:
     // of additional bucket-level filters (see 'createPredicatesOnBucketLevelField()') that are
     // inserted before this stage while the original filter is incorporated into this stage as
     // '_eventFilter' (to be applied to each unpacked document) and/or '_wholeBucketFilter' for the
-    // cases when _all_ events in a bucket would match (currently, we only do this for the
-    // timeField).
+    // cases when _all_ events in a bucket would match so that the filter is evaluated only once
+    // rather than on all events from the bucket (currently, we only do this for the 'timeField').
     std::unique_ptr<MatchExpression> _eventFilter;
     BSONObj _eventFilterBson;
     DepsTracker _eventFilterDeps;
     std::unique_ptr<MatchExpression> _wholeBucketFilter;
     BSONObj _wholeBucketFilterBson;
 
+    // If after unpacking there are no stages referencing any fields (e.g. $count), unpack directly
+    // to BSON so that data doesn't need to be materialized to Document.
     bool _unpackToBson = false;
 
     bool _optimizedEndOfPipeline = false;
