@@ -34,7 +34,8 @@ from wiredtiger import stat
 from wtdataset import SimpleDataSet
 
 class test_checkpoint04(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,statistics=(all)'
+    # We don't want stats from earlier runs to interfere with later runs.
+    conn_config = 'cache_size=50MB,statistics=(all,clear)'
 
     def create_tables(self, ntables):
         tables = {}
@@ -127,11 +128,8 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             # Run the loop again if any of the below condition fails and exit if the test passes.
             if prep_min < time_min and prep_max < time_max and prep_recent < time_recent and prep_total < time_total:
                 break
-            else:
-                multiplier += 1
-                # Reopen the connection to reset statistics. 
-                # We don't want stats from earlier runs to interfere with later runs.
-                self.reopen_conn()
+
+            multiplier += 1
 
 if __name__ == '__main__':
     wttest.run()
