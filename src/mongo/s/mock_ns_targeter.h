@@ -92,6 +92,7 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const override {
         return _targetQuery(itemRef.getUpdateRef().getFilter(), chunkRanges);
     }
@@ -133,6 +134,11 @@ public:
                              const ShardEndpoint& endpoint,
                              const StaleDbRoutingVersion& staleInfo) override {
         // No-op
+    }
+
+    bool hasStaleShardResponse() override {
+        // No-op
+        return false;
     }
 
     bool refreshIfNeeded(OperationContext* opCtx) override {

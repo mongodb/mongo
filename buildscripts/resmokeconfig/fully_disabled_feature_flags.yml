@@ -16,3 +16,5 @@
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
 - featureFlagUnsplittableCollectionsOnNonPrimaryShard
+# PM-3190 - This feature affects existing tests and development is in progress
+- featureFlagUpdateOneWithIdWithoutShardKey

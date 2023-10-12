@@ -28,6 +28,8 @@
  */
 
 
+#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -584,6 +586,156 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                                      stats,
                                      abortBatch);
 }
+
+void executeNonTargetedSingleWriteWithoutShardKeyWithId(
+    OperationContext* opCtx,
+    NSTargeter& targeter,
+    BatchWriteOp& batchOp,
+    TargetedBatchMap& childBatches,
+    BatchWriteExecStats* stats,
+    const BatchedCommandRequest& clientRequest) {
+    TargetedBatchMap pendingBatches;
+    auto requests = constructARSRequestsToSend(
+        opCtx, targeter, childBatches, pendingBatches, stats, batchOp, boost::optional<bool>());
+    AsyncRequestsSender ars(opCtx,
+                            Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                            clientRequest.getNS().dbName(),
+                            requests,
+                            ReadPreferenceSetting(kPrimaryOnlyReadPreference),
+                            opCtx->isRetryableWrite() ? Shard::RetryPolicy::kIdempotent
+                                                      : Shard::RetryPolicy::kNoRetry,
+                            nullptr,
+                            {});
+
+    while (!ars.done()) {
+        auto response = ars.next();
+
+        // Get the TargetedWriteBatch to find where to put the response.
+        dassert(pendingBatches.find(response.shardId) != pendingBatches.end());
+        TargetedWriteBatch* batch = pendingBatches.find(response.shardId)->second.get();
+
+        const auto shardInfo =
+            response.shardHostAndPort ? response.shardHostAndPort->toString() : batch->getShardId();
+
+        BatchedCommandResponse batchedCommandResponse;
+        Status responseStatus = response.swResponse.getStatus();
+        if (responseStatus.isOK()) {
+            std::string errMsg;
+            if (!batchedCommandResponse.parseBSON(response.swResponse.getValue().data, &errMsg)) {
+                responseStatus = {ErrorCodes::FailedToParse, errMsg};
+            }
+            bool abortBatch = processResponseFromRemote(
+                opCtx, targeter, shardInfo, batchedCommandResponse, batchOp, batch, stats);
+            // Since we are not in a transaction we can not abort on Write Errors and the following
+            // value must be false.
+            dassert(abortBatch == false);
+
+            if (response.shardHostAndPort) {
+                // Remember that we successfully wrote to this shard
+                // NOTE: This will record lastOps for shards where we actually didn't update
+                // or delete any documents, which preserves old behavior but is conservative
+                stats->noteWriteAt(*response.shardHostAndPort,
+                                   batchedCommandResponse.isLastOpSet()
+                                       ? batchedCommandResponse.getLastOp()
+                                       : repl::OpTime(),
+                                   batchedCommandResponse.isElectionIdSet()
+                                       ? batchedCommandResponse.getElectionId()
+                                       : OID());
+            }
+            auto& targetedWrite = batch->getWrites().front();
+            auto& writeOp = batchOp.getWriteOp(targetedWrite->writeOpRef.first);
+            // The write op is complete if we receive ok:1 n:1 shard response and we can return
+            // early. Any pending child write ops would be marked NoOp.
+            if (writeOp.getWriteState() == WriteOpState_Completed) {
+                break;
+            }
+        } else {
+            bool abortBatch = processErrorResponseFromLocal(
+                opCtx, batchOp, batch, responseStatus, shardInfo, response.shardHostAndPort);
+            // Since we are not in a transaction we can not abort on Write Errors and the following
+            // value must be false.
+            dassert(abortBatch == false);
+        }
+    }
+
+    if (targeter.hasStaleShardResponse()) {
+        // If there were any stale shard responses, we will need to retry the whole batch and hence
+        // we cancel all writes.
+        for (auto& targetedWriteBatchMap : pendingBatches) {
+            auto& targetedWrite = targetedWriteBatchMap.second->getWrites().front();
+            auto& writeOp = batchOp.getWriteOp(targetedWrite->writeOpRef.first);
+            writeOp.resetWriteToReady();
+            // Since all targeted writes belong to one writeOp we can break the loop.
+            break;
+        }
+    }
+}
+
+void executeNonOrdinaryWriteChildBatches(OperationContext* opCtx,
+                                         NSTargeter& targeter,
+                                         BatchWriteOp& batchOp,
+                                         TargetedBatchMap& childBatches,
+                                         BatchWriteExecStats* stats,
+                                         const BatchedCommandRequest& clientRequest,
+                                         bool& abortBatch,
+                                         size_t& nextOpIndex,
+                                         WriteType writeType) {
+    switch (writeType) {
+        case WriteType::WithoutShardKeyOrId: {
+            // If the WriteType is 'WithoutShardKeyOrId', then we have detected an
+            // updateOne/deleteOne request without a shard key or _id. We will use a two phase
+            // protocol to apply the write.
+            tassert(6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);
+
+            auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+                opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+
+            // If there is only 1 targetable shard, we can skip using the two phase write
+            // protocol.
+            if (targeter.getNShardsOwningChunks() == 1) {
+                executeChildBatches(opCtx,
+                                    targeter,
+                                    clientRequest,
+                                    childBatches,
+                                    stats,
+                                    batchOp,
+                                    abortBatch,
+                                    allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+            } else {
+                // Execute the two phase write protocol for writes that cannot directly target a
+                // shard. If there are any transaction errors, 'abortBatch' will be set.
+                executeTwoPhaseWrite(opCtx,
+                                     targeter,
+                                     batchOp,
+                                     childBatches,
+                                     stats,
+                                     clientRequest,
+                                     abortBatch,
+                                     allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+            }
+            break;
+        }
+        case WriteType::WithoutShardKeyWithId:
+            executeNonTargetedSingleWriteWithoutShardKeyWithId(
+                opCtx, targeter, batchOp, childBatches, stats, clientRequest);
+            break;
+        case WriteType::TimeseriesRetryableUpdate:
+            // If the WriteType is 'TimeseriesRetryableUpdate', then we have detected
+            // a retryable time-series update request. We will run it in the internal
+            // transaction api and collect the response.
+            executeRetryableTimeseriesUpdate(opCtx,
+                                             targeter,
+                                             batchOp,
+                                             childBatches,
+                                             stats,
+                                             clientRequest,
+                                             abortBatch,
+                                             nextOpIndex);
+            break;
+        default:
+            MONGO_UNREACHABLE
+    }
+}
 }  // namespace
 
 void BatchWriteExec::executeBatch(OperationContext* opCtx,
@@ -639,8 +791,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         // If we've already had a targeting error, we've refreshed the metadata once and can
         // record target errors definitively.
         bool recordTargetErrors = refreshedTargeter;
-        auto targetStatus = batchOp.targetBatch(targeter, recordTargetErrors, &childBatches);
-        if (!targetStatus.isOK()) {
+        auto statusWithWriteType = batchOp.targetBatch(targeter, recordTargetErrors, &childBatches);
+        if (!statusWithWriteType.isOK()) {
             // Don't do anything until a targeter refresh
             targeter.noteCouldNotTarget();
             refreshedTargeter = true;
@@ -651,63 +803,19 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                 // Throw when there is a transient transaction error since this should be a top
                 // level error and not just a write error.
-                if (isTransientTransactionError(targetStatus.getStatus().code(),
+                if (isTransientTransactionError(statusWithWriteType.getStatus().code(),
                                                 false /* hasWriteConcernError */,
                                                 false /* isCommitOrAbort */)) {
-                    uassertStatusOK(targetStatus);
+                    uassertStatusOK(statusWithWriteType);
                 }
 
                 break;
             }
         } else {
-            if (targetStatus.getValue() == WriteType::TimeseriesRetryableUpdate) {
-                // If the targetStatus value is 'TimeseriesRetryableUpdate', then we have detected
-                // a retryable time-series update request. We will run it in the internal
-                // transaction api and collect the response.
-                executeRetryableTimeseriesUpdate(opCtx,
-                                                 targeter,
-                                                 batchOp,
-                                                 childBatches,
-                                                 stats,
-                                                 clientRequest,
-                                                 abortBatch,
-                                                 nextOpIndex);
-            } else if (feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                       targetStatus.getValue() == WriteType::WithoutShardKeyOrId) {
-                // If the targetStatus value is 'WithoutShardKeyOrId', then we have detected an
-                // updateOne/deleteOne request without a shard key or _id. We will use a two phase
-                // protocol to apply the write.
-                tassert(
-                    6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);
-
-                auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-                    opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
-
-                // If there is only 1 targetable shard, we can skip using the two phase write
-                // protocol.
-                if (targeter.getNShardsOwningChunks() == 1) {
-                    executeChildBatches(opCtx,
-                                        targeter,
-                                        clientRequest,
-                                        childBatches,
-                                        stats,
-                                        batchOp,
-                                        abortBatch,
-                                        allowShardKeyUpdatesWithoutFullShardKeyInQuery);
-                } else {
-                    // Execute the two phase write protocol for writes that cannot directly target a
-                    // shard. If there are any transaction errors, 'abortBatch' will be set.
-                    executeTwoPhaseWrite(opCtx,
-                                         targeter,
-                                         batchOp,
-                                         childBatches,
-                                         stats,
-                                         clientRequest,
-                                         abortBatch,
-                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery);
-                }
-            } else {
+            if (statusWithWriteType.getValue() == WriteType::Ordinary ||
+                (statusWithWriteType.getValue() == WriteType::WithoutShardKeyWithId &&
+                 !feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
+                     serverGlobalParams.featureCompatibility))) {
                 // Tries to execute all of the child batches. If there are any transaction errors,
                 // 'abortBatch' will be set.
                 executeChildBatches(
@@ -719,6 +827,16 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     batchOp,
                     abortBatch,
                     boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
+            } else {
+                executeNonOrdinaryWriteChildBatches(opCtx,
+                                                    targeter,
+                                                    batchOp,
+                                                    childBatches,
+                                                    stats,
+                                                    clientRequest,
+                                                    abortBatch,
+                                                    nextOpIndex,
+                                                    statusWithWriteType.getValue());
             }
         }
 

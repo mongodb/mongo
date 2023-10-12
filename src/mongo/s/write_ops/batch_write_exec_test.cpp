@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -460,6 +462,7 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(
@@ -764,6 +767,7 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(kShardName1,
@@ -882,6 +886,7 @@ TEST_F(BatchWriteExecTest,
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(kShardName1,
@@ -1009,6 +1014,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(kShardName1,
@@ -1146,6 +1152,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(kShardName1,
@@ -1278,6 +1285,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             if (targetAll) {
@@ -1987,6 +1995,199 @@ TEST_F(BatchWriteExecTest, PartialTenantMigrationErrorUnorderedOp) {
     future.default_timed_get();
 }
 
+
+TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyNoMatch) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    const static OID epoch = OID::gen();
+    const static Timestamp timestamp{2};
+
+    const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
+            *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+            return std::vector{ShardEndpoint(kShardName1,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none),
+                               ShardEndpoint(kShardName2,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none)};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        kNss,
+        {MockRange(ShardEndpoint(
+                       kShardName1,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(
+                       kShardName2,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 1));
+        entry.setU(
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("a" << 1))));
+        entry.setMulti(false);
+        updateOp.setUpdates({entry});
+        return updateOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, request, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setN(0);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setN(0);
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(0, response.getN());
+}
+
+TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyWithMatch) {
+    RAIIServerParameterControllerForTest _featureFlagController{
+        "featureFlagUpdateOneWithIdWithoutShardKey", true};
+
+    const static OID epoch = OID::gen();
+    const static Timestamp timestamp{2};
+
+    const NamespaceString kNss =
+        NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
+    class MultiShardTargeter : public MockNSTargeter {
+    public:
+        using MockNSTargeter::MockNSTargeter;
+
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            invariant(chunkRange == nullptr);
+            *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+            return std::vector{ShardEndpoint(kShardName1,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none),
+                               ShardEndpoint(kShardName2,
+                                             ShardVersionFactory::make(
+                                                 ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                                             boost::none)};
+        }
+    };
+
+    MultiShardTargeter multiShardNSTargeter(
+        kNss,
+        {MockRange(ShardEndpoint(
+                       kShardName1,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {100, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << MINKEY),
+                   BSON("x" << 0)),
+         MockRange(ShardEndpoint(
+                       kShardName2,
+                       ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {101, 200}),
+                                                 boost::optional<CollectionIndexes>(boost::none)),
+                       boost::none),
+                   BSON("x" << 0),
+                   BSON("x" << MAXKEY))});
+
+    BatchedCommandRequest request([&] {
+        write_ops::UpdateCommandRequest updateOp(kNss);
+        // Op style update.
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON("_id" << 2));
+        entry.setU(
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("$inc" << BSON("a" << 2))));
+        entry.setMulti(false);
+        updateOp.setUpdates({entry});
+        return updateOp;
+    }());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(
+            operationContext(), multiShardNSTargeter, request, &response, &stats);
+
+        return response;
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost1, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setN(1);
+
+        return response.toBSON();
+    });
+
+    onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(kTestShardHost2, request.target);
+
+        BatchedCommandResponse response;
+        response.setStatus(Status::OK());
+        response.setN(0);
+        return response.toBSON();
+    });
+
+    auto response = future.default_timed_get();
+    ASSERT_OK(response.getTopLevelStatus());
+    ASSERT_EQ(response.getN(), 1);
+}
+
 /**
  * Mimics a two shard backend with a targeting error on the first shard.
  */
@@ -2069,6 +2270,7 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRanges = nullptr) const override {
             return std::vector{ShardEndpoint(kShardName1,
                                              ShardVersionFactory::make(
@@ -2221,6 +2423,7 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(kShardName1,
@@ -2382,6 +2585,7 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
             OperationContext* opCtx,
             const BatchItemRef& itemRef,
             bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
             std::set<ChunkRange>* chunkRange = nullptr) const override {
             invariant(chunkRange == nullptr);
             return std::vector{ShardEndpoint(kShardName1,

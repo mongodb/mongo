@@ -60,12 +60,28 @@ enum WriteOpState {
     // responses
     WriteOpState_Pending,
 
+    // This is used for WriteType::WriteWithoutShardKeyWithId to defer responses for child write ops
+    // only until we are sure that there won't be a retry of broadcast.
+    WriteOpState_Deferred,
+
     // Op was successful, write completed
     // We assume all states higher than this one are *final*
     WriteOpState_Completed,
 
+    // This is used for WriteType::WriteWithoutShardKeyWithId for child write ops only when we
+    // decide we do not need to send the child op request or wait for its response from the targeted
+    // shard.
+    WriteOpState_NoOp,
+
     // Op failed with some error
     WriteOpState_Error,
+};
+
+enum class WriteType {
+    Ordinary,
+    TimeseriesRetryableUpdate,
+    WithoutShardKeyOrId,
+    WithoutShardKeyWithId,
 };
 
 /**
@@ -160,7 +176,8 @@ public:
     void targetWrites(OperationContext* opCtx,
                       const NSTargeter& targeter,
                       std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
-                      bool* useTwoPhaseWriteProtocol = nullptr);
+                      bool* useTwoPhaseWriteProtocol = nullptr,
+                      bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr);
 
     /**
      * Returns the number of child writes that were last targeted.
@@ -195,6 +212,12 @@ public:
     void noteWriteError(const TargetedWrite& targetedWrite, const write_ops::WriteError& error);
 
     /**
+     * Marks the write op complete if n is 1 along with transitioning any pending child write ops to
+     * WriteOpState::NoOp. If n is 0 then defers the state update of the child write op until later.
+     */
+    void noteWriteWithoutShardKeyWithIdResponse(const TargetedWrite& targetedWrite, int n);
+
+    /**
      * Sets the reply for this write op directly, and forces the state to _Completed.
      *
      * Should only be used when in state _Ready.
@@ -207,6 +230,13 @@ public:
      * Should only be used when in state _Ready.
      */
     void setOpError(const write_ops::WriteError& error);
+
+    /**
+     * Sets the WriteType for this WriteOp.
+     */
+    void setWriteType(WriteType writeType);
+
+    WriteType getWriteType();
 
     /**
      * Combines the pointed-to BulkWriteReplyItems into a single item. Used for merging the results
@@ -242,6 +272,8 @@ private:
 
     // stores the shards where this write operation succeeded
     absl::flat_hash_set<ShardId> _successfulShardSet;
+
+    WriteType _writeType{WriteType::Ordinary};
 };
 // First value is write item index in the batch, second value is child write op index
 typedef std::pair<int, int> WriteOpRef;

@@ -97,3 +97,9 @@ feature_flags:
     cpp_varname: feature_flags::gBalanceUnshardedCollections
     default: false
     shouldBeFCVGated: true
+  # TODO (SERVER-76291): Remove once 8.0 becomes last LTS.
+  featureFlagUpdateOneWithIdWithoutShardKey:
+    description: "Feature flag for updateOne and deleteOne with _id equality without shard key correctness during chunk migrations."
+    cpp_varname: feature_flags::gUpdateOneWithIdWithoutShardKey
+    default: false
+    shouldBeFCVGated: true

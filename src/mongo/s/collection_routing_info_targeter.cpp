@@ -75,6 +75,7 @@
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -422,6 +423,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     OperationContext* opCtx,
     const BatchItemRef& itemRef,
     bool* useTwoPhaseWriteProtocol,
+    bool* isNonTargetedWriteWithoutShardKeyWithExactId,
     std::set<ChunkRange>* chunkRanges) const {
     // If the update is replacement-style:
     // 1. Attempt to target using the query. If this fails, AND the query targets more than one
@@ -599,6 +601,10 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             updateOneOpStyleBroadcastWithExactIDCount.increment(1);
             if (isUpsert && useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
+            } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
+                       feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
+                           serverGlobalParams.featureCompatibility)) {
+                *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             }
         } else {
             if (useTwoPhaseWriteProtocol) {
@@ -832,6 +838,12 @@ void CollectionRoutingInfoTargeter::noteStaleDbResponse(OperationContext* opCtx,
     Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.dbName(),
                                                              staleInfo.getVersionWanted());
     _lastError = LastErrorType::kStaleDbVersion;
+}
+
+bool CollectionRoutingInfoTargeter::hasStaleShardResponse() {
+    return _lastError &&
+        (_lastError.value() == LastErrorType::kStaleShardVersion ||
+         _lastError.value() == LastErrorType::kStaleDbVersion);
 }
 
 bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {

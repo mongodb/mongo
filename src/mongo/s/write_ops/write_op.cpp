@@ -29,6 +29,7 @@
 
 #include "mongo/s/write_ops/write_op.h"
 
+#include "mongo/s/write_ops/batch_write_op.h"
 #include <absl/container/flat_hash_set.h>
 #include <algorithm>
 #include <boost/none.hpp>
@@ -43,6 +44,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -146,12 +148,16 @@ BulkWriteReplyItem WriteOp::takeBulkWriteReplyItem() {
 void WriteOp::targetWrites(OperationContext* opCtx,
                            const NSTargeter& targeter,
                            std::vector<std::unique_ptr<TargetedWrite>>* targetedWrites,
-                           bool* useTwoPhaseWriteProtocol) {
+                           bool* useTwoPhaseWriteProtocol,
+                           bool* isNonTargetedWriteWithoutShardKeyWithExactId) {
     auto endpoints = [&] {
         if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
             return std::vector{targeter.targetInsert(opCtx, _itemRef.getDocument())};
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            return targeter.targetUpdate(opCtx, _itemRef, useTwoPhaseWriteProtocol);
+            return targeter.targetUpdate(opCtx,
+                                         _itemRef,
+                                         useTwoPhaseWriteProtocol,
+                                         isNonTargetedWriteWithoutShardKeyWithExactId);
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
             return targeter.targetDelete(opCtx, _itemRef, useTwoPhaseWriteProtocol);
         }
@@ -183,7 +189,14 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         // Outside of a transaction, multiple endpoints currently imply no versioning, since we
         // can't retry half a regular multi-write.
         if (endpoints.size() > 1u && !inTransaction) {
-            endpoint.shardVersion->setPlacementVersionIgnored();
+            // Do not ignore shard version if this is an updateOne/deleteOne with exact _id
+            // equality.
+            if (!feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                (isNonTargetedWriteWithoutShardKeyWithExactId &&
+                 !*isNonTargetedWriteWithoutShardKeyWithExactId)) {
+                endpoint.shardVersion->setPlacementVersionIgnored();
+            }
         }
 
         const auto sampleId = targetedSampleId && targetedSampleId->isFor(endpoint)
@@ -219,7 +232,7 @@ void WriteOp::_updateOpState() {
     for (const auto& childOp : _childOps) {
         // Don't do anything till we have all the info. Unless we're in a transaction because
         // we abort aggresively whenever we get an error during a transaction.
-        if (childOp.state != WriteOpState_Completed && childOp.state != WriteOpState_Error) {
+        if (childOp.state < WriteOpState_Deferred) {
             hasPendingChild = true;
 
             if (!_inTxn) {
@@ -307,6 +320,27 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
     _updateOpState();
 }
 
+void WriteOp::noteWriteWithoutShardKeyWithIdResponse(const TargetedWrite& targetedWrite, int n) {
+    dassert(n == 0 || n == 1);
+    if (n == 0) {
+        // Defer the completion of this child WriteOp until later when we are sure that we do not
+        // need to retry them due to StaleConfig or StaleDBVersion.
+        const WriteOpRef& ref = targetedWrite.writeOpRef;
+        auto& childOp = _childOps[ref.second];
+        childOp.state = WriteOpState_Deferred;
+    } else {
+        noteWriteComplete(targetedWrite);
+        for (auto& childOp : _childOps) {
+            dassert(childOp.parentOp->_writeType == WriteType::WithoutShardKeyWithId);
+            if (childOp.state == WriteOpState_Pending) {
+                childOp.state = WriteOpState_NoOp;
+            }
+        }
+    }
+    // TODO: SERVER-80839 handle write errors here.
+    _updateOpState();
+}
+
 void WriteOp::setOpComplete(boost::optional<BulkWriteReplyItem> bulkWriteReplyItem) {
     dassert(_state == WriteOpState_Ready);
     _bulkWriteReplyItem = std::move(bulkWriteReplyItem);
@@ -323,6 +357,14 @@ void WriteOp::setOpError(const write_ops::WriteError& error) {
     _error->setIndex(_itemRef.getItemIndex());
     _state = WriteOpState_Error;
     // No need to updateOpState, set directly
+}
+
+void WriteOp::setWriteType(WriteType writeType) {
+    _writeType = writeType;
+}
+
+WriteType WriteOp::getWriteType() {
+    return _writeType;
 }
 
 boost::optional<BulkWriteReplyItem> WriteOp::combineBulkWriteReplyItems(

@@ -539,6 +539,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     auto res = criTargeter.targetUpdate(operationContext(),
                                         BatchItemRef(&request, 0),
                                         nullptr /* useTwoPhaseWriteProtocol */,
+                                        nullptr,
                                         checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "2");
@@ -557,6 +558,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestAndSet, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
+                                   nullptr,
                                    checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "3");
@@ -572,6 +574,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestLT, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
+                                   nullptr,
                                    checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
@@ -589,6 +592,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestOpUpdate, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
+                                   nullptr,
                                    checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 5);
     if (checkChunkRanges) {
@@ -618,6 +622,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestReplUpdate, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
+                                   nullptr,
                                    checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "1");
@@ -637,6 +642,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     ASSERT_THROWS_CODE(criTargeter.targetUpdate(operationContext(),
                                                 BatchItemRef(&requestFullKey, 0),
                                                 nullptr /* useTwoPhaseWriteProtocol */,
+                                                nullptr,
                                                 checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::ShardKeyNotFound);
@@ -647,6 +653,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithRangePrefixHashedSha
     res = criTargeter.targetUpdate(operationContext(),
                                    BatchItemRef(&requestSuccess, 0),
                                    nullptr /* useTwoPhaseWriteProtocol */,
+                                   nullptr,
                                    checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     ASSERT_EQUALS(res[0].shardName, "4");
@@ -692,6 +699,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
         const auto res = criTargeter.targetUpdate(operationContext(),
                                                   BatchItemRef(&request, 0),
                                                   nullptr /* useTwoPhaseWriteProtocol */,
+                                                  nullptr,
                                                   checkChunkRanges ? &chunkRanges : nullptr);
         ASSERT_EQUALS(res.size(), 1);
         auto chunk = findChunk(updateQueryObj["a"]["b"]);
@@ -711,6 +719,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
     auto res = criTargeter.targetUpdate(operationContext(),
                                         BatchItemRef(&requestUpdate, 0),
                                         nullptr /* useTwoPhaseWriteProtocol */,
+                                        nullptr,
                                         checkChunkRanges ? &chunkRanges : nullptr);
     ASSERT_EQUALS(res.size(), 1);
     auto chunk = findChunk(updateObj["a"]["b"]);
@@ -726,6 +735,7 @@ void CollectionRoutingInfoTargeterTest::testTargetUpdateWithHashedPrefixHashedSh
     ASSERT_THROWS_CODE(criTargeter.targetUpdate(operationContext(),
                                                 BatchItemRef(&requestErr, 0),
                                                 nullptr /* useTwoPhaseWriteProtocol */,
+                                                nullptr,
                                                 checkChunkRanges ? &chunkRanges : nullptr),
                        DBException,
                        ErrorCodes::InvalidOptions);

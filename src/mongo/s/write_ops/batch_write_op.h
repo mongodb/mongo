@@ -93,12 +93,6 @@ struct ShardWCError {
 
 using TargetedBatchMap = std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>;
 
-enum class WriteType {
-    Ordinary,
-    WithoutShardKeyOrId,
-    TimeseriesRetryableUpdate,
-};
-
 /**
  * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
  * item in a batch is tracked via a WriteOp, and the function of the BatchWriteOp is to
@@ -214,6 +208,11 @@ public:
     int numWriteOpsIn(WriteOpState state) const;
 
     boost::optional<int> getNShardsOwningChunks();
+
+    /**
+     * Returns the WriteOp with index referencing the write item in the batch.
+     */
+    WriteOp& getWriteOp(int index);
 
 private:
     /**

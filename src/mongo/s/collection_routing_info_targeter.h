@@ -105,6 +105,7 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const override;
 
     /**
@@ -132,6 +133,11 @@ public:
     void noteStaleDbResponse(OperationContext* opCtx,
                              const ShardEndpoint& endpoint,
                              const StaleDbRoutingVersion& staleInfo) override;
+
+    /**
+     * Returns if _lastError is StaleConfig type.
+     */
+    bool hasStaleShardResponse() override;
 
     /**
      * Replaces the targeting information with the latest information from the cache.  If this

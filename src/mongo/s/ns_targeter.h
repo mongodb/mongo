@@ -92,6 +92,7 @@ public:
         OperationContext* opCtx,
         const BatchItemRef& itemRef,
         bool* useTwoPhaseWriteProtocol = nullptr,
+        bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
         std::set<ChunkRange>* chunkRanges = nullptr) const = 0;
 
     /**
@@ -124,7 +125,7 @@ public:
      *
      * Any stale responses noted here will be taken into account on the next refresh.
      *
-     * If stale responses are is noted, we must not have noted that we cannot target.
+     * If stale responses are noted, we must not have noted that we cannot target.
      */
     virtual void noteStaleShardResponse(OperationContext* opCtx,
                                         const ShardEndpoint& endpoint,
@@ -141,6 +142,8 @@ public:
     virtual void noteStaleDbResponse(OperationContext* optCtx,
                                      const ShardEndpoint& endpoint,
                                      const StaleDbRoutingVersion& staleInfo) = 0;
+
+    virtual bool hasStaleShardResponse() = 0;
 
     /**
      * Refreshes the targeting metadata for the namespace if needed, based on previously-noted
