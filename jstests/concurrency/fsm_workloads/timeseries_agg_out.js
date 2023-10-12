@@ -16,7 +16,6 @@
  *   featureFlagAggOutTimeseries
  * ]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/agg_out.js';
@@ -57,10 +56,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                                          // already exists. This error is not caught because the
                                          // view is being dropped by a previous thread.
         ];
-        assertWhenOwnDB.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
+        assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
         if (res.ok) {
             const cursor = new DBCommandCursor(db, res);
-            assertAlways.eq(0, cursor.itcount());  // No matter how many documents were in the
+            assert.eq(0, cursor.itcount());  // No matter how many documents were in the
             // original input stream, $out should never return any results.
         }
     };
@@ -75,7 +74,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             expireAfterSeconds = Random.rand();
         }
 
-        assertWhenOwnDB.commandWorkedOrFailedWithCode(
+        assert.commandWorkedOrFailedWithCode(
             db.runCommand({collMod: this.outputCollName, expireAfterSeconds: expireAfterSeconds}),
             [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.NamespaceNotFound]);
     };
@@ -87,7 +86,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (isMongos(db)) {
             return;  // convertToCapped can't be run against a mongos.
         }
-        assertWhenOwnDB.commandFailedWithCode(
+        assert.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
             ErrorCodes.CommandNotSupportedOnView);
     };
@@ -95,14 +94,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function teardown(db) {
         const collNames = db.getCollectionNames();
         // Ensure that a temporary collection is not left behind.
-        assertAlways.eq(db.getCollectionNames()
-                            .filter(col => col.includes('system.buckets.tmp.agg_out'))
-                            .length,
-                        0);
+        assert.eq(db.getCollectionNames()
+                      .filter(col => col.includes('system.buckets.tmp.agg_out'))
+                      .length,
+                  0);
 
         // Ensure that for the buckets collection there is a corresponding view.
-        assertAlways(!(collNames.includes('system.buckets.timeseries_agg_out') &&
-                       !collNames.includes('timeseries_agg_out')));
+        assert(!(collNames.includes('system.buckets.timeseries_agg_out') &&
+                 !collNames.includes('timeseries_agg_out')));
     };
 
     /**
@@ -110,7 +109,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.setup = function setup(db, collName, cluster) {
         db[collName].drop();
-        assertWhenOwnDB.commandWorked(db.createCollection(
+        assert.commandWorked(db.createCollection(
             collName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
         const docs = [];
         for (let i = 0; i < numDocs; ++i) {
@@ -119,8 +118,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 [metaFieldName]: (this.tid * numDocs) + i,
             });
         }
-        assertWhenOwnDB.commandWorked(
-            db.runCommand({insert: collName, documents: docs, ordered: false}));
+        assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
     };
 
     return $config;

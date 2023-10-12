@@ -3,7 +3,6 @@
  *
  * Tests updates that specify upsert=true.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     let states = {
@@ -11,12 +10,12 @@ export const $config = (function() {
             const docId = Random.randInt(5) * 4;
             let updateRes =
                 assert.writeOK(db[collName].update({_id: docId}, {$inc: {x: 1}}, {upsert: true}));
-            assertAlways.eq(1,
-                            updateRes.nMatched + updateRes.nUpserted,
-                            "unexpected matched count: " + updateRes);
-            assertAlways.eq(1,
-                            updateRes.nModified + updateRes.nUpserted,
-                            "unexpected modified count: " + updateRes);
+            assert.eq(1,
+                      updateRes.nMatched + updateRes.nUpserted,
+                      "unexpected matched count: " + updateRes);
+            assert.eq(1,
+                      updateRes.nModified + updateRes.nUpserted,
+                      "unexpected modified count: " + updateRes);
         },
     };
 
@@ -25,8 +24,8 @@ export const $config = (function() {
     };
 
     function teardown(db, collName, cluster) {
-        assertAlways.eq(0, db[collName].countDocuments({_id: {$nin: [0, 4, 8, 12, 16]}}));
-        assertAlways.lt(0, db[collName].countDocuments({_id: {$in: [0, 4, 8, 12, 16]}}));
+        assert.eq(0, db[collName].countDocuments({_id: {$nin: [0, 4, 8, 12, 16]}}));
+        assert.lt(0, db[collName].countDocuments({_id: {$in: [0, 4, 8, 12, 16]}}));
     }
 
     return {

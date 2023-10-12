@@ -11,7 +11,6 @@
  *  ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     uniformDistTransitions
@@ -24,7 +23,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const targetFCV = fcvValues[Random.randInt(3)];
         jsTestLog('Executing FCV state, setting to:' + targetFCV);
         try {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setFeatureCompatibilityVersion: targetFCV, confirm: true}));
         } catch (e) {
             if (e.code === 5147403) {
@@ -35,7 +34,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             if (e.code === 7428200) {
                 // Cannot upgrade FCV if a previous FCV downgrade stopped in the middle of cleaning
                 // up internal server metadata.
-                assertAlways.eq(latestFCV, targetFCV);
+                assert.eq(latestFCV, targetFCV);
                 jsTestLog(
                     'setFCV: Cannot upgrade FCV if a previous FCV downgrade stopped in the middle \
                     of cleaning up internal server metadata');

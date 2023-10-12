@@ -11,7 +11,6 @@
  */
 import "jstests/libs/parallelTester.js";
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -48,9 +47,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (let i = this.latchCount; i >= 0; --i) {
             const latchCollName = collName + '_' + i;
             let coll = db.getCollection(latchCollName);
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
-            assertAlways.commandWorked(coll.createIndex(this.newShardKey));
+            assert.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }
     };
@@ -77,7 +76,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 key: this.newShardKey
             };
 
-            assertAlways.commandWorked(db.adminCommand(cmdObj));
+            assert.commandWorked(db.adminCommand(cmdObj));
         } catch (e) {
             // There is a race that could occur where two threads run refineCollectionShardKey
             // concurrently on the same collection. Since the epoch of the collection changes,

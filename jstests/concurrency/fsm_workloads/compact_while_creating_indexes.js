@@ -7,7 +7,6 @@
  * @tags: [requires_compact, does_not_support_wiredtiger_lsm]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 // TODO(SERVER-81114): re-enable the buildInfo checks below when the cache eviction issue is
@@ -32,16 +31,16 @@ export const $config = (function() {
                 bulk.insert({x: i});
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(nDocumentsToInsert, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(nDocumentsToInsert, res.nInserted);
         }
 
         function compact(db, collName) {
             let res = db.runCommand({compact: collName, force: true});
             if (!isEphemeral(db)) {
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             } else {
-                assertAlways.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+                assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
             }
         }
 

@@ -8,7 +8,7 @@
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
 
-import {assertAlways, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedOrFailedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
@@ -41,8 +41,8 @@ export const $config = (function() {
                     bulk.insert({});
                 }
                 let res = bulk.execute();
-                assertAlways.commandWorked(res);
-                assertAlways.eq(this.numDocs, res.nInserted, tojson(res));
+                assert.commandWorked(res);
+                assert.eq(this.numDocs, res.nInserted, tojson(res));
             } catch (ex) {
                 assert.eq(true, ex instanceof BulkWriteError);
                 assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
@@ -126,7 +126,7 @@ export const $config = (function() {
                 explain: {find: this.chooseRandomlyFrom(this.involvedCollections), filter: {}},
                 verbosity: "executionStats"
             });
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         },
 
         /**
@@ -146,7 +146,7 @@ export const $config = (function() {
             this.killRandomGetMore(myDB, function(toKill) {
                 const res = myDB.runCommand(
                     {killCursors: toKill.command.collection, cursors: [toKill.command.getMore]});
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             });
         },
 
@@ -155,7 +155,7 @@ export const $config = (function() {
             // Not checking return value since the operation may end on its own before we have
             // a chance to kill it.
             this.killRandomGetMore(myDB, function(toKill) {
-                assertAlways.commandWorked(myDB.killOp(toKill.opid));
+                assert.commandWorked(myDB.killOp(toKill.opid));
             });
         },
 
@@ -178,13 +178,13 @@ export const $config = (function() {
                     // The getMore request can fail if the database, a collection, or an index was
                     // dropped. It can also fail if another thread kills it through killCursor or
                     // killOp.
-                    assertAlways.contains(e.code,
-                                          [
-                                              ...interruptedQueryErrors,
-                                              ErrorCodes.NamespaceNotFound,
-                                              ErrorCodes.OperationFailed
-                                          ],
-                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(e.code,
+                                    [
+                                        ...interruptedQueryErrors,
+                                        ErrorCodes.NamespaceNotFound,
+                                        ErrorCodes.OperationFailed
+                                    ],
+                                    'unexpected error code: ' + e.code + ': ' + e.message);
                 }
             }
         },
@@ -250,7 +250,7 @@ export const $config = (function() {
             myDB[targetColl].dropIndex(indexSpec);
 
             // Re-create the index that was dropped.
-            assertAlways.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec), [
+            assert.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec), [
                 ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
@@ -286,7 +286,7 @@ export const $config = (function() {
         let myDB = unusedDB.getSiblingDB(this.uniqueDBName);
         this.involvedCollections.forEach(collName => {
             this.populateDataAndIndexes(myDB, collName);
-            assertAlways.eq(this.numDocs, myDB[collName].find({}).itcount());
+            assert.eq(this.numDocs, myDB[collName].find({}).itcount());
         });
     }
 

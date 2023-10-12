@@ -8,8 +8,6 @@
  * ]
  *
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
@@ -18,14 +16,14 @@ export const $config = (function() {
         function write(db, collName) {
             const coll = db[collName];
             const i = Random.randInt(499) * 2;
-            assertAlways.writeOK(coll.update({i: i}, {$set: {i: 2000}}, {multi: true}));
-            assertAlways.writeOK(coll.remove({i: 2000}));
-            assertAlways.writeOK(coll.save({i: i}));
+            assert.writeOK(coll.update({i: i}, {$set: {i: 2000}}, {multi: true}));
+            assert.writeOK(coll.remove({i: 2000}));
+            assert.writeOK(coll.save({i: i}));
         }
 
         function count(db, collName) {
             const num_odd_doc = db[collName].countDocuments({i: {$mod: [2, 1]}});
-            assertAlways.eq(500, num_odd_doc);
+            assert.eq(500, num_odd_doc);
         }
 
         return {init: init, write: write, count: count};

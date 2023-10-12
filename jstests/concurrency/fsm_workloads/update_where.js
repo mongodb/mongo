@@ -5,7 +5,6 @@
  * thread and updates them. Also queries by the thread that created the documents to verify counts.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_where.js";
 
@@ -24,10 +23,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             },
             {$set: {x: Random.randInt(this.randomBound)}},
             {multi: true});
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
 
-        assertWhenOwnColl.gte(res.nModified, 0);
-        assertWhenOwnColl.lte(res.nModified, this.insertedDocuments);
+        assert.gte(res.nModified, 0);
+        assert.lte(res.nModified, this.insertedDocuments);
     };
 
     $config.transitions = {

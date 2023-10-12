@@ -6,8 +6,6 @@
  *
  * @tags: [requires_capped]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
@@ -15,12 +13,12 @@ export const $config = (function() {
         var doc = {_id: new ObjectId(), field: ''};
 
         var size = Object.bsonsize(doc);
-        assertAlways.gte(targetSize, size);
+        assert.gte(targetSize, size);
 
         // Set 'field' as a string with enough characters
         // to make the whole document 'size' bytes long
         doc.field = new Array(targetSize - size + 1).join('x');
-        assertAlways.eq(targetSize, Object.bsonsize(doc));
+        assert.eq(targetSize, Object.bsonsize(doc));
 
         return doc;
     }
@@ -31,8 +29,8 @@ export const $config = (function() {
         var doc = makeDocWithSize(targetSize);
 
         var res = db[collName].insert(doc);
-        assertAlways.commandWorked(res);
-        assertAlways.eq(1, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(1, res.nInserted);
 
         return doc._id;
     }
@@ -72,10 +70,10 @@ export const $config = (function() {
             var foundIds = this.getObjectIds(db, myCollName);
             var count = foundIds.length;
 
-            assertWhenOwnDB.lt(count, threshold, 'expected at least one truncation to occur');
-            assertWhenOwnDB.eq(insertedIds.slice(insertedIds.length - count),
-                               foundIds,
-                               'expected truncation to remove the oldest documents');
+            assert.lt(count, threshold, 'expected at least one truncation to occur');
+            assert.eq(insertedIds.slice(insertedIds.length - count),
+                      foundIds,
+                      'expected truncation to remove the oldest documents');
         }
     };
 
@@ -96,7 +94,7 @@ export const $config = (function() {
         // TODO: how to avoid having too many files open?
         function create(db, collName) {
             var myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
-            assertAlways.commandWorked(db.createCollection(myCollName, options));
+            assert.commandWorked(db.createCollection(myCollName, options));
 
             this.verifySizeTruncation(db, myCollName, options);
         }

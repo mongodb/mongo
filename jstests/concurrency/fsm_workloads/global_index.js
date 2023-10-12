@@ -7,8 +7,6 @@
  *     requires_replication
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const data = {
         uuidArr: ["47b5c083-8d60-4920-90e2-ba3ff668c371", "8acc9ba2-2d8f-4b01-b835-8f1818c1df1c"],
@@ -42,13 +40,13 @@ export const $config = (function() {
 
         createGlobalIndex: function createGlobalIndex(db, collName) {
             // _shardsvrCreateGlobalIndex is idempotent, we don't expect any failures.
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({_shardsvrCreateGlobalIndex: getUUID(this.uuidArr)}));
         },
 
         dropGlobalIndex: function dropGlobalIndex(db, collName) {
             // _shardsvrDropGlobalIndex is idempotent, we don't expect any failures.
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({_shardsvrDropGlobalIndex: getUUID(this.uuidArr)}));
         },
 
@@ -56,7 +54,7 @@ export const $config = (function() {
             const i = randInt(this.range);
             try {
                 this.session.startTransaction();
-                assertAlways.commandWorked(this.sessionDb.runCommand({
+                assert.commandWorked(this.sessionDb.runCommand({
                     "_shardsvrInsertGlobalIndexKey": getUUID(this.uuidArr),
                     key: {a: i},
                     docKey: {sk: 1, _id: i}
@@ -74,7 +72,7 @@ export const $config = (function() {
             const i = randInt(this.range);
             try {
                 this.session.startTransaction();
-                assertAlways.commandWorked(this.sessionDb.runCommand({
+                assert.commandWorked(this.sessionDb.runCommand({
                     "_shardsvrDeleteGlobalIndexKey": getUUID(this.uuidArr),
                     key: {a: i},
                     docKey: {sk: 1, _id: i}
@@ -96,12 +94,12 @@ export const $config = (function() {
             const uuid = getUUID(this.uuidArr);
             try {
                 this.session.startTransaction();
-                assertAlways.commandWorked(this.sessionDb.runCommand({
+                assert.commandWorked(this.sessionDb.runCommand({
                     "_shardsvrDeleteGlobalIndexKey": uuid,
                     key: {a: deleteKey},
                     docKey: {sk: 1, _id: i}
                 }));
-                assertAlways.commandWorked(this.sessionDb.runCommand({
+                assert.commandWorked(this.sessionDb.runCommand({
                     "_shardsvrInsertGlobalIndexKey": uuid,
                     key: {a: insertKey},
                     docKey: {sk: 1, _id: i}
@@ -129,7 +127,7 @@ export const $config = (function() {
                 }
 
                 this.session.startTransaction();
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     this.sessionDb.runCommand({_shardsvrWriteGlobalIndexKeys: 1, ops: ops}));
                 this.session.commitTransaction();
             } catch (e) {
@@ -154,7 +152,7 @@ export const $config = (function() {
                 }
 
                 this.session.startTransaction();
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     this.sessionDb.runCommand({_shardsvrWriteGlobalIndexKeys: 1, ops: ops}));
                 this.session.commitTransaction();
             } catch (e) {

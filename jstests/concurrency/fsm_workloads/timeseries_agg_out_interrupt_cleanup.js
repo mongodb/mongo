@@ -13,7 +13,6 @@
  *   featureFlagAggOutTimeseries
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -65,12 +64,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function teardown(db) {
         const collNames = db.getCollectionNames();
         // Ensure that a temporary collection is not left behind.
-        assertAlways.eq(
-            collNames.filter(coll => coll.includes('system.buckets.tmp.agg_out')).length, 0);
+        assert.eq(collNames.filter(coll => coll.includes('system.buckets.tmp.agg_out')).length, 0);
 
         // Ensure that for the buckets collection there is a corresponding view.
-        assertAlways(!(collNames.includes('system.buckets.interrupt_temp_out') &&
-                       !collNames.includes('interrupt_temp_out')));
+        assert(!(collNames.includes('system.buckets.interrupt_temp_out') &&
+                 !collNames.includes('interrupt_temp_out')));
     };
 
     /**

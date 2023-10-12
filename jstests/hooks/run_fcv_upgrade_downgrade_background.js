@@ -9,8 +9,6 @@ if (typeof db === 'undefined') {
         "Expected mongo shell to be connected a server, but global 'db' object isn't defined");
 }
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 // Disable implicit sessions so FSM workloads that kill random sessions won't interrupt the
 // operations in this test that aren't resilient to interruptions.
 TestData.disableImplicitSessions = true;
@@ -37,7 +35,7 @@ const sendFCVUpDown = function(ver) {
         if (e.code === 7428200) {
             // Cannot upgrade FCV if a previous FCV downgrade stopped in the middle of cleaning
             // up internal server metadata.
-            assertAlways.eq(latestFCV, ver);
+            assert.eq(latestFCV, ver);
             jsTestLog(
                 'setFCV: Cannot upgrade FCV if a previous FCV downgrade stopped in the middle \
 				of cleaning up internal server metadata');

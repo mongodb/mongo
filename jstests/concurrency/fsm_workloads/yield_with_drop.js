@@ -1,7 +1,6 @@
 /**
  * Executes query operations that can yield while the source collection is dropped and recreated.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const data = {
@@ -27,14 +26,13 @@ export const $config = (function() {
             function assertWriteWorkedOrFailedWithExpectedCode(cmdRes) {
                 if (cmdRes.ok) {
                     if (cmdRes.hasOwnProperty("writeErrors") && cmdRes.writeErrors.length > 0) {
-                        assertAlways(this.kAllowedErrors.includes(cmdRes.writeErrors[0].code),
-                                     cmdRes);
+                        assert(this.kAllowedErrors.includes(cmdRes.writeErrors[0].code), cmdRes);
                     }
 
                     return;
                 }
 
-                assertAlways.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
+                assert.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
             },
         create: function create(db, collName) {
             for (let i = 0; i < this.nDocs; i++) {
@@ -48,8 +46,8 @@ export const $config = (function() {
                 });
                 this.assertWriteWorkedOrFailedWithExpectedCode(cmdRes);
             }
-            assertAlways.commandWorkedOrFailedWithCode(db[collName].createIndex({a: 1}),
-                                                       this.kAllowedErrors);
+            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({a: 1}),
+                                                 this.kAllowedErrors);
         }
     };
 
@@ -57,11 +55,11 @@ export const $config = (function() {
         query: function query(db, collName) {
             let cmdRes = db.runCommand(
                 {find: collName, filter: {c: {$lt: this.nDocs}}, batchSize: this.nDocs});
-            assertAlways.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
+            assert.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
 
             if (cmdRes.hasOwnProperty("cursor") && cmdRes.cursor.id > 0) {
                 cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName});
-                assertAlways.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
+                assert.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
             }
         },
 
@@ -83,13 +81,13 @@ export const $config = (function() {
 
         count: function count(db, collName) {
             const cmdRes = db.runCommand({count: collName, query: {a: {$lt: this.nDocs}}});
-            assertAlways.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
+            assert.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
         },
 
         distinct: function distinct(db, collName) {
             const cmdRes =
                 db.runCommand({distinct: collName, key: "a", query: {a: {$lt: this.nDocs}}});
-            assertAlways.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
+            assert.commandWorkedOrFailedWithCode(cmdRes, this.kAllowedErrors);
         },
 
         recreateColl: function recreateColl(db, collName) {
@@ -115,9 +113,9 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // Lower the following parameters to force even more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
         });
 
@@ -129,9 +127,9 @@ export const $config = (function() {
      */
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function resetYieldParams(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
         });
     }

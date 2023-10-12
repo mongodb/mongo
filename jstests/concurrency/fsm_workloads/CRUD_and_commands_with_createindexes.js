@@ -6,7 +6,6 @@
  * @tags: [
  * ]
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/CRUD_and_commands.js";
 
@@ -23,7 +22,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             let created = false;
             while (!created) {
                 try {
-                    assertWhenOwnColl.commandWorked(db[collName].createIndex({_id: 1}));
+                    assert.commandWorked(db[collName].createIndex({_id: 1}));
                     created = true;
                 } catch (e) {
                     if (e.code != ErrorCodes.ConflictingOperationInProgress) {

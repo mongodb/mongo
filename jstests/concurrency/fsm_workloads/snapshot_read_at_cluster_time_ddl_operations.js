@@ -9,11 +9,7 @@
  *   requires_replication,
  * ]
  */
-import {
-    assertAlways,
-    assertWhenOwnColl,
-    interruptedQueryErrors
-} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFindAtClusterTime,
     doSnapshotGetMoreAtClusterTime
@@ -36,8 +32,8 @@ export const $config = (function() {
         insertDocs: function insertDocs(db, collName) {
             for (let i = 0; i < this.numDocsToInsertPerThread; ++i) {
                 const res = db[collName].insert({x: 1});
-                assertWhenOwnColl.commandWorked(res);
-                assertWhenOwnColl.eq(1, res.nInserted);
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted);
             }
         },
 
@@ -47,9 +43,9 @@ export const $config = (function() {
                     db[collName].update({a: i}, {$inc: {x: 1}});
                 } catch (e) {
                     // dropIndex can cause queries to throw if these queries yield.
-                    assertAlways.contains(e.code,
-                                          [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(e.code,
+                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                    'unexpected error code: ' + e.code + ': ' + e.message);
                 }
             }
         },
@@ -60,9 +56,9 @@ export const $config = (function() {
                     db[collName].findOne({a: i});
                 } catch (e) {
                     // dropIndex can cause queries to throw if these queries yield.
-                    assertAlways.contains(e.code,
-                                          [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(e.code,
+                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                    'unexpected error code: ' + e.code + ': ' + e.message);
                 }
             }
         },
@@ -73,9 +69,9 @@ export const $config = (function() {
                 db[collName].deleteOne({a: indexToDelete});
             } catch (e) {
                 // dropIndex can cause queries to throw if these queries yield.
-                assertAlways.contains(e.code,
-                                      [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                      'unexpected error code: ' + e.code + ': ' + e.message);
+                assert.contains(e.code,
+                                [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                'unexpected error code: ' + e.code + ': ' + e.message);
             }
         },
 
@@ -124,7 +120,7 @@ export const $config = (function() {
                     db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
             });
         }
-        assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
         const docs = [...Array(this.numIds).keys()].map((i) => ({a: i, x: 1}));
         assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
         assert.commandWorked(

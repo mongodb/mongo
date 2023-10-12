@@ -3,7 +3,6 @@
  *
  * State function that kills a random session from config.system.sessions.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {KilledSessionUtil} from "jstests/libs/killed_session_util.js";
 
 export function killSession(db, collName) {
@@ -15,7 +14,7 @@ export function killSession(db, collName) {
         try {
             let res = db.adminCommand({refreshLogicalSessionCacheNow: 1});
             if (res.ok === 1) {
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             } else if (res.code === 18630 || res.code === 18631) {
                 // Refreshing the logical session cache may trigger sharding the sessions
                 // collection, which can fail with 18630 or 18631 if its session is killed while
@@ -24,7 +23,7 @@ export function killSession(db, collName) {
                 ourSessionWasKilled = true;
                 continue;
             } else {
-                assertAlways.commandFailedWithCode(
+                assert.commandFailedWithCode(
                     res,
                     [ErrorCodes.DuplicateKey, ErrorCodes.WriteConcernFailed],
                     'unexpected error code: ' + res.code + ': ' + res.message);
@@ -42,7 +41,7 @@ export function killSession(db, collName) {
 
             const sessionUUID = sessionToKill.toArray()[0]._id.id;
             res = db.runCommand({killSessions: [{id: sessionUUID}]});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         } catch (e) {
             if (KilledSessionUtil.isKilledSessionCode(e.code)) {
                 // This session was killed when running either listSessions or killSesssions.

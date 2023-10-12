@@ -12,7 +12,6 @@
  *
  * @tags: [requires_capped]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
@@ -71,13 +70,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             17152,                        // namespace is capped so it can't be used for $out.
             28769,                        // $out collection cannot be sharded.
         ];
-        assertWhenOwnDB.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
+        assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
 
         if (res.ok) {
             const cursor = new DBCommandCursor(db, res);
-            assertAlways.eq(0, cursor.itcount());  // No matter how many documents were in the
-                                                   // original input stream, $out should never
-                                                   // return any results.
+            assert.eq(0, cursor.itcount());  // No matter how many documents were in the
+                                             // original input stream, $out should never
+                                             // return any results.
         }
     };
 
@@ -87,7 +86,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.createIndexes = function createIndexes(db, unusedCollName) {
         for (var i = 0; i < this.indexSpecs; ++i) {
-            assertWhenOwnDB.commandWorked(db[this.outputCollName].createIndex(this.indexSpecs[i]));
+            assert.commandWorked(db[this.outputCollName].createIndex(this.indexSpecs[i]));
         }
     };
 
@@ -107,17 +106,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Change the validation level.
             const validationLevels = ['off', 'strict', 'moderate'];
             const newValidationLevel = validationLevels[Random.randInt(validationLevels.length)];
-            assertWhenOwnDB.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: this.outputCollName, validationLevel: newValidationLevel}),
                 ErrorCodes.ConflictingOperationInProgress);
         } else {
             // Change the validation action.
-            assertWhenOwnDB.commandWorkedOrFailedWithCode(
-                db.runCommand({
-                    collMod: this.outputCollName,
-                    validationAction: Random.rand() > 0.5 ? 'warn' : 'error'
-                }),
-                ErrorCodes.ConflictingOperationInProgress);
+            assert.commandWorkedOrFailedWithCode(db.runCommand({
+                collMod: this.outputCollName,
+                validationAction: Random.rand() > 0.5 ? 'warn' : 'error'
+            }),
+                                                 ErrorCodes.ConflictingOperationInProgress);
         }
     };
 
@@ -130,8 +128,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             return;  // convertToCapped can't be run against a mongos.
         }
 
-        assertWhenOwnDB.commandWorked(
-            db.runCommand({convertToCapped: this.outputCollName, size: 100000}));
+        assert.commandWorked(db.runCommand({convertToCapped: this.outputCollName, size: 100000}));
     };
 
     /**
@@ -142,8 +139,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
         if (isMongos(db) && this.tid === 0) {
-            assertWhenOwnDB.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assertWhenOwnDB.commandWorked(db.adminCommand(
+            assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
+            assert.commandWorked(db.adminCommand(
                 {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}));
         }
     };
@@ -156,7 +153,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // `shardCollection()` requires a shard key index to be in place on the output collection,
         // as we may be sharding a non-empty collection.
-        assertWhenOwnDB.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
+        assert.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
     };
 
     return $config;

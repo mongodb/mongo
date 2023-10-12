@@ -5,8 +5,6 @@
  * @tags: [
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const data = {numIds: 10, docValue: "mydoc"};
 
@@ -20,8 +18,8 @@ export const $config = (function() {
             try {
                 for (let i = 0; i < 5; i++) {
                     const res = db[collName].insert({value: this.docValue, num: 1});
-                    assertWhenOwnColl.commandWorked(res);
-                    assertWhenOwnColl.eq(1, res.nInserted);
+                    assert.commandWorked(res);
+                    assert.eq(1, res.nInserted);
                 }
             } catch (e) {
                 if (e.code == ErrorCodes.ConflictingOperationInProgress) {
@@ -41,7 +39,7 @@ export const $config = (function() {
                 try {
                     res =
                         db[collName].update({_id: indexToUpdate}, {$inc: {num: 1}}, {upsert: true});
-                    assertWhenOwnColl.commandWorked(res);
+                    assert.commandWorked(res);
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
@@ -61,7 +59,7 @@ export const $config = (function() {
                     } else {
                         // TODO(SERVER-46651) upsert with concurrent dropCollection can result in
                         // writeErrors if queries yield.
-                        assertAlways.writeError(res, "unexpected error: " + tojsononeline(e));
+                        assert.writeError(res, "unexpected error: " + tojsononeline(e));
                     }
                 }
             }
@@ -78,7 +76,7 @@ export const $config = (function() {
                         update: {$inc: {num: 1}},
                         upsert: true
                     });
-                    assertWhenOwnColl.commandWorked(res);
+                    assert.commandWorked(res);
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
                     // automatically be retried when TestData.runInsideTransaction=true
@@ -92,7 +90,7 @@ export const $config = (function() {
                             throw e;
                         }
                     } else {
-                        assertAlways.contains(
+                        assert.contains(
                             e.code,
                             [
                                 // dropIndex can cause queries to throw if these queries yield.
@@ -109,7 +107,7 @@ export const $config = (function() {
                 try {
                     let res = db[collName].findOne({value: this.docValue});
                     if (res !== null) {
-                        assertAlways.eq(this.docValue, res.value);
+                        assert.eq(this.docValue, res.value);
                     }
                 } catch (e) {
                     // We propagate TransientTransactionErrors to allow the state function to
@@ -126,14 +124,13 @@ export const $config = (function() {
                     } else {
                         // dropIndex or collection drops can cause queries to throw if these queries
                         // yield.
-                        assertAlways.contains(
-                            e.code,
-                            [
-                                ErrorCodes.NamespaceNotFound,
-                                ErrorCodes.OperationFailed,
-                                ErrorCodes.QueryPlanKilled,
-                            ],
-                            'unexpected error code: ' + e.code + ': ' + e.message);
+                        assert.contains(e.code,
+                                        [
+                                            ErrorCodes.NamespaceNotFound,
+                                            ErrorCodes.OperationFailed,
+                                            ErrorCodes.QueryPlanKilled,
+                                        ],
+                                        'unexpected error code: ' + e.code + ': ' + e.message);
                     }
                 }
             }
@@ -156,9 +153,9 @@ export const $config = (function() {
                     }
                 } else {
                     // dropIndex can cause queries to throw if these queries yield.
-                    assertAlways.contains(e.code,
-                                          [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(e.code,
+                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                    'unexpected error code: ' + e.code + ': ' + e.message);
                 }
             }
         },
@@ -228,10 +225,10 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
         for (let i = 0; i < this.numIds; i++) {
             const res = db[collName].insert({_id: i, value: this.docValue, num: 1});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }
     }

@@ -10,7 +10,6 @@
  * The parent test, invalidated_cursors.js, uses $currentOp.
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/invalidated_cursors.js";
 
@@ -155,7 +154,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // likely for the "killCursors" command to need to handle destroying the underlying
         // PlanExecutor.
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
         });
 
@@ -166,14 +165,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var myDB = db.getSiblingDB(this.uniqueDBName);
         this.involvedCollections.forEach(collName => {
             this.populateDataAndIndexes(myDB, collName);
-            assertAlways.eq(this.numDocs, myDB[collName].find({}).itcount());
+            assert.eq(this.numDocs, myDB[collName].find({}).itcount());
         });
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
             // Restore DocumentSourceCursor batch size to the default.
-            assertAlways.commandWorked(db.adminCommand(
+            assert.commandWorked(db.adminCommand(
                 {setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}));
         });
     };

@@ -8,7 +8,6 @@
  *  assumes_balancer_off,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
@@ -39,7 +38,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Returns the _id of a random document owned by this thread for a given collection.
      */
     $config.data.getIdForThread = function getIdForThread(collName) {
-        assertAlways.neq(0, this.ownedIds[collName].size);
+        assert.neq(0, this.ownedIds[collName].size);
 
         const randomIndex = Random.randInt(this.ownedIds[collName].length);
         return this.ownedIds[collName][randomIndex];
@@ -176,12 +175,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // Give each document the same shard key and _id value, but a different tid.
                 bulk.insert({_id: i, [this.defaultShardKeyField]: i, tid: chosenThread});
             }
-            assertAlways.commandWorked(bulk.execute());
+            assert.commandWorked(bulk.execute());
 
             // Create a chunk with boundaries matching the partition's. The low chunk's lower bound
             // is minKey, so a split is not necessary.
             if (!partition.isLowChunk) {
-                assertAlways.commandWorked(db.adminCommand(
+                assert.commandWorked(db.adminCommand(
                     {split: ns, middle: {[this.defaultShardKeyField]: partition.lower}}));
             }
         }

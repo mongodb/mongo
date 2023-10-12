@@ -15,7 +15,6 @@
  *  ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
@@ -54,7 +53,7 @@ export const $config = (function() {
     function mutexLock(db, tid, collName) {
         jsTestLog('Trying to acquire mutexLock for resource tid:' + tid +
                   ' collection:' + collName);
-        assertAlways.soon(() => {
+        assert.soon(() => {
             let doc =
                 db[data.CRUDMutex].findAndModify({query: {tid: tid}, update: {$set: {mutex: 1}}});
             return doc.mutex === 0;
@@ -84,7 +83,7 @@ export const $config = (function() {
             jsTestLog('create state tid:' + tid + ' currentTid:' + this.tid +
                       ' collection:' + targetThreadColl);
             // Add necessary indexes for resharding.
-            assertAlways.commandWorked(db.adminCommand({
+            assert.commandWorked(db.adminCommand({
                 createIndexes: targetThreadColl,
                 indexes: [
                     {key: {[`tid_${tid}_0`]: 1}, name: `tid_${tid}_0_1`, unique: false},
@@ -93,7 +92,7 @@ export const $config = (function() {
                 writeConcern: {w: 'majority'}
             }));
             try {
-                assertAlways.commandWorked(db.adminCommand(
+                assert.commandWorked(db.adminCommand(
                     {shardCollection: fullNs, key: {[`tid_${tid}_0`]: 1}, unique: false}));
             } catch (e) {
                 const exceptionCode = e.code;
@@ -125,7 +124,7 @@ export const $config = (function() {
                       ' collection:' + targetThreadColl);
             mutexLock(db, tid, targetThreadColl);
             try {
-                assertAlways.eq(db[targetThreadColl].drop(), true);
+                assert.eq(db[targetThreadColl].drop(), true);
             } finally {
                 mutexUnlock(db, tid, targetThreadColl);
             }
@@ -144,7 +143,7 @@ export const $config = (function() {
             try {
                 jsTestLog('rename state tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + srcCollName + ' dst:' + destCollName);
-                assertAlways.commandWorked(srcColl.renameCollection(destCollName));
+                assert.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode) {
@@ -192,7 +191,7 @@ export const $config = (function() {
             try {
                 jsTestLog('resharding state tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + fullNs + ' newKey ' + newKey);
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     db.adminCommand({reshardCollection: fullNs, key: {[`${newKey}`]: 1}}));
             } catch (e) {
                 const exceptionCode = e.code;
@@ -216,7 +215,7 @@ export const $config = (function() {
             }
             jsTestLog('Check database metadata state');
             const inconsistencies = db.checkMetadataConsistency().toArray();
-            assertAlways.eq(0, inconsistencies.length, tojson(inconsistencies));
+            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function(db, collName, connCache) {
             if (this.skipMetadataChecks) {
@@ -231,7 +230,7 @@ export const $config = (function() {
             jsTestLog('Check collection metadata state tid:' + tid + ' currentTid:' + this.tid +
                       ' collection:' + targetThreadColl);
             const inconsistencies = db[targetThreadColl].checkMetadataConsistency().toArray();
-            assertAlways.eq(0, inconsistencies.length, tojson(inconsistencies));
+            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         CRUD: function(db, collName, connCache) {
             let tid = this.tid;
@@ -260,14 +259,14 @@ export const $config = (function() {
                           ' collection:' + targetThreadColl);
                 // Check if insert succeeded
                 var res = insertBulkOp.execute();
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
 
                 let currentDocs = countDocuments(coll, {generation: generation});
 
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 // If a concurrent rename came in, then either the full operation succeded (meaning
                 // there will be 0 documents left) or the insert came in first.
-                assertAlways(currentDocs === numDocs || currentDocs === 0);
+                assert(currentDocs === numDocs || currentDocs === 0);
 
                 jsTestLog('CRUD - Update tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + targetThreadColl);
@@ -282,7 +281,7 @@ export const $config = (function() {
                     }
                     throw err;
                 }
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
 
                 // Delete Data
                 jsTestLog('CRUD - Remove tid:' + tid + ' currentTid:' + this.tid +
@@ -290,7 +289,7 @@ export const $config = (function() {
                 // Check if delete succeeded
                 coll.remove({generation: generation}, {multi: true});
                 // Check guarantees IF NO CONCURRENT DROP is running.
-                assertAlways.eq(countDocuments(coll, {generation: generation}), 0);
+                assert.eq(countDocuments(coll, {generation: generation}), 0);
             } finally {
                 mutexUnlock(db, tid, targetThreadColl);
             }

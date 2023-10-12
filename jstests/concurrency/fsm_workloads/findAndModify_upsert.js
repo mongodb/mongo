@@ -6,8 +6,6 @@
  * created) based on the 'query' specification, and updated using the
  * $push operator.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {sort: false, shardKey: {tid: 1}};
 
@@ -51,18 +49,15 @@ export const $config = (function() {
             }
 
             var res = db.runCommand(cmdObj);
-            assertAlways.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             var doc = res.value;
-            assertAlways(doc !== null, 'a document should have been inserted');
+            assert(doc !== null, 'a document should have been inserted');
 
-            assertAlways((function() {
-                             assertAlways.eq(this.tid, doc.tid);
-                             assertAlways(Array.isArray(doc.values),
-                                          'expected values to be an array');
-                             assertAlways.eq(1, doc.values.length);
-                             assertAlways.eq(updatedValue, doc.values[0]);
-                         }).bind(this));
+            assert.eq(this.tid, doc.tid);
+            assert(Array.isArray(doc.values), 'expected values to be an array');
+            assert.eq(1, doc.values.length);
+            assert.eq(updatedValue, doc.values[0]);
         }
 
         function update(db, collName) {
@@ -81,21 +76,18 @@ export const $config = (function() {
             }
 
             var res = db.runCommand(cmdObj);
-            assertAlways.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.StaleConfig);
 
             var doc = res.value;
-            assertWhenOwnColl(doc !== null,
-                              'query spec should have matched a document, returned ' + tojson(res));
+            assert(doc !== null,
+                   'query spec should have matched a document, returned ' + tojson(res));
 
             if (doc !== null) {
-                assertAlways.eq(this.tid, doc.tid);
-                assertWhenOwnColl(Array.isArray(doc.values), 'expected values to be an array');
-                assertWhenOwnColl(function() {
-                    assertWhenOwnColl.gte(doc.values.length, 2);
-                    assertWhenOwnColl.eq(updatedValue, doc.values[doc.values.length - 1]);
-                    assertWhenOwnColl(isSorted(doc.values),
-                                      'expected values to be sorted: ' + tojson(doc.values));
-                });
+                assert.eq(this.tid, doc.tid);
+                assert(Array.isArray(doc.values), 'expected values to be an array');
+                assert.gte(doc.values.length, 2);
+                assert.eq(updatedValue, doc.values[doc.values.length - 1]);
+                assert(isSorted(doc.values), 'expected values to be sorted: ' + tojson(doc.values));
             }
         }
 

@@ -8,8 +8,6 @@
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const kMaxCmdTimeMs = 60000;
     const kMaxTxnLockReqTimeMs = 100;
@@ -59,9 +57,9 @@ export const $config = (function() {
 
             var res = db.getRole(roleName);
 
-            assertAlways(res !== null, "role '" + roleName + "' should exist");
-            assertAlways.eq(roleName, res.role);
-            assertAlways(!res.isBuiltin, 'role should be user-defined');
+            assert(res !== null, "role '" + roleName + "' should exist");
+            assert.eq(roleName, res.role);
+            assert(!res.isBuiltin, 'role should be user-defined');
 
             // Some test machines may hit high contention during these concurrency tests
             // allow for occaisional failure with retries.
@@ -84,7 +82,7 @@ export const $config = (function() {
                 }
             }, "Failed dropping role '" + roleName + "'", kDropRoleRetries, kDropRoleRetryInterval);
 
-            assertAlways.isnull(db.getRole(roleName), "role '" + roleName + "' should not exist");
+            assert.isnull(db.getRole(roleName), "role '" + roleName + "' should not exist");
         }
 
         return {init: init, createAndDropRole: createAndDropRole};

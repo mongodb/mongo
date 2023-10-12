@@ -9,7 +9,6 @@
  *  uses_change_streams
  * ];
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
@@ -59,7 +58,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const doMultiUpdate = () => {
             const result = db.runCommand(
                 {update: collName, updates: [{q: {x: id}, u: {$inc: {counter: 1}}, multi: true}]});
-            assertWhenOwnColl.commandWorked(result);
+            assert.commandWorked(result);
             jsTest.log("tid:" + this.tid + " multiUpdate _id: " + id +
                        " at operationTime: " + tojson(result.operationTime));
         };
@@ -104,7 +103,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const doMultiDelete = () => {
             const result = db.runCommand(
                 {delete: collName, deletes: [{q: {x: id}, limit: 0 /* multi:true */}]});
-            assertWhenOwnColl.commandWorked(result);
+            assert.commandWorked(result);
 
             jsTest.log("tid:" + this.tid + " multiDelete _id: " + id +
                        " at operationTime: " + tojson(result.operationTime));
@@ -198,10 +197,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                         break;
                     }
                 }
-                assertAlways(
-                    found,
-                    "did not find worker thread operation matching the change stream event: " +
-                        tojson(event) + "; Outstanding operations: " + tojson(operationsByTid));
+                assert(found,
+                       "did not find worker thread operation matching the change stream event: " +
+                           tojson(event) + "; Outstanding operations: " + tojson(operationsByTid));
             } else {
                 // Check that no duplicate events are seen on the change stream.
                 // - For deletes this means that we should not see the same document deleted more
@@ -210,9 +208,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 // updated value more than once. This is because the updates are {$inc: 1}, so they
                 // must be strictly incrementing.
                 if (event.operationType === 'delete') {
-                    assertAlways(!seenDeletes.includes(event.documentKey._id),
-                                 "Found duplicate change stream event for delete on _id: " +
-                                     event.documentKey._id);
+                    assert(!seenDeletes.includes(event.documentKey._id),
+                           "Found duplicate change stream event for delete on _id: " +
+                               event.documentKey._id);
                     seenDeletes.push(event.documentKey._id);
                 } else if (event.operationType === 'update') {
                     const idAndUpdate = {
@@ -236,7 +234,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // actually was actually applied on all the intended documents (SERVER-20361).
         if (TestData.runInsideTransaction) {
             for (let tid = 0; tid < $config.threadCount; ++tid) {
-                assertAlways(
+                assert(
                     operationsByTid[tid].length === 0,
                     "Did not observe change stream event for all worker thread operations. Outstanding operations: " +
                         tojson(operationsByTid));
@@ -272,7 +270,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.teardown = function teardown(db, collName, cluster) {
         // Drop the collection as to have a sentinel event (drop) on the change stream.
-        assertAlways(db[collName].drop());
+        assert(db[collName].drop());
 
         // Validate the change stream events after setting 'writePeriodicNoops'  on all the nodes of
         // the cluster to ensure liveness in case there are nodes with no events to report.

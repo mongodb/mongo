@@ -6,7 +6,6 @@
  *
  * @tags: [requires_sharding, assumes_balancer_off, does_not_support_stepdowns]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
@@ -41,7 +40,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         jsTestLog('innerChunkSize: ' + innerChunkSize);
         for (var i = 0; i < this.iterations; ++i) {
             var splitPoint = ((i + 1) * innerChunkSize) + partition.lower;
-            assertAlways.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, splitPoint));
+            assert.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, splitPoint));
         }
     };
 
@@ -68,7 +67,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var numChunksBefore = ChunkHelper.getNumChunks(
             config, ns, this.partition.chunkLower, this.partition.chunkUpper);
 
-        assertAlways(typeof chunk.min._id, 'number');
+        assert(typeof chunk.min._id, 'number');
 
         let splitChunkRes;
         if (chunk.min._id + 1 >= chunk.max._id || numDocsBefore <= 1) {
@@ -89,13 +88,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var shardNumDocsAfter =
             ChunkHelper.getNumDocs(shardPrimary, ns, chunk.min._id, chunk.max._id);
         var msg = 'Shard does not have same number of documents after splitChunk.\n' + msgBase;
-        assertWhenOwnColl.eq(shardNumDocsAfter, numDocsBefore, msg);
+        assert.eq(shardNumDocsAfter, numDocsBefore, msg);
 
         // Verify that all config servers have the correct after-state.
         // (see comments below for specifics).
         for (var conn of connCache.config) {
             let res = conn.adminCommand({hello: 1});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             if (res.isWritablePrimary) {
                 // If the splitChunk operation succeeded, verify that there are now
                 // two chunks between the old chunk's lower and upper bounds.
@@ -106,11 +105,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 if (splitChunkRes.ok) {
                     msg = 'splitChunk succeeded but the config does not see exactly 2 chunks ' +
                         'between the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 2, msg);
+                    assert.eq(numChunksBetweenOldChunksBounds, 2, msg);
                 } else {
                     msg = 'splitChunk failed but the config does not see exactly 1 chunk between ' +
                         'the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 1, msg);
+                    assert.eq(numChunksBetweenOldChunksBounds, 1, msg);
                 }
 
                 // If the splitChunk operation succeeded, verify that the total number
@@ -121,11 +120,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 if (splitChunkRes.ok) {
                     msg = 'splitChunk succeeded but the config does nnot see exactly 1 more ' +
                         'chunk between the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksAfter, numChunksBefore + 1, msg);
+                    assert.eq(numChunksAfter, numChunksBefore + 1, msg);
                 } else {
                     msg = 'splitChunk failed but the config does not see the same number ' +
                         'of chunks between the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
+                    assert.eq(numChunksAfter, numChunksBefore, msg);
                 }
             }
         }
@@ -139,7 +138,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
 
             msg = 'Mongos does not see same number of documents after splitChunk.\n' + msgBase;
-            assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msgBase);
+            assert.eq(numDocsAfter, numDocsBefore, msgBase);
 
             // Regardless of if the splitChunk operation succeeded or failed,
             // verify that each mongos sees all data in the original chunk's
@@ -149,12 +148,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             msg = 'Mongos does not see exactly 1 shard for chunk after splitChunk.\n' + msgBase +
                 '\n' +
                 'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
-            assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
+            assert.eq(shardsForChunk.shards.length, 1, msg);
 
             msg = 'Mongos sees different shard for chunk than chunk does after splitChunk.\n' +
                 msgBase + '\n' +
                 'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
-            assertWhenOwnColl.eq(shardsForChunk.shards[0], chunk.shard, msg);
+            assert.eq(shardsForChunk.shards[0], chunk.shard, msg);
 
             // If the splitChunk operation succeeded, verify that the mongos sees two chunks between
             // the old chunk's lower and upper bounds. If the operation failed, verify that the
@@ -164,11 +163,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             if (splitChunkRes.ok) {
                 msg = 'splitChunk succeeded but the mongos does not see exactly 2 chunks ' +
                     'between the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 2, msg);
+                assert.eq(numChunksBetweenOldChunksBounds, 2, msg);
             } else {
                 msg = 'splitChunk failed but the mongos does not see exactly 1 chunk between ' +
                     'the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 1, msg);
+                assert.eq(numChunksBetweenOldChunksBounds, 1, msg);
             }
 
             // If the splitChunk operation succeeded, verify that the total number of chunks in our
@@ -178,11 +177,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             if (splitChunkRes.ok) {
                 msg = 'splitChunk succeeded but the mongos does nnot see exactly 1 more ' +
                     'chunk between the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksAfter, numChunksBefore + 1, msg);
+                assert.eq(numChunksAfter, numChunksBefore + 1, msg);
             } else {
                 msg = 'splitChunk failed but the mongos does not see the same number ' +
                     'of chunks between the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
+                assert.eq(numChunksAfter, numChunksBefore, msg);
             }
         }
     }

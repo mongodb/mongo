@@ -8,8 +8,6 @@
  * ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
@@ -37,8 +35,8 @@ export const $config = (function() {
                 [timeFieldName]: new Date(),
                 first: true,
             });
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         },
 
         insertManyOrdered: function insertManyOrdered(db, collName) {
@@ -52,8 +50,8 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: true});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.insertedIds.length, batchSize);
+            assert.commandWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         insertManyUnordered: function insertManyUnordered(db, collName) {
@@ -67,8 +65,8 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: false});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.insertedIds.length, batchSize);
+            assert.commandWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         deleteAllBuckets: function deleteAllBuckets(db, collName) {
@@ -78,7 +76,7 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         collName = this.getCollectionName(collName);
-        assertAlways.commandWorked(db.createCollection(collName, {
+        assert.commandWorked(db.createCollection(collName, {
             timeseries: {
                 timeField: timeFieldName,
                 metaField: metaFieldName,

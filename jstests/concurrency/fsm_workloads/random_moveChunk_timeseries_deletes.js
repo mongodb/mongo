@@ -9,7 +9,6 @@
  *  requires_fcv_51,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -54,8 +53,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 $gte: Random.randInt($config.data.numMetaCount),
             },
         };
-        assertAlways.commandWorked(db[collName].deleteMany(filter));
-        assertAlways.commandWorked(db[this.nonShardCollName].deleteMany(filter));
+        assert.commandWorked(db[collName].deleteMany(filter));
+        assert.commandWorked(db[this.nonShardCollName].deleteMany(filter));
     };
 
     $config.data.validateCollection = function validate(db, collName) {
@@ -64,10 +63,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // validation needs to be more lenient.
         const count = db[collName].find().itcount();
         const countNonSharded = db[this.nonShardCollName].find().itcount();
-        assertAlways.gte(
-            count,
-            countNonSharded,
-            "Expected sharded collection to have the same or more records than unsharded");
+        assert.gte(count,
+                   countNonSharded,
+                   "Expected sharded collection to have the same or more records than unsharded");
     };
 
     $config.transitions = {

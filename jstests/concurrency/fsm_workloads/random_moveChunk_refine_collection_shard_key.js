@@ -11,7 +11,6 @@
  */
 import "jstests/libs/parallelTester.js";
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
@@ -84,7 +83,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const latchCollName = this.getCurrentLatchCollName(collName);
 
         try {
-            assertAlways.commandWorked(db.adminCommand({
+            assert.commandWorked(db.adminCommand({
                 refineCollectionShardKey: db.getCollection(latchCollName).getFullName(),
                 key: this.newShardKey
             }));
@@ -137,9 +136,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         for (let i = this.latchCount; i >= 0; --i) {
             const latchCollName = collName + '_' + i;
             let coll = db.getCollection(latchCollName);
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({shardCollection: coll.getFullName(), key: this.defaultShardKey}));
-            assertAlways.commandWorked(coll.createIndex(this.newShardKey));
+            assert.commandWorked(coll.createIndex(this.newShardKey));
             $super.setup.apply(this, [db, latchCollName, cluster]);
         }
     };

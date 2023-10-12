@@ -11,7 +11,6 @@
  * @tags: [assumes_balancer_off]
  */
 
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_where.js";
 
@@ -27,8 +26,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             $where: 'this.x === Math.floor(Math.random() * ' + this.randomBound + ') ' +
                 '&& this.tid === ' + this.tid
         });
-        assertWhenOwnColl.gte(res.nRemoved, 0);
-        assertWhenOwnColl.lte(res.nRemoved, this.insertedDocuments);
+        assert.gte(res.nRemoved, 0);
+        assert.lte(res.nRemoved, this.insertedDocuments);
         this.insertedDocuments -= res.nRemoved;
     };
 

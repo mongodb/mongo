@@ -9,8 +9,6 @@
  *   antithesis_incompatible,
  *  ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 const bigString = 'X'.repeat(1024 * 1024 - 30);  // Almost 1MB, to create documents of exactly 1MB
 const maxChunkSizeMB = 10;
 const dbNames = ['db0', 'db1'];
@@ -46,7 +44,7 @@ export const $config = (function() {
                 insertBulkOp.insert({s: bigString});
             }
 
-            assertAlways.commandWorked(insertBulkOp.execute());
+            assert.commandWorked(insertBulkOp.execute());
         },
     };
 

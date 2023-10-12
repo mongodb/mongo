@@ -7,7 +7,6 @@
  *
  * This workload was designed to reproduce SERVER-24761.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedOrFailedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
@@ -114,9 +113,9 @@ export const $config = (function() {
         // Similarly, this bulk insert can also give up with a NoProgressMade error after repeated
         // attempts in the sharded causal consistency configuration. We also ignore that error.
         const bulkInsertResult = coll.insert(Array(numDocs).fill({a: 0, b: 0, c: 0}));
-        assertAlways(!bulkInsertResult.hasWriteConcernError(), bulkInsertResult);
+        assert(!bulkInsertResult.hasWriteConcernError(), bulkInsertResult);
         bulkInsertResult.getWriteErrors().forEach(err => {
-            assertAlways.contains(
+            assert.contains(
                 err.code, [ErrorCodes.CannotImplicitlyCreateCollection, ErrorCodes.NoProgressMade]);
         }, bulkInsertResult);
     }

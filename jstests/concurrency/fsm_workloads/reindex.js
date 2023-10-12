@@ -6,7 +6,6 @@
  *
  * @tags: [SERVER-40561]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
@@ -31,8 +30,8 @@ export const $config = (function() {
                 });
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.nDocumentsToInsert, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(this.nDocumentsToInsert, res.nInserted);
         }
 
         function createIndexes(db, collName) {
@@ -57,39 +56,36 @@ export const $config = (function() {
             var coll = db[this.threadCollName];
             var nInsertedDocuments = this.nDocumentsToInsert;
             var count = coll.find({integer: Random.randInt(this.maxInteger)}).itcount();
-            assertWhenOwnColl.eq(
-                nInsertedDocuments / this.maxInteger,
-                count,
-                'number of ' +
-                    'documents returned by integer query should match the number ' +
-                    'inserted');
+            assert.eq(nInsertedDocuments / this.maxInteger,
+                      count,
+                      'number of ' +
+                          'documents returned by integer query should match the number ' +
+                          'inserted');
 
             var coords = [[[-26, -26], [-26, 26], [26, 26], [26, -26], [-26, -26]]];
             var geoQuery = {geo: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: coords}}}};
 
             // We can only perform a geo query when we own the collection and are sure a geo index
             // is present. The same is true of text queries.
-            assertWhenOwnColl(function() {
-                count = coll.find(geoQuery).itcount();
-                assertWhenOwnColl.eq(count,
-                                     nInsertedDocuments,
-                                     'number of documents returned by' +
-                                         ' geospatial query should match number inserted');
+            count = coll.find(geoQuery).itcount();
+            assert.eq(count,
+                      nInsertedDocuments,
+                      'number of documents returned by' +
+                          ' geospatial query should match number inserted');
 
-                count = coll.find({$text: {$search: 'ipsum'}}).itcount();
-                assertWhenOwnColl.eq(count,
-                                     nInsertedDocuments,
-                                     'number of documents returned by' +
-                                         ' text query should match number inserted');
-            });
+            count = coll.find({$text: {$search: 'ipsum'}}).itcount();
+            assert.eq(count,
+                      nInsertedDocuments,
+                      'number of documents returned by' +
+                          ' text query should match number inserted');
 
             var indexCount = db[this.threadCollName].getIndexes().length;
-            assertWhenOwnColl.eq(indexCount, this.nIndexes);
+            assert.eq(indexCount, this.nIndexes);
         }
 
         function reIndex(db, collName) {
             var res = db[this.threadCollName].reIndex();
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         }
 
         return {init: init, createIndexes: createIndexes, reIndex: reIndex, query: query};

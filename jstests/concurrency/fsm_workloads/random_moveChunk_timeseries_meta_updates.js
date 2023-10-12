@@ -9,7 +9,6 @@
  *  requires_fcv_51,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -40,7 +39,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         jsTestLog("Executing bucket level update on: " + collName + " on field '" + updateField +
                   "'");
-        assertAlways.commandWorked(shardedColl.update(
+        assert.commandWorked(shardedColl.update(
             {[updateField]: {$gte: oldValue}}, {$inc: {[updateField]: 1}}, {multi: true}));
     };
 
@@ -51,8 +50,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const pipeline = [{$project: {_id: "$_id"}}, {$sort: {_id: 1}}];
         const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
                                                     db[this.nonShardCollName].aggregate(pipeline));
-        assertAlways.eq(
-            diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+        assert.eq(diff,
+                  {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
     };
 
     $config.transitions = {

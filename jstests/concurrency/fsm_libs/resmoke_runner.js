@@ -1,4 +1,3 @@
-import {AssertLevel, setGlobalAssertLevel} from "jstests/concurrency/fsm_libs/assert.js";
 import {Cluster} from "jstests/concurrency/fsm_libs/cluster.js";
 import {runner} from "jstests/concurrency/fsm_libs/runner.js";
 import {ThreadManager} from "jstests/concurrency/fsm_libs/thread_mgr.js";
@@ -33,21 +32,6 @@ async function runWorkloads(workloads,
     const executionMode = {serial: true};
     validateExecutionOptions(executionMode, executionOptions);
     Object.freeze(executionOptions);  // immutable after validation (and normalization)
-
-    // Determine how strong to make assertions while simultaneously executing different
-    // workloads.
-    let assertLevel = AssertLevel.OWN_DB;
-    if (clusterOptions.sameDB) {
-        // The database is shared by multiple workloads, so only make the asserts that apply
-        // when the collection is owned by an individual workload.
-        assertLevel = AssertLevel.OWN_COLL;
-    }
-    if (clusterOptions.sameCollection) {
-        // The collection is shared by multiple workloads, so only make the asserts that always
-        // apply.
-        assertLevel = AssertLevel.ALWAYS;
-    }
-    setGlobalAssertLevel(assertLevel);
 
     const context = {};
     const applyMultipliers = true;

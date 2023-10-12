@@ -3,8 +3,6 @@
  *
  * Inserts some documents into a collection with a text index.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         init: function init(db, collName) {
@@ -17,8 +15,8 @@ export const $config = (function() {
             var snippet = this.getRandomTextSnippet();
             doc[this.indexedField] = snippet;
             var res = db[collName].insert(doc);
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
             // TODO: what else can we assert? should that go in a read test?
 
             // Searching for the text we inserted should return at least one doc.
@@ -27,7 +25,7 @@ export const $config = (function() {
             if (Array.isArray(snippet)) {
                 snippet = snippet.join(' ');
             }
-            assertWhenOwnColl.gt(db[collName].find({$text: {$search: snippet}}).itcount(), 0);
+            assert.gt(db[collName].find({$text: {$search: snippet}}).itcount(), 0);
         }
     };
 
@@ -41,7 +39,7 @@ export const $config = (function() {
         // be visible to other transactions, depending on readConcern/writeConcern settings.
         const wcMajority = {w: "majority"};
         // Only allowed to create one text index, other tests may create one.
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.runCommand({createIndexes: collName, indexes: [ixSpec], writeConcern: wcMajority}));
     }
 

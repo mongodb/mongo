@@ -8,8 +8,6 @@
  *     does_not_support_transactions
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
@@ -26,8 +24,8 @@ export const $config = (function() {
             const coll = this.getCollection(db, collName);
             for (let i = 0; i < 100; i++) {
                 const res = coll.insert({t: this.tid, i: i});
-                assertAlways.commandWorked(res);
-                assertAlways.eq(1, res.nInserted, tojson(res));
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted, tojson(res));
             }
         },
 
@@ -38,17 +36,16 @@ export const $config = (function() {
             const coll = this.getCollection(db, collName);
             for (let i = 0; i < 100; i++) {
                 const res = coll.insert({t: this.tid, i: i});
-                assertAlways.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
-                assertAlways.eq(0, res.nInserted, tojson(res));
+                assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey);
+                assert.eq(0, res.nInserted, tojson(res));
             }
         }
     };
 
     function setup(db, collName) {
         collName = this.getCollectionName(collName);
-        assertAlways.commandWorked(db.createCollection(collName));
-        assertAlways.commandWorked(
-            db.getCollection(collName).createIndex({t: 1, i: 1}, {unique: true}));
+        assert.commandWorked(db.createCollection(collName));
+        assert.commandWorked(db.getCollection(collName).createIndex({t: 1, i: 1}, {unique: true}));
     }
 
     const transitions = {

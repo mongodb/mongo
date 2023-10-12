@@ -10,8 +10,6 @@
  *     assumes_unsharded_collection,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -28,7 +26,7 @@ export const $config = (function() {
             this.fromDBName = db.getName() + uniqueDBName(this.prefix, this.tid, 0);
             this.num = 1;
             var fromDB = db.getSiblingDB(this.fromDBName);
-            assertAlways.commandWorked(fromDB.createCollection(collName));
+            assert.commandWorked(fromDB.createCollection(collName));
         }
 
         function rename(db, collName) {
@@ -39,11 +37,11 @@ export const $config = (function() {
                 dropTarget: false
             };
 
-            assertAlways.commandWorked(db.adminCommand(renameCommand));
+            assert.commandWorked(db.adminCommand(renameCommand));
 
             // Remove any files associated with the "from" namespace
             // to avoid having too many files open
-            assertAlways.commandWorked(db.getSiblingDB(this.fromDBName).dropDatabase());
+            assert.commandWorked(db.getSiblingDB(this.fromDBName).dropDatabase());
 
             this.fromDBName = toDBName;
         }

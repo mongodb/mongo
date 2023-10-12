@@ -6,7 +6,6 @@
  * value is a string large enough to make the whole index key be 1K, which is
  * the maximum.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
@@ -34,9 +33,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         this.indexedValue = (this.tid + bigstr).slice(0, maxIndexedSize - bsonOverhead);
 
-        assertAlways.eq(maxIndexedSize,
-                        Object.bsonsize({'': this.indexedValue}),
-                        'buggy test: the inserted docs will not have the expected index-key size');
+        assert.eq(maxIndexedSize,
+                  Object.bsonsize({'': this.indexedValue}),
+                  'buggy test: the inserted docs will not have the expected index-key size');
     };
 
     return $config;

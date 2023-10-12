@@ -2,7 +2,6 @@
  * Intersperses $geoNear aggregations with updates and deletes of documents they may match.
  * @tags: [requires_non_retryable_writes]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
@@ -21,21 +20,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // We only run the verification when workloads are run on separate collections, since the
         // aggregation may fail if we don't have exactly one 2d index to use.
-        assertWhenOwnColl(function verifyResults() {
-            // We manually verify the results ourselves rather than calling advanceCursor(). In the
-            // event of a failure, the aggregation cursor cannot support explain().
-            let lastDistanceSeen = 0;
-            while (cursor.hasNext()) {
-                const doc = cursor.next();
-                assertAlways.lte(doc.dist,
-                                 maxDistance,
-                                 `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`);
-                assertAlways.lte(lastDistanceSeen,
-                                 doc.dist,
-                                 `dist in ${tojson(doc)} is not less than the previous distance`);
-                lastDistanceSeen = doc.dist;
-            }
-        });
+        // We manually verify the results ourselves rather than calling advanceCursor(). In the
+        // event of a failure, the aggregation cursor cannot support explain().
+        let lastDistanceSeen = 0;
+        while (cursor.hasNext()) {
+            const doc = cursor.next();
+            assert.lte(doc.dist,
+                       maxDistance,
+                       `dist in ${tojson(doc)} exceeds max allowable $geoNear distance`);
+            assert.lte(lastDistanceSeen,
+                       doc.dist,
+                       `dist in ${tojson(doc)} is not less than the previous distance`);
+            lastDistanceSeen = doc.dist;
+        }
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
@@ -72,8 +69,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 i++;
             }
         }
-        assertAlways.commandWorked(bulk.execute());
-        assertAlways.commandWorked(db[collName].createIndex(this.getIndexSpec()));
+        assert.commandWorked(bulk.execute());
+        assert.commandWorked(db[collName].createIndex(this.getIndexSpec()));
     };
 
     return $config;

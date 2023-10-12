@@ -9,8 +9,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -26,7 +24,7 @@ export const $config = (function() {
         function init(db, collName) {
             this.fromCollName = uniqueCollectionName(this.prefix, this.tid, 0);
             this.num = 1;
-            assertAlways.commandWorked(db.createCollection(this.fromCollName));
+            assert.commandWorked(db.createCollection(this.fromCollName));
         }
 
         function rename(db, collName) {
@@ -35,7 +33,7 @@ export const $config = (function() {
 
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request
-            assertWhenOwnDB.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
 
             this.fromCollName = toCollName;
         }
@@ -52,7 +50,7 @@ export const $config = (function() {
                 const numColls =
                     collectionInfos.filter((collInfo) => collInfo.name.startsWith(this.prefix))
                         .length;
-                assertAlways.eq(numColls, this.threadCount, () => tojson(collectionInfos));
+                assert.eq(numColls, this.threadCount, () => tojson(collectionInfos));
             }
         }
 

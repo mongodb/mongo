@@ -6,8 +6,6 @@
  * events triggers the concurrent destruction of a Collection object and
  * the updating of said object's PlanCache (SERVER-17117).
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     function populateData(db, collName) {
         var coll = db[collName];
@@ -18,16 +16,16 @@ export const $config = (function() {
                 bulk.insert({a: 1, b: Random.rand()});
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             // Create two indexes to force plan caching: The {a: 1} index is
             // cached by the query planner because we query on a single value
             // of 'a' and a range of 'b' values.
-            assertAlways.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), [
+            assert.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), [
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
-            assertAlways.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), [
+            assert.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), [
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
@@ -43,7 +41,7 @@ export const $config = (function() {
 
             var cmdObj = {query: {a: 1, b: {$gt: Random.rand()}}, limit: Random.randInt(10)};
 
-            // We can't use assertAlways.commandWorked here because the plan
+            // We can't use assert.commandWorked here because the plan
             // executor can be killed during the count.
             coll.runCommand('count', cmdObj);
         }

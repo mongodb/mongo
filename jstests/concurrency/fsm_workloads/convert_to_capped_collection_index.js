@@ -15,7 +15,6 @@
  *
  * @tags: [requires_collstats, requires_capped]
  */
-import {assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -23,8 +22,8 @@ import {
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.convertToCapped = function convertToCapped(db, collName) {
-        assertWhenOwnDB.commandWorked(db[this.threadCollName].createIndex({i: 1, rand: 1}));
-        assertWhenOwnDB.eq(2, db[this.threadCollName].getIndexes().length);
+        assert.commandWorked(db[this.threadCollName].createIndex({i: 1, rand: 1}));
+        assert.eq(2, db[this.threadCollName].getIndexes().length);
         $super.states.convertToCapped.apply(this, arguments);
     };
 

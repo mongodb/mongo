@@ -2,7 +2,6 @@
  * Helpers for dropping collections or databases created by a workload
  * during its execution.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export function dropCollections(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
@@ -12,7 +11,7 @@ export function dropCollections(db, pattern) {
             return pattern.test(collInfo.name);
         })
         .forEach(function(collInfo) {
-            assertAlways(db[collInfo.name].drop());
+            assert(db[collInfo.name].drop());
         });
 }
 
@@ -20,12 +19,12 @@ export function dropDatabases(db, pattern) {
     assert(pattern instanceof RegExp, 'expected pattern to be a regular expression');
 
     var res = db.adminCommand('listDatabases');
-    assertAlways.commandWorked(res);
+    assert.commandWorked(res);
 
     res.databases.forEach(function(dbInfo) {
         if (pattern.test(dbInfo.name)) {
             var res = db.getSiblingDB(dbInfo.name).dropDatabase();
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         }
     });
 }

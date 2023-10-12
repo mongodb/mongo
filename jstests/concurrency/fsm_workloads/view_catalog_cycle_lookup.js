@@ -7,8 +7,6 @@
  *
  * @tags: [requires_fcv_51]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
@@ -66,7 +64,7 @@ export const $config = (function() {
                     case 3:
                         return [];
                     default:
-                        assertAlways(false, "Invalid index: " + index);
+                        assert(false, "Invalid index: " + index);
                 }
             },
     };
@@ -86,12 +84,10 @@ export const $config = (function() {
             const toName = this.getRandomView(this.viewList);
             const res = db.runCommand(
                 {collMod: fromName, viewOn: toName, pipeline: this.getRandomViewPipeline()});
-            assertAlways(res.ok === 1 ||
-                             [
-                                 ErrorCodes.GraphContainsCycle,
-                                 ErrorCodes.ConflictingOperationInProgress
-                             ].includes(res.code),
-                         tojson(res));
+            assert(res.ok === 1 ||
+                       [ErrorCodes.GraphContainsCycle, ErrorCodes.ConflictingOperationInProgress]
+                           .includes(res.code),
+                   tojson(res));
         }
 
         /**
@@ -107,12 +103,10 @@ export const $config = (function() {
             const fromName = this.getRandomView(this.viewList);
             const res = db.runCommand(
                 {collMod: fromName, viewOn: collName, pipeline: this.getRandomViewPipeline()});
-            assertAlways(res.ok === 1 ||
-                             [
-                                 ErrorCodes.GraphContainsCycle,
-                                 ErrorCodes.ConflictingOperationInProgress
-                             ].includes(res.code),
-                         tojson(res));
+            assert(res.ok === 1 ||
+                       [ErrorCodes.GraphContainsCycle, ErrorCodes.ConflictingOperationInProgress]
+                           .includes(res.code),
+                   tojson(res));
         }
 
         function readFromView(db, collName) {
@@ -128,9 +122,9 @@ export const $config = (function() {
             // replaced with a view.
             // TODO (SERVER-35635): It would be more appropriate for the server to return
             // OperationFailed, as CommandNotSupportedOnView is misleading.
-            assertAlways(res.ok === 1 || res.code === ErrorCodes.CommandNotSupportedOnView ||
-                             res.code === ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
-                         () => tojson(res));
+            assert(res.ok === 1 || res.code === ErrorCodes.CommandNotSupportedOnView ||
+                       res.code === ErrorCodes.CommandOnShardedViewNotSupportedOnMongod,
+                   () => tojson(res));
         }
 
         return {
@@ -150,13 +144,13 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         const coll = db[collName];
 
-        assertAlways.commandWorked(coll.insert({a: 1, b: 2}));
-        assertAlways.commandWorked(coll.insert({a: 2, b: 3}));
-        assertAlways.commandWorked(coll.insert({a: 3, b: 4}));
-        assertAlways.commandWorked(coll.insert({a: 4, b: 1}));
+        assert.commandWorked(coll.insert({a: 1, b: 2}));
+        assert.commandWorked(coll.insert({a: 2, b: 3}));
+        assert.commandWorked(coll.insert({a: 3, b: 4}));
+        assert.commandWorked(coll.insert({a: 4, b: 1}));
 
         for (let viewName of this.viewList) {
-            assertAlways.commandWorked(db.createView(viewName, collName, []));
+            assert.commandWorked(db.createView(viewName, collName, []));
         }
 
         // We need to increase the maximum sub-pipeline view depth for this test since sharded view
@@ -171,7 +165,7 @@ export const $config = (function() {
             assert(maxSubPipelineViewDepthParam.hasOwnProperty("internalMaxSubPipelineViewDepth"));
             this.oldMaxSubPipelineViewDepth =
                 maxSubPipelineViewDepthParam.internalMaxSubPipelineViewDepth;
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalMaxSubPipelineViewDepth: 100}));
         });
     }
@@ -180,7 +174,7 @@ export const $config = (function() {
         // Restore the old max subpipeline view depth.
         if (this.oldMaxSubPipelineViewDepth) {
             cluster.executeOnMongodNodes((db) => {
-                assertAlways.commandWorked(db.adminCommand({
+                assert.commandWorked(db.adminCommand({
                     setParameter: 1,
                     internalMaxSubPipelineViewDepth: this.oldMaxSubPipelineViewDepth
                 }));

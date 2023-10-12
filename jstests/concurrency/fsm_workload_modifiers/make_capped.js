@@ -6,38 +6,23 @@
  *
  * However, it only does this when it owns the collection, to avoid surprising
  * other workloads.
- *
- * It also modifies any state named 'find' to run with a weaker assertion level:
- * only assertAlways assertions will run in that state.
  */
-import {
-    assertAlways,
-    AssertLevel,
-    assertWhenOwnColl,
-    getGlobalAssertLevel,
-    setGlobalAssertLevel
-} from "jstests/concurrency/fsm_libs/assert.js";
 
 export function makeCapped($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
-        assertWhenOwnColl(function() {
-            db[collName].drop();
-            assertAlways.commandWorked(db.createCollection(collName, {
-                capped: true,
-                size: 16384  // bytes
-            }));
-        });
+        db[collName].drop();
+        assert.commandWorked(db.createCollection(collName, {
+            capped: true,
+            size: 16384  // bytes
+        }));
 
         $super.setup.apply(this, arguments);
     };
 
     if ($super.states.find) {
         $config.states.find = function find(db, collName) {
-            var oldAssertLevel = getGlobalAssertLevel();
             try {
-                // Temporarily weaken the global assertion level to avoid spurious
-                // failures due to collection truncation
-                setGlobalAssertLevel(AssertLevel.ALWAYS);
+                this.skipAssertions = true;
                 $super.states.find.apply(this, arguments);
             } catch (e) {
                 if (e.message.indexOf('CappedPositionLost') >= 0) {
@@ -48,7 +33,7 @@ export function makeCapped($config, $super) {
                 }
                 throw e;
             } finally {
-                setGlobalAssertLevel(oldAssertLevel);
+                this.skipAssertions = false;
             }
         };
     }

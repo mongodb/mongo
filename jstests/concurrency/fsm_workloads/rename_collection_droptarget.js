@@ -9,8 +9,6 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -26,8 +24,8 @@ export const $config = (function() {
         function insert(db, collName, numDocs) {
             for (var i = 0; i < numDocs; ++i) {
                 var res = db[collName].insert({});
-                assertAlways.commandWorked(res);
-                assertAlways.eq(1, res.nInserted);
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted);
             }
         }
 
@@ -36,18 +34,18 @@ export const $config = (function() {
             this.fromCollName = uniqueCollectionName(this.prefix, this.tid, num++);
             this.toCollName = uniqueCollectionName(this.prefix, this.tid, num++);
 
-            assertAlways.commandWorked(db.createCollection(this.fromCollName));
+            assert.commandWorked(db.createCollection(this.fromCollName));
         }
 
         function rename(db, collName) {
             // Clear out the "from" collection and insert 'fromCollCount' documents
             var fromCollCount = 7;
-            assertWhenOwnDB(db[this.fromCollName].drop());
-            assertAlways.commandWorked(db.createCollection(this.fromCollName));
+            assert(db[this.fromCollName].drop());
+            assert.commandWorked(db.createCollection(this.fromCollName));
             insert(db, this.fromCollName, fromCollCount);
 
             var toCollCount = 4;
-            assertAlways.commandWorked(db.createCollection(this.toCollName));
+            assert.commandWorked(db.createCollection(this.toCollName));
             insert(db, this.toCollName, toCollCount);
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
@@ -57,10 +55,10 @@ export const $config = (function() {
 
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request
-            assertWhenOwnDB.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
 
-            assertWhenOwnDB.eq(fromCollCount, db[this.toCollName].find().itcount());
-            assertWhenOwnDB.eq(0, db[this.fromCollName].find().itcount());
+            assert.eq(fromCollCount, db[this.toCollName].find().itcount());
+            assert.eq(0, db[this.fromCollName].find().itcount());
 
             // Swap "to" and "from" collections for next execution
             var temp = this.fromCollName;

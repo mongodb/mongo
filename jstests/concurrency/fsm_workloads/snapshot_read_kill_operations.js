@@ -5,7 +5,7 @@
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
 
-import {assertWhenOwnColl, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     abortTransaction,
     cleanupOnLastIteration
@@ -151,7 +151,7 @@ export const $config = (function() {
             }));
         }
 
-        assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
         for (let i = 0; i < this.numIds; ++i) {
             const res = db[collName].insert({_id: i, value: i});
             assert.commandWorked(res);

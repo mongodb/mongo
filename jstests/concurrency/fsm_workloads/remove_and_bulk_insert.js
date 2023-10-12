@@ -7,8 +7,6 @@
  * This workload was designed to reproduce SERVER-20512, where a record in an evicted page was
  * accessed after a WriteConflictException occurred in Collection::deleteDocument().
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         insert: function insert(db, collName) {
@@ -21,7 +19,7 @@ export const $config = (function() {
 
         remove: function remove(db, collName) {
             var res = db[collName].remove({});
-            assertAlways.lte(0, res.nRemoved, tojson(res));
+            assert.lte(0, res.nRemoved, tojson(res));
         }
     };
 

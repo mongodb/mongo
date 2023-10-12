@@ -5,15 +5,13 @@
  *
  * @tags: [requires_sharding]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {};
 
     var states = (function() {
         function init(db, collName) {
             this.docNum = 0;
-            assertAlways.commandWorked(db[collName].insertOne({_id: this.docNum}));
+            assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
             checkForDocument(db[collName], this.docNum);
         }
 
@@ -24,26 +22,26 @@ export const $config = (function() {
         }
 
         function createShardedCollection(db, collName) {
-            assertAlways.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-            assertAlways.commandWorked(
+            assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
+            assert.commandWorked(
                 db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
-            assertAlways.commandWorked(db[collName].insertOne({_id: this.docNum}));
+            assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
             checkForDocument(db[collName], this.docNum);
         }
 
         function createUnshardedCollection(db, collName) {
-            assertAlways.commandWorked(db[collName].insertOne({_id: this.docNum}));
+            assert.commandWorked(db[collName].insertOne({_id: this.docNum}));
             checkForDocument(db[collName], this.docNum);
         }
 
         function dropCollection(db, collName) {
             checkForDocument(db[collName], this.docNum++);
-            assertAlways(db[collName].drop());
+            assert(db[collName].drop());
         }
 
         function dropDatabase(db, collName) {
             checkForDocument(db[collName], this.docNum++);
-            assertAlways.commandWorked(db.dropDatabase());
+            assert.commandWorked(db.dropDatabase());
         }
 
         return {

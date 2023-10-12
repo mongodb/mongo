@@ -9,7 +9,6 @@
  * This workload was designed to reproduce an issue similar to SERVER-18304 for update operations
  * using the findAndModify command where the old version of the document is returned.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
@@ -41,13 +40,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 update: {$inc: {counter: 1}},
                 new: false
             });
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             var doc = res.value;
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
                 // return null.
-                assertWhenOwnColl.neq(
+                assert.neq(
                     doc, null, 'findAndModify should have found and updated a matching document');
             }
             if (doc !== null) {

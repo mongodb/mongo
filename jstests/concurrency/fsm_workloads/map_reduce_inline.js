@@ -11,8 +11,6 @@
  *   does_not_support_causal_consistency
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     function mapper() {
         if (this.hasOwnProperty('key') && this.hasOwnProperty('value')) {
@@ -53,7 +51,7 @@ export const $config = (function() {
             var options = {finalize: this.finalizer, out: {inline: 1}};
 
             var res = db[collName].mapReduce(this.mapper, this.reducer, options);
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         }
 
         return {init: init, mapReduce: mapReduce};
@@ -73,8 +71,8 @@ export const $config = (function() {
         }
 
         var res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(this.numDocs, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numDocs, res.nInserted);
     }
 
     return {

@@ -14,8 +14,6 @@
  *   does_not_support_causal_consistency,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         mapper: function mapper() {
@@ -59,7 +57,7 @@ export const $config = (function() {
                     bulk.insert({key: Random.randInt(10000)});
                 }
                 var res = bulk.execute();
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             } catch (ex) {
                 assert.eq(true, ex instanceof BulkWriteError, tojson(ex));
                 assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);

@@ -3,14 +3,12 @@
  *
  * Simply checks that the serverStatus command works
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         status: function status(db, collName) {
             var res = db.serverStatus();
-            assertAlways.commandWorked(res);
-            assertAlways(res.hasOwnProperty('version'));
+            assert.commandWorked(res);
+            assert(res.hasOwnProperty('version'));
         }
     };
 

@@ -6,7 +6,6 @@
  * collection. This includes multi=true updates and multi=false updates with exact _id queries.
  */
 
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
@@ -22,7 +21,7 @@ export var expectedCounters = {};
 export function exactIdUpdate(db, collName, session, idToUpdate) {
     const collection = session.getDatabase(db.getName()).getCollection(collName);
     withTxnAndAutoRetry(session, () => {
-        assertWhenOwnColl.commandWorked(
+        assert.commandWorked(
             collection.update({_id: idToUpdate}, {$inc: {counter: 1}}, {multi: false}));
     });
     // Update the expected counter for the targeted id.
@@ -36,8 +35,7 @@ export function exactIdUpdate(db, collName, session, idToUpdate) {
 export function multiUpdate(db, collName, session, tid) {
     const collection = session.getDatabase(db.getName()).getCollection(collName);
     withTxnAndAutoRetry(session, () => {
-        assertWhenOwnColl.commandWorked(
-            collection.update({tid: tid}, {$inc: {counter: 1}}, {multi: true}));
+        assert.commandWorked(collection.update({tid: tid}, {$inc: {counter: 1}}, {multi: true}));
     });
 
     // The expected counter for every document owned by this thread should be incremented.
@@ -53,7 +51,7 @@ export function verifyDocuments(db, collName, tid) {
     const docs = db[collName].find({tid: tid}).toArray();
     docs.forEach(doc => {
         const expectedCounter = expectedCounters[collName][doc._id];
-        assertWhenOwnColl.eq(expectedCounter, doc.counter, () => {
+        assert.eq(expectedCounter, doc.counter, () => {
             return 'unexpected counter value for collection ' + db[collName] +
                 ', doc: ' + tojson(doc);
         });

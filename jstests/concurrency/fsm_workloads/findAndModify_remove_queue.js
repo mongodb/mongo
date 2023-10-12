@@ -9,7 +9,6 @@
  * This workload was designed to reproduce SERVER-18304.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -36,15 +35,15 @@ export const $config = (function() {
             updateDoc.$push[this.opName] = id;
 
             var res = ownedDB[collName].update({_id: this.tid}, updateDoc, {upsert: true});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
-            assertAlways.contains(res.nMatched, [0, 1], tojson(res));
+            assert.contains(res.nMatched, [0, 1], tojson(res));
             if (res.nMatched === 0) {
-                assertAlways.eq(0, res.nModified, tojson(res));
-                assertAlways.eq(1, res.nUpserted, tojson(res));
+                assert.eq(0, res.nModified, tojson(res));
+                assert.eq(1, res.nUpserted, tojson(res));
             } else {
-                assertAlways.eq(1, res.nModified, tojson(res));
-                assertAlways.eq(0, res.nUpserted, tojson(res));
+                assert.eq(1, res.nModified, tojson(res));
+                assert.eq(0, res.nUpserted, tojson(res));
             }
         }
     };
@@ -53,13 +52,13 @@ export const $config = (function() {
         function remove(db, collName) {
             var res = db.runCommand(
                 {findAndModify: db[collName].getName(), query: {}, sort: {rand: -1}, remove: true});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             var doc = res.value;
             if (isMongod(db)) {
                 // Storage engines should automatically retry the operation, and thus should never
                 // return null.
-                assertWhenOwnColl.neq(
+                assert.neq(
                     doc, null, 'findAndModify should have found and removed a matching document');
             }
             if (doc !== null) {
@@ -81,18 +80,18 @@ export const $config = (function() {
             var doc = this.newDocForInsert(i);
             // Require that documents inserted by this workload use _id values that can be compared
             // using the default JS comparator.
-            assertAlways.neq(typeof doc._id,
-                             'object',
-                             'default comparator of' +
-                                 ' Array.prototype.sort() is not well-ordered for JS objects');
+            assert.neq(typeof doc._id,
+                       'object',
+                       'default comparator of' +
+                           ' Array.prototype.sort() is not well-ordered for JS objects');
             bulk.insert(doc);
         }
         var res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(this.numDocs, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numDocs, res.nInserted);
 
         this.getIndexSpecs().forEach(function createIndex(indexSpec) {
-            assertAlways.commandWorked(db[collName].createIndex(indexSpec));
+            assert.commandWorked(db[collName].createIndex(indexSpec));
         });
     }
 
@@ -104,24 +103,22 @@ export const $config = (function() {
                 // Each findAndModify should be internally retried until it removes exactly one
                 // document. Since this.numDocs == this.iterations * this.threadCount, there should
                 // not be any documents remaining.
-                assertWhenOwnColl.eq(db[collName].find().itcount(),
-                                     0,
-                                     'Expected all documents to have been removed');
+                assert.eq(db[collName].find().itcount(),
+                          0,
+                          'Expected all documents to have been removed');
             }
         }
 
-        assertWhenOwnColl(() => {
-            var docs = ownedDB[collName].find().toArray();
-            var ids = [];
+        var docs = ownedDB[collName].find().toArray();
+        var ids = [];
 
-            for (var i = 0; i < docs.length; ++i) {
-                ids.push(docs[i][this.opName].sort());
-            }
+        for (var i = 0; i < docs.length; ++i) {
+            ids.push(docs[i][this.opName].sort());
+        }
 
-            checkForDuplicateIds(ids, this.opName);
-        });
+        checkForDuplicateIds(ids, this.opName);
 
-        assertAlways.commandWorked(ownedDB.dropDatabase());
+        assert.commandWorked(ownedDB.dropDatabase());
 
         function checkForDuplicateIds(ids, opName) {
             var indices = new Array(ids.length);
@@ -137,7 +134,7 @@ export const $config = (function() {
 
                 var msg = 'threads ' + tojson(smallest.indices) + ' claim to have ' + opName +
                     ' a document with _id = ' + tojson(smallest.value);
-                assertWhenOwnColl.eq(1, smallest.indices.length, msg);
+                assert.eq(1, smallest.indices.length, msg);
 
                 indices[smallest.indices[0]]++;
             }

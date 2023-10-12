@@ -4,7 +4,6 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     withTxnAndAutoRetry
@@ -26,19 +25,18 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             let prevDocuments = undefined;
             for (let i = 0; i < this.numReads; i++) {
                 const collectionDocs = collection.find().batchSize(batchSize).toArray();
-                assertWhenOwnColl.eq(this.numDocs, collectionDocs.length, () => {
+                assert.eq(this.numDocs, collectionDocs.length, () => {
                     return "txnNumber: " + tojson(this.session.getTxnNumber_forTesting()) +
                         ", session id: " + tojson(this.session.getSessionId()) +
                         ", read number: " + i + ", collection docs: " + tojson(collectionDocs);
                 });
                 if (prevDocuments) {
-                    assertAlways.sameMembers(
-                        prevDocuments,
-                        collectionDocs,
-                        () => "Document mismatch - previous documents: " +
-                            tojsononeline(prevDocuments) +
-                            ", current documents: " + tojsononeline(collectionDocs),
-                        bsonBinaryEqual);  // Exact document matches.
+                    assert.sameMembers(prevDocuments,
+                                       collectionDocs,
+                                       () => "Document mismatch - previous documents: " +
+                                           tojsononeline(prevDocuments) +
+                                           ", current documents: " + tojsononeline(collectionDocs),
+                                       bsonBinaryEqual);  // Exact document matches.
                 }
                 prevDocuments = collectionDocs;
             }

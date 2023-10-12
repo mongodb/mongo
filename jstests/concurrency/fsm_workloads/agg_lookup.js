@@ -3,7 +3,7 @@
  *
  * Runs a $lookup aggregation simultaneously with updates.
  */
-import {assertWhenOwnColl, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const data = {numDocs: 100};
@@ -44,7 +44,7 @@ export const $config = (function() {
 
             const res = getQueryResults();
             if (res) {
-                assertWhenOwnColl.eq(res.length, data.numDocs);
+                assert.eq(res.length, data.numDocs);
             }
         }
 
@@ -52,7 +52,7 @@ export const $config = (function() {
             const index = Random.randInt(this.numDocs + 1);
             const update = Random.randInt(this.numDocs + 1);
             const res = db[collName].update({_id: index}, {$set: {to: update}});
-            assertWhenOwnColl.commandWorked(res);
+            assert.commandWorked(res);
         }
 
         return {query, update};
@@ -68,9 +68,9 @@ export const $config = (function() {
         }
 
         const res = bulk.execute();
-        assertWhenOwnColl.commandWorked(res);
-        assertWhenOwnColl.eq(this.numDocs, res.nInserted);
-        assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
+        assert.commandWorked(res);
+        assert.eq(this.numDocs, res.nInserted);
+        assert.eq(this.numDocs, db[collName].find().itcount());
 
         const getParam = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
         const isLookupPushdownEnabled = getParam.hasOwnProperty("internalQueryFrameworkControl") &&
@@ -86,7 +86,7 @@ export const $config = (function() {
             if (strategy === 0) {
                 jsTestLog("Using hash join");
             } else if (strategy === 1) {
-                assertWhenOwnColl.commandWorked(db[collName].createIndex({to: 1}));
+                assert.commandWorked(db[collName].createIndex({to: 1}));
                 jsTestLog("Using index join");
                 this.allowDiskUse = false;
             } else {
@@ -98,7 +98,7 @@ export const $config = (function() {
 
     function teardown(db, collName) {
         // Drop indexes, if any were created.
-        assertWhenOwnColl.commandWorked(db[collName].dropIndexes());
+        assert.commandWorked(db[collName].dropIndexes());
     }
 
     return {

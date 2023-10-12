@@ -6,8 +6,6 @@
  * time, other threads may be dropping {b: 1}. This tests that the replanning process is robust to
  * index drops.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     let data = {
         collName: 'drop_index_during_replan',
@@ -24,18 +22,16 @@ export const $config = (function() {
                 // By running this query multiple times, we expect to create an active plan cache
                 // entry whose plan uses index {a: 1}.
                 for (let i = 0; i < 2; ++i) {
-                    assertAlways.eq(
-                        coll.find({a: "common_value_a", b: "unique_value_15"}).itcount(), 1);
+                    assert.eq(coll.find({a: "common_value_a", b: "unique_value_15"}).itcount(), 1);
                 }
 
                 // Run a query with the same shape, but with different parameters. For this query,
                 // we expect the {a: 1} plan to be evicted during replanning, in favor of {b: 1}.
                 // The query may fail due to a concurrent index drop.
-                assertAlways.eq(coll.find({a: "unique_value_15", b: "common_value_b"}).itcount(),
-                                1);
+                assert.eq(coll.find({a: "unique_value_15", b: "common_value_b"}).itcount(), 1);
             } catch (e) {
                 // We expect any errors to be due to the query getting killed.
-                assertAlways.eq(e.code, ErrorCodes.QueryPlanKilled);
+                assert.eq(e.code, ErrorCodes.QueryPlanKilled);
             }
         },
 
@@ -46,7 +42,7 @@ export const $config = (function() {
             db[collName].dropIndex({b: 1});
 
             // Recreate the index that was dropped.
-            assertAlways.commandWorkedOrFailedWithCode(db[collName].createIndex({b: 1}), [
+            assert.commandWorkedOrFailedWithCode(db[collName].createIndex({b: 1}), [
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
@@ -57,13 +53,13 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         this.indexSpecs.forEach(indexSpec => {
-            assertAlways.commandWorked(db[collName].createIndex(indexSpec));
+            assert.commandWorked(db[collName].createIndex(indexSpec));
         });
 
         for (let i = 0; i < 200; ++i) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db[collName].insert({a: "common_value_a", b: "unique_value_" + i}));
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db[collName].insert({a: "unique_value_" + i, b: "common_value_b"}));
         }
     }

@@ -8,7 +8,6 @@
  * ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
@@ -37,7 +36,7 @@ export const $config = (function() {
             const collectionSize = 100;
             const coll = db[threadCollectionName(collName, tid)];
             const fullNs = coll.getFullName();
-            assertAlways.commandWorked(db.adminCommand({shardCollection: fullNs, key: {"_id": 1}}));
+            assert.commandWorked(db.adminCommand({shardCollection: fullNs, key: {"_id": 1}}));
 
             // Insert documents
             let bulk = coll.initializeUnorderedBulkOp();
@@ -45,9 +44,9 @@ export const $config = (function() {
                 bulk.insert({_id: i, a: i, b: i * 2, c: i / 2, d: i * 3, e: i / 3});
             }
             // Execute the inserts and split the data into two chunks.
-            assertAlways.commandWorked(bulk.execute());
+            assert.commandWorked(bulk.execute());
             const midpoint = collectionSize / 2;
-            assertAlways.commandWorked(db.adminCommand({split: fullNs, middle: {_id: midpoint}}));
+            assert.commandWorked(db.adminCommand({split: fullNs, middle: {_id: midpoint}}));
         }
     };
 
@@ -112,7 +111,7 @@ export const $config = (function() {
             const idx = Random.randInt(data.availableIndexes.length);
             const index = data.availableIndexes[idx];
             const indexName = Object.keys(index)[0];
-            assertAlways.commandWorked(db.runCommand({
+            assert.commandWorked(db.runCommand({
                 createIndexes: this.collName,
                 indexes:
                     [{key: index, name: indexName, expireAfterSeconds: data.expireAfterSeconds}]
@@ -133,8 +132,7 @@ export const $config = (function() {
             const indexToDrop = data.expectedIndexes[idx];
             const indexName = Object.keys(indexToDrop)[0];
             try {
-                assertAlways.commandWorked(
-                    db.runCommand({dropIndexes: this.collName, index: indexName}));
+                assert.commandWorked(db.runCommand({dropIndexes: this.collName, index: indexName}));
             } catch (e) {
                 // Since dropping an index across shards is not atomic, it can be the case that
                 // the cluster ends up in an inconsistent state temporarily. In particular, a
@@ -166,8 +164,7 @@ export const $config = (function() {
                 collMod: this.collName,
                 index: {keyPattern: indexToModify, expireAfterSeconds: data.expireAfterSeconds}
             });
-            assertAlways.commandWorkedOrFailedWithCode(result,
-                                                       ErrorCodes.ConflictingOperationInProgress);
+            assert.commandWorkedOrFailedWithCode(result, ErrorCodes.ConflictingOperationInProgress);
         },
 
         // Verify that the indexes that we expect to be on disk are actually there and that indexes
@@ -181,9 +178,9 @@ export const $config = (function() {
         // inconsistent indexes the chance to clear up.
         verifyIndexes: function(db, collName, connCache) {
             function getKeyPattern(index) {
-                assertAlways.hasFields(index, ["spec"]);
+                assert.hasFields(index, ["spec"]);
                 const spec = index["spec"];
-                assertAlways.hasFields(spec, ["key"]);
+                assert.hasFields(spec, ["key"]);
                 return spec["key"];
             }
 
@@ -192,7 +189,7 @@ export const $config = (function() {
                 const actualIndexes = ShardedIndexUtil.getPerShardIndexes(db[collName]);
                 for (let expectedIndex of data.expectedIndexes) {
                     let match = actualIndexes.some((indexList) => {
-                        assertAlways.hasFields(indexList, ["indexes"]);
+                        assert.hasFields(indexList, ["indexes"]);
                         const indexes = indexList["indexes"];
                         const indexKeyPatterns = indexes.map(index => getKeyPattern(index));
                         return ShardedIndexUtil.containsBSONIgnoreFieldsOrder(indexKeyPatterns,

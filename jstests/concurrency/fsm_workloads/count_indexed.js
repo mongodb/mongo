@@ -8,7 +8,6 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/count.js";
 
@@ -24,7 +23,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName) {
         this.threadCollName = this.prefix + '_' + this.tid;
         $super.states.init.apply(this, arguments);
-        assertAlways.commandWorked(db[this.threadCollName].createIndex({tid: 1, i: 1}));
+        assert.commandWorked(db[this.threadCollName].createIndex({tid: 1, i: 1}));
     };
 
     return $config;

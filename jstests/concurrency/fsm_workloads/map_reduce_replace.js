@@ -13,7 +13,6 @@
  *   does_not_support_causal_consistency
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_inline.js";
 
@@ -30,13 +29,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         $super.states.init.apply(this, arguments);
 
         this.outCollName = uniqueCollectionName(prefix, this.tid);
-        assertAlways.commandWorked(db.createCollection(this.outCollName));
+        assert.commandWorked(db.createCollection(this.outCollName));
     };
 
     $config.states.mapReduce = function mapReduce(db, collName) {
         var fullName = db[this.outCollName].getFullName();
-        assertAlways(db[this.outCollName].exists() !== null,
-                     "output collection '" + fullName + "' should exist");
+        assert(db[this.outCollName].exists() !== null,
+               "output collection '" + fullName + "' should exist");
 
         var options = {
             finalize: this.finalizer,
@@ -46,7 +45,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         };
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
     };
 
     return $config;

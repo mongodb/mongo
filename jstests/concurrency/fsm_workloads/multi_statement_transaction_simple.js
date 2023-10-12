@@ -6,7 +6,6 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
@@ -22,7 +21,7 @@ export const $config = (function() {
             withTxnAndAutoRetry(session, () => {
                 documents = collection.find().toArray();
 
-                assertWhenOwnColl.eq(numDocs, documents.length, () => tojson(documents));
+                assert.eq(numDocs, documents.length, () => tojson(documents));
             }, txnHelperOptions);
             return documents;
         }
@@ -36,9 +35,9 @@ export const $config = (function() {
             const documents = getAllDocuments(this.session, collection, this.numAccounts, {
                 retryOnKilledSession: this.retryOnKilledSession
             });
-            assertWhenOwnColl.eq(this.numAccounts * this.initialValue,
-                                 computeTotalOfAllBalances(documents),
-                                 () => tojson(documents));
+            assert.eq(this.numAccounts * this.initialValue,
+                      computeTotalOfAllBalances(documents),
+                      () => tojson(documents));
         }
 
         function transferMoney(db, collName) {
@@ -58,17 +57,17 @@ export const $config = (function() {
                     updates: [{q: {_id: transferFrom}, u: {$inc: {balance: -transferAmount}}}],
                 });
 
-                assertAlways.commandWorked(res);
-                assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
-                assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
+                assert.commandWorked(res);
+                assert.eq(res.n, 1, () => tojson(res));
+                assert.eq(res.nModified, 1, () => tojson(res));
 
                 res = collection.runCommand('update', {
                     updates: [{q: {_id: transferTo}, u: {$inc: {balance: transferAmount}}}],
                 });
 
-                assertAlways.commandWorked(res);
-                assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
-                assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
+                assert.commandWorked(res);
+                assert.eq(res.n, 1, () => tojson(res));
+                assert.eq(res.nModified, 1, () => tojson(res));
             }, {retryOnKilledSession: this.retryOnKilledSession});
         }
 
@@ -93,7 +92,7 @@ export const $config = (function() {
             }));
         }
 
-        assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
 
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < this.numAccounts; ++i) {
@@ -101,8 +100,8 @@ export const $config = (function() {
         }
 
         const res = bulk.execute({w: 'majority'});
-        assertWhenOwnColl.commandWorked(res);
-        assertWhenOwnColl.eq(this.numAccounts, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numAccounts, res.nInserted);
 
         if (cluster.isSharded()) {
             // Advance each router's cluster time to be >= the time of the writes, so the first
@@ -113,9 +112,9 @@ export const $config = (function() {
 
     function teardown(db, collName, cluster) {
         const documents = db[collName].find().toArray();
-        assertWhenOwnColl.eq(this.numAccounts * this.initialValue,
-                             computeTotalOfAllBalances(documents),
-                             () => tojson(documents));
+        assert.eq(this.numAccounts * this.initialValue,
+                  computeTotalOfAllBalances(documents),
+                  () => tojson(documents));
 
         // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be
         // majority by setting CWWC to {w: majority}.

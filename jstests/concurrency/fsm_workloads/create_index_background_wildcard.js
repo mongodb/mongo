@@ -6,7 +6,6 @@
  *   creates_background_indexes
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/create_index_background.js";
 
@@ -19,7 +18,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const fieldName = "arrayField";
 
         // Be sure we're not overwriting an existing field.
-        assertAlways.eq(originalDoc.hasOwnProperty(fieldName), false);
+        assert.eq(originalDoc.hasOwnProperty(fieldName), false);
 
         // Insert a field which has an array as the value, to exercise the special multikey
         // metadata functionality wildcard indexes rely on.

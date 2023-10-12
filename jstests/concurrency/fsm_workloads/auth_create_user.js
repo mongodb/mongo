@@ -3,7 +3,6 @@
  *
  * Repeatedly creates new users on a database.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {dropUsers} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 
 // UMC commands are not supported in transactions.
@@ -47,9 +46,9 @@ export const $config = (function() {
             // Verify the newly created user exists, as well as all previously created users
             for (var i = 0; i < this.num; ++i) {
                 var res = db.getUser(username);
-                assertAlways(res !== null, "user '" + username + "' should exist");
-                assertAlways.eq(username, res.user);
-                assertAlways.eq(db.getName(), res.db);
+                assert(res !== null, "user '" + username + "' should exist");
+                assert.eq(username, res.user);
+                assert.eq(db.getName(), res.db);
             }
         }
 

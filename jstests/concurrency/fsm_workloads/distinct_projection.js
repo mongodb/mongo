@@ -5,7 +5,6 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/distinct.js";
 
@@ -14,7 +13,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.states.distinct = function distinct(db, collName) {
         var query = {i: {$lt: this.numDocs / 2}};
-        assertWhenOwnColl.eq(this.numDocs / 2, db[this.threadCollName].distinct('i', query).length);
+        assert.eq(this.numDocs / 2, db[this.threadCollName].distinct('i', query).length);
     };
 
     return $config;

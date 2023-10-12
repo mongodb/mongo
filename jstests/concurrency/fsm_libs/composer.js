@@ -1,14 +1,9 @@
-import {AssertLevel} from "jstests/concurrency/fsm_libs/assert.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 
 export var composer = (function() {
     function runCombinedFSM(workloads, configs, mixProb) {
         // TODO: what if a workload depends on iterations?
         var iterations = 100;
-
-        assert.eq(
-            AssertLevel.ALWAYS, globalAssertLevel, 'global assertion level is not set as ALWAYS');
-
         var currentWorkload = getRandomElem(workloads, Random.rand());
         var currentState = configs[currentWorkload].startState;
 

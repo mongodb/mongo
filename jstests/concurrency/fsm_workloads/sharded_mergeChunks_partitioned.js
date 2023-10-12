@@ -9,7 +9,6 @@
  *  assumes_balancer_off,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
@@ -54,7 +53,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var innerChunkSize = Math.floor(this.partitionSize / this.iterations);
         for (var i = 0; i < this.iterations; ++i) {
             var splitPoint = ((i + 1) * innerChunkSize) + partition.lower;
-            assertAlways.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, splitPoint));
+            assert.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, splitPoint));
         }
     };
 
@@ -77,12 +76,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         // Verify that there is at least one chunk in our partition and that
         // there are at least as many chunks in our partition as iterations.
-        assertWhenOwnColl.gte(
+        assert.gte(
             numChunksInPartition, 1, "should be at least one chunk in each thread's partition.");
-        assertWhenOwnColl.gt(numChunksInPartition,
-                             this.iterations,
-                             "should be more chunks in each thread's partition " +
-                                 'than iterations in order to accomodate that many mergeChunks.');
+        assert.gt(numChunksInPartition,
+                  this.iterations,
+                  "should be more chunks in each thread's partition " +
+                      'than iterations in order to accomodate that many mergeChunks.');
     };
 
     // Merge a random chunk in this thread's partition with its upper neighbor.
@@ -129,7 +128,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var shardNumDocsAfter =
             ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
         var msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
-        assertWhenOwnColl.eq(shardNumDocsAfter, numDocsBefore, msg);
+        assert.eq(shardNumDocsAfter, numDocsBefore, msg);
 
         // Save the number of chunks before the mergeChunks operation. This will be used
         // to verify that the number of chunks after a successful mergeChunks decreases
@@ -156,13 +155,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         shardNumDocsAfter =
             ChunkHelper.getNumDocs(shardPrimary, ns, chunk1.min._id, chunk2.max._id);
         msg = "Chunk1's shard should contain all documents after mergeChunks.\n" + msgBase;
-        assertWhenOwnColl.eq(shardNumDocsAfter, numDocsBefore, msg);
+        assert.eq(shardNumDocsAfter, numDocsBefore, msg);
 
         // Verify that all config servers have the correct after-state.
         // (see comments below for specifics).
         for (var conn of connCache.config) {
             var res = conn.adminCommand({hello: 1});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             if (res.isWritablePrimary) {
                 // If the mergeChunks operation succeeded, verify that there is now one chunk
                 // between the original chunks' lower and upper bounds. If the operation failed,
@@ -173,11 +172,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 if (mergeChunksRes.ok) {
                     msg = 'mergeChunks succeeded but config does not see exactly 1 chunk between ' +
                         'the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 1, msg);
+                    assert.eq(numChunksBetweenOldChunksBounds, 1, msg);
                 } else {
                     msg = 'mergeChunks failed but config does not see exactly 2 chunks between ' +
                         'the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 2, msg);
+                    assert.eq(numChunksBetweenOldChunksBounds, 2, msg);
                 }
 
                 // If the mergeChunks operation succeeded, verify that the total number
@@ -188,11 +187,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 if (mergeChunksRes.ok) {
                     msg = 'mergeChunks succeeded but config does not see exactly 1 fewer chunks ' +
                         'between the chunk bounds than before.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksAfter, numChunksBefore - 1, msg);
+                    assert.eq(numChunksAfter, numChunksBefore - 1, msg);
                 } else {
                     msg = 'mergeChunks failed but config sees a different number of chunks ' +
                         'between the chunk bounds.\n' + msgBase;
-                    assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
+                    assert.eq(numChunksAfter, numChunksBefore, msg);
                 }
             }
         }
@@ -206,7 +205,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk1.min._id, chunk2.max._id);
             msg = 'Mongos sees a different amount of documents between chunk bounds after ' +
                 'mergeChunks.\n' + msgBase;
-            assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msg);
+            assert.eq(numDocsAfter, numDocsBefore, msg);
 
             // Regardless of if the mergeChunks operation succeeded or failed, verify that each
             // mongos sees all data in the original chunks' range only on the shard the original
@@ -216,11 +215,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             msg = 'Mongos does not see exactly 1 shard for chunk after mergeChunks.\n' + msgBase +
                 '\n' +
                 'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
-            assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
+            assert.eq(shardsForChunk.shards.length, 1, msg);
             msg = 'Mongos sees different shard for chunk than chunk does after mergeChunks.\n' +
                 msgBase + '\n' +
                 'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
-            assertWhenOwnColl.eq(shardsForChunk.shards[0], chunk1.shard, msg);
+            assert.eq(shardsForChunk.shards[0], chunk1.shard, msg);
 
             // If the mergeChunks operation succeeded, verify that the mongos sees one chunk between
             // the original chunks' lower and upper bounds. If the operation failed, verify that the
@@ -230,11 +229,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             if (mergeChunksRes.ok) {
                 msg = 'mergeChunks succeeded but mongos does not see exactly 1 chunk between ' +
                     'the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 1, msg);
+                assert.eq(numChunksBetweenOldChunksBounds, 1, msg);
             } else {
                 msg = 'mergeChunks failed but mongos does not see exactly 2 chunks between ' +
                     'the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 2, msg);
+                assert.eq(numChunksBetweenOldChunksBounds, 2, msg);
             }
 
             // If the mergeChunks operation succeeded, verify that the mongos sees that the total
@@ -245,11 +244,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             if (mergeChunksRes.ok) {
                 msg = 'mergeChunks succeeded but mongos does not see exactly 1 fewer chunks ' +
                     'between the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksAfter, numChunksBefore - 1, msg);
+                assert.eq(numChunksAfter, numChunksBefore - 1, msg);
             } else {
                 msg = 'mergeChunks failed but mongos does not see the same number of chunks ' +
                     'between the chunk bounds.\n' + msgBase;
-                assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
+                assert.eq(numChunksAfter, numChunksBefore, msg);
             }
         }
     };

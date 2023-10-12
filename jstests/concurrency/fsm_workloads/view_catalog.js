@@ -4,8 +4,6 @@
  * Creates, modifies and drops view namespaces concurrently. Each worker operates on their own view,
  * built on a shared underlying collection.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the view name, since the workload name is assumed
@@ -24,41 +22,40 @@ export const $config = (function() {
                 assert.eq({_id: counter}, db[collName].aggregate(pipeline).toArray()[0]);
                 assert.eq({_id: counter}, db[viewName].findOne());
                 const res = db.runCommand({listCollections: 1, filter: {name: viewName}});
-                assertAlways.commandWorked(res);
-                assertAlways.eq(1, res.cursor.firstBatch.length, tojson(res));
-                assertAlways.eq({
+                assert.commandWorked(res);
+                assert.eq(1, res.cursor.firstBatch.length, tojson(res));
+                assert.eq({
                     name: viewName,
                     type: "view",
                     options: {viewOn: collName, pipeline: pipeline},
                     info: {readOnly: true}
                 },
-                                res.cursor.firstBatch[0],
-                                tojson(res));
+                          res.cursor.firstBatch[0],
+                          tojson(res));
             };
         }
 
         function create(db, collName) {
             this.counter++;
             let pipeline = [{$match: {_id: this.counter}}];
-            assertAlways.commandWorked(
-                db.createView(this.threadViewName, this.threadCollName, pipeline));
+            assert.commandWorked(db.createView(this.threadViewName, this.threadCollName, pipeline));
             this.confirmViewDefinition(db, this.threadViewName, collName, pipeline, this.counter);
         }
 
         function modify(db, collName) {
             this.counter++;
             let pipeline = [{$match: {_id: this.counter}}];
-            assertAlways.commandWorked(db.runCommand(
+            assert.commandWorked(db.runCommand(
                 {collMod: this.threadViewName, viewOn: this.threadCollName, pipeline: pipeline}));
             this.confirmViewDefinition(db, this.threadViewName, collName, pipeline, this.counter);
         }
 
         function drop(db, collName) {
-            assertAlways.commandWorked(db.runCommand({drop: this.threadViewName}));
+            assert.commandWorked(db.runCommand({drop: this.threadViewName}));
 
             let res = db.runCommand({listCollections: 1, filter: {name: this.threadViewName}});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(0, res.cursor.firstBatch.length, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(0, res.cursor.firstBatch.length, tojson(res));
         }
 
         return {init: init, create: create, modify: modify, drop: drop};
@@ -76,7 +73,7 @@ export const $config = (function() {
         for (let i = 0; i < this.iterations; i++) {
             bulk.insert({_id: i});
         }
-        assertAlways.commandWorked(bulk.execute());
+        assert.commandWorked(bulk.execute());
     };
 
     return {

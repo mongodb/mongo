@@ -7,7 +7,6 @@
  *  - what value to $set the field to
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -25,18 +24,18 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         // index on 'value', the field being updated
-        assertAlways.commandWorked(db[collName].createIndex({value: 1}));
+        assert.commandWorked(db[collName].createIndex({value: 1}));
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 5);
-        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
 
         for (var i = 0; i < this.numDocs; ++i) {
             // make sure the inserted docs have a 'value' field, so they won't need
             // to grow when this workload runs against a capped collection
             var res = db[collName].insert({_id: i, value: 0});
-            assertWhenOwnColl.commandWorked(res);
-            assertWhenOwnColl.eq(1, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted);
         }
     }
 
@@ -49,23 +48,23 @@ export const $config = (function() {
         data: {
             // explicitly pass db to avoid accidentally using the global `db`
             assertResult: function assertResult(db, res) {
-                assertAlways.eq(0, res.nUpserted, tojson(res));
+                assert.eq(0, res.nUpserted, tojson(res));
 
                 if (isMongod(db)) {
                     // Storage engines will automatically retry any operations when there are
                     // conflicts, so we should always see a matching document.
-                    assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
+                    assert.eq(res.nMatched, 1, tojson(res));
                 } else {
                     // On storage engines that do not support document-level concurrency, it is
                     // possible that the query will not find the document. This can happen if
                     // another thread updated the target document during a yield, triggering an
                     // invalidation.
-                    assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
+                    assert.contains(res.nMatched, [0, 1], tojson(res));
                 }
 
                 // We can't be sure nModified will be non-zero because we may have just set a key to
                 // its existing value
-                assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+                assert.contains(res.nModified, [0, 1], tojson(res));
             },
 
             setOrUnset: function setOrUnset(db, collName, set, numDocs) {

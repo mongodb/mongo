@@ -4,7 +4,6 @@
  * Intersperse queries which use the ID_HACK stage with updates and deletes of documents they may
  * match.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
@@ -19,10 +18,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.query = function idHack(db, collName) {
         var nQueries = 100;
         for (var i = 0; i < nQueries; i++) {
-            assertAlways.lte(db[collName].find({_id: i}).itcount(), 1);
+            assert.lte(db[collName].find({_id: i}).itcount(), 1);
             var res = db[collName].findOne({_id: i});
             if (res !== null) {
-                assertAlways.eq(i, res._id);
+                assert.eq(i, res._id);
             }
         }
     };

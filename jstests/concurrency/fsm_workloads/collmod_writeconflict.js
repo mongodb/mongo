@@ -3,7 +3,6 @@
  *
  * Ensures collMod successfully handles WriteConflictExceptions.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/collmod.js";
 
@@ -15,18 +14,18 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // properly.
         /*
           So long as there are no BFs, leave WCE tracing disabled.
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.adminCommand({setParameter: 1, traceWriteConflictExceptions: true}));
         */
 
         // Set up failpoint to trigger WriteConflictException during write operations.
-        assertAlways.commandWorked(db.adminCommand(
+        assert.commandWorked(db.adminCommand(
             {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.5}}));
     };
     $config.teardown = function teardown(db, collName, cluster) {
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.adminCommand({setParameter: 1, traceWriteConflictExceptions: false}));
     };
 

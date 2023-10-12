@@ -9,7 +9,6 @@
  *
  * @tags: [requires_non_retryable_writes]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var states = {
@@ -21,9 +20,9 @@ export const $config = (function() {
                 update = {$inc: {n: 1}},
                 options = {multi: true, upsert: true});
             var debugDoc = tojson({query: query, update: update, options: options, result: res});
-            assertWhenOwnColl.eq(1, res.nUpserted, debugDoc);
-            assertWhenOwnColl.eq(0, res.nMatched, debugDoc);
-            assertWhenOwnColl.eq(0, res.nModified, debugDoc);
+            assert.eq(1, res.nUpserted, debugDoc);
+            assert.eq(0, res.nMatched, debugDoc);
+            assert.eq(0, res.nModified, debugDoc);
         },
 
         update: function update(db, collName) {
@@ -34,9 +33,9 @@ export const $config = (function() {
                 {$inc: {n: 1}},
                 {multi: true, upsert: true});
 
-            assertWhenOwnColl.eq(0, res.nUpserted, tojson(res));
-            assertWhenOwnColl.lte(1, res.nMatched, tojson(res));
-            assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
+            assert.eq(0, res.nUpserted, tojson(res));
+            assert.lte(1, res.nMatched, tojson(res));
+            assert.eq(res.nMatched, res.nModified, tojson(res));
         },
 
         assertConsistency: function assertConsistency(db, collName) {
@@ -49,7 +48,7 @@ export const $config = (function() {
             // opportunities to have n incremented.)
             var prevN = Infinity;
             db[collName].find({tid: this.tid}).sort({i: 1}).forEach(function(doc) {
-                assertWhenOwnColl.gte(prevN, doc.n);
+                assert.gte(prevN, doc.n);
                 prevN = doc.n;
             });
         }
@@ -62,7 +61,7 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({tid: 1, i: 1}));
+        assert.commandWorked(db[collName].createIndex({tid: 1, i: 1}));
     }
 
     return {

@@ -5,8 +5,6 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is the thread's id.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     function makeSortSpecFromIndexSpec(ixSpec) {
         var sort = {};
@@ -35,26 +33,24 @@ export const $config = (function() {
 
         insert: function insert(db, collName) {
             var res = db[collName].insert(this.getDoc());
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
             this.nInserted += this.docsPerInsert;
         },
 
         find: function find(db, collName) {
             // collection scan
             var count = db[collName].find(this.getQuery()).sort({$natural: 1}).itcount();
-            assertWhenOwnColl.eq(count, this.nInserted);
+            if (!this.skipAssertions) {
+                assert.eq(count, this.nInserted);
+            }
 
             // Use hint() to force an index scan, but only when an appropriate index exists.
-            // We can only use hint() when the index exists and we know that the collection
-            // is not being potentially modified by other workloads.
-            var ownColl = false;
-            assertWhenOwnColl(function() {
-                ownColl = true;
-            });
-            if (this.indexExists && ownColl) {
+            if (this.indexExists) {
                 count = db[collName].find(this.getQuery()).hint(this.getIndexSpec()).itcount();
-                assertWhenOwnColl.eq(count, this.nInserted);
+                if (!this.skipAssertions) {
+                    assert.eq(count, this.nInserted);
+                }
             }
 
             // Otherwise, impose a sort ordering over the collection scan
@@ -63,7 +59,9 @@ export const $config = (function() {
                 // valid sort spec; however, for geospatial and text indexes it is not
                 var sort = makeSortSpecFromIndexSpec(this.getIndexSpec());
                 count = db[collName].find(this.getQuery()).sort(sort).itcount();
-                assertWhenOwnColl.eq(count, this.nInserted);
+                if (!this.skipAssertions) {
+                    assert.eq(count, this.nInserted);
+                }
             }
         }
     };
@@ -72,7 +70,7 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         const spec = {name: this.getIndexName(), key: this.getIndexSpec()};
-        assertAlways.commandWorked(db.runCommand({
+        assert.commandWorked(db.runCommand({
             createIndexes: collName,
             indexes: [spec],
             writeConcern: {w: 'majority'},
@@ -104,7 +102,8 @@ export const $config = (function() {
             },
             indexedField: 'x',
             shardKey: {x: 1},
-            docsPerInsert: 1
+            docsPerInsert: 1,
+            skipAssertions: false,
         },
         setup: setup
     };

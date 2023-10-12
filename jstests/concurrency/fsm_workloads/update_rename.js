@@ -3,13 +3,11 @@
  *
  * Each thread does a $rename to cause documents to jump between indexes.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var fieldNames = ['update_rename_x', 'update_rename_y', 'update_rename_z'];
 
     function choose(array) {
-        assertAlways.gt(array.length, 0, "can't choose an element of an empty array");
+        assert.gt(array.length, 0, "can't choose an element of an empty array");
         return array[Random.randInt(array.length)];
     }
 
@@ -27,9 +25,9 @@ export const $config = (function() {
 
             var res = db[collName].update(query, updater);
 
-            assertAlways.eq(0, res.nUpserted, tojson(res));
-            assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-            assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
+            assert.eq(0, res.nUpserted, tojson(res));
+            assert.contains(res.nMatched, [0, 1], tojson(res));
+            assert.eq(res.nMatched, res.nModified, tojson(res));
         }
     };
 
@@ -41,20 +39,20 @@ export const $config = (function() {
         fieldNames.slice(1).forEach(function(fieldName) {
             var indexSpec = {};
             indexSpec[fieldName] = 1;
-            assertAlways.commandWorked(db[collName].createIndex(indexSpec));
+            assert.commandWorked(db[collName].createIndex(indexSpec));
         });
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 5);
-        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
 
         for (var i = 0; i < this.numDocs; ++i) {
             var fieldName = fieldNames[i % fieldNames.length];
             var doc = {};
             doc[fieldName] = i;
             var res = db[collName].insert(doc);
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted);
         }
     }
 

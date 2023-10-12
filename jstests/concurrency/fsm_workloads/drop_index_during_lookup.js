@@ -4,7 +4,7 @@
  * Sets up a situation where index join strategy will be chosen for $lookup while while running
  * concurrent dropIndexes against the index chosen for the foreign side.
  */
-import {assertAlways, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     let data = {
@@ -22,7 +22,7 @@ export const $config = (function() {
             } catch (e) {
                 // We expect any errors of query getting killed due to selected index for join is
                 // dropped.
-                assertAlways.contains(e.code, interruptedQueryErrors);
+                assert.contains(e.code, interruptedQueryErrors);
             }
         },
 
@@ -32,20 +32,19 @@ export const $config = (function() {
             db[this.foreignCollName].dropIndex({b: 1});
 
             // Recreate the index that was dropped.
-            assertAlways.commandWorkedOrFailedWithCode(db[this.foreignCollName].createIndex({b: 1}),
-                                                       [
-                                                           ErrorCodes.IndexBuildAborted,
-                                                           ErrorCodes.NoMatchingDocument,
-                                                       ]);
+            assert.commandWorkedOrFailedWithCode(db[this.foreignCollName].createIndex({b: 1}), [
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.NoMatchingDocument,
+            ]);
         }
     };
 
     let transitions = {lookup: {lookup: 0.8, dropIndex: 0.2}, dropIndex: {lookup: 1}};
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[this.collName].insert({_id: 0, a: 0}));
-        assertAlways.commandWorked(db[this.foreignCollName].insert({_id: 0, b: 0}));
-        assertAlways.commandWorked(db[this.foreignCollName].createIndex({b: 1}));
+        assert.commandWorked(db[this.collName].insert({_id: 0, a: 0}));
+        assert.commandWorked(db[this.foreignCollName].insert({_id: 0, b: 0}));
+        assert.commandWorked(db[this.foreignCollName].createIndex({b: 1}));
     }
 
     return {

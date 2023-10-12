@@ -11,8 +11,6 @@
  *     requires_capped,
  *   ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -32,8 +30,8 @@ export const $config = (function() {
 
             var options = {capped: true, size: 4096};
 
-            assertAlways.commandWorked(fromDB.createCollection(collName, options));
-            assertAlways(fromDB[collName].isCapped());
+            assert.commandWorked(fromDB.createCollection(collName, options));
+            assert(fromDB[collName].isCapped());
         }
 
         function rename(db, collName) {
@@ -44,12 +42,12 @@ export const $config = (function() {
                 dropTarget: false
             };
 
-            assertAlways.commandWorked(db.adminCommand(renameCommand));
-            assertAlways(db.getSiblingDB(toDBName)[collName].isCapped());
+            assert.commandWorked(db.adminCommand(renameCommand));
+            assert(db.getSiblingDB(toDBName)[collName].isCapped());
 
             // Remove any files associated with the "from" namespace
             // to avoid having too many files open
-            assertAlways.commandWorked(db.getSiblingDB(this.fromDBName).dropDatabase());
+            assert.commandWorked(db.getSiblingDB(this.fromDBName).dropDatabase());
 
             this.fromDBName = toDBName;
         }

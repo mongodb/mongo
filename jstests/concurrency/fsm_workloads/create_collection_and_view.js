@@ -4,8 +4,6 @@
  *
  * @tags: [catches_command_failures, antithesis_incompatible]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const prefix = "create_collection_and_view";
 
@@ -22,7 +20,7 @@ export const $config = (function() {
     };
 
     const setup = (db, collName) => {
-        assertAlways.commandWorked(db.createCollection(getBaseCollectionName(collName)));
+        assert.commandWorked(db.createCollection(getBaseCollectionName(collName)));
     };
 
     const teardown = (db, collName) => {
@@ -36,7 +34,7 @@ export const $config = (function() {
             // In a sharded collection, we may sometimes get a NamespaceNotFound error, as we
             // attempt to to do some additional validation on the creation options after we get back
             // the NamespaceExists error, and the namespace may have been dropped in the meantime.
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.createCollection(
                     getCollectionName(collName),
                     {viewOn: getBaseCollectionName(collName), pipeline: [{$match: {}}]}),
@@ -44,7 +42,7 @@ export const $config = (function() {
         },
         createCollection: (db, collName) => {
             // In a sharded collection, we may sometimes get a NamespaceNotFound error. See above.
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.createCollection(getCollectionName(collName)),
                 [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound]);
         },
@@ -52,10 +50,10 @@ export const $config = (function() {
             // Check how many collections/views match our namespace.
             const res =
                 db.runCommand("listCollections", {filter: {name: getCollectionName(collName)}});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             // We expect that we only ever find 0 or 1. If we find 2 or more, then we managed to
             // create a view and collection on the same namespace simultaneously, which is a bug.
-            assertAlways.lte(res.cursor.firstBatch.length, 1);
+            assert.lte(res.cursor.firstBatch.length, 1);
         },
         dropNamespace: (db, collName) => {
             db.getCollection(getCollectionName(collName)).drop();

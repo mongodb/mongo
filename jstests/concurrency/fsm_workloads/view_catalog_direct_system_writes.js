@@ -5,7 +5,6 @@
  * does so via direct writes to system.views instead of using the collMod or drop commands. Each
  * worker operates on their own view, built on a shared underlying collection.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/view_catalog.js";
 
@@ -13,9 +12,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.create = function create(db, collName) {
         this.counter++;
         let pipeline = [{$match: {_id: this.counter}}];
-        assertAlways.commandWorkedOrFailedWithCode(db.createCollection("system.views"),
-                                                   ErrorCodes.NamespaceExists);
-        assertAlways.commandWorked(db.adminCommand({
+        assert.commandWorkedOrFailedWithCode(db.createCollection("system.views"),
+                                             ErrorCodes.NamespaceExists);
+        assert.commandWorked(db.adminCommand({
             applyOps: [{
                 op: "i",
                 ns: db.getName() + ".system.views",
@@ -30,7 +29,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.states.drop = function drop(db, collName) {
-        assertAlways.commandWorked(db.adminCommand({
+        assert.commandWorked(db.adminCommand({
             applyOps: [{
                 op: "d",
                 ns: db.getName() + ".system.views",
@@ -39,8 +38,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }));
 
         let res = db.runCommand({listCollections: 1, filter: {name: this.threadViewName}});
-        assertAlways.commandWorked(res);
-        assertAlways.eq(0, res.cursor.firstBatch.length, tojson(res));
+        assert.commandWorked(res);
+        assert.eq(0, res.cursor.firstBatch.length, tojson(res));
     };
 
     // Unfortunately we cannot perform an update in the place of a collMod since the update would

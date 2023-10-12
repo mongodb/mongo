@@ -12,7 +12,6 @@
  * @tags: [does_not_support_wiredtiger_lsm, incompatible_with_macos, requires_compact]
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
@@ -37,8 +36,8 @@ export const $config = (function() {
                 bulk.insert({a: Random.randInt(10), b: Random.randInt(10), c: Random.randInt(10)});
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.nDocumentsToInsert, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(this.nDocumentsToInsert, res.nInserted);
         }
 
         function createIndexes(db, collName) {
@@ -70,20 +69,20 @@ export const $config = (function() {
         function compact(db, collName) {
             var res = db.runCommand({compact: this.threadCollName, force: true});
             if (!isEphemeral(db)) {
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             } else {
-                assertAlways.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
+                assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
             }
         }
 
         function query(db, collName) {
             var count = db[this.threadCollName].find().itcount();
-            assertWhenOwnColl.eq(count,
-                                 this.nDocumentsToInsert,
-                                 'number of documents in ' +
-                                     'collection should not change following a compact');
+            assert.eq(count,
+                      this.nDocumentsToInsert,
+                      'number of documents in ' +
+                          'collection should not change following a compact');
             var indexesCount = db[this.threadCollName].getIndexes().length;
-            assertWhenOwnColl.eq(indexesCount, this.nIndexes);
+            assert.eq(indexesCount, this.nIndexes);
         }
 
         return {init: init, collectionSetup: collectionSetup, compact: compact, query: query};

@@ -8,21 +8,20 @@
  * @tags: [uses_ttl]
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 export const $config = (function() {
     var states = {
         init: function init(db, collName) {
             var res = db[collName].insert({indexed_insert_ttl: new ISODate(), first: true});
-            assertAlways.commandWorked(res);
-            assertWhenOwnColl.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         },
 
         insert: function insert(db, collName) {
             var res = db[collName].insert({indexed_insert_ttl: new ISODate()});
-            assertAlways.commandWorked(res);
-            assertWhenOwnColl.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         }
     };
 
@@ -31,7 +30,7 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         var res = db[collName].createIndex({indexed_insert_ttl: 1},
                                            {expireAfterSeconds: this.ttlSeconds});
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
     }
 
     function teardown(db, collName, cluster) {
@@ -53,7 +52,7 @@ export const $config = (function() {
         var timeoutMS =
             (TestData.inEvergreen ? 10 : 2) * Math.max(defaultTTLSecs, this.ttlSeconds) * 1000;
 
-        assertWhenOwnColl.soon(function checkTTLCount() {
+        assert.soon(function checkTTLCount() {
             // All initial documents should be removed by the end of the workload.
             var count = db[collName].find({first: true}).itcount();
             return count === 0;

@@ -10,7 +10,7 @@
  *  assumes_unsharded_collection,
  * ]
  */
-import {assertAlways, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     const data = {
@@ -55,7 +55,7 @@ export const $config = (function() {
             const myCollName = randomCollectionName(this.prefix, this.collectionCount);
             for (let i = 0; i < 10; ++i) {
                 let res = localDb.runCommand({find: myCollName, filter: {}});
-                assertAlways.commandWorkedOrFailedWithCode(res, interruptedQueryErrors);
+                assert.commandWorkedOrFailedWithCode(res, interruptedQueryErrors);
             }
         }
 
@@ -65,8 +65,8 @@ export const $config = (function() {
             for (let i = 0; i < 10; ++i) {
                 let res = localDb.runCommand(
                     {find: myCollName, filter: {}, tailable: true, batchSize: 0});
-                assertAlways.commandWorked(res);
-                assertAlways.commandWorkedOrFailedWithCode(
+                assert.commandWorked(res);
+                assert.commandWorkedOrFailedWithCode(
                     localDb.runCommand({getMore: res.cursor.id, collection: myCollName}),
                     interruptedQueryErrors);
             }

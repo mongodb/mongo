@@ -4,7 +4,6 @@
  * Intersperse queries which use the AND_SORTED stage with updates and deletes of documents they
  * may match.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_rooted_or.js";
 
@@ -50,14 +49,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Intersect the two
             var andix1ix2 = {andSorted: {args: {nodes: [ixscan1, ixscan2]}}};
             var res = db.runCommand({stageDebug: {collection: collName, plan: andix1ix2}});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             for (var j = 0; j < res.results.length; j++) {
                 var result = res.results[j];
                 // These should always be true, since they're just verifying that the results
                 // match
                 // the query predicate.
-                assertAlways.eq(result.c, 0);
-                assertAlways.eq(result.d, this.nDocs);
+                assert.eq(result.c, 0);
+                assert.eq(result.d, this.nDocs);
             }
         }
     };

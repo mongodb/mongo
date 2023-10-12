@@ -11,7 +11,6 @@
  *  requires_fcv_51,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
@@ -63,8 +62,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 [this.timeField]: new Date(timer),
                 f: metaVal,
             };
-            assertAlways.commandWorked(db[collName].insert(doc));
-            assertAlways.commandWorked(db[this.nonShardCollName].insert(doc));
+            assert.commandWorked(db[collName].insert(doc));
+            assert.commandWorked(db[this.nonShardCollName].insert(doc));
         }
     };
 
@@ -107,8 +106,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1, _id: 1}}];
         const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
                                                     db[this.nonShardCollName].aggregate(pipeline));
-        assertAlways.eq(
-            diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+        assert.eq(diff,
+                  {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
@@ -152,7 +151,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         db[collName].drop();
         db[this.nonShardCollName].drop();
 
-        assertAlways.commandWorked(db.createCollection(
+        assert.commandWorked(db.createCollection(
             collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}));
         cluster.shardCollection(db[collName], {t: 1}, false);
 
@@ -183,12 +182,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         }
 
         let res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(this.numInitialDocs, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numInitialDocs, res.nInserted);
 
         res = bulkUnsharded.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(this.numInitialDocs, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numInitialDocs, res.nInserted);
 
         // Verify that the number of docs are same.
         assert.eq(db[collName].find().itcount(), db[this.nonShardCollName].find().itcount());
@@ -198,7 +197,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         currentTimeStamp = this.startTime;
         for (let i = 0; i < (this.threadCount - 1); ++i) {
             currentTimeStamp += chunkRange;
-            assertWhenOwnColl.commandWorked(ChunkHelper.splitChunkAt(
+            assert.commandWorked(ChunkHelper.splitChunkAt(
                 db, this.bucketPrefix + collName, {'control.min.t': new Date(currentTimeStamp)}));
         }
 
@@ -207,7 +206,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const destinationShards = Object.keys(cluster.getSerializedCluster().shards);
         for (const destinationShard of destinationShards) {
             currentTimeStamp += chunkRange;
-            assertWhenOwnColl.commandWorked(ChunkHelper.splitChunkAt(
+            assert.commandWorked(ChunkHelper.splitChunkAt(
                 db, this.bucketPrefix + collName, {'control.min.t': new Date(currentTimeStamp)}));
 
             ChunkHelper.moveChunk(

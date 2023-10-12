@@ -3,8 +3,6 @@
  *
  * Repeatedly creates a collection.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -25,7 +23,7 @@ export const $config = (function() {
         function create(db, collName) {
             // TODO: should we ever do something different?
             var myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
-            assertAlways.commandWorked(db.createCollection(myCollName));
+            assert.commandWorked(db.createCollection(myCollName));
         }
 
         return {init: init, create: create};

@@ -12,7 +12,6 @@
  *     requires_persistence,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedOrFailedHandleTxnErrors
 } from "jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js";
@@ -71,7 +70,7 @@ export const $config = (function() {
                 return;
             }
 
-            assertAlways.commandWorked(db.runCommand(
+            assert.commandWorked(db.runCommand(
                 {dropIndexes: this.getCollectionNameForThread(this.tid), index: "x_1"}));
         }
 
@@ -89,8 +88,7 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         for (let j = 0; j < this.threadCount; ++j) {
             const collectionName = this.getCollectionNameForThread(j);
-            assertAlways.commandWorked(
-                db.createCollection(collectionName, this.getCollectionOptions()));
+            assert.commandWorked(db.createCollection(collectionName, this.getCollectionOptions()));
             var bulk = db[collectionName].initializeUnorderedBulkOp();
 
             // Preload documents for each thread's collection. This ensures that the index build and
@@ -99,8 +97,8 @@ export const $config = (function() {
                 const uniqueValuePrefix = i.toString() + "_";
                 bulk.insert(this.buildvariableSizedDoc(uniqueValuePrefix));
             }
-            assertAlways.commandWorked(bulk.execute());
-            assertAlways.eq(this.numDocsToLoad, db[collectionName].find({}).itcount());
+            assert.commandWorked(bulk.execute());
+            assert.eq(this.numDocsToLoad, db[collectionName].find({}).itcount());
         }
     }
 

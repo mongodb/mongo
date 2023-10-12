@@ -9,7 +9,6 @@
  *   requires_fcv_60,
  *  ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
 
@@ -246,23 +245,23 @@ export const $config = (function() {
         for (let i = 0; i < this.threadCount; ++i) {
             for (let j = 0; j < 100; ++j) {
                 const uniqueNum = i * 100 + j;
-                assertAlways.commandWorked(db[collName].insert(
+                assert.commandWorked(db[collName].insert(
                     {_id: uniqueNum, x: i, ["y_" + i]: uniqueNum, a: uniqueNum, b: uniqueNum}));
             }
         }
 
         db[sameDbCollName].drop();
         db.getSiblingDB(otherDbName)[otherDbCollName].drop();
-        assertAlways.commandWorked(db[sameDbCollName].insert({_id: 0}));
-        assertAlways.commandWorked(db.getSiblingDB(otherDbName)[otherDbCollName].insert({_id: 0}));
+        assert.commandWorked(db[sameDbCollName].insert({_id: 0}));
+        assert.commandWorked(db.getSiblingDB(otherDbName)[otherDbCollName].insert({_id: 0}));
 
         if (isMongos(db)) {
             const shardNames = Object.keys(cluster.getSerializedCluster().shards);
             const numShards = shardNames.length;
             if (numShards > 1) {
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     db.adminCommand({movePrimary: db.getName(), to: shardNames[0]}));
-                assertAlways.commandWorked(db.getSiblingDB(otherDbName).adminCommand({
+                assert.commandWorked(db.getSiblingDB(otherDbName).adminCommand({
                     movePrimary: otherDbName,
                     to: shardNames[1]
                 }));

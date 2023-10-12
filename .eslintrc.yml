@@ -121,7 +121,6 @@ globals:
   numberDecimalsEqual: true
   debug: true
   bsonsize: true
-  globalAssertLevel: true
   _DelegatingDriverSession: true
   _DummyDriverSession: true
   _ServerSession: true

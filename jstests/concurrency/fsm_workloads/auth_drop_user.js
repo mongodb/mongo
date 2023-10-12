@@ -8,7 +8,6 @@ TestData.runInsideTransaction = false;
  * drops the user from the database.
  * @tags: [incompatible_with_concurrency_simultaneous]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {
@@ -47,9 +46,9 @@ export const $config = (function() {
                 kCreateUserRetryInterval);
 
             const res = db.getUser(username);
-            assertAlways(res !== null, "user '" + username + "' should exist");
-            assertAlways.eq(username, res.user);
-            assertAlways.eq(db.getName(), res.db);
+            assert(res !== null, "user '" + username + "' should exist");
+            assert.eq(username, res.user);
+            assert.eq(db.getName(), res.db);
 
             const kDropUserRetries = 5;
             const kDropUserRetryInterval = 5 * 1000;
@@ -62,7 +61,7 @@ export const $config = (function() {
                     return false;
                 }
             }, "Failed dropping user '" + username + "'", kDropUserRetries, kDropUserRetryInterval);
-            assertAlways.isnull(db.getUser(username), "user '" + username + "' should not exist");
+            assert.isnull(db.getUser(username), "user '" + username + "' should not exist");
         }
 
         return {init: init, createAndDropUser: createAndDropUser};

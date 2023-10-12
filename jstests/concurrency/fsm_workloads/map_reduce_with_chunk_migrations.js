@@ -15,7 +15,6 @@
  *  does_not_support_causal_consistency
  * ]
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -61,7 +60,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         };
 
         const res = db[collName].mapReduce(map, reduce, {out: {replace: this.resultsCollection}});
-        assertWhenOwnColl.commandWorked(res);
+        assert.commandWorked(res);
 
         assert.eq(this.numDocs, db[this.resultsCollection].find().itcount());
     };

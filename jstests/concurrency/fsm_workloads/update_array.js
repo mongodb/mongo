@@ -8,7 +8,6 @@
  * update and the find, because thread ids are unique.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -17,19 +16,19 @@ export const $config = (function() {
         // res: WriteResult
         // nModifiedPossibilities: array of allowed values for res.nModified
         function assertUpdateSuccess(db, res, nModifiedPossibilities) {
-            assertAlways.eq(0, res.nUpserted, tojson(res));
+            assert.eq(0, res.nUpserted, tojson(res));
 
             if (isMongod(db)) {
                 // The update should have succeeded if a matching document existed.
-                assertWhenOwnColl.contains(1, nModifiedPossibilities, tojson(res));
-                assertWhenOwnColl.contains(res.nModified, nModifiedPossibilities, tojson(res));
+                assert.contains(1, nModifiedPossibilities, tojson(res));
+                assert.contains(res.nModified, nModifiedPossibilities, tojson(res));
             } else {
                 // On storage engines that do not support document-level concurrency, it is possible
                 // that the update will not update all matching documents. This can happen if
                 // another thread updated a target document during a yield, triggering an
                 // invalidation.
-                assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
+                assert.contains(res.nMatched, [0, 1], tojson(res));
+                assert.contains(res.nModified, [0, 1], tojson(res));
             }
         }
 
@@ -41,21 +40,19 @@ export const $config = (function() {
 
             // find the doc and make sure it was updated
             var doc = db[collName].findOne({_id: docIndex});
-            assertWhenOwnColl(function() {
-                assertWhenOwnColl.neq(null, doc);
-                assertWhenOwnColl(doc.hasOwnProperty('arr'),
-                                  'doc should have contained a field named "arr": ' + tojson(doc));
+            assert.neq(null, doc);
+            assert(doc.hasOwnProperty('arr'),
+                   'doc should have contained a field named "arr": ' + tojson(doc));
 
-                // If the document was invalidated during a yield, then we may not have updated
-                // anything. The $push operator always modifies the matched document, so if we
-                // matched something, then we must have updated it.
-                if (res.nMatched > 0) {
-                    assertWhenOwnColl.contains(value,
-                                               doc.arr,
-                                               "doc.arr doesn't contain value (" + value +
-                                                   ') after $push: ' + tojson(doc.arr));
-                }
-            });
+            // If the document was invalidated during a yield, then we may not have updated
+            // anything. The $push operator always modifies the matched document, so if we
+            // matched something, then we must have updated it.
+            if (res.nMatched > 0) {
+                assert.contains(value,
+                                doc.arr,
+                                "doc.arr doesn't contain value (" + value +
+                                    ') after $push: ' + tojson(doc.arr));
+            }
         }
 
         function doPull(db, collName, docIndex, value) {
@@ -66,20 +63,18 @@ export const $config = (function() {
 
             // find the doc and make sure it was updated
             var doc = db[collName].findOne({_id: docIndex});
-            assertWhenOwnColl(function() {
-                assertWhenOwnColl.neq(null, doc);
+            assert.neq(null, doc);
 
-                // If the document was invalidated during a yield, then we may not have updated
-                // anything. If the update matched a document, then the $pull operator would have
-                // removed all occurrences of 'value' from the array (meaning that there should be
-                // none left).
-                if (res.nMatched > 0) {
-                    assertWhenOwnColl.eq(-1,
-                                         doc.arr.indexOf(value),
-                                         'doc.arr contains removed value (' + value +
-                                             ') after $pull: ' + tojson(doc.arr));
-                }
-            });
+            // If the document was invalidated during a yield, then we may not have updated
+            // anything. If the update matched a document, then the $pull operator would have
+            // removed all occurrences of 'value' from the array (meaning that there should be
+            // none left).
+            if (res.nMatched > 0) {
+                assert.eq(-1,
+                          doc.arr.indexOf(value),
+                          'doc.arr contains removed value (' + value +
+                              ') after $pull: ' + tojson(doc.arr));
+            }
         }
 
         return {
@@ -103,11 +98,11 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         // index on 'arr', the field being updated
-        assertAlways.commandWorked(db[collName].createIndex({arr: 1}));
+        assert.commandWorked(db[collName].createIndex({arr: 1}));
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({_id: i, arr: []});
-            assertWhenOwnColl.commandWorked(res);
-            assertWhenOwnColl.eq(1, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted);
         }
     }
 

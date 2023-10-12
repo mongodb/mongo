@@ -9,8 +9,6 @@
  *     assumes_unsharded_collection,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -26,8 +24,8 @@ export const $config = (function() {
         function insert(db, collName, numDocs) {
             for (var i = 0; i < numDocs; ++i) {
                 var res = db[collName].insert({});
-                assertAlways.commandWorked(res);
-                assertAlways.eq(1, res.nInserted);
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted);
             }
         }
 
@@ -37,7 +35,7 @@ export const $config = (function() {
             this.toDBName = db.getName() + uniqueDBName(this.prefix, this.tid, num++);
 
             var fromDB = db.getSiblingDB(this.fromDBName);
-            assertAlways.commandWorked(fromDB.createCollection(collName));
+            assert.commandWorked(fromDB.createCollection(collName));
         }
 
         function rename(db, collName) {
@@ -46,12 +44,12 @@ export const $config = (function() {
 
             // Clear out the "from" collection and insert 'fromCollCount' documents
             var fromCollCount = 7;
-            assertAlways(fromDB[collName].drop());
-            assertAlways.commandWorked(fromDB.createCollection(collName));
+            assert(fromDB[collName].drop());
+            assert.commandWorked(fromDB.createCollection(collName));
             insert(fromDB, collName, fromCollCount);
 
             var toCollCount = 4;
-            assertAlways.commandWorked(toDB.createCollection(collName));
+            assert.commandWorked(toDB.createCollection(collName));
             insert(toDB, collName, toCollCount);
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
@@ -62,9 +60,9 @@ export const $config = (function() {
                 dropTarget: true
             };
 
-            assertAlways.commandWorked(fromDB.adminCommand(renameCommand));
-            assertAlways.eq(fromCollCount, toDB[collName].find().itcount());
-            assertAlways.eq(0, fromDB[collName].find().itcount());
+            assert.commandWorked(fromDB.adminCommand(renameCommand));
+            assert.eq(fromCollCount, toDB[collName].find().itcount());
+            assert.eq(0, fromDB[collName].find().itcount());
 
             // Swap "to" and "from" collections for next execution
             var temp = this.fromDBName;

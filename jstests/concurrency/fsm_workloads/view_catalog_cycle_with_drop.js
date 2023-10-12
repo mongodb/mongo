@@ -4,8 +4,6 @@
  * Creates a set of views and then attempts to read while remapping views against each other and the
  * underlying collection.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
@@ -35,8 +33,7 @@ export const $config = (function() {
                 ErrorCodes.NamespaceNotFound,
                 ErrorCodes.ConflictingOperationInProgress
             ];
-            assertAlways.commandWorkedOrFailedWithCode(
-                res, errorCodes, () => `cmd: ${tojson(cmd)}`);
+            assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }
 
         /**
@@ -49,12 +46,12 @@ export const $config = (function() {
             const dropCmd = {drop: viewName};
             let res = db.runCommand(dropCmd);
             let errorCodes = [ErrorCodes.NamespaceNotFound];
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.runCommand(dropCmd), errorCodes, () => `cmd: ${tojson(dropCmd)}`);
 
             res = db.createView(viewName, collName, []);
             errorCodes = [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound];
-            assertAlways.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: createView`);
+            assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: createView`);
         }
 
         /**
@@ -69,8 +66,7 @@ export const $config = (function() {
             const res = db.runCommand(cmd);
             const errorCodes = [ErrorCodes.CommandNotSupportedOnView];
             // TODO SERVER-26037: Replace with the appropriate error code. See ticket for details.
-            assertAlways.commandWorkedOrFailedWithCode(
-                res, errorCodes, () => `cmd: ${tojson(cmd)}`);
+            assert.commandWorkedOrFailedWithCode(res, errorCodes, () => `cmd: ${tojson(cmd)}`);
         }
 
         return {
@@ -90,10 +86,10 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         let coll = db[collName];
-        assertAlways.commandWorked(coll.insert({x: 1}));
+        assert.commandWorked(coll.insert({x: 1}));
 
         for (let viewName of this.viewList) {
-            assertAlways.commandWorked(db.createView(viewName, collName, []));
+            assert.commandWorked(db.createView(viewName, collName, []));
         }
     }
 

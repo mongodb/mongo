@@ -6,7 +6,6 @@
  *
  * Other workloads that need an index { a: 1, b: 1 } can extend this.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
@@ -45,7 +44,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        assertAlways.commandWorked(db[collName].createIndex({a: 1, b: 1}));
+        assert.commandWorked(db[collName].createIndex({a: 1, b: 1}));
     };
 
     return $config;

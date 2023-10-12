@@ -5,8 +5,6 @@
  */
 import "jstests/libs/parallelTester.js";
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     // The organization of documents in every collection is as follows:
     //
@@ -27,8 +25,8 @@ export const $config = (function() {
         }
 
         const res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(res.nInserted, nDocsToInsert);
+        assert.commandWorked(res);
+        assert.eq(res.nInserted, nDocsToInsert);
     }
 
     const states = {
@@ -60,8 +58,8 @@ export const $config = (function() {
                 ? coll.insert({tid: this.tid, a: this.insertIdx, b: {c: this.insertIdx}})
                 : coll.insert({tid: this.tid, a: this.insertIdx, b: this.insertIdx});
 
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.nInserted, 1);
+            assert.commandWorked(res);
+            assert.eq(res.nInserted, 1);
             this.insertIdx++;
         },
 
@@ -78,7 +76,7 @@ export const $config = (function() {
                 ? coll.find({tid: this.tid, a: idx, b: {c: idx}}).itcount()
                 : coll.find({tid: this.tid, a: idx, b: idx}).itcount();
 
-            assertAlways.eq(nFound, 1);
+            assert.eq(nFound, 1);
         },
 
         update: function update(db, collName) {
@@ -95,10 +93,10 @@ export const $config = (function() {
                 : coll.update({tid: this.tid, a: this.updateIdx, b: this.updateIdx},
                               {tid: this.tid, a: this.insertIdx, b: this.insertIdx});
 
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.nMatched, 1);
-            assertAlways.eq(res.nUpserted, 0);
-            assertAlways.eq(res.nModified, 1);
+            assert.commandWorked(res);
+            assert.eq(res.nMatched, 1);
+            assert.eq(res.nUpserted, 0);
+            assert.eq(res.nModified, 1);
             this.updateIdx++;
             this.insertIdx++;
         },
@@ -117,8 +115,8 @@ export const $config = (function() {
                 : coll.remove({tid: this.tid, a: this.removeIdx, b: this.removeIdx},
                               {justOne: true});
 
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.nRemoved, 1);
+            assert.commandWorked(res);
+            assert.eq(res.nRemoved, 1);
             this.removeIdx++;
         },
 
@@ -126,7 +124,7 @@ export const $config = (function() {
             const coll = db.getCollection(collName + '_' + this.latch.getCount().toString());
 
             try {
-                assertAlways.commandWorked(db.adminCommand(
+                assert.commandWorked(db.adminCommand(
                     {refineCollectionShardKey: coll.getFullName(), key: this.newShardKey}));
             } catch (e) {
                 // There is a race that could occur where two threads run refineCollectionShardKey
@@ -212,9 +210,9 @@ export const $config = (function() {
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
             let coll = db.getCollection(collName + '_' + i);
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({shardCollection: coll.getFullName(), key: this.oldShardKey}));
-            assertAlways.commandWorked(coll.createIndex(this.newShardKey));
+            assert.commandWorked(coll.createIndex(this.newShardKey));
         }
     }
 

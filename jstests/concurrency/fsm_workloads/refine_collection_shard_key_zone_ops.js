@@ -17,8 +17,6 @@
  */
 import "jstests/libs/parallelTester.js";
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         oldShardKeyField: 'a',
@@ -56,7 +54,7 @@ export const $config = (function() {
         const tags = getConfigTagsCollection(db)
                          .find({ns: db + '.' + collName, tag: {$regex: threadZoneRegexMatch}})
                          .toArray();
-        assertAlways.eq(2, tags.length);
+        assert.eq(2, tags.length);
         tags.forEach((tag) => {
             currentZoneRangeMapForCollection[tag.tag] = {'min': tag.min, 'max': tag.max};
         });
@@ -102,7 +100,7 @@ export const $config = (function() {
 
         // Assume that we only have two zones owned by the thread for a given collection.
         const zoneKeys = Object.keys(zonesMappedToRangesOwnedByThreadForCollection);
-        assertAlways.eq(2, zoneKeys.length);
+        assert.eq(2, zoneKeys.length);
 
         const firstZoneName = zoneKeys[0];
         const firstZoneRange = zonesMappedToRangesOwnedByThreadForCollection[zoneKeys[0]];
@@ -111,27 +109,27 @@ export const $config = (function() {
 
         // Swap the zone ranges by first setting both to null, then reversing the values such that
         // the first zone's range will now be associated with the second zone, and vice versa.
-        assertAlways.commandWorked(db.adminCommand({
+        assert.commandWorked(db.adminCommand({
             updateZoneKeyRange: fullCollName,
             min: firstZoneRange.min,
             max: firstZoneRange.max,
             zone: null
         }));
 
-        assertAlways.commandWorked(db.adminCommand({
+        assert.commandWorked(db.adminCommand({
             updateZoneKeyRange: fullCollName,
             min: secondZoneRange.min,
             max: secondZoneRange.max,
             zone: null
         }));
 
-        assertAlways.commandWorked(db.adminCommand({
+        assert.commandWorked(db.adminCommand({
             updateZoneKeyRange: fullCollName,
             min: secondZoneRange.min,
             max: secondZoneRange.max,
             zone: firstZoneName
         }));
-        assertAlways.commandWorked(db.adminCommand({
+        assert.commandWorked(db.adminCommand({
             updateZoneKeyRange: fullCollName,
             min: firstZoneRange.min,
             max: firstZoneRange.max,
@@ -142,10 +140,10 @@ export const $config = (function() {
         const firstTagRangeOnConfig = getConfigTagsCollection(db).findOne({tag: firstZoneName});
         const secondTagRangeOnConfig = getConfigTagsCollection(db).findOne({tag: secondZoneName});
 
-        assertAlways.eq(secondZoneRange.min, firstTagRangeOnConfig.min);
-        assertAlways.eq(secondZoneRange.max, firstTagRangeOnConfig.max);
-        assertAlways.eq(firstZoneRange.min, secondTagRangeOnConfig.min);
-        assertAlways.eq(firstZoneRange.max, secondTagRangeOnConfig.max);
+        assert.eq(secondZoneRange.min, firstTagRangeOnConfig.min);
+        assert.eq(secondZoneRange.max, firstTagRangeOnConfig.max);
+        assert.eq(firstZoneRange.min, secondTagRangeOnConfig.min);
+        assert.eq(firstZoneRange.max, secondTagRangeOnConfig.max);
 
         zonesMappedToRangesOwnedByThreadForCollection[firstZoneName] = secondZoneRange;
         zonesMappedToRangesOwnedByThreadForCollection[secondZoneName] = firstZoneRange;
@@ -182,9 +180,9 @@ export const $config = (function() {
             })[0];
 
             // Move the zone to the other shard.
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({addShardToZone: newShardForZone, zone: randomZone}));
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({removeShardFromZone: formerShardForZone, zone: randomZone}));
 
             // Verify that the zone exists only on the new shard.
@@ -192,8 +190,8 @@ export const $config = (function() {
                 configShardsCollection.findOne({_id: formerShardForZone}).tags;
             const tagsForNewShard = configShardsCollection.findOne({_id: newShardForZone}).tags;
 
-            assertAlways.eq(false, tagsForFormerShard.includes(randomZone));
-            assertAlways.eq(true, tagsForNewShard.includes(randomZone));
+            assert.eq(false, tagsForFormerShard.includes(randomZone));
+            assert.eq(true, tagsForNewShard.includes(randomZone));
 
             currentZoneShardMap[randomZone] = newShardForZone;
         },
@@ -232,7 +230,7 @@ export const $config = (function() {
             const latchColl = db.getCollection(latchCollName);
 
             try {
-                assertAlways.commandWorked(db.adminCommand(
+                assert.commandWorked(db.adminCommand(
                     {refineCollectionShardKey: latchColl.getFullName(), key: this.newShardKey}));
             } catch (e) {
                 // There is a race that could occur where two threads run refineCollectionShardKey
@@ -291,14 +289,14 @@ export const $config = (function() {
 
                 // Add the zone to one random shard.
                 const randomShard = shardNames[Random.randInt(shardNames.length)];
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     db.adminCommand({addShardToZone: randomShard, zone: zoneName}));
 
                 // Assign a range to the zone.
                 const lowerZoneRange = {[this.oldShardKeyField]: currentRangeLowerBound};
                 const uppperZoneRange =
                     {[this.oldShardKeyField]: currentRangeLowerBound + this.partitionSize};
-                assertAlways.commandWorked(db.adminCommand({
+                assert.commandWorked(db.adminCommand({
                     updateZoneKeyRange: latchColl.getFullName(),
                     min: lowerZoneRange,
                     max: uppperZoneRange,
@@ -309,9 +307,9 @@ export const $config = (function() {
             }
 
             // Shard the collection, implicitly creating chunks to match the created zones.
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({shardCollection: latchColl.getFullName(), key: this.oldShardKey}));
-            assertAlways.commandWorked(latchColl.createIndex(this.newShardKey));
+            assert.commandWorked(latchColl.createIndex(this.newShardKey));
 
             db.printShardingStatus();
         }

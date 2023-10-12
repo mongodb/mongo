@@ -16,7 +16,6 @@
  *  ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -36,7 +35,7 @@ export const $config = (function() {
      */
     function acquireCollectionName(db, mustBeAlreadyCreated = true) {
         let acquiredCollDoc = null;
-        assertAlways.soon(function() {
+        assert.soon(function() {
             const query = {acquired: false};
             if (mustBeAlreadyCreated) {
                 query.created = true;
@@ -60,7 +59,7 @@ export const $config = (function() {
             update:
                 {$set: {collName: collName + newExtension, acquired: false, created: !wasDropped}}
         });
-        assertAlways(match !== null);
+        assert(match !== null);
     }
 
     let states = {
@@ -70,7 +69,7 @@ export const $config = (function() {
             const collName = acquireCollectionName(db, false /*mustBeAlreadyCreated*/);
             try {
                 jsTestLog(`Beginning shardCollection state for ${collName}`);
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
                 jsTestLog(`shardCollection state for ${collName} completed`);
             } finally {
@@ -97,9 +96,9 @@ export const $config = (function() {
             const renamedCollName = collName + '_renamed';
             try {
                 jsTestLog(`Beginning renameCollection state for ${collName}`);
-                assertAlways.commandWorked(db[collName].renameCollection(renamedCollName));
+                assert.commandWorked(db[collName].renameCollection(renamedCollName));
                 // reverse the rename before leaving the state.
-                assertAlways.commandWorked(db[renamedCollName].renameCollection(collName));
+                assert.commandWorked(db[renamedCollName].renameCollection(collName));
                 jsTestLog(`renameCollection state for ${collName} completed`);
             } finally {
                 releaseCollectionName(db, collName);
@@ -112,7 +111,7 @@ export const $config = (function() {
                 jsTestLog(`Beginning moveChunk state for ${collName}`);
                 const collUUID =
                     getConfig(db).collections.findOne({_id: db[collName].getFullName()}).uuid;
-                assertAlways(collUUID);
+                assert(collUUID);
                 const shards = getConfig(db).shards.find().toArray();
                 const chunkToMove = getConfig(db).chunks.findOne({uuid: collUUID});
                 const destination = shards.filter(
@@ -128,7 +127,7 @@ export const $config = (function() {
 
         resetPlacementHistory: function(db, collName, connCache) {
             jsTestLog(`Beginning resetPlacementHistory state`);
-            assertAlways.commandWorked(db.adminCommand({resetPlacementHistory: 1}));
+            assert.commandWorked(db.adminCommand({resetPlacementHistory: 1}));
             jsTestLog(`resetPlacementHistory state completed`);
         },
 

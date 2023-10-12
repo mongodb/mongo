@@ -9,8 +9,6 @@
  * ]
  *
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
@@ -21,12 +19,12 @@ export const $config = (function() {
 
         // Runs one find query so that the queryStatsEntry is updated.
         function findOneShape(db, collName) {
-            assertWhenOwnColl.gt(db[collName].find({i: {$lt: 50}}).itcount(), 0);
+            assert.gt(db[collName].find({i: {$lt: 50}}).itcount(), 0);
         }
 
         // Runs one agg query so that the queryStatsEntry is updated.
         function aggOneShape(db, collName) {
-            assertWhenOwnColl.gt(db[collName].aggregate([{$match: {i: {$gt: 900}}}]).itcount(), 0);
+            assert.gt(db[collName].aggregate([{$match: {i: {$gt: 900}}}]).itcount(), 0);
         }
 
         // Runs many queries with different shapes to ensure eviction occurs in the queryStats
@@ -38,7 +36,7 @@ export const $config = (function() {
                 db[collName].aggregate([{$match: query}]).itcount();
             }
             const evictedAfter = db.serverStatus().metrics.queryStats.numEvicted;
-            assertAlways.gt(evictedAfter, 0);
+            assert.gt(evictedAfter, 0);
         }
 
         // Runs queryStats with transformation.
@@ -57,9 +55,9 @@ export const $config = (function() {
                 // multiple getMores.
                 cursor: {batchSize: 1}
             });
-            assertAlways.commandWorked(response);
+            assert.commandWorked(response);
             const cursor = new DBCommandCursor(db.getSiblingDB("admin"), response);
-            assertAlways.gt(cursor.itcount(), 0);
+            assert.gt(cursor.itcount(), 0);
         }
 
         // Runs queryStats without transformation.
@@ -71,9 +69,9 @@ export const $config = (function() {
                 // multiple getMores.
                 cursor: {batchSize: 1}
             });
-            assertAlways.commandWorked(response);
+            assert.commandWorked(response);
             const cursor = new DBCommandCursor(db.getSiblingDB("admin"), response);
-            assertAlways.gt(cursor.itcount(), 0);
+            assert.gt(cursor.itcount(), 0);
         }
 
         return {
@@ -94,11 +92,11 @@ export const $config = (function() {
         const setQueryStatsParams = (db) => {
             var res;
             res = db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             internalQueryStatsRateLimit = res.was;
 
             res = db.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             internalQueryStatsCacheSize = res.was;
         };
 

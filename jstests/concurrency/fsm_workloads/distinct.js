@@ -5,8 +5,6 @@
  * The indexed field contains unique values.
  * Each thread operates on a separate collection.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {numDocs: 1000, prefix: 'distinct_fsm', shardKey: {i: 1}};
 
@@ -18,13 +16,13 @@ export const $config = (function() {
                 bulk.insert({i: i});
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.numDocs, res.nInserted);
-            assertAlways.commandWorked(db[this.threadCollName].createIndex({i: 1}));
+            assert.commandWorked(res);
+            assert.eq(this.numDocs, res.nInserted);
+            assert.commandWorked(db[this.threadCollName].createIndex({i: 1}));
         }
 
         function distinct(db, collName) {
-            assertWhenOwnColl.eq(this.numDocs, db[this.threadCollName].distinct('i').length);
+            assert.eq(this.numDocs, db[this.threadCollName].distinct('i').length);
         }
 
         return {init: init, distinct: distinct};

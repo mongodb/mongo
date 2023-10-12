@@ -7,7 +7,6 @@
  * of increments performed.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -33,20 +32,20 @@ export const $config = (function() {
 
             var res = db[collName].update({_id: this.id}, updateDoc);
             assert.commandWorked(res);
-            assertAlways.eq(0, res.nUpserted, tojson(res));
+            assert.eq(0, res.nUpserted, tojson(res));
 
             if (isMongod(db)) {
                 // Storage engines will automatically retry any operations when there are conflicts,
                 // so we should always see a matching document.
-                assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
-                assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
+                assert.eq(res.nMatched, 1, tojson(res));
+                assert.eq(res.nModified, 1, tojson(res));
             } else {
                 // On storage engines that do not support document-level concurrency, it is possible
                 // that the query will not find the document. This can happen if another thread
                 // updated the target document during a yield, triggering an invalidation.
-                assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                assertAlways.eq(res.nModified, res.nMatched, tojson(res));
+                assert.contains(res.nMatched, [0, 1], tojson(res));
+                assert.contains(res.nModified, [0, 1], tojson(res));
+                assert.eq(res.nModified, res.nMatched, tojson(res));
             }
 
             // The $inc operator always modifies the matched document, so if we matched something,
@@ -56,16 +55,16 @@ export const $config = (function() {
 
         find: function find(db, collName) {
             var docs = db[collName].find().toArray();
-            assertWhenOwnColl.eq(1, docs.length);
-            assertWhenOwnColl(() => {
+            if (!this.skipAssertions) {
+                assert.eq(1, docs.length);
                 // If the document hasn't been updated at all, then the field won't exist.
                 var doc = docs[0];
                 if (doc.hasOwnProperty(this.fieldName)) {
-                    assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
+                    assert.eq(this.count, doc[this.fieldName]);
                 } else {
-                    assertWhenOwnColl.eq(this.count, 0);
+                    assert.eq(this.count, 0);
                 }
-            });
+            }
         }
     };
 

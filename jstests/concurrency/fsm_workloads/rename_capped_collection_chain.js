@@ -7,8 +7,6 @@
  *
  * @tags: [requires_capped]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -27,8 +25,8 @@ export const $config = (function() {
 
             var options = {capped: true, size: 4096};
 
-            assertAlways.commandWorked(db.createCollection(this.fromCollName, options));
-            assertWhenOwnDB(db[this.fromCollName].isCapped());
+            assert.commandWorked(db.createCollection(this.fromCollName, options));
+            assert(db[this.fromCollName].isCapped());
         }
 
         function rename(db, collName) {
@@ -37,9 +35,9 @@ export const $config = (function() {
 
             // SERVER-57128: NamespaceNotFound is an acceptable error if the mongos retries
             // the rename after the coordinator has already fulfilled the original request
-            assertWhenOwnDB.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.NamespaceNotFound);
 
-            assertWhenOwnDB(db[toCollName].isCapped());
+            assert(db[toCollName].isCapped());
             this.fromCollName = toCollName;
         }
 

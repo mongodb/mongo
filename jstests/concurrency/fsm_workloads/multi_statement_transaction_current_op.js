@@ -11,7 +11,6 @@
  * ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -23,39 +22,39 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         sessions.forEach((session) => {
             const transactionDocument = session.transaction;
 
-            assertAlways.gte(transactionDocument.parameters.txnNumber, 0);
-            assertAlways.eq(transactionDocument.parameters.autocommit, false);
+            assert.gte(transactionDocument.parameters.txnNumber, 0);
+            assert.eq(transactionDocument.parameters.autocommit, false);
             if (transactionDocument.parameters.readConcern !== undefined) {
-                assertAlways(acceptableReadConcernLevels.includes(
+                assert(acceptableReadConcernLevels.includes(
                     transactionDocument.parameters.readConcern.level));
             }
             if (transactionDocument.globalReadTimestamp !== undefined) {
-                assertAlways.gt(transactionDocument.globalReadTimestamp, Timestamp(0, 0));
+                assert.gt(transactionDocument.globalReadTimestamp, Timestamp(0, 0));
             }
-            assertAlways.gt(ISODate(transactionDocument.startWallClockTime),
-                            ISODate("1970-01-01T00:00:00.000Z"));
+            assert.gt(ISODate(transactionDocument.startWallClockTime),
+                      ISODate("1970-01-01T00:00:00.000Z"));
 
-            assertAlways.hasFields(transactionDocument,
-                                   ["timeOpenMicros", "timeActiveMicros", "timeInactiveMicros"]);
+            assert.hasFields(transactionDocument,
+                             ["timeOpenMicros", "timeActiveMicros", "timeInactiveMicros"]);
             const timeOpen = Number(transactionDocument["timeOpenMicros"]);
             const timeActive = Number(transactionDocument["timeActiveMicros"]);
             const timeInactive = Number(transactionDocument["timeInactiveMicros"]);
 
-            assertAlways.gte(timeOpen, 0);
-            assertAlways.gte(timeActive, 0);
-            assertAlways.gte(timeInactive, 0);
-            assertAlways.eq(timeActive + timeInactive, timeOpen, () => tojson(transactionDocument));
+            assert.gte(timeOpen, 0);
+            assert.gte(timeActive, 0);
+            assert.gte(timeInactive, 0);
+            assert.eq(timeActive + timeInactive, timeOpen, () => tojson(transactionDocument));
 
             if (transactionDocument.numParticipants > 0) {
                 const participants = transactionDocument.participants;
-                assertAlways.eq(transactionDocument.numParticipants, participants.length);
+                assert.eq(transactionDocument.numParticipants, participants.length);
 
                 let hasCoordinator = false;
                 let numNonReadOnly = 0;
                 let numReadOnly = 0;
                 participants.forEach((participant) => {
                     if (participant.coordinator) {
-                        assertAlways.eq(hasCoordinator, false);
+                        assert.eq(hasCoordinator, false);
                         hasCoordinator = true;
                     }
 
@@ -68,9 +67,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     }
                 });
 
-                assertAlways.eq(hasCoordinator, true);
-                assertAlways.eq(transactionDocument.numNonReadOnlyParticipants, numNonReadOnly);
-                assertAlways.eq(transactionDocument.numReadOnlyParticipants, numReadOnly);
+                assert.eq(hasCoordinator, true);
+                assert.eq(transactionDocument.numNonReadOnlyParticipants, numNonReadOnly);
+                assert.eq(transactionDocument.numReadOnlyParticipants, numReadOnly);
             }
         });
     };

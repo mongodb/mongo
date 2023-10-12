@@ -10,7 +10,6 @@
  *
  * @tags: [uses_curop_agg_stage]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
 
@@ -30,7 +29,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             db.getSiblingDB('admin').aggregate([{$currentOp: {}}, {$match: filter}]).toArray();
         for (let op of currentOpOutput) {
             assert(op.hasOwnProperty('opid'));
-            assertAlways.commandWorked(db.getSiblingDB('admin').killOp(op.opid));
+            assert.commandWorked(db.getSiblingDB('admin').killOp(op.opid));
         }
     };
     $config.states.killOp = function killOp(db, collName) {
@@ -54,8 +53,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.teardown = function teardown(db, collName, cluster) {
         // Ensure that no temporary collection is left behind.
-        assertAlways.eq(db.getCollectionNames().filter(col => col.includes('tmp.agg_out')).length,
-                        0);
+        assert.eq(db.getCollectionNames().filter(col => col.includes('tmp.agg_out')).length, 0);
     };
 
     $config.transitions = {

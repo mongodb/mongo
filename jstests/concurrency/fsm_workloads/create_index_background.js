@@ -11,7 +11,6 @@
  *   creates_background_indexes
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -25,9 +24,7 @@ export const $config = (function() {
             // Find highest value of x.
             var highest = 0;
             var cursor = coll.find({tid: tid}).sort({x: -1}).limit(-1);
-            assertWhenOwnColl(function() {
-                highest = cursor.next().x;
-            });
+            highest = cursor.next().x;
             return highest;
         },
         getPartialFilterExpression: function getPartialFilterExpression() {
@@ -55,15 +52,15 @@ export const $config = (function() {
                 bulk.insert(this.extendDocument(doc));
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.nDocumentsToSeed, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(this.nDocumentsToSeed, res.nInserted, tojson(res));
 
             // In the first thread create the background index.
             if (this.tid === 0) {
                 var coll = db[collName];
                 // Before creating the background index make sure insert or update
                 // CRUD operations are active.
-                assertWhenOwnColl.soon(function() {
+                assert.soon(function() {
                     return coll.find({crud: {$exists: true}}).itcount() > 0;
                 }, 'No documents with "crud" field have been inserted or updated', 60 * 1000);
 
@@ -74,7 +71,7 @@ export const $config = (function() {
                 }
 
                 res = coll.createIndex(this.getIndexSpec(), createOptions);
-                assertAlways.commandWorked(res, tojson(res));
+                assert.commandWorked(res, tojson(res));
             }
         }
 
@@ -88,12 +85,12 @@ export const $config = (function() {
             for (var i = 0; i < this.nDocumentsToCreate; ++i) {
                 const doc = {x: i + highest + 1, tid: this.tid, crud: 1};
                 res = coll.insert(this.extendDocument(doc));
-                assertAlways.commandWorked(res);
-                assertAlways.eq(res.nInserted, 1, tojson(res));
+                assert.commandWorked(res);
+                assert.eq(res.nInserted, 1, tojson(res));
             }
-            assertWhenOwnColl.eq(coll.find({tid: this.tid}).itcount(),
-                                 this.nDocumentsToCreate + count,
-                                 'createDocs itcount mismatch');
+            assert.eq(coll.find({tid: this.tid}).itcount(),
+                      this.nDocumentsToCreate + count,
+                      'createDocs itcount mismatch');
         }
 
         function readDocs(db, collName) {
@@ -101,7 +98,7 @@ export const $config = (function() {
             var coll = db[collName];
             var res;
             var count = coll.find({tid: this.tid}).itcount();
-            assertWhenOwnColl.gte(
+            assert.gte(
                 count, this.nDocumentsToRead, 'readDocs not enough documents for tid ' + this.tid);
 
             var highest = this.getHighestX(coll, this.tid);
@@ -109,10 +106,9 @@ export const $config = (function() {
                 // Do randomized reads on index x. A document is not guaranteed
                 // to match the randomized 'x' predicate.
                 res = coll.find({x: Random.randInt(highest), tid: this.tid}).itcount();
-                assertWhenOwnColl.contains(res, [0, 1], tojson(res));
+                assert.contains(res, [0, 1], tojson(res));
             }
-            assertWhenOwnColl.eq(
-                coll.find({tid: this.tid}).itcount(), count, 'readDocs itcount mismatch');
+            assert.eq(coll.find({tid: this.tid}).itcount(), count, 'readDocs itcount mismatch');
         }
 
         function updateDocs(db, collName) {
@@ -122,9 +118,9 @@ export const $config = (function() {
                 var coll = db[collName];
                 var res;
                 var count = coll.find({tid: this.tid}).itcount();
-                assertWhenOwnColl.gte(count,
-                                      this.nDocumentsToUpdate,
-                                      'updateDocs not enough documents for tid ' + this.tid);
+                assert.gte(count,
+                           this.nDocumentsToUpdate,
+                           'updateDocs not enough documents for tid ' + this.tid);
 
                 var highest = this.getHighestX(coll, this.tid);
                 for (var i = 0; i < this.nDocumentsToUpdate; ++i) {
@@ -135,12 +131,12 @@ export const $config = (function() {
                     updateExpr = this.extendUpdateExpr(updateExpr);
 
                     res = coll.update({x: Random.randInt(highest), tid: this.tid}, updateExpr);
-                    assertAlways.commandWorked(res);
-                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                    assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                    assertWhenOwnColl.eq(res.nUpserted, 0, tojson(res));
+                    assert.commandWorked(res);
+                    assert.contains(res.nModified, [0, 1], tojson(res));
+                    assert.contains(res.nMatched, [0, 1], tojson(res));
+                    assert.eq(res.nUpserted, 0, tojson(res));
                 }
-                assertWhenOwnColl.eq(
+                assert.eq(
                     coll.find({tid: this.tid}).itcount(), count, 'updateDocs itcount mismatch');
             }
         }
@@ -169,13 +165,13 @@ export const $config = (function() {
                 // Do randomized deletes on index x. A document is not guaranteed
                 // to match the randomized 'x' predicate.
                 res = coll.remove({x: Random.randInt(highest), tid: this.tid});
-                assertAlways.commandWorked(res);
-                assertWhenOwnColl.contains(res.nRemoved, [0, 1], tojson(res));
+                assert.commandWorked(res);
+                assert.contains(res.nRemoved, [0, 1], tojson(res));
                 nActualDeletes += res.nRemoved;
             }
-            assertWhenOwnColl.eq(coll.find({tid: this.tid}).itcount(),
-                                 count - nActualDeletes,
-                                 'deleteDocs itcount mismatch');
+            assert.eq(coll.find({tid: this.tid}).itcount(),
+                      count - nActualDeletes,
+                      'deleteDocs itcount mismatch');
         }
 
         return {
@@ -203,36 +199,36 @@ export const $config = (function() {
         var coll = db[collName];
 
         var res = coll.createIndex({tid: 1});
-        assertAlways.commandWorked(res, tojson(res));
+        assert.commandWorked(res, tojson(res));
 
         var bulk = coll.initializeUnorderedBulkOp();
         for (var i = 0; i < nSetupDocs; ++i) {
             bulk.insert({x: i});
         }
         res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(nSetupDocs, res.nInserted, tojson(res));
+        assert.commandWorked(res);
+        assert.eq(nSetupDocs, res.nInserted, tojson(res));
 
         // Increase the following parameters to reduce the number of yields.
         cluster.executeOnMongodNodes(function(db) {
             var res;
             res = db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 100000});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             internalQueryExecYieldIterations = res.was;
 
             res = db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10000});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             internalQueryExecYieldPeriodMS = res.was;
         });
     }
 
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function(db) {
-            assertAlways.commandWorked(db.adminCommand({
+            assert.commandWorked(db.adminCommand({
                 setParameter: 1,
                 internalQueryExecYieldIterations: internalQueryExecYieldIterations
             }));
-            assertAlways.commandWorked(db.adminCommand(
+            assert.commandWorked(db.adminCommand(
                 {setParameter: 1, internalQueryExecYieldPeriodMS: internalQueryExecYieldPeriodMS}));
         });
     }

@@ -8,7 +8,6 @@
  * @tags: [creates_background_indexes, uses_transactions]
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFind,
     doSnapshotGetMore
@@ -47,8 +46,8 @@ export const $config = (function() {
         insertDocs: function insertDocs(db, collName) {
             for (let i = 0; i < this.numDocsToInsertPerThread; ++i) {
                 const res = db[collName].insert({value: this.valueToBeInserted});
-                assertWhenOwnColl.commandWorked(res);
-                assertWhenOwnColl.eq(1, res.nInserted);
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted);
             }
         },
 
@@ -64,9 +63,9 @@ export const $config = (function() {
                         throw e;
                     }
                     // dropIndex can cause queries to throw if these queries yield.
-                    assertAlways.contains(e.code,
-                                          [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(e.code,
+                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                    'unexpected error code: ' + e.code + ': ' + e.message);
                 }
             }
         },
@@ -83,9 +82,9 @@ export const $config = (function() {
                         throw e;
                     }
                     // dropIndex can cause queries to throw if these queries yield.
-                    assertAlways.contains(e.code,
-                                          [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                          'unexpected error code: ' + e.code + ': ' + e.message);
+                    assert.contains(e.code,
+                                    [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                    'unexpected error code: ' + e.code + ': ' + e.message);
                 }
             }
         },
@@ -102,9 +101,9 @@ export const $config = (function() {
                     throw e;
                 }
                 // dropIndex can cause queries to throw if these queries yield.
-                assertAlways.contains(e.code,
-                                      [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
-                                      'unexpected error code: ' + e.code + ': ' + e.message);
+                assert.contains(e.code,
+                                [ErrorCodes.QueryPlanKilled, ErrorCodes.OperationFailed],
+                                'unexpected error code: ' + e.code + ': ' + e.message);
             }
         },
 
@@ -144,7 +143,7 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
         for (let i = 0; i < this.numIds; ++i) {
             const res = db[collName].insert({_id: i, value: this.valueToBeInserted});
             assert.commandWorked(res);

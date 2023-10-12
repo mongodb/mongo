@@ -7,7 +7,6 @@
  *  does_not_support_add_remove_shards,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
@@ -91,8 +90,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             for (var j = 0; j < collNames.length; j++) {
                 collName = collNames[j];
                 const ns = dbName + '.' + collName;
-                assertAlways.commandWorked(
-                    db.adminCommand({shardCollection: ns, key: this.shardKey}));
+                assert.commandWorked(db.adminCommand({shardCollection: ns, key: this.shardKey}));
                 $super.setup.apply(this, [db, collName, cluster]);
             }
         }

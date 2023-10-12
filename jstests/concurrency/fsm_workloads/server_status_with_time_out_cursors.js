@@ -8,8 +8,6 @@
  *     assumes_balancer_off,
  * ]
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const states = {
         /**
@@ -59,8 +57,7 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         // Write some data.
-        assertWhenOwnColl.commandWorked(
-            db[collName].insert(Array.from({length: 100}, _ => ({a: 1}))));
+        assert.commandWorked(db[collName].insert(Array.from({length: 100}, _ => ({a: 1}))));
     }
 
     return {

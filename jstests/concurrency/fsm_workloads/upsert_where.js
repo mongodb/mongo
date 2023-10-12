@@ -5,7 +5,6 @@
  * updates it, and queries by the thread that created the documents to verify counts.
  */
 
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_where.js";
 
@@ -20,11 +19,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             {$where: 'this.x === ' + this.randomBound + ' && this.tid === ' + this.tid},
             {$set: {x: Random.randInt(this.randomBound), tid: this.tid}},
             {upsert: true});
-        assertWhenOwnColl.eq(res.nUpserted, 1);
+        assert.eq(res.nUpserted, 1);
         var upsertedDocument = db[collName].findOne({_id: res.getUpsertedId()._id});
-        assertWhenOwnColl(function() {
-            assertWhenOwnColl.eq(upsertedDocument.tid, this.tid);
-        }.bind(this));
+        assert.eq(upsertedDocument.tid, this.tid);
         this.insertedDocuments += res.nUpserted;
     };
 

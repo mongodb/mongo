@@ -4,7 +4,6 @@
  * Designed to execute queries and make them yield as much as possible while also updating and
  * removing documents that they operate on.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     // The explain used to build the assertion message in advanceCursor() is the only command not
@@ -35,16 +34,15 @@ export const $config = (function() {
             while (cursor.hasNext()) {
                 prevDoc = doc;
                 doc = cursor.next();
-                assertAlways(
-                    verifier(doc, prevDoc),
-                    'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
-                        (skipExplainInErrorMessage ? ''
-                                                   : 'Query plan: ' + tojson(cursor.explain())) +
-                        '\n' +
-                        'Previous doc: ' + tojson(prevDoc) + '\n' +
-                        'This doc: ' + tojson(doc));
+                assert(verifier(doc, prevDoc),
+                       'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
+                           (skipExplainInErrorMessage ? ''
+                                                      : 'Query plan: ' + tojson(cursor.explain())) +
+                           '\n' +
+                           'Previous doc: ' + tojson(prevDoc) + '\n' +
+                           'This doc: ' + tojson(doc));
             }
-            assertAlways.eq(cursor.itcount(), 0);
+            assert.eq(cursor.itcount(), 0);
         },
         /*
          * Many subclasses will want different behavior in the update stage. To change what types
@@ -68,7 +66,7 @@ export const $config = (function() {
                 return;
             }
             var updateDoc = this.genUpdateDoc();
-            assertAlways.commandWorked(db[collName].update(randDoc, updateDoc));
+            assert.commandWorked(db[collName].update(randDoc, updateDoc));
         },
 
         /*
@@ -80,9 +78,9 @@ export const $config = (function() {
             var doc = db[collName].findOne({_id: id});
             if (doc !== null) {
                 var res = db[collName].remove({_id: id});
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
                 if (res.nRemoved > 0) {
-                    assertAlways.commandWorked(db[collName].insert(doc));
+                    assert.commandWorked(db[collName].insert(doc));
                 }
             }
         },
@@ -130,9 +128,9 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // Lower the following parameters to force even more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 1}));
         });
         // Set up some data to query.
@@ -144,7 +142,7 @@ export const $config = (function() {
             bulk.find({_id: i}).upsert().updateOne(
                 {$set: {a: i, b: N - i, c: i, d: N - i, yield_text: word}});
         }
-        assertAlways.commandWorked(bulk.execute());
+        assert.commandWorked(bulk.execute());
     }
 
     /*
@@ -152,9 +150,9 @@ export const $config = (function() {
      */
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function resetYieldParams(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 10}));
         });
     }

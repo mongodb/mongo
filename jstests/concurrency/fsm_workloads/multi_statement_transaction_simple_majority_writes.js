@@ -6,7 +6,6 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
@@ -24,7 +23,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        assertWhenOwnColl.commandWorked(db[this.majorityWriteCollName].insert(
+        assert.commandWorked(db[this.majorityWriteCollName].insert(
             {_id: this.tid, counter: this.counter}, {writeConcern: {w: 'majority'}}));
     };
 
@@ -35,13 +34,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.majorityWriteUnrelatedDoc = function majorityWriteUnrelatedDoc(db, collName) {
         this.counter += 1;
-        assertWhenOwnColl.commandWorked(db[this.majorityWriteCollName].update(
+        assert.commandWorked(db[this.majorityWriteCollName].update(
             {_id: this.tid}, {$set: {counter: this.counter}}, {writeConcern: {w: 'majority'}}));
 
         // As soon as the write returns, its effects should be visible in the majority snapshot.
         const doc = db[this.majorityWriteCollName].findOne({_id: this.tid});
-        assertWhenOwnColl.eq(
-            this.counter, doc.counter, 'unexpected counter value, doc: ' + tojson(doc));
+        assert.eq(this.counter, doc.counter, 'unexpected counter value, doc: ' + tojson(doc));
     };
 
     /**
@@ -57,14 +55,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // based on the thread's id, since threads may concurrently write to the same document.
         const transactionDocId = Random.randInt(this.numAccounts);
         const threadUniqueField = 'thread' + this.tid;
-        assertWhenOwnColl.commandWorked(
-            db[collName].update({_id: transactionDocId},
-                                {$set: {[threadUniqueField]: this.counter}},
-                                {writeConcern: {w: 'majority'}}));
+        assert.commandWorked(db[collName].update({_id: transactionDocId},
+                                                 {$set: {[threadUniqueField]: this.counter}},
+                                                 {writeConcern: {w: 'majority'}}));
 
         // As soon as the write returns, its effects should be visible in the majority snapshot.
         const doc = db[collName].findOne({_id: transactionDocId});
-        assertWhenOwnColl.eq(
+        assert.eq(
             this.counter,
             doc[threadUniqueField],
             'unexpected thread unique field value, thread: ' + this.tid + ', doc: ' + tojson(doc));

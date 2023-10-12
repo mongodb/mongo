@@ -8,8 +8,6 @@
  *
  * All threads update the same TTL index on the same collection.
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         numDocs: 1000,
@@ -23,17 +21,16 @@ export const $config = (function() {
                 collMod: this.threadCollName,
                 index: {keyPattern: {createdAt: 1}, expireAfterSeconds: newTTL}
             });
-            assertAlways.commandWorkedOrFailedWithCode(res,
-                                                       [ErrorCodes.ConflictingOperationInProgress]);
+            assert.commandWorkedOrFailedWithCode(res, [ErrorCodes.ConflictingOperationInProgress]);
             // only assert if new expireAfterSeconds differs from old one
             if (res.ok === 1 && res.hasOwnProperty('expireAfterSeconds_new')) {
-                assertWhenOwnDB.eq(res.expireAfterSeconds_new, newTTL);
+                assert.eq(res.expireAfterSeconds_new, newTTL);
             }
 
             // Attempt an invalid collMod which should always fail regardless of whether a WCE
             // occurred. This is meant to reproduce SERVER-56772.
             const encryptSchema = {$jsonSchema: {properties: {_id: {encrypt: {}}}}};
-            assertAlways.commandFailedWithCode(
+            assert.commandFailedWithCode(
                 db.runCommand({
                     collMod: this.threadCollName,
                     validator: encryptSchema,
@@ -56,12 +53,12 @@ export const $config = (function() {
         }
 
         var res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(this.numDocs, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numDocs, res.nInserted);
 
         // create TTL index
         res = db[this.threadCollName].createIndex({createdAt: 1}, {expireAfterSeconds: 3600});
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
     }
 
     return {

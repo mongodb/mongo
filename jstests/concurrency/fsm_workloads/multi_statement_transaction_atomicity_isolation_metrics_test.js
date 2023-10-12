@@ -5,7 +5,6 @@
  * @tags: [uses_transactions, uses_prepare_transaction, assumes_snapshot_transactions]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     checkServerStatusInvariants
@@ -41,7 +40,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             let timeActive = Number(txnStats["timeActiveMicros"]);
             let timeInactive = Number(txnStats["timeInactiveMicros"]);
             let timeOpen = Number(txnStats["timeOpenMicros"]);
-            assertAlways.eq(timeActive + timeInactive, timeOpen, () => tojson(txnStats));
+            assert.eq(timeActive + timeInactive, timeOpen, () => tojson(txnStats));
         });
     };
 

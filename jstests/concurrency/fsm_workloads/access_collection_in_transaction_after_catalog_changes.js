@@ -11,7 +11,6 @@
  * unconditionally, which need not be true in a sharded cluster.
  * @tags: [uses_transactions, requires_replication]
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var states = (function() {
@@ -32,18 +31,18 @@ export const $config = (function() {
             // of the allowed error codes, but it must not crash the server.
             let success = false;
             try {
-                assertWhenOwnColl.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
+                assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
                 op(ddlColl);
                 success = true;
             } catch (e) {
-                assertWhenOwnColl.contains(e.code,
-                                           [
-                                               ErrorCodes.LockTimeout,
-                                               ErrorCodes.WriteConflict,
-                                               ErrorCodes.SnapshotUnavailable,
-                                               ErrorCodes.OperationNotSupportedInTransaction
-                                           ],
-                                           () => tojson(e));
+                assert.contains(e.code,
+                                [
+                                    ErrorCodes.LockTimeout,
+                                    ErrorCodes.WriteConflict,
+                                    ErrorCodes.SnapshotUnavailable,
+                                    ErrorCodes.OperationNotSupportedInTransaction
+                                ],
+                                () => tojson(e));
             }
 
             // Commit or abort the transaction.
@@ -56,18 +55,17 @@ export const $config = (function() {
                     // errors, if a conflicting collection does not get created until commit time.
                     success = false;
                 } else {
-                    assertWhenOwnColl.commandWorked(commitRes);
+                    assert.commandWorked(commitRes);
                 }
             } else {
                 // The failed operation already aborted the transaction. Run abortTransaction to
                 // update the transaction state in the shell.
-                assertWhenOwnColl.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                                        ErrorCodes.NoSuchTransaction);
+                assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                             ErrorCodes.NoSuchTransaction);
             }
 
             // Record whether the operation succeeded or failed.
-            assertWhenOwnColl.commandWorked(
-                db[loggingCollName].insert({op: opName, success: success}));
+            assert.commandWorked(db[loggingCollName].insert({op: opName, success: success}));
         }
 
         /**
@@ -178,7 +176,7 @@ export const $config = (function() {
                 if (res instanceof WriteResult && res.hasWriteError()) {
                     throw _getErrorWithCode(res.getWriteError(), res.getWriteError().errmsg);
                 } else if (!res.ok) {
-                    assertWhenOwnColl.commandWorked(res);
+                    assert.commandWorked(res);
                 }
             };
             runOpInTxn(this.session,
@@ -193,7 +191,7 @@ export const $config = (function() {
 
         function remove(db, collName) {
             const op = function(ddlColl) {
-                assertWhenOwnColl.commandWorked(ddlColl.remove({}, {justOne: true}));
+                assert.commandWorked(ddlColl.remove({}, {justOne: true}));
             };
             runOpInTxn(this.session,
                        db,
@@ -207,7 +205,7 @@ export const $config = (function() {
 
         function update(db, collName) {
             const op = function(ddlColl) {
-                assertWhenOwnColl.commandWorked(ddlColl.update({}, {$inc: {x: 1}}));
+                assert.commandWorked(ddlColl.update({}, {$inc: {x: 1}}));
             };
             runOpInTxn(this.session,
                        db,
@@ -226,18 +224,17 @@ export const $config = (function() {
         function createColl(db, collName) {
             // Insert a document to ensure the collection exists and provide data that can be
             // accessed in the transaction states.
-            assertWhenOwnColl.commandWorked(
-                db.getSiblingDB(this.ddlDBName)[this.ddlCollName].insert({x: 1}));
+            assert.commandWorked(db.getSiblingDB(this.ddlDBName)[this.ddlCollName].insert({x: 1}));
         }
 
         function createIndex(db, collName) {
-            assertWhenOwnColl.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName)[this.ddlCollName].createIndex({x: 1}),
                 [ErrorCodes.IndexBuildAborted, ErrorCodes.NoMatchingDocument]);
         }
 
         function dropColl(db, collName) {
-            assertWhenOwnColl.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.getSiblingDB(this.ddlDBName).runCommand({drop: this.ddlCollName}),
                 ErrorCodes.NamespaceNotFound);
         }
@@ -246,7 +243,7 @@ export const $config = (function() {
             const ddlCollFullName = db.getSiblingDB(this.ddlDBName)[this.ddlCollName].getFullName();
             const renameCollFullName =
                 db.getSiblingDB(this.ddlDBName)[this.renameCollName].getFullName();
-            assertWhenOwnColl.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.adminCommand(
                     {renameCollection: ddlCollFullName, to: renameCollFullName, dropTarget: true}),
                 ErrorCodes.NamespaceNotFound);
@@ -272,8 +269,8 @@ export const $config = (function() {
     })();
 
     function setup(db, collName, cluster) {
-        assertWhenOwnColl.commandWorked(db[collName].insert({_id: "startTxnDoc"}));
-        assertWhenOwnColl.commandWorked(db.runCommand({create: this.loggingCollName}));
+        assert.commandWorked(db[collName].insert({_id: "startTxnDoc"}));
+        assert.commandWorked(db.runCommand({create: this.loggingCollName}));
     }
 
     function teardown(db, collName, cluster) {

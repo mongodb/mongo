@@ -455,32 +455,6 @@ for restrictions. The one above would be considered a known bug. However,
 excluding a compact workload from sharded runners would be a restriction because
 compact can only be run against individual mongods.
 
-## Using assertions
-
-Do NOT use built-in mongo shell asserts within any FSM-based workload. Instead
-use any of the following assertion levels which are defined in terms of the DB
-and collection passed to state functions within a workload.
-
-#### `assertAlways`
-
-Works just like a regular shell assert(), but is more clear about its
-consideration for the other two assert modes
-
-#### `assertWhenOwnColl`
-
-Asserts when the current workload owns the collection. In this case, other
-workloads could potentially modify other collections in the same database, or
-access the database itself. Use this assertion when all you need is a guarantee
-that no other FSM has been given access to the collection, but other FSMs may
-have access to the same DB.
-
-#### `assertWhenOwnDB`
-
-Asserts when the current workload owns the database, including all the
-collections in that database. Use this assertion when you need to guarantee
-exclusive access for this workload to the provided database and all its included
-collections.
-
 ## Other components of the FSM library
 
 Most of these components live in jstests/concurrency/fsm_libs and provide the

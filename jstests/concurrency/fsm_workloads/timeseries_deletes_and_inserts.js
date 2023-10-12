@@ -14,8 +14,6 @@
  *   requires_fcv_70,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     const data = {
         logColl: "deletes_and_inserts_log",
@@ -78,7 +76,7 @@ export const $config = (function() {
     function setup(db, collName, cluster) {
         // Lower the following parameter to force more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 10}));
         });
 
@@ -104,7 +102,7 @@ export const $config = (function() {
     function teardown(db, collName, cluster) {
         // Reset the yield parameter.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1000}));
         });
 
@@ -123,14 +121,14 @@ export const $config = (function() {
 
             if (wasDeleted && !wasInserted) {
                 // Easy case: this reading was deleted and never inserted - we expect 0 records.
-                assertWhenOwnColl(nReadings == 0,
-                                  `Expected all of the readings to be deleted: readingNo: ${
-                                      readingNo}, nReadings: ${nReadings}`);
+                assert(nReadings == 0,
+                       `Expected all of the readings to be deleted: readingNo: ${
+                           readingNo}, nReadings: ${nReadings}`);
             } else if (wasInserted && !wasDeleted) {
                 // This reading was inserted but not deleted. We should expect
                 // readings for AT LEAST the number of remaining sensors. We may see more than this
                 // if the insert happened after a sensor was deleted.
-                assertWhenOwnColl(
+                assert(
                     nReadings >= nSensorsRemaining,
                     `Expected all of the remaining sensors' readings to be inserted: readingNo: ${
                         readingNo}, nReadings: ${nReadings}, nSensorsRemaining: ${
@@ -143,7 +141,7 @@ export const $config = (function() {
                 // This reading was not inserted or deleted. If it was a part of the seed data, make
                 // sure that it still exists.
                 if (readingNo < data.nReadingsPerSensor) {
-                    assertWhenOwnColl(
+                    assert(
                         nReadings == nSensorsRemaining,
                         `Expected none of the remaining sensors' readings to be deleted: readingNo: ${
                             readingNo}, nReadings: ${nReadings}, nSensorsRemaining: ${
@@ -161,10 +159,9 @@ export const $config = (function() {
                                    ])
                                    .toArray();
 
-            assertWhenOwnColl(
-                minReading.length == 0 || minReading[0].min >= data.nReadingsPerSensor,
-                `Expected all of the original readings to be deleted: sensorId: ${
-                    deletedSensor.sensorId}, minReading: ${tojson(minReading)}`);
+            assert(minReading.length == 0 || minReading[0].min >= data.nReadingsPerSensor,
+                   `Expected all of the original readings to be deleted: sensorId: ${
+                       deletedSensor.sensorId}, minReading: ${tojson(minReading)}`);
         }
     }
 

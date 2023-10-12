@@ -4,7 +4,6 @@
  * Intersperse queries which use the AND_HASH stage with updates and deletes of documents they may
  * match.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_rooted_or.js";
 
@@ -15,7 +14,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.query = function andHash(db, collName) {
         var nMatches = 100;
-        assertAlways.lte(nMatches, this.nDocs);
+        assert.lte(nMatches, this.nDocs);
         // Construct the query plan: two ixscans under an andHashed.
         // Scan c <= nMatches
         var ixscan1 = {
@@ -59,11 +58,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         };
 
         var res = db.runCommand({stageDebug: {plan: fetch, collection: collName}});
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
         for (var i = 0; i < res.results.length; i++) {
             var result = res.results[i];
-            assertAlways.lte(result.c, nMatches);
-            assertAlways.gte(result.d, this.nDocs - nMatches);
+            assert.lte(result.c, nMatches);
+            assert.gte(result.d, this.nDocs - nMatches);
         }
     };
 

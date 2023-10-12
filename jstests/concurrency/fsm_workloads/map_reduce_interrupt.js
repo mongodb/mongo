@@ -11,7 +11,6 @@
  *   uses_curop_agg_stage
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -36,8 +35,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             // Note: Even if the killOp reaches the server after the map-reduce command is already
             // done, the server still returns an "ok" response, so this assertion is safe.
-            assertAlways.commandWorked(
-                db.getSiblingDB('admin').runCommand({killOp: 1, op: randomOpId}));
+            assert.commandWorked(db.getSiblingDB('admin').runCommand({killOp: 1, op: randomOpId}));
         } else {
             // No map-reduce operations to kill at the moment.
         }
@@ -91,17 +89,16 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
         const dbTempCollectionsResult =
             db.runCommand({listCollections: 1, filter: {'options.temp': true}});
-        assertAlways.commandWorked(dbTempCollectionsResult);
-        assertAlways.eq(
-            dbTempCollectionsResult.cursor.firstBatch.length, 0, dbTempCollectionsResult);
+        assert.commandWorked(dbTempCollectionsResult);
+        assert.eq(dbTempCollectionsResult.cursor.firstBatch.length, 0, dbTempCollectionsResult);
 
         if (!cluster.isSharded()) {
             // Note that we can't do this check on sharded clusters, which do not have a "local"
             // database.
             const localTempCollectionsResult = db.getSiblingDB('local').runCommand(
                 {listCollections: 1, filter: {'options.temp': true}});
-            assertAlways.commandWorked(localTempCollectionsResult);
-            assertAlways.eq(
+            assert.commandWorked(localTempCollectionsResult);
+            assert.eq(
                 localTempCollectionsResult.cursor.firstBatch.length, 0, localTempCollectionsResult);
 
             // Unsetting CWWC is not allowed, so explicitly restore the default write concern to be

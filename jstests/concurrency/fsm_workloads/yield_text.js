@@ -4,7 +4,6 @@
  * Intersperse queries which use the TEXT stage with updates and deletes of documents they may
  * match.
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
@@ -22,15 +21,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var verifier = function textVerifier(doc, prevDoc) {
             return doc.yield_text.indexOf(word) !== -1;
         };
-
-        // If we don't have the right text index, or someone drops our text index, this
-        // assertion
-        // is either pointless or won't work. So only verify the results when we know no one
-        // else
-        // is messing with our indices.
-        assertWhenOwnColl(function verifyTextResults() {
-            this.advanceCursor(cursor, verifier);
-        }.bind(this));
+        this.advanceCursor(cursor, verifier);
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {
@@ -41,7 +32,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        assertWhenOwnColl.commandWorked(db[collName].createIndex({yield_text: 'text'}));
+        assert.commandWorked(db[collName].createIndex({yield_text: 'text'}));
     };
 
     return $config;

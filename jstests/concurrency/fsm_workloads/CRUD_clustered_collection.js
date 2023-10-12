@@ -7,7 +7,6 @@
  *  ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/CRUD_and_commands.js";
 
@@ -37,11 +36,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // As the default collection created by runner.js won't be clustered we need to recreate it.
         db[coll].drop();
 
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.runCommand({create: coll, clusteredIndex: {key: {_id: 1}, unique: true}}));
         for (let i = 0; i < this.numIds; i++) {
             const res = db[coll].insert({_id: i, value: this.docValue, num: 1});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             assert.eq(1, res.nInserted);
         }
 

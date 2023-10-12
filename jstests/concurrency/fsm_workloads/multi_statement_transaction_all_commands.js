@@ -3,7 +3,6 @@
  *
  * @tags: [uses_transactions, state_functions_share_transaction]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {cleanupOnLastIteration} from "jstests/concurrency/fsm_workload_helpers/cleanup_txns.js";
 
 export const $config = (function() {
@@ -73,7 +72,7 @@ export const $config = (function() {
         runFindAndModify: function runFindAndModify(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                assertAlways.commandWorked(collection.runCommand(
+                assert.commandWorked(collection.runCommand(
                     'findAndModify', {query: {_id: this.tid}, update: {$inc: {x: 1}}, new: true}));
             });
         },
@@ -81,7 +80,7 @@ export const $config = (function() {
         runUpdate: function runUpdate(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                assertAlways.commandWorked(collection.runCommand('update', {
+                assert.commandWorked(collection.runCommand('update', {
                     updates: [{q: {_id: this.tid}, u: {$inc: {x: 1}}}],
                 }));
             });
@@ -90,7 +89,7 @@ export const $config = (function() {
         runDelete: function runDelete(db, collName) {
             autoRetryTxn(this, () => {
                 const collection = this.session.getDatabase(db.getName()).getCollection(collName);
-                assertAlways.commandWorked(collection.runCommand('delete', {
+                assert.commandWorked(collection.runCommand('delete', {
                     deletes: [{q: {_id: this.tid}, limit: 1}],
                 }));
             });
@@ -149,7 +148,7 @@ export const $config = (function() {
     }
 
     function setup(db, collName, cluster) {
-        assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
         const bulk = db[collName].initializeUnorderedBulkOp();
 
         for (let i = 0; i < this.numDocs; ++i) {
@@ -157,8 +156,8 @@ export const $config = (function() {
         }
 
         const res = bulk.execute({w: 'majority'});
-        assertWhenOwnColl.commandWorked(res);
-        assertWhenOwnColl.eq(this.numDocs, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.numDocs, res.nInserted);
 
         if (cluster.isSharded()) {
             // Advance each router's cluster time to be >= the time of the writes, so the first

@@ -5,20 +5,18 @@
  *
  * @tags: [assumes_balancer_off]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         remove: function remove(db, collName) {
             // try removing a random document
             var res = this.doRemove(db, collName, {rand: {$gte: Random.rand()}}, {justOne: true});
-            assertAlways.lte(res.nRemoved, 1);
+            assert.lte(res.nRemoved, 1);
             if (res.nRemoved === 0) {
                 // The above remove() can fail to remove a document when the random value
                 // in the query is greater than any of the random values in the collection.
                 // When that situation occurs, just remove an arbitrary document instead.
                 res = this.doRemove(db, collName, {}, {justOne: true});
-                assertAlways.lte(res.nRemoved, 1);
+                assert.lte(res.nRemoved, 1);
             }
             this.assertResult(res);
         }
@@ -32,7 +30,7 @@ export const $config = (function() {
         for (var i = 0; i < num; ++i) {
             db[collName].insert({i: i, rand: Random.rand()});
         }
-        assertWhenOwnColl.eq(db[collName].find().itcount(), num);
+        assert.eq(db[collName].find().itcount(), num);
     }
 
     return {
@@ -46,10 +44,10 @@ export const $config = (function() {
                 return db[collName].remove(query, options);
             },
             assertResult: function assertResult(res) {
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
                 // when running on its own collection,
                 // this iteration should remove exactly one document
-                assertWhenOwnColl.eq(1, res.nRemoved, tojson(res));
+                assert.eq(1, res.nRemoved, tojson(res));
             }
         },
         startState: 'remove'

@@ -7,8 +7,6 @@
  *   uses_full_validation,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const dbPrefix = jsTestName() + '_db_';
 
 export const $config = (function() {
@@ -50,7 +48,7 @@ export const $config = (function() {
         for (let i = 0; i < 80; i++) {
             bulk.insert({_id: x + i.toString()});
         }
-        assertAlways.commandWorked(bulk.execute());
+        assert.commandWorked(bulk.execute());
 
         // Avoid filling the cache by flushing on a shorter interval
         setSyncDelay(db, 10);

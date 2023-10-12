@@ -5,7 +5,6 @@
  * appear in both a collection scan and an index scan. The indexed value is a
  * legacy coordinate pair, indexed with a 2d index.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
@@ -17,7 +16,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.init = function init(db, collName) {
         $super.states.init.apply(this, arguments);
 
-        assertAlways.lt(this.tid, 1 << 16);  // assume tid is a 16 bit nonnegative int
+        assert.lt(this.tid, 1 << 16);  // assume tid is a 16 bit nonnegative int
         // split the tid into the odd bits and the even bits
         // for example:
         //  tid:  57 = 00111001
@@ -38,8 +37,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 }
             }
         }
-        assertAlways.lt(oddBits, 256);
-        assertAlways.lt(evenBits, 256);
+        assert.lt(oddBits, 256);
+        assert.lt(evenBits, 256);
         this.indexedValue = [(evenBits - 128) / 2, (oddBits - 128) / 2];
     };
 

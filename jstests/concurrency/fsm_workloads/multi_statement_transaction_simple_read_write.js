@@ -12,7 +12,6 @@
 // better coverage for the commitTransaction retry bug described in SERVER-48307.
 import "jstests/libs/override_methods/retry_writes_at_least_once.js";
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     withTxnAndAutoRetry
@@ -51,12 +50,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
             });
 
-            assertAlways.commandWorked(res);
-            assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
-            assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
+            assert.commandWorked(res);
+            assert.eq(res.n, 1, () => tojson(res));
+            assert.eq(res.nModified, 1, () => tojson(res));
 
             const doc = collection.findOne({_id: readDocId});
-            assertWhenOwnColl.eq(
+            assert.eq(
                 // The document has been updated, so the in-memory counters should all be correct.
                 this.counters[readDocId],
                 // We don't initialize the thread unique field to 0, so treat undefined as 0.
@@ -80,7 +79,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
             const doc = collection.findOne({_id: readDocId});
-            assertWhenOwnColl.eq(
+            assert.eq(
                 expectedCounterBeforeWrite,
                 // We don't initialize the thread unique field to 0, so treat undefined as 0.
                 doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
@@ -92,9 +91,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
             });
 
-            assertAlways.commandWorked(updateRes);
-            assertWhenOwnColl.eq(updateRes.n, 1, () => tojson(updateRes));
-            assertWhenOwnColl.eq(updateRes.nModified, 1, () => tojson(updateRes));
+            assert.commandWorked(updateRes);
+            assert.eq(updateRes.n, 1, () => tojson(updateRes));
+            assert.eq(updateRes.nModified, 1, () => tojson(updateRes));
         }, {retryOnKilledSession: this.retryOnKilledSession});
     };
 
@@ -111,7 +110,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const collection = this.session.getDatabase(db.getName()).getCollection(collName);
         withTxnAndAutoRetry(this.session, () => {
             let doc = collection.findOne({_id: readDocId});
-            assertWhenOwnColl.eq(
+            assert.eq(
                 expectedCounterBeforeWrite,
                 // We don't initialize the thread unique field to 0, so treat undefined as 0.
                 doc.hasOwnProperty(this.threadUniqueField) ? doc[this.threadUniqueField] : 0,
@@ -123,12 +122,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 updates: [{q: {_id: writeDocId}, u: {$inc: {[this.threadUniqueField]: 1}}}],
             });
 
-            assertAlways.commandWorked(updateRes);
-            assertWhenOwnColl.eq(updateRes.n, 1, () => tojson(updateRes));
-            assertWhenOwnColl.eq(updateRes.nModified, 1, () => tojson(updateRes));
+            assert.commandWorked(updateRes);
+            assert.eq(updateRes.n, 1, () => tojson(updateRes));
+            assert.eq(updateRes.nModified, 1, () => tojson(updateRes));
 
             doc = collection.findOne({_id: readDocId});
-            assertWhenOwnColl.eq(
+            assert.eq(
                 // The document has been updated, so the in-memory counters should all be correct.
                 this.counters[readDocId],
                 // We don't initialize the thread unique field to 0, so treat undefined as 0.

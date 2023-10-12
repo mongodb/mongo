@@ -3,8 +3,6 @@
  *
  * Repeatedly creates and drops a collection.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
@@ -24,8 +22,8 @@ export const $config = (function() {
         function createAndDrop(db, collName) {
             // TODO: should we ever do something different?
             var myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
-            assertAlways.commandWorked(db.createCollection(myCollName));
-            assertAlways(db[myCollName].drop());
+            assert.commandWorked(db.createCollection(myCollName));
+            assert(db[myCollName].drop());
         }
 
         return {init: init, createAndDrop: createAndDrop};

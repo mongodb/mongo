@@ -7,8 +7,6 @@
  *   requires_sharding,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
 const collPrefix = 'sharded_coll_';
@@ -38,14 +36,14 @@ export const $config = (function() {
         function create(db, collName) {
             const coll = getRandomCollection(db);
             jsTestLog("Executing create state on: " + coll.getFullName());
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
         }
 
         function drop(db, collName) {
             const coll = getRandomCollection(db);
             jsTestLog("Executing drop state on: " + coll.getFullName());
-            assertAlways.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));
+            assert.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));
         }
 
         return {init: init, create: create, drop: drop};

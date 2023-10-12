@@ -10,7 +10,6 @@
  * @tags: [creates_background_indexes]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     assertWorkedHandleTxnErrors,
     assertWorkedOrFailedHandleTxnErrors
@@ -38,7 +37,7 @@ export const $config = (function() {
             if (mayFailWithDatabaseDifferCase) {
                 expectedWriteErrors.push(ErrorCodes.DatabaseDifferCase);
             }
-            assertAlways.commandWorkedOrFailedWithCode(res, expectedWriteErrors);
+            assert.commandWorkedOrFailedWithCode(res, expectedWriteErrors);
             return res;
         }
     };
@@ -95,27 +94,27 @@ export const $config = (function() {
 
         drop: function drop(db, collName) {
             if (this.created)
-                assertAlways(this.myDB.getCollection(collName).drop());
+                assert(this.myDB.getCollection(collName).drop());
         },
 
         dropDatabase: function dropDatabase(db, collName) {
-            assertAlways.commandWorkedOrFailedWithCode(this.myDB.dropDatabase(),
-                                                       ErrorCodes.StaleDbVersion);
+            assert.commandWorkedOrFailedWithCode(this.myDB.dropDatabase(),
+                                                 ErrorCodes.StaleDbVersion);
         },
 
         listDatabases: function listDatabases(db, collName) {
             for (let database of db.adminCommand({listDatabases: 1}).databases) {
                 let res = db.getSiblingDB(database.name).runCommand({listCollections: 1});
-                assertAlways.commandWorked(res);
-                assertAlways.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+                assert.commandWorked(res);
+                assert.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
             }
         },
 
         listDatabasesNameOnly: function listDatabases(db, collName) {
             for (let database of db.adminCommand({listDatabases: 1, nameOnly: 1}).databases) {
                 let res = db.getSiblingDB(database.name).runCommand({listCollections: 1});
-                assertAlways.commandWorked(res);
-                assertAlways.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+                assert.commandWorked(res);
+                assert.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
             }
         },
     };

@@ -16,7 +16,6 @@
  *   does_not_support_transactions,
  *  ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 const numChunks = 20;
@@ -104,7 +103,7 @@ export const $config = (function() {
             var srcColl = db[collName];
             const destCollName = getRandomCollName(this.threadCount);
             try {
-                assertAlways.commandWorked(srcColl.renameCollection(destCollName));
+                assert.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode == ErrorCodes.IllegalOperation) {

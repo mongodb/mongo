@@ -5,7 +5,6 @@
  * collection. This includes multi=true deletes and multi=false deletes with exact _id queries.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     withTxnAndAutoRetry
 } from "jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js";
@@ -34,7 +33,7 @@ export function getNextGroupIdForDelete(collName, partitionSize) {
  * query. Should only be called if this thread hasn't deleted every document assigned to it.
  */
 export function getIdForDelete(collName) {
-    assertAlways.neq(0, expectedDocuments[collName].length);
+    assert.neq(0, expectedDocuments[collName].length);
     const randomIndex = Random.randInt(expectedDocuments[collName].length);
     return expectedDocuments[collName][randomIndex]._id;
 }
@@ -55,7 +54,7 @@ export function exactIdDelete(db, collName, session) {
 
     const collection = session.getDatabase(db.getName()).getCollection(collName);
     withTxnAndAutoRetry(session, () => {
-        assertWhenOwnColl.commandWorked(collection.remove({_id: idToDelete}, {multi: false}));
+        assert.commandWorked(collection.remove({_id: idToDelete}, {multi: false}));
     });
 
     // Remove the deleted document from the in-memory representation.
@@ -81,7 +80,7 @@ export function multiDelete(db, collName, session, tid, partitionSize) {
 
     const collection = session.getDatabase(db.getName()).getCollection(collName);
     withTxnAndAutoRetry(session, () => {
-        assertWhenOwnColl.commandWorked(
+        assert.commandWorked(
             collection.remove({tid: tid, groupId: groupIdToDelete}, {multi: true}));
     });
 
@@ -96,7 +95,7 @@ export function multiDelete(db, collName, session, tid, partitionSize) {
  */
 export function verifyDocuments(db, collName, tid) {
     const docs = db[collName].find({tid: tid}).toArray();
-    assertWhenOwnColl.eq(expectedDocuments[collName].length, docs.length, () => {
+    assert.eq(expectedDocuments[collName].length, docs.length, () => {
         return 'unexpected number of documents for ' + db[collName] + ', docs: ' + tojson(docs) +
             ', expected docs: ' + tojson(expectedDocuments[collName]);
     });
@@ -104,7 +103,7 @@ export function verifyDocuments(db, collName, tid) {
     // Verify only the documents we haven't tried to delete were found.
     const expectedDocIds = new Set(expectedDocuments[collName].map(doc => doc._id));
     docs.forEach(doc => {
-        assertWhenOwnColl(expectedDocIds.has(doc._id), () => {
+        assert(expectedDocIds.has(doc._id), () => {
             return 'expected document for collection ' + db[collName] +
                 ' to be deleted, doc: ' + tojson(doc);
         });
@@ -112,7 +111,7 @@ export function verifyDocuments(db, collName, tid) {
     });
 
     // All expected document ids should have been found in the collection.
-    assertWhenOwnColl.eq(0, expectedDocIds.size, () => {
+    assert.eq(0, expectedDocIds.size, () => {
         return 'did not find all expected documents for collection ' + db[collName] +
             ', _ids not found: ' + tojson(expectedDocIds);
     });

@@ -5,7 +5,6 @@
  * base workload's setup function. The implicit _id index and any indexes
  * that already existed at the start of setup are not dropped.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export function dropAllIndexes($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
@@ -20,7 +19,7 @@ export function dropAllIndexes($config, $super) {
             var name = ixSpec.name;
             if (name !== '_id_' && !Array.contains(oldIndexes, name)) {
                 var res = db[collName].dropIndex(name);
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
             }
         });
     };

@@ -9,7 +9,6 @@
  * Uses an ordered, bulk operation to perform the updates.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -30,7 +29,7 @@ export const $config = (function() {
             // TODO: this actually does assume that there are no unique indexes.
             //       but except for weird cases like that, it is valid even when other
             //       threads are modifying the same collection
-            assertAlways.eq(0, result.getWriteErrorCount());
+            assert.eq(0, result.getWriteErrorCount());
 
             ++this.count;
         },
@@ -41,22 +40,22 @@ export const $config = (function() {
             // We aren't updating any fields in any indexes, so we should always see all
             // matching documents, since they would not be able to move ahead or behind
             // our collection scan or index scan.
-            assertWhenOwnColl.eq(this.docCount, docs.length);
+            assert.eq(this.docCount, docs.length);
 
             if (isMongod(db)) {
                 // Storage engines will automatically retry any operations when there are conflicts,
                 // so we should have updated all matching documents.
                 docs.forEach(function(doc) {
-                    assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
+                    assert.eq(this.count, doc[this.fieldName]);
                 }, this);
             }
 
             docs.forEach(function(doc) {
                 // If the document hasn't been updated at all, then the field won't exist.
                 if (doc.hasOwnProperty(this.fieldName)) {
-                    assertWhenOwnColl.lte(doc[this.fieldName], this.count);
+                    assert.lte(doc[this.fieldName], this.count);
                 }
-                assertWhenOwnColl.lt(doc._id, this.docCount);
+                assert.lt(doc._id, this.docCount);
             }, this);
         }
     };

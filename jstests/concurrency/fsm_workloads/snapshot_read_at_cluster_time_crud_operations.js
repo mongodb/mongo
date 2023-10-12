@@ -13,7 +13,7 @@
  *   requires_replication,
  * ]
  */
-import {assertWhenOwnColl, interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
+import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     doSnapshotFindAtClusterTime,
     doSnapshotGetMoreAtClusterTime
@@ -58,8 +58,8 @@ export const $config = (function() {
         insertDocs: function insertDocs(db, collName) {
             for (let i = 0; i < this.numDocsToInsertPerThread; ++i) {
                 const res = db[collName].insert({x: 1});
-                assertWhenOwnColl.commandWorked(res);
-                assertWhenOwnColl.eq(1, res.nInserted);
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted);
             }
         },
 
@@ -130,14 +130,14 @@ export const $config = (function() {
                     db.adminCommand({setParameter: 1, minSnapshotHistoryWindowInSeconds: 3600}));
             });
         }
-        assertWhenOwnColl.commandWorked(db.runCommand({create: collName}));
+        assert.commandWorked(db.runCommand({create: collName}));
         const docs = [...Array(this.numIds).keys()].map((i) => ({_id: i, x: 1}));
         this.clusterTime =
             assert.commandWorked(db.runCommand({insert: collName, documents: docs})).operationTime;
     }
 
     function teardown(db, collName, cluster) {
-        assertWhenOwnColl.commandWorked(db.runCommand({drop: collName}));
+        assert.commandWorked(db.runCommand({drop: collName}));
         cluster.executeOnMongodNodes(function(db) {
             assert.commandWorked(db.adminCommand({
                 setParameter: 1,

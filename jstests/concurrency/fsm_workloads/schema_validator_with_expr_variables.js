@@ -8,19 +8,17 @@
  * error.
  * @tags: [requires_non_retryable_writes, requires_persistence, catches_command_failures]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     function setup(db, collName) {
         for (let i = 0; i < 200; ++i) {
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db[collName].insert({_id: i, a: i, one: 1, counter: 0, array: [0, i]}));
         }
 
         // Add a validator which checks that field 'a' has value 5 and sum of the elements in field
         // 'array' is 5. The expression is purposefully complex so that it can create a stress on
         // expressions with variables.
-        assertAlways.commandWorked(db.runCommand({
+        assert.commandWorked(db.runCommand({
             collMod: collName,
             validator: {
                 $expr: {
@@ -55,17 +53,17 @@ export const $config = (function() {
 
     const states = {
         applyValidator: function(db, collName) {
-            assertAlways.commandWorked(db[collName].update({_id: 5}, {$inc: {counter: 1}}));
-            assertAlways.commandFailedWithCode(
+            assert.commandWorked(db[collName].update({_id: 5}, {$inc: {counter: 1}}));
+            assert.commandFailedWithCode(
                 db[collName].update({_id: 4}, {$set: {a: 4}, $inc: {counter: 1}}),
                 ErrorCodes.DocumentValidationFailure);
 
             // Update all the documents in the collection.
-            assertAlways.commandWorked(db[collName].update(
+            assert.commandWorked(db[collName].update(
                 {}, {$set: {a: 5, array: [2, 3]}, $inc: {counter: 1}}, {multi: true}));
 
             // Validation fails when elements of 'array' doesn't add up to 5.
-            assertAlways.commandFailedWithCode(
+            assert.commandFailedWithCode(
                 db[collName].update({_id: 4}, {$set: {a: 5, array: [2, 2]}}),
                 ErrorCodes.DocumentValidationFailure);
         }

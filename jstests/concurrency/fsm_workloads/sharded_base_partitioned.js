@@ -21,7 +21,6 @@
  *  assumes_balancer_off,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {isMongodConfigsvr} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -50,13 +49,13 @@ export const $config = (function() {
 
         // Unless only 1 thread, verify that we aren't both the high and low chunk.
         if (this.threadCount > 1) {
-            assertAlways(!(partition.isLowChunk && partition.isHighChunk),
-                         'should not be both the high and low chunk when there is more than 1 ' +
-                             'thread:\n' + tojson(this));
+            assert(!(partition.isLowChunk && partition.isHighChunk),
+                   'should not be both the high and low chunk when there is more than 1 ' +
+                       'thread:\n' + tojson(this));
         } else {
-            assertAlways(partition.isLowChunk && partition.isHighChunk,
-                         'should be both the high and low chunk when there is only 1 thread:\n' +
-                             tojson(this));
+            assert(partition.isLowChunk && partition.isHighChunk,
+                   'should be both the high and low chunk when there is only 1 thread:\n' +
+                       tojson(this));
         }
 
         return partition;
@@ -150,7 +149,7 @@ export const $config = (function() {
                 config, ns, this.partition.chunkLower, this.partition.chunkUpper);
             var chunks = ChunkHelper.getChunks(config, ns, MinKey, MaxKey);
             var msg = tojson({tid: this.tid, data: this.data, chunks: chunks});
-            assertWhenOwnColl.eq(numChunks, 1, msg);
+            assert.eq(numChunks, 1, msg);
         }
 
         function dummy(db, collName, connCache) {
@@ -168,7 +167,7 @@ export const $config = (function() {
 
         // Sharding must be enabled on db[collName].
         var msg = 'collection ' + collName + ' must be sharded.';
-        assertAlways.gte(findChunksUtil.findChunksByNs(configDB, ns).itcount(), 1, msg);
+        assert.gte(findChunksUtil.findChunksByNs(configDB, ns).itcount(), 1, msg);
 
         for (var tid = 0; tid < this.threadCount; ++tid) {
             // Define this thread's partition.
@@ -180,7 +179,7 @@ export const $config = (function() {
             for (var i = partition.lower; i < partition.upper; ++i) {
                 bulk.insert({_id: i});
             }
-            assertAlways.commandWorked(bulk.execute());
+            assert.commandWorked(bulk.execute());
 
             // Add split point for lower end of this thread's partition.
             // Since a split point will be created at the low end of each partition,
@@ -188,8 +187,7 @@ export const $config = (function() {
             // It's unnecessary to add a split point for the lower end for the thread
             // that has the lowest partition, because its chunk's lower end should be MinKey.
             if (!partition.isLowChunk) {
-                assertWhenOwnColl.commandWorked(
-                    ChunkHelper.splitChunkAtPoint(db, collName, partition.lower));
+                assert.commandWorked(ChunkHelper.splitChunkAtPoint(db, collName, partition.lower));
             }
 
             this.setupAdditionalSplitPoints(db, collName, partition);

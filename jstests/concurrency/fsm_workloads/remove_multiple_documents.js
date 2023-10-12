@@ -10,8 +10,6 @@
  *
  * @tags: [assumes_balancer_off]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         init: function init(db, collName) {
@@ -27,14 +25,14 @@ export const $config = (function() {
             var high = low + 0.05 * Random.rand();
 
             var res = db[collName].remove({tid: this.tid, rand: {$gte: low, $lte: high}});
-            assertAlways.gte(res.nRemoved, 0);
-            assertAlways.lte(res.nRemoved, this.numDocs);
+            assert.gte(res.nRemoved, 0);
+            assert.lte(res.nRemoved, this.numDocs);
             this.numDocs -= res.nRemoved;
         },
 
         count: function count(db, collName) {
             var numDocs = db[collName].find({tid: this.tid}).itcount();
-            assertWhenOwnColl.eq(this.numDocs, numDocs);
+            assert.eq(this.numDocs, numDocs);
         }
     };
 

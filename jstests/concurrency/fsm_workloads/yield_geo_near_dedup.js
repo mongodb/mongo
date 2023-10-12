@@ -2,7 +2,6 @@
  * Intersperses $geoNear aggregations with updates of non-geo fields to test deduplication.
  * @tags: [requires_non_retryable_writes]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_geo_near.js";
 
@@ -12,13 +11,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var doc = db[collName].findOne({_id: id});
         if (doc !== null) {
             var res = db[collName].remove({_id: id});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
             if (res.nRemoved > 0) {
                 // Re-insert the document with the same '_id', but an incremented
                 // 'timesInserted' to
                 // distinguish it from the deleted document.
                 doc.timesInserted++;
-                assertAlways.commandWorked(db[collName].insert(doc));
+                assert.commandWorked(db[collName].insert(doc));
             }
         }
     };
@@ -50,28 +49,23 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             }
         }]);
 
-        // We only run the verification when workloads are run on separate collections, since the
-        // aggregation may fail if we don't have exactly one 2d index to use.
-        assertWhenOwnColl(function verifyResults() {
-            const seenObjs = [];
-            const seenObjsOriginals = [];
-            while (cursor.hasNext()) {
-                const doc = cursor.next();
+        const seenObjs = [];
+        const seenObjsOriginals = [];
+        while (cursor.hasNext()) {
+            const doc = cursor.next();
 
-                // The pair (_id, timesInserted) is the smallest set of attributes that uniquely
-                // identifies a document.
-                const objToSearch = {_id: doc._id, timesInserted: doc.timesInserted};
-                for (let i = 0; i < seenObjs.length; ++i) {
-                    assertWhenOwnColl.neq(
-                        bsonWoCompare(seenObjs[i], objToSearch),
-                        0,
-                        () => `$geoNear returned document ${tojson(doc)} multiple ` +
-                            `times: first occurence was ${tojson(seenObjsOriginals[i])}`);
-                }
-                seenObjs.push(objToSearch);
-                seenObjsOriginals.push(doc);
+            // The pair (_id, timesInserted) is the smallest set of attributes that uniquely
+            // identifies a document.
+            const objToSearch = {_id: doc._id, timesInserted: doc.timesInserted};
+            for (let i = 0; i < seenObjs.length; ++i) {
+                assert.neq(bsonWoCompare(seenObjs[i], objToSearch),
+                           0,
+                           () => `$geoNear returned document ${tojson(doc)} multiple ` +
+                               `times: first occurence was ${tojson(seenObjsOriginals[i])}`);
             }
-        });
+            seenObjs.push(objToSearch);
+            seenObjsOriginals.push(doc);
+        }
     };
 
     $config.data.genUpdateDoc = function genUpdateDoc() {

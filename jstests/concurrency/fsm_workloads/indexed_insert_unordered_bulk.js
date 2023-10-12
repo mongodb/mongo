@@ -6,7 +6,6 @@
  *
  * Uses an unordered, bulk operation to perform the inserts.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
@@ -24,8 +23,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             bulk.insert(doc);
         }
         var res = bulk.execute();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(this.docsPerInsert, res.nInserted, tojson(res));
+        assert.commandWorked(res);
+        assert.eq(this.docsPerInsert, res.nInserted, tojson(res));
 
         this.nInserted += this.docsPerInsert;
     };

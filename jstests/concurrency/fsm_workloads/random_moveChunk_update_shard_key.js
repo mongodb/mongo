@@ -8,7 +8,6 @@
  *  uses_transactions,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {
@@ -110,7 +109,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         collection, collName, shardKeyField, moveAcrossChunks) {
         const idToUpdate = this.getIdForThread(collName);
         const randomDocToUpdate = collection.findOne({_id: idToUpdate});
-        assertWhenOwnColl.neq(randomDocToUpdate, null);
+        assert.neq(randomDocToUpdate, null);
 
         print("Updating the shard key field for this document: " + tojson(randomDocToUpdate));
 
@@ -195,9 +194,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     function assertDocWasUpdated(
         collection, idToUpdate, currentShardKey, newShardKey, newCounter, tid) {
-        assertWhenOwnColl.isnull(collection.findOne({_id: idToUpdate, skey: currentShardKey}));
-        assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
-                             {_id: idToUpdate, skey: newShardKey, tid: tid, counter: newCounter});
+        assert.isnull(collection.findOne({_id: idToUpdate, skey: currentShardKey}));
+        assert.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
+                  {_id: idToUpdate, skey: newShardKey, tid: tid, counter: newCounter});
     }
 
     function wasDocUpdated(collection, idToUpdate, currentShardKey) {
@@ -233,9 +232,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     upsert: true,
                     new: true
                 });
-                assertWhenOwnColl.neq(modifiedDoc, null);
-                assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
-                                     modifiedDoc);
+                assert.neq(modifiedDoc, null);
+                assert.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}), modifiedDoc);
 
                 this.expectedCounters[idToUpdate] = counterForId + 1;
             } catch (e) {
@@ -274,10 +272,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     print("Ignoring acceptable updateShardKey error attempting to update the" +
                           "document with _id: " + idToUpdate + " and shardKey: " + currentShardKey +
                           ": " + e);
-                    assertWhenOwnColl.neq(
-                        collection.findOne({_id: idToUpdate, skey: currentShardKey}), null);
-                    assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
-                                         null);
+                    assert.neq(collection.findOne({_id: idToUpdate, skey: currentShardKey}), null);
+                    assert.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}), null);
                     return;
                 }
                 throw e;
@@ -315,7 +311,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 this.generateRandomUpdateStyle(idToUpdate, newShardKey, counterForId),
                 {multi: false});
             try {
-                assertWhenOwnColl.commandWorked(updateResult);
+                assert.commandWorked(updateResult);
                 this.expectedCounters[idToUpdate] = counterForId + 1;
             } catch (e) {
                 const err = updateResult instanceof WriteResult ? updateResult.getWriteError()
@@ -354,10 +350,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                     print("Ignoring acceptable updateShardKey error attempting to update the" +
                           "document with _id: " + idToUpdate + " and shardKey: " + currentShardKey +
                           ": " + tojson(updateResult));
-                    assertWhenOwnColl.neq(
-                        collection.findOne({_id: idToUpdate, skey: currentShardKey}), null);
-                    assertWhenOwnColl.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}),
-                                         null);
+                    assert.neq(collection.findOne({_id: idToUpdate, skey: currentShardKey}), null);
+                    assert.eq(collection.findOne({_id: idToUpdate, skey: newShardKey}), null);
                     return;
                 }
 
@@ -477,16 +471,14 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 bulk.insert({_id: i, skey: i, tid: tid});
             }
 
-            assertAlways.commandWorked(bulk.execute());
+            assert.commandWorked(bulk.execute());
 
             // Create a chunk with boundaries matching the partition's. The low chunk's lower bound
             // is minKey, so a split is not necessary.
             if (!partition.isLowChunk) {
-                assertAlways.commandWorked(
-                    db.adminCommand({split: ns, middle: {skey: partition.lower}}));
+                assert.commandWorked(db.adminCommand({split: ns, middle: {skey: partition.lower}}));
             }
-            assertAlways.commandWorked(
-                db.adminCommand({split: ns, middle: {skey: medianIdForThread}}));
+            assert.commandWorked(db.adminCommand({split: ns, middle: {skey: medianIdForThread}}));
         }
         db.printShardingStatus();
 
@@ -511,7 +503,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const docs = db[collName].find({tid: this.tid}).toArray();
         docs.forEach(doc => {
             const expectedCounter = this.expectedCounters[doc._id];
-            assertWhenOwnColl.eq(expectedCounter, doc.counter, () => {
+            assert.eq(expectedCounter, doc.counter, () => {
                 return 'unexpected counter value, doc: ' + tojson(doc);
             });
         });

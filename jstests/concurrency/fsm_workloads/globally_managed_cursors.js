@@ -5,7 +5,6 @@
  * The "grandparent test," invalidated_cursors.js, uses $currentOp.
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -16,7 +15,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         const db = unusedDB.getSiblingDB(this.uniqueDBName);
         const cmdRes =
             db.runCommand({listCollections: 1, cursor: {batchSize: $config.data.batchSize}});
-        assertAlways.commandWorked(cmdRes);
+        assert.commandWorked(cmdRes);
         this.cursor = new DBCommandCursor(db, cmdRes);
     };
 
@@ -28,7 +27,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // We expect this might fail if the namespace does not exist, otherwise it should always
         // succeed.
         if (cmdRes.code != ErrorCodes.NamespaceNotFound) {
-            assertAlways.commandWorked(cmdRes);
+            assert.commandWorked(cmdRes);
             this.cursor = new DBCommandCursor(db, cmdRes);
         }
     };

@@ -8,7 +8,6 @@
  * and then inserts 'modulus * countPerNum' documents. [250, 1000]
  * Each thread inserts docs into a unique collection.
  */
-import {assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/count.js";
@@ -30,15 +29,15 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.count = function count(db, collName) {
         if (!isMongos(db)) {
             // SERVER-33753: count() without a predicate can be wrong on sharded clusters.
-            assertWhenOwnColl.eq(this.getCount(db),
-                                 // having done 'skip(this.countPerNum - 1).limit(10)'
-                                 10);
+            assert.eq(this.getCount(db),
+                      // having done 'skip(this.countPerNum - 1).limit(10)'
+                      10);
         }
 
         var num = Random.randInt(this.modulus);
-        assertWhenOwnColl.eq(this.getCount(db, {i: num}),
-                             // having done 'skip(this.countPerNum - 1).limit(10)'
-                             1);
+        assert.eq(this.getCount(db, {i: num}),
+                  // having done 'skip(this.countPerNum - 1).limit(10)'
+                  1);
     };
 
     return $config;

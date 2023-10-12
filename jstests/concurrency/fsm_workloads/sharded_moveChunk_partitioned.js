@@ -9,7 +9,6 @@
  *  assumes_balancer_off,
  * ]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
@@ -41,7 +40,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var numShards = config.getDB('config').shards.find().itcount();
         var msg = 'There must be more than one shard when performing a moveChunks operation\n' +
             'shards: ' + tojson(config.getDB('config').shards.find().toArray());
-        assertAlways.gt(numShards, 1, msg);
+        assert.gt(numShards, 1, msg);
 
         // Choose a random chunk in our partition to move.
         var chunk = this.getRandomChunkInPartition(collName, config);
@@ -99,11 +98,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             if (waitForDelete && !runningWithStepdowns) {
                 msg = 'moveChunk succeeded but original shard still had documents.\n' + msgBase +
                     ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-                assertWhenOwnColl.eq(fromShardNumDocsAfter, 0, msg);
+                assert.eq(fromShardNumDocsAfter, 0, msg);
             }
             msg = 'moveChunk succeeded but new shard did not contain all documents.\n' + msgBase +
                 ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-            assertWhenOwnColl.eq(toShardNumDocsAfter, numDocsBefore, msg);
+            assert.eq(toShardNumDocsAfter, numDocsBefore, msg);
         }
         // If the moveChunk operation failed, verify that the shard the chunk was
         // originally on returns all data for the chunk, and the shard the chunk
@@ -111,7 +110,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         else {
             msg = 'moveChunk failed but original shard did not contain all documents.\n' + msgBase +
                 ', waitForDelete: ' + waitForDelete + ', bounds: ' + tojson(bounds);
-            assertWhenOwnColl.eq(fromShardNumDocsAfter, numDocsBefore, msg);
+            assert.eq(fromShardNumDocsAfter, numDocsBefore, msg);
         }
 
         // Verify that all config servers have the correct after-state.
@@ -122,10 +121,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         msg = msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' + tojson(chunkAfter);
         if (moveChunkRes.ok) {
             msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
-            assertWhenOwnColl.eq(chunkAfter.shard, toShard, msg);
+            assert.eq(chunkAfter.shard, toShard, msg);
         } else {
             msg = "moveChunk failed but chunk's shard was not original shard.\n" + msg;
-            assertWhenOwnColl.eq(chunkAfter.shard, fromShard, msg);
+            assert.eq(chunkAfter.shard, fromShard, msg);
         }
 
         // Regardless of whether the operation succeeded or failed, verify that the number of chunks
@@ -133,7 +132,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         var numChunksAfter = ChunkHelper.getNumChunks(
             config, ns, this.partition.chunkLower, this.partition.chunkUpper);
         msg = 'Number of chunks in partition seen by config changed with moveChunk.\n' + msgBase;
-        assertWhenOwnColl.eq(numChunksBefore, numChunksAfter, msg);
+        assert.eq(numChunksBefore, numChunksAfter, msg);
 
         // Verify that all mongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
@@ -144,7 +143,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
             msg = 'Number of documents in range seen by mongos changed with moveChunk, range: ' +
                 tojson(bounds) + '.\n' + msgBase;
-            assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msg);
+            assert.eq(numDocsAfter, numDocsBefore, msg);
 
             // If the moveChunk operation succeeded, verify that each mongos sees all data in the
             // chunk's range on only the toShard. If the operation failed, verify that each mongos
@@ -153,13 +152,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
             msg =
                 msgBase + '\nMongos find().explain() results for chunk: ' + tojson(shardsForChunk);
-            assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
+            assert.eq(shardsForChunk.shards.length, 1, msg);
             if (moveChunkRes.ok) {
                 msg = 'moveChunk succeeded but chunk was not on new shard.\n' + msg;
-                assertWhenOwnColl.eq(shardsForChunk.shards[0], toShard, msg);
+                assert.eq(shardsForChunk.shards[0], toShard, msg);
             } else {
                 msg = 'moveChunk failed but chunk was not on original shard.\n' + msg;
-                assertWhenOwnColl.eq(shardsForChunk.shards[0], fromShard, msg);
+                assert.eq(shardsForChunk.shards[0], fromShard, msg);
             }
 
             // If the moveChunk operation succeeded, verify that each mongos updated the chunk's
@@ -170,10 +169,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 msgBase + '\nchunkBefore: ' + tojson(chunk) + '\nchunkAfter: ' + tojson(chunkAfter);
             if (moveChunkRes.ok) {
                 msg = "moveChunk succeeded but chunk's shard was not new shard.\n" + msg;
-                assertWhenOwnColl.eq(chunkAfter.shard, toShard, msg);
+                assert.eq(chunkAfter.shard, toShard, msg);
             } else {
                 msg = "moveChunk failed but chunk's shard was not original shard.\n" + msg;
-                assertWhenOwnColl.eq(chunkAfter.shard, fromShard, msg);
+                assert.eq(chunkAfter.shard, fromShard, msg);
             }
         }
     };

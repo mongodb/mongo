@@ -1,6 +1,5 @@
 // Helper functions for checking transaction server status invariants that may not hold for brief
 // periods of time due to non-atomic updates.
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 /**
  * Returns all elements in the given array that evaluate to false for the given predicate
@@ -114,7 +113,7 @@ export function totalAbortedEqualsSumOfAbortCauses(txnStats) {
 export function checkInvariant(samples, predFn, maxErrPct) {
     let failedSamples = filterFalse(samples, predFn);
     let errRate = failedSamples.length / samples.length;
-    assertAlways.lte(errRate, maxErrPct, () => {
+    assert.lte(errRate, maxErrPct, () => {
         let failedSamplesStr = failedSamples.map(tojsononeline).join("\n");
         return "'" + predFn.name + "' invariant violated. Failed samples: " + failedSamplesStr;
     });

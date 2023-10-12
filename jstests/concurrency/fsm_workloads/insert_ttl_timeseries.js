@@ -11,7 +11,6 @@
  * ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {BalancerHelper} from "jstests/concurrency/fsm_workload_helpers/balancer.js";
 
 export const $config = (function() {
@@ -47,8 +46,8 @@ export const $config = (function() {
                 [timeFieldName]: getTime(),
                 first: true,
             });
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         },
 
         /**
@@ -61,8 +60,8 @@ export const $config = (function() {
                 [timeFieldName]: getTime(),
                 data: Random.rand(),
             });
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         },
 
         /**
@@ -80,8 +79,8 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: true});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.insertedIds.length, batchSize);
+            assert.commandWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         /**
@@ -99,8 +98,8 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: false});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.insertedIds.length, batchSize);
+            assert.commandWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         /**
@@ -119,8 +118,8 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: false});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.insertedIds.length, batchSize);
+            assert.commandWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         },
 
         /**
@@ -140,14 +139,14 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: false});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(res.insertedIds.length, batchSize);
+            assert.commandWorked(res);
+            assert.eq(res.insertedIds.length, batchSize);
         }
     };
 
     function setup(db, collName, cluster) {
         collName = this.getCollectionName(collName);
-        assertAlways.commandWorked(db.createCollection(collName, {
+        assert.commandWorked(db.createCollection(collName, {
             timeseries: {
                 timeField: timeFieldName,
                 metaField: metaFieldName,
@@ -177,7 +176,7 @@ export const $config = (function() {
 
         print("Waiting for data to be deleted by TTL monitor");
         collName = this.getCollectionName(collName);
-        assertAlways.soon(() => {
+        assert.soon(() => {
             return db[collName].find({first: true}).itcount() == 0;
         }, 'Expected oldest documents to be removed', timeoutMS);
     }

@@ -8,8 +8,6 @@
  * we attempted to make a copy of a record after a WriteConflictException occurred in
  * Collection::updateDocument().
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         insert: function insert(db, collName) {
@@ -22,9 +20,9 @@ export const $config = (function() {
 
         update: function update(db, collName) {
             var res = db[collName].update({}, {$inc: {n: 1}}, {multi: true});
-            assertAlways.lte(0, res.nMatched, tojson(res));
-            assertAlways.eq(res.nMatched, res.nModified, tojson(res));
-            assertAlways.eq(0, res.nUpserted, tojson(res));
+            assert.lte(0, res.nMatched, tojson(res));
+            assert.eq(res.nMatched, res.nModified, tojson(res));
+            assert.eq(0, res.nUpserted, tojson(res));
         }
     };
 

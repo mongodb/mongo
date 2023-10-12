@@ -3,18 +3,17 @@
  *
  * Intended for use by workloads testing sharding (i.e., workloads starting with 'sharded_').
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 
 export var BalancerHelper = (function() {
     // Disables balancing for a given collection.
     function disableBalancerForCollection(db, ns) {
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.getSiblingDB('config').collections.update({_id: ns}, {$set: {"noBalance": true}}));
     }
 
     // Enables balancing for a given collection.
     function enableBalancerForCollection(db, ns) {
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.getSiblingDB('config').collections.update({_id: ns}, {$unset: {"noBalance": 1}}));
     }
 

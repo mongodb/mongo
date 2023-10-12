@@ -5,8 +5,6 @@
  *   requires_sharding,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
 const collPrefix = 'sharded_coll_';
@@ -61,7 +59,7 @@ export const $config = (function() {
         function shardCollection(db, collName) {
             let coll = getRandomCollection(db);
             jsTestLog('Executing shardCollection state: ' + coll.getFullName());
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}),
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.StaleDbVersion]);
         }
@@ -71,7 +69,7 @@ export const $config = (function() {
             jsTestLog('Executing dropDatabase state: ' + myDb.getName());
             var resOK;
             try {
-                assertAlways.commandWorked(myDb.dropDatabase());
+                assert.commandWorked(myDb.dropDatabase());
                 resOK = true;
             } catch (e) {
                 resOK = false;

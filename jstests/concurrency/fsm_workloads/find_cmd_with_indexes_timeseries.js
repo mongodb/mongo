@@ -14,8 +14,6 @@
  *   does_not_support_transactions
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     // Hardcode time-series collection information so that the threads can all obtain it and run on
     // the same fields and indexes.
@@ -55,19 +53,18 @@ export const $config = (function() {
      * Checks that the dropIndex cmd result either succeeded or failed in an acceptible manner.
      */
     function processDropIndex(dropIndexRes, indexSpec) {
-        assertAlways(dropIndexRes.ok == 1 || dropIndexRes.code == ErrorCodes.IndexNotFound,
-                     "Drop index for spec '" + indexSpec + "' failed: " + tojson(dropIndexRes));
+        assert(dropIndexRes.ok == 1 || dropIndexRes.code == ErrorCodes.IndexNotFound,
+               "Drop index for spec '" + indexSpec + "' failed: " + tojson(dropIndexRes));
     }
 
     /**
      * Checks that the createIndex cmd result either succeeded or failed in an acceptible manner.
      */
     function processCreateIndex(createIndexRes, indexSpec) {
-        assertAlways(createIndexRes.ok == 1 ||
-                         createIndexRes.code == ErrorCodes.IndexAlreadyExists ||
-                         createIndexRes.code == ErrorCodes.IndexBuildAborted ||
-                         createIndexRes.code == ErrorCodes.NoMatchingDocument,
-                     "Create index for spec '" + indexSpec + "'failed: " + tojson(createIndexRes));
+        assert(createIndexRes.ok == 1 || createIndexRes.code == ErrorCodes.IndexAlreadyExists ||
+                   createIndexRes.code == ErrorCodes.IndexBuildAborted ||
+                   createIndexRes.code == ErrorCodes.NoMatchingDocument,
+               "Create index for spec '" + indexSpec + "'failed: " + tojson(createIndexRes));
     }
 
     const states = {
@@ -117,15 +114,15 @@ export const $config = (function() {
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[timeFieldName]: {$lte: docTimes[9]}}).toArray();
-                assertAlways.eq(numDocs,
-                                queryDocs.length,
-                                "Failed to find " + numDocs +
-                                    " documents with time field greater than '" + docTimes[0] +
-                                    "'. Query results: " + tojson(queryDocs));
+                assert.eq(numDocs,
+                          queryDocs.length,
+                          "Failed to find " + numDocs +
+                              " documents with time field greater than '" + docTimes[0] +
+                              "'. Query results: " + tojson(queryDocs));
             } catch (e) {
                 // The query may fail because the index got dropped out from under it.
-                assertAlways(e.code == ErrorCodes.QueryPlanKilled,
-                             "Expected a QueryPlanKilled error, but encountered: " + e.message);
+                assert(e.code == ErrorCodes.QueryPlanKilled,
+                       "Expected a QueryPlanKilled error, but encountered: " + e.message);
             }
         },
 
@@ -137,15 +134,15 @@ export const $config = (function() {
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[timeFieldName]: {$lte: docTimes[4]}}).toArray();
-                assertAlways.eq(numDocs / 2,
-                                queryDocs.length,
-                                "Failed to find " + (numDocs / 2) +
-                                    " documents with time field greater than '" + docTimes[5] +
-                                    "'. Query results: " + tojson(queryDocs));
+                assert.eq(numDocs / 2,
+                          queryDocs.length,
+                          "Failed to find " + (numDocs / 2) +
+                              " documents with time field greater than '" + docTimes[5] +
+                              "'. Query results: " + tojson(queryDocs));
             } catch (e) {
                 // The query may fail because the index got dropped out from under it.
-                assertAlways(e.code == ErrorCodes.QueryPlanKilled,
-                             "Expected a QueryPlanKilled error, but encountered: " + e.message);
+                assert(e.code == ErrorCodes.QueryPlanKilled,
+                       "Expected a QueryPlanKilled error, but encountered: " + e.message);
             }
         },
 
@@ -157,7 +154,7 @@ export const $config = (function() {
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[metaIndexKey]: {$gte: 0}}).toArray();
-                assertAlways.eq(
+                assert.eq(
                     numDocs,
                     queryDocs.length,
                     "Failed to find " + numDocs +
@@ -165,8 +162,8 @@ export const $config = (function() {
                         tojson(queryDocs));
             } catch (e) {
                 // The query may fail because the index got dropped out from under it.
-                assertAlways(e.code == ErrorCodes.QueryPlanKilled,
-                             "Expected a QueryPlanKilled error, but encountered: " + e.message);
+                assert(e.code == ErrorCodes.QueryPlanKilled,
+                       "Expected a QueryPlanKilled error, but encountered: " + e.message);
             }
         },
 
@@ -178,15 +175,15 @@ export const $config = (function() {
             const coll = db.getCollection(getCollectionName(collName));
             try {
                 const queryDocs = coll.find({[metaIndexKey]: {$gt: 4}}).toArray();
-                assertAlways.eq(numDocs / 2,
-                                queryDocs.length,
-                                "Failed to find " + (numDocs / 2) +
-                                    " documents with meta field greater than 4. Query results: " +
-                                    tojson(queryDocs));
+                assert.eq(numDocs / 2,
+                          queryDocs.length,
+                          "Failed to find " + (numDocs / 2) +
+                              " documents with meta field greater than 4. Query results: " +
+                              tojson(queryDocs));
             } catch (e) {
                 // The query may fail because the index got dropped out from under it.
-                assertAlways(e.code == ErrorCodes.QueryPlanKilled,
-                             "Expected a QueryPlanKilled error, but encountered: " + e.message);
+                assert(e.code == ErrorCodes.QueryPlanKilled,
+                       "Expected a QueryPlanKilled error, but encountered: " + e.message);
             }
         },
 
@@ -197,7 +194,7 @@ export const $config = (function() {
      */
     function setup(db, collName, cluster) {
         // Create the collection.
-        assertAlways.commandWorked(db.createCollection(getCollectionName(collName), {
+        assert.commandWorked(db.createCollection(getCollectionName(collName), {
             timeseries: {
                 timeField: timeFieldName,
                 metaField: metaFieldName,
@@ -210,8 +207,8 @@ export const $config = (function() {
             // Insert a document with the current time.
             const res =
                 coll.insert({_id: i, [timeFieldName]: docTimes[i], [metaFieldName]: {a: i}});
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted, tojson(res));
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted, tojson(res));
         }
     }
 

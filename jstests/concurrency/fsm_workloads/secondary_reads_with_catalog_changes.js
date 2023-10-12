@@ -24,27 +24,26 @@
  */
 import "jstests/libs/sbe_assert_error_override.js";
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/secondary_reads.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.buildIndex = function buildIndex(db, spec) {
         // Index must be built eventually.
-        assertWhenOwnColl.soon(() => {
+        assert.soon(() => {
             const res = db[this.collName].createIndex(spec);
             if (res.ok === 1) {
-                assertWhenOwnColl.commandWorked(res);
+                assert.commandWorked(res);
                 return true;
             }
             if (TestData.runInsideTransaction) {
-                assertWhenOwnColl.commandFailedWithCode(res, [
+                assert.commandFailedWithCode(res, [
                     ErrorCodes.IndexBuildAborted,
                     ErrorCodes.IndexBuildAlreadyInProgress,
                     ErrorCodes.NoMatchingDocument,
                 ]);
             } else {
-                assertWhenOwnColl.commandFailedWithCode(res, [
+                assert.commandFailedWithCode(res, [
                     ErrorCodes.IndexBuildAborted,
                     ErrorCodes.NoMatchingDocument,
                 ]);
@@ -55,7 +54,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.data.assertSecondaryReadOk = function(res) {
-        assertAlways.commandFailedWithCode(
+        assert.commandFailedWithCode(
             res,
             [
                 // The query was interrupted due to an index or collection drop
@@ -74,12 +73,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         } else {
             const res = db[this.collName].dropIndex({x: 1});
             if (res.ok === 1) {
-                assertWhenOwnColl.commandWorked(res);
+                assert.commandWorked(res);
                 // Always rebuild the index because reader threads will retry until the index
                 // exists.
                 this.buildIndex(db, {x: 1});
             } else {
-                assertWhenOwnColl.commandFailedWithCode(res, [
+                assert.commandFailedWithCode(res, [
                     ErrorCodes.IndexNotFound,
                     ErrorCodes.NamespaceNotFound,
                     ErrorCodes.BackgroundOperationInProgressForNamespace
@@ -94,12 +93,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         } else {
             const res = db.runCommand({drop: this.collName});
             if (res.ok === 1) {
-                assertWhenOwnColl.commandWorked(res);
+                assert.commandWorked(res);
                 // Always rebuild the index because reader threads will retry until the index
                 // exists.
                 this.buildIndex(db, {x: 1});
             } else {
-                assertWhenOwnColl.commandFailedWithCode(res, [
+                assert.commandFailedWithCode(res, [
                     ErrorCodes.NamespaceNotFound,
                     ErrorCodes.BackgroundOperationInProgressForNamespace
                 ]);

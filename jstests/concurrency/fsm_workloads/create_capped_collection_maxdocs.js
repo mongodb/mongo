@@ -12,7 +12,6 @@
  *
  * @tags: [does_not_support_stepdowns, requires_capped]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -36,7 +35,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // TODO: how to avoid having too many files open?
     function create(db, collName) {
         var myCollName = uniqueCollectionName(this.prefix, this.tid, this.num++);
-        assertAlways.commandWorked(db.createCollection(myCollName, options));
+        assert.commandWorked(db.createCollection(myCollName, options));
 
         // Define a small document to be an eighth the size of the capped collection.
         var smallDocSize = Math.floor(options.size / 8) - 1;
@@ -58,10 +57,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
             var foundIds = this.getObjectIds(db, myCollName);
             var count = foundIds.length;
-            assertWhenOwnDB.eq(3, count, 'expected truncation to occur due to number of docs');
-            assertWhenOwnDB.eq(insertedIds.slice(insertedIds.length - count),
-                               foundIds,
-                               'expected truncation to remove the oldest documents');
+            assert.eq(3, count, 'expected truncation to occur due to number of docs');
+            assert.eq(insertedIds.slice(insertedIds.length - count),
+                      foundIds,
+                      'expected truncation to remove the oldest documents');
         }
     }
 

@@ -10,7 +10,6 @@
  *  featureFlagTimeseriesUpdatesSupport,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
@@ -28,9 +27,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             },
         };
         // May delete different measurements from the two collections.
-        const res1 = assertAlways.commandWorked(
+        const res1 = assert.commandWorked(
             db.runCommand({findAndModify: collName, query: filter, remove: true}));
-        const res2 = assertAlways.commandWorked(
+        const res2 = assert.commandWorked(
             db.runCommand({findAndModify: this.nonShardCollName, query: filter, remove: true}));
         if (res1 && res1.lastErrorObject.n) {
             assert(res1.value[fieldNameF][fieldNameTid] >= filterFieldVal,

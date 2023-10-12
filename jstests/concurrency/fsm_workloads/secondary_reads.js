@@ -17,7 +17,6 @@
  *
  * @tags: [requires_replication, uses_write_concern]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {supportsCommittedReads} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -29,11 +28,11 @@ export const $config = (function() {
     }
 
     function buildIndex(db, spec) {
-        assertAlways.commandWorked(db[this.collName].createIndex(spec));
+        assert.commandWorked(db[this.collName].createIndex(spec));
     }
 
     function assertSecondaryReadOk(res) {
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
     }
 
     function insertDocumentsAndBuildIndex(db, writeConcern) {
@@ -50,8 +49,8 @@ export const $config = (function() {
             bulk.insert({_id: i, x: i});
         }
         let res = bulk.execute(writeConcern);
-        assertWhenOwnColl.commandWorked(res);
-        assertWhenOwnColl.eq(this.nDocumentsToInsert, res.nInserted);
+        assert.commandWorked(res);
+        assert.eq(this.nDocumentsToInsert, res.nInserted);
         this.nDocumentsInTotal += this.nDocumentsToInsert;
     }
 
@@ -82,7 +81,7 @@ export const $config = (function() {
         });
         // Make sure there is no hole in the result.
         for (let i = 0; i < arr.length - 1; i++) {
-            assertWhenOwnColl.eq(arr[i].x, arr[i + 1].x + 1, () => tojson(arr));
+            assert.eq(arr[i].x, arr[i + 1].x + 1, () => tojson(arr));
         }
     }
 

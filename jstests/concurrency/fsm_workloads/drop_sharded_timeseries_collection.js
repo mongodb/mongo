@@ -8,8 +8,6 @@
  *   requires_fcv_51,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 const dbPrefix = 'fsm_db_for_sharded_timeseries_collection_';
 const dbCount = 2;
 const collPrefix = 'sharded_timeseries_collection_';
@@ -39,7 +37,7 @@ export const $config = (function() {
         create: function(db, collName) {
             const coll = getRandomTimeseriesView(db);
             jsTestLog("Executing create state on: " + coll.getFullName());
-            assertAlways.commandWorked(db.adminCommand({
+            assert.commandWorked(db.adminCommand({
                 shardCollection: coll.getFullName(),
                 key: {[metaField]: 1, [timeField]: 1},
                 timeseries: {timeField: timeField, metaField: metaField}
@@ -48,7 +46,7 @@ export const $config = (function() {
         dropView: function(db, collName) {
             const coll = getRandomTimeseriesView(db);
             jsTestLog("Executing dropView state on: " + coll.getFullName());
-            assertAlways.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));
+            assert.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));
         },
     };
 

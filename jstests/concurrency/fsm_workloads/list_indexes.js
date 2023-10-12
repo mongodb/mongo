@@ -4,8 +4,6 @@
  * Checks that the listIndexes command can tolerate concurrent modifications to the
  * index catalog.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = (function() {
         // Picks a random index to drop and recreate.
@@ -13,16 +11,16 @@ export const $config = (function() {
             var spec = {};
             spec['foo' + this.tid] = 1;
 
-            assertWhenOwnColl.commandWorked(db[collName].dropIndex(spec));
+            assert.commandWorked(db[collName].dropIndex(spec));
             sleep(100);
-            assertWhenOwnColl.commandWorked(db[collName].createIndex(spec));
+            assert.commandWorked(db[collName].createIndex(spec));
         }
 
         // List indexes, using a batchSize of 2 to ensure getmores happen.
         function listIndices(db, collName) {
             var cursor = new DBCommandCursor(
                 db, db.runCommand({listIndexes: collName, cursor: {batchSize: 2}}));
-            assertWhenOwnColl.gte(cursor.itcount(), 0);
+            assert.gte(cursor.itcount(), 0);
         }
 
         return {modifyIndices: modifyIndices, listIndices: listIndices};
@@ -38,7 +36,7 @@ export const $config = (function() {
         for (var i = 0; i < this.threadCount; ++i) {
             var spec = {};
             spec['foo' + i] = 1;
-            assertAlways.commandWorked(db[collName].createIndex(spec));
+            assert.commandWorked(db[collName].createIndex(spec));
         }
     }
 

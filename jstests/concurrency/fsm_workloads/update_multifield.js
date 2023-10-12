@@ -5,7 +5,6 @@
  * The collection has an index for each field, and a compound index for all fields.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -50,19 +49,19 @@ export const $config = (function() {
     var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({x: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({y: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({z: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({x: 1, y: 1, z: 1}));
+        assert.commandWorked(db[collName].createIndex({x: 1}));
+        assert.commandWorked(db[collName].createIndex({y: 1}));
+        assert.commandWorked(db[collName].createIndex({z: 1}));
+        assert.commandWorked(db[collName].createIndex({x: 1, y: 1, z: 1}));
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 3);
-        assertAlways.gt(this.numDocs, 0, 'numDocs should be a positive number');
+        assert.gt(this.numDocs, 0, 'numDocs should be a positive number');
 
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({_id: i});
-            assertWhenOwnColl.commandWorked(res);
-            assertWhenOwnColl.eq(1, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted);
         }
     }
 
@@ -74,21 +73,21 @@ export const $config = (function() {
         transitions: transitions,
         data: {
             assertResult: function(res, db, collName, query) {
-                assertAlways.eq(0, res.nUpserted, tojson(res));
+                assert.eq(0, res.nUpserted, tojson(res));
 
                 if (isMongod(db)) {
                     // Storage engines will automatically retry any operations when there are
                     // conflicts, so we should always see a matching document.
-                    assertWhenOwnColl.eq(res.nMatched, 1, tojson(res));
-                    assertWhenOwnColl.eq(res.nModified, 1, tojson(res));
+                    assert.eq(res.nMatched, 1, tojson(res));
+                    assert.eq(res.nModified, 1, tojson(res));
                 } else {
                     // On storage engines that do not support document-level concurrency, it is
                     // possible that the query will not find the document. This can happen if
                     // another thread updated the target document during a yield, triggering an
                     // invalidation.
-                    assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
-                    assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
-                    assertAlways.eq(res.nModified, res.nMatched, tojson(res));
+                    assert.contains(res.nMatched, [0, 1], tojson(res));
+                    assert.contains(res.nModified, [0, 1], tojson(res));
+                    assert.eq(res.nModified, res.nMatched, tojson(res));
                 }
             },
             multi: false,

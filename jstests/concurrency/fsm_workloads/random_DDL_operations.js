@@ -8,7 +8,6 @@
  *  ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
@@ -40,7 +39,7 @@ export const $config = (function() {
             const fullNs = coll.getFullName();
 
             jsTestLog('Executing create state: ' + fullNs);
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
         },
         drop: function(db, collName, connCache) {
@@ -48,7 +47,7 @@ export const $config = (function() {
             const coll = getRandomCollection(db);
 
             jsTestLog('Executing drop state: ' + coll.getFullName());
-            assertAlways.eq(coll.drop(), true);
+            assert.eq(coll.drop(), true);
         },
         rename: function(db, collName, connCache) {
             db = getRandomDb(db);
@@ -58,7 +57,7 @@ export const $config = (function() {
             const destCollName = destCollNS.split('.')[1];
 
             jsTestLog('Executing rename state:' + srcCollName + ' to ' + destCollNS);
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 srcColl.renameCollection(destCollName, true /* dropTarget */), [
                     ErrorCodes.NamespaceNotFound,
                     ErrorCodes.ConflictingOperationInProgress,
@@ -70,7 +69,7 @@ export const $config = (function() {
             const shardId = getRandomShard(connCache);
 
             jsTestLog('Executing movePrimary state: ' + db.getName() + ' to ' + shardId);
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.adminCommand({movePrimary: db.getName(), to: shardId}), [
                     ErrorCodes.ConflictingOperationInProgress,
                     // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
@@ -83,7 +82,7 @@ export const $config = (function() {
             const coll = getRandomCollection(db);
 
             jsTestLog('Executing collMod state: ' + coll.getFullName());
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}),
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
         },
@@ -123,7 +122,7 @@ export const $config = (function() {
 
     let teardown = function(db, collName, cluster) {
         const configDB = db.getSiblingDB("config");
-        assertAlways(configDB.collections.countDocuments({allowMigrations: {$exists: true}}) == 0);
+        assert(configDB.collections.countDocuments({allowMigrations: {$exists: true}}) == 0);
     };
 
     return {

@@ -4,7 +4,6 @@
  * Runs explain() on a collection.
  *
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
@@ -15,7 +14,7 @@ export const $config = (function() {
         shardKey: {j: 1},
         assignEqualProbsToTransitions: function assignEqualProbsToTransitions(statesMap) {
             var states = Object.keys(statesMap);
-            assertAlways.gt(states.length, 0);
+            assert.gt(states.length, 0);
             var probs = {};
             var pr = 1.0 / states.length;
             states.forEach(function(s) {
@@ -35,23 +34,22 @@ export const $config = (function() {
             // test the three verbosity levels:
             // 'queryPlanner', 'executionStats', and 'allPlansExecution'
             ['queryPlanner', 'executionStats', 'allPlansExecution'].forEach(function(verbosity) {
-                assertAlways.commandWorked(
-                    db[collName].find({j: this.nInserted / 2}).explain(verbosity));
+                assert.commandWorked(db[collName].find({j: this.nInserted / 2}).explain(verbosity));
             }.bind(this));
         }
 
         function explainNonExistentNS(db, collName) {
-            assertAlways(!db[this.collNotExist].exists());
+            assert(!db[this.collNotExist].exists());
             var res = db[this.collNotExist].find().explain();
-            assertAlways.commandWorked(res);
-            assertAlways(res.queryPlanner, tojson(res));
-            assertAlways(res.queryPlanner.winningPlan, tojson(res));
+            assert.commandWorked(res);
+            assert(res.queryPlanner, tojson(res));
+            assert(res.queryPlanner.winningPlan, tojson(res));
             if (isMongod(db)) {
-                assertAlways.eq(getWinningPlan(res.queryPlanner).stage, 'EOF', tojson(res));
+                assert.eq(getWinningPlan(res.queryPlanner).stage, 'EOF', tojson(res));
             } else {
                 // In the sharding case, each shard has a winningPlan
                 res.queryPlanner.winningPlan.shards.forEach(function(shard) {
-                    assertAlways.eq(getWinningPlan(shard).stage, 'EOF', tojson(res));
+                    assert.eq(getWinningPlan(shard).stage, 'EOF', tojson(res));
                 });
             }
         }

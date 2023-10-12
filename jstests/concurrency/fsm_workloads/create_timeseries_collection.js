@@ -6,8 +6,6 @@
  *   does_not_support_stepdowns,
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {prefix: "create_timeseries_collection"};
 
@@ -24,7 +22,7 @@ export const $config = (function() {
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const timeFieldName = "time";
-            assertAlways.commandWorked(
+            assert.commandWorked(
                 db.createCollection(collName, {timeseries: {timeField: timeFieldName}}));
         }
 
@@ -32,7 +30,7 @@ export const $config = (function() {
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const coll = db.getCollection(collName);
-            assertAlways.commandWorked(coll.insert({
+            assert.commandWorked(coll.insert({
                 _id: this.num,
                 measurement: "measurement",
                 time: ISODate(),
@@ -41,7 +39,7 @@ export const $config = (function() {
 
         function drop(db, collName) {
             collName = getCollectionName(this.prefix, collName, this.tid);
-            assertAlways(db.getCollection(collName).drop(), "failed to drop " + collName);
+            assert(db.getCollection(collName).drop(), "failed to drop " + collName);
         }
 
         return {init: init, create: create, insert: insert, drop: drop};

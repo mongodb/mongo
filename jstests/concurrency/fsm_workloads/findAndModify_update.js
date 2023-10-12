@@ -6,8 +6,6 @@
  * selected based on 'query' and 'sort' specifications, and updated
  * using either the $min or $max operator.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         numDocsPerThread: 3,  // >1 for 'sort' to be meaningful
@@ -22,8 +20,8 @@ export const $config = (function() {
         function init(db, collName) {
             for (var i = 0; i < this.numDocsPerThread; ++i) {
                 var res = db[collName].insert(makeDoc(this.tid));
-                assertAlways.commandWorked(res);
-                assertAlways.eq(1, res.nInserted);
+                assert.commandWorked(res);
+                assert.eq(1, res.nInserted);
             }
         }
 
@@ -37,15 +35,15 @@ export const $config = (function() {
                 update: {$max: {value: updatedValue}},
                 new: true
             });
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             var doc = res.value;
-            assertWhenOwnColl(doc !== null,
-                              'query spec should have matched a document, returned ' + tojson(res));
+            assert(doc !== null,
+                   'query spec should have matched a document, returned ' + tojson(res));
 
             if (doc !== null) {
-                assertAlways.eq(this.tid, doc.tid);
-                assertWhenOwnColl.eq(updatedValue, doc.value);
+                assert.eq(this.tid, doc.tid);
+                assert.eq(updatedValue, doc.value);
             }
         }
 
@@ -59,15 +57,15 @@ export const $config = (function() {
                 update: {$min: {value: updatedValue}},
                 new: true
             });
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             var doc = res.value;
-            assertWhenOwnColl(doc !== null,
-                              'query spec should have matched a document, returned ' + tojson(res));
+            assert(doc !== null,
+                   'query spec should have matched a document, returned ' + tojson(res));
 
             if (doc !== null) {
-                assertAlways.eq(this.tid, doc.tid);
-                assertWhenOwnColl.eq(updatedValue, doc.value);
+                assert.eq(this.tid, doc.tid);
+                assert.eq(updatedValue, doc.value);
             }
         }
 
@@ -86,7 +84,7 @@ export const $config = (function() {
 
     function setup(db, collName, cluster) {
         var res = db[collName].createIndex({tid: 1, value: 1});
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
     }
 
     return {

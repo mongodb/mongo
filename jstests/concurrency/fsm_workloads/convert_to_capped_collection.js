@@ -11,8 +11,6 @@
  *
  * @tags: [requires_collstats, requires_capped]
  */
-import {assertAlways, assertWhenOwnDB} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     // TODO: This workload may fail if an iteration multiplier is specified.
     var data = {prefix: 'convert_to_capped_collection'};
@@ -31,12 +29,12 @@ export const $config = (function() {
             }
 
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq((this.tid + 1) * 200, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq((this.tid + 1) * 200, res.nInserted);
 
-            assertWhenOwnDB(!db[this.threadCollName].isCapped());
-            assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
-            assertWhenOwnDB(db[this.threadCollName].isCapped());
+            assert(!db[this.threadCollName].isCapped());
+            assert.commandWorked(db[this.threadCollName].convertToCapped(this.size));
+            assert(db[this.threadCollName].isCapped());
         }
 
         function convertToCapped(db, collName) {
@@ -44,15 +42,13 @@ export const $config = (function() {
             // is not a multiple of 256
             this.size /= 1.5;
 
-            assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
-            assertWhenOwnDB(db[this.threadCollName].isCapped());
+            assert.commandWorked(db[this.threadCollName].convertToCapped(this.size));
+            assert(db[this.threadCollName].isCapped());
 
             // only the _id index should remain after running convertToCapped
             var indexKeys = db[this.threadCollName].getIndexKeys();
-            assertWhenOwnDB.eq(1, indexKeys.length);
-            assertWhenOwnDB(function() {
-                assertWhenOwnDB.docEq({_id: 1}, indexKeys[0]);
-            });
+            assert.eq(1, indexKeys.length);
+            assert.docEq({_id: 1}, indexKeys[0]);
         }
 
         return {init: init, convertToCapped: convertToCapped};

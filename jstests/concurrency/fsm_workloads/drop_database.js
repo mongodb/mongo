@@ -6,8 +6,6 @@
  * @tags: [
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         init: function init(db, collName) {
@@ -18,9 +16,9 @@ export const $config = (function() {
             // TODO: should we ever do something different?
             //       e.g. create multiple collections on the database and then drop?
             var myDB = db.getSiblingDB(this.uniqueDBName);
-            assertAlways.commandWorked(myDB.createCollection(collName));
+            assert.commandWorked(myDB.createCollection(collName));
 
-            assertAlways.commandWorked(myDB.dropDatabase());
+            assert.commandWorked(myDB.dropDatabase());
         }
     };
 

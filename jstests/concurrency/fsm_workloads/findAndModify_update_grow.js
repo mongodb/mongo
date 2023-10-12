@@ -6,7 +6,6 @@
  * moves don't happen and that large changes in document size are handled
  * correctly.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -38,8 +37,8 @@ export const $config = (function() {
             this.bsonsize = Object.bsonsize(doc);
 
             var res = db[collName].insert(doc);
-            assertAlways.commandWorked(res);
-            assertAlways.eq(1, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(1, res.nInserted);
         }
 
         function findAndModify(db, collName) {
@@ -73,19 +72,19 @@ export const $config = (function() {
                 update: update,
                 new: true
             });
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             var doc = res.value;
-            assertWhenOwnColl(doc !== null,
-                              'query spec should have matched a document, returned ' + tojson(res));
+            assert(doc !== null,
+                   'query spec should have matched a document, returned ' + tojson(res));
 
             if (doc === null) {
                 return;
             }
 
-            assertAlways.eq(this.tid, doc.tid);
-            assertWhenOwnColl.eq(updatedValue, doc[uniqueFieldName]);
-            assertWhenOwnColl.eq(updatedLength, doc.length);
+            assert.eq(this.tid, doc.tid);
+            assert.eq(updatedValue, doc[uniqueFieldName]);
+            assert.eq(updatedLength, doc.length);
 
             this.length = updatedLength;
             this.bsonsize = Object.bsonsize(doc);
@@ -96,8 +95,7 @@ export const $config = (function() {
             if (isMongod(db)) {
                 // Even though the document has at least doubled in size, the document
                 // must never move.
-                assertWhenOwnColl.eq(
-                    before.$recordId, after.$recordId, 'document should not have moved');
+                assert.eq(before.$recordId, after.$recordId, 'document should not have moved');
             }
         }
 

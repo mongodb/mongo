@@ -13,7 +13,6 @@
  *
  * This workload was designed to reproduce SERVER-21434.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {
@@ -36,13 +35,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.opName = 'modified';
 
     $config.data.validateResult = function validateResult(db, collName, res) {
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
 
         var doc = res.value;
         if (isMongod(db)) {
             // Storage engines should automatically retry the operation, and thus should never
             // return null.
-            assertWhenOwnColl.neq(doc, null, 'findAndModify should have found a matching document');
+            assert.neq(doc, null, 'findAndModify should have found a matching document');
         }
         if (doc !== null) {
             this.saveDocId(db, collName, doc._id);

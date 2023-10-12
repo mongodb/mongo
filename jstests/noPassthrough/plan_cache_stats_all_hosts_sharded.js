@@ -6,7 +6,6 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
 // ]
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 for (let shardCount = 1; shardCount <= 2; shardCount++) {

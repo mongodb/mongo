@@ -8,7 +8,6 @@
  * This workload was designed to reproduce SERVER-25039.
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/kill_rooted_or.js";
 
@@ -30,13 +29,13 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (!aggResult.ok) {
             // We expect to see errors caused by the plan executor being killed, because of the
             // collection getting dropped on another thread.
-            assertAlways.contains(aggResult.code,
-                                  [
-                                      ErrorCodes.NamespaceNotFound,
-                                      ErrorCodes.OperationFailed,
-                                      ErrorCodes.QueryPlanKilled
-                                  ],
-                                  aggResult);
+            assert.contains(aggResult.code,
+                            [
+                                ErrorCodes.NamespaceNotFound,
+                                ErrorCodes.OperationFailed,
+                                ErrorCodes.QueryPlanKilled
+                            ],
+                            aggResult);
             return;
         }
 

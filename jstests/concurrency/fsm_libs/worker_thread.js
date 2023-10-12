@@ -13,21 +13,16 @@ export const workerThread = (function() {
     // args.cluster = connection strings for all cluster nodes (see cluster.js for format)
     // args.clusterOptions = the configuration of the cluster
     // args.seed = seed for the random number generator
-    // args.globalAssertLevel = the global assertion level to use
     // args.errorLatch = CountDownLatch instance that threads count down when they error
     // args.sessionOptions = the options to start a session with
     // run = callback that takes a map of workloads to their associated $config
     async function main(workloads, args, run) {
-        const {setGlobalAssertLevel} = await import("jstests/concurrency/fsm_libs/assert.js");
-
         var myDB;
         var configs = {};
         var connectionString = 'mongodb://' + args.host + '/?appName=tid:' + args.tid;
         if (typeof args.replSetName !== 'undefined') {
             connectionString += '&replicaSet=' + args.replSetName;
         }
-
-        setGlobalAssertLevel(args.globalAssertLevel);
 
         // The global 'TestData' object may still be undefined if the concurrency suite isn't being
         // run by resmoke.py (e.g. if it is being run via a parallel shell in the backup/restore

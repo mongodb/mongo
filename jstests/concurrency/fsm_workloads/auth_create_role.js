@@ -3,7 +3,6 @@
  *
  * Repeatedly creates new roles on a database.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 
 // UMC commands are not supported in transactions.
@@ -54,9 +53,9 @@ export const $config = (function() {
             for (var i = 0; i < this.num; ++i) {
                 var name = uniqueRoleName(this.prefix, this.tid, i);
                 var res = db.getRole(name);
-                assertAlways(res !== null, "role '" + name + "' should exist");
-                assertAlways.eq(name, res.role);
-                assertAlways(!res.isBuiltin, 'role should be user-defined');
+                assert(res !== null, "role '" + name + "' should exist");
+                assert.eq(name, res.role);
+                assert(!res.isBuiltin, 'role should be user-defined');
             }
         }
 

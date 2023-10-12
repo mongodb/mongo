@@ -9,7 +9,6 @@
  * This workload was designed to reproduce SERVER-15892.
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 
 export const $config = (function() {
@@ -31,7 +30,7 @@ export const $config = (function() {
 
             var res = db.runCommand(
                 {findAndModify: collName, query: {_id: 'findAndModify_inc'}, update: updateDoc});
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
 
             // If the document was invalidated during a yield, then we wouldn't have modified it.
             // The "findAndModify" command returns a null value in this case. See SERVER-22002 for
@@ -41,9 +40,8 @@ export const $config = (function() {
                 // is retried internally. We never expect to see a null value returned by the
                 // "findAndModify" command when it is known that a matching document exists in the
                 // collection.
-                assertWhenOwnColl(
-                    res.value !== null,
-                    'query spec should have matched a document, returned ' + tojson(res));
+                assert(res.value !== null,
+                       'query spec should have matched a document, returned ' + tojson(res));
             }
 
             if (res.value !== null) {
@@ -53,15 +51,13 @@ export const $config = (function() {
 
         find: function find(db, collName) {
             var docs = db[collName].find().toArray();
-            assertWhenOwnColl.eq(1, docs.length);
-            assertWhenOwnColl(() => {
-                var doc = docs[0];
-                if (doc.hasOwnProperty(this.fieldName)) {
-                    assertWhenOwnColl.eq(this.count, doc[this.fieldName]);
-                } else {
-                    assertWhenOwnColl.eq(this.count, 0);
-                }
-            });
+            assert.eq(1, docs.length);
+            var doc = docs[0];
+            if (doc.hasOwnProperty(this.fieldName)) {
+                assert.eq(this.count, doc[this.fieldName]);
+            } else {
+                assert.eq(this.count, 0);
+            }
         }
 
     };

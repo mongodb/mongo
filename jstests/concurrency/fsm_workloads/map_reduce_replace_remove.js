@@ -13,7 +13,6 @@
  *   does_not_support_causal_consistency
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_replace.js";
 
@@ -21,8 +20,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.remove = function remove(db, collName) {
         for (var i = 0; i < 20; ++i) {
             var res = db[collName].remove({_id: Random.randInt(this.numDocs)}, {justOne: true});
-            assertAlways.commandWorked(res);
-            assertAlways.lte(0, res.nRemoved, tojson(res));
+            assert.commandWorked(res);
+            assert.lte(0, res.nRemoved, tojson(res));
         }
     };
 

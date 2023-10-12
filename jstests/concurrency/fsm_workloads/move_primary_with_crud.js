@@ -8,7 +8,6 @@
  *  ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {
@@ -30,7 +29,7 @@ export const $config = (function() {
         }
 
         let res = undefined;
-        assertAlways.soon(() => {
+        assert.soon(() => {
             try {
                 res = cmd();
                 return true;
@@ -158,7 +157,7 @@ export const $config = (function() {
             const toShard = shards[Random.randInt(shards.length)];
             jsTestLog(`Running movePrimary: db=${db} to=${toShard}`);
 
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.adminCommand({movePrimary: db.getName(), to: toShard}), [
                     // Caused by a concurrent movePrimary operation on the same database but a
                     // different destination shard.
@@ -200,16 +199,16 @@ export const $config = (function() {
                 // Caused by a concurrent movePrimary operation.
                 ErrorCodes.QueryPlanKilled);
 
-            assertAlways.eq(Object.keys(this.collMirror).length,
-                            docs.length,
-                            `expectedData=${JSON.stringify(this.collMirror)}} actualData=${
-                                JSON.stringify(docs)}`);
+            assert.eq(Object.keys(this.collMirror).length,
+                      docs.length,
+                      `expectedData=${JSON.stringify(this.collMirror)}} actualData=${
+                          JSON.stringify(docs)}`);
 
             docs.forEach(doc => {
-                assertAlways.eq(this.collMirror[doc._id],
-                                doc,
-                                `expectedData=${JSON.stringify(this.collMirror)}} actualData=${
-                                    JSON.stringify(docs)}`);
+                assert.eq(this.collMirror[doc._id],
+                          doc,
+                          `expectedData=${JSON.stringify(this.collMirror)}} actualData=${
+                              JSON.stringify(docs)}`);
             });
         }
     };

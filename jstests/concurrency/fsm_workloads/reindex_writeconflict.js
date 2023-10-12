@@ -3,13 +3,11 @@
  *
  * Ensures reIndex successfully handles WriteConflictExceptions.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var states = {
         reIndex: function reIndex(db, collName) {
             var res = db[collName].reIndex();
-            assertAlways.commandWorked(res);
+            assert.commandWorked(res);
         },
     };
 
@@ -24,19 +22,19 @@ export const $config = (function() {
 
         /*
           So long as there are no BFs, leave WCE tracing disabled.
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.adminCommand({setParameter: 1, traceWriteConflictExceptions: true}));
         */
 
         // Set up failpoint to trigger WriteConflictException during write operations.
-        assertAlways.commandWorked(db.adminCommand(
+        assert.commandWorked(db.adminCommand(
             {configureFailPoint: 'WTWriteConflictException', mode: {activationProbability: 0.5}}));
     }
 
     function teardown(db, collName, cluster) {
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.adminCommand({configureFailPoint: 'WTWriteConflictException', mode: "off"}));
-        assertAlways.commandWorked(
+        assert.commandWorked(
             db.adminCommand({setParameter: 1, traceWriteConflictExceptions: false}));
     }
 

@@ -42,7 +42,6 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     isKilledSessionCode,
     withTxnAndAutoRetry
@@ -74,7 +73,7 @@ export const $config = (function() {
                 return Object.assign({}, doc, {order: filteredCommitOrder});
             });
 
-            assertWhenOwnColl.eq([], result, tojson(filteredDocuments));
+            assert.eq([], result, tojson(filteredDocuments));
         }
     }
 
@@ -126,11 +125,11 @@ export const $config = (function() {
         const highestTxnNum =
             Math.max(updatedDocsServerHistory.length, data.updatedDocsClientHistory.length);
         for (let txnNum = 0; txnNum < highestTxnNum; ++txnNum) {
-            assertAlways((arrayEq(updatedDocsServerHistory[txnNum] || [],
-                                  data.updatedDocsClientHistory[txnNum] || [])),
-                         () => 'expected ' + tojson(data.updatedDocsClientHistory[txnNum]) +
-                             ' but instead have ' + tojson(updatedDocsServerHistory[txnNum]) +
-                             ' for txnNumber ' + txnNum);
+            assert((arrayEq(updatedDocsServerHistory[txnNum] || [],
+                            data.updatedDocsClientHistory[txnNum] || [])),
+                   () => 'expected ' + tojson(data.updatedDocsClientHistory[txnNum]) +
+                       ' but instead have ' + tojson(updatedDocsServerHistory[txnNum]) +
+                       ' for txnNumber ' + txnNum);
         }
     }
 
@@ -165,7 +164,7 @@ export const $config = (function() {
             }
         }
 
-        assertWhenOwnColl.eq(allDocuments.length, numDocs * this.collections.length, () => {
+        assert.eq(allDocuments.length, numDocs * this.collections.length, () => {
             if (this.session) {
                 return "txnNumber: " + tojson(this.session.getTxnNumber_forTesting()) +
                     ", session id: " + tojson(this.session.getSessionId()) +
@@ -238,12 +237,11 @@ export const $config = (function() {
                         const res = txnCollection.runCommand('update', {
                             updates: [{q: {_id: docId}, u: updateMods}],
                         });
-                        assertAlways.commandWorked(
-                            res,
-                            () => "Failed to update. result: " + tojson(res) +
-                                ", collection: " + tojson(coll));
-                        assertWhenOwnColl.eq(res.n, 1, () => tojson(res));
-                        assertWhenOwnColl.eq(res.nModified, 1, () => tojson(res));
+                        assert.commandWorked(res,
+                                             () => "Failed to update. result: " + tojson(res) +
+                                                 ", collection: " + tojson(coll));
+                        assert.eq(res.n, 1, () => tojson(res));
+                        assert.eq(res.nModified, 1, () => tojson(res));
                         committedTxnInfo.push(
                             {_id: docId, dbName: txnDbName, collName: txnCollName});
                     }
@@ -277,7 +275,7 @@ export const $config = (function() {
 
                 try {
                     const cursor = sessionCollection.find();
-                    assertAlways.eq(cursor.itcount(), this.numDocs);
+                    assert.eq(cursor.itcount(), this.numDocs);
                 } catch (e) {
                     if (this.retryOnKilledSession && isKilledSessionCode(e.code)) {
                         // If the session is expected to be killed, ignore it.
@@ -347,8 +345,8 @@ export const $config = (function() {
             }
 
             const res = bulk.execute({w: 'majority'});
-            assertWhenOwnColl.commandWorked(res);
-            assertWhenOwnColl.eq(this.numDocs, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(this.numDocs, res.nInserted);
         }
 
         if (cluster.isSharded()) {

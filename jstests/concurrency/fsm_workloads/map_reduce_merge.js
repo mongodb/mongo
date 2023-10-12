@@ -15,7 +15,6 @@
  *   does_not_support_causal_consistency
  * ]
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_inline.js";
 
@@ -33,21 +32,21 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.mapReduce = function mapReduce(db, collName) {
         var outDB = db.getSiblingDB(this.outDBName);
         var fullName = outDB[collName].getFullName();
-        assertAlways(outDB[collName].exists() !== null,
-                     "output collection '" + fullName + "' should exist");
+        assert(outDB[collName].exists() !== null,
+               "output collection '" + fullName + "' should exist");
 
         // Have all threads combine their results into the same collection
         var options = {finalize: this.finalizer, out: {merge: collName, db: this.outDBName}};
 
         var res = db[collName].mapReduce(this.mapper, this.reducer, options);
-        assertAlways.commandWorked(res);
+        assert.commandWorked(res);
     };
 
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
         var outDB = db.getSiblingDB(db.getName() + uniqueDBName);
-        assertAlways.commandWorked(outDB.createCollection(collName));
+        assert.commandWorked(outDB.createCollection(collName));
     };
 
     return $config;

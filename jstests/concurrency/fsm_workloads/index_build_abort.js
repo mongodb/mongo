@@ -17,7 +17,6 @@
  * ]
  */
 
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 export const $config = (function() {
@@ -76,17 +75,17 @@ export const $config = (function() {
                         }
                     }
                     let bulkRes = bulk.execute();
-                    assertAlways.commandWorked(bulkRes);
-                    assertAlways.eq(this.nDocuments, bulkRes.nInserted, tojson(bulkRes));
-                    assertAlways.commandFailedWithCode(coll.createIndexes([{a: "2d"}]),
-                                                       this.expectedErrorCodes);
+                    assert.commandWorked(bulkRes);
+                    assert.eq(this.nDocuments, bulkRes.nInserted, tojson(bulkRes));
+                    assert.commandFailedWithCode(coll.createIndexes([{a: "2d"}]),
+                                                 this.expectedErrorCodes);
                 } finally {
                     mutexUnlock(db, randomColl);
                 }
             }
         },
         dropIndexes: function dropIndexes(db, collName) {
-            assertAlways.commandWorkedOrFailedWithCode(
+            assert.commandWorkedOrFailedWithCode(
                 db.runCommand({dropIndexes: getRandCollectionName(), index: "*"}),
                 ErrorCodes.NamespaceNotFound);
         },

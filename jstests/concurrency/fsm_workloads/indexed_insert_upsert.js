@@ -8,7 +8,6 @@
  * Instead of inserting via coll.insert(), this workload inserts using an
  * upsert.
  */
-import {assertAlways} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
@@ -29,9 +28,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         doc._id = new ObjectId();      // _id is required for shard targeting
 
         var res = db[collName].update(doc, {$inc: {unused: 0}}, {upsert: true});
-        assertAlways.eq(0, res.nMatched, tojson(res));
-        assertAlways.eq(1, res.nUpserted, tojson(res));
-        assertAlways.eq(0, res.nModified, tojson(res));
+        assert.eq(0, res.nMatched, tojson(res));
+        assert.eq(1, res.nUpserted, tojson(res));
+        assert.eq(0, res.nModified, tojson(res));
 
         this.nInserted += this.docsPerInsert;
     };

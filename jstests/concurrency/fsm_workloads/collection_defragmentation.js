@@ -5,7 +5,6 @@
  *
  * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
@@ -58,7 +57,7 @@ export const $config = (function() {
                 const dbName = dbPrefix + i;
                 for (let j = 0; j < collCount; j++) {
                     const fullNs = dbName + "." + collPrefix + j;
-                    assertWhenOwnColl.commandWorked(connCache.mongos[0].adminCommand({
+                    assert.commandWorked(connCache.mongos[0].adminCommand({
                         configureCollectionBalancing: fullNs,
                         defragmentCollection: true,
                         chunkSize: maxChunkSizeMB,
@@ -157,7 +156,7 @@ export const $config = (function() {
                 configDB.chunks.aggregate([{$match: chunksJoinClause}, {$sample: {size: 1}}])
                     .toArray()[0];
             try {
-                assertAlways.commandWorked(
+                assert.commandWorked(
                     db.adminCommand({split: randomColl.getFullName(), find: randomChunk.min}));
                 jsTest.log("Manual split chunk of chunk " + tojson(randomChunk));
             } catch (e) {
@@ -172,8 +171,8 @@ export const $config = (function() {
             const extendedShardKey =
                 getExtendedCollectionShardKey(configDB, randomColl.getFullName());
             try {
-                assertWhenOwnColl.commandWorked(randomColl.createIndex(extendedShardKey));
-                assertWhenOwnColl.commandWorked(randomDB.adminCommand(
+                assert.commandWorked(randomColl.createIndex(extendedShardKey));
+                assert.commandWorked(randomDB.adminCommand(
                     {refineCollectionShardKey: randomColl.getFullName(), key: extendedShardKey}));
                 jsTest.log("Manual refine shard key for collection " + randomColl.getFullName() +
                            " to " + tojson(extendedShardKey));
@@ -217,7 +216,7 @@ export const $config = (function() {
         for (let i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
-            assertAlways.commandWorked(newDb.adminCommand({enablesharding: dbName}));
+            assert.commandWorked(newDb.adminCommand({enablesharding: dbName}));
             for (let j = 0; j < collCount; j++) {
                 const fullNs = dbName + "." + collPrefix + j;
                 const numChunks = Random.randInt(30);
@@ -263,14 +262,14 @@ export const $config = (function() {
                 // Wait for defragmentation to complete
                 defragmentationUtil.waitForEndOfDefragmentation(mongos, fullNs);
                 // Enable balancing and wait for balanced
-                assertAlways.commandWorked(mongos.getDB('config').collections.update(
+                assert.commandWorked(mongos.getDB('config').collections.update(
                     {_id: fullNs}, {$set: {"noBalance": false}}));
                 sh.awaitCollectionBalance(mongos.getCollection(fullNs), 300000 /* 5 minutes */);
                 // Re-disable balancing
-                assertAlways.commandWorked(mongos.getDB('config').collections.update(
+                assert.commandWorked(mongos.getDB('config').collections.update(
                     {_id: fullNs}, {$set: {"noBalance": true}}));
                 // Begin defragmentation again
-                assertAlways.commandWorked(mongos.adminCommand({
+                assert.commandWorked(mongos.adminCommand({
                     configureCollectionBalancing: fullNs,
                     defragmentCollection: true,
                     chunkSize: maxChunkSizeMB,

@@ -4,7 +4,6 @@
  * Base workload for aggregation. Inserts a bunch of documents in its setup,
  * then each thread does an aggregation with an empty $match.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 
 export const $config = (function() {
     var data = {
@@ -30,17 +29,17 @@ export const $config = (function() {
         // overhead
         doc.padding = "";
         var paddingLength = size - Object.bsonsize(doc);
-        assertAlways.lte(
+        assert.lte(
             0, paddingLength, 'document is already bigger than ' + size + ' bytes: ' + tojson(doc));
         doc.padding = getStringOfLength(paddingLength);
-        assertAlways.eq(size, Object.bsonsize(doc));
+        assert.eq(size, Object.bsonsize(doc));
         return doc;
     }
 
     var states = {
         query: function query(db, collName) {
             var count = db[collName].aggregate([]).itcount();
-            assertWhenOwnColl.eq(count, this.numDocs);
+            assert.eq(count, this.numDocs);
         }
     };
 
@@ -60,11 +59,11 @@ export const $config = (function() {
                                this.docSize));
         }
         var res = bulk.execute();
-        assertWhenOwnColl.commandWorked(res);
-        assertWhenOwnColl.eq(this.numDocs, res.nInserted);
-        assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
-        assertWhenOwnColl.eq(this.numDocs / 2, db[collName].find({flag: false}).itcount());
-        assertWhenOwnColl.eq(this.numDocs / 2, db[collName].find({flag: true}).itcount());
+        assert.commandWorked(res);
+        assert.eq(this.numDocs, res.nInserted);
+        assert.eq(this.numDocs, db[collName].find().itcount());
+        assert.eq(this.numDocs / 2, db[collName].find({flag: false}).itcount());
+        assert.eq(this.numDocs / 2, db[collName].find({flag: true}).itcount());
     }
 
     function teardown(db, collName, cluster) {

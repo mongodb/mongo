@@ -5,12 +5,10 @@
  * The field contains non-unique values.
  * Each thread operates on the same collection.
  */
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
-
 export const $config = (function() {
     var data = {
         randRange: function randRange(low, high) {
-            assertAlways.gt(high, low);
+            assert.gt(high, low);
             return low + Random.randInt(high - low + 1);
         },
         numDocs: 1000
@@ -25,12 +23,12 @@ export const $config = (function() {
                 bulk.insert({i: i % this.modulus, tid: this.tid});
             }
             var res = bulk.execute();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.numDocs, res.nInserted);
+            assert.commandWorked(res);
+            assert.eq(this.numDocs, res.nInserted);
         }
 
         function distinct(db, collName) {
-            assertWhenOwnColl.eq(this.modulus, db[collName].distinct('i', {tid: this.tid}).length);
+            assert.eq(this.modulus, db[collName].distinct('i', {tid: this.tid}).length);
         }
 
         return {init: init, distinct: distinct};

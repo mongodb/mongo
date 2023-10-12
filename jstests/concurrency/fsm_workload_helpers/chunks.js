@@ -8,7 +8,6 @@
  * Intended for use by workloads testing sharding (i.e., workloads starting with 'sharded_').
  */
 
-import {assertAlways, assertWhenOwnColl} from "jstests/concurrency/fsm_libs/assert.js";
 import {
     isMongod,
     isMongodConfigsvr,
@@ -48,7 +47,7 @@ export var ChunkHelper = (function() {
             }
 
             // Throw an exception if the command errored for any other reason.
-            assertWhenOwnColl.commandWorked(res, cmd);
+            assert.commandWorked(res, cmd);
         }
 
         return res;
@@ -123,14 +122,14 @@ export var ChunkHelper = (function() {
     // to any node in the set for which isWritablePrimary is true.
     function getPrimary(connArr) {
         const kDefaultTimeoutMS = 10 * 60 * 1000;  // 10 minutes.
-        assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
+        assert(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
 
         let primary = null;
         assert.soon(() => {
             for (let conn of connArr) {
                 assert(isMongod(conn.getDB('admin')), tojson(conn) + ' is not to a mongod');
                 let res = conn.adminCommand({hello: 1});
-                assertAlways.commandWorked(res);
+                assert.commandWorked(res);
 
                 if (res.isWritablePrimary) {
                     primary = conn;
@@ -145,7 +144,7 @@ export var ChunkHelper = (function() {
     // Take a set of mongos connections to a sharded cluster and return a
     // random connection.
     function getRandomMongos(connArr) {
-        assertAlways(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
+        assert(Array.isArray(connArr), 'Expected an array but got ' + tojson(connArr));
         var conn = connArr[Random.randInt(connArr.length)];
         assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a mongos');
         return conn;
@@ -157,7 +156,7 @@ export var ChunkHelper = (function() {
         assert(isMongos(conn.getDB('admin')), tojson(conn) + ' is not to a mongos');
         var adminDB = conn.getDB('admin');
         var shardVersion = adminDB.runCommand({getShardVersion: collName, fullMetadata: true});
-        assertAlways.commandWorked(shardVersion);
+        assert.commandWorked(shardVersion);
         // As noted in SERVER-20768, doing a range query with { $lt : X },  where
         // X is the _upper bound_ of a chunk,  incorrectly targets the shard whose
         // _lower bound_ is X. Therefore, if upper !== MaxKey, we use a workaround
@@ -169,8 +168,8 @@ export var ChunkHelper = (function() {
             query = {$and: [{_id: {$gte: lower}}, {_id: {$lte: upper - 1}}]};
         }
         var res = conn.getCollection(collName).find(query).explain();
-        assertAlways.commandWorked(res);
-        assertAlways.gt(
+        assert.commandWorked(res);
+        assert.gt(
             res.queryPlanner.winningPlan.shards.length, 0, 'Explain did not have shards key.');
 
         var shards = res.queryPlanner.winningPlan.shards.map(shard => shard.shardName);
