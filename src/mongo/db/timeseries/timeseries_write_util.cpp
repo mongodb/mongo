@@ -59,6 +59,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/ops/delete_request_gen.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_exec_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -83,6 +85,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -950,5 +953,47 @@ BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringDat
         }
     }
     return b.obj();
+}
+
+void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions& options) {
+    if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform a delete with a non-empty query on a time-series "
+                "collection that "
+                "does not have a metaField ",
+                options.getMetaField() || request->getQuery().isEmpty());
+
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot perform a non-multi delete on a time-series collection",
+                request->getMulti());
+        if (auto metaField = options.getMetaField()) {
+            request->setQuery(timeseries::translateQuery(request->getQuery(), *metaField));
+        }
+    }
+}
+
+void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options) {
+    if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform a non-multi update on a time-series collection",
+                request->isMulti());
+
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform an upsert on a time-series collection",
+                !request->isUpsert());
+
+        auto metaField = options.getMetaField();
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot perform an update on a time-series collection that does not have a "
+                "metaField",
+                options.getMetaField());
+
+        request->setQuery(timeseries::translateQuery(request->getQuery(), *metaField));
+        auto modification = uassertStatusOK(
+            timeseries::translateUpdate(request->getUpdateModification(), *metaField));
+        request->setUpdateModification(modification);
+    }
 }
 }  // namespace mongo::timeseries

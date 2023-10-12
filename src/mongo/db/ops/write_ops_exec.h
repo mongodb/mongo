@@ -134,7 +134,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            bool upsert,
                            const boost::optional<mongo::UUID>& collectionUUID,
                            boost::optional<BSONObj>& docFound,
-                           const UpdateRequest& updateRequest);
+                           UpdateRequest* updateRequest);
 
 /**
  * Executes a delete, supports returning the deleted document. the returned document is placed into
@@ -142,7 +142,7 @@ UpdateResult performUpdate(OperationContext* opCtx,
  */
 long long performDelete(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        const DeleteRequest& deleteRequest,
+                        DeleteRequest* deleteRequest,
                         CurOp* curOp,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,

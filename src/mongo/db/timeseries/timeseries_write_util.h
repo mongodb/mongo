@@ -52,6 +52,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -266,4 +267,40 @@ void performAtomicWritesForUpdate(
  * Change the bucket namespace to time-series view namespace for time-series command.
  */
 BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringData viewNss);
+
+/**
+ * Translates the hint provided for an update/delete request on a timeseries view to match the
+ * indexes of the underlying bucket collection.
+ */
+template <typename R>
+void timeseriesHintTranslation(const CollectionPtr& coll, R* request) {
+    // Only translate the hint if it is specified with an index key.
+    auto timeseriesOptions = coll->getTimeseriesOptions();
+    if (timeseries::isHintIndexKey(request->getHint())) {
+        request->setHint(uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
+            *timeseriesOptions, request->getHint())));
+    }
+}
+
+/**
+ * Performs checks on an update/delete request being performed on a timeseries view.
+ */
+template <typename R>
+void timeseriesRequestChecks(const CollectionPtr& coll,
+                             R* request,
+                             std::function<void(R*, const TimeseriesOptions&)> checkRequestFn) {
+    timeseries::assertTimeseriesBucketsCollection(coll.get());
+    auto timeseriesOptions = coll->getTimeseriesOptions().value();
+    checkRequestFn(request, timeseriesOptions);
+}
+
+/**
+ * Function that performs checks on a delete request being performed on a timeseries collection.
+ */
+void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions& options);
+
+/**
+ * Function that performs checks on an update request being performed on a timeseries collection.
+ */
+void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options);
 }  // namespace mongo::timeseries

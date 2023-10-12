@@ -93,6 +93,7 @@
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
@@ -387,6 +388,15 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
 
+        if (isTimeseriesViewRequest) {
+            timeseries::timeseriesRequestChecks<DeleteRequest>(
+                collection.getCollectionPtr(),
+                &deleteRequest,
+                timeseries::deleteRequestCheckFunction);
+            timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
+                                                                 &deleteRequest);
+        }
+
         ParsedDelete parsedDelete(
             opCtx, &deleteRequest, collection.getCollectionPtr(), isTimeseriesViewRequest);
         uassertStatusOK(parsedDelete.parseRequest());
@@ -423,7 +433,12 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 DatabaseHolder::get(opCtx)->getDb(opCtx, nss.dbName()));
         if (isTimeseriesViewRequest) {
-            timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+            timeseries::timeseriesRequestChecks<UpdateRequest>(
+                collection.getCollectionPtr(),
+                &updateRequest,
+                timeseries::updateRequestCheckFunction);
+            timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
+                                                                 &updateRequest);
         }
 
         ParsedUpdate parsedUpdate(opCtx,
@@ -554,7 +569,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             }
             boost::optional<BSONObj> docFound;
             write_ops_exec::performDelete(
-                opCtx, nsString, deleteRequest, &curOp, inTransaction, boost::none, docFound);
+                opCtx, nsString, &deleteRequest, &curOp, inTransaction, boost::none, docFound);
             recordStatsForTopCommand(opCtx);
             return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
@@ -593,7 +608,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                                       req.getUpsert().value_or(false),
                                                       boost::none,
                                                       docFound,
-                                                      updateRequest);
+                                                      &updateRequest);
                     recordStatsForTopCommand(opCtx);
                     return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
 

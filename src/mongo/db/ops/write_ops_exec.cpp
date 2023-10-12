@@ -755,13 +755,13 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            bool upsert,
                            const boost::optional<mongo::UUID>& collectionUUID,
                            boost::optional<BSONObj>& docFound,
-                           const UpdateRequest& updateRequest) {
+                           UpdateRequest* updateRequest) {
     auto [isTimeseriesViewUpdate, nsString] =
-        timeseries::isTimeseriesViewRequest(opCtx, updateRequest);
+        timeseries::isTimeseriesViewRequest(opCtx, *updateRequest);
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesViewUpdate || !updateRequest.shouldReturnAnyDocs() ||
+            !isTimeseriesViewUpdate || !updateRequest->shouldReturnAnyDocs() ||
                 !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -821,11 +821,14 @@ UpdateResult performUpdate(OperationContext* opCtx,
     }
 
     if (isTimeseriesViewUpdate) {
-        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+        timeseries::timeseriesRequestChecks<UpdateRequest>(
+            collection.getCollectionPtr(), updateRequest, timeseries::updateRequestCheckFunction);
+        timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
+                                                             updateRequest);
     }
 
     ParsedUpdate parsedUpdate(opCtx,
-                              &updateRequest,
+                              updateRequest,
                               collection.getCollectionPtr(),
                               false /*forgoOpCounterIncrements*/,
                               isTimeseriesViewUpdate);
@@ -882,17 +885,17 @@ UpdateResult performUpdate(OperationContext* opCtx,
 
 long long performDelete(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        const DeleteRequest& deleteRequest,
+                        DeleteRequest* deleteRequest,
                         CurOp* curOp,
                         bool inTransaction,
                         const boost::optional<mongo::UUID>& collectionUUID,
                         boost::optional<BSONObj>& docFound) {
     auto [isTimeseriesViewDelete, nsString] =
-        timeseries::isTimeseriesViewRequest(opCtx, deleteRequest);
+        timeseries::isTimeseriesViewRequest(opCtx, *deleteRequest);
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
-            !isTimeseriesViewDelete || !deleteRequest.getReturnDeleted() ||
+            !isTimeseriesViewDelete || !deleteRequest->getReturnDeleted() ||
                 !opCtx->isRetryableWrite());
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -918,10 +921,13 @@ long long performDelete(OperationContext* opCtx,
     }
 
     if (isTimeseriesViewDelete) {
-        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
+        timeseries::timeseriesRequestChecks<DeleteRequest>(
+            collection.getCollectionPtr(), deleteRequest, timeseries::deleteRequestCheckFunction);
+        timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
+                                                             deleteRequest);
     }
 
-    ParsedDelete parsedDelete(opCtx, &deleteRequest, collectionPtr, isTimeseriesViewDelete);
+    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr, isTimeseriesViewDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto dbName = nsString.dbName();
@@ -1244,38 +1250,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     }();
 
     if (source == OperationSource::kTimeseriesUpdate) {
-        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
-
-        // Only translate the hint if it is specified with an index key.
-        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-        if (timeseries::isHintIndexKey(updateRequest->getHint())) {
-            updateRequest->setHint(
-                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                    *timeseriesOptions, updateRequest->getHint())));
-        }
-
-        if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Cannot perform a non-multi update on a time-series collection",
-                    updateRequest->isMulti());
-
-            uassert(ErrorCodes::InvalidOptions,
-                    "Cannot perform an upsert on a time-series collection",
-                    !updateRequest->isUpsert());
-
-            auto metaField = timeseriesOptions->getMetaField();
-            uassert(ErrorCodes::InvalidOptions,
-                    "Cannot perform an update on a time-series collection that does not have a "
-                    "metaField",
-                    timeseriesOptions->getMetaField());
-
-            updateRequest->setQuery(
-                timeseries::translateQuery(updateRequest->getQuery(), *metaField));
-            auto modification = uassertStatusOK(
-                timeseries::translateUpdate(updateRequest->getUpdateModification(), *metaField));
-            updateRequest->setUpdateModification(std::move(modification));
-        }
+        timeseries::timeseriesRequestChecks<UpdateRequest>(
+            collection.getCollectionPtr(), updateRequest, timeseries::updateRequestCheckFunction);
+        timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
+                                                             updateRequest);
     }
 
     if (source == OperationSource::kTimeseriesInsert) {
@@ -1707,31 +1685,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     if (source == OperationSource::kTimeseriesDelete) {
-        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
-
-        // Only translate the hint if it is specified by index key.
-        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-        if (timeseries::isHintIndexKey(request.getHint())) {
-            request.setHint(
-                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                    *timeseriesOptions, request.getHint())));
-        }
-
-        if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            uassert(
-                ErrorCodes::InvalidOptions,
-                "Cannot perform a delete with a non-empty query on a time-series collection that "
-                "does not have a metaField",
-                timeseriesOptions->getMetaField() || request.getQuery().isEmpty());
-
-            uassert(ErrorCodes::IllegalOperation,
-                    "Cannot perform a non-multi delete on a time-series collection",
-                    request.getMulti());
-            if (auto metaField = timeseriesOptions->getMetaField()) {
-                request.setQuery(timeseries::translateQuery(request.getQuery(), *metaField));
-            }
-        }
+        timeseries::timeseriesRequestChecks<DeleteRequest>(
+            collection.getCollectionPtr(), &request, timeseries::deleteRequestCheckFunction);
+        timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
+                                                             &request);
     }
 
     ParsedDelete parsedDelete(opCtx,
@@ -2982,15 +2939,10 @@ void explainUpdate(OperationContext* opCtx,
         MODE_IX);
 
     if (isTimeseriesViewRequest) {
-        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
-
-        const auto& requestHint = updateRequest.getHint();
-        if (timeseries::isHintIndexKey(requestHint)) {
-            auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-            updateRequest.setHint(
-                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                    *timeseriesOptions, requestHint)));
-        }
+        timeseries::timeseriesRequestChecks<UpdateRequest>(
+            collection.getCollectionPtr(), &updateRequest, timeseries::updateRequestCheckFunction);
+        timeseries::timeseriesHintTranslation<UpdateRequest>(collection.getCollectionPtr(),
+                                                             &updateRequest);
     }
 
     ParsedUpdate parsedUpdate(opCtx,
@@ -3030,14 +2982,10 @@ void explainDelete(OperationContext* opCtx,
                           MODE_IX);
 
     if (isTimeseriesViewRequest) {
-        timeseries::assertTimeseriesBucketsCollection(collection.getCollectionPtr().get());
-
-        if (timeseries::isHintIndexKey(deleteRequest.getHint())) {
-            auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
-            deleteRequest.setHint(
-                uassertStatusOK(timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
-                    *timeseriesOptions, deleteRequest.getHint())));
-        }
+        timeseries::timeseriesRequestChecks<DeleteRequest>(
+            collection.getCollectionPtr(), &deleteRequest, timeseries::deleteRequestCheckFunction);
+        timeseries::timeseriesHintTranslation<DeleteRequest>(collection.getCollectionPtr(),
+                                                             &deleteRequest);
     }
 
     ParsedDelete parsedDelete(

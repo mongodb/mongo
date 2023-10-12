@@ -1055,7 +1055,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 updateRequest.isUpsert(),
                                                                 nsEntry.getCollectionUUID(),
                                                                 docFound,
-                                                                updateRequest);
+                                                                &updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, boost::none);
                     return true;
@@ -1167,7 +1167,7 @@ bool handleDeleteOp(OperationContext* opCtx,
             boost::optional<BSONObj> docFound;
             auto nDeleted = write_ops_exec::performDelete(opCtx,
                                                           nsString,
-                                                          deleteRequest,
+                                                          &deleteRequest,
                                                           &curOp,
                                                           inTransaction,
                                                           nsEntry.getCollectionUUID(),
