@@ -202,7 +202,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 if (idElem.str() == ShardIdentityType::IdName) {
                     auto shardIdentityDoc =
                         uassertStatusOK(ShardIdentityType::fromShardIdentityDocument(insertedDoc));
-                    uassertStatusOK(shardIdentityDoc.validate());
+                    uassertStatusOK(shardIdentityDoc.validate(
+                        true /* fassert cluster role matches shard identity document */));
                     /**
                      * Perform shard identity initialization once we are certain that the document
                      * is committed.

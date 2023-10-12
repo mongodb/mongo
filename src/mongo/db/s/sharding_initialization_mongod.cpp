@@ -440,6 +440,9 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
 
         auto shardIdentity =
             uassertStatusOK(ShardIdentityType::fromShardIdentityDocument(shardIdentityBSON));
+        uassertStatusOK(shardIdentity.validate(
+            true /* fassert cluster role matches shard identity document */));
+
 
         {
             // Global lock is required to call initializeFromShardIdentity

@@ -21,6 +21,9 @@ var shardIdentityDoc = {
     clusterId: ObjectId()
 };
 
+// TODO: SERVER-67837 Change to test that the server crashed when auto-bootstrapping is enabled by
+// default.
+//
 // Insert with shard name "config" on shard server should fail
 var res =
     assert.commandFailedWithCode(rs.getPrimary().getDB('admin').runCommand(

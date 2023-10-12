@@ -48,7 +48,7 @@ const node1 = MongoRunner.runMongod({
 
 assert.commandFailedWithCode(
     node1.getDB('testDB').runCommand({insert: 'testColl', documents: [{x: 1}]}),
-    ErrorCodes.NotWritablePrimary);
+    [ErrorCodes.NotWritablePrimary, ErrorCodes.PrimarySteppedDown]);
 
 // A replica set reconfig should succeed in adding the uninitiated node into the auto-initiated
 // config shard replica set.
@@ -90,7 +90,7 @@ const node3 = MongoRunner.runMongod({
 });
 assert.commandFailedWithCode(
     node3.getDB('testDB').runCommand({insert: 'testColl', documents: [{x: 1}]}),
-    ErrorCodes.NotWritablePrimary);
+    [ErrorCodes.NotWritablePrimary, ErrorCodes.PrimarySteppedDown]);
 
 // An external replSetInitiate should initiate the replica set successfully.
 assert.commandWorked(node3.adminCommand({replSetInitiate: 1}));

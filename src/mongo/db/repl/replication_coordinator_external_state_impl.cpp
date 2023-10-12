@@ -1097,11 +1097,11 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         !ShardingState::get(opCtx)->enabled()) {
         // Note this must be called after the config server has created the cluster ID and also
         // after the onStepUp logic for the shard role because this triggers sharding state
-        // initialization which will transition some components into the "primary" state, like the
-        // TransactionCoordinatorService, and they would fail if the onStepUp logic attempted the
-        // same transition.
+        // initialization which will transition some components into the "primary" state, like
+        // the TransactionCoordinatorService, and they would fail if the onStepUp logic
+        // attempted the same transition.
         ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
-        if (gFeatureFlagAllMongodsAreSharded.isEnabled(serverGlobalParams.featureCompatibility)) {
+        if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             ShardingReady::get(opCtx)->scheduleTransitionToConfigShard(opCtx);
         }
     }

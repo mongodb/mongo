@@ -133,7 +133,9 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
         return;
     }
 
-    if (gFeatureFlagAllMongodsAreSharded.isEnabled(serverGlobalParams.featureCompatibility) &&
+    // (Ignore FCV check): Auto-bootstrapping happens irrespective of the FCV when
+    // gFeatureFlagAllMongodsAreSharded is enabled.
+    if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafe() &&
         !ShardingReady::get(opCtx)->isReady()) {
         for (auto it = begin; it != end; it++) {
             const auto& insertedDoc = it->doc;

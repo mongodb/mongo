@@ -2610,7 +2610,7 @@ MemberState TopologyCoordinator::getMemberState() const {
         return MemberState::RS_STARTUP;
     }
 
-    if (_rsConfig.getConfigServer()) {
+    if (_rsConfig.getConfigServer() || _options.clusterRole.has(ClusterRole::ConfigServer)) {
         if (!_options.clusterRole.has(ClusterRole::ConfigServer) &&
             !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
