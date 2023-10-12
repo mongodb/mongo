@@ -38,8 +38,8 @@ namespace mongo::stage_builder {
 // assume (including TypeTags::Nothing).
 struct TypeSignature {
     // Predefined constants for common types.
-    static TypeSignature kAnyScalarType, kArrayType, kBlockType, kBooleanType, kCellType,
-        kDateTimeType, kNothingType, kNumericType, kObjectType, kStringType;
+    static TypeSignature kAnyBSONType, kAnyScalarType, kArrayType, kBlockType, kBooleanType,
+        kCellType, kDateTimeType, kNothingType, kNumericType, kObjectType, kStringType;
 
     // Return whether this signature is a strict subset of the other signature.
     bool isSubset(TypeSignature other) const {
@@ -48,6 +48,10 @@ struct TypeSignature {
     // Return whether this signature shares at least one type with the other signature.
     bool containsAny(TypeSignature other) const {
         return (typesMask & other.typesMask) != 0;
+    }
+    // Return whether no type is encoded in the signature.
+    bool isEmpty() const {
+        return typesMask == 0;
     }
     // Return a new signature containing all the types of this signature plus the ones from the
     // other signature.
@@ -79,5 +83,9 @@ template <typename Head, typename... Tail>
 TypeSignature getTypeSignature(Head type, Tail... tail) {
     return getTypeSignature(type).include(getTypeSignature(tail...));
 }
+
+// Return the set of SBE types encoded in the provided signature that can be stored in a BSON
+// object.
+std::vector<sbe::value::TypeTags> getBSONTypesFromSignature(TypeSignature signature);
 
 }  // namespace mongo::stage_builder

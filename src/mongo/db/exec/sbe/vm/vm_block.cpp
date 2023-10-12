@@ -31,11 +31,13 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 
+#include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/represent_as.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -123,11 +125,54 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
     auto [blockOwned, blockTag, blockVal] = getFromStack(0);
     invariant(blockTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
-
     auto out = valueBlockIn->map(fillEmptyOp.bindParams(fillTag, fillVal));
 
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
+}
+
+/**
+ * Implementation of the valueBlockFillEmptyBlock builtin. This instruction takes two blocks of the
+ * same size, and produces a new block where all missing values in the first block have been
+ * replaced with the correpsonding value in the second block.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEmptyBlock(
+    ArityType arity) {
+    invariant(arity == 2);
+    auto [fillOwned, fillTag, fillVal] = getFromStack(1);
+    if (fillTag == value::TypeTags::Nothing) {
+        return moveFromStack(0);
+    }
+    auto [blockOwned, blockTag, blockVal] = getFromStack(0);
+    tassert(8141618,
+            "Arguments of valueBlockFillEmptyBlock must be block of values",
+            fillTag == value::TypeTags::valueBlock && blockTag == value::TypeTags::valueBlock);
+
+    auto* fillBlockIn = value::bitcastTo<value::ValueBlock*>(fillVal);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
+
+    auto extractedFill = fillBlockIn->extract();
+    auto extractedValue = valueBlockIn->extract();
+    tassert(8141601,
+            "Fill value and block have a different number of items",
+            extractedFill.count == extractedValue.count);
+
+    std::vector<value::Value> valueOut(extractedValue.count);
+    std::vector<value::TypeTags> tagOut(extractedValue.count, value::TypeTags::Nothing);
+
+    for (size_t i = 0; i < extractedValue.count; ++i) {
+        if (extractedValue.tags[i] == value::TypeTags::Nothing) {
+            std::tie(tagOut[i], valueOut[i]) =
+                value::copyValue(extractedFill.tags[i], extractedFill.vals[i]);
+        } else {
+            std::tie(tagOut[i], valueOut[i]) =
+                value::copyValue(extractedValue.tags[i], extractedValue.vals[i]);
+        }
+    }
+    auto res = std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
 }
 
 template <bool less>
@@ -290,11 +335,108 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLteSca
     return builtinValueBlockCmpScalar<std::less_equal<>>(arity);
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmp3wScalar(
+    ArityType arity) {
+    invariant(arity == 2);
+    auto [blockOwned, blockTag, blockVal] = getFromStack(0);
+    invariant(blockTag == value::TypeTags::valueBlock);
+    auto value = getFromStack(1);
+
+    auto blockView = value::getValueBlock(blockVal);
+
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+        return compare3way(tag, val, value.b, value.c);
+    });
+
+    auto res = blockView->map(cmpOp);
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
 /*
- * TODO: Comment.
+ * Given two blocks and a mask of equal size, return a new block having the values from the first
+ * argument when the matching entry in the mask is True, and the values from the second argument
+ * when the matching entry in the mask is False.
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombine(ArityType arity) {
-    MONGO_UNREACHABLE;
+    invariant(arity == 3);
+
+    auto [bitmapOwned, bitmapTag, bitmapVal] = getFromStack(2);
+    tassert(8141609,
+            "valueBlockCombine expects a block of boolean values as mask",
+            bitmapTag == value::TypeTags::valueBlock);
+    auto* bitmap = value::getValueBlock(bitmapVal);
+    auto bitmapExtracted = bitmap->extract();
+    tassert(8141610,
+            "valueBlockCombine expects a block of boolean values as mask",
+            allBools(bitmapExtracted.tags, bitmapExtracted.count));
+
+    size_t numTrue = 0;
+    for (size_t i = 0; i < bitmapExtracted.count; i++) {
+        numTrue += value::bitcastTo<bool>(bitmapExtracted.vals[i]);
+    }
+    auto promoteArgAsResult =
+        [&](size_t stackPos) -> FastTuple<bool, value::TypeTags, value::Value> {
+        auto [owned, tag, val] = moveFromStack(stackPos);
+        tassert(8141611,
+                "valueBlockCombine expects a block as argument",
+                tag == value::TypeTags::valueBlock);
+        auto* rhsBlock = value::getValueBlock(val);
+        auto count = rhsBlock->tryCount();
+        if (!count.has_value()) {
+            count = rhsBlock->extract().count;
+        }
+        tassert(8141612,
+                "valueBlockCombine expects the arguments to have the same size",
+                *count == bitmapExtracted.count);
+        return {owned, tag, val};
+    };
+    if (numTrue == 0) {
+        return promoteArgAsResult(1);
+    } else if (numTrue == bitmapExtracted.count) {
+        return promoteArgAsResult(0);
+    }
+
+    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+    tassert(8141615,
+            "valueBlockCombine expects a block as first argument",
+            lhsTag == value::TypeTags::valueBlock);
+    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(1);
+    tassert(8141616,
+            "valueBlockCombine expects a block as second argument",
+            rhsTag == value::TypeTags::valueBlock);
+    auto* lhsBlock = value::getValueBlock(lhsVal);
+    auto* rhsBlock = value::getValueBlock(rhsVal);
+
+    auto lhsExtracted = lhsBlock->extract();
+    auto rhsExtracted = rhsBlock->extract();
+    tassert(8141617,
+            "valueBlockCombine expects the arguments to have the same size",
+            lhsExtracted.count == rhsExtracted.count &&
+                lhsExtracted.count == bitmapExtracted.count);
+
+    std::vector<value::Value> valueOut(bitmapExtracted.count);
+    std::vector<value::TypeTags> tagOut(bitmapExtracted.count, value::TypeTags::Nothing);
+    for (size_t i = 0; i < bitmapExtracted.count; i++) {
+        if (value::bitcastTo<bool>(bitmapExtracted.vals[i])) {
+            std::tie(tagOut[i], valueOut[i]) =
+                value::copyValue(lhsExtracted.tags[i], lhsExtracted.vals[i]);
+        } else {
+            std::tie(tagOut[i], valueOut[i]) =
+                value::copyValue(rhsExtracted.tags[i], rhsExtracted.vals[i]);
+        }
+    }
+    auto blockOut =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
 }
 
 static constexpr auto invokeLambdaOpType = ColumnOpType{ColumnOpType::kNoFlags,
@@ -429,6 +571,96 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     return {true,
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNewFill(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [rightOwned, rightTag, rightVal] = getFromStack(1);
+    auto [countOwned, countTag, countVal] =
+        value::genericNumConvert(rightTag, rightVal, value::TypeTags::NumberInt32);
+    tassert(8141602,
+            "valueBlockNewFill expects an integer in the size argument",
+            countTag == value::TypeTags::NumberInt32);
+
+    // Take ownership of the value, we are transferring it to the block.
+    auto [leftOwned, leftTag, leftVal] = moveFromStack(0);
+    if (!leftOwned) {
+        std::tie(leftTag, leftVal) = value::copyValue(leftTag, leftVal);
+    }
+    auto blockOut =
+        std::make_unique<value::MonoBlock>(value::bitcastTo<int32_t>(countVal), leftTag, leftVal);
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSize(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [_, blockTag, blockVal] = getFromStack(0);
+    tassert(8141603,
+            "valueBlockSize expects a block as argument",
+            blockTag == value::TypeTags::valueBlock);
+    auto* block = value::getValueBlock(blockVal);
+    auto count = block->tryCount();
+    if (!count.has_value()) {
+        count = block->extract().count;
+    }
+    tassert(8141604, "block exceeds maximum length", mongo::detail::inRange<int32_t>(*count));
+
+    return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(*count)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNone(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [blockOwned, blockTag, blockVal] = getFromStack(0);
+    tassert(8141605,
+            "valueBlockNone expects a block as first argument",
+            blockTag == value::TypeTags::valueBlock);
+    auto [searchOwned, searchTag, searchVal] = getFromStack(1);
+
+    auto* block = value::getValueBlock(blockVal);
+    auto extracted = block->extract();
+
+    for (size_t i = 0; i < extracted.count; i++) {
+        auto [cmpTag, cmpVal] =
+            sbe::value::compareValue(extracted.tags[i], extracted.vals[i], searchTag, searchVal);
+        if (cmpTag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(cmpVal) == 0) {
+            return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+        }
+    }
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogicalNot(
+    ArityType arity) {
+    invariant(arity == 1);
+
+    auto [bitmapOwned, bitmapTag, bitmapVal] = getFromStack(0);
+    tassert(8141607,
+            "valueBlockLogicalNot expects a block of boolean values as argument",
+            bitmapTag == value::TypeTags::valueBlock);
+
+    auto bitmapView = value::getValueBlock(bitmapVal);
+
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+        tassert(8141608,
+                "valueBlockLogicalNot expects a block of boolean values as argument",
+                tag == value::TypeTags::Boolean);
+        return std::make_pair(tag, !value::bitcastTo<bool>(val));
+    });
+
+    auto res = bitmapView->map(cmpOp);
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F(ArityType arity) {

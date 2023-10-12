@@ -60,8 +60,10 @@ namespace mongo::stage_builder {
  */
 class Vectorizer {
 public:
-    using VariableTypes = stdx::
-        unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
+    using VariableTypes =
+        stdx::unordered_map<optimizer::ProjectionName,
+                            std::pair<TypeSignature, boost::optional<optimizer::ProjectionName>>,
+                            optimizer::ProjectionName::Hasher>;
     struct Tree {
         // The ABT expression produced by vectorizing the original expression tree. If not set, the
         // original expression cannot be converted into a vectorized one, usually because of missing
@@ -91,6 +93,7 @@ public:
     // supported".
     template <int Arity>
     Tree operator()(const optimizer::ABT& n, const optimizer::ABTOpFixedArity<Arity>& op) {
+        logUnsupportedConversion(n);
         return {{}, TypeSignature::kAnyScalarType, {}};
     }
 
@@ -100,7 +103,13 @@ public:
 
     Tree operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op);
 
+    Tree operator()(const optimizer::ABT& n, const optimizer::UnaryOp& op);
+
     Tree operator()(const optimizer::ABT& n, const optimizer::FunctionCall& op);
+
+    Tree operator()(const optimizer::ABT& n, const optimizer::Let& op);
+
+    Tree operator()(const optimizer::ABT& n, const optimizer::If& op);
 
 private:
     // Ensure that the generated tree is representing a block of measures (i.e.
@@ -109,6 +118,9 @@ private:
 
     // Return an expression combining all the active bitmap masks currently in scope.
     optimizer::ABT generateMaskArg();
+
+    // Helper method to report unsupported constructs.
+    void logUnsupportedConversion(const optimizer::ABT& node);
 
     // The purpose of the operations being vectorized.
     Purpose _purpose;

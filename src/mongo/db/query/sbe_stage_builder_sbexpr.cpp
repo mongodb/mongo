@@ -117,7 +117,9 @@ optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));
 }
 
-TypeSignature constantFold(optimizer::ABT& abt, StageBuilderState& state) {
+TypeSignature constantFold(optimizer::ABT& abt,
+                           StageBuilderState& state,
+                           const VariableTypes* slotInfo) {
     auto& runtimeEnv = *state.env;
 
     auto env = optimizer::VariableEnvironment::build(abt);
@@ -148,6 +150,11 @@ TypeSignature constantFold(optimizer::ABT& abt, StageBuilderState& state) {
         constEval.optimize(abt);
 
         TypeChecker typeChecker;
+        if (slotInfo) {
+            for (const auto& var : *slotInfo) {
+                typeChecker.bind(var.first, var.second);
+            }
+        }
         signature = typeChecker.typeCheck(abt);
 
         modified = typeChecker.modified();
@@ -159,8 +166,10 @@ TypeSignature constantFold(optimizer::ABT& abt, StageBuilderState& state) {
     return signature;
 }
 
-TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state) {
-    TypeSignature signature = constantFold(abt, state);
+TypedExpression abtToExpr(optimizer::ABT& abt,
+                          StageBuilderState& state,
+                          const VariableTypes* slotInfo) {
+    TypeSignature signature = constantFold(abt, state, slotInfo);
 
     auto& runtimeEnv = *state.env;
 

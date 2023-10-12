@@ -235,7 +235,14 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             generateFilter(_state, eventFilter, /*rootSlot*/ boost::none, &outputs);
         if (eventFilterSbExpr.hasABT()) {
             auto abt = abt::unwrap(eventFilterSbExpr.extractABT());
-            constantFold(abt, _state);
+            // Prepare a temporary object to expose the block variables as scalar types.
+            VariableTypes varTypes;
+            outputs.forEachSlot([&](const TypedSlot& slot) {
+                varTypes.emplace(getABTVariableName(slot.slotId),
+                                 slot.typeSignature.exclude(TypeSignature::kBlockType)
+                                     .exclude(TypeSignature::kCellType));
+            });
+            constantFold(abt, _state, &varTypes);
 
             if (abt.is<optimizer::Constant>()) {
                 auto [tag, val] = abt.cast<optimizer::Constant>()->get();
@@ -255,11 +262,14 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                 Vectorizer vectorizer(_state.frameIdGenerator, Vectorizer::Purpose::Filter);
                 Vectorizer::VariableTypes bindings;
                 outputs.forEachSlot([&bindings](const TypedSlot& slot) {
-                    bindings.emplace(getABTVariableName(slot.slotId), slot.typeSignature);
+                    bindings.emplace(getABTVariableName(slot.slotId),
+                                     std::make_pair(slot.typeSignature, boost::none));
                 });
                 Vectorizer::Tree blockABT = vectorizer.vectorize(abt, bindings);
 
-                if (blockABT.expr.has_value()) {
+                if (blockABT.expr.has_value() &&
+                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                        .isSubset(blockABT.typeSignature)) {
                     // We successfully created an expression working on the block values and
                     // returning a block of boolean values; attach it to a project stage and use
                     // the result as the bitmap for the BlockToRow stage.

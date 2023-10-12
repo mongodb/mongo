@@ -52,15 +52,30 @@ TEST(VectorizerTest, ConvertGt) {
 
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
-    bindings.emplace("inputVar"_sd,
-                     TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType));
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
 
     auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
 
-    ASSERT_EXPLAIN_V2_AUTO(
-        "FunctionCall [valueBlockGtScalar]\n"
-        "|   Const [9]\n"
-        "Variable [inputVar]\n",
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockGtScalar\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"NumberInt32\", \n"
+        "            value: 9\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
         *processed.expr);
 }
 
@@ -70,17 +85,44 @@ TEST(VectorizerTest, ConvertGtOnCell) {
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
     bindings.emplace("inputVar"_sd,
-                     TypeSignature::kCellType.include(TypeSignature::kAnyScalarType));
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
 
     auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
 
-    ASSERT_EXPLAIN_V2_AUTO(
-        "FunctionCall [cellFoldValues_F]\n"
-        "|   Variable [inputVar]\n"
-        "FunctionCall [valueBlockGtScalar]\n"
-        "|   Const [9]\n"
-        "FunctionCall [cellBlockGetFlatValuesBlock]\n"
-        "Variable [inputVar]\n",
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockGtScalar\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"NumberInt32\", \n"
+        "                    value: 9\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
         *processed.expr);
 }
 
@@ -93,26 +135,89 @@ TEST(VectorizerTest, ConvertBooleanOpOnCell) {
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
     bindings.emplace("inputVar"_sd,
-                     TypeSignature::kCellType.include(TypeSignature::kAnyScalarType));
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
 
     auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
 
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Let [__l1_0]\n"
-        "|   FunctionCall [valueBlockLogicalAnd]\n"
-        "|   |   FunctionCall [cellFoldValues_F]\n"
-        "|   |   |   Variable [inputVar]\n"
-        "|   |   FunctionCall [valueBlockGtScalar]\n"
-        "|   |   |   Const [9]\n"
-        "|   |   FunctionCall [cellBlockGetFlatValuesBlock]\n"
-        "|   |   Variable [inputVar]\n"
-        "|   Variable [__l1_0]\n"
-        "FunctionCall [cellFoldValues_F]\n"
-        "|   Variable [inputVar]\n"
-        "FunctionCall [valueBlockLteScalar]\n"
-        "|   Const [59]\n"
-        "FunctionCall [cellBlockGetFlatValuesBlock]\n"
-        "Variable [inputVar]\n",
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"Let\", \n"
+        "    variable: \"__l1_0\", \n"
+        "    bind: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"cellFoldValues_F\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"FunctionCall\", \n"
+        "                name: \"valueBlockLteScalar\", \n"
+        "                arguments: [\n"
+        "                    {\n"
+        "                        nodeType: \"FunctionCall\", \n"
+        "                        name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                        arguments: [\n"
+        "                            {\n"
+        "                                nodeType: \"Variable\", \n"
+        "                                name: \"inputVar\"\n"
+        "                            }\n"
+        "                        ]\n"
+        "                    }, \n"
+        "                    {\n"
+        "                        nodeType: \"Const\", \n"
+        "                        tag: \"NumberInt32\", \n"
+        "                        value: 59\n"
+        "                    }\n"
+        "                ]\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"inputVar\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"valueBlockLogicalAnd\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"__l1_0\"\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"FunctionCall\", \n"
+        "                name: \"cellFoldValues_F\", \n"
+        "                arguments: [\n"
+        "                    {\n"
+        "                        nodeType: \"FunctionCall\", \n"
+        "                        name: \"valueBlockGtScalar\", \n"
+        "                        arguments: [\n"
+        "                            {\n"
+        "                                nodeType: \"FunctionCall\", \n"
+        "                                name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                                arguments: [\n"
+        "                                    {\n"
+        "                                        nodeType: \"Variable\", \n"
+        "                                        name: \"inputVar\"\n"
+        "                                    }\n"
+        "                                ]\n"
+        "                            }, \n"
+        "                            {\n"
+        "                                nodeType: \"Const\", \n"
+        "                                tag: \"NumberInt32\", \n"
+        "                                value: 9\n"
+        "                            }\n"
+        "                        ]\n"
+        "                    }, \n"
+        "                    {\n"
+        "                        nodeType: \"Variable\", \n"
+        "                        name: \"inputVar\"\n"
+        "                    }\n"
+        "                ]\n"
+        "            }\n"
+        "        ]\n"
+        "    }\n"
+        "}\n",
         *processed.expr);
 }
 
@@ -132,23 +237,190 @@ TEST(VectorizerTest, ConvertFilter) {
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
     bindings.emplace("inputVar"_sd,
-                     TypeSignature::kCellType.include(TypeSignature::kAnyScalarType));
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
 
     // Use Project to highlight that traverseF always translates to a cellFoldValue_F.
     auto processed =
         Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree1, bindings);
 
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Let [__l7_0]\n"
-        "|   FunctionCall [cellFoldValues_F]\n"
-        "|   |   Variable [inputVar]\n"
-        "|   FunctionCall [valueBlockFillEmpty]\n"
-        "|   |   Const [false]\n"
-        "|   FunctionCall [valueBlockGtScalar]\n"
-        "|   |   Const [9]\n"
-        "|   Variable [__l7_0]\n"
-        "FunctionCall [cellBlockGetFlatValuesBlock]\n"
-        "Variable [inputVar]\n",
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"Let\", \n"
+        "    variable: \"__l7_0\", \n"
+        "    bind: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"cellBlockGetFlatValuesBlock\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"inputVar\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"cellFoldValues_F\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"FunctionCall\", \n"
+        "                name: \"valueBlockFillEmpty\", \n"
+        "                arguments: [\n"
+        "                    {\n"
+        "                        nodeType: \"FunctionCall\", \n"
+        "                        name: \"valueBlockGtScalar\", \n"
+        "                        arguments: [\n"
+        "                            {\n"
+        "                                nodeType: \"Variable\", \n"
+        "                                name: \"__l7_0\"\n"
+        "                            }, \n"
+        "                            {\n"
+        "                                nodeType: \"Const\", \n"
+        "                                tag: \"NumberInt32\", \n"
+        "                                value: 9\n"
+        "                            }\n"
+        "                        ]\n"
+        "                    }, \n"
+        "                    {\n"
+        "                        nodeType: \"Const\", \n"
+        "                        tag: \"Boolean\", \n"
+        "                        value: false\n"
+        "                    }\n"
+        "                ]\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"inputVar\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertBlockIf) {
+    auto tree1 = make<If>(make<FunctionCall>("exists", makeSeq(make<Variable>("inputVar"))),
+                          make<Variable>("inputVar"),
+                          Constant::boolean(false));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"Let\", \n"
+        "    variable: \"__l1_0\", \n"
+        "    bind: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"valueBlockExists\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"FunctionCall\", \n"
+        "                name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                arguments: [\n"
+        "                    {\n"
+        "                        nodeType: \"Variable\", \n"
+        "                        name: \"inputVar\"\n"
+        "                    }\n"
+        "                ]\n"
+        "            }\n"
+        "        ]\n"
+        "    }, \n"
+        "    expression: {\n"
+        "        nodeType: \"FunctionCall\", \n"
+        "        name: \"valueBlockCombine\", \n"
+        "        arguments: [\n"
+        "            {\n"
+        "                nodeType: \"FunctionCall\", \n"
+        "                name: \"cellFoldValues_F\", \n"
+        "                arguments: [\n"
+        "                    {\n"
+        "                        nodeType: \"FunctionCall\", \n"
+        "                        name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                        arguments: [\n"
+        "                            {\n"
+        "                                nodeType: \"Variable\", \n"
+        "                                name: \"inputVar\"\n"
+        "                            }\n"
+        "                        ]\n"
+        "                    }, \n"
+        "                    {\n"
+        "                        nodeType: \"Variable\", \n"
+        "                        name: \"inputVar\"\n"
+        "                    }\n"
+        "                ]\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Let\", \n"
+        "                variable: \"__l2_0\", \n"
+        "                bind: {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"valueBlockLogicalNot\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"__l1_0\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                expression: {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"valueBlockNewFill\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"If\", \n"
+        "                            condition: {\n"
+        "                                nodeType: \"FunctionCall\", \n"
+        "                                name: \"valueBlockNone\", \n"
+        "                                arguments: [\n"
+        "                                    {\n"
+        "                                        nodeType: \"Variable\", \n"
+        "                                        name: \"__l2_0\"\n"
+        "                                    }, \n"
+        "                                    {\n"
+        "                                        nodeType: \"Const\", \n"
+        "                                        tag: \"Boolean\", \n"
+        "                                        value: true\n"
+        "                                    }\n"
+        "                                ]\n"
+        "                            }, \n"
+        "                            then: {\n"
+        "                                nodeType: \"Const\", \n"
+        "                                tag: \"Nothing\"\n"
+        "                            }, \n"
+        "                            else: {\n"
+        "                                nodeType: \"Const\", \n"
+        "                                tag: \"Boolean\", \n"
+        "                                value: false\n"
+        "                            }\n"
+        "                        }, \n"
+        "                        {\n"
+        "                            nodeType: \"FunctionCall\", \n"
+        "                            name: \"valueBlockSize\", \n"
+        "                            arguments: [\n"
+        "                                {\n"
+        "                                    nodeType: \"Variable\", \n"
+        "                                    name: \"__l2_0\"\n"
+        "                                }\n"
+        "                            ]\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }\n"
+        "            }, \n"
+        "            {\n"
+        "                nodeType: \"Variable\", \n"
+        "                name: \"__l1_0\"\n"
+        "            }\n"
+        "        ]\n"
+        "    }\n"
+        "}\n",
         *processed.expr);
 }
 

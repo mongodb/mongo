@@ -858,6 +858,7 @@ enum class Builtin : uint16_t {
     // Start of 2 byte builtins.
     valueBlockExists = 256,
     valueBlockFillEmpty,
+    valueBlockFillEmptyBlock,
     valueBlockMin,
     valueBlockMax,
     valueBlockCount,
@@ -867,9 +868,14 @@ enum class Builtin : uint16_t {
     valueBlockNeqScalar,
     valueBlockLtScalar,
     valueBlockLteScalar,
+    valueBlockCmp3wScalar,
     valueBlockCombine,
     valueBlockLogicalAnd,
     valueBlockLogicalOr,
+    valueBlockLogicalNot,
+    valueBlockNewFill,
+    valueBlockSize,
+    valueBlockNone,
 
     cellFoldValues_F,
     cellFoldValues_P,
@@ -2020,6 +2026,7 @@ private:
     // Block builtins
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmptyBlock(ArityType arity);
     template <bool less>
     FastTuple<bool, value::TypeTags, value::Value> valueBlockMinMaxImpl(
         value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock);
@@ -2036,9 +2043,14 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNeqScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLtScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLteScalar(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCmp3wScalar(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCombine(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalAnd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalOr(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockLogicalNot(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNewFill(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNone(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_F(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(

@@ -44,50 +44,6 @@
 
 namespace mongo::stage_builder {
 
-// Return the set of SBE types encoded in the provided signature.
-std::vector<sbe::value::TypeTags> getBSONTypesFromSignature(TypeSignature signature) {
-    // This constant signature holds all the types that have a BSON counterpart and can
-    // represent a value stored in the database, excluding all the TypeTags that describe
-    // internal types like SortSpec, TimeZoneDB, etc...
-    static TypeSignature kAnyBSONType = getTypeSignature(sbe::value::TypeTags::Nothing,
-                                                         sbe::value::TypeTags::NumberInt32,
-                                                         sbe::value::TypeTags::NumberInt64,
-                                                         sbe::value::TypeTags::NumberDouble,
-                                                         sbe::value::TypeTags::NumberDecimal,
-                                                         sbe::value::TypeTags::Date,
-                                                         sbe::value::TypeTags::Timestamp,
-                                                         sbe::value::TypeTags::Boolean,
-                                                         sbe::value::TypeTags::Null,
-                                                         sbe::value::TypeTags::StringSmall,
-                                                         sbe::value::TypeTags::StringBig,
-                                                         sbe::value::TypeTags::Array,
-                                                         sbe::value::TypeTags::ArraySet,
-                                                         sbe::value::TypeTags::Object,
-                                                         sbe::value::TypeTags::ObjectId,
-                                                         sbe::value::TypeTags::MinKey,
-                                                         sbe::value::TypeTags::MaxKey,
-                                                         sbe::value::TypeTags::bsonObject,
-                                                         sbe::value::TypeTags::bsonArray,
-                                                         sbe::value::TypeTags::bsonString,
-                                                         sbe::value::TypeTags::bsonSymbol,
-                                                         sbe::value::TypeTags::bsonObjectId,
-                                                         sbe::value::TypeTags::bsonBinData,
-                                                         sbe::value::TypeTags::bsonUndefined,
-                                                         sbe::value::TypeTags::bsonRegex,
-                                                         sbe::value::TypeTags::bsonJavascript,
-                                                         sbe::value::TypeTags::bsonDBPointer,
-                                                         sbe::value::TypeTags::bsonCodeWScope);
-    signature = signature.intersect(kAnyBSONType);
-    std::vector<sbe::value::TypeTags> tags;
-    for (size_t i = 0; i < sizeof(size_t) * 8; i++) {
-        auto tag = static_cast<sbe::value::TypeTags>(i);
-        if (getTypeSignature(tag).isSubset(signature)) {
-            tags.push_back(tag);
-        }
-    }
-    return tags;
-}
-
 TypeChecker::TypeChecker() {
     // Define an initial binding level, so that the caller can define variable bindings before
     // invoking typeCheck().
@@ -339,6 +295,13 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
                 lhs.include(rhs).intersect(TypeSignature::kNothingType));
         } break;
 
+        case optimizer::Operations::Cmp3w: {
+            // The signature of comparison is integer plus Nothing if either operands can be
+            // Nothing.
+            return getTypeSignature(sbe::value::TypeTags::NumberInt32)
+                .include(lhs.include(rhs).intersect(TypeSignature::kNothingType));
+        } break;
+
         default:
             break;
     }
@@ -479,6 +442,11 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         return evaluateTypeTest(n, argTypes[0], getTypeSignature(sbe::value::TypeTags::Timestamp));
     }
 
+    if ((op.name() == "dateTrunc" && arity == 6) || (op.name() == "dateAdd" && arity == 5)) {
+        // Always mark Nothing as a possible return type, as it can be reported due to invalid
+        // arguments.
+        return getTypeSignature(sbe::value::TypeTags::Date).include(TypeSignature::kNothingType);
+    }
     return TypeSignature::kAnyScalarType;
 }
 

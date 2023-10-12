@@ -36,6 +36,37 @@ TypeSignature getTypeSignature(sbe::value::TypeTags type) {
     return TypeSignature{1LL << tagIndex};
 }
 
+// This constant signature holds all the types that have a BSON counterpart and can
+// represent a value stored in the database, excluding all the TypeTags that describe
+// internal types like SortSpec, TimeZoneDB, etc...
+TypeSignature TypeSignature::kAnyBSONType = getTypeSignature(sbe::value::TypeTags::Nothing,
+                                                             sbe::value::TypeTags::NumberInt32,
+                                                             sbe::value::TypeTags::NumberInt64,
+                                                             sbe::value::TypeTags::NumberDouble,
+                                                             sbe::value::TypeTags::NumberDecimal,
+                                                             sbe::value::TypeTags::Date,
+                                                             sbe::value::TypeTags::Timestamp,
+                                                             sbe::value::TypeTags::Boolean,
+                                                             sbe::value::TypeTags::Null,
+                                                             sbe::value::TypeTags::StringSmall,
+                                                             sbe::value::TypeTags::StringBig,
+                                                             sbe::value::TypeTags::Array,
+                                                             sbe::value::TypeTags::ArraySet,
+                                                             sbe::value::TypeTags::Object,
+                                                             sbe::value::TypeTags::ObjectId,
+                                                             sbe::value::TypeTags::MinKey,
+                                                             sbe::value::TypeTags::MaxKey,
+                                                             sbe::value::TypeTags::bsonObject,
+                                                             sbe::value::TypeTags::bsonArray,
+                                                             sbe::value::TypeTags::bsonString,
+                                                             sbe::value::TypeTags::bsonSymbol,
+                                                             sbe::value::TypeTags::bsonObjectId,
+                                                             sbe::value::TypeTags::bsonBinData,
+                                                             sbe::value::TypeTags::bsonUndefined,
+                                                             sbe::value::TypeTags::bsonRegex,
+                                                             sbe::value::TypeTags::bsonJavascript,
+                                                             sbe::value::TypeTags::bsonDBPointer,
+                                                             sbe::value::TypeTags::bsonCodeWScope);
 TypeSignature TypeSignature::kAnyScalarType = TypeSignature{~0}.exclude(
     getTypeSignature(sbe::value::TypeTags::cellBlock, sbe::value::TypeTags::valueBlock));
 TypeSignature TypeSignature::kArrayType = getTypeSignature(
@@ -55,5 +86,18 @@ TypeSignature TypeSignature::kObjectType =
 TypeSignature TypeSignature::kStringType = getTypeSignature(sbe::value::TypeTags::StringSmall,
                                                             sbe::value::TypeTags::StringBig,
                                                             sbe::value::TypeTags::bsonString);
+
+// Return the set of SBE types encoded in the provided signature.
+std::vector<sbe::value::TypeTags> getBSONTypesFromSignature(TypeSignature signature) {
+    signature = signature.intersect(TypeSignature::kAnyBSONType);
+    std::vector<sbe::value::TypeTags> tags;
+    for (size_t i = 0; i < sizeof(size_t) * 8; i++) {
+        auto tag = static_cast<sbe::value::TypeTags>(i);
+        if (getTypeSignature(tag).isSubset(signature)) {
+            tags.push_back(tag);
+        }
+    }
+    return tags;
+}
 
 }  // namespace mongo::stage_builder

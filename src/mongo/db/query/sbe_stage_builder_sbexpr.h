@@ -68,12 +68,21 @@ struct TypedExpression {
     TypeSignature typeSignature;
 };
 
-// Run constant folding on the provided ABT tree and return its type signature.
-TypeSignature constantFold(optimizer::ABT& abt, StageBuilderState& state);
+using VariableTypes = stdx::
+    unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
 
-// Optimize and convert the provided ABT tree into an equivalent EExpression tree,
-// returning its type signature.
-TypedExpression abtToExpr(optimizer::ABT& abt, StageBuilderState& state);
+// Run constant folding on the provided ABT tree and return its type signature. If the type
+// information in the slotInfo is available, it is used to assign a type to the visible slots.
+TypeSignature constantFold(optimizer::ABT& abt,
+                           StageBuilderState& state,
+                           const VariableTypes* slotInfo = nullptr);
+
+// Optimize and convert the provided ABT tree into an equivalent EExpression tree, returning its
+// type signature. If the type information in the slotInfo is available, it is used to assign a type
+// to the visible slots.
+TypedExpression abtToExpr(optimizer::ABT& abt,
+                          StageBuilderState& state,
+                          const VariableTypes* slotInfo = nullptr);
 
 /**
  * The SbVar class is used to represent variables in the SBE stage builder. "SbVar" is short for

@@ -8850,6 +8850,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockExists(arity);
         case Builtin::valueBlockFillEmpty:
             return builtinValueBlockFillEmpty(arity);
+        case Builtin::valueBlockFillEmptyBlock:
+            return builtinValueBlockFillEmptyBlock(arity);
         case Builtin::valueBlockMin:
             return builtinValueBlockMin(arity);
         case Builtin::valueBlockMax:
@@ -8868,12 +8870,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockLtScalar(arity);
         case Builtin::valueBlockLteScalar:
             return builtinValueBlockLteScalar(arity);
+        case Builtin::valueBlockCmp3wScalar:
+            return builtinValueBlockCmp3wScalar(arity);
         case Builtin::valueBlockCombine:
             return builtinValueBlockCombine(arity);
         case Builtin::valueBlockLogicalAnd:
             return builtinValueBlockLogicalAnd(arity);
         case Builtin::valueBlockLogicalOr:
             return builtinValueBlockLogicalOr(arity);
+        case Builtin::valueBlockLogicalNot:
+            return builtinValueBlockLogicalNot(arity);
+        case Builtin::valueBlockNewFill:
+            return builtinValueBlockNewFill(arity);
+        case Builtin::valueBlockSize:
+            return builtinValueBlockSize(arity);
+        case Builtin::valueBlockNone:
+            return builtinValueBlockNone(arity);
         case Builtin::cellFoldValues_F:
             return builtinCellFoldValues_F(arity);
         case Builtin::cellFoldValues_P:
@@ -9278,6 +9290,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockExists";
         case Builtin::valueBlockFillEmpty:
             return "valueBlockFillEmpty";
+        case Builtin::valueBlockFillEmptyBlock:
+            return "valueBlockFillEmptyBlock";
         case Builtin::valueBlockMin:
             return "valueBlockMin";
         case Builtin::valueBlockMax:
@@ -9296,12 +9310,22 @@ std::string builtinToString(Builtin b) {
             return "valueBlockLtScalar";
         case Builtin::valueBlockLteScalar:
             return "valueBlockLteScalar";
+        case Builtin::valueBlockCmp3wScalar:
+            return "valueBlockCmp3wScalar";
         case Builtin::valueBlockCombine:
             return "valueBlockCombine";
         case Builtin::valueBlockLogicalAnd:
             return "valueBlockLogicalAnd";
         case Builtin::valueBlockLogicalOr:
             return "valueBlockLogicalOr";
+        case Builtin::valueBlockLogicalNot:
+            return "valueBlockLogicalNot";
+        case Builtin::valueBlockNewFill:
+            return "valueBlockNewFill";
+        case Builtin::valueBlockSize:
+            return "valueBlockSize";
+        case Builtin::valueBlockNone:
+            return "valueBlockNone";
         case Builtin::cellFoldValues_F:
             return "cellFoldValues_F";
         case Builtin::cellFoldValues_P:
