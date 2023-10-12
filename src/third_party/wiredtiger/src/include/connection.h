@@ -523,6 +523,7 @@ struct __wt_connection_impl {
     /* Queue of refs to pre-fetch from */
     TAILQ_HEAD(__wt_pf_qh, __wt_prefetch_queue_entry) pfqh; /* Locked: prefetch_lock */
     bool prefetch_auto_on;
+    bool prefetch_available;
 
 #define WT_STATLOG_FILENAME "WiredTigerStat.%d.%H"
     WT_SESSION_IMPL *stat_session; /* Statistics log session */

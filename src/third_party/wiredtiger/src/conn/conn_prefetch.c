@@ -30,14 +30,14 @@ __wt_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
      * This might have already been parsed and set during connection configuration, but do it here
      * as well, in preparation for the functionality being runtime configurable.
      */
-    WT_RET(__wt_config_gets(session, cfg, "prefetch", &cval));
-    conn->prefetch_auto_on = cval.val != 0;
+    WT_RET(__wt_config_gets(session, cfg, "prefetch.available", &cval));
+    conn->prefetch_available = cval.val != 0;
 
     /*
      * Pre-fetch functionality isn't runtime configurable, so don't bother starting utility threads
-     * if it isn't enabled.
+     * if it isn't available.
      */
-    if (!conn->prefetch_auto_on)
+    if (!conn->prefetch_available)
         return (0);
 
     F_SET(conn, WT_CONN_PREFETCH_RUN);

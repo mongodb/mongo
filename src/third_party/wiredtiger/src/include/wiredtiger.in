@@ -881,6 +881,12 @@ struct __wt_session {
      * @config{isolation, the default isolation level for operations in this session., a string\,
      * chosen from the following options: \c "read-uncommitted"\, \c "read-committed"\, \c
      * "snapshot"; default \c snapshot.}
+     * @config{prefetch = (, Enable automatic detection of scans by applications\, and attempt to
+     * pre-fetch future content into the cache., a set of related configuration options defined as
+     * follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether pre-fetch is enabled for this
+     * session., a boolean flag; default \c false.}
+     * @config{ ),,}
      * @configend
      * @errors
      */
@@ -2543,6 +2549,12 @@ struct __wt_connection {
      * @config{isolation, the default isolation level for operations in this session., a string\,
      * chosen from the following options: \c "read-uncommitted"\, \c "read-committed"\, \c
      * "snapshot"; default \c snapshot.}
+     * @config{prefetch = (, Enable automatic detection of scans by applications\, and attempt to
+     * pre-fetch future content into the cache., a set of related configuration options defined as
+     * follows.}
+     * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether pre-fetch is enabled for this
+     * session., a boolean flag; default \c false.}
+     * @config{ ),,}
      * @configend
      * @param[out] sessionp the new session handle
      * @errors
@@ -3231,8 +3243,15 @@ struct __wt_connection {
  * is not an absolute path\, the path is relative to the database home (see @ref absolute_path for
  * more information)., a string; default \c ".".}
  * @config{ ),,}
- * @config{prefetch, Enable automatic detection of scans by applications\, and attempt to pre-fetch
- * future content into the cache., a boolean flag; default \c false.}
+ * @config{prefetch = (, Enable automatic detection of scans by applications\, and attempt to
+ * pre-fetch future content into the cache., a set of related configuration options defined as
+ * follows.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;available, whether the thread pool for the pre-fetch
+ * functionality is started., a boolean flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;
+ * default, whether pre-fetch is enabled for all sessions by default., a boolean flag; default \c
+ * false.}
+ * @config{ ),,}
  * @config{readonly, open connection in read-only mode.  The database must exist.  All methods that
  * may modify a database are disabled.  See @ref readonly for more information., a boolean flag;
  * default \c false.}
