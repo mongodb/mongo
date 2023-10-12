@@ -169,7 +169,7 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         # Removing the local file guarantees that we'd go to the cloud to get the data.
         # However, this loop appears to last forever, it seems to keep the
         # file around because the file handle is in use.  Even inserting a
-        # self.reopen_conn() into the loop does not fix it.  FIXME-WT-10995.
+        # self.reopen_conn() into the loop does not fix it.  FIXME-WT-10953.
         #
         #    # Make sure the local file is removed, so we actually will go to the
         #    # cloud the next time this URI is accessed.
