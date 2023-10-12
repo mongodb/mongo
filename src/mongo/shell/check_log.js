@@ -210,6 +210,29 @@ checkLog = (function() {
             {runHangAnalyzer: false});
     };
 
+    /*
+     * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
+     * the provided 'msg' is found in the logs and returned, or it times out. Throws an exception on
+     * timeout.
+     */
+    let containsLog = function(conn, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
+        // Don't run the hang analyzer because we don't expect contains() to always succeed.
+        let logMsg = null;
+        assert.soon(
+            function() {
+                logMsg = getLogMessage(conn, msg);
+                if (logMsg) {
+                    return true;
+                }
+                return false;
+            },
+            'Could not find log entries containing the following message: ' + msg,
+            timeoutMillis,
+            retryIntervalMS,
+            {runHangAnalyzer: false});
+        return logMsg;
+    };
+
     let containsJson = function(conn, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
         // Don't run the hang analyzer because we don't expect contains() to always succeed.
         assert.soon(
@@ -456,6 +479,7 @@ checkLog = (function() {
         checkContainsWithAtLeastCountJson: checkContainsWithAtLeastCountJson,
         checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
         contains: contains,
+        containsLog: containsLog,
         containsJson: containsJson,
         containsRelaxedJson: containsRelaxedJson,
         containsWithCount: containsWithCount,

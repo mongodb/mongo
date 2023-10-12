@@ -2852,15 +2852,27 @@ void ReshardingCoordinator::_logStatsOnCompletion(bool success) {
     for (auto shard : _coordinatorDoc.getRecipientShards()) {
         totalDocuments += shard.getMutableState().getTotalNumDocuments().value_or(0);
         docSize += shard.getMutableState().getTotalDocumentSize().value_or(0);
-        totalIndexes += shard.getMutableState().getNumOfIndexes().value_or(0);
+        if (shard.getMutableState().getNumOfIndexes().value_or(0) > totalIndexes) {
+            totalIndexes = shard.getMutableState().getNumOfIndexes().value_or(0);
+        }
     }
     statsBuilder.append("numberOfTotalDocuments", totalDocuments);
     statsBuilder.append("averageDocSize", totalDocuments > 0 ? (docSize / totalDocuments) : 0);
     statsBuilder.append("numberOfIndexes", totalIndexes);
 
     statsBuilder.append("numberOfSourceShards", (int64_t)(_coordinatorDoc.getDonorShards().size()));
-    statsBuilder.append("numberOfDestinationShards",
-                        (int64_t)(_coordinatorDoc.getRecipientShards().size()));
+
+    auto numDestinationShards = 0;
+    if (const auto& shardDistribution = _coordinatorDoc.getShardDistribution()) {
+        std::set<ShardId> destinationShards;
+        for (const auto& shardDist : *shardDistribution) {
+            destinationShards.emplace(shardDist.getShard());
+        }
+        numDestinationShards = destinationShards.size();
+    } else {
+        numDestinationShards = _coordinatorDoc.getRecipientShards().size();
+    }
+    statsBuilder.append("numberOfDestinationShards", (int64_t)numDestinationShards);
 
     builder.append("statistics", statsBuilder.obj());
     LOGV2(7763800, "Resharding complete", "info"_attr = builder.obj());
