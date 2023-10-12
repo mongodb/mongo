@@ -64,8 +64,8 @@ config_verbose(void)
     event_handler.handle_general = NULL;
 
     /*! [Configure verbose_messaging] */
-    error_check(wiredtiger_open(
-      home, (WT_EVENT_HANDLER *)&event_handler, "create,verbose=[api:1,version,write:0]", &conn));
+    error_check(wiredtiger_open(home, (WT_EVENT_HANDLER *)&event_handler,
+      "create,verbose=[api:1,all:0,version,write:2]", &conn));
     /*! [Configure verbose_messaging] */
 
     /* Make a series of API calls, to ensure verbose messages are produced. */
