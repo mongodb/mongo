@@ -43,12 +43,9 @@ def get_users_who_forked_mongo_repo(owner: str, repo: str, token: str) -> list[s
     """
     github_client = Github(token)
     repository = github_client.get_repo(f"{owner}/{repo}")
-    forks = []
 
-    for fork in repository.get_forks():
-        forks.append(fork.owner.login)
-
-    return forks
+    # If a repo is archived it is read only so it is safe to be allowed
+    return [fork.owner.login for fork in repository.get_forks() if not fork.archived]
 
 
 def is_10gen_member(user: str, org: str, token: str) -> bool:  # noqa: D406
@@ -104,6 +101,8 @@ def main():
     members_from_10gen = [
         user for user in forked_users if is_10gen_member(user, '10gen', access_token_10gen_member)
     ]
+    # Sort so list is easier to see diffs of time over time
+    members_from_10gen.sort()
 
     # Generate report message
     if members_from_10gen:
