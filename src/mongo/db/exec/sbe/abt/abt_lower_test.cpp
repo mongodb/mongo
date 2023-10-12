@@ -1289,13 +1289,8 @@ DEATH_TEST_F(ABTPlanGeneration,
 
 TEST_F(ABTPlanGeneration, LowerBinaryOpEqMemberRHSArray) {
     // Lower BinaryOp [EqMember] where the type of RHS is array.
-    std::string output = autoUpdateExpressionVariation(make<BinaryOp>(
-        Operations::EqMember,
-        Constant::str("hello"),
-        Constant::array(
-            std::pair{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(1)},
-            std::pair{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(2)},
-            std::pair{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(3)})));
+    std::string output = autoUpdateExpressionVariation(
+        _binary("EqMember", "hello"_cstr, _carray("1"_cdouble, "2"_cdouble, "3"_cdouble))._n);
 
     ASSERT_STR_EQ_AUTO(  // NOLINT
         "isMember(\"hello\", [1L, 2L, 3L]) ",

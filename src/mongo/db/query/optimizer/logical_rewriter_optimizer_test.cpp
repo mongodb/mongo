@@ -2723,29 +2723,19 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
 }
 
 TEST(LogicalRewriter, IsArrayConstantFolding) {
-    auto rootNode =
-        NodeBuilder{}
-            .root("p0")
-            .filter(
-                _evalf(_get("c",
-                            _traverse1(_cmp(
-                                "EqMember",
-                                _carray(std::pair{sbe::value::TypeTags::NumberDouble,
-                                                  sbe::value::bitcastFrom<double>(17.0000)},
-                                        std::pair{sbe::value::TypeTags::NumberDouble,
-                                                  sbe::value::bitcastFrom<double>(19.0000)},
-                                        std::pair{sbe::value::TypeTags::NumberDouble,
-                                                  sbe::value::bitcastFrom<double>(23.0000)},
-                                        std::pair{sbe::value::TypeTags::NumberDouble,
-                                                  sbe::value::bitcastFrom<double>(34.0000)},
-                                        std::pair{sbe::value::TypeTags::NumberDouble,
-                                                  sbe::value::bitcastFrom<double>(35.0000)},
-                                        std::pair{sbe::value::TypeTags::NumberDouble,
-                                                  sbe::value::bitcastFrom<double>(42.0000)},
-                                        std::pair{sbe::value::TypeTags::StringSmall,
-                                                  sbe::value::makeSmallString("abc"_sd).second})))),
-                       "p0"_var))
-            .finish(_scan("p0", "coll"));
+    auto rootNode = NodeBuilder{}
+                        .root("p0")
+                        .filter(_evalf(_get("c",
+                                            _traverse1(_cmp("EqMember",
+                                                            _carray("17.0000"_cdouble,
+                                                                    "19.0000"_cdouble,
+                                                                    "23.0000"_cdouble,
+                                                                    "34.0000"_cdouble,
+                                                                    "35.0000"_cdouble,
+                                                                    "42.0000"_cdouble,
+                                                                    "abc"_cstr)))),
+                                       "p0"_var))
+                        .finish(_scan("p0", "coll"));
 
     auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager({OptPhase::PathLower, OptPhase::ConstEvalPost},

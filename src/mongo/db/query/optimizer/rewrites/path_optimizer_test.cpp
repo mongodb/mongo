@@ -1622,13 +1622,7 @@ TEST(Path, PathCompareEqMemberArrayLower) {
             .root("x")
             .filter(_evalf(
                 _get("a",
-                     _traverse1(_cmp("EqMember",
-                                     _carray(std::pair{sbe::value::TypeTags::NumberDouble,
-                                                       sbe::value::bitcastFrom<double>(1)},
-                                             std::pair{sbe::value::TypeTags::NumberDouble,
-                                                       sbe::value::bitcastFrom<double>(2)},
-                                             std::pair{sbe::value::TypeTags::NumberDouble,
-                                                       sbe::value::bitcastFrom<double>(3)})))),
+                     _traverse1(_cmp("EqMember", _carray("1"_cdouble, "2"_cdouble, "3"_cdouble)))),
                 "x"_var))
             .eval("x", _evalp(_field("a", _pconst("hello"_cstr)), "root"_var))
             .finish(_scan("root", "test"));
