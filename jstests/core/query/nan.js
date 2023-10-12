@@ -1,82 +1,76 @@
 /**
  * Tests basic NaN handling. Note that WiredTiger indexes handle -NaN and NaN differently.
- * @tags: [
- *    # TODO SERVER-67818: NaN does not equal NaN in CQF.
- *    cqf_incompatible,
- * ]
  */
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+
 const coll = db.jstests_nan;
 coll.drop();
 
-assert.commandWorked(coll.insert({_id: 0, a: -Infinity}));
-assert.commandWorked(coll.insert({_id: 1, a: -3}));
-assert.commandWorked(coll.insert({_id: 2, a: 0}));
-assert.commandWorked(coll.insert({_id: 3, a: 3}));
-assert.commandWorked(coll.insert({_id: 4, a: Infinity}));
-assert.commandWorked(coll.insert({_id: 5, a: NaN}));
-assert.commandWorked(coll.insert({_id: 6, a: -NaN}));
-assert.commandWorked(coll.insert({_id: 7, a: undefined}));
-assert.commandWorked(coll.insert({_id: 8, a: null}));
-assert.commandWorked(coll.insert({_id: 9, a: []}));
-assert.commandWorked(coll.insert({_id: 10, a: {b: 1}}));
-assert.commandWorked(coll.insert({_id: 11, a: {b: 1}}));
+const docs = [
+    {_id: 0, a: -Infinity},
+    {_id: 1, a: -3},
+    {_id: 2, a: 0},
+    {_id: 3, a: 3},
+    {_id: 4, a: Infinity},
+    {_id: 5, a: NaN},
+    {_id: 6, a: -NaN},
+    {_id: 7, a: undefined},
+    {_id: 8, a: null},
+    {_id: 9, a: []},
+    {_id: 10, a: {b: 1}},
+    {_id: 11, a: {b: 1}},
+];
+assert.commandWorked(coll.insert(docs));
 
 /**
  * Ensures correct results for EQ, LT, LTE, GT, GTE, and IN cases.
  */
 function testNaNComparisons() {
     // EQ
-    let cursor = coll.find({a: NaN}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    let res = coll.find({a: NaN}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
 
     // LT
-    cursor = coll.find({a: {$lt: NaN}});
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$lt: NaN}}).toArray();
+    assertArrayEq({actual: res, expected: []});
 
     // LTE
-    cursor = coll.find({a: {$lte: NaN}}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$lte: NaN}}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
 
     // GT
-    cursor = coll.find({a: {$gt: NaN}});
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$gt: NaN}}).toArray();
+    assertArrayEq({actual: res, expected: []});
 
     // GTE
-    cursor = coll.find({a: {$gte: NaN}}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$gte: NaN}}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
 
     // IN
     // Positive NaN should match both positive and negative NaN. Note that the second value protects
     // the $in from being optimized away.
-    cursor = coll.find({a: {$in: [NaN, 1000]}}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$in: [NaN, 1000]}}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
 
     // Negative NaN should match both positive and negative NaN. Note that the second value protects
     // the $in from being optimized away.
-    cursor = coll.find({a: {$in: [-NaN, 1000]}}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$in: [-NaN, 1000]}}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
 
     // NaNs of different types should match both positive and negative NaN. Note that the second
     // value protects the $in from being optimized away.
-    cursor = coll.find({a: {$in: [NumberDecimal(NaN), 1000]}}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$in: [NumberDecimal(NaN), 1000]}}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
 
-    cursor = coll.find({a: {$in: [NumberDecimal(-NaN), 1000]}}).sort({_id: 1});
-    assert.eq(5, cursor.next()["_id"]);
-    assert.eq(6, cursor.next()["_id"]);
-    assert(!cursor.hasNext());
+    res = coll.find({a: {$in: [NumberDecimal(-NaN), 1000]}}).toArray();
+    assertArrayEq({actual: res, expected: [docs[5], docs[6]]});
+
+    // NE
+    // Should match all documents except docs with _id 5 and 6.
+    let docsCopy = [...docs];
+    docsCopy.splice(5, 2);
+    res = coll.find({a: {$ne: NaN}}).toArray();
+    assertArrayEq({actual: res, expected: docsCopy});
 }
 
 // Unindexed.

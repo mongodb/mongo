@@ -71,7 +71,9 @@ ABT translateShardKeyField(std::string shardKey);
 
 /**
  * Return the minimum or maximum value for the "class" of values represented by the input
- * constant. Used to support type bracketing.
+ * constant. Used to support type bracketing. Note that we only take a type tag as input; this means
+ * that bracketing for special _values_ such as NaN is not handled here. Not to be confused with
+ * getMinMaxBoundForValue().
  * Return format is <min/max value, bool inclusive>
  */
 std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(bool isMin,

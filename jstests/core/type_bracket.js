@@ -53,6 +53,12 @@ let tests = [
     {filter: {a: {$lte: 0}}, expected: [docs[30]]},
     {filter: {a: {$lt: 0}}, expected: []},
 
+    // NaN special case
+    {filter: {a: {$gt: NaN}}, expected: []},
+    {filter: {a: {$gte: NaN}}, expected: [docs[31]]},
+    {filter: {a: {$lt: NaN}}, expected: []},
+    {filter: {a: {$lte: NaN}}, expected: [docs[31]]},
+
     // Negative Infinity
     {filter: {a: {$lt: -Infinity}}, expected: []},
     {filter: {a: {$lte: -Infinity}}, expected: []},

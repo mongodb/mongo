@@ -22,7 +22,6 @@ assert.neq(null, classicConn, "mongod was unable to start up");
 const classicColl = classicConn.getDB(jsTestName()).classic_compare;
 classicColl.drop();
 
-// TODO SERVER-67818 Bonsai NaN $eq NaN should be true.
 // The above ticket also fixes inequality comparisons to NaN.
 const docs = smallDocs().filter(doc => !tojson(doc).match(/NaN/));
 cqfColl.insert(docs);
@@ -32,9 +31,6 @@ for (const op of ['$eq', '$lt', '$lte', '$gt', '$gte']) {
     for (const leaf of leafs()) {
         // TODO SERVER-67550 Equality to null does not match undefined, in Bonsai.
         if (tojson(leaf).match(/null|undefined/))
-            continue;
-        // TODO SERVER-67818 Bonsai NaN $eq NaN should be true.
-        if (tojson(leaf).match(/NaN/))
             continue;
         // Regex with non-equality predicate is not allowed.
         if (leaf instanceof RegExp && op !== '$eq')

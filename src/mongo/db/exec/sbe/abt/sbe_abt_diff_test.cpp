@@ -160,6 +160,12 @@ TEST_F(NodeSBE, DiffTestBasic) {
                                                fromjson({"{a:1, b:2}"}),
                                                fromjson({"{ a: 1, b: 2, c: 3 }"})));
 
+    ASSERT_TRUE(comparePipelineAgainstExpected(
+        contextFn,
+        "[{$match: {a: NaN}}]",
+        {BSON("a" << Decimal128::kNegativeNaN), BSON("a" << Decimal128::kPositiveNaN)},
+        {BSON("a" << Decimal128::kNegativeNaN), BSON("a" << Decimal128::kPositiveNaN)}));
+
     ASSERT_TRUE(compare("[]", {"{a:1, b:2, c:3}"}));
     ASSERT_TRUE(compare("[{$addFields: {c: {$literal: 3}}}]", {"{a:1, b:2}"}));
 }

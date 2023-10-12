@@ -90,6 +90,22 @@
 #include "mongo/util/str.h"
 
 namespace mongo::optimizer {
+namespace {
+/**
+ * Return the minimum or maximum value for the "class" of values represented by the input
+ * constant. Used to support type bracketing. Takes into account both the type tag and value of
+ * the input constant.
+ * Return format is <min/max value, bool inclusive>
+ */
+std::pair<boost::optional<ABT>, bool> getMinMaxBoundForValue(const bool isMin,
+                                                             const sbe::value::TypeTags& tag,
+                                                             const sbe::value::Value& val) {
+    if (sbe::value::isNaN(tag, val)) {
+        return {Constant::fromDouble(std::numeric_limits<double>::quiet_NaN()), true};
+    }
+    return getMinMaxBoundForType(isMin, tag);
+}
+}  // namespace
 
 class ABTMatchExpressionPreVisitor : public SelectiveMatchExpressionVisitorBase<true> {
     using SelectiveMatchExpressionVisitorBase<true>::visit;
@@ -595,7 +611,7 @@ private:
         switch (op) {
             case Operations::Lt:
             case Operations::Lte: {
-                auto&& [constant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
+                auto&& [constant, inclusive] = getMinMaxBoundForValue(true /*isMin*/, tag, val);
                 if (constant) {
                     maybeComposePath(result,
                                      make<PathCompare>(inclusive ? Operations::Gte : Operations::Gt,
@@ -613,7 +629,7 @@ private:
 
             case Operations::Gt:
             case Operations::Gte: {
-                auto&& [constant, inclusive] = getMinMaxBoundForType(false /*isMin*/, tag);
+                auto&& [constant, inclusive] = getMinMaxBoundForValue(false /*isMin*/, tag, val);
                 if (constant) {
                     maybeComposePath(result,
                                      make<PathCompare>(inclusive ? Operations::Lte : Operations::Lt,
