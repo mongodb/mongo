@@ -6,7 +6,7 @@
 	],
 	"settings": {
 		"clangd.arguments": [
-			"--query-driver=/opt/mongodbtoolchain/v4/bin/clang++",
+			"--query-driver=/opt/mongodbtoolchain/v4/bin/*",
 			"--header-insertion=never",
 			"-j=4"
 		],
