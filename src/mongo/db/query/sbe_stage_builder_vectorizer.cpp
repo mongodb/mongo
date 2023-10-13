@@ -411,7 +411,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
         if (TypeSignature::kBlockType.isSubset(argument.typeSignature)) {
             return {makeABTFunction("valueBlockExists"_sd, std::move(*argument.expr)),
                     TypeSignature::kBlockType.include(TypeSignature::kBooleanType),
-                    {}};
+                    argument.sourceCell};
         }
     }
 
