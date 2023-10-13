@@ -273,10 +273,10 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
                                         BucketPrepareAction prepare) {
     auto it = stripe.openBucketsById.find(bucketId);
     if (it != stripe.openBucketsById.end()) {
-        StateChangeSuccessful stateChangeResult = (prepare == BucketPrepareAction::kPrepare)
+        StateChangeSucessful stateChangeResult = (prepare == BucketPrepareAction::kPrepare)
             ? prepareBucketState(registry, it->second.get()->bucketId, it->second.get())
             : unprepareBucketState(registry, it->second.get()->bucketId, it->second.get());
-        if (stateChangeResult == StateChangeSuccessful::kYes) {
+        if (stateChangeResult == StateChangeSucessful::kYes) {
             return it->second.get();
         }
     }
@@ -480,15 +480,15 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
 
-    // The namespace is stored two times: the bucket itself and openBucketsByKey. The bucket
-    // consists of minmax and schema data so add their memory usage. Since the metadata is stored in
-    // the bucket, we need to add that as well. A unique pointer to the bucket is stored once:
-    // openBucketsById. A raw pointer to the bucket is stored at most twice: openBucketsByKey,
-    // idleBuckets.
-
-    bucket->memoryUsage += (key.ns.size() * 2) + bucket->minmax.calculateMemUsage() +
-        bucket->schema.calculateMemUsage() + key.metadata.toBSON().objsize() + sizeof(Bucket) +
-        sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
+    // The namespace is stored two times: the bucket itself and openBucketsByKey. We don't have a
+    // great approximation for the _schema or _minmax data structure size, so we use the control
+    // field size as an approximation for _minmax, and half that size for _schema. Since the
+    // metadata is stored in the bucket, we need to add that as well. A unique pointer to the bucket
+    // is stored once: openBucketsById. A raw pointer to the bucket is stored at most twice:
+    // openBucketsByKey, idleBuckets.
+    bucket->memoryUsage += (key.ns.size() * 2) + 1.5 * controlField.objsize() +
+        key.metadata.toBSON().objsize() + sizeof(Bucket) + sizeof(std::unique_ptr<Bucket>) +
+        (sizeof(Bucket*) * 2);
 
     return {std::move(bucket)};
 }
@@ -518,10 +518,8 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
         auto& archivedSet = setIt->second;
         if (auto bucketIt = archivedSet.find(bucket->minTime);
             bucketIt != archivedSet.end() && bucket->bucketId == bucketIt->second.bucketId) {
-            long long memory = marginalMemoryUsageForArchivedBucket(
-                bucketIt->second,
-                (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                          : IncludeMemoryOverheadFromMap::kExclude);
+            long long memory =
+                marginalMemoryUsageForArchivedBucket(bucketIt->second, archivedSet.size() == 1);
             if (archivedSet.size() == 1) {
                 stripe.archivedBuckets.erase(setIt);
             } else {
@@ -923,24 +921,14 @@ void removeBucket(
     // we can remove the state from the catalog altogether.
     switch (mode) {
         case RemovalMode::kClose: {
+            // Ensure that we are in a state of pending compression (represented by a negative
+            // direct write counter).
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                // When removing a closed bucket, the BucketStateRegistry may contain state for this
-                // bucket due to an untracked ongoing direct write (such as TTL delete).
-                if (state.has_value()) {
-                    invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()),
-                              bucketStateToString(*state));
-                    invariant(stdx::get<DirectWriteCounter>(state.value()) < 0,
-                              bucketStateToString(*state));
-                }
-            } else {
-                // Ensure that we are in a state of pending compression (represented by a negative
-                // direct write counter).
-                invariant(state.has_value());
-                invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
-                invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
-            }
+            // Ensure that we are in a state of pending compression (represented by a negative
+            // direct write counter).
+            invariant(state.has_value());
+            invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
+            invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
             break;
         }
         case RemovalMode::kAbort:
@@ -966,10 +954,8 @@ void archiveBucket(BucketCatalog& catalog,
     if (it == archivedSet.end()) {
         auto [it, inserted] =
             archivedSet.emplace(bucket.minTime, ArchivedBucket{bucket.bucketId, bucket.timeField});
-        long long memory = marginalMemoryUsageForArchivedBucket(
-            it->second,
-            (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                      : IncludeMemoryOverheadFromMap::kExclude);
+        long long memory =
+            marginalMemoryUsageForArchivedBucket(it->second, archivedSet.size() == 1);
         catalog.memoryUsage.fetchAndAdd(memory);
         archived = true;
     }
@@ -1022,10 +1008,8 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                 // finishes.
                 stopTrackingBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
             }
-            long long memory = marginalMemoryUsageForArchivedBucket(
-                candidateBucket,
-                (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                          : IncludeMemoryOverheadFromMap::kExclude);
+            long long memory =
+                marginalMemoryUsageForArchivedBucket(candidateBucket, archivedSet.size() == 1);
             if (archivedSet.size() == 1) {
                 stripe.archivedBuckets.erase(setIt);
             } else {
@@ -1159,13 +1143,16 @@ void expireIdleBuckets(BucketCatalog& catalog,
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
     int32_t numExpired = 0;
 
+    const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+        serverGlobalParams.featureCompatibility);
+
     while (!stripe.idleBuckets.empty() &&
            catalog.memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe.idleBuckets.back();
 
         auto state = getBucketState(catalog.bucketStateRegistry, bucket);
-        if (state && !conflictsWithInsertions(state.value())) {
+        if (canArchive && state && !conflictsWithInsertions(state.value())) {
             // Can archive a bucket if it's still eligible for insertions.
             archiveBucket(catalog, stripe, stripeLock, *bucket, closedBuckets);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
@@ -1180,7 +1167,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
         ++numExpired;
     }
 
-    while (!stripe.archivedBuckets.empty() &&
+    while (canArchive && !stripe.archivedBuckets.empty() &&
            catalog.memoryUsage.load() > getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
 
@@ -1189,10 +1176,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
 
         auto& [timestamp, bucket] = *archivedSet.begin();
         closeArchivedBucket(catalog.bucketStateRegistry, bucket, closedBuckets);
-        long long memory = marginalMemoryUsageForArchivedBucket(
-            bucket,
-            (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                      : IncludeMemoryOverheadFromMap::kExclude);
+        long long memory = marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
         if (archivedSet.size() == 1) {
             // If this is the only entry, erase the whole map so we don't leave it empty.
             stripe.archivedBuckets.erase(stripe.archivedBuckets.begin());
@@ -1444,20 +1428,6 @@ std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
     return kEmptyStats;
 }
 
-std::pair<NamespaceString, std::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
-    BucketCatalog& sideBucketCatalog) {
-    stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
-    invariant(sideBucketCatalog.executionStats.size() == 1);
-    return *sideBucketCatalog.executionStats.begin();
-}
-
-void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        std::shared_ptr<ExecutionStats> collStats,
-                                        const NamespaceString& viewNs) {
-    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, viewNs);
-    addCollectionExecutionStats(stats, *collStats);
-}
-
 Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid) {
     return {ErrorCodes::TimeseriesBucketCleared,
             str::stream() << "Time-series bucket " << oid << " for namespace "
@@ -1469,15 +1439,6 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      ClosedBuckets& closedBuckets) {
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-
-        removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
-        return;
-    }
-
     bool error = false;
     try {
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
@@ -1496,15 +1457,6 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      boost::optional<ClosedBucket>& closedBucket) {
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-
-        removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
-        return;
-    }
-
     bool error = false;
     try {
         closedBucket = boost::in_place(&catalog.bucketStateRegistry,
@@ -1522,13 +1474,6 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketStateRegistry& registry,
                          ArchivedBucket& bucket,
                          ClosedBuckets& closedBuckets) {
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(registry, bucket.bucketId);
-        return;
-    }
-
     try {
         closedBuckets.emplace_back(&registry, bucket.bucketId, bucket.timeField, boost::none);
     } catch (...) {

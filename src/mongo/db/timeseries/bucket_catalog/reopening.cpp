@@ -100,15 +100,14 @@ void ReopeningContext::clear(WithLock) {
 ArchivedBucket::ArchivedBucket(const BucketId& b, const std::string& t)
     : bucketId{b}, timeField{t} {}
 
-long long marginalMemoryUsageForArchivedBucket(
-    const ArchivedBucket& bucket, IncludeMemoryOverheadFromMap includeMemoryOverheadFromMap) {
+long long marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
+                                               bool onlyEntryForMatchingMetaHash) {
     return sizeof(Date_t) +        // key in set of archived buckets for meta hash
         sizeof(ArchivedBucket) +   // main data for archived bucket
         bucket.timeField.size() +  // allocated space for timeField string, ignoring SSO
-        (includeMemoryOverheadFromMap == IncludeMemoryOverheadFromMap::kInclude
-             ? sizeof(std::size_t) +                                    // key in set (meta hash)
+        (onlyEntryForMatchingMetaHash ? sizeof(std::size_t) +           // key in set (meta hash)
                  sizeof(decltype(Stripe::archivedBuckets)::value_type)  // set container
-             : 0);
+                                      : 0);
 }
 
 ReopeningRequest::ReopeningRequest(ExecutionStatsController&& s) : stats{std::move(s)} {}
