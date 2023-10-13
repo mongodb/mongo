@@ -430,7 +430,11 @@ void updateCollectionMetadataInTransaction(OperationContext* opCtx,
                     write_ops::UpdateOpEntry updateEntry;
                     updateEntry.setMulti(false);
                     updateEntry.setUpsert(true);
-                    updateEntry.setQ(BSON(CollectionType::kUuidFieldName << coll.getUuid()));
+                    updateEntry.setQ(
+                        BSON(CollectionType::kNssFieldName
+                             << NamespaceStringUtil::serialize(coll.getNss(),
+                                                               SerializationContext::stateDefault())
+                             << CollectionType::kUuidFieldName << coll.getUuid()));
                     updateEntry.setU(mongo::write_ops::UpdateModification(
                         coll.toBSON(), write_ops::UpdateModification::ReplacementTag{}));
                     return updateEntry;
