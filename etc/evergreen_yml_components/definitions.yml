@@ -2720,6 +2720,7 @@ tasks:
 ## compile - build bazel targets ##
 ## The bazel migration is in progress & this
 ## task ensures we can build with bazel.
+# TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
 - name: compile_bazel_dist_test
   tags: []
   depends_on:
@@ -2753,6 +2754,7 @@ tasks:
 
 # Validates that the bazel mongo toolchain can be used to compile targets that
 # contain C and asssembly source code files.
+# TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
 - name: compile_bazel_c_and_asm_targets
   tags: []
   depends_on:
@@ -2765,6 +2767,33 @@ tasks:
     vars:
       targets: src/third_party/unwind:unwind
       compiler: gcc
+
+# Validates that the scons setting --use-libunwind is propagated to bazel's invocation (via --//bazel/config:use_libunwind)
+# and that the bazel compilation correctly injects the libunwind dependency into other targets.
+# TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
+- name: compile_bazel_libunwind
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
+  - func: "fetch bazel"
+  - func: "scons compile"
+    vars:
+      targets: >-
+        build/fast/mongo/db/commands/libfsync_locked.a
+      task_compile_flags: >-
+        BAZEL_BUILD_ENABLED=1
+        --build-profile=fast
+        --ninja=disabled
+        --link-model=static
+        --use-libunwind=on
+        -j 200
+        --modules=
+  - func: "verify build output present"
+    vars:
+      output: build/fast/third_party/unwind/libunwind.a
 
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test_half
@@ -9124,6 +9153,11 @@ task_groups:
   name: compile_bazel_c_and_asm_targets_TG
   tasks:
   - compile_bazel_c_and_asm_targets
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_libunwind_TG
+  tasks:
+  - compile_bazel_libunwind
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

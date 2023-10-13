@@ -31,11 +31,26 @@ def mongo_cc_library(
       linkstatic: Whether or not linkstatic should be passed to the native bazel cc_library rule.
       local_defines: macro definitions passed to all source and header files.
     """
+
+    global_deps = []
+    global_defines = []
+
+    # Avoid injecting into unwind/libunwind_asm to avoid a circular dependency.
+    if name not in ["unwind", "libunwind_asm"]:
+      global_deps = select({
+          "//bazel/config:use_libunwind_enabled": ["//src/third_party/unwind:unwind"],
+          "//conditions:default": [],
+      })
+      global_defines = select({
+        "//bazel/config:use_libunwind_enabled": ["MONGO_CONFIG_USE_LIBUNWIND"],
+        "//conditions:default": [],
+      })
+
     native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        deps = deps,
+        deps = deps + global_deps,
         copts = MONGO_DEFAULT_COPTS + copts,
         visibility = visibility,
         testonly = testonly,
@@ -43,6 +58,6 @@ def mongo_cc_library(
         data = data,
         tags = tags,
         linkstatic = linkstatic,
-        local_defines = local_defines,
+        local_defines = local_defines + global_defines,
         includes = []
     )

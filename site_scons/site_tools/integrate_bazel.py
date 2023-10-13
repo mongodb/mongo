@@ -152,8 +152,13 @@ def generate(env):
         static_link = env.GetOption("link-model") in ["auto", "static"]
         if not env.ToolchainIs('gcc', 'clang'):
             raise Exception(f"Toolchain {env.ToolchainName()} is neither `gcc` nor `clang`")
+
+        compiler_args = [f"--//bazel/config:compiler_type={env.ToolchainName()}"]
+        if env.GetOption("use-libunwind") == "on":
+            compiler_args += ["--//bazel/config:use_libunwind"]
+
         global BAZEL_RUNNER
-        BAZEL_RUNNER.set_compile_args([f"--//bazel/config:compiler_type={env.ToolchainName()}"])
+        BAZEL_RUNNER.set_compile_args(compiler_args)
         BAZEL_RUNNER.set_link_args(
             ["--dynamic_mode=off"] if static_link else ["--dynamic_mode=fully"])
 

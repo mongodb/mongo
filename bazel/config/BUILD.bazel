@@ -1,6 +1,10 @@
-load("//bazel/config:configs.bzl", "compiler_type")
+load("//bazel/config:configs.bzl", "compiler_type", "use_libunwind")
 
 package(default_visibility = ["//visibility:public"])
+
+# --------------------------------------
+# Compiler types
+# --------------------------------------
 
 compiler_type(
     name = "compiler_type",
@@ -20,6 +24,11 @@ config_setting(
         "//bazel/config:compiler_type": "gcc",
     },
 )
+
+
+# --------------------------------------
+# Architecture + OS combinations
+# --------------------------------------
 
 config_setting(
     name = "linux_aarch64",
@@ -61,6 +70,10 @@ config_setting(
     ],
 )
 
+# --------------------------------------
+# Compilation modes
+# --------------------------------------
+
 config_setting(
     name = "opt",
     values = {"compilation_mode": "opt"},
@@ -85,4 +98,20 @@ config_setting(
     constraint_values = [
         "@platforms//os:windows",
     ],
+)
+
+# --------------------------------------
+# Libunwind options
+# --------------------------------------
+
+use_libunwind(
+    name = "use_libunwind",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_libunwind_enabled",
+    flag_values = {
+        "//bazel/config:use_libunwind": "True",
+    },
 )

@@ -228,6 +228,7 @@ buildvariants:
   tasks:
     - name: compile_bazel_dist_test_TG
     - name: compile_bazel_c_and_asm_targets_TG
+    - name: compile_bazel_libunwind_TG
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile

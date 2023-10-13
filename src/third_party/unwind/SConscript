@@ -168,7 +168,7 @@ env.Append(CPPDEFINES=[
 
 unwind_sources = unwind_common_sources + unwind_platform_sources
 
-env.Library(
+env.BazelLibrary(
     target='unwind',
     source=env.File(unwind_sources, unwind_src_dir),
 )
