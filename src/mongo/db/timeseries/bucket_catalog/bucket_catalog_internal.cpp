@@ -29,63 +29,16 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 
-#include <algorithm>
-#include <climits>
-#include <limits>
-#include <list>
-#include <map>
-#include <set>
-#include <string>
-#include <tuple>
-#include <type_traits>
+#include <boost/utility/in_place_factory.hpp>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/container/small_vector.hpp>
-#include <boost/container/vector.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bsoncolumn.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/operation_id.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/storage/kv/kv_engine.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
-#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
-#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
-#include "mongo/db/timeseries/timeseries_global_options.h"
-#include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/platform/random.h"
-#include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/variant.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future.h"
-#include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog::internal {
 namespace {
@@ -925,8 +878,6 @@ void removeBucket(
             // Ensure that we are in a state of pending compression (represented by a negative
             // direct write counter).
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            // Ensure that we are in a state of pending compression (represented by a negative
-            // direct write counter).
             invariant(state.has_value());
             invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
             invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
@@ -955,6 +906,7 @@ void archiveBucket(BucketCatalog& catalog,
     if (it == archivedSet.end()) {
         auto [it, inserted] =
             archivedSet.emplace(bucket.minTime, ArchivedBucket{bucket.bucketId, bucket.timeField});
+
         long long memory =
             marginalMemoryUsageForArchivedBucket(it->second, archivedSet.size() == 1);
         catalog.memoryUsage.fetchAndAdd(memory);
@@ -1035,7 +987,7 @@ ReopeningContext getReopeningContext(OperationContext* opCtx,
         return {catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
     }
 
-    if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
+    if (!allowQueryBasedReopening) {
         return {catalog, stripe, stripeLock, info.key, catalogEra, {}};
     }
 
@@ -1177,6 +1129,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
 
         auto& [timestamp, bucket] = *archivedSet.begin();
         closeArchivedBucket(catalog.bucketStateRegistry, bucket, closedBuckets);
+
         long long memory = marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
         if (archivedSet.size() == 1) {
             // If this is the only entry, erase the whole map so we don't leave it empty.
@@ -1284,6 +1237,10 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     }
 
     catalog.numberOfActiveBuckets.fetchAndAdd(1);
+    if (info.openedDuetoMetadata) {
+        info.stats.incNumBucketsOpenedDueToMetadata();
+    }
+
     // Make sure we set the control.min time field to match the rounded _id timestamp.
     auto controlDoc = buildControlMinTimestampDoc(info.options.getTimeField(), roundedTime);
     bucket->minmax.update(
@@ -1337,10 +1294,17 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         return {RolloverAction::kSoftClose, RolloverReason::kTimeForward};
     }
     if (info.time < bucketTime) {
+        const bool canArchive = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility);
         if (shouldUpdateStats) {
-            info.stats.incNumBucketsArchivedDueToTimeBackward();
+            if (canArchive) {
+                info.stats.incNumBucketsArchivedDueToTimeBackward();
+            } else {
+                info.stats.incNumBucketsClosedDueToTimeBackward();
+            }
         }
-        return {RolloverAction::kArchive, RolloverReason::kTimeBackward};
+        return {canArchive ? RolloverAction::kArchive : RolloverAction::kSoftClose,
+                RolloverReason::kTimeBackward};
     }
     if (bucket.numMeasurements == static_cast<std::uint64_t>(gTimeseriesBucketMaxCount)) {
         info.stats.incNumBucketsClosedDueToCount();
@@ -1366,7 +1330,9 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
         bucket, doc, info.options.getMetaField(), newFieldNamesToBeInserted, sizeToBeAdded);
     if (bucket.size + sizeToBeAdded > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
-            bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount);
+            bucket.numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount) &&
+            feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                serverGlobalParams.featureCompatibility);
         if (keepBucketOpenForLargeMeasurements) {
             if (bucket.size + sizeToBeAdded > absoluteMaxSize) {
                 if (absoluteMaxSize != largeMeasurementsMaxBucketSize) {
@@ -1431,8 +1397,8 @@ std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
 
 Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid) {
     return {ErrorCodes::TimeseriesBucketCleared,
-            str::stream() << "Time-series bucket " << oid << " for namespace "
-                          << ns.toStringForErrorMsg() << " was cleared"};
+            str::stream() << "Time-series bucket " << oid << " for namespace " << ns
+                          << " was cleared"};
 }
 
 void closeOpenBucket(BucketCatalog& catalog,
