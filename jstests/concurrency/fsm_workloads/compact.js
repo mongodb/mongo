@@ -9,7 +9,13 @@
  * with wiredTiger LSM variants. Bypass this command for the wiredTiger LSM variant
  * until a fix is available for WT-2523.
  *
- * @tags: [does_not_support_wiredtiger_lsm, incompatible_with_macos, requires_compact]
+ * @tags: [
+ *  does_not_support_wiredtiger_lsm,
+ *  incompatible_with_macos,
+ *  requires_compact,
+ *  # The config fuzzer may try to stress wiredtiger which can cause this test to timeout.
+ *  does_not_support_config_fuzzer,
+ * ]
  */
 
 import {
