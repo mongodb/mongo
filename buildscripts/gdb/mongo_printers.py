@@ -275,29 +275,35 @@ class RecordIdPrinter(object):
         """Display hint."""
         return 'string'
 
+    ## Get the address at given offset of data as the selected pointer type
+    def __get_data_address(self, ptr, offset):
+        ptr_type = gdb.lookup_type(ptr).pointer()
+        return self.val['_data']['_M_elems'][offset].address.cast(ptr_type)
+
     def to_string(self):
         """Return RecordId for printing."""
         rid_format = int(self.val["_format"])
         if rid_format == 0:
             return "null RecordId"
         elif rid_format == 1:
-            long_id = int(self.val['_data']['longId']['id'])
-            return "RecordId long: %d" % (long_id)
+            koffset = 8 - 1  ##  std::alignment_of_v<int64_t> - sizeof(Format); (see record_id.h)
+            rid_address = self.__get_data_address('int64_t', koffset)
+            return "RecordId long: %d" % int(rid_address.dereference())
         elif rid_format == 2:
-            inline_str = self.val['_data']['inlineStr']
-            str_len = int(inline_str['size'])
-            str_array = inline_str['dataArr']
-            # Reading the std::array elements
-            raw_bytes = [int(str_array['_M_elems'][i]) for i in range(0, str_len)]
+            str_len = self.__get_data_address('int8_t', 0).dereference()
+            array_address = self.__get_data_address('int8_t', 1)
+            raw_bytes = [array_address[i] for i in range(0, str_len)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
             return "RecordId small string %d hex bytes: %s" % (str_len, str("".join(hex_bytes)))
         elif rid_format == 3:
-            holder_ptr = self.val['_data']['heapStr']["buffer"]['_buffer']["_holder"]["px"]
-            holder = holder_ptr.dereference()
+            koffset = 8 - 1  ## std::alignment_of_v<ConstSharedBuffer> - sizeof(Format); (see record_id.h)
+            buffer = self.__get_data_address('mongo::ConstSharedBuffer', koffset).dereference()
+            holder_ptr = holder = buffer['_buffer']["_holder"]["px"]
+            holder = holder.dereference()
             str_len = int(holder["_capacity"])
             # Start of data is immediately after pointer for holder
             start_ptr = (holder_ptr + 1).dereference().cast(lookup_type("char")).address
-            raw_bytes = [int(start_ptr[i]) for i in range(0, str_len)]
+            raw_bytes = [start_ptr[i] for i in range(0, str_len)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
             return "RecordId big string %d hex bytes @ %s: %s" % (str_len, holder_ptr + 1,
                                                                   str("".join(hex_bytes)))
