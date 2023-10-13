@@ -987,7 +987,7 @@ ReopeningContext getReopeningContext(OperationContext* opCtx,
         return {catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
     }
 
-    if (!allowQueryBasedReopening) {
+    if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
         return {catalog, stripe, stripeLock, info.key, catalogEra, {}};
     }
 
