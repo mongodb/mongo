@@ -141,7 +141,9 @@ int32_t getCacheDerivedBucketMaxSize(StorageEngine* storageEngine, uint32_t work
     uint64_t storageCacheSize =
         static_cast<uint64_t>(storageEngine->getEngine()->getCacheSizeMB() * 1024 * 1024);
 
-    if (storageCacheSize == 0 || workloadCardinality == 0) {
+    if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        storageCacheSize == 0 || workloadCardinality == 0) {
         return INT_MAX;
     }
 
@@ -201,11 +203,11 @@ boost::optional<InsertWaiter> checkForWait(const Stripe& stripe,
 }
 }  // namespace
 
-StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes) {
+StripeNumber getStripeNumber(const BucketKey& key) {
     if (MONGO_unlikely(alwaysUseSameBucketCatalogStripe.shouldFail())) {
         return 0;
     }
-    return key.hash % numberOfStripes;
+    return key.hash % BucketCatalog::kNumberOfStripes;
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
@@ -386,6 +388,8 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     const BucketToReopen& bucketToReopen,
     const uint64_t catalogEra,
     const BucketKey* expectedKey) {
+    invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+        serverGlobalParams.featureCompatibility));
     const auto& [bucketDoc, validator] = bucketToReopen;
     if (catalogEra < getCurrentEra(registry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
@@ -656,9 +660,6 @@ stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     bucket.numMeasurements++;
     bucket.size += sizeToBeAdded;
     if (isNewlyOpenedBucket) {
-        if (info.openedDuetoMetadata) {
-            batch->openedDueToMetadata = true;
-        }
         // The namespace is stored two times: the bucket itself and openBucketsByKey.
         // We don't have a great approximation for the
         // _schema size, so we use initial document size minus metadata as an approximation. Since
@@ -705,7 +706,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto stripeNumber = getStripeNumber(key, catalog.numberOfStripes);
+    auto stripeNumber = getStripeNumber(key);
 
     // Save the catalog era value from before we make any further checks. This guarantees that we
     // don't miss a direct write that happens sometime in between our decision to potentially reopen

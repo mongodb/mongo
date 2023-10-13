@@ -31,30 +31,11 @@
 
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <list>
-#include <map>
-#include <memory>
 #include <queue>
-#include <set>
-#include <variant>
-#include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/oid.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
@@ -69,13 +50,9 @@
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -170,9 +147,7 @@ public:
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
 
-    BucketCatalog() : stripes(numberOfStripes) {}
-    BucketCatalog(size_t numberOfStripes)
-        : numberOfStripes(numberOfStripes), stripes(numberOfStripes){};
+    BucketCatalog() = default;
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;
 
@@ -277,8 +252,6 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
  * must have been previously prepared.
  *
  * Returns bucket information of a bucket if one was closed.
- *
- * Debug builds will attempt to verify the resulting bucket contents on disk if passed an 'opCtx'.
  */
 boost::optional<ClosedBucket> finish(OperationContext* opCtx,
                                      BucketCatalog& catalog,
@@ -324,7 +297,7 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns);
  * Clears the buckets for the given database by removing the bucket from the catalog asynchronously
  * through the BucketStateRegistry.
  */
-void clear(BucketCatalog& catalog, const DatabaseName& dbName);
+void clear(BucketCatalog& catalog, StringData dbName);
 
 /**
  * Resets the counter used for bucket OID generation. Should be called after a bucket _id collision.
