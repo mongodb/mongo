@@ -122,8 +122,7 @@ def generate(env):
 
         # Invoke the build (note that we only specify static library target; the build action
         # will build both static and dynamic as a result):
-        return env._BazelBuild(target=f"{scons_outfile_base}.a",
-                               source=[])  # `source` is required, even though it is empty
+        return env._BazelBuild(target=f"{scons_outfile_base}.a", source=source, *args, **kwargs)
 
     if env.get("BAZEL_BUILD_ENABLED"):
         # === Architecture ===
