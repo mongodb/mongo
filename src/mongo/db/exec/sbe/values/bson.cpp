@@ -349,13 +349,9 @@ void appendValueToBsonArr(ArrayBuilder& builder, value::TypeTags tag, value::Val
         case value::TypeTags::bsonSymbol:
             builder.append(BSONSymbol{value::getStringOrSymbolView(tag, val)});
             break;
-        case value::TypeTags::Array: {
-            ArrayBuilder subarrBuilder(builder.subarrayStart());
-            convertToBsonArr(subarrBuilder, value::ArrayEnumerator{tag, val});
-            subarrBuilder.doneFast();
-            break;
-        }
-        case value::TypeTags::ArraySet: {
+        case value::TypeTags::Array:
+        case value::TypeTags::ArraySet:
+        case value::TypeTags::ArrayMultiSet: {
             ArrayBuilder subarrBuilder(builder.subarrayStart());
             convertToBsonArr(subarrBuilder, value::ArrayEnumerator{tag, val});
             subarrBuilder.doneFast();
@@ -470,13 +466,9 @@ void appendValueToBsonObj(ObjBuilder& builder,
         case value::TypeTags::bsonSymbol:
             builder.appendSymbol(name, value::getStringOrSymbolView(tag, val));
             break;
-        case value::TypeTags::Array: {
-            typename ObjBuilder::ArrayBuilder subarrBuilder(builder.subarrayStart(name));
-            convertToBsonArr(subarrBuilder, value::ArrayEnumerator{tag, val});
-            subarrBuilder.doneFast();
-            break;
-        }
-        case value::TypeTags::ArraySet: {
+        case value::TypeTags::Array:
+        case value::TypeTags::ArraySet:
+        case value::TypeTags::ArrayMultiSet: {
             typename ObjBuilder::ArrayBuilder subarrBuilder(builder.subarrayStart(name));
             convertToBsonArr(subarrBuilder, value::ArrayEnumerator{tag, val});
             subarrBuilder.doneFast();

@@ -8451,6 +8451,131 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstLastNFin
     }
 }
 
+std::tuple<value::Array*, value::ArrayMultiSet*, int32_t> addToSetState(value::TypeTags stateTag,
+                                                                        value::Value stateVal) {
+    tassert(8124900, "state should be of type Array", stateTag == value::TypeTags::Array);
+    auto stateArr = value::getArrayView(stateVal);
+    tassert(8124901,
+            str::stream() << "state array should have "
+                          << static_cast<size_t>(AggArrayWithSize::kLast) << " elements",
+            stateArr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+
+    // Read the accumulator from the state.
+    auto [accMultiSetTag, accMultiSetVal] =
+        stateArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(8124902,
+            "accumulator should be of type MultiSet",
+            accMultiSetTag == value::TypeTags::ArrayMultiSet);
+    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
+
+    auto [accMultiSetSizeTag, accMultiSetSizeVal] =
+        stateArr->getAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues));
+    tassert(8124903,
+            "accumulator size be of type NumberInt32",
+            accMultiSetSizeTag == value::TypeTags::NumberInt32);
+
+    return {stateArr, accMultiSet, value::bitcastTo<int32_t>(accMultiSetSizeVal)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> aggRemovableAddToSetInitImpl(
+    CollatorInterface* collator) {
+    auto [stateTag, stateVal] = value::makeNewArray();
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto stateArr = value::getArrayView(stateVal);
+
+    auto [mSetTag, mSetVal] = value::makeNewArrayMultiSet(collator);
+
+    // the order is important!!!
+    stateArr->push_back(mSetTag, mSetVal);  // the multiset with the values
+    stateArr->push_back(value::TypeTags::NumberInt32,
+                        value::bitcastFrom<int32_t>(0));  // the size in bytes of the multiset
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetInit(
+    ArityType arity) {
+    return aggRemovableAddToSetInitImpl(nullptr /* collator */);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetCollInit(
+    ArityType arity) {
+    auto [collatorOwned, collatorTag, collatorVal] = getFromStack(0);
+    tassert(8124904, "expected value of type 'collator'", collatorTag == value::TypeTags::collator);
+
+    return aggRemovableAddToSetInitImpl(value::getCollatorView(collatorVal));
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [newElTag, newElVal] = moveOwnedFromStack(1);
+    value::ValueGuard newElGuard{newElTag, newElVal};
+    auto [sizeCapOwned, sizeCapTag, sizeCapVal] = getFromStack(2);
+    tassert(8124905,
+            "The size cap must be of type NumberInt32",
+            sizeCapTag == value::TypeTags::NumberInt32);
+    auto capSize = value::bitcastTo<int32_t>(sizeCapVal);
+
+    auto [stateArr, accMultiSet, accMultiSetSize] = addToSetState(stateTag, stateVal);
+
+    // Check the size of the accumulator will not exceed the cap.
+    int32_t newElSize = value::getApproximateSize(newElTag, newElVal);
+    if (accMultiSetSize + newElSize >= capSize) {
+        auto elsNum = accMultiSet->size();
+        auto setTotalSize = accMultiSetSize;
+        uasserted(ErrorCodes::ExceededMemoryLimit,
+                  str::stream() << "Used too much memory for a single set. Memory limit: "
+                                << capSize << " bytes. The set contains " << elsNum
+                                << " elements and is of size " << setTotalSize
+                                << " bytes. The element being added has size " << newElSize
+                                << " bytes.");
+    }
+
+    // Update the state.
+    stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(accMultiSetSize + newElSize));
+
+    accMultiSet->push_back(newElTag, newElVal);
+    newElGuard.reset();
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [elTag, elVal] = moveOwnedFromStack(1);
+    value::ValueGuard elGuard{elTag, elVal};
+
+    auto [stateArr, accMultiSet, accMultiSetSize] = addToSetState(stateTag, stateVal);
+
+    int32_t elSize = value::getApproximateSize(elTag, elVal);
+    invariant(elSize <= accMultiSetSize);
+    stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(accMultiSetSize - elSize));
+
+    elGuard.reset();
+    accMultiSet->remove(elTag, elVal);
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddToSetFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+
+    auto [stateArr, accMultiSet, _] = addToSetState(stateTag, stateVal);
+
+    // Convert the multiSet to Set.
+    auto [accSetTag, accSetVal] = value::makeCopyArraySetFromArrayMultiSet(*accMultiSet);
+    return {true, accSetTag, accSetVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity,
                                                                          const CodeFragment* code) {
@@ -8840,6 +8965,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggFirstLastNRemove(arity);
         case Builtin::aggRemovableLastNFinalize:
             return builtinAggFirstLastNFinalize<AccumulatorFirstLastN::Sense::kLast>(arity);
+        case Builtin::aggRemovableAddToSetInit:
+            return builtinAggRemovableAddToSetInit(arity);
+        case Builtin::aggRemovableAddToSetCollInit:
+            return builtinAggRemovableAddToSetCollInit(arity);
+        case Builtin::aggRemovableAddToSetAdd:
+            return builtinAggRemovableAddToSetAdd(arity);
+        case Builtin::aggRemovableAddToSetRemove:
+            return builtinAggRemovableAddToSetRemove(arity);
+        case Builtin::aggRemovableAddToSetFinalize:
+            return builtinAggRemovableAddToSetFinalize(arity);
         case Builtin::aggLinearFillCanAdd:
             return builtinAggLinearFillCanAdd(arity);
         case Builtin::aggLinearFillAdd:
@@ -9286,6 +9421,16 @@ std::string builtinToString(Builtin b) {
             return "aggLinearFillAdd";
         case Builtin::aggLinearFillFinalize:
             return "aggLinearFillFinalize";
+        case Builtin::aggRemovableAddToSetInit:
+            return "aggRemovableAddToSetInit";
+        case Builtin::aggRemovableAddToSetCollInit:
+            return "aggRemovableAddToSetCollInit";
+        case Builtin::aggRemovableAddToSetAdd:
+            return "aggRemovableAddToSetAdd";
+        case Builtin::aggRemovableAddToSetRemove:
+            return "aggRemovableAddToSetRemove";
+        case Builtin::aggRemovableAddToSetFinalize:
+            return "aggRemovableAddToSetFinalize";
         case Builtin::valueBlockExists:
             return "valueBlockExists";
         case Builtin::valueBlockFillEmpty:
