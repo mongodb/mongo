@@ -293,6 +293,8 @@ buildvariants:
     test_flags: >-
       --mongosSetParameters="{featureFlagGRPC: true}"
       --mongodSetParameters="{featureFlagGRPC: true}"
+      --excludeWithAnyTags=requires_external_data_source
+
   tasks:
     - name: compile_ninja_quick_TG
     - name: compile_test_parallel_unittest_stream_TG

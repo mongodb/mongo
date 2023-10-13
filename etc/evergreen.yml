@@ -2343,6 +2343,7 @@ buildvariants:
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
       --mongodSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
+      --excludeWithAnyTags=requires_external_data_source
     large_distro_name: rhel80-build
     compile_variant: *enterprise-rhel80-fixed-service-executor-64-bit
   tasks:

@@ -177,39 +177,50 @@ assert.throwsWithCode(() => {
 // functions, separately from $_externalDataSources to help narrow down the source of any failures.
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 let objsPerPipe = 25;
-_writeTestPipe(pipeName1, objsPerPipe);
-_writeTestPipe(pipeName2, objsPerPipe);
-let result = _readTestPipes(pipeName1, pipeName2);
-assert.eq((2 * objsPerPipe),
-          bsonObjToArray(result)[0],  // "objects" first field contains the count of objects read
-          "_readTestPipes read wrong number of objects: " + bsonObjToArray(result)[0]);
+(function testBasicPipeReadWrite() {
+    jsTestLog("Testing testBasicPipeReadWrite()");
+
+    _writeTestPipe(pipeName1, objsPerPipe);
+    _writeTestPipe(pipeName2, objsPerPipe);
+    let result = _readTestPipes(pipeName1, pipeName2);
+    assert.eq(
+        (2 * objsPerPipe),
+        bsonObjToArray(result)[0],  // "objects" first field contains the count of objects read
+        "_readTestPipes read wrong number of objects: " + bsonObjToArray(result)[0]);
+})();
 
 function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Test that $_externalDataSource can read and aggregate multiple named pipes.
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    objsPerPipe = 100;
-    _writeTestPipe(pipeName1, objsPerPipe, 0, 2048, pipeDir);
-    _writeTestPipe(pipeName2, objsPerPipe, 0, 2048, pipeDir);
-    result = db.coll.aggregate([{$count: "objects"}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [
-                {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
-            ]
-        }]
-    });
-    assert.eq(
-        (2 * objsPerPipe),
-        result._batch[0].objects,  // shell puts agg result in "_batch"[0] field of a wrapper obj
-        "$_externalDataSources read wrong number of objects: " + result._batch[0].objects);
+    (function testCountOverMultiplePipes() {
+        jsTestLog("Testing testCountOverMultiplePipes()");
+
+        objsPerPipe = 100;
+        _writeTestPipe(pipeName1, objsPerPipe, 0, 2048, pipeDir);
+        _writeTestPipe(pipeName2, objsPerPipe, 0, 2048, pipeDir);
+        let result = db.coll.aggregate([{$count: "objects"}], {
+            $_externalDataSources: [{
+                collName: "coll",
+                dataSources: [
+                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
+                ]
+            }]
+        });
+        assert.eq(
+            (2 * objsPerPipe),
+            result._batch[0]
+                .objects,  // shell puts agg result in "_batch"[0] field of a wrapper obj
+            "$_externalDataSources read wrong number of objects: " + result._batch[0].objects);
+    })();
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Test correctness by verifying reading from the pipes returns the same objects written to
     // them.
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // The following objects are also in BSON file external_data_source.bson in the same order.
+    const kPipes = 2;  // number of pipes to write
     const kObjsToWrite = [
         {"Zero": "zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero"},
         {"One": "one one one one one one one one one one one one one one one one one one one one"},
@@ -220,55 +231,63 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
         {"Six": "six six six six six six six six six six six six six six six six six six six six"}
     ];
     const kNumObjs = kObjsToWrite.length;  // number of different objects for round-robin
-    const kPipes = 2;                      // number of pipes to write
-    _writeTestPipeObjects(pipeName1, objsPerPipe, kObjsToWrite, pipeDir);
-    _writeTestPipeObjects(pipeName2, objsPerPipe, kObjsToWrite, pipeDir);
-    let cursor = db.coll.aggregate([], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [
-                {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
-            ]
-        }]
-    });
-    // Verify the objects read from the pipes match what was written to them.
-    for (let pipe = 0; pipe < kPipes; ++pipe) {
-        for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
-            assert.eq(cursor.next(),
-                      kObjsToWrite[objIdx % kNumObjs],
-                      "Object read from pipe does not match expected.");
+    (function testRoundtripOverMultiplePipes() {
+        jsTestLog("Testing testRoundtripOverMultiplePipes()");
+
+        _writeTestPipeObjects(pipeName1, objsPerPipe, kObjsToWrite, pipeDir);
+        _writeTestPipeObjects(pipeName2, objsPerPipe, kObjsToWrite, pipeDir);
+        let cursor = db.coll.aggregate([], {
+            $_externalDataSources: [{
+                collName: "coll",
+                dataSources: [
+                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
+                ]
+            }]
+        });
+        // Verify the objects read from the pipes match what was written to them.
+        for (let pipe = 0; pipe < kPipes; ++pipe) {
+            for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
+                assert.eq(cursor.next(),
+                          kObjsToWrite[objIdx % kNumObjs],
+                          "Object read from pipe does not match expected.");
+            }
         }
-    }
+    })();
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Test _writeTestPipeBsonFile() correctness by verifying it writes objects from
     // external_data_source.bson correctly as read back via $_externalDataSources. This is the same
     // as prior test except for using _writeTestPipeBsonFile() instead of _writeTestPipeObjects().
     ////////////////////////////////////////////////////////////////////////////////////////////////
-    _writeTestPipeBsonFile(
-        pipeName1, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
-    _writeTestPipeBsonFile(
-        pipeName2, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
-    cursor = db.coll.aggregate([{$project: {_id: 0}}], {
-        $_externalDataSources: [{
-            collName: "coll",
-            dataSources: [
-                {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
-                {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
-            ]
-        }]
-    });
-    // Verify the objects read from the pipes match what was written to them.
-    for (let pipe = 0; pipe < kPipes; ++pipe) {
-        for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
-            assert.eq(cursor.next(),
-                      kObjsToWrite[objIdx % kNumObjs],
-                      "Object read from pipe does not match expected.");
+    (function testRoundtripOverMultiplePipesUsingBsonFile() {
+        jsTestLog("Testing testRoundtripOverMultiplePipesUsingBsonFile()");
+
+        _writeTestPipeBsonFile(
+            pipeName1, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
+        _writeTestPipeBsonFile(
+            pipeName2, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
+        let cursor = db.coll.aggregate([{$project: {_id: 0}}], {
+            $_externalDataSources: [{
+                collName: "coll",
+                dataSources: [
+                    {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                    {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
+                ]
+            }]
+        });
+        // Verify the objects read from the pipes match what was written to them.
+        for (let pipe = 0; pipe < kPipes; ++pipe) {
+            for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
+                assert.eq(cursor.next(),
+                          kObjsToWrite[objIdx % kNumObjs],
+                          "Object read from pipe does not match expected.");
+            }
         }
-    }
+    })();
 
     // Prepares data for $match / $group / $unionWith / spill test cases.
+    jsTestLog("Preparing data for $match / $group / $unionWith/ spill");
     Random.setRandomSeed();
     const collObjs = [];
     const kNumGroups = 10;
@@ -282,6 +301,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     }
 
     (function testMatchOverExternalDataSource() {
+        jsTestLog("Testing testMatchOverExternalDataSource()");
+
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const kNumFilter = 5;
@@ -323,6 +344,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     }
 
     (function testGroupOverExternalDataSource() {
+        jsTestLog("Testing testGroupOverExternalDataSource()");
+
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
 
         const expectedRes = getCountPerGroupResult(collObjs);
@@ -339,6 +362,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     })();
 
     (function testUnionWithOverExternalDataSource() {
+        jsTestLog("Testing testUnionWithOverExternalDataSource()");
+
         _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
         _writeTestPipeObjects(pipeName2, collObjs.length, collObjs, pipeDir);
 
@@ -371,6 +396,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     })();
 
     (function testSpillingGroupOverExternalDataSource() {
+        jsTestLog("Testing testSpillingGroupOverExternalDataSource()");
+
         // Makes sure that both classic/SBE $group spill data.
         const oldClassicGroupMaxMemory = assert
                                              .commandWorked(db.adminCommand({
@@ -414,6 +441,8 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
     // Verifies that 'killCursors' command works over external data sources while the server keeps
     // reading data from a named pipe. Reading external data sources should be interruptible.
     (function testKillCursorOverExternalDataSource() {
+        jsTestLog("Testing testKillCursorOverExternalDataSource()");
+
         // Prepares a large dataset.
         const largeCollObjs = [];
         const kManyDocs = 250000;
@@ -469,6 +498,8 @@ MongoRunner.stopMongod(conn);
 if (hostInfo.os.type != "Windows") {
     // Verfies that 'externalPipeDir' server parameter works with the same test cases.
     (function testExternalPipeDirWorks() {
+        jsTestLog("Testing testExternalPipeDirWorks()");
+
         const pipeDir = MongoRunner.dataDir + "/tmp/";
         assert(mkdir(pipeDir).created, `Failed to create ${pipeDir}`);
 
@@ -484,6 +515,8 @@ if (hostInfo.os.type != "Windows") {
 
     // Verifies that 'externalPipeDir' with '..' is rejected.
     (function testInvalidExternalPipeDirRejected() {
+        jsTestLog("Testing testInvalidExternalPipeDirRejected()");
+
         const pipeDir = MongoRunner.dataDir + "/tmp/abc/../def/";
         assert(mkdir(pipeDir).created, `Failed to create ${pipeDir}`);
 

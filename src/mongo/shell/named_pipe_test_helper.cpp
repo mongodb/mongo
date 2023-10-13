@@ -217,16 +217,21 @@ void NamedPipeHelper::writeToPipeObjects(std::string pipeDir,
                                          long objects,
                                          std::vector<BSONObj> bsonObjs) noexcept {
     const std::string method = "NamedPipeHelper::writeToPipeObjects";
+    // This is a test-only function. Adding a log message to help debug test failures. Same comment
+    // on other log messages here.
+    LOGV2_INFO(8206001, "The pipe writer thread starts running", "pipe"_attr = pipeRelativePath);
 
     try {
         const int kNumBsonObjs = bsonObjs.size();
         NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath);  // producer
 
         pipeWriter.open();
+        LOGV2_INFO(8206002, "The pipe writer thread: pipe opened", "pipe"_attr = pipeRelativePath);
         for (long i = 0; i < objects; ++i) {
             BSONObj bsonObj{bsonObjs[i % kNumBsonObjs]};
             pipeWriter.write(bsonObj.objdata(), bsonObj.objsize());
         }
+        LOGV2_INFO(8206003, "The pipe writer thread: writing done", "pipe"_attr = pipeRelativePath);
         pipeWriter.close();
     } catch (const DBException& ex) {
         LOGV2_ERROR(
@@ -247,6 +252,8 @@ void NamedPipeHelper::writeToPipeObjectsAsync(std::string pipeDir,
                                               std::string pipeRelativePath,
                                               long objects,
                                               std::vector<BSONObj> bsonObjs) {
+    // This is a test-only function. Adding a log message to help debug test failures.
+    LOGV2_INFO(8206000, "Launching the pipe writer thread", "pipe"_attr = pipeRelativePath);
     stdx::thread thread(writeToPipeObjects,
                         std::move(pipeDir),
                         std::move(pipeRelativePath),
