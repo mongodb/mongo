@@ -29,28 +29,17 @@
 
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/container/vector.hpp>
-#include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <set>
-#include <string>
-#include <vector>
 
-#include <boost/move/utility_core.hpp>
-
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
 WriteBatch::WriteBatch(const BucketHandle& b,
                        const BucketKey& k,
                        OperationId o,
-                       ExecutionStatsController& s,
-                       StringData timeField)
-    : bucketHandle(b), bucketKey(k), opId(o), stats(s), timeField(timeField) {}
+                       ExecutionStatsController& s)
+    : bucketHandle(b), bucketKey(k), opId(o), stats(s) {}
 
 BSONObj WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) {

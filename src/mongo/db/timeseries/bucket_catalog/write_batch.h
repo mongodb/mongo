@@ -30,14 +30,7 @@
 #pragma once
 
 #include <boost/container/small_vector.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <utility>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
@@ -46,8 +39,6 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/future.h"
-#include "mongo/util/future_impl.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -73,8 +64,7 @@ struct WriteBatch {
     WriteBatch(const BucketHandle& bucketHandle,
                const BucketKey& bucketKey,
                OperationId opId,
-               ExecutionStatsController& stats,
-               StringData timeField);
+               ExecutionStatsController& stats);
 
     BSONObj toBSON() const;
 
@@ -82,8 +72,6 @@ struct WriteBatch {
     const BucketKey bucketKey;
     const OperationId opId;
     ExecutionStatsController stats;
-    StringData timeField;  // Necessary so we can compress on writes, since the compression
-                           // algorithm sorts on the timeField. See compressBucket().
 
     // Number of measurements we can hold in a batch without needing to allocate memory.
     static constexpr std::size_t kNumStaticBatchMeasurements = 10;
@@ -95,10 +83,6 @@ struct WriteBatch {
     uint32_t numPreviouslyCommittedMeasurements = 0;
     StringMap<std::size_t> newFieldNamesToBeInserted;   // Value is hash of string key
     boost::optional<DecompressionResult> decompressed;  // If set, bucket is compressed on-disk.
-
-    bool openedDueToMetadata =
-        false;  // If true, bucket has been opened due to the inserted measurement having different
-                // metadata than available buckets.
 
     AtomicWord<bool> commitRights{false};
     SharedPromise<CommitInfo> promise;
