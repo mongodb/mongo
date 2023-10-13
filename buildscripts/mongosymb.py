@@ -10,7 +10,8 @@ is experimental.
 
 Sample usage:
 
-mongosymb.py --symbolizer-path=/path/to/llvm-symbolizer /path/to/executable </file/with/stacktrace
+mongosymb.py --debug-file-resolver=path --symbolizer-path=/path/to/llvm-symbolizer
+/path/to/executable </file/with/stacktrace
 
 You can also pass --output-format=json, to get rich json output. It shows some extra information,
 but emits json instead of plain text.
