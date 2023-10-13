@@ -2664,22 +2664,23 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                     canCombineTimeseriesInsertWithOtherClients(opCtx, request));
 
                 if (swResult.isOK()) {
-                    const auto& insertResult = swResult.getValue();
+                    auto& insertResult = swResult.getValue();
 
                     // If the InsertResult doesn't contain a batch, we failed to insert the
                     // measurement into an open bucket and need to create/reopen a bucket.
-                    if (!insertResult.batch) {
-                        timeseries::bucket_catalog::BucketFindResult bucketFindResult;
+                    if (auto* reopeningContext =
+                            stdx::get_if<timeseries::bucket_catalog::ReopeningContext>(
+                                &insertResult)) {
                         BSONObj suitableBucket;
 
-                        if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
+                        if (auto* bucketId = stdx::get_if<OID>(&reopeningContext->candidate)) {
                             DBDirectClient client{opCtx};
                             hangTimeseriesInsertBeforeReopeningQuery.pauseWhileSet();
                             suitableBucket =
                                 client.findOne(bucketsColl->ns(), BSON("_id" << *bucketId));
-                            bucketFindResult.fetchedBucket = true;
+                            reopeningContext->fetchedBucket = true;
                         } else if (auto* pipeline = stdx::get_if<std::vector<BSONObj>>(
-                                       &insertResult.candidate)) {
+                                       &reopeningContext->candidate)) {
                             // Resort to Query-Based reopening approach.
                             DBDirectClient client{opCtx};
 
@@ -2704,20 +2705,18 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                                 if (cursor->more()) {
                                     suitableBucket = cursor->next();
                                 }
-                                bucketFindResult.queriedBucket = true;
+                                reopeningContext->queriedBucket = true;
                             }
                         }
 
-                        boost::optional<timeseries::bucket_catalog::BucketToReopen> bucketToReopen =
-                            boost::none;
                         if (!suitableBucket.isEmpty()) {
                             auto validator = [&](OperationContext * opCtx,
                                                  const BSONObj& bucketDoc) -> auto {
                                 return bucketsColl->checkValidation(opCtx, bucketDoc);
                             };
-                            auto bucketToReopen = timeseries::bucket_catalog::BucketToReopen{
-                                suitableBucket, validator, insertResult.catalogEra};
-                            bucketFindResult.bucketToReopen = std::move(bucketToReopen);
+                            reopeningContext->bucketToReopen =
+                                timeseries::bucket_catalog::BucketToReopen{suitableBucket,
+                                                                           validator};
                         }
 
                         swResult = timeseries::bucket_catalog::insert(
@@ -2728,11 +2727,20 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                             timeSeriesOptions,
                             measurementDoc,
                             canCombineTimeseriesInsertWithOtherClients(opCtx, request),
-                            std::move(bucketFindResult));
+                            reopeningContext);
+                    } else if (auto* waiter =
+                                   stdx::get_if<timeseries::bucket_catalog::InsertWaiter>(
+                                       &insertResult)) {
+                        // Need to wait for another operation to finish, then retry. This could be
+                        // another reopening request or a previously prepared write batch for the
+                        // same series (metaField value). The easiest way to retry here is to reset
+                        // swResult to a WriteConflict, which will automatically re-run the while
+                        // loop.
+                        timeseries::bucket_catalog::waitToInsert(waiter);
+                        swResult = Status{ErrorCodes::WriteConflict, "waited to retry"};
                     }
                 }
             } else {
-                timeseries::bucket_catalog::BucketFindResult bucketFindResult;
                 swResult = timeseries::bucket_catalog::insert(
                     opCtx,
                     bucketCatalog,
@@ -2740,8 +2748,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                     bucketsColl->getDefaultCollator(),
                     timeSeriesOptions,
                     measurementDoc,
-                    canCombineTimeseriesInsertWithOtherClients(opCtx, request),
-                    bucketFindResult);
+                    canCombineTimeseriesInsertWithOtherClients(opCtx, request));
             }
 
             // If there is an era offset (between the bucket we want to reopen and the

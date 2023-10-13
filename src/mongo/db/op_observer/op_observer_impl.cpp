@@ -1309,7 +1309,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     }
 
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-    clear(bucketCatalog, dbName.db());
+    clear(bucketCatalog, dbName);
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
