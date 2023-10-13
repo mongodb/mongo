@@ -2154,7 +2154,7 @@ buildvariants:
   # - name: .read_write_concern .large # Not passing
   #   distros:
   #   - rhel80-medium
-  # - name: .read_write_concern !.large # Not passing
+  - name: .read_write_concern !.large
   # - name: .replica_sets !.encrypt !.auth # Not passing
   #   distros:
   #   - rhel80-xlarge
@@ -2169,10 +2169,10 @@ buildvariants:
   - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
-  # - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen # Not passing
-  #   distros:
-  #   - rhel80-xlarge
-  # - name: retryable_writes_jscore_passthrough_gen # Not passing
+  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
     - rhel80-medium
@@ -2243,14 +2243,9 @@ buildvariants:
   - name: .read_write_concern .large
     distros:
     - rhel80-medium
-  - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: retryable_writes_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: .sharding .common
