@@ -1544,7 +1544,7 @@ void runPostCommitDebugChecks(OperationContext* opCtx,
         client.findOne(batch.bucketHandle.bucketId.ns.makeTimeseriesBucketsNamespace(),
                        BSON("_id" << batch.bucketHandle.bucketId.oid));
     if (!queriedBucket.isEmpty()) {
-        uint32_t memCount = bucket.numCommittedMeasurements;
+        uint32_t memCount = batch.numPreviouslyCommittedMeasurements + batch.measurements.size();
         uint32_t diskCount = isCompressedBucket(queriedBucket)
             ? static_cast<uint32_t>(queriedBucket.getObjectField(kBucketControlFieldName)
                                         .getIntField(kBucketControlCountFieldName))
