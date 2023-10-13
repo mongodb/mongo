@@ -730,7 +730,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
             }
         }
     }
-
+#ifdef MONGO_CONFIG_GRPC
     if (cs.isGRPC()) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot enable gRPC mode when connecting to a replica set",
@@ -740,11 +740,15 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
                 "Authentication is not currently supported when gRPC mode is enabled",
                 cs.getUser().empty());
     }
+#endif
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
     std::shared_ptr<DBClientBase> conn(
-        cs.connect(appname.value_or("MongoDB Shell"), errmsg, boost::none, &apiParameters));
+        cs.connect(appname.value_or(MongoURI::kDefaultTestRunnerAppName),
+                   errmsg,
+                   boost::none,
+                   &apiParameters));
 
     if (!conn.get()) {
         uasserted(ErrorCodes::InternalError, errmsg);

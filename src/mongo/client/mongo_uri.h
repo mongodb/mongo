@@ -112,6 +112,8 @@ StatusWith<std::string> uriDecode(StringData str);
  */
 class MongoURI {
 public:
+    inline static const std::string kDefaultTestRunnerAppName = "MongoDB Shell";
+
     class CaseInsensitiveString {
     public:
         CaseInsensitiveString(std::string str);
@@ -262,14 +264,12 @@ public:
         _helloOk.emplace(helloOk);
     }
 
-    bool isGRPC() const {
-        // TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
+    // TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
+    bool isGRPC() const {
         return _gRPC.get_value_or(false);
-#else
-        return false;
-#endif
     }
+#endif
 
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to

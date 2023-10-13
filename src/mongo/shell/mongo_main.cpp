@@ -75,6 +75,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/dbclient_session.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_aws_client_options.h"
 #include "mongo/client/sasl_oidc_client_params.h"
@@ -114,6 +115,7 @@
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/password.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/str.h"
@@ -121,6 +123,11 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 #include "mongo/util/version/releases.h"
+
+#ifdef MONGO_CONFIG_GRPC
+#include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/grpc/grpc_transport_layer_impl.h"
+#endif
 
 #ifdef _WIN32
 #include <io.h>
@@ -760,20 +767,15 @@ int mongo_main(int argc, char* argv[]) {
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();
 
+        // Set up the periodic runner for background job execution. This is required to be running
+        // before the transport layer is initialized.
+        auto runner = makePeriodicRunner(serviceContext);
+        serviceContext->setPeriodicRunner(std::move(runner));
+
 #ifdef MONGO_CONFIG_SSL
         OCSPManager::start(serviceContext);
 #endif
         shell_utils::ProgramRegistry::create(serviceContext);
-
-        transport::AsioTransportLayer::Options opts;
-        opts.enableIPv6 = shellGlobalParams.enableIPv6;
-        opts.mode = transport::AsioTransportLayer::Options::kEgress;
-
-        serviceContext->setTransportLayer(
-            std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
-        auto tlPtr = serviceContext->getTransportLayer();
-        uassertStatusOK(tlPtr->setup());
-        uassertStatusOK(tlPtr->start());
 
         // hide password from ps output
         redactPasswordOptions(argc, argv);
@@ -820,6 +822,37 @@ int mongo_main(int argc, char* argv[]) {
 #ifdef MONGO_CONFIG_GRPC
         parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
 #endif
+
+// Configure the correct TL based on URI options.
+#ifdef MONGO_CONFIG_GRPC
+        if (parsedURI.isGRPC() || shellGlobalParams.gRPC) {
+            // Create the client metadata.
+            boost::optional<std::string> appname = parsedURI.getAppName();
+            BSONObjBuilder bob;
+            uassertStatusOK(DBClientSession::appendClientMetadata(
+                appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
+            auto metadataDoc = bob.obj();
+
+            transport::grpc::GRPCTransportLayer::Options grpcOpts;
+            grpcOpts.enableEgress = true;
+            grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
+
+            serviceContext->setTransportLayer(
+                std::make_unique<transport::grpc::GRPCTransportLayerImpl>(serviceContext,
+                                                                          grpcOpts));
+        } else
+#endif
+        {
+            transport::AsioTransportLayer::Options opts;
+            opts.enableIPv6 = shellGlobalParams.enableIPv6;
+            opts.mode = transport::AsioTransportLayer::Options::kEgress;
+            serviceContext->setTransportLayer(
+                std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
+        }
+        auto tlPtr = serviceContext->getTransportLayer();
+        uassertStatusOK(tlPtr->setup());
+        uassertStatusOK(tlPtr->start());
+
 #ifdef MONGO_CONFIG_SSL
         if (!awsIam::saslAwsClientGlobalParams.awsSessionToken.empty()) {
             parsedURI.setOptionIfNecessary("authmechanismproperties"s,

@@ -189,6 +189,7 @@ public:
             // TODO(SERVER-74659): Please revisit if this periodic job could be made killable.
             false /*isKillableByStepdown*/);
         invariant(!_pruner);
+        invariant(svcCtx->getPeriodicRunner() != nullptr);
         _pruner.emplace(svcCtx->getPeriodicRunner()->makeJob(std::move(prunerJob)));
         _pruner->start();
     }

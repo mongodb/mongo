@@ -36,8 +36,9 @@ if (!FeatureFlagUtil.isPresentAndEnabled(mongod.getDB("admin"), "GRPC")) {
 
 const host = `localhost:${mongod.port}`;
 
-testShellConnect(true, `mongodb://${host}`, "--gRPC", "--tls", "--tlsCAFile", tlsCAFile);
-testShellConnect(true, `mongodb://${host}/?gRPC=true`, "--tls", "--tlsCAFile", tlsCAFile);
+// TODO SERVER-80768 Uncomment tests once gRPC ingress path is set up on mongod.
+// testShellConnect(true, `mongodb://${host}`, "--gRPC", "--tls", "--tlsCAFile", tlsCAFile);
+// testShellConnect(true, `mongodb://${host}/?gRPC=true`, "--tls", "--tlsCAFile", tlsCAFile);
 testShellConnect(false,
                  `mongodb://${host}`,
                  "--gRPC",
@@ -48,18 +49,15 @@ testShellConnect(false,
                  "jstests/libs/client.pem",
                  "--tlsCertificateKeyFilePassword",
                  "qwerty");
-// TODO: SERVER-80502 Enable the commented-out tests once the shell actually uses GRPCTransportLayer
-// to connect.
-
-// testShellConnect(false,
-//                  `mongodb://${host}/?gRPC=true`,
-//                  "--tls",
-//                  "--tlsCAFile",
-//                  tlsCAFile,
-//                  "--tlsCertificateKeyFile",
-//                  "jstests/libs/client.pem",
-//                  "--tlsCertificateKeyFilePassword",
-//                  "qwerty");
+testShellConnect(false,
+                 `mongodb://${host}/?gRPC=true`,
+                 "--tls",
+                 "--tlsCAFile",
+                 tlsCAFile,
+                 "--tlsCertificateKeyFile",
+                 "jstests/libs/client.pem",
+                 "--tlsCertificateKeyFilePassword",
+                 "qwerty");
 testShellConnect(false,
                  `mongodb://${host}`,
                  "--gRPC",
@@ -68,13 +66,13 @@ testShellConnect(false,
                  tlsCAFile,
                  "--tlsCRLFile",
                  "jstests/libs/crl.pem");
-// testShellConnect(false,
-//                  `mongodb://${host}/?gRPC=true`,
-//                  "--tls",
-//                  "--tlsCAFile",
-//                  tlsCAFile,
-//                  "--tlsCRLFile",
-//                  "jstests/libs/crl.pem");
+testShellConnect(false,
+                 `mongodb://${host}/?gRPC=true`,
+                 "--tls",
+                 "--tlsCAFile",
+                 tlsCAFile,
+                 "--tlsCRLFile",
+                 "jstests/libs/crl.pem");
 testShellConnect(
     false, `mongodb://${host}`, "--gRPC", "--tls", "--tlsCAFile", tlsCAFile, "--tlsFIPSMode");
 assertConnectFailsWithErrorCode(`mongodb://user:password@${host}/?gRPC=true&tls=true`,

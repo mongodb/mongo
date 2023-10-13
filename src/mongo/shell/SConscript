@@ -110,6 +110,9 @@ def shouldBuildGRPC(myEnv):
     return myEnv.TargetOSIs('linux') and myEnv['ENABLE_GRPC_BUILD']
 
 
+if shouldBuildGRPC(env):
+    env.InjectThirdParty(libraries=['grpc'])
+
 env.Library(
     target='shell_options_register',
     source=[
@@ -332,6 +335,7 @@ if not has_option('noshell') and jsEngine:
             "$BUILD_DIR/mongo/transport/transport_layer",
             "$BUILD_DIR/mongo/util/net/ssl_manager",
             "$BUILD_DIR/mongo/util/pcre_wrapper",
+            "$BUILD_DIR/mongo/util/periodic_runner_factory",
             "$BUILD_DIR/mongo/util/signal_handlers",
             "linenoise",
             "mongo_initializers",

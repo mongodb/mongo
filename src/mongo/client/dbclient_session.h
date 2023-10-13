@@ -236,6 +236,8 @@ public:
         return _uri;
     }
 
+    static Status appendClientMetadata(StringData applicationName, BSONObjBuilder* bob);
+
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override;
 
