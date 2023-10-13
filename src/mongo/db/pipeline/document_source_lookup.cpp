@@ -486,6 +486,9 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
         // This stage will only be on the shards pipeline if $lookup on sharded foreign collections
         // is allowed.
         hostRequirement = HostTypeRequirement::kAnyShard;
+    } else if (_fromNs.isCollectionlessAggregateNS()) {
+        // When the inner pipeline does not target a collection, it can run on any node.
+        hostRequirement = HostTypeRequirement::kRunOnceAnyNode;
     } else {
         // If the pipeline is unsplit or this stage is on the merging part of the pipeline,
         // when $lookup on sharded foreign collections is allowed, the foreign collection is
