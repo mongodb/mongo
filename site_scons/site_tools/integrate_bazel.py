@@ -56,10 +56,14 @@ class BazelRunner:
         if self.executed:
             return
 
+        args = [BAZELISK_PATH, 'build'] + list(self.bazel_targets) + list(self.compile_args) + list(
+            self.link_args)
+        print("Running bazel build command:", *args)
+
         # Build it and copy output.
-        subprocess.run([BAZELISK_PATH, 'build'] + list(self.bazel_targets) + list(self.compile_args)
-                       + list(self.link_args), shell=False, check=True)
+        subprocess.run(args, shell=False, check=True)
         for copy_operation in self.copy_operations:
+            os.makedirs(os.path.dirname(copy_operation.outfile), exist_ok=True)
             shutil.copyfile(copy_operation.infile, copy_operation.outfile)
 
         # Record the fact that it ran:
