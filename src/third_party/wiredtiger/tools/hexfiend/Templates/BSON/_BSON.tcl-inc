@@ -175,7 +175,7 @@ proc bson_document_detailed {{name Document} {val "{...}"}} {
   set size [len]
   ssection -collapsed $name {
     set pos0 [pos]
-    set size [uint32]
+    xentry "(size)" { xd [set size [uint32]] }
     #sectionvalue "$val \[[xd $size]\]"
     sectionvalue $val
     set posNext [set posEnd [endpos $pos0 $size]]
