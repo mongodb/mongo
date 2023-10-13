@@ -55,7 +55,7 @@ void checkQuerySettingsAreValid(const boost::intrusive_ptr<ExpressionContext>& e
                                 const QuerySettings& querySettings,
                                 size_t errorCode) {
     auto representativeQueryInfo =
-        createRepresentativeInfo(representativeQuery, expCtx, boost::none);
+        createRepresentativeInfo(representativeQuery, expCtx->opCtx, boost::none);
     auto config(QueryShapeConfiguration(
         representativeQueryInfo.queryShapeHash, querySettings, representativeQuery));
     ASSERT_THROWS_CODE(utils::validateQuerySettings(config, representativeQueryInfo, boost::none),
@@ -215,8 +215,9 @@ TEST_F(QuerySettingsValidationTestFixture, QuerySettingsCannotUseUuidAsNs) {
     const BSONObj representativeQ = BSON("find" << uuid1Res.getValue() << "$db"
                                                 << "testDB"
                                                 << "filter" << BSON("a" << BSONNULL));
-    ASSERT_THROWS_CODE(
-        createRepresentativeInfo(representativeQ, expCtx, boost::none), DBException, 7746605);
+    ASSERT_THROWS_CODE(createRepresentativeInfo(representativeQ, expCtx->opCtx, boost::none),
+                       DBException,
+                       7746605);
 }
 }  // namespace
 }  // namespace mongo::query_settings

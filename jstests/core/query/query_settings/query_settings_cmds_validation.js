@@ -27,7 +27,7 @@ const nonExistentQueryShapeHash = "0".repeat(64);
         7746402);
     assert.commandFailedWithCode(
         db.adminCommand(
-            {setQuerySettings: qsutils.makeQueryInstance(), settings: {notAValid: "settings"}}),
+            {setQuerySettings: qsutils.makeFindQueryInstance(), settings: {notAValid: "settings"}}),
         40415);
 }
 

@@ -96,10 +96,18 @@ env.Library(
 )
 
 env.Library(
-    target='query_settings_cmds', source=[
+    target='query_settings_cmds',
+    source=[
+        # This document source has been re-located here from 'pipeline' to avoid the
+        # 'pipeline' -> 'query_settings_utils' -> 'pipeline' cyclic dependency.
+        # Generating the Debug Query Shape requires re-parsing the query instance via
+        # `query_settings::utils::createRepresentativeInfo()`, which internally uses
+        # `Pipeline::parse()`.
+        '$BUILD_DIR/mongo/db/pipeline/document_source_query_settings.cpp',
         "query_settings_cmds.idl",
         "query_settings_cmds.cpp",
-    ], LIBDEPS_PRIVATE=[
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/query_settings_utils',

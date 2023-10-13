@@ -18,8 +18,8 @@ assert.commandWorked(db.createCollection(jsTestName()));
 
 const adminDB = db.getSiblingDB("admin");
 
-const queryA = qsutils.makeQueryInstance({a: 1});
-const queryB = qsutils.makeQueryInstance({b: "string"});
+const queryA = qsutils.makeFindQueryInstance({a: 1});
+const queryB = qsutils.makeFindQueryInstance({b: "string"});
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };
@@ -73,7 +73,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 // by passing a different QueryInstance with the same QueryShape.
 {
     assert.commandWorked(db.adminCommand(
-        {setQuerySettings: qsutils.makeQueryInstance({b: "test"}), settings: querySettingsA}));
+        {setQuerySettings: qsutils.makeFindQueryInstance({b: "test"}), settings: querySettingsA}));
     qsutils.assertQueryShapeConfiguration([
         qsutils.makeQueryShapeConfiguration(querySettingsB, queryA),
         qsutils.makeQueryShapeConfiguration(querySettingsA, queryB)
@@ -84,7 +84,7 @@ const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
 // the 'querySettings' cluster parameter by providing a query instance.
 {
     assert.commandWorked(
-        db.adminCommand({removeQuerySettings: qsutils.makeQueryInstance({b: "shape"})}));
+        db.adminCommand({removeQuerySettings: qsutils.makeFindQueryInstance({b: "shape"})}));
     qsutils.assertQueryShapeConfiguration(
         [qsutils.makeQueryShapeConfiguration(querySettingsB, queryA)]);
     qsutils.assertExplainQuerySettings(queryB, undefined);

@@ -30,6 +30,7 @@
 #include "document_source_query_settings.h"
 
 #include "mongo/db/bson/bson_helper.h"
+#include "mongo/db/commands/query_settings_utils.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/document_source_query_settings_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
@@ -44,6 +45,8 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(querySettings,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagQuerySettings);
 
+// TODO SERVER-82128 Re-implement this stage using 'DocumentSourceDeferredQueue' to address the
+// potentially infinite recursion loop.
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceQuerySettings::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(7746801,
@@ -60,15 +63,20 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceQuerySettings::cre
         querySettingsManager.getAllQueryShapeConfigurations(expCtx->opCtx, expCtx->ns.tenantId());
     std::deque<DocumentSource::GetNextResult> queuedElements;
     for (auto&& queryShapeConfig : settingsArray) {
-        queuedElements.emplace_back(Document{queryShapeConfig.toBSON()});
+        BSONObjBuilder bob;
+        queryShapeConfig.serialize(&bob);
+
+        // Append the 'debugQueryShape' query shape representation if the user explicitly requested
+        // so.
+        if (spec.getShowDebugQueryShape()) {
+            auto representativeInfo = query_settings::createRepresentativeInfo(
+                queryShapeConfig.getRepresentativeQuery(), expCtx->opCtx, boost::none);
+            bob.append(kDebugQueryShapeFieldName, representativeInfo.serializedQueryShape);
+        }
+        queuedElements.emplace_back(Document{bob.obj()});
     }
     stages.push_back(make_intrusive<DocumentSourceQueue>(std::move(queuedElements), expCtx));
 
-    // Append $addFields stage which will produce an extra field 'debugQueryShape' with the
-    // DebugQueryShape value of the 'representativeQuery'.
-    if (spec.getShowDebugQueryShape()) {
-        // TODO: SERVER-77790 Implement $_internalDebugQueryShape expression.
-    }
     return stages;
 }
 

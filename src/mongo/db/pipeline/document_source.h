@@ -315,7 +315,7 @@ public:
         // parallel. For example, a partial $group before a subsequent global $group.
         boost::intrusive_ptr<DocumentSource> shardsStage = nullptr;
 
-        // A stage or stages which funciton to merge all the results together, or an empty list if
+        // A stage or stages which function to merge all the results together, or an empty list if
         // nothing is necessary after merging. For example, a $limit stage.
         std::list<boost::intrusive_ptr<DocumentSource>> mergingStages = {};
 

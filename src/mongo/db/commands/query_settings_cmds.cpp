@@ -204,9 +204,8 @@ public:
                     "hash was given.",
                     querySettings.has_value());
 
-            auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
             auto representativeQueryInfo =
-                createRepresentativeInfo(querySettings->second, expCtx, tenantId);
+                createRepresentativeInfo(querySettings->second, opCtx, tenantId);
             return updateQuerySettings(opCtx,
                                        request().getSettings(),
                                        QueryShapeConfiguration(queryShapeHash,
@@ -218,9 +217,7 @@ public:
             OperationContext* opCtx, const QueryInstance& queryInstance) {
             auto& querySettingsManager = QuerySettingsManager::get(opCtx);
             auto tenantId = request().getDbName().tenantId();
-            auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
-            auto representativeQueryInfo =
-                createRepresentativeInfo(queryInstance, expCtx, tenantId);
+            auto representativeQueryInfo = createRepresentativeInfo(queryInstance, opCtx, tenantId);
             auto& queryShapeHash = representativeQueryInfo.queryShapeHash;
 
             // If there is already an entry for a given QueryShapeHash, then perform
@@ -320,10 +317,8 @@ public:
                                     // Converts 'queryInstance' into QueryShapeHash, for convenient
                                     // comparison during search for the matching
                                     // QueryShapeConfiguration.
-                                    auto expCtx =
-                                        make_intrusive<ExpressionContext>(opCtx, nullptr, ns());
                                     auto representativeQueryInfo =
-                                        createRepresentativeInfo(queryInstance, expCtx, tenantId);
+                                        createRepresentativeInfo(queryInstance, opCtx, tenantId);
 
                                     return representativeQueryInfo.queryShapeHash;
                                 },
