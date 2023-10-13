@@ -2,10 +2,16 @@
  * Test the rank based window functions.
  */
 import {assertErrCodeAndErrMsgContains, documentEq} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db[jsTestName()];
-for (let i = 0; i < 12; i++) {
-    coll.insert({_id: i, double: Math.floor(i / 2)});
+const numDoc = 12;
+for (let i = 0; i < numDoc; i++) {
+    const doc = {_id: i, double: Math.floor(i / 2)};
+    if (i < numDoc / 3 || i >= numDoc / 3 * 2) {
+        doc.nullOrMissing = null;
+    }
+    coll.insert(doc);
 }
 
 let origDocs = coll.find().sort({_id: 1});
@@ -116,3 +122,33 @@ verifyResults(result, function(num, baseObj) {
 });
 result = runRankBasedAccumulator({double: 1}, {$documentNumber: {}});
 verifyResults(result, noTieFunc);
+
+// Check results with null or missing fields. Ignore this test on a sharded collection, because
+// null and missing are treated the same during sorting, so the interleaving of null and missing
+// is unknown after merging shard streams. Hence the rank result is also unknown.
+// Ignore this test for replica sets as well, because in secondary read suites, null and missing
+// might be ordered different on disk due to different record id orders.
+if (!FixtureHelpers.isSharded(coll) && !FixtureHelpers.isReplSet(db)) {
+    result = runRankBasedAccumulator({nullOrMissing: 1}, {$rank: {}});
+    verifyResults(result, function(num, baseObj) {
+        if (num < numDoc / 3) {
+            baseObj.rank = 1;
+        } else if (num < numDoc / 3 * 2) {
+            baseObj.rank = numDoc / 3 + 1;
+        } else {
+            baseObj.rank = numDoc / 3 * 2 + 1;
+        }
+        return baseObj;
+    });
+    result = runRankBasedAccumulator({nullOrMissing: 1}, {$denseRank: {}});
+    verifyResults(result, function(num, baseObj) {
+        if (num < numDoc / 3) {
+            baseObj.rank = 1;
+        } else if (num < numDoc / 3 * 2) {
+            baseObj.rank = 2;
+        } else {
+            baseObj.rank = 3;
+        }
+        return baseObj;
+    });
+}

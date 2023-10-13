@@ -6584,8 +6584,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinali
     return {true, arrayTag, arrayVal};
 }
 
-std::tuple<value::Array*, std::pair<value::TypeTags, value::Value>, int64_t, int64_t> rankState(
-    value::TypeTags stateTag, value::Value stateVal) {
+std::tuple<value::Array*, std::pair<value::TypeTags, value::Value>, bool, int64_t, int64_t>
+rankState(value::TypeTags stateTag, value::Value stateVal) {
     uassert(
         7795500, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
     auto state = value::getArrayView(stateVal);
@@ -6595,8 +6595,15 @@ std::tuple<value::Array*, std::pair<value::TypeTags, value::Value>, int64_t, int
             state->size() == AggRankElems::kRankArraySize);
 
     auto lastValue = state->getAt(AggRankElems::kLastValue);
+    auto [lastValueIsNothingTag, lastValueIsNothingVal] =
+        state->getAt(AggRankElems::kLastValueIsNothing);
     auto [lastRankTag, lastRankVal] = state->getAt(AggRankElems::kLastRank);
     auto [sameRankCountTag, sameRankCountVal] = state->getAt(AggRankElems::kSameRankCount);
+
+    uassert(8188900,
+            "Last rank is nothing component should be a boolean",
+            lastValueIsNothingTag == value::TypeTags::Boolean);
+    auto lastValueIsNothing = value::bitcastTo<bool>(lastValueIsNothingVal);
 
     uassert(7795502,
             "Last rank component should be a 64-bit integer",
@@ -6607,7 +6614,7 @@ std::tuple<value::Array*, std::pair<value::TypeTags, value::Value>, int64_t, int
             "Same rank component should be a 64-bit integer",
             sameRankCountTag == value::TypeTags::NumberInt64);
     auto sameRankCount = value::bitcastTo<int64_t>(sameRankCountVal);
-    return {state, lastValue, lastRank, sameRankCount};
+    return {state, lastValue, lastValueIsNothing, lastRank, sameRankCount};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
@@ -6627,15 +6634,29 @@ FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
         if (!valueOwned) {
             std::tie(valueTag, valueVal) = value::copyValue(valueTag, valueVal);
         }
-        newState->push_back(valueTag, valueVal);
-        newState->push_back(value::TypeTags::NumberInt64, 1);
-        newState->push_back(value::TypeTags::NumberInt64, 1);
+        if (valueTag == value::TypeTags::Nothing) {
+            newState->push_back(value::TypeTags::Null, 0);  // kLastValue
+            newState->push_back(value::TypeTags::Boolean,
+                                value::bitcastFrom<bool>(true));  // kLastValueIsNothing
+        } else {
+            newState->push_back(valueTag, valueVal);  // kLastValue
+            newState->push_back(value::TypeTags::Boolean,
+                                value::bitcastFrom<bool>(false));  // kLastValueIsNothing
+        }
+        newState->push_back(value::TypeTags::NumberInt64, 1);  // kLastRank
+        newState->push_back(value::TypeTags::NumberInt64, 1);  // kSameRankCount
         newStateGuard.reset();
         return {true, newStateTag, newStateVal};
     }
 
     value::ValueGuard stateGuard{stateTag, stateVal};
-    auto [state, lastValue, lastRank, sameRankCount] = rankState(stateTag, stateVal);
+    auto [state, lastValue, lastValueIsNothing, lastRank, sameRankCount] =
+        rankState(stateTag, stateVal);
+    // Update the last value to Nothing before comparison if the flag is set.
+    if (lastValueIsNothing) {
+        lastValue.first = value::TypeTags::Nothing;
+        lastValue.second = 0;
+    }
     auto [compareTag, compareVal] =
         value::compareValue(valueTag, valueVal, lastValue.first, lastValue.second, collator);
     if (compareTag == value::TypeTags::NumberInt32 && compareVal == 0) {
@@ -6644,7 +6665,17 @@ FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
         if (!valueOwned) {
             std::tie(valueTag, valueVal) = value::copyValue(valueTag, valueVal);
         }
-        state->setAt(AggRankElems::kLastValue, valueTag, valueVal);
+        if (valueTag == value::TypeTags::Nothing) {
+            state->setAt(AggRankElems::kLastValue, value::TypeTags::Null, 0);
+            state->setAt(AggRankElems::kLastValueIsNothing,
+                         value::TypeTags::Boolean,
+                         value::bitcastFrom<bool>(true));
+        } else {
+            state->setAt(AggRankElems::kLastValue, valueTag, valueVal);
+            state->setAt(AggRankElems::kLastValueIsNothing,
+                         value::TypeTags::Boolean,
+                         value::bitcastFrom<bool>(false));
+        }
         state->setAt(AggRankElems::kLastRank,
                      value::TypeTags::NumberInt64,
                      dense ? lastRank + 1 : lastRank + sameRankCount);
@@ -6702,7 +6733,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRankColl
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankFinalize(ArityType arity) {
     invariant(arity == 1);
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
-    auto [state, lastValue, lastRank, sameRankCount] = rankState(stateTag, stateVal);
+    auto [state, lastValue, lastValueIsNothing, lastRank, sameRankCount] =
+        rankState(stateTag, stateVal);
     return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(lastRank)};
 }
 

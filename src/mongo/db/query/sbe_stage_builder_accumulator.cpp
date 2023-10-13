@@ -1066,10 +1066,9 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorRank(
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     if (collatorSlot) {
-        exprs.push_back(makeFunction(
-            "aggRankColl", makeFillEmptyNull(std::move(arg)), makeVariable(*collatorSlot)));
+        exprs.push_back(makeFunction("aggRankColl", std::move(arg), makeVariable(*collatorSlot)));
     } else {
-        exprs.push_back(makeFunction("aggRank", makeFillEmptyNull(std::move(arg))));
+        exprs.push_back(makeFunction("aggRank", std::move(arg)));
     }
     return exprs;
 }
@@ -1091,10 +1090,10 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorDenseRank(
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     if (collatorSlot) {
-        exprs.push_back(makeFunction(
-            "aggDenseRankColl", makeFillEmptyNull(std::move(arg)), makeVariable(*collatorSlot)));
+        exprs.push_back(
+            makeFunction("aggDenseRankColl", std::move(arg), makeVariable(*collatorSlot)));
     } else {
-        exprs.push_back(makeFunction("aggDenseRank", makeFillEmptyNull(std::move(arg))));
+        exprs.push_back(makeFunction("aggDenseRank", std::move(arg)));
     }
     return exprs;
 }

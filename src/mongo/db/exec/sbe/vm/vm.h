@@ -1024,11 +1024,12 @@ enum AggStdDevValueElems {
  *
  * The array contains three elements:
  * - The element at index `kLastValue` is the last value.
+ * - The element at index `kLastValueIsNothing` is true if the last value is nothing.
  * - The element at index `kLastRank` is the rank of the last value.
  * - The element at index `kSameRankCount` is how many values are of the same rank as the last
  * value.
  */
-enum AggRankElems { kLastValue, kLastRank, kSameRankCount, kRankArraySize };
+enum AggRankElems { kLastValue, kLastValueIsNothing, kLastRank, kSameRankCount, kRankArraySize };
 
 /**
  * This enum defines indices into an 'Array' that returns the result of accumulators that track the
