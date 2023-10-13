@@ -323,80 +323,48 @@ TEST_F(ServiceContextTest, NonDescriptiveNames) {
 }
 
 TEST_F(ABTTranslationTest, ParameterizedEqTranslation) {
-    testParameterizedABTTranslation("FIND - $match basic",
+    testParameterizedABTTranslation("$match basic",
                                     "{find: 'collection', '$db': 'test', filter: {a: 1}}");
-    testParameterizedABTTranslation("PIPELINE - $match basic", "", "[{$match: {'a': 1}}]");
 }
 
 TEST_F(ABTTranslationTest, ParameterizedInequalityTranslation) {
-    testParameterizedABTTranslation("FIND - $match with range",
+    testParameterizedABTTranslation("$match with range",
                                     "{find: 'collection', '$db': 'test', filter: {a: {$gte: 70}}}");
 
     testParameterizedABTTranslation(
-        "PIPELINE - $match with range", "", "[{$match: {'a': {$gte: 70}}}]");
-
-    testParameterizedABTTranslation(
-        "FIND - $match with range conjunction",
+        "$match with range conjunction",
         "{find: 'collection', '$db': 'test', filter: {a: {$gt: 70, $lt: 90}}}");
 
     testParameterizedABTTranslation(
-        "PIPELINE - $match with range conjunction", "", "[{$match: {'a': {$gt: 70, $lt: 90}}}]");
-
-    testParameterizedABTTranslation(
-        "FIND - $match with range conjunction on string data",
+        "$match with range conjunction on string data",
         "{find: 'collection', '$db': 'test', filter: {a: {$gt: 'a', $lt: 'd'}}}");
 
-    testParameterizedABTTranslation("PIPELINE - $match with range conjunction on string data",
-                                    "",
-                                    "[{$match: {'a': {$gt: 'a', $lt: 'd'}}}]");
-
     testParameterizedABTTranslation(
-        "FIND - $match with range on double",
+        "$match with range on double",
         "{find: 'collection', '$db': 'test', filter: {a: {$gte: 4.5}}}");
-
-    testParameterizedABTTranslation(
-        "PIPELINE - $match with range on double", "", "[{$match: {'a': {$gte: 4.5}}}]");
 }
 
 TEST_F(ABTTranslationTest, ParameterizedInTranslation) {
-    testParameterizedABTTranslation("FIND - $match with $in, empty list",
+    testParameterizedABTTranslation("$match with $in, empty list",
                                     "{find: 'collection', '$db': 'test', filter: {a: {$in: []}}}");
 
-    testParameterizedABTTranslation(
-        "PIPELINE - $match with $in, empty list", "", "[{$match: {'a': {$in: []}}}]");
-
-    testParameterizedABTTranslation("FIND - $match with $in, singleton list",
+    testParameterizedABTTranslation("$match with $in, singleton list",
                                     "{find: 'collection', '$db': 'test', filter: {a: {$in: [1]}}}");
 
     testParameterizedABTTranslation(
-        "PIPELINE - $match with $in, singleton list", "", "[{$match: {'a': {$in: [1]}}}]");
-
-    testParameterizedABTTranslation(
-        "FIND - $match with $in and a list of equalities becomes a comparison to an EqMember list",
+        "$match with $in and a list of equalities becomes a comparison to an EqMember list",
         "{find: 'collection', '$db': 'test', filter: {a: {$in: [1, 2, 3]}}}");
 
     testParameterizedABTTranslation(
-        "PIPELINE - $match with $in and a list of equalities becomes a comparison to an EqMember "
-        "list",
-        "",
-        "[{$match: {'a': {$in: [1, 2, 3]}}}]");
-
-    testParameterizedABTTranslation(
-        "FIND - $match with $in over an array, duplicated equalities removed",
+        "$match with $in over an array, duplicated equalities removed",
         "{find: 'collection', '$db': 'test', filter: {a: {$in: ['abc', 'def', 'ghi', 'def']}}}");
-
-    testParameterizedABTTranslation(
-        "PIPELINE - $match with $in over an array, duplicated equalities removed",
-        "",
-        "[{$match: {'a': {$in: ['abc', 'def', 'ghi', 'def']}}}]");
 }
 
 TEST_F(ABTTranslationTest, ParameterizedSizeTranslation) {
-    testParameterizedABTTranslation("FIND - $match with $size",
+    testParameterizedABTTranslation("$match with $size",
                                     "{find: 'collection', '$db': 'test', filter: {a: {$size: 2}}}");
-
-    testParameterizedABTTranslation(
-        "PIPELINE - $match with $size", "", "[{$match: {'a': {$size: 2}}}]");
 }
+
 }  // namespace
+
 }  // namespace mongo::optimizer

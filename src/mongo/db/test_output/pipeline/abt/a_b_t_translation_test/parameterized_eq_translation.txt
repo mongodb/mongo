@@ -1,4 +1,4 @@
-==== VARIATION: FIND - $match basic ====
+==== VARIATION: $match basic ====
 -- INPUTS:
 find command: {find: 'collection', '$db': 'test', filter: {a: 1}}
 metadata: 
@@ -25,34 +25,5 @@ Filter []
 |   |   Const [1]
 |   Const [0]
 Scan [test, {test}]
-
-
-==== VARIATION: PIPELINE - $match basic ====
--- INPUTS:
-pipeline: [{$match: {'a': 1}}]
-metadata: 
-	number of partitions: 1
-	scan definitions: 
-		collection: 
-			options: 
-			distribution and paths: 
-				distribution type: Centralized
-				distribution paths: 
-			indexes: 
-			collection exists: 1
-			CE type: (empty)
-
--- OUTPUT:
-Root [{scan_0}]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathCompare [Eq]
-|   FunctionCall [getParam]
-|   |   Const [1]
-|   Const [0]
-Scan [collection, {scan_0}]
 
 

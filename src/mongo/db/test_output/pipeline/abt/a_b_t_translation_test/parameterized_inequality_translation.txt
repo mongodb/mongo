@@ -1,4 +1,4 @@
-==== VARIATION: FIND - $match with range ====
+==== VARIATION: $match with range ====
 -- INPUTS:
 find command: {find: 'collection', '$db': 'test', filter: {a: {$gte: 70}}}
 metadata: 
@@ -30,39 +30,7 @@ Filter []
 Scan [test, {test}]
 
 
-==== VARIATION: PIPELINE - $match with range ====
--- INPUTS:
-pipeline: [{$match: {'a': {$gte: 70}}}]
-metadata: 
-	number of partitions: 1
-	scan definitions: 
-		collection: 
-			options: 
-			distribution and paths: 
-				distribution type: Centralized
-				distribution paths: 
-			indexes: 
-			collection exists: 1
-			CE type: (empty)
-
--- OUTPUT:
-Root [{scan_0}]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathComposeM []
-|   |   PathCompare [Lt]
-|   |   Const [""]
-|   PathCompare [Gte]
-|   FunctionCall [getParam]
-|   |   Const [1]
-|   Const [0]
-Scan [collection, {scan_0}]
-
-
-==== VARIATION: FIND - $match with range conjunction ====
+==== VARIATION: $match with range conjunction ====
 -- INPUTS:
 find command: {find: 'collection', '$db': 'test', filter: {a: {$gt: 70, $lt: 90}}}
 metadata: 
@@ -106,51 +74,7 @@ Filter []
 Scan [test, {test}]
 
 
-==== VARIATION: PIPELINE - $match with range conjunction ====
--- INPUTS:
-pipeline: [{$match: {'a': {$gt: 70, $lt: 90}}}]
-metadata: 
-	number of partitions: 1
-	scan definitions: 
-		collection: 
-			options: 
-			distribution and paths: 
-				distribution type: Centralized
-				distribution paths: 
-			indexes: 
-			collection exists: 1
-			CE type: (empty)
-
--- OUTPUT:
-Root [{scan_0}]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathComposeM []
-|   |   PathCompare [Lt]
-|   |   Const [""]
-|   PathCompare [Gt]
-|   FunctionCall [getParam]
-|   |   Const [1]
-|   Const [0]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathComposeM []
-|   |   PathCompare [Gt]
-|   |   Const [nan]
-|   PathCompare [Lt]
-|   FunctionCall [getParam]
-|   |   Const [1]
-|   Const [1]
-Scan [collection, {scan_0}]
-
-
-==== VARIATION: FIND - $match with range conjunction on string data ====
+==== VARIATION: $match with range conjunction on string data ====
 -- INPUTS:
 find command: {find: 'collection', '$db': 'test', filter: {a: {$gt: 'a', $lt: 'd'}}}
 metadata: 
@@ -194,51 +118,7 @@ Filter []
 Scan [test, {test}]
 
 
-==== VARIATION: PIPELINE - $match with range conjunction on string data ====
--- INPUTS:
-pipeline: [{$match: {'a': {$gt: 'a', $lt: 'd'}}}]
-metadata: 
-	number of partitions: 1
-	scan definitions: 
-		collection: 
-			options: 
-			distribution and paths: 
-				distribution type: Centralized
-				distribution paths: 
-			indexes: 
-			collection exists: 1
-			CE type: (empty)
-
--- OUTPUT:
-Root [{scan_0}]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathComposeM []
-|   |   PathCompare [Lt]
-|   |   Const [{}]
-|   PathCompare [Gt]
-|   FunctionCall [getParam]
-|   |   Const [8]
-|   Const [0]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathComposeM []
-|   |   PathCompare [Gte]
-|   |   Const [""]
-|   PathCompare [Lt]
-|   FunctionCall [getParam]
-|   |   Const [8]
-|   Const [1]
-Scan [collection, {scan_0}]
-
-
-==== VARIATION: FIND - $match with range on double ====
+==== VARIATION: $match with range on double ====
 -- INPUTS:
 find command: {find: 'collection', '$db': 'test', filter: {a: {$gte: 4.5}}}
 metadata: 
@@ -268,37 +148,5 @@ Filter []
 |   |   Const [3]
 |   Const [0]
 Scan [test, {test}]
-
-
-==== VARIATION: PIPELINE - $match with range on double ====
--- INPUTS:
-pipeline: [{$match: {'a': {$gte: 4.5}}}]
-metadata: 
-	number of partitions: 1
-	scan definitions: 
-		collection: 
-			options: 
-			distribution and paths: 
-				distribution type: Centralized
-				distribution paths: 
-			indexes: 
-			collection exists: 1
-			CE type: (empty)
-
--- OUTPUT:
-Root [{scan_0}]
-Filter []
-|   EvalFilter []
-|   |   Variable [scan_0]
-|   PathGet [a]
-|   PathTraverse [1]
-|   PathComposeM []
-|   |   PathCompare [Lt]
-|   |   Const [""]
-|   PathCompare [Gte]
-|   FunctionCall [getParam]
-|   |   Const [3]
-|   Const [0]
-Scan [collection, {scan_0}]
 
 

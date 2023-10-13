@@ -71,8 +71,6 @@
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
@@ -877,38 +875,12 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
         : make<ValueScanNode>(ProjectionNameVector{scanProjName},
                               createInitialScanProps(scanProjName, scanDefName));
 
-    // Check if pipeline is eligible for plan caching.
-    auto _isCacheable = false;
     if (pipeline) {
-        _isCacheable = [&]() -> bool {
-            auto& sources = pipeline->getSources();
-            if (sources.empty())
-                return false;
-
-            // First stage must be a DocumentSourceMatch.
-            const auto& it = sources.begin();
-            auto firstStageName = it->get()->getSourceName();
-            if (firstStageName != DocumentSourceMatch::kStageName)
-                return false;
-
-            // If optional second stage exists, must be a projection stage.
-            auto secondStageItr = std::next(it);
-            if (secondStageItr != sources.end())
-                return secondStageItr->get()->getSourceName() == DocumentSourceProject::kStageName;
-
-            return true;
-        }();
-        _isCacheable = false;  // TODO: SERVER-82185: Remove once E2E parameterization enabled
-        if (_isCacheable)
-            MatchExpression::parameterize(
-                dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression());
         abt = translatePipelineToABT(metadata, *pipeline, scanProjName, std::move(abt), prefixId);
     } else {
         // Clear match expression auto-parameterization by setting max param count to zero before
         // CQ to ABT translation
-        // TODO: SERVER-82185: Update value of _isCacheable to true for M2-eligible queries
-        if (!_isCacheable)
-            MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
+        MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
         abt = translateCanonicalQueryToABT(
             metadata, *canonicalQuery, scanProjName, std::move(abt), prefixId);
     }
