@@ -155,10 +155,9 @@ public:
     BucketStateRegistry bucketStateRegistry;
 
     // The actual buckets in the catalog are distributed across a number of 'Stripe's. Each can be
-    // independently locked and operated on in parallel. The size of the stripe vector should not be
-    // changed after initialization.
-    const std::size_t numberOfStripes = 32;
-    std::vector<Stripe> stripes;
+    // independently locked and operated on in parallel.
+    static constexpr std::size_t kNumberOfStripes = 32;
+    std::array<Stripe, kNumberOfStripes> stripes;
 
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
