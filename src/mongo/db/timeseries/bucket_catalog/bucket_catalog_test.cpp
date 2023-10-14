@@ -313,7 +313,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now()),
                           CombineWithInsertsFromOtherClients::kAllow);
-    auto batch2 = result2.getValue().batch;
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_EQ(batch1, batch2);
     ASSERT(!claimWriteBatchCommitRights(*batch2));
 
@@ -384,16 +384,23 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
               stdx::get<SuccessfulInsertion>(result3.getValue()).batch);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"),
-                      getMetadata(*_bucketCatalog, result1.getValue().batch->bucketHandle));
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
-                      getMetadata(*_bucketCatalog, result2.getValue().batch->bucketHandle));
-    ASSERT(getMetadata(*_bucketCatalog, result3.getValue().batch->bucketHandle).isEmpty());
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << "123"),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSONObj()),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
+    ASSERT(getMetadata(*_bucketCatalog,
+                       stdx::get<SuccessfulInsertion>(result3.getValue()).batch->bucketHandle)
+               .isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
-    for (const auto& batch :
-         {result1.getValue().batch, result2.getValue().batch, result3.getValue().batch}) {
+    for (const auto& batch : {stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
+                              stdx::get<SuccessfulInsertion>(result2.getValue()).batch,
+                              stdx::get<SuccessfulInsertion>(result3.getValue()).batch}) {
         _commit(batch, 0);
     }
 }
@@ -416,13 +423,18 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketArray) {
         BSON(_timeField << Date_t::now() << _metaField << BSON_ARRAY(BSON("b" << 1 << "a" << 0))),
         CombineWithInsertsFromOtherClients::kAllow);
 
-    ASSERT_EQ(result1.getValue().batch, result2.getValue().batch);
+    ASSERT_EQ(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
+              stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
-                      getMetadata(*_bucketCatalog, result1.getValue().batch->bucketHandle));
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
-                      getMetadata(*_bucketCatalog, result2.getValue().batch->bucketHandle));
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSON_ARRAY(BSON("a" << 0 << "b" << 1))),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
@@ -447,17 +459,20 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketObjArray) {
                                                                  << BSON("g" << 0 << "f" << 1))))),
                CombineWithInsertsFromOtherClients::kAllow);
 
-    ASSERT_EQ(result1.getValue().batch, result2.getValue().batch);
+    ASSERT_EQ(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
+              stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj(BSON(
                  "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
-        getMetadata(*_bucketCatalog, result1.getValue().batch->bucketHandle));
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
     ASSERT_BSONOBJ_EQ(
         BSON(_metaField << BSONObj(BSON(
                  "c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON("f" << 1 << "g" << 0))))),
-        getMetadata(*_bucketCatalog, result2.getValue().batch->bucketHandle));
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
 }
 
 
@@ -485,17 +500,22 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucketNestedArray) {
                                                                                << "456"))))),
                CombineWithInsertsFromOtherClients::kAllow);
 
-    ASSERT_EQ(result1.getValue().batch, result2.getValue().batch);
+    ASSERT_EQ(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
+              stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
-                                                                        << BSON_ARRAY("123"
-                                                                                      << "456"))))),
-                      getMetadata(*_bucketCatalog, result1.getValue().batch->bucketHandle));
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj(BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1)
-                                                                        << BSON_ARRAY("123"
-                                                                                      << "456"))))),
-                      getMetadata(*_bucketCatalog, result2.getValue().batch->bucketHandle));
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSONObj(
+                 BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON_ARRAY("123"
+                                                                                 << "456"))))),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSONObj(
+                 BSON("c" << BSON_ARRAY(BSON("a" << 0 << "b" << 1) << BSON_ARRAY("123"
+                                                                                 << "456"))))),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle));
 }
 
 TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
@@ -515,16 +535,22 @@ TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
                           CombineWithInsertsFromOtherClients::kAllow);
 
     // Inserts should all be into three distinct buckets (and therefore batches).
-    ASSERT_NE(result1.getValue().batch, result2.getValue().batch);
+    ASSERT_NE(stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
+              stdx::get<SuccessfulInsertion>(result2.getValue()).batch);
 
     // Check metadata in buckets.
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
-                      getMetadata(*_bucketCatalog, result1.getValue().batch->bucketHandle));
-    ASSERT(getMetadata(*_bucketCatalog, result2.getValue().batch->bucketHandle).isEmpty());
+    ASSERT_BSONOBJ_EQ(
+        BSON(_metaField << BSONNULL),
+        getMetadata(*_bucketCatalog,
+                    stdx::get<SuccessfulInsertion>(result1.getValue()).batch->bucketHandle));
+    ASSERT(getMetadata(*_bucketCatalog,
+                       stdx::get<SuccessfulInsertion>(result2.getValue()).batch->bucketHandle)
+               .isEmpty());
 
     // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
-    for (const auto& batch : {result1.getValue().batch, result2.getValue().batch}) {
+    for (const auto& batch : {stdx::get<SuccessfulInsertion>(result1.getValue()).batch,
+                              stdx::get<SuccessfulInsertion>(result2.getValue()).batch}) {
         _commit(batch, 0);
     }
 }
@@ -559,15 +585,14 @@ TEST_F(BucketCatalogTest, ClearDatabaseBuckets) {
 }
 
 TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
     ASSERT_EQ(batch1->measurements.size(), 1);
@@ -693,7 +718,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                           _getTimeseriesOptions(_ns1),
                           BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount),
                           CombineWithInsertsFromOtherClients::kAllow);
-    auto& batch2 = result2.getValue().batch;
+    auto& batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(oldId, batch2->bucketHandle.bucketId);
     _commit(batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted.size()) << batch2->toBSON();
@@ -702,15 +727,14 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
 }
 
 TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
     ASSERT_EQ(batch1->measurements.size(), 1);
@@ -739,15 +763,14 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
 }
 
 TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
-    auto batch = insert(_opCtx,
-                        *_bucketCatalog,
-                        _ns1,
-                        _getCollator(_ns1),
-                        _getTimeseriesOptions(_ns1),
-                        BSON(_timeField << Date_t::now()),
-                        CombineWithInsertsFromOtherClients::kAllow)
-                     .getValue()
-                     .batch;
+    auto result = insert(_opCtx,
+                         *_bucketCatalog,
+                         _ns1,
+                         _getCollator(_ns1),
+                         _getTimeseriesOptions(_ns1),
+                         BSON(_timeField << Date_t::now()),
+                         CombineWithInsertsFromOtherClients::kAllow);
+    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
 
     clear(*_bucketCatalog, _ns1);
@@ -756,15 +779,14 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
     ASSERT(isWriteBatchFinished(*batch));
     ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
-    batch = insert(_opCtx,
-                   *_bucketCatalog,
-                   _ns1,
-                   _getCollator(_ns1),
-                   _getTimeseriesOptions(_ns1),
-                   BSON(_timeField << Date_t::now()),
-                   CombineWithInsertsFromOtherClients::kAllow)
-                .getValue()
-                .batch;
+    result = insert(_opCtx,
+                    *_bucketCatalog,
+                    _ns1,
+                    _getCollator(_ns1),
+                    _getTimeseriesOptions(_ns1),
+                    BSON(_timeField << Date_t::now()),
+                    CombineWithInsertsFromOtherClients::kAllow);
+    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -784,15 +806,14 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
 
 
 TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
-    auto batch = insert(_opCtx,
-                        *_bucketCatalog,
-                        _ns1,
-                        _getCollator(_ns1),
-                        _getTimeseriesOptions(_ns1),
-                        BSON(_timeField << Date_t::now()),
-                        CombineWithInsertsFromOtherClients::kAllow)
-                     .getValue()
-                     .batch;
+    auto result = insert(_opCtx,
+                         *_bucketCatalog,
+                         _ns1,
+                         _getCollator(_ns1),
+                         _getTimeseriesOptions(_ns1),
+                         BSON(_timeField << Date_t::now()),
+                         CombineWithInsertsFromOtherClients::kAllow);
+    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
@@ -808,30 +829,28 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
 }
 
 TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
     ASSERT_EQ(batch1->measurements.size(), 1);
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements, 0);
 
     // Insert before clear so there's a second batch live at the same time.
-    auto batch2 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result2 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
     ASSERT_NE(batch1, batch2);
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
 
@@ -849,15 +868,14 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
 
     // Make sure a subsequent insert, which opens a new bucket, doesn't corrupt the old bucket
     // state and prevent us from finishing the first batch.
-    auto batch3 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result3 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_NE(batch1, batch3);
     ASSERT_NE(batch2, batch3);
     ASSERT_NE(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
@@ -872,15 +890,14 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
 }
 
 TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
-    auto batch = insert(_opCtx,
-                        *_bucketCatalog,
-                        _ns1,
-                        _getCollator(_ns1),
-                        _getTimeseriesOptions(_ns1),
-                        BSON(_timeField << Date_t::now()),
-                        CombineWithInsertsFromOtherClients::kAllow)
-                     .getValue()
-                     .batch;
+    auto result = insert(_opCtx,
+                         *_bucketCatalog,
+                         _ns1,
+                         _getCollator(_ns1),
+                         _getTimeseriesOptions(_ns1),
+                         BSON(_timeField << Date_t::now()),
+                         CombineWithInsertsFromOtherClients::kAllow);
+    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
 
     abort(*_bucketCatalog, batch, {ErrorCodes::TimeseriesBucketCleared, ""});
@@ -893,45 +910,41 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
 }
 
 TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
-    auto batch2 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result2 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
-    auto batch3 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result3 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
 
-    auto batch4 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kAllow)
-                      .getValue()
-                      .batch;
+    auto result4 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch4 = stdx::get<SuccessfulInsertion>(result4.getValue()).batch;
 
     ASSERT_NE(batch1, batch2);
     ASSERT_NE(batch1, batch3);
@@ -944,25 +957,23 @@ TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
 }
 
 TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
-    auto batch2 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result2 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     ASSERT(claimWriteBatchCommitRights(*batch1));
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -986,34 +997,31 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
-    auto batch2 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
-    auto batch3 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result2 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
+    auto result3 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
 
@@ -1045,38 +1053,34 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     ASSERT(isWriteBatchFinished(*batch2));
 
     // Make sure a new batch ends up in a new bucket.
-    auto batch4 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result4 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
     ASSERT_NE(batch2->bucketHandle.bucketId, batch4->bucketHandle.bucketId);
 }
 
 TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
-    auto batch2 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result2 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 1 and 2 use the same bucket.
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
@@ -1093,38 +1097,35 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresNewInsertsGoToNewBucket) {
 
     // Ensure a batch started after batch 2 aborts, does not insert future measurements into the
     // aborted batch/bucket.
-    auto batch3 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result3 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
     ASSERT_NE(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
-    auto batch1 = insert(_opCtx,
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result1 = insert(_opCtx,
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
 
-    auto batch2 = insert(_makeOperationContext().second.get(),
-                         *_bucketCatalog,
-                         _ns1,
-                         _getCollator(_ns1),
-                         _getTimeseriesOptions(_ns1),
-                         BSON(_timeField << Date_t::now()),
-                         CombineWithInsertsFromOtherClients::kDisallow)
-                      .getValue()
-                      .batch;
+    auto result2 = insert(_makeOperationContext().second.get(),
+                          *_bucketCatalog,
+                          _ns1,
+                          _getCollator(_ns1),
+                          _getTimeseriesOptions(_ns1),
+                          BSON(_timeField << Date_t::now()),
+                          CombineWithInsertsFromOtherClients::kDisallow);
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
 
     // Batch 2 is the first batch to commit the time field.
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -1349,6 +1350,7 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"),
                          CombineWithInsertsFromOtherClients::kAllow);
+    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
 
     // No buckets are closed.
     ASSERT(result.getValue().closedBuckets.empty());
