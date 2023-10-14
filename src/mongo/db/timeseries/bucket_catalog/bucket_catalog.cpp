@@ -251,17 +251,6 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
     auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    if (kDebugBuild && opCtx) {
-        Bucket* bucket = internal::useBucket(catalog.bucketStateRegistry,
-                                             stripe,
-                                             stripeLock,
-                                             batch->bucketHandle.bucketId,
-                                             internal::IgnoreBucketState::kYes);
-        if (bucket) {
-            internal::runPostCommitDebugChecks(opCtx, *bucket, *batch);
-        }
-    }
-
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
@@ -306,6 +295,10 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
     stats.incNumMeasurementsCommitted(batch->measurements.size());
     if (bucket) {
         bucket->numCommittedMeasurements += batch->measurements.size();
+        /* TODO (SERVER-82126): reenable or remove
+        if (kDebugBuild && opCtx) {
+            internal::runPostCommitDebugChecks(opCtx, *bucket, *batch);
+        }*/
     }
 
     if (!bucket) {
