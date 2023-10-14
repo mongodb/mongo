@@ -17,15 +17,8 @@ export class QuerySettingsUtils {
     /**
      * Makes an query instance of the find command with an optional filter clause.
      */
-    makeFindQueryInstance(filter = {}) {
+    makeQueryInstance(filter = {}) {
         return {find: this.collName, $db: this.db.getName(), filter};
-    }
-
-    /**
-     * Makes an query instance of the aggregate command with an optional pipeline clause.
-     */
-    makeAggregateQueryInstance(pipeline = [], collName = this.collName) {
-        return {aggregate: collName, $db: this.db.getName(), pipeline};
     }
 
     /**
@@ -38,10 +31,10 @@ export class QuerySettingsUtils {
     /**
      * Return query settings for the current tenant without query hashes.
      */
-    getQuerySettings(opts = {}) {
+    getQuerySettings() {
         return this.adminDB
             .aggregate([
-                {$querySettings: opts},
+                {$querySettings: {}},
                 {$project: {queryShapeHash: 0}},
                 {$sort: {representativeQuery: 1}},
             ])

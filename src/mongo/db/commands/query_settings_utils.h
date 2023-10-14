@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/stdx/unordered_set.h"
@@ -37,7 +36,6 @@
 namespace mongo::query_settings {
 
 struct RepresentativeQueryInfo {
-    const BSONObj serializedQueryShape;
     const query_shape::QueryShapeHash queryShapeHash;
     const stdx::unordered_set<NamespaceString> involvedNamespaces;
     const boost::optional<mongo::EncryptionInformation> encryptionInformation;
@@ -48,9 +46,10 @@ struct RepresentativeQueryInfo {
  * Creates the corresponding RepresentativeQueryInfo instance by parsing the representative
  * query BSONObj.
  */
-RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
-                                                 OperationContext* opCtx,
-                                                 const boost::optional<TenantId>& tenantId);
+RepresentativeQueryInfo createRepresentativeInfo(
+    const BSONObj& cmd,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::optional<TenantId>& tenantId);
 
 namespace utils {
 
