@@ -47,6 +47,7 @@ std::unique_ptr<CellBlock> MaterializedCellBlock::clone() const {
 namespace {
 std::string pathToString(const CellBlock::Path& p) {
     std::string out;
+    size_t idx = 0;
     for (auto& component : p) {
         if (std::holds_alternative<CellBlock::Id>(component)) {
             out += "Id";
@@ -57,9 +58,12 @@ std::string pathToString(const CellBlock::Path& p) {
         } else if (std::holds_alternative<CellBlock::Traverse>(component)) {
             out += "Traverse";
         }
-        out.push_back('/');
+        ++idx;
+
+        if (idx != p.size()) {
+            out.push_back('/');
+        }
     }
-    out.pop_back();
     return out;
 }
 }  // namespace
