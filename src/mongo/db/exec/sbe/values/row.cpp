@@ -158,24 +158,6 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
             val = arrVal;
             break;
         }
-        case TypeTags::ArrayMultiSet: {
-            // The first byte is a flag to tell us whether the ArrayMultiSet had a collation prior
-            // to serialization.
-            auto collated = buf.read<char>();
-            auto [arrTag, arrVal] = makeNewArrayMultiSet(collated ? collator : nullptr);
-            auto cnt = buf.read<LittleEndian<size_t>>();
-            auto arr = getArrayMultiSetView(arrVal);
-            if (cnt) {
-                arr->reserve(cnt);
-                for (size_t idx = 0; idx < cnt; ++idx) {
-                    auto [tag, val] = deserializeValue(buf, collator);
-                    arr->push_back(tag, val);
-                }
-            }
-            tag = arrTag;
-            val = arrVal;
-            break;
-        }
         case TypeTags::Object: {
             auto cnt = buf.read<LittleEndian<size_t>>();
             auto [objTag, objVal] = makeNewObject();
@@ -258,20 +240,6 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
     return {tag, val};
 }
 
-template <typename T>
-static void serializeArraySetValue(BufBuilder& buf, T* array) {
-    // If an ArraySet or an ArrayMultiSet has a collation, we serialize a byte which acts as a flag
-    // as to whether the set should be created with a collation upon deserialization. Also, we
-    // assume that the caller which does deserialization will have the context about what
-    // the collation is, and therefore we can save space by not serializing the full
-    // description of the collation.
-    buf.appendChar(array->getCollator() ? 1 : 0);
-    buf.appendNum(array->size());
-    for (auto& kv : array->values()) {
-        serializeValue(buf, kv.first, kv.second);
-    }
-}
-
 static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     buf.appendUChar(static_cast<uint8_t>(tag));
 
@@ -334,11 +302,17 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
             break;
         }
         case TypeTags::ArraySet: {
-            serializeArraySetValue<ArraySet>(buf, getArraySetView(val));
-            break;
-        }
-        case TypeTags::ArrayMultiSet: {
-            serializeArraySetValue<ArrayMultiSet>(buf, getArrayMultiSetView(val));
+            auto arr = getArraySetView(val);
+            // If an ArraySet has a collation, we serialize a byte which acts as a flag as to
+            // whether the set should be created with a collation upon deserialization. Also, we
+            // assume that the caller which does deserialization will have the context about what
+            // the collation is, and therefore we can save space by not serializing the full
+            // description of the collation.
+            buf.appendChar(arr->getCollator() ? 1 : 0);
+            buf.appendNum(arr->size());
+            for (auto& kv : arr->values()) {
+                serializeValue(buf, kv.first, kv.second);
+            }
             break;
         }
         case TypeTags::Object: {
@@ -499,7 +473,6 @@ static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, 
             buf.appendSymbol(getStringOrSymbolView(tag, val));
             break;
         }
-        case TypeTags::ArrayMultiSet:
         case TypeTags::ArraySet:
         case TypeTags::Array: {
             // TODO SERVER-61629: convert this to serialize the 'arr' directly instead of
@@ -706,14 +679,6 @@ int getApproximateSize(TypeTags tag, Value val) {
         }
         case TypeTags::ArraySet: {
             auto arr = getArraySetView(val);
-            result += sizeof(*arr);
-            for (auto& kv : arr->values()) {
-                result += getApproximateSize(kv.first, kv.second);
-            }
-            break;
-        }
-        case TypeTags::ArrayMultiSet: {
-            auto arr = getArrayMultiSetView(val);
             result += sizeof(*arr);
             for (auto& kv : arr->values()) {
                 result += getApproximateSize(kv.first, kv.second);

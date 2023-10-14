@@ -42,8 +42,7 @@ namespace mongo::stage_builder {
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    std::unique_ptr<sbe::EExpression> arg,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+    std::unique_ptr<sbe::EExpression> arg);
 
 /**
  * Similar to above but takes multiple arguments.
@@ -51,8 +50,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    StringDataMap<std::unique_ptr<sbe::EExpression>> args,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+    StringDataMap<std::unique_ptr<sbe::EExpression>> args);
 
 /**
  * Build a list of window function add functions.
@@ -60,8 +58,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    std::unique_ptr<sbe::EExpression> arg,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+    std::unique_ptr<sbe::EExpression> arg);
 
 /**
  * Similar to above but takes multiple arguments.
@@ -78,8 +75,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
-    std::unique_ptr<sbe::EExpression> arg,
-    boost::optional<sbe::value::SlotId> collatorSlot);
+    std::unique_ptr<sbe::EExpression> arg);
 
 /**
  * Similar to above but takes multiple arguments.

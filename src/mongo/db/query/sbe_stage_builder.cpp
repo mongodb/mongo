@@ -3956,17 +3956,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         };
         if (removable) {
             if (initExprArgs.size() == 1) {
-                window.initExprs = buildWindowInit(
-                    _state, outputField, std::move(initExprArgs.begin()->second), collatorSlot);
-            } else {
                 window.initExprs =
-                    buildWindowInit(_state, outputField, std::move(initExprArgs), collatorSlot);
+                    buildWindowInit(_state, outputField, std::move(initExprArgs.begin()->second));
+            } else {
+                window.initExprs = buildWindowInit(_state, outputField, std::move(initExprArgs));
             }
             if (argExprs.size() == 1) {
-                window.addExprs = buildWindowAdd(
-                    _state, outputField, argExprs.begin()->second->clone(), collatorSlot);
-                window.removeExprs = buildWindowRemove(
-                    _state, outputField, argExprs.begin()->second->clone(), collatorSlot);
+                window.addExprs =
+                    buildWindowAdd(_state, outputField, argExprs.begin()->second->clone());
+                window.removeExprs =
+                    buildWindowRemove(_state, outputField, argExprs.begin()->second->clone());
             } else {
                 window.addExprs =
                     buildWindowAdd(_state, outputField, cloneExprMap(argExprs), collatorSlot);
@@ -4219,7 +4218,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto emptyWindowExpr = [](StringData accExprName) {
                 if (accExprName == "$sum") {
                     return makeConstant(sbe::value::TypeTags::NumberInt32, 0);
-                } else if (accExprName == "$push" || accExprName == AccumulatorAddToSet::kName) {
+                } else if (accExprName == "$push") {
                     auto [tag, val] = sbe::value::makeNewArray();
                     return makeConstant(tag, val);
                 } else {
