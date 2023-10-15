@@ -451,7 +451,7 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsScheduleDBWorkFailed) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         ASSERT_EQUALS(ErrorCodes::UnknownError, cloner->run());
     });
     // Wait for the failpoint to be reached
@@ -488,7 +488,7 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsCallbackCanceled) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         ASSERT_EQUALS(ErrorCodes::CallbackCanceled, cloner->run());
     });
     // Wait for the failpoint to be reached
@@ -531,7 +531,7 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsFailed) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         ASSERT_EQUALS(ErrorCodes::OperationFailed, cloner->run());
     });
 
@@ -618,7 +618,7 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryFailTransientlyBeforeFirstBa
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
 
@@ -679,7 +679,7 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryFailTransientlyAfterFirstBat
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
 
@@ -730,7 +730,7 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryNonRetriableError) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         auto status = cloner->run();
         ASSERT_EQUALS(ErrorCodes::UnknownError, status);
     });
@@ -776,7 +776,7 @@ TEST_F(CollectionClonerTestResumable,
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         auto status = cloner->run();
         ASSERT_EQUALS(ErrorCodes::UnknownError, status);
     });
@@ -827,7 +827,7 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryNonTransientErrorAtRetry) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         auto status = cloner->run();
         ASSERT_EQUALS(ErrorCodes::UnknownError, status);
     });
@@ -890,7 +890,7 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryNonTransientErrorAfterPastRe
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         auto status = cloner->run();
         ASSERT_EQUALS(ErrorCodes::UnknownError, status);
     });
@@ -969,7 +969,7 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
 

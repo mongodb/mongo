@@ -244,7 +244,7 @@ ServiceContext* initialize(const char* yaml_config) {
     ScopeGuard giGuard([] { mongo::runGlobalDeinitializers().ignore(); });
     setGlobalServiceContext(ServiceContext::make());
 
-    Client::initThread("initandlisten");
+    Client::initThread("initandlisten", getGlobalServiceContext()->getService());
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
     {

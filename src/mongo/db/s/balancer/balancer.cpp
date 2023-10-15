@@ -505,7 +505,7 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    Client::initThread("BalancerSecondary");
+    Client::initThread("BalancerSecondary", getGlobalServiceContext()->getService());
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {
@@ -695,7 +695,7 @@ void Balancer::_mainThread() {
         _joinCond.notify_all();
     });
 
-    Client::initThread("Balancer");
+    Client::initThread("Balancer", getGlobalServiceContext()->getService());
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {

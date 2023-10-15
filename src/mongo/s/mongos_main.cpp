@@ -479,7 +479,8 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // This client initiation pattern is only to be used here, with plans to eliminate this
         // pattern down the line.
         if (!haveClient()) {
-            Client::initThread(getThreadName());
+            Client::initThread(getThreadName(),
+                               serviceContext->getService(ClusterRole::RouterServer));
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {

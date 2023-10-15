@@ -419,7 +419,7 @@ TEST_F(TenantDatabaseClonerTest, ListCollectionsRemoteUnreachableBeforeMajorityF
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_NOT_OK(cloner->run());
     });
     // Wait for the failpoint to be reached
@@ -460,7 +460,7 @@ TEST_F(TenantDatabaseClonerTest, ListCollectionsRecordsCorrectOperationTime) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
     // Wait for the failpoint to be reached
@@ -590,7 +590,7 @@ TEST_F(TenantDatabaseClonerTest, DatabaseAndCollectionStats) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
     // Wait for the failpoint to be reached

@@ -72,7 +72,7 @@ private:
 executor::ThreadPoolMock::Options MultiApplierTest::makeThreadPoolMockOptions() const {
     executor::ThreadPoolMock::Options options;
     options.onCreateThread = []() {
-        Client::initThread("MultiApplierTest");
+        Client::initThread("MultiApplierTest", getGlobalServiceContext()->getService());
     };
     return options;
 }

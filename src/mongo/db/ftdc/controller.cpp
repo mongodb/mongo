@@ -200,7 +200,7 @@ void FTDCController::stop() {
 void FTDCController::doLoop() noexcept {
     // Note: All exceptions thrown in this loop are considered process fatal. The default terminate
     // is used to provide a good stack trace of the issue.
-    Client::initThread(kFTDCThreadName);
+    Client::initThread(kFTDCThreadName, getGlobalServiceContext()->getService());
     Client* client = &cc();
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.

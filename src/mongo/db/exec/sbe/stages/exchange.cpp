@@ -56,7 +56,7 @@ MONGO_INITIALIZER(s_globalThreadPool)(InitializerContext* context) {
     options.minThreads = 0;
     options.maxThreads = 128;
     options.onCreateThread = [](const std::string& name) {
-        Client::initThread(name);
+        Client::initThread(name, getGlobalServiceContext()->getService());
     };
     s_globalThreadPool = std::make_unique<ThreadPool>(options);
     s_globalThreadPool->startup();

@@ -464,7 +464,7 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
     // Wait for the failpoint to be reached

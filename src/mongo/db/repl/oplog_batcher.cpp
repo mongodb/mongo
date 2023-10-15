@@ -322,7 +322,7 @@ void OplogBatcher::_consume(OperationContext* opCtx, OplogBuffer* oplogBuffer) {
 }
 
 void OplogBatcher::_run(StorageInterface* storageInterface) {
-    Client::initThread("ReplBatcher");
+    Client::initThread("ReplBatcher", getGlobalServiceContext()->getService());
 
     {
         // The OplogBatcher's thread has its own shutdown sequence triggered by the OplogApplier,

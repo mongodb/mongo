@@ -170,7 +170,7 @@ public:
         storageGlobalParams.dbpath = _tempDir->path();
         storageGlobalParams.ephemeral = false;
 
-        Client::initThread("oplog application main");
+        Client::initThread("oplog application main", getGlobalServiceContext()->getService());
         _client = Client::getCurrent();
 
         repl::ReplSettings replSettings;

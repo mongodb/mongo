@@ -1753,7 +1753,8 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 
     PromiseAndFuture<void> promiseAndFuture;
     _stepUpThread = stdx::thread([this, &promiseAndFuture] {
-        Client::initThread("IndexBuildsCoordinator-StepUp");
+        Client::initThread("IndexBuildsCoordinator-StepUp",
+                           getGlobalServiceContext()->getService());
         auto threadCtx = Client::getCurrent()->makeOperationContext();
         threadCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         promiseAndFuture.promise.emplaceValue();

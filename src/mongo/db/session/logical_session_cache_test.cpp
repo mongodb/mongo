@@ -86,7 +86,7 @@ public:
         // Re-initialize the client after setting the AuthorizationManager to get an
         // AuthorizationSession.
         Client::releaseCurrent();
-        Client::initThread(getThreadName());
+        Client::initThread(getThreadName(), getGlobalServiceContext()->getService());
         _opCtx = makeOperationContext();
 
         auto mockService = std::make_unique<MockServiceLiaison>(_service);

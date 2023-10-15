@@ -168,7 +168,7 @@ void DeferredWriter::startup(std::string workerName) {
     options.minThreads = 0;
     options.maxThreads = 1;
     options.onCreateThread = [](const std::string& name) {
-        Client::initThread(name);
+        Client::initThread(name, getGlobalServiceContext()->getService());
     };
     _pool = std::make_unique<ThreadPool>(options);
     _pool->startup();

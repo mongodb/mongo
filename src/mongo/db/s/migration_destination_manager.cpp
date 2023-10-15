@@ -1157,7 +1157,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
                                                  bool skipToCritSecTaken) {
     invariant(_sessionId);
 
-    Client::initThread("migrateThread");
+    Client::initThread("migrateThread", getGlobalServiceContext()->getService());
     auto client = Client::getCurrent();
     bool recovering = false;
     while (true) {

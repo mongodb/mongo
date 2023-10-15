@@ -314,7 +314,7 @@ TEST_F(TenantCollectionClonerTest, ListIndexesRemoteUnreachableBeforeMajorityFin
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_NOT_OK(cloner->run());
     });
     // Wait for the failpoint to be reached
@@ -339,7 +339,7 @@ TEST_F(TenantCollectionClonerTest, ListIndexesRecordsCorrectOperationTime) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
     });
     // Wait for the failpoint to be reached
@@ -393,7 +393,7 @@ TEST_F(TenantCollectionClonerTest, BeginCollectionFailed) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         auto status = cloner->run();
         ASSERT_EQUALS(51267, status.code());
     });
@@ -508,7 +508,7 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsFailed) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_EQUALS(ErrorCodes::FailPointEnabled, cloner->run());
     });
 
@@ -537,7 +537,7 @@ TEST_F(TenantCollectionClonerTest, QueryFailure) {
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_NOT_OK(cloner->run());
     });
 
@@ -601,7 +601,7 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnFirstBatch) {
     // Run the cloner in a separate thread. The cloner should detect the drop at the beginning
     // of the query stage and exit normally, without copying over any documents.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
         ASSERT_EQ(0, cloner->getStats().documentsCopied);
     });
@@ -648,7 +648,7 @@ TEST_F(TenantCollectionClonerTest, QueryStageNamespaceNotFoundOnSubsequentBatch)
     // Run the cloner in a separate thread. The cloner should detect the drop on the second query
     // batch and exit normally.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
         // We cloned two documents before we registered the drop.
         ASSERT_EQ(2, cloner->getStats().documentsCopied);
@@ -693,7 +693,7 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledCheckIfDonorCollectionIsEmptyS
     cloner->setBatchSize_forTest(2);
 
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
         ASSERT_EQ(0, cloner->getStats().documentsCopied);
     });
@@ -746,7 +746,7 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundFirstBatc
     // Run the cloner in a separate thread. The cloner should detect the drop at the beginning
     // of the query stage and exit normally, without copying over any documents.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
         ASSERT_EQ(0, cloner->getStats().documentsCopied);
     });
@@ -803,7 +803,7 @@ TEST_F(TenantCollectionClonerTest, QueryPlanKilledThenNamespaceNotFoundSubsequen
     // Run the cloner in a separate thread. The cloner should detect the drop during the query
     // stage. It will have copied over some documents before that.
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
         ASSERT_EQ(2, cloner->getStats().documentsCopied);
     });
@@ -1050,7 +1050,7 @@ TEST_F(TenantCollectionClonerTest, NoDocumentsIfInsertedAfterListIndexes) {
                  _nss.ns_forTest() + "'}"));
     auto cloner = makeCollectionCloner();
     stdx::thread clonerThread([&] {
-        Client::initThread("ClonerRunner");
+        Client::initThread("ClonerRunner", getGlobalServiceContext()->getService());
         ASSERT_OK(cloner->run());
         ASSERT_EQ(0, cloner->getStats().documentsCopied);
     });

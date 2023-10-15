@@ -250,7 +250,7 @@ bool BackgroundSync::_inShutdown_inlock() const {
 }
 
 void BackgroundSync::_run() {
-    Client::initThread("BackgroundSync");
+    Client::initThread("BackgroundSync", getGlobalServiceContext()->getService());
     AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
     {

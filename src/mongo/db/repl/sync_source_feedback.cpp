@@ -162,7 +162,7 @@ void SyncSourceFeedback::shutdown() {
 void SyncSourceFeedback::run(executor::TaskExecutor* executor,
                              BackgroundSync* bgsync,
                              ReplicationCoordinator* replCoord) {
-    Client::initThread("SyncSourceFeedback");
+    Client::initThread("SyncSourceFeedback", getGlobalServiceContext()->getService());
 
     HostAndPort syncTarget;
 

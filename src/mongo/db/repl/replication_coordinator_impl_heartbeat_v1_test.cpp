@@ -2018,7 +2018,8 @@ TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     auto hbRespObj = (BSONObjBuilder(hbResp.toBSON()) << "ok" << 1).obj();
 
     stdx::thread heartbeatReponseThread([&] {
-        Client::initThread("handleHeartbeatResponseForTest");
+        Client::initThread("handleHeartbeatResponseForTest",
+                           getGlobalServiceContext()->getService());
         getReplCoord()->handleHeartbeatResponse_forTest(hbRespObj, 1 /* targetIndex */);
     });
 

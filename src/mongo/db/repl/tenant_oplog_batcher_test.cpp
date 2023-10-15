@@ -75,12 +75,12 @@ class TenantOplogBatcherTest : public unittest::Test, public ScopedGlobalService
 public:
     void setUp() override {
         unittest::Test::setUp();
-        Client::initThread("TenantOplogBatcherTest");
+        Client::initThread("TenantOplogBatcherTest", getGlobalServiceContext()->getService());
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
         thread_pool_options.onCreateThread = [] {
-            Client::initThread("TenantOplogBatcher");
+            Client::initThread("TenantOplogBatcher", getGlobalServiceContext()->getService());
         };
         _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();

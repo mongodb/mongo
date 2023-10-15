@@ -107,28 +107,15 @@ public:
         return {};
     }
 
-    /** Placeholder for Service argument. */
-    static Service* unspecifiedService() {
-        return getGlobalServiceContext()->getService();
-    }
-
     /**
      * Creates a Client object and stores it in TLS for the current thread.
      *
-     * A `service` of `unspecifiedService()` can be given, and will take a default.
-     *
-     * A `session` of `noSession()` can be given, to default to a null pointer.
      * If `session` is non-null, then it will be used to augment the thread name
      * and for reporting purposes. Its ref count will be bumped by this Client.
      */
     static void initThread(StringData desc,
                            Service* service,
-                           std::shared_ptr<transport::Session> session);
-
-    /** Convenience for the common case of using an unspecifiedService and noSession. */
-    static void initThread(StringData desc) {
-        return initThread(desc, unspecifiedService(), noSession());
-    }
+                           std::shared_ptr<transport::Session> session = noSession());
 
     /**
      * Moves client into the thread_local for this thread. After this call, Client::getCurrent

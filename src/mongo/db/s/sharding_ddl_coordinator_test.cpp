@@ -44,7 +44,8 @@ public:
         _network = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
         thread_pool_options.onCreateThread = [] {
-            Client::initThread("ShardingDDLCoordinatorTest");
+            Client::initThread("ShardingDDLCoordinatorTest",
+                               getGlobalServiceContext()->getService());
         };
 
         _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);

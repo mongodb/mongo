@@ -115,7 +115,7 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId,
     // is to avoid interfering the thread local client in the test thread.
     Status status = Status::OK();
     stdx::thread enqueueDocumentThread([&]() {
-        Client::initThread("enqueueDocumentThread");
+        Client::initThread("enqueueDocumentThread", getGlobalServiceContext()->getService());
         status = _enqueueDocumentsFn(documents.cbegin(), documents.cend(), info);
     });
     // Wait until the enqueue finishes.
@@ -193,7 +193,7 @@ void OplogFetcherMock::_doStartup_inlock() {
     // _finishCallback is called only once (outside of the mutex) on shutdown.
     _waitForFinishThread = stdx::thread([this]() {
         auto future = [&] {
-            Client::initThread("OplogFetcherMock");
+            Client::initThread("OplogFetcherMock", getGlobalServiceContext()->getService());
             stdx::lock_guard<Latch> lock(_mutex);
             return _finishPromise->getFuture();
         }();

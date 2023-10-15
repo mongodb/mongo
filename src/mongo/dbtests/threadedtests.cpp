@@ -299,7 +299,7 @@ private:
 
     virtual void subthread(int x) {
         string threadName = (str::stream() << "ticketHolder" << x);
-        Client::initThread(threadName.c_str());
+        Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
 
         for (int i = 0; i < checkIns; i++) {

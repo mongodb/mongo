@@ -51,7 +51,7 @@ class AuthenticationSessionTestFixture : public ServiceContextTest {
 public:
     AuthenticationSessionTestFixture() {
         Client::releaseCurrent();
-        Client::initThread(getThreadName(), Client::unspecifiedService(), session);
+        Client::initThread(getThreadName(), getGlobalServiceContext()->getService(), session);
         opCtx = cc().makeOperationContext();
     }
 

@@ -109,7 +109,7 @@ public:
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getServiceContext(), std::move(authzManager));
         Client::releaseCurrent();
-        Client::initThread(getThreadName(), Client::unspecifiedService(), session);
+        Client::initThread(getThreadName(), getServiceContext()->getService(), session);
         authzSession = AuthorizationSession::get(getClient());
         _opCtx = makeOperationContext();
 

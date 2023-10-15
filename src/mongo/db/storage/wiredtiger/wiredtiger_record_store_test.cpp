@@ -1204,7 +1204,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
     // Store the client with an uncommitted transaction. Create a new, concurrent client.
     auto client1 = Client::releaseCurrent();
-    Client::initThread("client2");
+    Client::initThread("client2", getGlobalServiceContext()->getService());
 
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
     boost::optional<Lock::GlobalLock> gl2;

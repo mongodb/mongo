@@ -155,7 +155,8 @@ public:
         // recipient's primary-only service is set up.
         executor::ThreadPoolMock::Options threadPoolOptions;
         threadPoolOptions.onCreateThread = [] {
-            Client::initThread("TestReshardingDonorOplogIterator");
+            Client::initThread("TestReshardingDonorOplogIterator",
+                               getGlobalServiceContext()->getService());
         };
 
         auto executor = executor::makeThreadPoolTestExecutor(

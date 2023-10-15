@@ -141,8 +141,8 @@ TEST_F(MockClientTest, MockClientShutdown) {
     };
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
-        mongo::Client::initThread("MockClientShutdown");
-        client.start(getServiceContext());
+        mongo::Client::initThread("MockClientShutdown", getGlobalServiceContext()->getService())
+            client.start(getServiceContext());
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {

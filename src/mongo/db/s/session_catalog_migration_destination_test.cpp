@@ -279,7 +279,7 @@ public:
             insertRequest.serialize({}, &insertBuilder);
             sessionInfo.serialize(&insertBuilder);
 
-            Client::initThread("test-insert-thread");
+            Client::initThread("test-insert-thread", getGlobalServiceContext()->getService());
             auto innerOpCtx = Client::getCurrent()->makeOperationContext();
 
             auto opMsgRequest = OpMsgRequestBuilder::create(

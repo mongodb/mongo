@@ -59,13 +59,13 @@ void ClonerTestFixture::setUp() {
 
     // Release the current client and start a new client.
     _oldClient = Client::releaseCurrent();
-    Client::initThread("ClonerTest");
+    Client::initThread("ClonerTest", getGlobalServiceContext()->getService());
 
     ThreadPool::Options options;
     options.minThreads = 1U;
     options.maxThreads = 1U;
     options.onCreateThread = [](StringData threadName) {
-        Client::initThread(threadName);
+        Client::initThread(threadName, getGlobalServiceContext()->getService());
     };
     _dbWorkThreadPool = std::make_unique<ThreadPool>(options);
     _dbWorkThreadPool->startup();

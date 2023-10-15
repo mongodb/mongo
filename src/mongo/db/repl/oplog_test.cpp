@@ -176,7 +176,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     ThreadPool::Options options;
     options.maxThreads = 2U;
     options.onCreateThread = [](const std::string& name) {
-        Client::initThread(name);
+        Client::initThread(name, getGlobalServiceContext()->getService());
     };
     ThreadPool pool(options);
     pool.startup();

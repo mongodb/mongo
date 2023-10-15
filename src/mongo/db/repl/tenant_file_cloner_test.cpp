@@ -450,7 +450,7 @@ TEST_F(TenantFileClonerTest, InProgressStats) {
                                                   << "query"));
         // Run the cloner in another thread.
         TenantFileClonerThread = stdx::thread([&] {
-            Client::initThread("TenantFileClonerRunner");
+            Client::initThread("TenantFileClonerRunner", getGlobalServiceContext()->getService());
             ASSERT_OK(tenantFileCloner->run());
         });
         fileWritingFailpoint->waitForTimesEntered(Interruptible::notInterruptible(),

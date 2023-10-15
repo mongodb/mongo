@@ -369,7 +369,7 @@ void MozJSProxyScope::shutdownThread() {
  */
 void MozJSProxyScope::implThread(MozJSProxyScope* proxy) {
     if (hasGlobalServiceContext()) {
-        Client::initThread("js");
+        Client::initThread("js", getGlobalServiceContext()->getService());
     }
 
     std::unique_ptr<MozJSImplScope> scope;

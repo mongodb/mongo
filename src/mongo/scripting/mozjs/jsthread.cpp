@@ -209,7 +209,7 @@ private:
             try {
                 MozJSImplScope scope(static_cast<MozJSScriptEngine*>(getGlobalScriptEngine()),
                                      boost::none /* Don't override global jsHeapLimitMB */);
-                Client::initThread("js");
+                Client::initThread("js", getGlobalServiceContext()->getService());
                 scope.setParentStack(thisv->_sharedData->_stack);
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);
             } catch (...) {

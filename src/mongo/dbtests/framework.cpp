@@ -94,7 +94,7 @@ int runDbTests(int argc, char** argv) {
         shutdownGlobalStorageEngineCleanly(getGlobalServiceContext());
     });
 
-    Client::initThread("testsuite");
+    Client::initThread("testsuite", getGlobalServiceContext()->getService());
 
     auto globalServiceContext = getGlobalServiceContext();
     CollectionShardingStateFactory::set(

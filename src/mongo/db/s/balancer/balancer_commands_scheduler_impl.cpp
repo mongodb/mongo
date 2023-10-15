@@ -383,7 +383,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         _stateUpdatedCV.notify_all();
     });
 
-    Client::initThread("BalancerCommandsScheduler");
+    Client::initThread("BalancerCommandsScheduler", getGlobalServiceContext()->getService());
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {

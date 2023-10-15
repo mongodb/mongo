@@ -149,7 +149,7 @@ private:
 auto makeExecutor() {
     executor::ThreadPoolMock::Options options;
     options.onCreateThread = [] {
-        Client::initThread("executor");
+        Client::initThread("executor", getGlobalServiceContext()->getService());
     };
     auto net = std::make_unique<executor::NetworkInterfaceMock>();
     return executor::makeSharedThreadPoolTestExecutor(std::move(net), std::move(options));

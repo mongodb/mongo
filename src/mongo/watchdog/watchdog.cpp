@@ -145,7 +145,7 @@ void WatchdogPeriodicThread::setPeriod(Milliseconds period) {
 }
 
 void WatchdogPeriodicThread::doLoop() {
-    Client::initThread(_threadName);
+    Client::initThread(_threadName, getGlobalServiceContext()->getService());
     Client* client = &cc();
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.

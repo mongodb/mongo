@@ -179,7 +179,7 @@ void ReplCoordTest::init() {
     _externalState = externalState.get();
     executor::ThreadPoolMock::Options tpOptions;
     tpOptions.onCreateThread = []() {
-        Client::initThread("replexec");
+        Client::initThread("replexec", getGlobalServiceContext()->getService());
 
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);

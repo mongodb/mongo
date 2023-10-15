@@ -136,7 +136,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
     Date_t created = jsTime();
 
     _thread = stdx::thread([created] {
-        Client::initThread("Uptime-reporter");
+        Client::initThread("Uptime-reporter", getGlobalServiceContext()->getService());
 
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
         {

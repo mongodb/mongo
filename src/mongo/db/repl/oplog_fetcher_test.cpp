@@ -411,7 +411,7 @@ private:
     executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override {
         executor::ThreadPoolMock::Options options;
         options.onCreateThread = []() {
-            Client::initThread("OplogFetcherTest");
+            Client::initThread("OplogFetcherTest", getGlobalServiceContext()->getService());
         };
         return options;
     };

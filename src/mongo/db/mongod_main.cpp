@@ -471,7 +471,7 @@ MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 // of the initialization steps within.  If you add or change any of these steps, make sure
 // any necessary changes are also made to File Copy Based Initial Sync.
 ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
-    Client::initThread("initandlisten");
+    Client::initThread("initandlisten", serviceContext->getService());
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
     {
@@ -1224,8 +1224,8 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
     tpOptions.threadNamePrefix = "ReplNodeDbWorker-";
     tpOptions.poolName = "ReplNodeDbWorkerThreadPool";
     tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
-    tpOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
+    tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
+        Client::initThread(threadName.c_str(), serviceContext->getService());
 
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
@@ -1243,8 +1243,8 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     tpOptions.threadNamePrefix = "ReplCoord-";
     tpOptions.poolName = "ReplCoordThreadPool";
     tpOptions.maxThreads = 50;
-    tpOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
+    tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
+        Client::initThread(threadName.c_str(), serviceContext->getService());
 
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);

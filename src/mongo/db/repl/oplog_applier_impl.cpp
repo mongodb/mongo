@@ -491,7 +491,7 @@ void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAnd
 }
 
 void ApplyBatchFinalizerForJournal::_run() {
-    Client::initThread("ApplyBatchFinalizerForJournal");
+    Client::initThread("ApplyBatchFinalizerForJournal", getGlobalServiceContext()->getService());
 
     {
         stdx::lock_guard<Client> lk(cc());

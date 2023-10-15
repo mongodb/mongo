@@ -92,7 +92,7 @@ public:
         threadPoolOptions.threadNamePrefix = "ShardingDDLCoordinatorServiceTest-";
         threadPoolOptions.poolName = "ShardingDDLCoordinatorServiceTestThreadPool";
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str());
+            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         };
 
         auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(

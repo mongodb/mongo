@@ -148,7 +148,7 @@ public:
         _net = network.get();
         executor::ThreadPoolMock::Options thread_pool_options;
         thread_pool_options.onCreateThread = [] {
-            Client::initThread("TenantOplogApplier");
+            Client::initThread("TenantOplogApplier", getGlobalServiceContext()->getService());
         };
         _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();

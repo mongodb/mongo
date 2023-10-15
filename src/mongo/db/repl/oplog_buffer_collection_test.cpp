@@ -760,7 +760,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndFindsDocument) {
     std::size_t count = 0;
 
     stdx::thread peekingThread([&]() {
-        Client::initThread("peekingThread");
+        Client::initThread("peekingThread", getGlobalServiceContext()->getService());
         barrier.countDownAndWait();
         success = oplogBuffer.waitForData(Seconds(30));
         count = oplogBuffer.getCount();
@@ -791,14 +791,14 @@ TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameDocum
     std::size_t count2 = 0;
 
     stdx::thread peekingThread1([&]() {
-        Client::initThread("peekingThread1");
+        Client::initThread("peekingThread1", getGlobalServiceContext()->getService());
         barrier.countDownAndWait();
         success1 = oplogBuffer.waitForData(Seconds(30));
         count1 = oplogBuffer.getCount();
     });
 
     stdx::thread peekingThread2([&]() {
-        Client::initThread("peekingThread2");
+        Client::initThread("peekingThread2", getGlobalServiceContext()->getService());
         barrier.countDownAndWait();
         success2 = oplogBuffer.waitForData(Seconds(30));
         count2 = oplogBuffer.getCount();
@@ -829,7 +829,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataBlocksAndTimesOutWhenItDoesNotFindD
     std::size_t count = 0;
 
     stdx::thread peekingThread([&]() {
-        Client::initThread("peekingThread");
+        Client::initThread("peekingThread", getGlobalServiceContext()->getService());
         success = oplogBuffer.waitForData(Seconds(1));
         count = oplogBuffer.getCount();
     });

@@ -410,7 +410,7 @@ protected:
         dbThreadPoolOptions.minThreads = 1U;
         dbThreadPoolOptions.maxThreads = 1U;
         dbThreadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str());
+            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         };
         _dbWorkThreadPool = std::make_unique<ThreadPool>(dbThreadPoolOptions);
         _dbWorkThreadPool->startup();
@@ -470,7 +470,7 @@ protected:
         threadPoolOptions.minThreads = 1U;
         threadPoolOptions.maxThreads = 1U;
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-            Client::initThread(threadName.c_str());
+            Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         };
 
         auto dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateMock>();
@@ -596,7 +596,7 @@ private:
 executor::ThreadPoolMock::Options InitialSyncerTest::makeThreadPoolMockOptions() const {
     executor::ThreadPoolMock::Options options;
     options.onCreateThread = []() {
-        Client::initThread("InitialSyncerTest");
+        Client::initThread("InitialSyncerTest", getGlobalServiceContext()->getService());
     };
     return options;
 }
@@ -604,7 +604,7 @@ executor::ThreadPoolMock::Options InitialSyncerTest::makeThreadPoolMockOptions()
 executor::ThreadPoolMock::Options InitialSyncerTest::makeClonerThreadPoolMockOptions() const {
     executor::ThreadPoolMock::Options options;
     options.onCreateThread = []() {
-        Client::initThread("ClonerThreadTest");
+        Client::initThread("ClonerThreadTest", getGlobalServiceContext()->getService());
     };
     return options;
 }

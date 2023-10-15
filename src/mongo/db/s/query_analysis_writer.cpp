@@ -398,8 +398,9 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     threadPoolOptions.minThreads = gQueryAnalysisWriterMinThreadPoolSize;
     threadPoolOptions.threadNamePrefix = "QueryAnalysisWriter-";
     threadPoolOptions.poolName = "QueryAnalysisWriterThreadPool";
-    threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str());
+    threadPoolOptions.onCreateThread = [service =
+                                            opCtx->getService()](const std::string& threadName) {
+        Client::initThread(threadName.c_str(), service);
     };
     _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),

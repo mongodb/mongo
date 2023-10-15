@@ -67,7 +67,7 @@ void TaskRunnerTest::setUp() {
     ThreadPool::Options options;
     options.poolName = "TaskRunnerTest";
     options.onCreateThread = [](const std::string& name) {
-        Client::initThread(name);
+        Client::initThread(name, getGlobalServiceContext()->getService());
     };
     _threadPool = std::make_unique<ThreadPool>(options);
     _threadPool->startup();

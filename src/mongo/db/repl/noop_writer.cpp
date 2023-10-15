@@ -101,8 +101,8 @@ public:
     }
 
 private:
-    void run(const Seconds& waitTime, NoopWriteFn&& noopWrite) {
-        Client::initThread("NoopWriter");
+    void run(Seconds waitTime, NoopWriteFn&& noopWrite) {
+        Client::initThread("NoopWriter", getGlobalServiceContext()->getService());
 
         while (true) {
             try {

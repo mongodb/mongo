@@ -63,7 +63,7 @@ public:
 
     void setUp() override {
         setGlobalServiceContext(ServiceContext::make());
-        Client::initThread("CommandMirroringTest"_sd);
+        Client::initThread("CommandMirroringTest"_sd, getGlobalServiceContext()->getService());
     }
 
     void tearDown() override {

@@ -81,7 +81,7 @@ public:
 
     void setUp() override {
         setGlobalServiceContext(ServiceContext::make());
-        Client::initThread(kClientThreadName);
+        Client::initThread(kClientThreadName, getGlobalServiceContext()->getService());
         _instanceCount.store(0);
     }
 
@@ -131,7 +131,7 @@ TEST_F(ClientOutOfLineExecutorTest, DestructorExecutesLeftovers) {
     unittest::Barrier b1(2), b2(2);
 
     auto thread = stdx::thread([this, kDummiesCount, b1 = &b1, b2 = &b2]() {
-        Client::initThread("ThreadWithLeftovers"_sd);
+        Client::initThread("ThreadWithLeftovers"_sd, getGlobalServiceContext()->getService());
 
         auto handle = ClientOutOfLineExecutor::get(Client::getCurrent())->getHandle();
         for (auto i = 0; i < kDummiesCount; i++) {
@@ -161,7 +161,7 @@ TEST_F(ClientOutOfLineExecutorTest, ScheduleAfterClientThreadReturns) {
     ClientOutOfLineExecutor::QueueHandle handle;
 
     auto thread = stdx::thread([&handle]() mutable {
-        Client::initThread("ClientThread"_sd);
+        Client::initThread("ClientThread"_sd, getGlobalServiceContext()->getService());
         handle = ClientOutOfLineExecutor::get(Client::getCurrent())->getHandle();
         // Return to destroy the client, and close the task queue.
     });
