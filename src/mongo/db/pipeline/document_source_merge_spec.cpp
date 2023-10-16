@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/document_source_merge_spec.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -78,10 +79,12 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
                                    BSONObjBuilder* bob,
-                                   const SerializationContext& sc) {
-    bob->append(fieldName,
-                BSON("db" << DatabaseNameUtil::serialize(targetNss.dbName(), sc) << "coll"
-                          << targetNss.coll()));
+                                   const SerializationContext& sc,
+                                   const SerializationOptions& opts) {
+    bob->append(
+        fieldName,
+        BSON("db" << opts.serializeIdentifier(DatabaseNameUtil::serialize(targetNss.dbName(), sc))
+                  << "coll" << opts.serializeIdentifier(targetNss.coll())));
 }
 
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
@@ -118,11 +121,12 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
 
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
-                                  BSONObjBuilder* bob) {
+                                  BSONObjBuilder* bob,
+                                  const SerializationOptions& opts) {
     if (fields.size() == 1) {
-        bob->append(fieldName, fields.front());
+        bob->append(fieldName, opts.serializeFieldPathFromString(fields.front()));
     } else {
-        bob->append(fieldName, fields);
+        bob->append(fieldName, opts.serializeFieldPathFromString(fields));
     }
 }
 
