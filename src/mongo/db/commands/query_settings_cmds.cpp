@@ -34,17 +34,16 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/query_settings_cmds_gen.h"
-#include "mongo/db/commands/query_settings_utils.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include <algorithm>
 
 namespace mongo {
 namespace {

@@ -59,6 +59,7 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/assert_util.h"
@@ -106,6 +107,7 @@ public:
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         boost::intrusive_ptr<ExpressionContext> expCtx,
         std::unique_ptr<ParsedFindCommand> parsedFind,
+        query_settings::QuerySettings&& querySettings,
         bool explain = false,
         std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline = {},
         bool isCountLike = false,
@@ -182,6 +184,10 @@ public:
 
     std::shared_ptr<CollatorInterface> getCollatorShared() const {
         return _expCtx->getCollatorShared();
+    }
+
+    const query_settings::QuerySettings& getQuerySettings() const {
+        return _querySettings;
     }
 
     /**
@@ -429,6 +435,9 @@ private:
     bool _isUncacheableSbe = false;
 
     bool _isSearchQuery = false;
+
+    // Query settings associated with the given query.
+    query_settings::QuerySettings _querySettings = query_settings::QuerySettings();
 };
 
 }  // namespace mongo

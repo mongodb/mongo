@@ -90,7 +90,6 @@ void generatePlannerInfo(PlanExecutor* exec,
                          const MultipleCollectionAccessor& collections,
                          BSONObj extraInfo,
                          const SerializationContext& serializationContext,
-                         const query_settings::QuerySettings& querySettings,
                          BSONObjBuilder* out) {
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
@@ -140,6 +139,11 @@ void generatePlannerInfo(PlanExecutor* exec,
         if (query->getCollator()) {
             plannerBob.append("collation", query->getCollator()->getSpec().toBSON());
         }
+
+        auto& querySettings = query->getQuerySettings();
+        if (auto querySettingsBSON = querySettings.toBSON(); !querySettingsBSON.isEmpty()) {
+            plannerBob.append("querySettings", querySettingsBSON);
+        }
     }
 
     if (queryHash) {
@@ -148,10 +152,6 @@ void generatePlannerInfo(PlanExecutor* exec,
 
     if (planCacheKeyHash) {
         plannerBob.append("planCacheKey", zeroPaddedHex(*planCacheKeyHash));
-    }
-
-    if (auto querySettingsBSON = querySettings.toBSON(); !querySettingsBSON.isEmpty()) {
-        plannerBob.append("querySettings", querySettingsBSON);
     }
 
     if (!extraInfo.isEmpty()) {
@@ -361,7 +361,6 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
-                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     //
     // Use the stats trees to produce explain BSON.
@@ -371,8 +370,7 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(
-            exec, command, collections, extraInfo, serializationContext, querySettings, out);
+        generatePlannerInfo(exec, command, collections, extraInfo, serializationContext, out);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
@@ -416,7 +414,6 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
-                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     auto&& explainer = exec->getPlanExplainer();
     auto winningPlanTrialStats = explainer.getWinningPlanTrialStats();
@@ -448,7 +445,6 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   serializationContext,
                   command,
-                  querySettings,
                   out);
 
     explain_common::generateServerInfo(out);
@@ -461,7 +457,6 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
-                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     explainStages(exec,
                   MultipleCollectionAccessor(collection),
@@ -469,7 +464,6 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   serializationContext,
                   command,
-                  querySettings,
                   out);
 }
 
@@ -479,7 +473,6 @@ void Explain::explainStages(PlanExecutor* exec,
                             BSONObj extraInfo,
                             const SerializationContext& serializationContext,
                             const BSONObj& command,
-                            const query_settings::QuerySettings& querySettings,
                             BSONObjBuilder* out) {
     explainStages(exec,
                   MultipleCollectionAccessor(collection),
@@ -487,7 +480,6 @@ void Explain::explainStages(PlanExecutor* exec,
                   extraInfo,
                   serializationContext,
                   command,
-                  querySettings,
                   out);
 }
 

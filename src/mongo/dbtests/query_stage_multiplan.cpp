@@ -588,7 +588,6 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
                            BSONObj(),
                            SerializationContext::stateCommandReply(),
                            BSONObj(),
-                           query_settings::QuerySettings(),
                            &bob);
     BSONObj explained = bob.done();
 

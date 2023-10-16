@@ -85,6 +85,8 @@ public:
     boost::optional<const IndexName&> getIndexName() const;
     boost::optional<const NaturalOrderHint&> getNaturalHint() const;
 
+    size_t hash() const;
+
 private:
     stdx::variant<IndexKeyPattern, IndexName, NaturalOrderHint> _hint;
 };  // namespace index_hint

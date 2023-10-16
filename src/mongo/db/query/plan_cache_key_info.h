@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/container_hash/hash.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -37,6 +38,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/query_settings_gen.h"
+#include "mongo/db/query/query_settings_hash.h"
 
 namespace mongo {
 /**
@@ -44,8 +47,10 @@ namespace mongo {
  */
 class PlanCacheKeyInfo {
 public:
-    PlanCacheKeyInfo(CanonicalQuery::QueryShapeString shapeString, std::string indexabilityString)
-        : _lengthOfQueryShape{shapeString.size()} {
+    PlanCacheKeyInfo(CanonicalQuery::QueryShapeString shapeString,
+                     std::string indexabilityString,
+                     query_settings::QuerySettings querySettings)
+        : _lengthOfQueryShape{shapeString.size()}, _querySettings{std::move(querySettings)} {
         _key = std::move(shapeString);
         _key += indexabilityString;
     };
@@ -67,7 +72,9 @@ public:
     }
 
     uint32_t planCacheKeyHash() const {
-        return canonical_query_encoder::computeHash(stringData());
+        size_t hash = canonical_query_encoder::computeHash(stringData());
+        boost::hash_combine(hash, query_settings::hash(_querySettings));
+        return hash;
     }
 
     const std::string& toString() const {
@@ -101,5 +108,9 @@ private:
 
     // How long the "query shape" is.
     const size_t _lengthOfQueryShape;
+
+    // QuerySettings are part of the PlanCacheKey for both classic and SBE plan caches and because
+    // of that are stored in PlanCacheKeyInfo.
+    query_settings::QuerySettings _querySettings;
 };
 }  // namespace mongo

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
@@ -106,6 +107,19 @@ boost::optional<const NaturalOrderHint&> IndexHint::getNaturalHint() const {
         return {};
     }
     return stdx::get<NaturalOrderHint>(_hint);
+}
+
+size_t IndexHint::hash() const {
+    return stdx::visit(
+        OverloadedVisitor{
+            [&](const IndexKeyPattern& keyPattern) {
+                return SimpleBSONObjComparator::kInstance.hash(keyPattern);
+            },
+            [&](const IndexName& indexName) { return absl::Hash<std::string>{}(indexName); },
+            [&](const NaturalOrderHint& naturalOrderHint) {
+                return absl::Hash<NaturalOrderHint::Direction>{}(naturalOrderHint.direction);
+            }},
+        _hint);
 }
 
 };  // namespace mongo

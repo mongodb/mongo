@@ -42,7 +42,7 @@ enums:
     type: string
     values:
       kV1: "v1" # Classic + Multiplanner
-      kV2: "v2" # Nebari + Multiplanner
+      kV2: "v2" # SBE + Multiplanner
 
 structs:
   Namespace:

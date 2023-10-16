@@ -295,8 +295,6 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
                                BSONObj(),
                                SerializationContext::stateCommandReply(pExpCtx->serializationCtxt),
                                BSONObj(),
-                               // TODO: SERVER-79231 Apply QuerySettings for aggregate commands.
-                               query_settings::QuerySettings(),
                                &explainStatsBuilder);
     }
 

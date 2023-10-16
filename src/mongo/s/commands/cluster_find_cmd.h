@@ -228,7 +228,10 @@ public:
                     },
                     /*requiresFullQueryStatsFeatureFlag*/ false);
             }
-            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));
+
+            // TODO: SERVER-77469 Propagate QueryShapeHash/QuerySettings from mongos to the shards.
+            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
+                expCtx, std::move(parsedFind), query_settings::QuerySettings()));
 
             try {
                 // Do the work to generate the first batch of results. This blocks waiting to get

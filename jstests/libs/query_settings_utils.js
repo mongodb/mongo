@@ -80,14 +80,15 @@ export class QuerySettingsUtils {
         if (query.find) {
             const explain =
                 assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));
-            assert.docEq(expectedQuerySettings,
-                         getQueryPlanner(explain).querySettings,
-                         explain.queryPlanner);
+            const queryPlanner = getQueryPlanner(explain);
+            assert.docEq(expectedQuerySettings, queryPlanner.querySettings, queryPlanner);
         }
     }
 
     // Adjust the 'clusterServerParameterRefreshIntervalSecs' value for faster fetching of
     // 'querySettings' cluster parameter on mongos from the configsvr.
+    // TODO: Update cluster parameter cache on set-/removeQuerySettings and perform single retry on
+    // failure.
     setClusterParamRefreshSecs(newValue) {
         if (FixtureHelpers.isMongos(this.db)) {
             const response = assert.commandWorked(this.db.adminCommand(
@@ -109,11 +110,12 @@ export class QuerySettingsUtils {
      * Remove all query settings for the current tenant.
      */
     removeAllQuerySettings() {
-        this.adminDB.aggregate([{$querySettings: {}}])
-            .toArray()
-            .forEach(el => assert.commandWorked(
-                         this.adminDB.runCommand({removeQuerySettings: el.queryShapeHash})),
-                     this);
-        this.assertQueryShapeConfiguration([]);
+        let settingsArray = this.getQuerySettings();
+        while (settingsArray.length > 0) {
+            const setting = settingsArray.pop();
+            assert.commandWorked(
+                this.adminDB.runCommand({removeQuerySettings: setting.representativeQuery}));
+            this.assertQueryShapeConfiguration(settingsArray);
+        }
     }
 }

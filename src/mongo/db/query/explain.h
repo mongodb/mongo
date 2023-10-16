@@ -41,7 +41,6 @@
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/util/serialization_context.h"
 
@@ -88,7 +87,6 @@ public:
                               BSONObj extraInfo,
                               const SerializationContext& serializationContext,
                               const BSONObj& command,
-                              const query_settings::QuerySettings& querySettings,
                               BSONObjBuilder* out);
 
     static void explainStages(PlanExecutor* exec,
@@ -97,7 +95,6 @@ public:
                               BSONObj extraInfo,
                               const SerializationContext& serializationContext,
                               const BSONObj& command,
-                              const query_settings::QuerySettings& querySettings,
                               BSONObjBuilder* out);
 
     /**
@@ -110,7 +107,6 @@ public:
                               BSONObj extraInfo,
                               const SerializationContext& serializationContext,
                               const BSONObj& command,
-                              const query_settings::QuerySettings& querySettings,
                               BSONObjBuilder* out);
 
     /**
@@ -139,7 +135,6 @@ public:
         BSONObj extraInfo,
         const SerializationContext& serializationContext,
         const BSONObj& command,
-        const query_settings::QuerySettings& querySettings,
         BSONObjBuilder* out);
 
     /**

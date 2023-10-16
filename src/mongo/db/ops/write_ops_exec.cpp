@@ -2962,7 +2962,6 @@ void explainUpdate(OperationContext* opCtx,
                            BSONObj(),
                            SerializationContext::stateCommandReply(serializationContext),
                            command,
-                           query_settings::QuerySettings(),
                            &bodyBuilder);
 }
 
@@ -3003,7 +3002,6 @@ void explainDelete(OperationContext* opCtx,
                            BSONObj(),
                            SerializationContext::stateCommandReply(serializationContext),
                            command,
-                           query_settings::QuerySettings(),
                            &bodyBuilder);
 }
 

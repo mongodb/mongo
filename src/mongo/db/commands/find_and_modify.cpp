@@ -415,7 +415,6 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
             BSONObj(),
             SerializationContext::stateCommandReply(request.getSerializationContext()),
             cmdObj,
-            query_settings::QuerySettings(),
             &bodyBuilder);
     } else {
         auto updateRequest = UpdateRequest();
@@ -462,7 +461,6 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
             BSONObj(),
             SerializationContext::stateCommandReply(request.getSerializationContext()),
             cmdObj,
-            query_settings::QuerySettings(),
             &bodyBuilder);
     }
 }

@@ -45,6 +45,7 @@
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/plan_cache_key_info.h"
 #include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_version.h"
@@ -110,7 +111,8 @@ void encodeIndexability(const MatchExpression* tree,
 
 PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeString,
                                       const MatchExpression* root,
-                                      const CollectionPtr& collection) {
+                                      const CollectionPtr& collection,
+                                      const query_settings::QuerySettings& querySettings) {
 
     StringBuilder indexabilityKeyBuilder;
     plan_cache_detail::encodeIndexability(
@@ -118,7 +120,7 @@ PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeSt
         CollectionQueryInfo::get(collection).getPlanCacheIndexabilityState(),
         &indexabilityKeyBuilder);
 
-    return PlanCacheKeyInfo(std::move(shapeString), indexabilityKeyBuilder.str());
+    return PlanCacheKeyInfo(std::move(shapeString), indexabilityKeyBuilder.str(), querySettings);
 }
 
 namespace {
@@ -149,8 +151,12 @@ PlanCacheKey make(const CanonicalQuery& query,
                   const CollectionPtr& collection,
                   PlanCacheKeyTag<PlanCacheKey> tag) {
     auto shapeString = canonical_query_encoder::encodeClassic(query);
-    return {plan_cache_detail::makePlanCacheKeyInfo(
-        std::move(shapeString), query.getPrimaryMatchExpression(), collection)};
+    return {
+        plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
+                                                query.getPrimaryMatchExpression(),
+                                                collection,
+                                                query.getQuerySettings()),
+    };
 }
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
@@ -179,7 +185,8 @@ sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAcce
     auto shapeString = canonical_query_encoder::encodeSBE(query);
     return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                     query.getPrimaryMatchExpression(),
-                                                    collections.getMainCollection()),
+                                                    collections.getMainCollection(),
+                                                    query.getQuerySettings()),
             std::move(mainCollectionState),
             std::move(secondaryCollectionStates)};
 }

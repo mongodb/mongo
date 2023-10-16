@@ -282,7 +282,6 @@ public:
                                BSONObj(),
                                SerializationContext::stateCommandReply(serializationCtx),
                                cmdObj,
-                               query_settings::QuerySettings(),
                                &bodyBuilder);
         return Status::OK();
     }

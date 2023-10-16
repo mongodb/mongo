@@ -196,7 +196,6 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
  * Performs the lookup for the QuerySettings given the 'parsedRequest'.
  */
 query_settings::QuerySettings lookupQuerySettingsForFind(
-    OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const ParsedFindCommand& parsedRequest,
     const CollectionPtr& collection,
@@ -209,6 +208,8 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
              collection, *parsedRequest.findCommandRequest, parsedRequest.collator.get()))) {
         return query_settings::QuerySettings();
     }
+
+    auto opCtx = expCtx->opCtx;
     auto& manager = query_settings::QuerySettingsManager::get(opCtx);
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
@@ -271,8 +272,9 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             /*requiresFullQueryStatsFeatureFlag*/ false);
     }
 
-    return uassertStatusOK(
-        CanonicalQuery::canonicalize(std::move(expCtx), std::move(parsedRequest)));
+    auto querySettings = lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss);
+    return uassertStatusOK(CanonicalQuery::canonicalize(
+        std::move(expCtx), std::move(parsedRequest), std::move(querySettings)));
 }
 
 /**
@@ -454,10 +456,13 @@ public:
                                            std::move(findCommand),
                                            extensionsCallback,
                                            MatchExpressionParser::kAllowAllSpecialFeatures));
+
             auto querySettings =
-                lookupQuerySettingsForFind(opCtx, expCtx, *parsedRequest, collectionPtr, nss);
-            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
-                std::move(expCtx), std::move(parsedRequest), true /* explain */));
+                lookupQuerySettingsForFind(expCtx, *parsedRequest, collectionPtr, nss);
+            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(std::move(expCtx),
+                                                                   std::move(parsedRequest),
+                                                                   std::move(querySettings),
+                                                                   true /* explain */));
 
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
             // $$USER_ROLES for the find command.
@@ -501,18 +506,13 @@ public:
                                                 collection,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
-                                                permitYield));
+                                                permitYield,
+                                                QueryPlannerParams::DEFAULT));
 
             auto bodyBuilder = result->getBodyBuilder();
             // Got the execution tree. Explain it.
-            Explain::explainStages(exec.get(),
-                                   collection,
-                                   verbosity,
-                                   BSONObj(),
-                                   respSc,
-                                   _request.body,
-                                   querySettings,
-                                   &bodyBuilder);
+            Explain::explainStages(
+                exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
         }
 
         /**
@@ -772,7 +772,8 @@ public:
                                                 collection,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
-                                                permitYield));
+                                                permitYield,
+                                                QueryPlannerParams::DEFAULT));
 
             // If the executor supports it, find operations will maintain the storage engine state
             // across commands.

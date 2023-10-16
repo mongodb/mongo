@@ -150,7 +150,8 @@ PlanCacheKey makeKey(const CanonicalQuery& cq, const std::vector<CoreIndexInfo>&
     plan_cache_detail::encodeIndexability(
         cq.getPrimaryMatchExpression(), indexabilityState, &indexabilityKeyBuilder);
 
-    return {PlanCacheKeyInfo{cq.encodeKey(), indexabilityKeyBuilder.str()}};
+    return {PlanCacheKeyInfo{
+        cq.encodeKey(), indexabilityKeyBuilder.str(), query_settings::QuerySettings()}};
 }
 
 /**
@@ -1289,7 +1290,8 @@ protected:
 };
 
 const std::string mockKey("mock_cache_key");
-const PlanCacheKey CachePlanSelectionTest::ck{PlanCacheKeyInfo{mockKey, ""}};
+const PlanCacheKey CachePlanSelectionTest::ck{
+    PlanCacheKeyInfo{mockKey, "", query_settings::QuerySettings()}};
 
 //
 // Equality

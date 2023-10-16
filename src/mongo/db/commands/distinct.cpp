@@ -266,8 +266,6 @@ public:
                                BSONObj(),
                                SerializationContext::stateCommandReply(serializationCtx),
                                cmdObj,
-                               // TODO: SERVER-79230 Apply QuerySettings for distinct commands.
-                               query_settings::QuerySettings(),
                                &bodyBuilder);
         return Status::OK();
     }
