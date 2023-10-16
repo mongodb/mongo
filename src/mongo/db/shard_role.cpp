@@ -301,12 +301,9 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
     auto collOrView = acquireLocalCollectionOrView(opCtx, catalog, prerequisites);
     const auto& nss = prerequisites.nss;
 
-    const bool isPlacementConcernVersioned =
-        placementConcern.dbVersion || placementConcern.shardVersion;
-
     const auto scopedCSS = CollectionShardingState::acquire(opCtx, nss);
     auto collectionDescription =
-        scopedCSS->getCollectionDescription(opCtx, isPlacementConcernVersioned);
+        scopedCSS->getCollectionDescription(opCtx, placementConcern.shardVersion.has_value());
 
     invariant(!collectionDescription.isSharded() || placementConcern.shardVersion);
     auto optOwnershipFilter = collectionDescription.isSharded()
