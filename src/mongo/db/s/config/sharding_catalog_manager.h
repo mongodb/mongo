@@ -723,6 +723,16 @@ private:
     StatusWith<std::vector<DatabaseName>> _getDBNamesListFromShard(
         OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter);
 
+
+    /**
+     * Runs the listCollections command for every database provided on the specified host and
+     * returns the namespaces of all collections.
+     */
+    StatusWith<std::vector<CollectionType>> _getCollListFromShard(
+        OperationContext* opCtx,
+        const std::vector<DatabaseName>& dbNames,
+        std::shared_ptr<RemoteCommandTargeter> targeter);
+
     /**
      * Runs a command against a "shard" that is not yet in the cluster and thus not present in the
      * ShardRegistry.
@@ -849,7 +859,8 @@ private:
      */
     void _addShardInTransaction(OperationContext* opCtx,
                                 const ShardType& newShard,
-                                std::vector<DatabaseName>&& databasesInNewShard);
+                                std::vector<DatabaseName>&& databasesInNewShard,
+                                std::vector<CollectionType>&& collectionsInNewShard);
     /**
      * Use the internal transaction API to remove a shard.
      */
