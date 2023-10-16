@@ -1478,100 +1478,94 @@ public:
                                              numErrors);
             }
 
-            auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
-
-            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-            auto ws = std::make_unique<WorkingSet>();
-            auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
-
-            for (auto& reply : replies) {
-                WorkingSetID id = ws->allocate();
-                WorkingSetMember* member = ws->get(id);
-                member->keyData.clear();
-                member->recordId = RecordId();
-                member->resetDocument(SnapshotId(), reply.toBSON());
-                member->transitionToOwnedObj();
-                root->pushBack(id);
-            }
-
-            exec = uassertStatusOK(
-                plan_executor_factory::make(expCtx,
-                                            std::move(ws),
-                                            std::move(root),
-                                            &CollectionPtr::null,
-                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                            false, /* whether owned BSON must be returned */
-                                            cursorNss));
-
-
+            // Try and fit all replies into the firstBatch.
             long long batchSize = std::numeric_limits<long long>::max();
             if (req.getCursor() && req.getCursor()->getBatchSize()) {
                 batchSize = *req.getCursor()->getBatchSize();
+            }
+
+            if (batchSize > (long long)replies.size()) {
+                batchSize = replies.size();
             }
 
             size_t numRepliesInFirstBatch = 0;
             FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 BSONObj nextDoc;
-                PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
-                if (state == PlanExecutor::IS_EOF) {
-                    break;
-                }
-                invariant(state == PlanExecutor::ADVANCED);
+                nextDoc = replies[objCount].toBSON();
 
                 // If we can't fit this result inside the current batch, then we stash it for
                 // later.
                 if (!responseSizeTracker.haveSpaceForNext(nextDoc)) {
-                    exec->stashResult(nextDoc);
                     break;
                 }
 
                 numRepliesInFirstBatch++;
                 responseSizeTracker.add(nextDoc);
             }
-            CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
-            if (exec->isEOF()) {
-                invariant(numRepliesInFirstBatch == replies.size());
-                auto reply = BulkWriteCommandReply(
-                    BulkWriteCommandResponseCursor(0, std::move(replies), cursorNss), numErrors);
-                if (!retriedStmtIds.empty()) {
-                    reply.setRetriedStmtIds(std::move(retriedStmtIds));
+
+            long long cursorId = 0;
+
+            // We have replies left that will not make the first batch. Need to construct a cursor.
+            if (numRepliesInFirstBatch != replies.size()) {
+                auto expCtx = make_intrusive<ExpressionContext>(
+                    opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
+
+                std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+                auto ws = std::make_unique<WorkingSet>();
+                auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+
+                size_t currentIdx = numRepliesInFirstBatch;
+                for (; currentIdx < replies.size(); currentIdx++) {
+                    WorkingSetID id = ws->allocate();
+                    WorkingSetMember* member = ws->get(id);
+                    member->keyData.clear();
+                    member->recordId = RecordId();
+                    member->resetDocument(SnapshotId(), replies[currentIdx].toBSON());
+                    member->transitionToOwnedObj();
+                    root->pushBack(id);
                 }
 
-                _setElectionIdAndOpTime(opCtx, reply);
+                exec = uassertStatusOK(
+                    plan_executor_factory::make(expCtx,
+                                                std::move(ws),
+                                                std::move(root),
+                                                &CollectionPtr::null,
+                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                false, /* whether owned BSON must be returned */
+                                                cursorNss));
 
-                return reply;
+                exec->saveState();
+                exec->detachFromOperationContext();
+
+                auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
+                    opCtx,
+                    {std::move(exec),
+                     cursorNss,
+                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+                     APIParameters::get(opCtx),
+                     opCtx->getWriteConcern(),
+                     repl::ReadConcernArgs::get(opCtx),
+                     ReadPreferenceSetting::get(opCtx),
+                     reqObj,
+                     bulk_write_common::getPrivileges(req)});
+                cursorId = pinnedCursor.getCursor()->cursorid();
+
+                pinnedCursor->incNBatches();
+                pinnedCursor->incNReturnedSoFar(replies.size());
             }
 
-            exec->saveState();
-            exec->detachFromOperationContext();
-
-            auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
-                opCtx,
-                {std::move(exec),
-                 cursorNss,
-                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
-                 APIParameters::get(opCtx),
-                 opCtx->getWriteConcern(),
-                 repl::ReadConcernArgs::get(opCtx),
-                 ReadPreferenceSetting::get(opCtx),
-                 reqObj,
-                 bulk_write_common::getPrivileges(req)});
-            auto cursorId = pinnedCursor.getCursor()->cursorid();
-
-            pinnedCursor->incNBatches();
-            pinnedCursor->incNReturnedSoFar(replies.size());
+            CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
 
             replies.resize(numRepliesInFirstBatch);
             auto reply = BulkWriteCommandReply(
                 BulkWriteCommandResponseCursor(cursorId, std::move(replies), cursorNss), numErrors);
+
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }
 
             _setElectionIdAndOpTime(opCtx, reply);
-
             return reply;
         }
 
