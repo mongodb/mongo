@@ -103,3 +103,10 @@ feature_flags:
         default: true
         version: 7.0
         shouldBeFCVGated: true
+    featureFlagBanEncryptionOptionsInCollectionCreation:
+        description: "Feature flag that bans encryption options from being used in createCollection
+        commands"
+        cpp_varname: gFeatureFlagBanEncryptionOptionsInCollectionCreation
+        default: true
+        version: 7.2
+        shouldBeFCVGated: true

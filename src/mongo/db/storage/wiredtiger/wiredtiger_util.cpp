@@ -64,6 +64,7 @@
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -491,7 +492,9 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
     }
 
-    if (encryptionOptsRegex->matchView(config) &&
+    if (gFeatureFlagBanEncryptionOptionsInCollectionCreation.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        encryptionOptsRegex->matchView(config) &&
         MONGO_likely(!allowEncryptionOptionsInCreationString.shouldFail())) {
         return {ErrorCodes::IllegalOperation,
                 "Manual configuration of encryption options as part of 'configString' is not "

@@ -909,6 +909,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='db_commands_test',
     source=[
+        'create_command_test.cpp',
         'create_indexes_test.cpp',
         'external_data_source_commands_test.cpp',
         'fle_compact_test.cpp',
