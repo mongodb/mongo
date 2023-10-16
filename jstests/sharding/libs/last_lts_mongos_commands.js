@@ -18,6 +18,7 @@ export const commandsAddedToMongosSinceLastLTS = [
     "cleanupStructuredEncryptionData",
     "cpuload",
     "createUnsplittableCollection",
+    "getDatabaseVersion",
     "fsyncUnlock",
     "lockInfo",
     "moveCollection",

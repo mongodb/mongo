@@ -255,6 +255,7 @@ let testCases = {
     getChangeStreamState: {skip: "does not return user data"},
     getClusterParameter: {skip: "does not return user data"},
     getCmdLineOpts: {skip: "does not return user data"},
+    getDatabaseVersion: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
     getDiagnosticData: {skip: "does not return user data"},
     getLog: {skip: "does not return user data"},

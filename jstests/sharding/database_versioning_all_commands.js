@@ -15,6 +15,7 @@
  *      ensures all test cases match existing commands. This is useful for commands that only exist
  *      in enterprise modules, for instance.
  */
+
 import {
     commandsAddedToMongosSinceLastLTS,
     commandsRemovedFromMongosSinceLastLTS
@@ -28,14 +29,14 @@ function getNewDbName(dbName) {
     return "db" + getNewDbName.counter;
 }
 
-function assertMongosDatabaseVersion(conn, dbName, dbVersion) {
-    let res = conn.adminCommand({getShardVersion: dbName});
-    assert.commandWorked(res);
-    assert.eq(dbVersion, res.version);
-}
-
-function assertShardDatabaseVersion(shard, dbName, dbVersion) {
-    let res = shard.adminCommand({getDatabaseVersion: dbName});
+function assertMatchingDatabaseVersion(conn, dbName, dbVersion) {
+    let res = conn.adminCommand({getDatabaseVersion: dbName});
+    // TODO (SERVER-81967): Remove once 8.0 becomes last LTS.
+    if (!res.ok && res.code === ErrorCodes.CommandNotFound) {
+        res = assert.commandWorked(conn.adminCommand({getShardVersion: dbName}));
+        assert.eq(dbVersion, res.version);
+        return;
+    }
     assert.commandWorked(res);
     assert.eq(dbVersion, res.dbVersion);
 }
@@ -116,11 +117,11 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
 
     // Ensure all nodes know the dbVersion before the movePrimary.
     assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
-    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
     assert.commandWorked(primaryShardBefore.adminCommand({_flushDatabaseCacheUpdates: dbName}));
-    assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
     assert.commandWorked(primaryShardAfter.adminCommand({_flushDatabaseCacheUpdates: dbName}));
-    assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(primaryShardAfter, dbName, dbVersionBefore);
 
     // Run movePrimary through the second mongos.
     assert.commandWorked(st.s1.adminCommand({movePrimary: dbName, to: primaryShardAfter.name}));
@@ -128,9 +129,9 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
         st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
     // After the movePrimary, both old and new primary shards should have cleared the dbVersion.
-    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
-    assertShardDatabaseVersion(primaryShardBefore, dbName, {});
-    assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+    assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
+    assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
 
     // Run the test case's command.
     const res = st.s0.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
@@ -148,17 +149,17 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
         // 3. Which should have caused the mongos to refresh and retry against the new primary shard
         // 4. The new primary shard should have returned StaleDbVersion and refreshed
         // 5. Which should have caused the mongos to refresh and retry again, this time succeeding.
-        assertMongosDatabaseVersion(st.s0, dbName, dbVersionAfter);
-        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
-        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
+        assertMatchingDatabaseVersion(st.s0, dbName, dbVersionAfter);
+        assertMatchingDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+        assertMatchingDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
     } else {
         // If the command does not participate in database versioning:
         // 1. The mongos should have targeted the old primary shard but not attached a dbVersion
         // 2. The old primary shard should have returned an ok response
         // 3. Both old and new primary shards should have cleared the dbVersion
-        assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
-        assertShardDatabaseVersion(primaryShardBefore, dbName, {});
-        assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+        assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
+        assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
+        assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
     }
 
     if (testCase.cleanUp) {
@@ -186,9 +187,9 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
                ", primary shard after: " + primaryShardAfter);
 
     // Ensure the router and primary shard know the dbVersion before the drop/recreate database.
-    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
-    assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
-    assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+    assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(primaryShardBefore, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
 
     // Drop and recreate the database through the second mongos. Insert the entry for the new
     // database explicitly to ensure it is assigned the other shard as the primary shard.
@@ -218,9 +219,9 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
 
     // The only change after the drop/recreate database should be that the old primary shard should
     // have cleared its dbVersion.
-    assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
-    assertShardDatabaseVersion(primaryShardBefore, dbName, {});
-    assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+    assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
+    assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
+    assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
 
     // Run the test case's command.
     const res = st.s0.getDB(testCase.runsAgainstAdminDb ? "admin" : dbName).runCommand(command);
@@ -238,17 +239,17 @@ function testCommandAfterDropRecreateDatabase(testCase, st) {
         // 3. Which should have caused the mongos to refresh and retry against the new primary shard
         // 4. The new primary shard should have returned StaleDbVersion and refreshed
         // 5. Which should have caused the mongos to refresh and retry again, this time succeeding.
-        assertMongosDatabaseVersion(st.s0, dbName, dbVersionAfter);
-        assertShardDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
-        assertShardDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
+        assertMatchingDatabaseVersion(st.s0, dbName, dbVersionAfter);
+        assertMatchingDatabaseVersion(primaryShardBefore, dbName, dbVersionAfter);
+        assertMatchingDatabaseVersion(primaryShardAfter, dbName, dbVersionAfter);
     } else {
         // If the command does not participate in database versioning, none of the nodes' view of
         // the dbVersion should have changed:
         // 1. The mongos should have targeted the old primary shard but not attached a dbVersion
         // 2. The old primary shard should have returned an ok response
-        assertMongosDatabaseVersion(st.s0, dbName, dbVersionBefore);
-        assertShardDatabaseVersion(primaryShardBefore, dbName, {});
-        assertShardDatabaseVersion(primaryShardAfter, dbName, {});
+        assertMatchingDatabaseVersion(st.s0, dbName, dbVersionBefore);
+        assertMatchingDatabaseVersion(primaryShardBefore, dbName, {});
+        assertMatchingDatabaseVersion(primaryShardAfter, dbName, {});
     }
 
     // Clean up.
@@ -535,6 +536,7 @@ let testCases = {
     getAuditConfig: {skip: "not on a user database", conditional: true},
     getClusterParameter: {skip: "always targets the config server"},
     getCmdLineOpts: {skip: "executes locally on mongos (not sent to any remote node)"},
+    getDatabaseVersion: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDefaultRWConcern: {skip: "executes locally on mongos (not sent to any remote node)"},
     getDiagnosticData: {skip: "executes locally on mongos (not sent to any remote node)"},
     getLog: {skip: "executes locally on mongos (not sent to any remote node)"},
