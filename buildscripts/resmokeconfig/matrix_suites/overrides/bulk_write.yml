@@ -9,9 +9,6 @@
 - name: single_op_core_excluded_files
   value:
     exclude_files:
-    # TODO (SERVER-80190): Enable the following test(s).
-    - jstests/core/timeseries/timeseries_bucket_index.js
-    - jstests/core/timeseries/timeseries_bucket_manual_removal.js
     # The following timeseries tests use failpoints that bulkWrite doesn't support.
     - jstests/core/timeseries/timeseries_delete_hint.js
     # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}

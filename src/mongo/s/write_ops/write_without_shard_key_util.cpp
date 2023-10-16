@@ -201,7 +201,8 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          const BSONObj& query,
                          const BSONObj& collation,
                          const boost::optional<BSONObj>& let,
-                         const boost::optional<LegacyRuntimeConstants>& legacyRuntimeConstants) {
+                         const boost::optional<LegacyRuntimeConstants>& legacyRuntimeConstants,
+                         bool isTimeseriesViewRequest) {
     // For existing unittests that do not expect sharding utilities to be initialized, we can set
     // this failpoint if we know the test will not use the two phase write protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
@@ -219,14 +220,13 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     }
 
     auto tsFields = cri.cm.getTimeseriesFields();
-    bool isTimeseries = tsFields.has_value();
 
     // updateOne and deleteOne do not use the two phase protocol for single writes that specify
     // _id in their queries, unless a document is being upserted. An exact _id match requires
     // default collation if the _id value is a collatable type.
     if (isUpdateOrDelete && query.hasField("_id") &&
         CollectionRoutingInfoTargeter::isExactIdQuery(opCtx, nss, query, collation, cri.cm) &&
-        !isUpsert && !isTimeseries) {
+        !isUpsert && !isTimeseriesViewRequest) {
         return false;
     }
 
@@ -244,7 +244,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,
         cri.cm.getShardKeyPattern(),
-        !isTimeseries
+        !isTimeseriesViewRequest
             ? query
             : timeseries::getBucketLevelPredicateForRouting(query,
                                                             expCtx,

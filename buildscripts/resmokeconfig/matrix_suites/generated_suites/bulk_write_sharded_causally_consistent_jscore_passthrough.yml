@@ -85,8 +85,6 @@ selector:
   - jstests/core/**/no_db_created.js
   - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/benchrun_pipeline_updates.js
-  - jstests/core/timeseries/timeseries_bucket_index.js
-  - jstests/core/timeseries/timeseries_bucket_manual_removal.js
   - jstests/core/timeseries/timeseries_delete_hint.js
   - jstests/core/**/set_param1.js
   - jstests/core/**/profile*.js

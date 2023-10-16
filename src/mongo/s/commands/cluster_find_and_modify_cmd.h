@@ -175,12 +175,14 @@ private:
                                  const BSONObj& cmdObj,
                                  const Status& responseStatus,
                                  const BSONObj& response,
+                                 bool isTimeseriesViewRequest,
                                  BSONObjBuilder* result);
 
     // Two-phase protocol to run a findAndModify command without a shard key or _id.
     static void _runCommandWithoutShardKey(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            const BSONObj& cmdObj,
+                                           bool isTimeseriesViewRequest,
                                            BSONObjBuilder* result);
 
     // Two-phase protocol to run an explain for a findAndModify command without a shard key or _id.
@@ -199,6 +201,7 @@ private:
                             const BSONObj& cmdObj,
                             bool isExplain,
                             boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                            bool isTimeseriesViewRequest,
                             BSONObjBuilder* result);
 
     // TODO SERVER-67429: Remove this function.
@@ -209,6 +212,7 @@ private:
         const boost::optional<DatabaseVersion>& dbVersion,
         const NamespaceString& nss,
         const BSONObj& cmdObj,
+        bool isTimeseriesViewRequest,
         BSONObjBuilder* result);
 
     // Update related command execution metrics.

@@ -4,8 +4,6 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # TODO SERVER-80190: Remove this tag.
- *   assumes_unsharded_collection,
  * ]
  */
 

@@ -204,8 +204,6 @@ selector:
   - jstests/core/**/benchrun_pipeline_updates.js
   - jstests/core/**/cursora.js
   - jstests/core/**/SERVER-23626.js
-  - jstests/core/timeseries/timeseries_bucket_index.js
-  - jstests/core/timeseries/timeseries_bucket_manual_removal.js
   - jstests/core/timeseries/timeseries_delete_hint.js
   - jstests/core/**/set_param1.js
   - jstests/core/**/profile*.js

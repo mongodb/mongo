@@ -404,7 +404,10 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                 // insert a new one.
                 updatedShardKey = wouldChangeOwningShardErrorInfo &&
                     documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                                      opCtx, nss, *wouldChangeOwningShardErrorInfo);
+                                      opCtx,
+                                      nss,
+                                      *wouldChangeOwningShardErrorInfo,
+                                      nss.isTimeseriesBucketsCollection());
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -457,7 +460,10 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
             try {
                 // Delete the original document and insert the new one
                 updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                    opCtx, nss, *wouldChangeOwningShardErrorInfo);
+                    opCtx,
+                    nss,
+                    *wouldChangeOwningShardErrorInfo,
+                    nss.isTimeseriesBucketsCollection());
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -720,7 +726,8 @@ bool ClusterWriteCmd::InvocationBase::_runExplainWithoutShardKey(
                 query,
                 collation,
                 _batchedRequest.getLet(),
-                _batchedRequest.getLegacyRuntimeConstants())) {
+                _batchedRequest.getLegacyRuntimeConstants(),
+                false /* isTimeseriesViewRequest */)) {
             // Explain currently cannot be run within a transaction, so each command is instead run
             // separately outside of a transaction, and we compose the results at the end.
             auto clusterQueryWithoutShardKeyExplainRes = [&] {

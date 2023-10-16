@@ -162,6 +162,7 @@ namespace documentShardKeyUpdateUtil {
 bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      const WouldChangeOwningShardInfo& documentKeyChangeInfo,
+                                     bool isTimeseriesViewRequest,
                                      bool fleCrudProcessed) {
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
@@ -169,8 +170,7 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
     // If the WouldChangeOwningShard error happens for a timeseries collection, the pre-image is
     // a measurement to be deleted and so the delete command should be sent to the timeseries view.
     auto deleteCmdObj = constructShardKeyDeleteCmdObj(
-        nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
-        updatePreImage);
+        isTimeseriesViewRequest ? nss.getTimeseriesViewNamespace() : nss, updatePreImage);
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, fleCrudProcessed);
 
     return executeOperationsAsPartOfShardKeyUpdate(

@@ -83,6 +83,7 @@ static constexpr StringData kNonDuplicateKeyErrorContext =
 bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      const WouldChangeOwningShardInfo& documentKeyChangeInfo,
+                                     bool isTimeseriesViewRequest,
                                      bool fleCrudProcessed = false);
 
 /**

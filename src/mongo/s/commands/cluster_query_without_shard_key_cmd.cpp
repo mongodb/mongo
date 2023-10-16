@@ -131,6 +131,7 @@ struct ParsedCommandInfo {
     int stmtId = kUninitializedStmtId;
     boost::optional<UpdateRequest> updateRequest;
     boost::optional<BSONObj> hint;
+    bool isTimeseriesNamespace = false;
 };
 
 struct AsyncRequestSenderResponseData {
@@ -286,7 +287,9 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
                     << " is not a supported opType for bulkWrite in _clusterQueryWithoutShardKey",
                 op.getType() == BulkWriteCRUDOp::kUpdate ||
                     op.getType() == BulkWriteCRUDOp::kDelete);
-        parsedInfo.nss = bulkWriteRequest.getNsInfo()[op.getNsInfoIdx()].getNs();
+        auto& nsInfo = bulkWriteRequest.getNsInfo()[op.getNsInfoIdx()];
+        parsedInfo.nss = nsInfo.getNs();
+        parsedInfo.isTimeseriesNamespace = nsInfo.getIsTimeseriesNamespace();
         parsedInfo.let = bulkWriteRequest.getLet();
         if (op.getType() == BulkWriteCRUDOp::kUpdate) {
             // The update case.
@@ -319,6 +322,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
         parsedInfo.query = updateRequest.getUpdates().front().getQ();
         parsedInfo.hint = updateRequest.getUpdates().front().getHint();
         parsedInfo.let = updateRequest.getLet();
+        parsedInfo.isTimeseriesNamespace = updateRequest.getIsTimeseriesNamespace();
 
         // In the batch write path, when the request is reconstructed to be passed to
         // the two phase write protocol, only the stmtIds field is used.
@@ -340,6 +344,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
         parsedInfo.query = deleteRequest.getDeletes().front().getQ();
         parsedInfo.hint = deleteRequest.getDeletes().front().getHint();
         parsedInfo.let = deleteRequest.getLet();
+        parsedInfo.isTimeseriesNamespace = deleteRequest.getIsTimeseriesNamespace();
 
         // In the batch write path, when the request is reconstructed to be passed to
         // the two phase write protocol, only the stmtIds field is used.
@@ -364,6 +369,8 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
             ? findAndModifyRequest.getSort()
             : boost::none;
         parsedInfo.let = findAndModifyRequest.getLet();
+        parsedInfo.isTimeseriesNamespace = findAndModifyRequest.getIsTimeseriesNamespace();
+
         if ((parsedInfo.upsert = findAndModifyRequest.getUpsert().get_value_or(false))) {
             parsedInfo.updateRequest = UpdateRequest{};
             parsedInfo.updateRequest->setNamespaceString(findAndModifyRequest.getNamespace());
@@ -425,8 +432,9 @@ public:
                 }
             }
 
-            const auto& timeseriesFields =
-                (cri.cm.isSharded() && cri.cm.getTimeseriesFields().has_value())
+            const auto& timeseriesFields = cri.cm.isSharded() &&
+                    cri.cm.getTimeseriesFields().has_value() &&
+                    parsedInfoFromRequest.isTimeseriesNamespace
                 ? cri.cm.getTimeseriesFields()
                 : boost::none;
             auto cmdObj =

@@ -218,8 +218,6 @@ selector:
   - jstests/core/**/SERVER-23626.js
   - jstests/core/**/find_and_modify_server7660.js
   - jstests/core/**/upsert_shell.js
-  - jstests/core/timeseries/timeseries_bucket_index.js
-  - jstests/core/timeseries/timeseries_bucket_manual_removal.js
   - jstests/core/timeseries/timeseries_delete_hint.js
   - jstests/core/**/set_param1.js
   - jstests/core/**/profile*.js
