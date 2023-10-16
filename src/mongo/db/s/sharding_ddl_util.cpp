@@ -161,8 +161,6 @@ Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonE
 namespace sharding_ddl_util {
 namespace {
 
-const auto kUnsplittableShardKey = KeyPattern(BSON("_id" << 1));
-
 void deleteChunks(OperationContext* opCtx,
                   const std::shared_ptr<Shard>& configShard,
                   const UUID& collectionUUID,
@@ -784,10 +782,6 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
                                             inlineExecutor,
                                             std::move(customTxnClient));
     txn.run(newOpCtx, std::move(transactionChain));
-}
-
-const KeyPattern& unsplittableCollectionShardKey() {
-    return kUnsplittableShardKey;
 }
 
 boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,

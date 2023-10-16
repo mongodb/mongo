@@ -79,7 +79,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_util.h"
-#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -101,7 +100,6 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
@@ -139,7 +137,6 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -661,110 +658,6 @@ StatusWith<std::vector<DatabaseName>> ShardingCatalogManager::_getDBNamesListFro
     return dbNames;
 }
 
-StatusWith<std::vector<CollectionType>> ShardingCatalogManager::_getCollListFromShard(
-    OperationContext* opCtx,
-    const std::vector<DatabaseName>& dbNames,
-    std::shared_ptr<RemoteCommandTargeter> targeter) {
-    std::vector<CollectionType> nssList;
-    const auto collCreationTime = [&]() {
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        return currentTime.clusterTime().asTimestamp();
-    }();
-
-    for (auto& dbName : dbNames) {
-        Status fetchStatus =
-            Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-        auto host = uassertStatusOK(
-            targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
-        const Milliseconds maxTimeMS =
-            std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
-
-        auto fetcherCallback = [&](const Fetcher::QueryResponseStatus& dataStatus,
-                                   Fetcher::NextAction* nextAction,
-                                   BSONObjBuilder* getMoreBob) {
-            // Throw out any accumulated results on error.
-            if (!dataStatus.isOK()) {
-                fetchStatus = dataStatus.getStatus();
-                return;
-            }
-            const auto& data = dataStatus.getValue();
-
-            try {
-                for (const BSONObj& doc : data.documents) {
-                    auto collInfo = ListCollectionsReplyItem::parse(
-                        IDLParserContext("ListCollectionReply"), doc);
-                    // Skip views and special collections.
-                    if (!collInfo.getInfo() || !collInfo.getInfo()->getUuid()) {
-                        continue;
-                    }
-
-                    const auto nss = NamespaceStringUtil::deserialize(dbName, collInfo.getName());
-
-                    if (nss.isNamespaceAlwaysUntracked()) {
-                        continue;
-                    }
-
-                    uassert(ErrorCodes::InvalidNamespace,
-                            str::stream()
-                                << "Namespace too long. Namespace: " << nss.toStringForErrorMsg()
-                                << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
-                            nss.size() <= NamespaceString::MaxNsShardedCollectionLen);
-                    auto coll = CollectionType(nss,
-                                               OID::gen(),
-                                               collCreationTime,
-                                               Date_t::now(),
-                                               collInfo.getInfo()->getUuid().get(),
-                                               sharding_ddl_util::unsplittableCollectionShardKey());
-                    coll.setUnsplittable(true);
-                    if (!doc["options"].eoo() && !doc["options"]["timeseries"].eoo()) {
-                        coll.setTimeseriesFields(TypeCollectionTimeseriesFields::parse(
-                            IDLParserContext("AddShardContext"),
-                            doc["options"]["timeseries"].Obj()));
-                    }
-                    nssList.push_back(coll);
-                }
-                *nextAction = Fetcher::NextAction::kNoAction;
-            } catch (DBException& ex) {
-                fetchStatus = ex.toStatus();
-                return;
-            }
-            fetchStatus = Status::OK();
-
-            if (!getMoreBob) {
-                return;
-            }
-            getMoreBob->append("getMore", data.cursorId);
-            getMoreBob->append("collection", data.nss.coll());
-        };
-        ListCollections listCollections;
-        listCollections.setDbName(dbName);
-        auto fetcher =
-            std::make_unique<Fetcher>(_executorForAddShard.get(),
-                                      host,
-                                      dbName,
-                                      listCollections.toBSON({}),
-                                      fetcherCallback,
-                                      BSONObj() /* metadata tracking, only used for shards */,
-                                      maxTimeMS /* command network timeout */,
-                                      maxTimeMS /* getMore network timeout */);
-
-        auto scheduleStatus = fetcher->schedule();
-        if (!scheduleStatus.isOK()) {
-            return scheduleStatus;
-        }
-
-        auto joinStatus = fetcher->join(opCtx);
-        if (!joinStatus.isOK()) {
-            return joinStatus;
-        }
-        if (!fetchStatus.isOK()) {
-            return fetchStatus;
-        }
-    }
-
-    return nssList;
-}
-
 void ShardingCatalogManager::installConfigShardIdentityDocument(OperationContext* opCtx) {
     invariant(!ShardingState::get(opCtx)->enabled());
 
@@ -844,7 +737,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     }
     ShardType& shardType = shardStatus.getValue();
 
-    // TODO SERVER-80532: the sharding catalog might lose some databases.
     // Check that none of the existing shard candidate's dbs exist already
     auto dbNamesStatus = _getDBNamesListFromShard(opCtx, targeter);
     if (!dbNamesStatus.isOK()) {
@@ -932,17 +824,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // while blocking on the network).
         FixedFCVRegion fcvRegion(opCtx);
 
-        std::vector<CollectionType> collList;
-        if (feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(*fcvRegion)) {
-            // TODO SERVER-80532: the sharding catalog might lose some collections.
-            auto listStatus = _getCollListFromShard(opCtx, dbNamesStatus.getValue(), targeter);
-            if (!listStatus.isOK()) {
-                return listStatus.getStatus();
-            }
-
-            collList = std::move(listStatus.getValue());
-        }
-
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",
                 !fcvRegion->isUpgradingOrDowngrading());
@@ -981,8 +862,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
               "Going to insert new entry for shard into config.shards",
               "shardType"_attr = shardType.toString());
 
-        _addShardInTransaction(
-            opCtx, shardType, std::move(dbNamesStatus.getValue()), std::move(collList));
+        _addShardInTransaction(opCtx, shardType, std::move(dbNamesStatus.getValue()));
 
         // Record in changelog
         BSONObjBuilder shardDetails;
@@ -1673,8 +1553,7 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
 void ShardingCatalogManager::_addShardInTransaction(
     OperationContext* opCtx,
     const ShardType& newShard,
-    std::vector<DatabaseName>&& databasesInNewShard,
-    std::vector<CollectionType>&& collectionsInNewShard) {
+    std::vector<DatabaseName>&& databasesInNewShard) {
 
     const auto existingShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
@@ -1691,12 +1570,7 @@ void ShardingCatalogManager::_addShardInTransaction(
 
     // 2. Set up and run the commit statements
     // TODO SERVER-66261 newShard may be passed by reference.
-    // TODO SERVER-81582: generate batches of transactions to insert the database/placementHistory
-    // and collection/placementHistory before adding the shard in config.shards.
-    auto transactionChain = [opCtx,
-                             newShard,
-                             dbNames = std::move(databasesInNewShard),
-                             nssList = std::move(collectionsInNewShard)](
+    auto transactionChain = [newShard, dbNames = std::move(databasesInNewShard)](
                                 const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
         write_ops::InsertCommandRequest insertShardEntry(NamespaceString::kConfigsvrShardsNamespace,
                                                          {newShard.toBSON()});
@@ -1730,60 +1604,6 @@ void ShardingCatalogManager::_addShardInTransaction(
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertDatabaseEntriesResponse) {
                 uassertStatusOK(insertDatabaseEntriesResponse.toStatus());
-                if (nssList.empty()) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
-
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-                std::vector<BSONObj> collEntries;
-
-                std::transform(nssList.begin(),
-                               nssList.end(),
-                               std::back_inserter(collEntries),
-                               [&](const CollectionType& coll) { return coll.toBSON(); });
-                write_ops::InsertCommandRequest insertCollectionEntries(
-                    NamespaceString::kConfigsvrCollectionsNamespace, std::move(collEntries));
-                return txnClient.runCRUDOp(insertCollectionEntries, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertCollectionEntriesResponse) {
-                uassertStatusOK(insertCollectionEntriesResponse.toStatus());
-                if (nssList.empty()) {
-                    BatchedCommandResponse noOpResponse;
-                    noOpResponse.setStatus(Status::OK());
-                    noOpResponse.setN(0);
-
-                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
-                }
-                std::vector<BSONObj> chunkEntries;
-                const auto unsplittableShardKey =
-                    ShardKeyPattern(sharding_ddl_util::unsplittableCollectionShardKey());
-                const auto shardId = ShardId(newShard.getName());
-                std::transform(
-                    nssList.begin(),
-                    nssList.end(),
-                    std::back_inserter(chunkEntries),
-                    [&](const CollectionType& coll) {
-                        // Create a single chunk for this
-                        ChunkType chunk(
-                            coll.getUuid(),
-                            {coll.getKeyPattern().globalMin(), coll.getKeyPattern().globalMax()},
-                            {{coll.getEpoch(), coll.getTimestamp()}, {1, 0}},
-                            shardId);
-                        chunk.setOnCurrentShardSince(coll.getTimestamp());
-                        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shardId)});
-                        return chunk.toConfigBSON();
-                    });
-
-                write_ops::InsertCommandRequest insertChunkEntries(
-                    NamespaceString::kConfigsvrChunksNamespace, std::move(chunkEntries));
-                return txnClient.runCRUDOp(insertChunkEntries, {});
-            })
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertChunkEntriesResponse) {
-                uassertStatusOK(insertChunkEntriesResponse.toStatus());
                 if (dbNames.empty()) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
@@ -1801,15 +1621,6 @@ void ShardingCatalogManager::_addShardInTransaction(
                                                                  {ShardId(newShard.getName())})
                                        .toBSON();
                                });
-                std::transform(nssList.begin(),
-                               nssList.end(),
-                               std::back_inserter(placementEntries),
-                               [&](const CollectionType& coll) {
-                                   return NamespacePlacementType(NamespaceString(coll.getNss()),
-                                                                 newShard.getTopologyTime(),
-                                                                 {ShardId(newShard.getName())})
-                                       .toBSON();
-                               });
                 write_ops::InsertCommandRequest insertPlacementEntries(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace,
                     std::move(placementEntries));
@@ -1822,13 +1633,11 @@ void ShardingCatalogManager::_addShardInTransaction(
             .semi();
     };
 
-    {
-        auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-        auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
-        txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
-        txn.run(opCtx, transactionChain);
-    }
+    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
+    txn.run(opCtx, transactionChain);
 
     // 3. Reuse the existing notification object to also broadcast the event of successful commit.
     notification.setPhase(CommitPhaseEnum::kSuccessful);
