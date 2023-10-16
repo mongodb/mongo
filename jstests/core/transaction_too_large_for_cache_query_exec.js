@@ -9,7 +9,6 @@
  *   requires_persistence,
  *   requires_non_retryable_writes,
  *   requires_wiredtiger,
- *   // TODO (SERVER-72880): Fix SELinux Test Executor Failures
  *   no_selinux
  * ]
  */
