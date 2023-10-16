@@ -13,10 +13,10 @@ assert.commandWorked(
 const cqfColl = cqfDb.cqf_compare;
 cqfColl.drop();
 
-// Disable via TestData so there's no conflict in case a variant has this enabled.
-TestData.setParameters.featureFlagCommonQueryFramework = false;
-TestData.setParameters.internalQueryFrameworkControl = 'trySbeEngine';
-const classicConn = MongoRunner.runMongod();
+const classicConn = MongoRunner.runMongod({
+    setParameter:
+        {featureFlagCommonQueryFramework: false, internalQueryFrameworkControl: "trySbeEngine"}
+});
 assert.neq(null, classicConn, "mongod was unable to start up");
 
 const classicColl = classicConn.getDB(jsTestName()).classic_compare;

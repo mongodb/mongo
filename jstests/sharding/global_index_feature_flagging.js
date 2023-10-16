@@ -5,8 +5,6 @@
  * requires_fcv_61, featureFlagGlobalIndexes, multiversion_incompatible
  * ]
  */
-delete TestData.setParameters.featureFlagGlobalIndexes;
-delete TestData.setParametersMongos.featureFlagGlobalIndexes;
 
 // Default value of the featureFlagGlobalIndexes is false
 const st = new ShardingTest({

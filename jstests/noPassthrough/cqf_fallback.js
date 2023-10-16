@@ -603,11 +603,10 @@ MongoRunner.stopMongod(conn);
 // Restart the mongod and verify that we never use the bonsai optimizer if the feature flag is not
 // set.
 
-// To do this, we modify the TestData directly; this ensures we disable the feature flag even if
-// a variant has enabled it be default.
-TestData.setParameters.featureFlagCommonQueryFramework = false;
-TestData.setParameters.internalQueryFrameworkControl = 'trySbeEngine';
-conn = MongoRunner.runMongod();
+conn = MongoRunner.runMongod({
+    setParameter:
+        {featureFlagCommonQueryFramework: false, internalQueryFrameworkControl: "trySbeEngine"}
+});
 assert.neq(null, conn, "mongod was unable to start up");
 
 db = conn.getDB("test");
@@ -650,9 +649,13 @@ MongoRunner.stopMongod(conn);
 // Show that we can't start a mongod with the framework control set to tryBonsaiExperimental when
 // test commands are off.
 TestData.enableTestCommands = false;
-TestData.setParameters.internalQueryFrameworkControl = "tryBonsaiExperimental";
 try {
-    conn = MongoRunner.runMongod();
+    conn = MongoRunner.runMongod({
+        setParameter: {
+            featureFlagCommonQueryFramework: false,
+            internalQueryFrameworkControl: "tryBonsaiExperimental"
+        }
+    });
     MongoRunner.stopMongod(conn);
     assert(false, "MongoD was able to start up when it should have failed");
 } catch (e) {
@@ -664,11 +667,12 @@ try {
 
 // Show that we can't start a mongod with the framework control set to tryBonsai
 // when the feature flag is off.
-TestData.setParameters.featureFlagCommonQueryFramework = false;
 TestData.enableTestCommands = true;
-TestData.setParameters.internalQueryFrameworkControl = "tryBonsai";
 try {
-    conn = MongoRunner.runMongod();
+    conn = MongoRunner.runMongod({
+        setParameter:
+            {featureFlagCommonQueryFramework: false, internalQueryFrameworkControl: "tryBonsai"}
+    });
     MongoRunner.stopMongod(conn);
     assert(false, "MongoD was able to start up when it should have failed");
 } catch (e) {

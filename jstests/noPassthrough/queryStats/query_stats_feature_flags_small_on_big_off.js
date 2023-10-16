@@ -33,31 +33,34 @@ function runTest(conn) {
     verifyMetrics(queryStats);
 }
 
-// Disable via TestData so there's no conflict in case a variant has all flags enabled.
-TestData.setParameters.featureFlagQueryStatsFindCommand = true;
-TestData.setParameters.featureFlagQueryStats = false;
 const conn = MongoRunner.runMongod({
     setParameter: {
         internalQueryStatsRateLimit: -1,
+        featureFlagQueryStatsFindCommand: true,
+        featureFlagQueryStats: false
     },
 });
 assert.neq(null, conn, 'failed to start mongod');
 runTest(conn);
 MongoRunner.stopMongod(conn);
 
-TestData.setParametersMongos.featureFlagQueryStatsFindCommand = true;
-TestData.setParametersMongos.featureFlagQueryStats = false;
 const st = new ShardingTest({
     mongos: 1,
-    shards: 1,
-    config: 1,
-    rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
             internalQueryStatsRateLimit: -1,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
+            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}",
+            featureFlagQueryStatsFindCommand: true,
+            featureFlagQueryStats: false
         }
-    }
+    },
+    config: 1,
+    configOptions:
+        {setParameter: {featureFlagQueryStatsFindCommand: true, featureFlagQueryStats: false}},
+    shards: 1,
+    rs: {nodes: 1},
+    rsOptions:
+        {setParameter: {featureFlagQueryStatsFindCommand: true, featureFlagQueryStats: false}}
 });
 runTest(st.s);
 st.stop();
