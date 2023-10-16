@@ -503,19 +503,19 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
         feature_flags::gTimeseriesDeletesSupport.isEnabled(
             serverGlobalParams.featureCompatibility) ||
         feature_flags::gTimeseriesUpdatesSupport.isEnabled(serverGlobalParams.featureCompatibility);
-    if (!arbitraryTimeseriesWritesEnabled || cri.cm.isSharded() ||
+    if (!arbitraryTimeseriesWritesEnabled || cri.cm.hasRoutingTable() ||
         maybeTsNss.isTimeseriesBucketsCollection()) {
         return cri;
     }
 
-    // If the 'maybeTsNss' namespace is not a timeseries buckets collection and not sharded, try
-    // to get the CollectionRoutingInfo for the corresponding timeseries buckets collection to
-    // see if it's sharded and it really is a timeseries buckets collection. We should do this to
-    // figure out whether we need to use the two phase write protocol or not on timeseries buckets
-    // collections.
+    // If the 'maybeTsNss' namespace is not a timeseries buckets collection and is not tracked on
+    // the configsvr, try to get the CollectionRoutingInfo for the corresponding timeseries buckets
+    // collection to see if it's tracked and it really is a timeseries buckets collection. We should
+    // do this to figure out whether we need to use the two phase write protocol or not on
+    // timeseries buckets collections.
     auto bucketCollNss = maybeTsNss.makeTimeseriesBucketsNamespace();
     auto bucketCollCri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketCollNss));
-    if (!bucketCollCri.cm.isSharded() || !bucketCollCri.cm.getTimeseriesFields()) {
+    if (!bucketCollCri.cm.hasRoutingTable() || !bucketCollCri.cm.getTimeseriesFields()) {
         return cri;
     }
 
@@ -609,12 +609,12 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
 
     const auto cri = getCollectionRoutingInfo(opCtx, cmdObj, nss);
     const auto& cm = cri.cm;
-    auto isShardedTimeseries = cm.isSharded() && cm.getTimeseriesFields();
-    if (isShardedTimeseries) {
+    auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
+    if (isTrackedTimeseries) {
         nss = std::move(cm.getNss());
     }
     // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
-    // writing to a sharded timeseries collection.
+    // writing to a tracked timeseries collection.
 
     boost::optional<ShardId> shardId;
     const BSONObj query = cmdObj.getObjectField("query");
@@ -622,7 +622,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
     const auto isUpsert = cmdObj.getBoolField("upsert");
     const auto let = getLet(cmdObj);
     const auto rc = getLegacyRuntimeConstants(cmdObj);
-    if (cm.isSharded()) {
+    if (cm.hasRoutingTable()) {
         auto expCtx = makeExpressionContextWithDefaultsForTargeter(
             opCtx, nss, cri, collation, boost::none /* verbosity */, let, rc);
         if (write_without_shard_key::useTwoPhaseProtocol(
@@ -647,7 +647,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
             opCtx,
             nss,
             makeExplainCmd(opCtx,
-                           isShardedTimeseries ? replaceNamespaceByBucketNss(cmdObj, nss) : cmdObj,
+                           isTrackedTimeseries ? replaceNamespaceByBucketNss(cmdObj, nss) : cmdObj,
                            verbosity),
             verbosity,
             &bob);
@@ -655,7 +655,7 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         return Status::OK();
     }
 
-    auto shardVersion = cm.isSharded()
+    auto shardVersion = cm.hasRoutingTable()
         ? boost::make_optional(cri.getShardVersion(*shardId))
         : boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED());
 
@@ -703,8 +703,8 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
 
     auto cri = getCollectionRoutingInfo(opCtx, cmdObj, nss);
     const auto& cm = cri.cm;
-    auto isShardedTimeseries = cm.isSharded() && cm.getTimeseriesFields();
-    if (isShardedTimeseries) {
+    auto isTrackedTimeseries = cm.hasRoutingTable() && cm.getTimeseriesFields();
+    if (isTrackedTimeseries) {
         nss = std::move(cm.getNss());
     }
     // Note: at this point, 'nss' should be the timeseries buckets collection namespace if we're
@@ -712,7 +712,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
 
     // Append mongoS' runtime constants to the command object before forwarding it to the shard.
     auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
-    if (cm.isSharded()) {
+    if (cm.hasRoutingTable()) {
         BSONObj query = cmdObjForShard.getObjectField("query");
         const bool isUpsert = cmdObjForShard.getBoolField("upsert");
         const BSONObj collation = getCollation(cmdObjForShard);
@@ -751,7 +751,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                 // sharded and we shard the underlying timeseries buckets collection. So, if we're
                 // writing to a sharded timeseries collection, replace the target namespace in the
                 // command by 'nss' which is the buckets namespace.
-                if (isShardedTimeseries) {
+                if (isTrackedTimeseries) {
                     cmdObjForShard = replaceNamespaceByBucketNss(cmdObjForShard, nss);
                 }
 
@@ -759,7 +759,11 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
                     opCtx, nss, applyReadWriteConcern(opCtx, this, cmdObjForShard), &result);
             }
         } else {
-            findAndModifyTargetedShardedCount.increment(1);
+            if (cm.isSharded()) {
+                findAndModifyTargetedShardedCount.increment(1);
+            } else {
+                findAndModifyUnshardedCount.increment(1);
+            }
 
             ShardId shardId = targetSingleShard(expCtx, cm, query, collation);
 
