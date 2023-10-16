@@ -980,7 +980,7 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
 
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
-            "hangWaitingForConflictingPreparedBatch", [&]() {
+            "hangTimeSeriesBatchPrepareWaitingForConflictingOperation", [&]() {
                 ASSERT_OK(prepareCommit(*_bucketCatalog, batch2));
             }};
 
@@ -1031,7 +1031,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
 
     {
         auto task = RunBackgroundTaskAndWaitForFailpoint{
-            "hangWaitingForConflictingPreparedBatch", [&]() {
+            "hangTimeSeriesBatchPrepareWaitingForConflictingOperation", [&]() {
                 ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2));
             }};
 
@@ -1669,98 +1669,114 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // Try to insert with no open bucket. Should hint to re-open.
-    auto result = tryInsert(_opCtx,
-                            *_bucketCatalog,
-                            _ns1,
-                            _getCollator(_ns1),
-                            _getTimeseriesOptions(_ns1),
-                            ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
-                            CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result.getStatus());
-    ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
-    ASSERT(!stdx::get<SuccessfulInsertion>(result.getValue()).batch);
-    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
-        stdx::get<SuccessfulInsertion>(result.getValue()).candidate));
+    {
+        auto result =
+            tryInsert(_opCtx,
+                      *_bucketCatalog,
+                      _ns1,
+                      _getCollator(_ns1),
+                      _getTimeseriesOptions(_ns1),
+                      ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
+                      CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
+        ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
+            stdx::get<ReopeningContext>(result.getValue()).candidate));
+    }
 
     // Actually insert so we do have an open bucket to test against.
-    result = insert(_opCtx,
-                    *_bucketCatalog,
-                    _ns1,
-                    _getCollator(_ns1),
-                    _getTimeseriesOptions(_ns1),
-                    ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
-                    CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result.getStatus());
-    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
-    ASSERT(batch);
-    auto bucketId = batch->bucketHandle.bucketId;
-    ASSERT(claimWriteBatchCommitRights(*batch));
-    ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
-    ASSERT_EQ(batch->measurements.size(), 1);
-    finish(_opCtx, *_bucketCatalog, batch, {});
+    BucketId bucketId{_ns1, OID::gen()};  // placeholder initialization, will be set properly below
+    {
+        auto result = insert(_opCtx,
+                             *_bucketCatalog,
+                             _ns1,
+                             _getCollator(_ns1),
+                             _getTimeseriesOptions(_ns1),
+                             ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"}})"),
+                             CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
+        ASSERT(batch);
+        bucketId = batch->bucketHandle.bucketId;
+        ASSERT(claimWriteBatchCommitRights(*batch));
+        ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
+        ASSERT_EQ(batch->measurements.size(), 1);
+        finish(_opCtx, *_bucketCatalog, batch, {});
+    }
 
     // Time backwards should hint to re-open.
-    result = tryInsert(_opCtx,
-                       *_bucketCatalog,
-                       _ns1,
-                       _getCollator(_ns1),
-                       _getTimeseriesOptions(_ns1),
-                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
-                       CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result.getStatus());
-    ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
-    ASSERT(!stdx::get<SuccessfulInsertion>(result.getValue()).batch);
-    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
-        stdx::get<SuccessfulInsertion>(result.getValue()).candidate));
+    {
+        auto result =
+            tryInsert(_opCtx,
+                      *_bucketCatalog,
+                      _ns1,
+                      _getCollator(_ns1),
+                      _getTimeseriesOptions(_ns1),
+                      ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
+                      CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
+        ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
+            stdx::get<ReopeningContext>(result.getValue()).candidate));
+    }
 
     // Time forward should not hint to re-open.
-    result = tryInsert(_opCtx,
-                       *_bucketCatalog,
-                       _ns1,
-                       _getCollator(_ns1),
-                       _getTimeseriesOptions(_ns1),
-                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}})"),
-                       CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result.getStatus());
-    ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
-    ASSERT(!stdx::get<SuccessfulInsertion>(result.getValue()).batch);
-    ASSERT_TRUE(stdx::holds_alternative<std::monostate>(result.getValue().candidate));
+    {
+        auto result =
+            tryInsert(_opCtx,
+                      *_bucketCatalog,
+                      _ns1,
+                      _getCollator(_ns1),
+                      _getTimeseriesOptions(_ns1),
+                      ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}})"),
+                      CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
+        ASSERT_TRUE(stdx::holds_alternative<std::monostate>(
+            stdx::get<ReopeningContext>(result.getValue()).candidate));
+    }
 
     // Now let's insert something with a different meta, so we open a new bucket, see we're past the
     // memory limit, and archive the existing bucket.
-    result =
-        insert(_opCtx,
-               *_bucketCatalog,
-               _ns1,
-               _getCollator(_ns1),
-               _getTimeseriesOptions(_ns1),
-               ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}, "tag": "foo"})"),
-               CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result.getStatus());
-    ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
-    ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
-    batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
-    ASSERT_NE(batch->bucketHandle.bucketId, bucketId);
-    ASSERT(batch);
-    ASSERT(claimWriteBatchCommitRights(*batch));
-    ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
-    ASSERT_EQ(batch->measurements.size(), 1);
-    finish(_opCtx, *_bucketCatalog, batch, {});
+    {
+        auto result = insert(
+            _opCtx,
+            *_bucketCatalog,
+            _ns1,
+            _getCollator(_ns1),
+            _getTimeseriesOptions(_ns1),
+            ::mongo::fromjson(R"({"time":{"$date":"2022-06-07T15:34:40.000Z"}, "tag": "foo"})"),
+            CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
+        ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
+        auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
+        ASSERT_NE(batch->bucketHandle.bucketId, bucketId);
+        ASSERT(batch);
+        ASSERT(claimWriteBatchCommitRights(*batch));
+        ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
+        ASSERT_EQ(batch->measurements.size(), 1);
+        finish(_opCtx, *_bucketCatalog, batch, {});
+    }
 
     // If we try to insert something that could fit in the archived bucket, we should get it back as
     // a candidate.
-    result = tryInsert(_opCtx,
-                       *_bucketCatalog,
-                       _ns1,
-                       _getCollator(_ns1),
-                       _getTimeseriesOptions(_ns1),
-                       ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
-                       CombineWithInsertsFromOtherClients::kAllow);
-    ASSERT_OK(result.getStatus());
-    ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
-    ASSERT(!stdx::get<SuccessfulInsertion>(result.getValue()).batch);
-    ASSERT_TRUE(stdx::holds_alternative<OID>(result.getValue().candidate));
-    ASSERT_EQ(stdx::get<OID>(result.getValue().candidate), bucketId.oid);
+    {
+        auto result =
+            tryInsert(_opCtx,
+                      *_bucketCatalog,
+                      _ns1,
+                      _getCollator(_ns1),
+                      _getTimeseriesOptions(_ns1),
+                      ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
+                      CombineWithInsertsFromOtherClients::kAllow);
+        ASSERT_OK(result.getStatus());
+        ASSERT(stdx::holds_alternative<ReopeningContext>(result.getValue()));
+        ASSERT_TRUE(
+            stdx::holds_alternative<OID>(stdx::get<ReopeningContext>(result.getValue()).candidate));
+        ASSERT_EQ(stdx::get<OID>(stdx::get<ReopeningContext>(result.getValue()).candidate),
+                  bucketId.oid);
+    }
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket) {
@@ -1839,8 +1855,13 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
         return autoColl->checkValidation(opCtx, bucketDoc);
     };
 
-    BucketFindResult findResult;
-    findResult.bucketToReopen = BucketToReopen{bucketDoc, validator};
+    ReopeningContext reopeningContext{*_bucketCatalog,
+                                      _bucketCatalog->stripes[0],
+                                      WithLock::withoutLock(),
+                                      batch->bucketKey,
+                                      getCurrentEra(_bucketCatalog->bucketStateRegistry),
+                                      {}};
+    reopeningContext.bucketToReopen = BucketToReopen{bucketDoc, validator};
 
     // We should be able to pass in a valid bucket and insert into it.
     result = insert(_opCtx,
@@ -1850,8 +1871,9 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
                     _getTimeseriesOptions(_ns1),
                     ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
                     CombineWithInsertsFromOtherClients::kAllow,
-                    findResult);
+                    &reopeningContext);
     ASSERT_OK(result.getStatus());
+    ASSERT_TRUE(stdx::holds_alternative<SuccessfulInsertion>(result.getValue()));
     batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(batch);
     ASSERT_EQ(batch->bucketHandle.bucketId.oid, bucketDoc["_id"].OID());
@@ -1874,9 +1896,9 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
                        ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:35:40.000Z"}})"),
                        CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result.getStatus());
-    ASSERT_TRUE(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
-    ASSERT(!stdx::get<SuccessfulInsertion>(result.getValue()).batch);
-    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(result.getValue().candidate));
+    ASSERT_TRUE(stdx::holds_alternative<ReopeningContext>(result.getValue()));
+    ASSERT_TRUE(stdx::holds_alternative<std::vector<BSONObj>>(
+        stdx::get<ReopeningContext>(result.getValue()).candidate));
 }
 
 TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
@@ -1940,6 +1962,123 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::WriteConflict);
 }
+
+TEST_F(BucketCatalogTest, ReopeningConflictsWithReopening) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // First attempt to insert to a series should trigger a reopening request to check for a bucket
+    // on disk.
+    auto result1 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  _getTimeseriesOptions(_ns1),
+                  ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"a"})"),
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1.getStatus());
+    ASSERT(stdx::holds_alternative<ReopeningContext>(result1.getValue()));
+
+    // A subsequent attempt while the first one is still outstanding should conflict and yield a
+    // InsertWaiter.
+    auto result2 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  _getTimeseriesOptions(_ns1),
+                  ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:50.000Z"},"tag":"a"})"),
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2.getStatus());
+    ASSERT(stdx::holds_alternative<InsertWaiter>(result2.getValue()));
+}
+
+TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Stage and prepare an insert.
+    auto result1 =
+        insert(_opCtx,
+               *_bucketCatalog,
+               _ns1,
+               _getCollator(_ns1),
+               _getTimeseriesOptions(_ns1),
+               ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"b"})"),
+               CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1.getStatus());
+    auto batch1 = stdx::get<SuccessfulInsertion>(result1.getValue()).batch;
+    ASSERT(batch1);
+    ASSERT(claimWriteBatchCommitRights(*batch1));
+    ASSERT_OK(prepareCommit(*_bucketCatalog, batch1));
+    ASSERT_EQ(batch1->measurements.size(), 1);
+
+    // Stage and abort another insert on the same bucket, so that new inserts can't land without
+    // reopening.
+    auto result2 =
+        insert(_opCtx,
+               *_bucketCatalog,
+               _ns1,
+               _getCollator(_ns1),
+               _getTimeseriesOptions(_ns1),
+               ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:45.000Z"},"tag":"b"})"),
+               CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2.getStatus());
+    auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
+    ASSERT(batch2);
+    ASSERT(claimWriteBatchCommitRights(*batch2));
+    abort(*_bucketCatalog, batch2, {ErrorCodes::WriteConflict, "foo"});
+
+    // A subsequent attempt to reopen a bucket should conflict and yield a InsertWaiter.
+    auto result3 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  _getTimeseriesOptions(_ns1),
+                  ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:50.000Z"},"tag":"b"})"),
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result3.getStatus());
+    ASSERT(stdx::holds_alternative<InsertWaiter>(result3.getValue()));
+}
+
+TEST_F(BucketCatalogTest, PreparingBatchConflictsWithReopening) {
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // First attempt to insert to a series should trigger a reopening request to check for a bucket
+    // on disk.
+    boost::optional<StatusWith<InsertResult>> result1 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  _getTimeseriesOptions(_ns1),
+                  ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})"),
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1->getStatus());
+    ASSERT(stdx::holds_alternative<ReopeningContext>(result1->getValue()));
+
+    // Stage an insert for the same series, but a different bucket.
+    auto result2 =
+        insert(_opCtx,
+               *_bucketCatalog,
+               _ns1,
+               _getCollator(_ns1),
+               _getTimeseriesOptions(_ns1),
+               ::mongo::fromjson(R"({"time":{"$date":"2022-07-05T15:34:40.000Z"},"tag":"c"})"),
+               CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2.getStatus());
+    auto batch = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
+    ASSERT(batch);
+    ASSERT(claimWriteBatchCommitRights(*batch));
+
+    // Ensure it blocks until we resolve the reopening request.
+    auto task = RunBackgroundTaskAndWaitForFailpoint{
+        "hangTimeSeriesBatchPrepareWaitingForConflictingOperation", [&]() {
+            ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
+        }};
+    result1 = boost::none;
+}
+
 
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
