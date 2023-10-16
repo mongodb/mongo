@@ -6,6 +6,7 @@ import itertools
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -581,19 +582,22 @@ class GDBDumper(Dumper):
         if not core_files:
             raise RuntimeError(f"No core dumps found in {core_file_dir}")
 
+        tmp_dir = os.path.join(analysis_dir, "tmp")
+        os.makedirs(tmp_dir, exist_ok=True)
         report = Report({"failures": 0, "results": []})
         for filename in core_files:
             core_file_path = os.path.abspath(filename)
             basename = os.path.basename(filename)
+            self._root_logger.info("Starting analysis of %s", basename)
             log_stream = StringIO()
             logger = logging.Logger(basename, level=logging.DEBUG)
             handler = logging.StreamHandler(log_stream)
             handler.setFormatter(logging.Formatter(fmt="%(message)s"))
             logger.addHandler(handler)
             try:
-                exit_code, status = self.analyze_core(core_file_path=core_file_path,
-                                                      install_dir=install_dir,
-                                                      analysis_dir=analysis_dir, logger=logger)
+                exit_code, status = self.analyze_core(
+                    core_file_path=core_file_path, install_dir=install_dir,
+                    analysis_dir=analysis_dir, tmp_dir=tmp_dir, logger=logger)
             except Exception:
                 logger.exception("Exception occured while analyzing core")
                 exit_code = 1
@@ -607,9 +611,11 @@ class GDBDumper(Dumper):
             if exit_code == 1:
                 report["failures"] += 1
             report["results"].append(result)
+            self._root_logger.info("Analysis of %s ended with status %s", basename, status)
+        shutil.rmtree(tmp_dir)
         return report
 
-    def analyze_core(self, core_file_path: str, install_dir: str, analysis_dir: str,
+    def analyze_core(self, core_file_path: str, install_dir: str, analysis_dir: str, tmp_dir: str,
                      logger: logging.Logger) -> Tuple[int, str]:  # returns (exit_code, test_status)
         cmds = []
         dbg = self._find_debugger()
@@ -641,24 +647,36 @@ class GDBDumper(Dumper):
         logging_dir = os.path.join(analysis_dir, basename)
         os.makedirs(logging_dir, exist_ok=True)
 
-        def get_file_name(process_type: str) -> str:
-            return os.path.join(logging_dir, f"{basename}.{process_type}.txt")
-
-        raw_stacks_filename = get_file_name("stacks")
         cmds += [
             f"set solib-search-path {lib_dir}",
-            "set index-cache directory /tmp/index-cache",
+            f"set index-cache directory {tmp_dir}",
             "set index-cache enabled on",
             f"file {binary_path}",
             f"core-file {core_file_path}",
-            f"echo \\nWriting raw stacks to {raw_stacks_filename}.\\n",
-            # This sends output to log file rather than stdout until we turn logging off.
-            f"set logging file {raw_stacks_filename}",
-            "set logging enabled on",
-            "thread apply all bt",
-            "set logging enabled off",
-            "show index-cache stats"
+            "python import gdbmongo",
+            "python gdbmongo.register_printers()",
+            "set width 0",
         ]
+
+        def add_commands(command: str, name: str):
+            file_path = os.path.join(logging_dir, f"{basename}.{name}.txt")
+            cmds.extend([
+                f"echo \\nWriting {name} to {file_path}.\\n",
+                f"set logging file {file_path}",
+                "set logging enabled on",
+                command,
+                "set logging enabled off",
+            ])
+
+        add_commands("info threads", "info_threads")
+        add_commands("thread apply all bt", "backtraces")
+        add_commands("mongodb-uniqstack mongodb-bt-if-active", "uniqstack")
+        add_commands("mongodb-show-locks", "show_locks")
+        add_commands("mongod-dump-sessions", "dump_sessions")
+        add_commands("mongodb-dump-mutexes", "dump_mutexes")
+        add_commands("mongodb-dump-recovery-units", "dump_recovery_units")
+        # depends on gdbmongo python dependency
+        add_commands("python print(gdbmongo.LockManagerPrinter.from_global().val)", "dump_locks")
 
         cmds = self._prefix() + cmds + self._postfix()
 

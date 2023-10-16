@@ -256,40 +256,50 @@ def get_decorations(obj):
 
     Each object returned by the iterator is a tuple whose first element is the type name of the
     decoration and whose second element is the decoration object itself.
-
-    TODO: De-duplicate the logic between here and DecorablePrinter. This code was copied from there.
     """
     type_name = str(obj.type).replace("class", "").replace(" ", "")
     decorable = obj.cast(lookup_type("mongo::Decorable<{}>".format(type_name)))
-    decl_vector = decorable["_decorations"]["_registry"]["_decorationInfo"]
+    start, count = get_decorable_info(decorable)
+    for i in range(count):
+        deco_type_name, obj, _ = get_object_decoration(decorable, start, i)
+        try:
+            yield (deco_type_name, obj)
+        except Exception as err:
+            print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
+
+
+def get_object_decoration(decorable, start, index):
+    decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_data"])
+    entry = start[index]
+    deco_type_info = str(entry["_typeInfo"])
+    deco_type_name = re.sub(r'.* <typeinfo for (.*)>', r'\1', deco_type_info)
+    offset = int(entry["_offset"])
+    obj = decoration_data[offset]
+    obj_addr = re.sub(r'^(.*) .*', r'\1', str(obj.address))
+    obj = _cast_decoration_value(deco_type_name, int(obj.address))
+    return (deco_type_name, obj, obj_addr)
+
+
+def get_decorable_info(decorable):
+    decorable_t = decorable.type.template_argument(0)
+    reg_sym, _ = gdb.lookup_symbol("mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t))
+    decl_vector = reg_sym.value()["_entries"]
     start = decl_vector["_M_impl"]["_M_start"]
     finish = decl_vector["_M_impl"]["_M_finish"]
-
-    decorable_t = decorable.type.template_argument(0)
-    decinfo_t = lookup_type('mongo::DecorationRegistry<{}>::DecorationInfo'.format(
-        str(decorable_t).replace("class", "").strip()))
+    decinfo_t = lookup_type('mongo::decorable_detail::RegistryEntry')
     count = int((int(finish) - int(start)) / decinfo_t.sizeof)
+    return start, count
 
-    for i in range(count):
-        descriptor = start[i]
-        dindex = int(descriptor["descriptor"]["_index"])
 
-        type_name = str(descriptor["constructor"])
-        type_name = type_name[0:len(type_name) - 1]
-        type_name = type_name[0:type_name.rindex(">")]
-        type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
-        # get_unique_ptr should be loaded from 'mongo_printers.py'.
-        decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_decorationData"])
-
-        if type_name.endswith('*'):
-            type_name = type_name[0:len(type_name) - 1]
-        type_name = type_name.rstrip()
-        try:
-            type_t = lookup_type(type_name)
-            obj = decoration_data[dindex].cast(type_t)
-            yield (type_name, obj)
-        except Exception as err:
-            print("Failed to look up decoration type: " + type_name + ": " + str(err))
+def _cast_decoration_value(type_name: str, decoration_address: int, /) -> gdb.Value:
+    # We cannot use gdb.lookup_type() when the decoration type is a pointer type, e.g.
+    # ServiceContext::declareDecoration<VectorClock*>(). gdb.parse_and_eval() is one of the few
+    # ways to convert a type expression into a gdb.Type value. Some care is taken to quote the
+    # non-pointer portion of the type so resolution for a type defined within an anonymous
+    # namespace works correctly.
+    type_name_regex = re.compile(r"^(.*[\w>])([\s\*]*)$")
+    escaped = type_name_regex.sub(r"'\1'\2*", type_name)
+    return gdb.parse_and_eval(f"({escaped}) {decoration_address}").dereference()
 
 
 def get_decoration(obj, type_name):

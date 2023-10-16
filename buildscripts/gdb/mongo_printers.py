@@ -15,7 +15,7 @@ if ROOT_PATH not in sys.path:
 from src.third_party.immer.dist.tools.gdb_pretty_printers.printers import ListIter as ImmerListIter  # pylint: disable=wrong-import-position
 
 if not gdb:
-    from buildscripts.gdb.mongo import get_boost_optional, lookup_type
+    from buildscripts.gdb.mongo import get_boost_optional, lookup_type, get_decorable_info, get_object_decoration
     from buildscripts.gdb.optimizer_printers import register_optimizer_printers
 
 try:
@@ -366,16 +366,7 @@ class DecorablePrinter(object):
     def __init__(self, val):
         """Initialize DecorablePrinter."""
         self.val = val
-        decorable_t = val.type.template_argument(0)
-
-        reg_sym, _ = gdb.lookup_symbol(
-            "mongo::decorable_detail::gdbRegistry<{}>".format(decorable_t))
-        decl_vector = reg_sym.value()["_entries"]
-        # TODO: abstract out navigating a std::vector
-        self.start = decl_vector["_M_impl"]["_M_start"]
-        finish = decl_vector["_M_impl"]["_M_finish"]
-        decinfo_t = lookup_type('mongo::decorable_detail::RegistryEntry')
-        self.count = int((int(finish) - int(self.start)) / decinfo_t.sizeof)
+        self.start, self.count = get_decorable_info(val)
 
     @staticmethod
     def display_hint():
@@ -388,22 +379,13 @@ class DecorablePrinter(object):
 
     def children(self):
         """Children."""
-        decoration_data = get_unique_ptr_bytes(self.val["_decorations"]["_data"])
-
         for index in range(self.count):
-            entry = self.start[index]
-            deco_type_info = str(entry["_typeInfo"])
-            deco_type_name = re.sub(r'.* <typeinfo for (.*)>', r'\1', deco_type_info)
-            offset = int(entry["_offset"])
-            obj = decoration_data[offset]
-            obj_addr = re.sub(r'^(.*) .*', r'\1', str(obj.address))
             try:
-                deco_type = lookup_type(deco_type_name)
-                obj = obj.cast(deco_type)
+                deco_type_name, obj, obj_addr = get_object_decoration(self.val, self.start, index)
+                yield ('key', "{}:{}:{}".format(index, obj_addr, deco_type_name))
+                yield ('value', obj)
             except Exception as err:
-                obj = f'[[Err:{err}]]'
-            yield ('key', "{}:{}:{}".format(index, obj_addr, deco_type_name))
-            yield ('value', obj)
+                print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
 
 
 class LazyInitPrinter(object):
