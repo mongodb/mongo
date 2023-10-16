@@ -431,7 +431,8 @@ public:
                                              "$push",
                                              "$stdDevSamp",
                                              "$stdDevPop",
-                                             "$avg"};
+                                             "$avg",
+                                             "$addToSet"};
         if (compatibleAccumulators.count(_accumulatorName)) {
             expCtx->sbeWindowCompatibility =
                 std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);

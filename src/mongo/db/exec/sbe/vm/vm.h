@@ -855,6 +855,11 @@ enum class Builtin : uint16_t {
     aggRemovableLastNAdd,
     aggRemovableLastNRemove,
     aggRemovableLastNFinalize,
+    aggRemovableAddToSetInit,
+    aggRemovableAddToSetCollInit,
+    aggRemovableAddToSetAdd,
+    aggRemovableAddToSetRemove,
+    aggRemovableAddToSetFinalize,
 
     // Additional one-byte builtins go here.
 
@@ -2019,6 +2024,14 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillCanAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillAdd(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLinearFillFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetInit(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetCollInit(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetRemove(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetFinalize(
+        ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> linearFillInterpolate(
         std::pair<value::TypeTags, value::Value> x1,
         std::pair<value::TypeTags, value::Value> y1,
