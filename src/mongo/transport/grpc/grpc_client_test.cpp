@@ -210,9 +210,8 @@ TEST_F(GRPCClientTest, GRPCClientShutdown) {
     };
 
     auto clientThreadBody = [&](auto&, auto& monitor) {
-        mongo::Client::initThread("GRPCClientShutdown",
-                                  getGlobalServiceContext()->getService()) auto client =
-            makeClient();
+        mongo::Client::initThread("GRPCClientShutdown", getGlobalServiceContext()->getService());
+        auto client = makeClient();
         client->start(getServiceContext());
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
