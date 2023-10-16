@@ -57,6 +57,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/exec/sbe/vm/label.h"
+#include "mongo/db/exec/sbe/vm/makeobj_cursors.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -1773,11 +1774,42 @@ private:
      * appear before F1 in the "computed" list, then F2 will appear after F1 in the output object.
      */
     void produceBsonObject(const MakeObjSpec* spec,
-                           value::TypeTags rootTag,
-                           value::Value rootVal,
                            int stackOffset,
                            const CodeFragment* code,
-                           UniqueBSONObjBuilder& bob);
+                           UniqueBSONObjBuilder& bob,
+                           value::TypeTags rootTag,
+                           value::Value rootVal) {
+        using TypeTags = value::TypeTags;
+
+        // Invoke the produceBsonObject() lambda with the appropriate iterator type.
+        switch (rootTag) {
+            case TypeTags::bsonObject: {
+                // For BSON objects, use BsonObjCursor.
+                auto cursor = BsonObjCursor(value::bitcastTo<const char*>(rootVal));
+                produceBsonObject(spec, stackOffset, code, bob, std::move(cursor));
+                break;
+            }
+            case TypeTags::Object: {
+                // For SBE objects, use ObjectCursor.
+                auto cursor = ObjectCursor(value::getObjectView(rootVal));
+                produceBsonObject(spec, stackOffset, code, bob, std::move(cursor));
+                break;
+            }
+            default: {
+                // For all other types, use BsonObjCursor initialized with an empty object.
+                auto cursor = BsonObjCursor(BSONObj::kEmptyObject.objdata());
+                produceBsonObject(spec, stackOffset, code, bob, std::move(cursor));
+                break;
+            }
+        }
+    }
+
+    template <typename CursorT>
+    void produceBsonObject(const MakeObjSpec* spec,
+                           int stackOffset,
+                           const CodeFragment* code,
+                           UniqueBSONObjBuilder& bob,
+                           CursorT cursor);
 
     /**
      * This struct is used by traverseAndProduceBsonObj() to hold args that stay the same across
@@ -2240,6 +2272,18 @@ struct ByteCode::InvokeLambdaFunctor {
     const CodeFragment* const code;
     const int64_t lamPos;
 };
+
+extern template void ByteCode::produceBsonObject<BsonObjCursor>(const MakeObjSpec* spec,
+                                                                int stackStartOffset,
+                                                                const CodeFragment* code,
+                                                                UniqueBSONObjBuilder& bob,
+                                                                BsonObjCursor cursor);
+
+extern template void ByteCode::produceBsonObject<ObjectCursor>(const MakeObjSpec* spec,
+                                                               int stackStartOffset,
+                                                               const CodeFragment* code,
+                                                               UniqueBSONObjBuilder& bob,
+                                                               ObjectCursor cursor);
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

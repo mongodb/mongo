@@ -273,15 +273,15 @@ std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fie
             "Expected 'fields' and 'values' to be the same size",
             fields.size() == values.size());
 
-    std::vector<sbe::MakeObjSpec::FieldInfo> fieldInfos;
+    std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
     for (size_t i = 0; i < fields.size(); ++i) {
-        fieldInfos.emplace_back(i);
+        fieldActions.emplace_back(i);
     }
 
     auto makeObjSpec = makeConstant(
         sbe::value::TypeTags::makeObjSpec,
         sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-            sbe::MakeObjSpec::FieldBehavior::kOpen, std::move(fields), std::move(fieldInfos))));
+            sbe::MakeObjSpec::FieldBehavior::kOpen, std::move(fields), std::move(fieldActions))));
     auto makeObjRoot = makeNothingConstant();
     sbe::EExpression::Vector makeObjArgs;
     makeObjArgs.reserve(2 + values.size());

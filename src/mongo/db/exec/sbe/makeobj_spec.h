@@ -61,7 +61,7 @@ struct MakeObjSpec {
     };
 
     /**
-     * This class holds info about what action should be taken for a given field. Each FieldInfo
+     * This class holds info about what action should be taken for a given field. Each FieldAction
      * can be one of the following:
      *   1) KeepOrDrop: If 'fieldBehavior == kClosed' is true then copy the field, otherwise ignore
      *                  the field.
@@ -73,20 +73,20 @@ struct MakeObjSpec {
      *   4) MakeObj:    Recursively invoke makeBsonObj() passing in the field as the input object,
      *                  and replace the field with output produced.
      */
-    class FieldInfo {
+    class FieldAction {
     public:
         using VariantType = stdx::variant<KeepOrDrop, ValueArg, LambdaArg, MakeObj>;
 
-        FieldInfo() = default;
-        FieldInfo(size_t valueArgIdx) : _data(ValueArg{valueArgIdx}) {}
-        FieldInfo(std::unique_ptr<MakeObjSpec> spec) : _data(MakeObj{std::move(spec)}) {}
+        FieldAction() = default;
+        FieldAction(size_t valueArgIdx) : _data(ValueArg{valueArgIdx}) {}
+        FieldAction(std::unique_ptr<MakeObjSpec> spec) : _data(MakeObj{std::move(spec)}) {}
 
-        FieldInfo(KeepOrDrop) : _data(KeepOrDrop{}) {}
-        FieldInfo(ValueArg valueArg) : _data(valueArg) {}
-        FieldInfo(LambdaArg lambdaArg) : _data(lambdaArg) {}
-        FieldInfo(MakeObj makeObj) : _data(std::move(makeObj)) {}
+        FieldAction(KeepOrDrop) : _data(KeepOrDrop{}) {}
+        FieldAction(ValueArg valueArg) : _data(valueArg) {}
+        FieldAction(LambdaArg lambdaArg) : _data(lambdaArg) {}
+        FieldAction(MakeObj makeObj) : _data(std::move(makeObj)) {}
 
-        FieldInfo clone() const;
+        FieldAction clone() const;
 
         bool isKeepOrDrop() const {
             return stdx::holds_alternative<KeepOrDrop>(_data);
@@ -117,13 +117,13 @@ struct MakeObjSpec {
 
     MakeObjSpec(FieldBehavior fieldBehavior,
                 std::vector<std::string> fields,
-                std::vector<FieldInfo> fieldInfos = {},
+                std::vector<FieldAction> actions = {},
                 NonObjInputBehavior nonObjInputBehavior = NonObjInputBehavior::kNewObj,
                 boost::optional<int32_t> traversalDepth = boost::none)
         : fieldBehavior(fieldBehavior),
           nonObjInputBehavior(nonObjInputBehavior),
           traversalDepth(traversalDepth),
-          fieldInfos(std::move(fieldInfos)),
+          actions(std::move(actions)),
           fields(buildFieldDict(std::move(fields))) {}
 
     MakeObjSpec(const MakeObjSpec& other)
@@ -135,7 +135,7 @@ struct MakeObjSpec {
           fieldBehavior(other.fieldBehavior),
           nonObjInputBehavior(other.nonObjInputBehavior),
           traversalDepth(other.traversalDepth),
-          fieldInfos(other.cloneFieldInfos()),
+          actions(other.cloneActions()),
           fields(other.fields) {}
 
     MakeObjSpec(MakeObjSpec&& other)
@@ -147,7 +147,7 @@ struct MakeObjSpec {
           fieldBehavior(other.fieldBehavior),
           nonObjInputBehavior(other.nonObjInputBehavior),
           traversalDepth(other.traversalDepth),
-          fieldInfos(std::move(other.fieldInfos)),
+          actions(std::move(other.actions)),
           fields(std::move(other.fields)) {}
 
     MakeObjSpec& operator=(const MakeObjSpec& other) = delete;
@@ -162,13 +162,13 @@ struct MakeObjSpec {
         return nonObjInputBehavior != NonObjInputBehavior::kNewObj;
     }
 
-    std::vector<FieldInfo> cloneFieldInfos() const {
-        std::vector<FieldInfo> fieldInfosCopy;
-        for (auto&& info : fieldInfos) {
-            fieldInfosCopy.emplace_back(info.clone());
+    std::vector<FieldAction> cloneActions() const {
+        std::vector<FieldAction> actionsCopy;
+        for (auto&& info : actions) {
+            actionsCopy.emplace_back(info.clone());
         }
 
-        return fieldInfosCopy;
+        return actionsCopy;
     }
 
     std::string toString() const {
@@ -178,7 +178,7 @@ struct MakeObjSpec {
         builder << "[";
 
         for (size_t i = 0; i < fields.size(); ++i) {
-            auto& info = fieldInfos[i];
+            auto& info = actions[i];
 
             if (i != 0) {
                 builder << ", ";
@@ -253,14 +253,14 @@ struct MakeObjSpec {
     // should return the input value.
     NonObjInputBehavior nonObjInputBehavior = NonObjInputBehavior::kNewObj;
 
-    // If this MakeObjSpec is part of a "MakeObj" FieldInfo, 'traversalDepth' indicates what
+    // If this MakeObjSpec is part of a "MakeObj" FieldAction, 'traversalDepth' indicates what
     // the array traversal depth limit should be. By default 'traversalDepth' is 'boost::none'
     // (i.e. by default there is no depth limit).
     boost::optional<int32_t> traversalDepth;
 
-    // Contains info about each field of interest. 'fields' and 'fieldInfos' are parallel vectors
-    // (i.e. the info corresponding to field[i] is stored in fieldInfos[i]).
-    std::vector<FieldInfo> fieldInfos;
+    // Contains info about each field of interest. 'fields' and 'actions' are parallel vectors
+    // (i.e. the info corresponding to field[i] is stored in actions[i]).
+    std::vector<FieldAction> actions;
 
     // Searchable vector of fields of interest.
     StringListSet fields;

@@ -285,13 +285,13 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
             "the shard key",
             fn.nodes().size() == shardKeyPaths.size());
     std::vector<std::string> fields;
-    std::vector<sbe::MakeObjSpec::FieldInfo> fieldInfos;
+    std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
     sbe::EExpression::Vector projectValues;
 
     size_t argIdx = 0;
     for (auto& i : shardKeyPaths) {
         fields.emplace_back(PathStringify::stringify(i._path));
-        fieldInfos.emplace_back(argIdx);
+        fieldActions.emplace_back(argIdx);
         ++argIdx;
     }
 
@@ -309,7 +309,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
     auto makeObjSpec =
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::makeObjSpec,
                                    sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-                                       fieldBehavior, std::move(fields), std::move(fieldInfos))));
+                                       fieldBehavior, std::move(fields), std::move(fieldActions))));
 
     auto makeObjRoot = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
     sbe::EExpression::Vector makeObjArgs;

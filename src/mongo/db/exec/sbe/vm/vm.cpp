@@ -5500,7 +5500,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
 
     UniqueBSONObjBuilder bob;
 
-    produceBsonObject(spec, objTag, objVal, stackStartOffset, code, bob);
+    produceBsonObject(spec, stackStartOffset, code, bob, objTag, objVal);
 
     bob.doneFast();
     char* data = bob.bb().release().release();

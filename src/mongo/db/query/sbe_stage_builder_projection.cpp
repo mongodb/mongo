@@ -206,7 +206,7 @@ struct ProjectionVisitorContext {
  * ProjectEvals ('evals').
  *
  * This function processes its inputs and returns a tuple containing a vector field names, a vector
- * of FieldInfos, and a vector of SbExprs.
+ * of Actions, and a vector of SbExprs.
  *
  * The output tuple is intended for to be used with MakeObjSpec and the makeBsonObj() VM function.
  */
@@ -220,7 +220,7 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
             evals.size() == fieldNames.size());
 
     std::vector<std::string> fields;
-    std::vector<sbe::MakeObjSpec::FieldInfo> fieldInfos;
+    std::vector<sbe::MakeObjSpec::FieldAction> actions;
     std::vector<SbExpr> valueAndLambdaArgs;
     std::vector<SbExpr> args;
 
@@ -235,31 +235,31 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
             case EvalMode::kKeep:
                 if (isInclusion) {
                     fields.emplace_back(fieldName);
-                    fieldInfos.emplace_back();
+                    actions.emplace_back();
                 }
                 break;
             case EvalMode::kDrop:
                 if (!isInclusion) {
                     fields.emplace_back(fieldName);
-                    fieldInfos.emplace_back();
+                    actions.emplace_back();
                 }
                 break;
             case EvalMode::kValueArg:
                 fields.emplace_back(fieldName);
-                fieldInfos.emplace_back(*nextArgIdx);
+                actions.emplace_back(*nextArgIdx);
                 valueAndLambdaArgs.emplace_back(std::move(exprs[0]));
                 ++(*nextArgIdx);
                 break;
             case EvalMode::kLambdaArg:
                 fields.emplace_back(fieldName);
-                fieldInfos.emplace_back(
+                actions.emplace_back(
                     sbe::MakeObjSpec::LambdaArg{*nextArgIdx, returnsNothingOnMissingInput});
                 valueAndLambdaArgs.emplace_back(std::move(exprs[0]));
                 ++(*nextArgIdx);
                 break;
             case EvalMode::kMakeObj:
                 fields.emplace_back(fieldName);
-                fieldInfos.emplace_back(std::move(spec));
+                actions.emplace_back(std::move(spec));
                 if (!exprs.empty()) {
                     std::move(exprs.begin(), exprs.end(), std::back_inserter(args));
                 }
@@ -269,7 +269,7 @@ auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
 
     std::move(valueAndLambdaArgs.begin(), valueAndLambdaArgs.end(), std::back_inserter(args));
 
-    return std::make_tuple(std::move(fields), std::move(fieldInfos), std::move(args));
+    return std::make_tuple(std::move(fields), std::move(actions), std::move(args));
 }
 
 void preVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
@@ -324,7 +324,7 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
 
     const bool isInclusion = ctx.projectType == projection_ast::ProjectType::kInclusion;
 
-    auto [fields, fieldInfos, args] =
+    auto [fields, actions, args] =
         prepareFieldEvals(childNames, ctx.evals(), isInclusion, &ctx.nextArgIdx);
 
     const bool hasValueArgs = ctx.getHasValueArgs();
@@ -350,7 +350,7 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
 
     // Generate a MakeObjSpec for the current nested level.
     auto spec = std::make_unique<sbe::MakeObjSpec>(
-        fieldBehavior, std::move(fields), std::move(fieldInfos), noiBehavior, traversalDepth);
+        fieldBehavior, std::move(fields), std::move(actions), noiBehavior, traversalDepth);
 
     if (ctx.levelsEmpty()) {
         SbExprBuilder b(ctx.state);

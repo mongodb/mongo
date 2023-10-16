@@ -36,22 +36,22 @@
 
 namespace mongo::sbe {
 StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
-    if (fieldInfos.empty()) {
+    if (actions.empty()) {
         numKeepOrDrops = names.size();
         numValueArgs = 0;
         numMandatoryLambdas = 0;
         numMandatoryMakeObjs = 0;
         totalNumArgs = 0;
 
-        fieldInfos = std::vector<FieldInfo>{};
-        fieldInfos.resize(numKeepOrDrops);
+        actions = std::vector<FieldAction>{};
+        actions.resize(numKeepOrDrops);
 
         return StringListSet(std::move(names));
     }
 
     tassert(7103500,
             "Expected 'names' and 'fieldsInfos' to be the same size",
-            names.size() == fieldInfos.size());
+            names.size() == actions.size());
 
     std::vector<std::string> keepOrDrops;
 
@@ -64,29 +64,29 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     size_t endPos = 0;
 
     for (size_t i = 0; i < names.size(); ++i) {
-        if (fieldInfos[i].isKeepOrDrop()) {
+        if (actions[i].isKeepOrDrop()) {
             ++numKeepOrDrops;
             keepOrDrops.emplace_back(std::move(names[i]));
         } else {
-            if (fieldInfos[i].isValueArg()) {
+            if (actions[i].isValueArg()) {
                 ++numValueArgs;
-            } else if (fieldInfos[i].isLambdaArg() &&
-                       !fieldInfos[i].getLambdaArg().returnsNothingOnMissingInput) {
+            } else if (actions[i].isLambdaArg() &&
+                       !actions[i].getLambdaArg().returnsNothingOnMissingInput) {
                 ++numMandatoryLambdas;
-            } else if (fieldInfos[i].isMakeObj() &&
-                       !fieldInfos[i].getMakeObjSpec()->returnsNothingOnMissingInput()) {
+            } else if (actions[i].isMakeObj() &&
+                       !actions[i].getMakeObjSpec()->returnsNothingOnMissingInput()) {
                 ++numMandatoryMakeObjs;
             }
 
-            if (fieldInfos[i].isValueArg() || fieldInfos[i].isLambdaArg()) {
+            if (actions[i].isValueArg() || actions[i].isLambdaArg()) {
                 ++totalNumArgs;
-            } else if (fieldInfos[i].isMakeObj()) {
-                totalNumArgs += fieldInfos[i].getMakeObjSpec()->totalNumArgs;
+            } else if (actions[i].isMakeObj()) {
+                totalNumArgs += actions[i].getMakeObjSpec()->totalNumArgs;
             }
 
             if (i != endPos) {
                 names[endPos] = std::move(names[i]);
-                fieldInfos[endPos] = std::move(fieldInfos[i]);
+                actions[endPos] = std::move(actions[i]);
             }
             ++endPos;
         }
@@ -94,14 +94,14 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
 
     if (endPos != names.size()) {
         names.erase(names.begin() + endPos, names.end());
-        fieldInfos.erase(fieldInfos.begin() + endPos, fieldInfos.end());
+        actions.erase(actions.begin() + endPos, actions.end());
     }
 
-    std::vector<FieldInfo> newFieldInfos;
-    newFieldInfos.resize(numKeepOrDrops);
+    std::vector<FieldAction> newActions;
+    newActions.resize(numKeepOrDrops);
 
-    std::move(fieldInfos.begin(), fieldInfos.end(), std::back_inserter(newFieldInfos));
-    fieldInfos = std::move(newFieldInfos);
+    std::move(actions.begin(), actions.end(), std::back_inserter(newActions));
+    actions = std::move(newActions);
 
     std::vector<std::string> newNames = std::move(keepOrDrops);
     std::move(names.begin(), names.end(), std::back_inserter(newNames));
@@ -114,22 +114,22 @@ size_t MakeObjSpec::getApproximateSize() const {
 
     size += size_estimator::estimate(fields);
 
-    size += size_estimator::estimateContainerOnly(fieldInfos);
+    size += size_estimator::estimateContainerOnly(actions);
 
-    for (size_t i = 0; i < fieldInfos.size(); ++i) {
-        if (fieldInfos[i].isMakeObj()) {
-            size += fieldInfos[i].getMakeObjSpec()->getApproximateSize();
+    for (size_t i = 0; i < actions.size(); ++i) {
+        if (actions[i].isMakeObj()) {
+            size += actions[i].getMakeObjSpec()->getApproximateSize();
         }
     }
 
     return size;
 }
 
-MakeObjSpec::FieldInfo MakeObjSpec::FieldInfo::clone() const {
-    return stdx::visit(OverloadedVisitor{[](KeepOrDrop kd) -> FieldInfo { return kd; },
-                                         [](ValueArg va) -> FieldInfo { return va; },
-                                         [](LambdaArg la) -> FieldInfo { return la; },
-                                         [](const MakeObj& makeObj) -> FieldInfo {
+MakeObjSpec::FieldAction MakeObjSpec::FieldAction::clone() const {
+    return stdx::visit(OverloadedVisitor{[](KeepOrDrop kd) -> FieldAction { return kd; },
+                                         [](ValueArg va) -> FieldAction { return va; },
+                                         [](LambdaArg la) -> FieldAction { return la; },
+                                         [](const MakeObj& makeObj) -> FieldAction {
                                              return MakeObj{makeObj.spec->clone()};
                                          }},
                        _data);
