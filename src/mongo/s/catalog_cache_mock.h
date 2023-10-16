@@ -56,19 +56,64 @@ public:
     CatalogCacheMock(ServiceContext* context, CatalogCacheLoaderMock& loader);
     ~CatalogCacheMock() = default;
 
+    StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx,
+                                               const DatabaseName& dbName) override;
+
     StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
                                                                const NamespaceString& nss,
                                                                bool allowLocks) override;
 
-    void setChunkManagerReturnValue(StatusWith<ChunkManager> statusWithChunks);
-    void clearChunkManagerReturnValue();
+    void setDatabaseReturnValue(const DatabaseName& dbName, CachedDatabaseInfo databaseInfo);
+
+    void setCollectionReturnValue(const NamespaceString& nss, CollectionRoutingInfo chunkManager);
 
     static std::unique_ptr<CatalogCacheMock> make();
 
     static const Status kChunkManagerInternalErrorStatus;
 
+    static CollectionRoutingInfo makeCollectionRoutingInfoUntracked(const NamespaceString& nss,
+                                                                    const ShardId& dbPrimaryShard,
+                                                                    DatabaseVersion dbVersion);
+    struct ExtraCollectionOptions {
+        boost::optional<TimeseriesOptions> timeseriesOptions;
+    };
+
+    struct Chunk {
+        ChunkRange range;
+        ShardId shard;
+    };
+
+    static CollectionRoutingInfo makeCollectionRoutingInfoUnsplittable(
+        const NamespaceString& nss,
+        const ShardId& dbPrimaryShard,
+        DatabaseVersion dbVersion,
+        const ShardId& dataShard,
+        ExtraCollectionOptions extraOptions = {});
+
+    static CollectionRoutingInfo makeCollectionRoutingInfoSharded(
+        const NamespaceString& nss,
+        const ShardId& dbPrimaryShard,
+        DatabaseVersion dbVersion,
+        KeyPattern shardKeyPattern,
+        std::vector<Chunk> chunks,
+        ExtraCollectionOptions extraOptions = {});
+
+    static CachedDatabaseInfo makeDatabaseInfo(const DatabaseName& dbName,
+                                               const ShardId& dbPrimaryShard,
+                                               const DatabaseVersion& dbVersion);
+
 private:
-    StatusWith<ChunkManager> _swChunkManagerReturnValue{kChunkManagerInternalErrorStatus};
+    stdx::unordered_map<DatabaseName, CachedDatabaseInfo> _dbCache;
+    stdx::unordered_map<NamespaceString, CollectionRoutingInfo> _collectionCache;
+
+    static CollectionRoutingInfo _makeCollectionRoutingInfoTracked(
+        const NamespaceString& nss,
+        const ShardId& dbPrimaryShard,
+        DatabaseVersion dbVersion,
+        KeyPattern shardKeyPattern,
+        std::vector<Chunk> chunks,
+        bool unsplittable,
+        ExtraCollectionOptions extraOptions = {});
 };
 
 }  // namespace mongo

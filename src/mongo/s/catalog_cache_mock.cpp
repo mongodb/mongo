@@ -31,6 +31,7 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
@@ -39,30 +40,46 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
+#include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
-
-const Status CatalogCacheMock::kChunkManagerInternalErrorStatus = {
-    ErrorCodes::InternalError, "Mocked catalog cache received unexpected chunks manager"};
-
 
 CatalogCacheMock::CatalogCacheMock(ServiceContext* serviceContext, CatalogCacheLoaderMock& loader)
     : CatalogCache(serviceContext, loader) {}
 
-StatusWith<CollectionRoutingInfo> CatalogCacheMock::getCollectionRoutingInfo(
-    OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {
-    if (!_swChunkManagerReturnValue.isOK()) {
-        return _swChunkManagerReturnValue.getStatus();
+StatusWith<CachedDatabaseInfo> CatalogCacheMock::getDatabase(OperationContext* opCtx,
+                                                             const DatabaseName& dbName) {
+    const auto it = _dbCache.find(dbName);
+    if (it != _dbCache.end()) {
+        return it->second;
+    } else {
+        return Status(ErrorCodes::InternalError,
+                      fmt::format("CatalogCacheMock: No mocked value for database '{}'",
+                                  dbName.toStringForErrorMsg()));
     }
-    ChunkManager cm = _swChunkManagerReturnValue.getValue();
-    return CollectionRoutingInfo(std::move(cm), boost::none);
 }
 
-void CatalogCacheMock::setChunkManagerReturnValue(StatusWith<ChunkManager> statusWithChunks) {
-    _swChunkManagerReturnValue = statusWithChunks;
+StatusWith<CollectionRoutingInfo> CatalogCacheMock::getCollectionRoutingInfo(
+    OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {
+    const auto it = _collectionCache.find(nss);
+    if (it != _collectionCache.end()) {
+        return it->second;
+    } else {
+        return Status(ErrorCodes::InternalError,
+                      fmt::format("CatalogCacheMock: No mocked value for collection '{}'",
+                                  nss.toStringForErrorMsg()));
+    }
 }
-void CatalogCacheMock::clearChunkManagerReturnValue() {
-    _swChunkManagerReturnValue = kChunkManagerInternalErrorStatus;
+
+void CatalogCacheMock::setDatabaseReturnValue(const DatabaseName& dbName,
+                                              CachedDatabaseInfo databaseInfo) {
+    _dbCache[dbName] = databaseInfo;
+}
+
+void CatalogCacheMock::setCollectionReturnValue(const NamespaceString& nss,
+                                                CollectionRoutingInfo collectionRoutingInfo) {
+    _collectionCache.erase(nss);
+    _collectionCache.emplace(nss, collectionRoutingInfo);
 }
 
 std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
@@ -70,4 +87,106 @@ std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
     auto serviceContext = ServiceContext::make();
     return std::make_unique<CatalogCacheMock>(serviceContext.get(), *catalogCacheLoader);
 }
+
+CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUntracked(
+    const NamespaceString& nss, const ShardId& dbPrimaryShard, DatabaseVersion dbVersion) {
+    ChunkManager cm(dbPrimaryShard, dbVersion, OptionalRoutingTableHistory(), boost::none);
+    return CollectionRoutingInfo(std::move(cm), boost::none /*shardingIndexesCatalog*/);
+}
+
+CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
+    const NamespaceString& nss,
+    const ShardId& dbPrimaryShard,
+    DatabaseVersion dbVersion,
+    const ShardId& dataShard,
+    ExtraCollectionOptions extraOptions) {
+    // Unsplittable collections always have this shard key pattern.
+    const KeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    // Unsplittable collections always have one single chunk.
+    const Chunk chunk{ChunkRange(BSON("_id" << MINKEY), BSON("_id" << MAXKEY)), dataShard};
+
+    return _makeCollectionRoutingInfoTracked(nss,
+                                             dbPrimaryShard,
+                                             dbVersion,
+                                             shardKeyPattern,
+                                             {chunk},
+                                             true /*unsplittable*/,
+                                             extraOptions);
+}
+
+
+CollectionRoutingInfo CatalogCacheMock::makeCollectionRoutingInfoSharded(
+    const NamespaceString& nss,
+    const ShardId& dbPrimaryShard,
+    DatabaseVersion dbVersion,
+    KeyPattern shardKeyPattern,
+    std::vector<Chunk> chunks,
+    ExtraCollectionOptions extraOptions) {
+    return _makeCollectionRoutingInfoTracked(nss,
+                                             dbPrimaryShard,
+                                             dbVersion,
+                                             shardKeyPattern,
+                                             chunks,
+                                             false /*unsplittable*/,
+                                             extraOptions);
+}
+
+CollectionRoutingInfo CatalogCacheMock::_makeCollectionRoutingInfoTracked(
+    const NamespaceString& nss,
+    const ShardId& dbPrimaryShard,
+    DatabaseVersion dbVersion,
+    KeyPattern shardKeyPattern,
+    std::vector<Chunk> chunks,
+    bool unsplittable,
+    ExtraCollectionOptions extraOptions) {
+    const auto collectionUUID = UUID::gen();
+    const auto collectionEpoch = OID::gen();
+    const Timestamp collectionTimestamp(1, 0);
+
+    boost::optional<TypeCollectionTimeseriesFields> optTimeseriesFields;
+    if (extraOptions.timeseriesOptions) {
+        optTimeseriesFields.emplace();
+        optTimeseriesFields->setTimeseriesOptions(*extraOptions.timeseriesOptions);
+    }
+
+    std::vector<ChunkType> chunkTypes = [&]() {
+        std::vector<ChunkType> chunkTypes;
+
+        ChunkVersion chunkVersion({collectionEpoch, collectionTimestamp}, {1, 0});
+        for (const auto& chunk : chunks) {
+            chunkTypes.emplace_back(collectionUUID, chunk.range, chunkVersion, chunk.shard);
+            chunkVersion.incMajor();
+        }
+
+        return chunkTypes;
+    }();
+
+    auto rth = RoutingTableHistory::makeNew(nss,
+                                            collectionUUID,
+                                            shardKeyPattern,
+                                            unsplittable,
+                                            nullptr /*defaultCollator*/,
+                                            false /*unique*/,
+                                            collectionEpoch,
+                                            collectionTimestamp,
+                                            optTimeseriesFields,
+                                            boost::none /*reshardingFields*/,
+                                            true /*allowMigrations*/,
+                                            chunkTypes);
+
+    ChunkManager cm(dbPrimaryShard,
+                    dbVersion,
+                    ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(std::move(rth)),
+                    boost::none /*clusterTime*/);
+    return CollectionRoutingInfo(std::move(cm), boost::none /*shardingIndexesCatalog*/);
+}
+
+CachedDatabaseInfo CatalogCacheMock::makeDatabaseInfo(const DatabaseName& dbName,
+                                                      const ShardId& dbPrimaryShard,
+                                                      const DatabaseVersion& dbVersion) {
+    DatabaseType dbInfo(dbName, dbPrimaryShard, dbVersion);
+    return CachedDatabaseInfo(std::move(dbInfo), ComparableDatabaseVersion());
+}
+
 }  // namespace mongo

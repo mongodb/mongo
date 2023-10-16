@@ -151,12 +151,12 @@ public:
         return 0;
     }
 
-    bool isShardedTimeSeriesBucketsNamespace() const override {
-        return _isShardedTimeSeriesBucketsNamespace;
+    bool isTrackedTimeSeriesBucketsNamespace() const override {
+        return _isTrackedTimeSeriesBucketsNamespace;
     }
 
-    void setIsShardedTimeSeriesBucketsNamespace(bool isShardedTimeSeriesBucketsNamespace) {
-        _isShardedTimeSeriesBucketsNamespace = isShardedTimeSeriesBucketsNamespace;
+    void setIsTrackedTimeSeriesBucketsNamespace(bool isTrackedTimeSeriesBucketsNamespace) {
+        _isTrackedTimeSeriesBucketsNamespace = isTrackedTimeSeriesBucketsNamespace;
     }
 
 private:
@@ -172,7 +172,7 @@ private:
 
     std::vector<MockRange> _mockRanges;
 
-    bool _isShardedTimeSeriesBucketsNamespace = false;
+    bool _isTrackedTimeSeriesBucketsNamespace = false;
 };
 
 void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB);

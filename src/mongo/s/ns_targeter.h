@@ -70,7 +70,7 @@ public:
      */
     virtual const NamespaceString& getNS() const = 0;
 
-    virtual bool isShardedTimeSeriesBucketsNamespace() const = 0;
+    virtual bool isTrackedTimeSeriesBucketsNamespace() const = 0;
 
     /**
      * Returns a ShardEndpoint for a single document write or throws ShardKeyNotFound if 'doc' is

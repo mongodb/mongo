@@ -977,7 +977,7 @@ TEST_F(BulkWriteOpTest, TargetRetryableTimeseriesUpdate) {
     targeters.push_back(initTargeterFullRange(bucketNs, endpoint1));
 
     auto bucketTargeter = static_cast<BulkWriteMockNSTargeter*>(targeters[1].get());
-    bucketTargeter->setIsShardedTimeSeriesBucketsNamespace(true);
+    bucketTargeter->setIsTrackedTimeSeriesBucketsNamespace(true);
 
     BulkWriteCommandRequest request(
         {BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("y" << 1))),
@@ -1329,7 +1329,7 @@ TEST_F(BulkWriteOpTest, BuildTimeseriesChildRequest) {
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     targeters.push_back(initTargeterFullRange(bucketNs, endpoint));
     auto bucketTargeter = static_cast<BulkWriteMockNSTargeter*>(targeters[0].get());
-    bucketTargeter->setIsShardedTimeSeriesBucketsNamespace(true);
+    bucketTargeter->setIsTrackedTimeSeriesBucketsNamespace(true);
 
     BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSON("x" << -1))},
                                     {NamespaceInfoEntry(ns)});

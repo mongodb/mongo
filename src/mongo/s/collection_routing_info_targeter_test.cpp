@@ -53,6 +53,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/collection_routing_info_targeter.h"
@@ -78,21 +79,23 @@ using unittest::assertGet;
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
-auto buildUpdate(const NamespaceString& nss, BSONObj query, BSONObj update, bool upsert) {
+auto buildUpdate(
+    const NamespaceString& nss, BSONObj query, BSONObj update, bool upsert, bool multi = false) {
     write_ops::UpdateCommandRequest updateOp(nss);
     write_ops::UpdateOpEntry entry;
     entry.setQ(query);
     entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
     entry.setUpsert(upsert);
+    entry.setMulti(multi);
     updateOp.setUpdates(std::vector{entry});
     return BatchedCommandRequest{std::move(updateOp)};
 }
 
-auto buildDelete(const NamespaceString& nss, BSONObj query) {
+auto buildDelete(const NamespaceString& nss, BSONObj query, bool multi = false) {
     write_ops::DeleteCommandRequest deleteOp(nss);
     write_ops::DeleteOpEntry entry;
     entry.setQ(query);
-    entry.setMulti(false);
+    entry.setMulti(multi);
     deleteOp.setDeletes(std::vector{entry});
     return BatchedCommandRequest{std::move(deleteOp)};
 }
@@ -1104,6 +1107,328 @@ TEST_F(CollectionRoutingInfoTargeterUnshardedTest, DeleteIsTargetedToOwningShard
     ASSERT_EQ(owningShard, shardEndpoint.shardName);
     ASSERT_EQ(boost::none, shardEndpoint.databaseVersion);
     ASSERT_EQ(shardVersion, shardEndpoint.shardVersion);
+}
+
+/**
+ * Fixture that sets up a mock CatalogCache with several timeseries collections.
+ */
+class CollectionRoutingInfoTargeterTimeseriesTest : public ShardingTestFixtureWithMockCatalogCache {
+public:
+    CollectionRoutingInfoTargeterTimeseriesTest()
+        : _dbName(DatabaseName::createDatabaseName_forTest(boost::none, "test")),
+          _untrackedTimeseriesNss(
+              NamespaceString::createNamespaceString_forTest(_dbName, "untrackedTS")),
+          _unsplittableTimeseriesNss(
+              NamespaceString::createNamespaceString_forTest(_dbName, "unsplittableTS")),
+          _shardedTimeseriesNss(
+              NamespaceString::createNamespaceString_forTest(_dbName, "shardedTS")) {
+        _timeseriesOptions.setTimeField(_timeField);
+        _timeseriesOptions.setMetaField(StringData(_metaField));
+    }
+
+    void setUp() override {
+        ShardingTestFixtureWithMockCatalogCache::setUp();
+
+        getCatalogCacheMock()->setDatabaseReturnValue(
+            _dbName, CatalogCacheMock::makeDatabaseInfo(_dbName, _dbPrimaryShard, _dbVersion));
+
+        auto extraOptions =
+            CatalogCacheMock::ExtraCollectionOptions{.timeseriesOptions{_timeseriesOptions}};
+
+        // _untrackedTimeseriesNss on dbPrimary shard (_shard0).
+        getCatalogCacheMock()->setCollectionReturnValue(
+            _untrackedTimeseriesNss,
+            CatalogCacheMock::makeCollectionRoutingInfoUntracked(
+                _untrackedTimeseriesNss, _dbPrimaryShard, _dbVersion));
+        getCatalogCacheMock()->setCollectionReturnValue(
+            _untrackedTimeseriesNss.makeTimeseriesBucketsNamespace(),
+            CatalogCacheMock::makeCollectionRoutingInfoUntracked(
+                _untrackedTimeseriesNss.makeTimeseriesBucketsNamespace(),
+                _dbPrimaryShard,
+                _dbVersion));
+
+        // _unsplittableTimeseriesNss on _shard1.
+        getCatalogCacheMock()->setCollectionReturnValue(
+            _unsplittableTimeseriesNss,
+            CatalogCacheMock::makeCollectionRoutingInfoUntracked(
+                _unsplittableTimeseriesNss, _dbPrimaryShard, _dbVersion));
+        getCatalogCacheMock()->setCollectionReturnValue(
+            _unsplittableTimeseriesNss.makeTimeseriesBucketsNamespace(),
+            CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
+                _unsplittableTimeseriesNss.makeTimeseriesBucketsNamespace(),
+                _dbPrimaryShard,
+                _dbVersion,
+                _shard1,
+                extraOptions));
+
+        // _shardedTimeseriesNss:
+        // - {meta: MINKEY} to {meta: 0} on _shard0.
+        // - {meta: 0} to {meta: MAXKEY} on _shard1.
+        getCatalogCacheMock()->setCollectionReturnValue(
+            _shardedTimeseriesNss,
+            CatalogCacheMock::makeCollectionRoutingInfoUntracked(
+                _shardedTimeseriesNss, _dbPrimaryShard, _dbVersion));
+        getCatalogCacheMock()->setCollectionReturnValue(
+            _shardedTimeseriesNss.makeTimeseriesBucketsNamespace(),
+            CatalogCacheMock::makeCollectionRoutingInfoSharded(
+                _shardedTimeseriesNss.makeTimeseriesBucketsNamespace(),
+                _dbPrimaryShard,
+                _dbVersion,
+                KeyPattern(BSON(timeseries::kBucketMetaFieldName << 1)),
+                {{ChunkRange(BSON(timeseries::kBucketMetaFieldName << MINKEY),
+                             BSON(timeseries::kBucketMetaFieldName << 0)),
+                  _shard0},
+                 {ChunkRange(BSON(timeseries::kBucketMetaFieldName << 0),
+                             BSON(timeseries::kBucketMetaFieldName << MAXKEY)),
+                  _shard1}},
+                extraOptions));
+    }
+
+protected:
+    const DatabaseName _dbName;
+    const NamespaceString _untrackedTimeseriesNss;
+    const NamespaceString _unsplittableTimeseriesNss;
+    const NamespaceString _shardedTimeseriesNss;
+
+    const ShardId _shard0{"shard0"};
+    const ShardId _shard1{"shard1"};
+
+    const ShardId _dbPrimaryShard{_shard0};
+    const DatabaseVersion _dbVersion{UUID::gen(), Timestamp(12, 34)};
+
+    const std::string _timeField{"timeField"};
+    const std::string _metaField{"metaField"};
+    TimeseriesOptions _timeseriesOptions;
+};
+
+TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToUntrackedTimeseries) {
+    // Expect all operations to be targeted to the db-primary shard, with 'databaseVersion' attached
+    // and 'shardVersion=UNSHARDED.
+    auto checkEndpoint = [&](const ShardEndpoint& shardEndpoint) {
+        ASSERT_EQ(_dbPrimaryShard, shardEndpoint.shardName);
+        ASSERT_EQ(_dbVersion, shardEndpoint.databaseVersion);
+        ASSERT_EQ(ChunkVersion::UNSHARDED(), shardEndpoint.shardVersion->placementVersion());
+        ASSERT_EQ(boost::none, shardEndpoint.shardVersion->indexVersion());
+    };
+
+    CollectionRoutingInfoTargeter cri(operationContext(), _untrackedTimeseriesNss);
+
+    // Insert
+    const auto endpointInsert = cri.targetInsert(operationContext(), BSON("x" << 1));
+    checkEndpoint(endpointInsert);
+
+    // Update
+    const auto update = buildUpdate(kNss, fromjson("{}"), fromjson("{$set: {p : 1}}"), false);
+    const auto endpointUpdate =
+        cri.targetUpdate(operationContext(), BatchItemRef(&update, 0), nullptr);
+    ASSERT_EQ(1, endpointUpdate.size());
+    checkEndpoint(endpointUpdate.front());
+
+    // Delete
+    const auto deleteOp = buildDelete(kNss, fromjson("{}"));
+    const auto endpointDelete =
+        cri.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0), nullptr);
+    ASSERT_EQ(1, endpointDelete.size());
+    checkEndpoint(endpointDelete.front());
+}
+
+
+TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToUnsplittableTimeseries) {
+    const auto nss = _unsplittableTimeseriesNss;
+    const auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+
+    // Expect all operations to be targeted to '_shard1', with a shard1's ShardVersion attached and
+    // no 'databaseVersion'.
+    auto checkEndpoint = [&](const ShardEndpoint& shardEndpoint) {
+        const auto expectedShardVersion =
+            uassertStatusOK(getCatalogCacheMock()->getCollectionRoutingInfo(
+                                operationContext(), bucketsNss, false))
+                .getShardVersion(_shard1);
+
+        ASSERT_EQ(_shard1, shardEndpoint.shardName);
+        ASSERT_EQ(boost::none, shardEndpoint.databaseVersion);
+        ASSERT_EQ(expectedShardVersion, shardEndpoint.shardVersion);
+    };
+
+    CollectionRoutingInfoTargeter cri(operationContext(), nss);
+    ASSERT_EQ(1, cri.getNShardsOwningChunks());
+
+    // Insert
+    const auto endpointInsert = cri.targetInsert(operationContext(), BSON("x" << 1));
+    checkEndpoint(endpointInsert);
+
+    // Update
+    const auto update = buildUpdate(kNss, fromjson("{}"), fromjson("{$set: {p : 1}}"), false);
+    const auto endpointUpdate =
+        cri.targetUpdate(operationContext(), BatchItemRef(&update, 0), nullptr);
+    ASSERT_EQ(1, endpointUpdate.size());
+    checkEndpoint(endpointUpdate.front());
+
+    // Delete
+    const auto deleteOp = buildDelete(kNss, fromjson("{}"));
+    const auto endpointDelete =
+        cri.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0), nullptr);
+    ASSERT_EQ(1, endpointDelete.size());
+    checkEndpoint(endpointDelete.front());
+}
+
+TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TargetWritesToShardedTimeseries) {
+    const auto nss = _shardedTimeseriesNss;
+    const auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+
+    auto checkEndpoints = [&](const std::vector<ShardEndpoint>& endpoints,
+                              std::set<ShardId> expectedTargetedShards) {
+        ASSERT_EQ(expectedTargetedShards.size(), endpoints.size());
+        const auto collectionRoutingInfo = uassertStatusOK(
+            getCatalogCacheMock()->getCollectionRoutingInfo(operationContext(), bucketsNss, false));
+        for (const auto& endpoint : endpoints) {
+            const auto it = expectedTargetedShards.find(endpoint.shardName);
+            ASSERT_TRUE(it != expectedTargetedShards.end());
+            expectedTargetedShards.erase(it);
+
+            const auto expectedShardVersion =
+                collectionRoutingInfo.getShardVersion(endpoint.shardName);
+            ASSERT_EQ(boost::none, endpoint.databaseVersion);
+            ASSERT_EQ(expectedShardVersion, endpoint.shardVersion);
+        }
+    };
+
+    CollectionRoutingInfoTargeter cri(operationContext(), nss);
+    ASSERT_EQ(2, cri.getNShardsOwningChunks());
+
+    // Insert
+    {
+        const auto endpoint = cri.targetInsert(
+            operationContext(),
+            BSON(_metaField << -1 << _timeField
+                            << uassertStatusOK(dateFromISOString("2023-01-01T00:00:00Z"))));
+        checkEndpoints({endpoint}, {_shard0});
+    }
+
+    {
+        const auto endpoint = cri.targetInsert(
+            operationContext(),
+            BSON(_metaField << 1 << _timeField
+                            << uassertStatusOK(dateFromISOString("2023-01-01T00:00:00Z"))));
+        checkEndpoints({endpoint}, {_shard1});
+    }
+
+    // Update
+    {
+        const auto update = buildUpdate(
+            kNss, BSON(_metaField << -1), fromjson("{$set: {p : 1}}"), false, true /*multi*/);
+        const auto endpoints =
+            cri.targetUpdate(operationContext(), BatchItemRef(&update, 0), nullptr);
+        checkEndpoints(endpoints, {_shard0});
+    }
+
+    {
+        const auto update = buildUpdate(kNss,
+                                        BSON(_metaField << BSON("$gte" << -10 << "$lt" << 10)),
+                                        fromjson("{$set: {p : 1}}"),
+                                        false,
+                                        true /*multi*/);
+        const auto endpoints =
+            cri.targetUpdate(operationContext(), BatchItemRef(&update, 0), nullptr);
+        checkEndpoints(endpoints, {_shard0, _shard1});
+    }
+
+    // Delete
+    {
+        const auto deleteOp = buildDelete(kNss, BSON(_metaField << -1), true /*multi*/);
+        const auto endpoints =
+            cri.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0), nullptr);
+        checkEndpoints(endpoints, {_shard0});
+    }
+
+    {
+        const auto deleteOp = buildDelete(
+            kNss, BSON(_metaField << BSON("$gte" << -10 << "$lt" << 10)), true /*multi*/);
+        const auto endpoints =
+            cri.targetDelete(operationContext(), BatchItemRef(&deleteOp, 0), nullptr);
+        checkEndpoints(endpoints, {_shard0, _shard1});
+    }
+}
+
+TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, UntrackedAreNotTranslatedToBucketsNs) {
+    const auto nss = _untrackedTimeseriesNss;
+
+    CollectionRoutingInfoTargeter cri(operationContext(), nss);
+    ASSERT_EQ(nss, cri.getNS());
+    ASSERT_EQ(false, cri.isTrackedTimeSeriesBucketsNamespace());
+    ASSERT_FALSE(cri.timeseriesNamespaceNeedsRewrite(nss));
+    ASSERT_EQ(0, cri.getNShardsOwningChunks());
+}
+
+TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, TrackedAreTranslatedToBucketsNs) {
+    auto testFn = [&](const NamespaceString& nss) {
+        const auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+
+        CollectionRoutingInfoTargeter cri(operationContext(), nss);
+        ASSERT_EQ(bucketsNss, cri.getNS());
+        ASSERT_EQ(true, cri.isTrackedTimeSeriesBucketsNamespace());
+        ASSERT_TRUE(cri.timeseriesNamespaceNeedsRewrite(nss));
+        ASSERT_FALSE(cri.timeseriesNamespaceNeedsRewrite(bucketsNss));
+        ASSERT_EQ(bucketsNss, cri.getRoutingInfo().cm.getNss());
+    };
+
+    testFn(_unsplittableTimeseriesNss);
+    testFn(_shardedTimeseriesNss);
+}
+
+TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, RefreshOnStaleResponse) {
+    const auto nss = _untrackedTimeseriesNss;
+    const auto bucketsNss = nss.makeTimeseriesBucketsNamespace();
+
+    CollectionRoutingInfoTargeter cri(operationContext(), nss);
+    ASSERT_EQ(nss, cri.getNS());
+    ASSERT_EQ(false, cri.isTrackedTimeSeriesBucketsNamespace());
+    ASSERT_FALSE(cri.timeseriesNamespaceNeedsRewrite(nss));
+
+    auto sci = StaleConfigInfo(bucketsNss, ShardVersion::UNSHARDED(), boost::none, _shard0);
+
+    // No need to refresh
+    ASSERT_FALSE(cri.refreshIfNeeded(operationContext()));
+
+    // Setup new metadata on the CatalogCache representing nss is now a sharded time series.
+    getCatalogCacheMock()->setCollectionReturnValue(
+        bucketsNss,
+        CatalogCacheMock::makeCollectionRoutingInfoSharded(
+            bucketsNss,
+            _dbPrimaryShard,
+            _dbVersion,
+            KeyPattern(BSON(timeseries::kBucketMetaFieldName << 1)),
+            {{ChunkRange(BSON(timeseries::kBucketMetaFieldName << MINKEY),
+                         BSON(timeseries::kBucketMetaFieldName << 0)),
+              _shard0},
+             {ChunkRange(BSON(timeseries::kBucketMetaFieldName << 0),
+                         BSON(timeseries::kBucketMetaFieldName << MAXKEY)),
+              _shard1}},
+            CatalogCacheMock::ExtraCollectionOptions{.timeseriesOptions{_timeseriesOptions}}));
+
+    cri.noteStaleShardResponse(
+        operationContext(), ShardEndpoint(_shard0, ShardVersion::UNSHARDED(), _dbVersion), sci);
+    ASSERT_TRUE(cri.refreshIfNeeded(operationContext()));
+
+    // CollectionRoutingInfoTargeter became aware that nss is now a sharded time series.
+    ASSERT_EQ(bucketsNss, cri.getNS());
+    ASSERT_EQ(true, cri.isTrackedTimeSeriesBucketsNamespace());
+    ASSERT_TRUE(cri.timeseriesNamespaceNeedsRewrite(nss));
+
+    // Setup new metadata on the CatalogCache representing nss is now an untracked time series.
+    getCatalogCacheMock()->setCollectionReturnValue(
+        bucketsNss,
+        CatalogCacheMock::makeCollectionRoutingInfoUntracked(
+            bucketsNss, _dbPrimaryShard, _dbVersion));
+
+    cri.noteStaleShardResponse(
+        operationContext(), ShardEndpoint(_shard0, ShardVersion::UNSHARDED(), _dbVersion), sci);
+    ASSERT_TRUE(cri.refreshIfNeeded(operationContext()));
+
+    // CollectionRoutingInfoTargeter became aware that nss is now an untracked time series.
+    ASSERT_EQ(nss, cri.getNS());
+    ASSERT_EQ(false, cri.isTrackedTimeSeriesBucketsNamespace());
+    ASSERT_FALSE(cri.timeseriesNamespaceNeedsRewrite(nss));
 }
 
 }  // namespace

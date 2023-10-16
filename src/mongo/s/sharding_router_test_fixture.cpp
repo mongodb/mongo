@@ -121,6 +121,9 @@ std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
 }  // namespace
 
 ShardingTestFixture::ShardingTestFixture()
+    : ShardingTestFixture(false /* withMockCatalogCache */) {}
+
+ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache)
     : _transportSession(transport::MockSession::create(nullptr)) {
     const auto service = getServiceContext();
 
@@ -189,9 +192,17 @@ ShardingTestFixture::ShardingTestFixture()
     auto shardRegistry(std::make_unique<ShardRegistry>(service, std::move(shardFactory), configCS));
     executorPool->startup();
 
-    CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+    auto catalogCache = [&]() -> std::unique_ptr<CatalogCache> {
+        if (withMockCatalogCache) {
+            auto catalogCacheLoader = std::make_unique<CatalogCacheLoaderMock>();
+            CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+            return std::make_unique<CatalogCacheMock>(getServiceContext(), *catalogCacheLoader);
+        } else {
+            CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+            return std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(service));
+        }
+    }();
 
-    auto catalogCache = std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(service));
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     auto uniqueOpCtx = makeOperationContext();

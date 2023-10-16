@@ -2183,7 +2183,7 @@ public:
     const TxnNumber kTxnNumber = 5;
 
 private:
-    FailPointEnableBlock fp{"isShardedTimeSeriesBucketsNamespaceAlwaysTrue"};
+    FailPointEnableBlock fp{"isTrackedTimeSeriesBucketsNamespaceAlwaysTrue"};
     boost::optional<CollectionRoutingInfoTargeter> _criTargeter;
 };
 

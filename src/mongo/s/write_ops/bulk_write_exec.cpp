@@ -714,10 +714,10 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
 
         auto isClientRequestOnTimeseriesBucketCollection =
             nsInfoEntry.getNs().isTimeseriesBucketsCollection();
-        if (targeter->isShardedTimeSeriesBucketsNamespace() &&
+        if (targeter->isTrackedTimeSeriesBucketsNamespace() &&
             !isClientRequestOnTimeseriesBucketCollection) {
-            // For sharded timeseries collections, only the bucket collections are sharded. This
-            // sets the namespace to the namespace of the sharded bucket collection.
+            // For tracked timeseries collections, only the bucket collections are tracked. This
+            // sets the namespace to the namespace of the tracked bucket collection.
             nsInfoEntry.setNs(targeter->getNS());
             nsInfoEntry.setIsTimeseriesNamespace(true);
         }
@@ -1168,7 +1168,7 @@ void BulkWriteOp::noteStaleResponses(
         auto& targeter = targeters.at(i);
         // We must use the namespace from the original client request instead of the targeter's
         // namespace because the targeter's namespace could be pointing to the bucket collection for
-        // sharded timeseries collections.
+        // tracked timeseries collections.
         auto errors = errorsPerNamespace.find(nsEntry.getNs());
         if (errors != errorsPerNamespace.cend()) {
             for (const auto& error : errors->second.getErrors(ErrorCodes::StaleConfig)) {

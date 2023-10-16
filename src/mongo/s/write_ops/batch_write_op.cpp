@@ -398,7 +398,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             break;
         }
 
-        if (targeter.isShardedTimeSeriesBucketsNamespace() &&
+        if (targeter.isTrackedTimeSeriesBucketsNamespace() &&
             writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
             opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
             if (!batchMap.empty()) {
@@ -655,7 +655,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         wcb.setEncryptionInformation(
             _clientRequest.getWriteCommandRequestBase().getEncryptionInformation());
 
-        if (targeter.isShardedTimeSeriesBucketsNamespace() &&
+        if (targeter.isTrackedTimeSeriesBucketsNamespace() &&
             !_clientRequest.getNS().isTimeseriesBucketsCollection()) {
             wcb.setIsTimeseriesNamespace(true);
         }

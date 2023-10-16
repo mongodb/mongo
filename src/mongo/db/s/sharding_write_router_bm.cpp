@@ -140,7 +140,7 @@ protected:
             const auto shards = std::vector<ShardId>{ShardId("shard0")};
             const auto originatorShard = shards[0];
 
-            const auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
+            auto [chunks, chunkManager] = createChunks(nShards, nChunks, shards);
 
             ShardingState::get(serviceContext)->setInitialized(originatorShard, clusterId);
 
@@ -162,7 +162,17 @@ protected:
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, kNss)
                 ->setFilteringMetadata(opCtx, CollectionMetadata(chunkManager, originatorShard));
 
-            catalogCache->setChunkManagerReturnValue(chunkManager);
+            // Setup the CatalogCacheMock for the temp resharding ns.
+            const auto reshardingTempNs =
+                chunkManager.getReshardingFields()->getDonorFields()->getTempReshardingNss();
+            catalogCache->setCollectionReturnValue(
+                reshardingTempNs,
+                CatalogCacheMock::makeCollectionRoutingInfoSharded(
+                    reshardingTempNs,
+                    shards[0],
+                    DatabaseVersion(),
+                    BSON("y" << 1),
+                    {{ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY)), shards[0]}}));
         }
 
         auto mockNetwork = std::make_unique<executor::NetworkInterfaceMock>();

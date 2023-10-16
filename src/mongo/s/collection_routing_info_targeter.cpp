@@ -89,7 +89,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(isShardedTimeSeriesBucketsNamespaceAlwaysTrue);
+MONGO_FAIL_POINT_DEFINE(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue);
 
 constexpr auto kIdFieldName = "_id"_sd;
 
@@ -243,7 +243,7 @@ CollectionRoutingInfoTargeter::CollectionRoutingInfoTargeter(const NamespaceStri
  * Initializes and returns the CollectionRoutingInfo which needs to be used for targeting.
  * If 'refresh' is true, additionally fetches the latest routing info from the config servers.
  *
- * Note: For sharded time-series collections, we use the buckets collection for targeting. If the
+ * Note: For tracked time-series collections, we use the buckets collection for targeting. If the
  * user request is on the view namespace, we implicitly transform the request to the buckets
  * namespace.
  */
@@ -256,19 +256,20 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
     }
     auto [cm, sii] = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, _nss));
 
-    // For a sharded time-series collection, only the underlying buckets collection is stored on the
+    // For a tracked time-series collection, only the underlying buckets collection is stored on the
     // config servers. If the user operation is on the time-series view namespace, we should check
-    // if the buckets namespace is sharded. There are a few cases that we need to take care of,
-    // 1. The request is on the view namespace. We check if the buckets collection is sharded. If
-    //    it is, we use the buckets collection namespace for the purpose of targeting. Additionally,
-    //    we set the '_isRequestOnTimeseriesViewNamespace' to true for this case.
+    // if the buckets namespace is tracked on the configsvr. There are a few cases that we need to
+    // take care of:
+    // 1. The request is on the view namespace. We check if the buckets collection is tracked. If it
+    //    is, we use the buckets collection namespace for the purpose of targeting. Additionally, we
+    //    set the '_isRequestOnTimeseriesViewNamespace' to true for this case.
     // 2. If request is on the buckets namespace, we don't need to execute any additional
     //    time-series logic. We can treat the request as though it was a request on a regular
     //    collection.
-    // 3. During a cache refresh the buckets collection changes from sharded to unsharded. In this
+    // 3. During a cache refresh the buckets collection changes from tracked to untracked. In this
     //    case, if the original request is on the view namespace, then we should reset the namespace
     //    back to the view namespace and reset '_isRequestOnTimeseriesViewNamespace'.
-    if (!cm.isSharded() && !_nss.isTimeseriesBucketsCollection()) {
+    if (!cm.hasRoutingTable() && !_nss.isTimeseriesBucketsCollection()) {
         auto bucketsNs = _nss.makeTimeseriesBucketsNamespace();
         if (refresh) {
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
@@ -276,14 +277,14 @@ CollectionRoutingInfo CollectionRoutingInfoTargeter::_init(OperationContext* opC
         }
         auto [bucketsPlacementInfo, bucketsIndexInfo] =
             uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, bucketsNs));
-        if (bucketsPlacementInfo.isSharded()) {
+        if (bucketsPlacementInfo.hasRoutingTable()) {
             _nss = bucketsNs;
             cm = std::move(bucketsPlacementInfo);
             sii = std::move(bucketsIndexInfo);
             _isRequestOnTimeseriesViewNamespace = true;
         }
-    } else if (!cm.isSharded() && _isRequestOnTimeseriesViewNamespace) {
-        // This can happen if a sharded time-series collection is dropped and re-created. Then we
+    } else if (!cm.hasRoutingTable() && _isRequestOnTimeseriesViewNamespace) {
+        // This can happen if a tracked time-series collection is dropped and re-created. Then we
         // need to reset the namespace to the original namespace.
         _nss = _nss.getTimeseriesViewNamespace();
 
@@ -884,17 +885,17 @@ int CollectionRoutingInfoTargeter::getNShardsOwningChunks() const {
     return 0;
 }
 
-bool CollectionRoutingInfoTargeter::isShardedTimeSeriesBucketsNamespace() const {
-    // Used for testing purposes to force that we always have a sharded timeseries bucket namespace.
-    if (MONGO_unlikely(isShardedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
+bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const {
+    // Used for testing purposes to force that we always have a tracked timeseries bucket namespace.
+    if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {
         return true;
     }
-    return _cri.cm.isSharded() && _cri.cm.getTimeseriesFields();
+    return _cri.cm.hasRoutingTable() && _cri.cm.getTimeseriesFields();
 }
 
 bool CollectionRoutingInfoTargeter::timeseriesNamespaceNeedsRewrite(
     const NamespaceString& nss) const {
-    return isShardedTimeSeriesBucketsNamespace() && !nss.isTimeseriesBucketsCollection();
+    return isTrackedTimeSeriesBucketsNamespace() && !nss.isTimeseriesBucketsCollection();
 }
 
 const CollectionRoutingInfo& CollectionRoutingInfoTargeter::getRoutingInfo() const {
