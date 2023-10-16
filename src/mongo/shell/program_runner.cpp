@@ -458,7 +458,7 @@ ProgramRunner::ProgramRunner(BSONObj args, BSONObj env, bool isMongo, ProgramReg
             _port < 0 || !_parentRegistry->isPortRegistered(_port));
 }
 
-void ProgramRunner::start() {
+void ProgramRunner::start(bool shouldLogArgs) {
     int pipeEnds[2];
 
     {
@@ -520,11 +520,15 @@ void ProgramRunner::start() {
 
     _pipe = pipeEnds[0];
 
-    LOGV2_INFO(22810,
-               "shell: Started program",
-               "pid"_attr = _pid,
-               "port"_attr = _port,
-               "argv"_attr = _argv);
+    logv2::DynamicAttributes attrs;
+    attrs.add("pid", _pid);
+    attrs.add("port", _port);
+
+    if (shouldLogArgs) {
+        attrs.add("argv", _argv);
+    }
+
+    LOGV2_INFO(22810, "shell: Started program", attrs);
 }
 
 void ProgramRunner::operator()(ProgramOutputMultiplexer* multiplexer, bool shouldLogOutput) {

@@ -78,6 +78,7 @@ def authenticate_azure(activation_endpoint, userCode, username, test_credentials
         landing_header = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//p[@id='message'][@class='text-block-body no-margin-top']"))
         )
+
         assert landing_header is not None and "You have signed in" in landing_header.text
         
     except Exception as e:        
