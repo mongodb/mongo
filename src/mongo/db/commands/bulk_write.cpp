@@ -323,15 +323,21 @@ private:
 
     // Helper to keep _approximateSize up to date when appending to _replies.
     void _addReply(const BulkWriteReplyItem& replyItem) {
-        _replies.emplace_back(replyItem);
+        if (_req.getSingleBatch() && _req.getCursor() && _req.getCursor()->getBatchSize() &&
+            int64_t(_replies.size()) >= *_req.getCursor()->getBatchSize()) {
+            return;
+        }
         _approximateSize += replyItem.getApproximateSize();
+        _replies.emplace_back(replyItem);
     }
 };
 
 bool aboveBulkWriteRepliesMaxSize(OperationContext* opCtx,
+                                  bool singleBatch,
                                   size_t idx,
                                   BulkWriteReplies& responses) {
-    int32_t bulkWriteRepliesMaxSize = gBulkWriteMaxRepliesSize.loadRelaxed();
+    auto bulkWriteRepliesMaxSize =
+        singleBatch ? BSONObjMaxUserSize : gBulkWriteMaxRepliesSize.loadRelaxed();
     if (responses.getApproximateSize() >= bulkWriteRepliesMaxSize) {
         Status status{ErrorCodes::ExceededMemoryLimit,
                       fmt::format("BulkWrite response size exceeded limit ({} bytes)",
@@ -829,7 +835,7 @@ bool handleInsertOp(OperationContext* opCtx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     BulkWriteReplies& responses,
                     InsertGrouper& insertGrouper) {
-    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
         return false;
     }
     const auto& nsInfo = req.getNsInfo();
@@ -941,7 +947,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     BulkWriteReplies& responses) {
-    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
         return false;
     }
 
@@ -1095,7 +1101,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     BulkWriteReplies& responses) {
-    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
         return false;
     }
 
@@ -1464,6 +1470,14 @@ public:
             auto reqObj = unparsedRequest().body;
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
+
+            if (req.getSingleBatch() && req.getCursor() && req.getCursor()->getBatchSize() &&
+                *req.getCursor()->getBatchSize() == 0) {
+                return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                                 0 /* cursorId */, {} /* firstBatch */, cursorNss),
+                                             numErrors);
+            }
+
             auto expCtx = make_intrusive<ExpressionContext>(
                 opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
 
