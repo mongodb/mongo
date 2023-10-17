@@ -374,12 +374,8 @@ let viewsCommandTests = {
     delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
     distinct: {command: {distinct: "view", key: "_id"}},
     donorAbortMigration: {skip: isUnrelated},
-    // TODO : remove overrides once possible SERVER-61845
-    donorAbortSplit: {skip: "has been removed from the server"},
     donorForgetMigration: {skip: isUnrelated},
-    donorForgetSplit: {skip: "has been removed from the server"},
     donorStartMigration: {skip: isUnrelated},
-    donorStartSplit: {skip: "has been removed from the server"},
     donorWaitForMigrationToCommit: {skip: isUnrelated},
     abortShardSplit: {skip: isUnrelated},
     commitShardSplit: {skip: isUnrelated},
