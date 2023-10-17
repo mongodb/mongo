@@ -1574,8 +1574,8 @@ static const char *const __stats_connection_desc[] = {
   "chunk-cache: chunks evicted",
   "chunk-cache: could not allocate due to exceeding capacity",
   "chunk-cache: lookups",
+  "chunk-cache: number of chunks loaded from flushed tables in chunk cache",
   "chunk-cache: number of misses",
-  "chunk-cache: number of newly inserted objects in chunk cache",
   "chunk-cache: number of times a read from storage failed",
   "chunk-cache: retried accessing a chunk while I/O was in progress",
   "chunk-cache: timed out due to too many retries",
@@ -2251,8 +2251,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->chunk_cache_chunks_evicted = 0;
     stats->chunk_cache_exceeded_capacity = 0;
     stats->chunk_cache_lookups = 0;
+    stats->chunk_cache_chunks_loaded_from_flushed_tables = 0;
     stats->chunk_cache_misses = 0;
-    stats->chunk_cache_newly_inserted = 0;
     stats->chunk_cache_io_failed = 0;
     stats->chunk_cache_retries = 0;
     stats->chunk_cache_toomany_retries = 0;
@@ -2939,8 +2939,9 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->chunk_cache_chunks_evicted += WT_STAT_READ(from, chunk_cache_chunks_evicted);
     to->chunk_cache_exceeded_capacity += WT_STAT_READ(from, chunk_cache_exceeded_capacity);
     to->chunk_cache_lookups += WT_STAT_READ(from, chunk_cache_lookups);
+    to->chunk_cache_chunks_loaded_from_flushed_tables +=
+      WT_STAT_READ(from, chunk_cache_chunks_loaded_from_flushed_tables);
     to->chunk_cache_misses += WT_STAT_READ(from, chunk_cache_misses);
-    to->chunk_cache_newly_inserted += WT_STAT_READ(from, chunk_cache_newly_inserted);
     to->chunk_cache_io_failed += WT_STAT_READ(from, chunk_cache_io_failed);
     to->chunk_cache_retries += WT_STAT_READ(from, chunk_cache_retries);
     to->chunk_cache_toomany_retries += WT_STAT_READ(from, chunk_cache_toomany_retries);
