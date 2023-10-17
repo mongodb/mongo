@@ -48,9 +48,9 @@ void OnCoefficientsChangeUpdaterImpl::updateCoefficients(ServiceContext* service
 
 ServiceContext::ConstructorActionRegisterer costModelUpdaterRegisterer{
     "costModelUpdaterRegisterer", [](ServiceContext* serviceCtx) {
-        BSONObj overrides = internalCostModelCoefficients.empty()
-            ? BSONObj()
-            : fromjson(internalCostModelCoefficients);
+        const std::string costModelCoefficients = internalCostModelCoefficients.get();
+        BSONObj overrides =
+            costModelCoefficients.empty() ? BSONObj() : fromjson(costModelCoefficients);
 
         onCoefficientsChangeUpdater(serviceCtx) =
             std::make_unique<OnCoefficientsChangeUpdaterImpl>(serviceCtx, overrides);

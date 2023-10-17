@@ -47,11 +47,12 @@ namespace mongo::cost_model {
 
 namespace {
 BSONObj getCostModelCoefficientsOverride() {
-    if (internalCostModelCoefficients.empty()) {
+    const std::string costModelCoefficients = internalCostModelCoefficients.get();
+    if (costModelCoefficients.empty()) {
         return BSONObj();
     }
 
-    return fromjson(internalCostModelCoefficients);
+    return fromjson(costModelCoefficients);
 }
 }  // namespace
 

@@ -1018,7 +1018,7 @@ server_parameters:
     description: "Cost Model Coefficients Override"
     set_at: [ startup, runtime ]
     cpp_varname: "internalCostModelCoefficients"
-    cpp_vartype: "std::string"
+    cpp_vartype: synchronized_value<std::string>
     on_update: cost_model::updateCostCoefficientsOnUpdate
 
   # TODO SERVER-68341 Remove this query knob after tenancy is supported in the sharded cluster.
