@@ -741,9 +741,10 @@ __verify_row_int_key_order(
               "tree: "
               "%s, %s",
               entry, __verify_addr_string(session, ref, vs->tmp1), (char *)vs->max_addr->data,
-              __wt_buf_set_printable(session, item.data, item.size, false, vs->tmp2),
-              __wt_buf_set_printable(
-                session, vs->max_key->data, vs->max_key->size, false, vs->tmp3));
+              __wt_buf_set_printable_format(
+                session, item.data, item.size, btree->key_format, false, vs->tmp2),
+              __wt_buf_set_printable_format(
+                session, vs->max_key->data, vs->max_key->size, btree->key_format, false, vs->tmp3));
     }
 
     /* Update the largest key we've seen to the key just checked. */
@@ -795,9 +796,10 @@ __verify_row_leaf_key_order(WT_SESSION_IMPL *session, WT_REF *ref, WT_VSTUFF *vs
               "the first key on the page at %s sorts equal to or less than the last key appearing "
               "on the page at %s, earlier in the tree: %s, %s",
               __verify_addr_string(session, ref, vs->tmp2), (char *)vs->max_addr->data,
-              __wt_buf_set_printable(session, vs->tmp1->data, vs->tmp1->size, false, vs->tmp3),
-              __wt_buf_set_printable(
-                session, vs->max_key->data, vs->max_key->size, false, vs->tmp4));
+              __wt_buf_set_printable_format(
+                session, vs->tmp1->data, vs->tmp1->size, btree->key_format, false, vs->tmp3),
+              __wt_buf_set_printable_format(
+                session, vs->max_key->data, vs->max_key->size, btree->key_format, false, vs->tmp4));
     }
 
     /* Update the largest key we've seen to the last key on this page. */
@@ -924,7 +926,8 @@ __verify_key_hs(
             WT_ERR_MSG(session, WT_ERROR,
               "key %s has a overlap of timestamp ranges between history store stop timestamp %s "
               "being newer than a more recent timestamp range having start timestamp %s",
-              __wt_buf_set_printable(session, tmp1->data, tmp1->size, false, vs->tmp2),
+              __wt_buf_set_printable_format(
+                session, tmp1->data, tmp1->size, btree->key_format, false, vs->tmp2),
               __wt_timestamp_to_string(older_stop_ts, ts_string[0]),
               __wt_timestamp_to_string(newer_start_ts, ts_string[1]));
         }
