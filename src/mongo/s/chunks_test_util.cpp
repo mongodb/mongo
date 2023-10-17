@@ -90,9 +90,9 @@ std::vector<BSONObj> genRandomSplitPoints(size_t numChunks) {
     std::vector<BSONObj> splitPoints;
     splitPoints.reserve(numChunks + 1);
     splitPoints.emplace_back(kShardKeyPattern.globalMin());
-    int nextSplit{-1000};
+    int64_t nextSplit{-1000};
     for (size_t i = 0; i < numChunks - 1; ++i) {
-        nextSplit += i * 10 * (_random.nextInt32(10) + 1);
+        nextSplit += 10 * (_random.nextInt32(10) + 1);
         splitPoints.emplace_back(BSON(kSKey << nextSplit));
     }
     splitPoints.emplace_back(kShardKeyPattern.globalMax());
@@ -243,25 +243,25 @@ BSONObj calculateIntermediateShardKey(const BSONObj& leftKey,
     const auto isMinKey = leftKey.woCompare(kShardKeyPattern.globalMin()) == 0;
     const auto isMaxKey = rightKey.woCompare(kShardKeyPattern.globalMax()) == 0;
 
-    int splitPoint;
+    int64_t splitPoint;
     if (isMinKey && isMaxKey) {
         // [min, max] -> split at 0
         splitPoint = 0;
     } else if (!isMinKey && !isMaxKey) {
         // [x, y] -> split in the middle
-        auto min = leftKey.firstElement().numberInt();
-        auto max = rightKey.firstElement().numberInt();
+        auto min = leftKey.firstElement().numberLong();
+        auto max = rightKey.firstElement().numberLong();
         invariant(min + 1 < max,
                   str::stream() << "Can't split range [" << min << ", " << max << "]");
         splitPoint = min + ((max - min) / 2);
     } else if (isMaxKey) {
         // [x, maxKey] -> split at x*2;
-        auto prevBound = leftKey.firstElement().numberInt();
+        auto prevBound = leftKey.firstElement().numberLong();
         auto increment = prevBound ? prevBound : _random.nextInt32(100) + 1;
         splitPoint = prevBound + std::abs(increment);
     } else if (isMinKey) {
         // [minKey, x] -> split at x*2;
-        auto prevBound = rightKey.firstElement().numberInt();
+        auto prevBound = rightKey.firstElement().numberLong();
         auto increment = prevBound ? prevBound : _random.nextInt32(100) + 1;
         splitPoint = prevBound - std::abs(increment);
     } else {
@@ -300,8 +300,8 @@ void performRandomChunkOperations(std::vector<ChunkType>* chunksPtr, size_t numO
     auto splitChunk = [&] {
         auto chunkToSplitIt = chunks.begin() + _random.nextInt32(chunks.size());
         while (chunkToSplitIt != chunks.begin() && chunkToSplitIt != std::prev(chunks.end()) &&
-               (chunkToSplitIt->getMax().firstElement().numberInt() -
-                chunkToSplitIt->getMin().firstElement().numberInt()) < 2) {
+               (chunkToSplitIt->getMax().firstElement().numberLong() -
+                chunkToSplitIt->getMin().firstElement().numberLong()) < 2) {
             // If the chunk is unsplittable select another one
             chunkToSplitIt = chunks.begin() + _random.nextInt32(chunks.size());
         }
