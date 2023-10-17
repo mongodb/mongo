@@ -228,6 +228,9 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     /* Initialize metadata tracking, required before creating tables. */
     WT_RET(__wt_meta_track_init(session));
 
+    /* Can create a table, so must be done after metadata tracking. */
+    WT_RET(__wt_chunkcache_setup(session, cfg));
+
     /*
      * Create the history store file. This will only actually create it on a clean upgrade or when
      * creating a new database.

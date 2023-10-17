@@ -2975,7 +2975,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_verbose_config(session, cfg, false));
     WT_ERR(__wt_timing_stress_config(session, cfg));
     WT_ERR(__wt_blkcache_setup(session, cfg, false));
-    WT_ERR(__wt_chunkcache_setup(session, cfg));
     WT_ERR(__wt_extra_diagnostics_config(session, cfg));
     WT_ERR(__wt_conn_optrack_setup(session, cfg, false));
     WT_ERR(__conn_session_size(session, cfg, &conn->session_size));
@@ -3212,6 +3211,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 
     /* Start the worker threads and run recovery. */
     WT_ERR(__wt_connection_workers(session, cfg));
+
+    /*
+     * We want WiredTiger in a reasonably normal state - despite the salvage flag, this is a boring
+     * metadata operation that should be done after metadata, transactions, schema, etc. are all up
+     * and running.
+     */
+    if (F_ISSET(conn, WT_CONN_SALVAGE))
+        WT_ERR(__wt_chunkcache_salvage(session));
 
     /*
      * If the user wants to verify WiredTiger metadata, verify the history store now that the

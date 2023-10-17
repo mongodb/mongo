@@ -425,6 +425,7 @@ WideCharToMultiByte
 WinNT
 WiredTiger
 WiredTiger's
+WiredTigerCC
 WiredTigerCheckpoint
 WiredTigerChunkCache
 WiredTigerHS
