@@ -46,7 +46,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
         return (false);
     if (!F_ISSET(txn, WT_TXN_HAS_SNAPSHOT))
         return (false);
-    if (!WT_TXNID_LT(txn->snapshot_data.snap_max, mod->first_dirty_txn))
+    if (!WT_TXNID_LT(txn->snap_max, mod->first_dirty_txn))
         return (false);
 
     /*
@@ -465,7 +465,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
          * checkpoint.
          */
         if (!btree->modified && !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT) &&
-          (btree->rec_max_txn >= txn->snapshot_data.snap_min ||
+          (btree->rec_max_txn >= txn->snap_min ||
             (conn->txn_global.checkpoint_timestamp != conn->txn_global.last_ckpt_timestamp &&
               btree->rec_max_timestamp > conn->txn_global.checkpoint_timestamp)))
             __wt_tree_modify_set(session);
