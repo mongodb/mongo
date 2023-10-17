@@ -2032,6 +2032,7 @@ buildvariants:
   - name: jsCore_wildcard_indexes
   - name: json_schema
   - name: .misc_js
+  - name: move_collection_fuzzer_gen
   - name: .multi_shard .common
   - name: query_golden_classic
   - name: .query_fuzzer !.cqf_only
@@ -2055,6 +2056,7 @@ buildvariants:
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
+  - name: unshard_collection_fuzzer_gen
   - name: .updatefuzzer
   - name: .watchdog
 
