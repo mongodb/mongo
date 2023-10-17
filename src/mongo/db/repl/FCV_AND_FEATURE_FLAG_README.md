@@ -407,26 +407,39 @@ if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompat
 }
 ```
 
-Note that this assumes that `serverGlobalParams.featureCompatibility` has already been initialized. 
-If we are calling `isEnabled(serverGlobalParams.featureCompatibility)` in a location where it might
-not already be initialized, we must do this instead:
+If the feature flag has `shouldBeFCVGated` set to false, then `isEnabled` will simply return
+whether the feature flag is enabled.
 
-```
-if(serverGlobalParams.featureCompatibility.isVersionInitialized() && 
-feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility)) {
-	// code if feature is enabled.
-} else {
-	// code if feature is not enabled.
-}
-```
 
-There are some places where we only want to check if the feature flag is turned on, regardless of
-which FCV we are on. For example, this could be the case if we need to perform the check in a spot
-in the code when the FCV has not been initialized yet. Only in these cases can we use the
-`isEnabledAndIgnoreFCVUnsafe` helper. `isEnabledAndIgnoreFCVUnsafe` should only be used when we are
-sure that we don't care what the FCV is. We should not use the `isEnabledAndIgnoreFCVUnsafe` helper
-otherwise because it can result in unsafe scenarios where we enable a feature on an FCV where it is
-not supported or where the feature has not been fully implemented yet.
+### Feature Flag Gating During Initial Sync
+***IMPORTANT NOTE ABOUT INITIAL SYNC***:
+
+`isEnabled` checks if the feature flag is enabled on the input FCV, which is usually
+the server's current FCV `serverGlobalParams.featureCompatibility`. However, during initial sync, we temporarily reset the FCV to be uninintialized. 
+
+***`isEnabled` will invariant if the FCV is uninitialized.*** Because of this,
+each feature team should think about whether the feature could be run during initial sync, for example: 
+ * if the feature is part of initial sync itself
+ * if the feature is in a background thread that runs during initial sync
+ * if the feature is run in a command that is allowed during initial sync, such as `hello`, etc 
+
+If the feature will never run during initial sync, it's fine to continue using `isEnabled`. However, if the feature could be run during initial sync, the feature team 
+should use one of these options instead: 
+ * Use `isEnabledUseLastLTSFCVWhenUninitialized`. It checks against the last LTS FCV version if the FCV version is unset, but note that this could result in the feature not being turned on even though the FCV will be set to latest once initial sync is complete.
+ * Use `isEnabledUseLatestFCVWhenUninitialized`. This instead checks against the 
+latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
+even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
+ * Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team. 
+
+There are some cases outside of startup where we also want to check if the feature flag is turned on,
+regardless of which FCV we are on. In these cases we can use the `isEnabledAndIgnoreFCVUnsafe`
+helper, but it should only be used when we are sure that we don't care what the FCV is. We should 
+not use the `isEnabledAndIgnoreFCVUnsafe` helper otherwise because it can result in unsafe scenarios
+where we enable a feature on an FCV where it is not supported or where the feature has not been 
+fully implemented yet. In order to use isEnabledAndIgnoreFCVUnsafe, you **must** add a comment above
+that line starting with "(Ignore FCV check):" describing why we can safely ignore checking the FCV
+here. 
+
 
 ***Note that in a single operation, you must only check the feature flag once***. This is because if
 you checked if the feature flag was enabled multiple times within a single operation, it's possible 
@@ -452,7 +465,7 @@ const isToasterEnabled = db.adminCommand({getParameter: 1, featureFlagToaster: 1
 ```
 We can also use the FeatureFlagUtil library like so: 
 ```
-if (FeatureFlagUtil.isEnabled(db, "Toaster")) {
+if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 }
 ```
 

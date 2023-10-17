@@ -71,7 +71,7 @@ public:
 
         Reply typedRun(OperationContext* opCtx) {
             if (!feature_flags::gFeatureFlagAuditConfigClusterParameter
-                     .isEnabledUseDefaultFCVWhenUninitialized(
+                     .isEnabledUseLastLTSFCVWhenUninitialized(
                          serverGlobalParams.featureCompatibility)) {
                 uassert(ErrorCodes::IllegalOperation,
                         str::stream() << Request::kCommandName << " cannot be run on standalones",
