@@ -250,19 +250,31 @@ class TieredConfigMixin:
     def conn_extensions(self, extlist):
         return self.tiered_conn_extensions(extlist)
 
+    # Returns configuration to be passed to the extension.
+    # Call may override, in which case, they probably want to
+    # look at self.is_local_storage or self.ss_name, as every
+    # extension has their own configurations that are valid.
+    #
+    # Some possible values to return: 'verbose=1'
+    # or for dir_store: 'verbose=1,delay_ms=13,force_delay=30'
+    def tiered_extension_config(self):
+        return ''
+
     # Load tiered storage source extension.
     def tiered_conn_extensions(self, extlist):
         # Handle non_tiered storage scenarios.
         if not self.is_tiered_scenario():
             return ''
         
-        config = ''
+        config = self.tiered_extension_config()
+        if config == None:
+            config = ''
+        elif config != '':
+            config = '=(config=\"(%s)\")' % config
+
         # S3 store is built as an optional loadable extension, not all test environments build S3.
         if not self.is_local_storage:
-            #config = '=(config=\"(verbose=1)\")'
             extlist.skip_if_missing = True
-        #if self.is_local_storage:
-            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
         # Windows doesn't support dynamically loaded extension libraries.
         if os.name == 'nt':
             extlist.skip_if_missing = True

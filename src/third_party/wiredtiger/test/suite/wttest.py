@@ -208,6 +208,10 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
     def getTierStorageSource(self):
         return self.platform_api.getTierStorageSource()
 
+    # Return the tier storage source configuration for this testcase, or None.
+    def getTierStorageSourceConfig(self):
+        return self.platform_api.getTierStorageSourceConfig()
+
     def buildDirectory(self):
         return self._builddir
 

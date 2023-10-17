@@ -246,7 +246,13 @@ class test_config04(wttest.WiredTigerTestCase):
             '/eviction updates target must be lower than the eviction updates trigger/')
 
     def test_invalid_config(self):
-        msg = '/Unbalanced brackets/'
+        # The tiered hook modifies the wiredtiger_open configuration string.
+        # This may influence what particular error message occurs in certain cases.
+        if self.runningHook('tiered'):
+            msg = '/./'
+        else:
+            msg = '/Unbalanced brackets/'
+
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.wiredtiger_open('.', '}'), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

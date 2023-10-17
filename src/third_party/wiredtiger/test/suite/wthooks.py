@@ -319,8 +319,12 @@ class WiredTigerHookPlatformAPI(object):
         raise NotImplementedError('getTierCachePercent method not implemented')
 
     def getTierStorageSource(self):
-        """The tier cache percentage generator for this test case."""
+        """The tiered storage source for this test case."""
         raise NotImplementedError('getTierStorageSource method not implemented')
+
+    def getTierStorageSourceConfig(self):
+        """The tiered storage source configuration for this test case."""
+        raise NotImplementedError('getTierStorageSourceConfig method not implemented')
 
 class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
     def tableExists(self, name):
@@ -350,6 +354,10 @@ class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
     # By default, dir_store is the storage source.
     def getTierStorageSource(self):
         return ('dir_store')
+
+    # By default, there is no extra configuration for the storage source.
+    def getTierStorageSourceConfig(self):
+        return None
 
 class MultiPlatformAPI(WiredTigerHookPlatformAPI):
     def __init__(self, platform_apis):
@@ -418,3 +426,12 @@ class MultiPlatformAPI(WiredTigerHookPlatformAPI):
             except NotImplementedError:
                 pass
         raise Exception('getTierStorageSource: no implementation')  # should never happen
+
+    def getTierStorageSourceConfig(self):
+        """The tier storage source configuration for this test case."""
+        for api in self.apis:
+            try:
+                return api.getTierStorageSourceConfig()
+            except NotImplementedError:
+                pass
+        raise Exception('getTierStorageSourceCOnfig: no implementation')  # should never happen

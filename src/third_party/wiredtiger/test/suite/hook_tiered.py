@@ -55,7 +55,7 @@
 #
 from __future__ import print_function
 
-import os, unittest, wthooks
+import os, re, unittest, wthooks
 from wttest import WiredTigerTestCase
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 
@@ -67,6 +67,7 @@ def wiredtiger_open_tiered(ignored_self, args):
     tiered_storage_sources = gen_tiered_storage_sources()
     testcase = WiredTigerTestCase.currentTestCase()
     extension_name = testcase.getTierStorageSource()
+    extension_config = testcase.getTierStorageSourceConfig()
 
     auth_token = None
     bucket = None
@@ -135,7 +136,12 @@ def wiredtiger_open_tiered(ignored_self, args):
             raise Exception('hook_tiered: bad extensions in config \"%s\"' % curconfig)
         ext_string = curconfig[start: end]
 
-    tier_string += ',' + ext_string + ',\"%s\"]' % extension_libs[0]
+    if extension_config == None:
+        ext_lib = '\"%s\"' % extension_libs[0]
+    else:
+        ext_lib = '\"%s\"=(config=\"%s\")' % (extension_libs[0], extension_config)
+
+    tier_string += ',' + ext_string + ',%s]' % ext_lib
 
     args = list(args)         # convert from a readonly tuple to a writeable list
     args[-1] += tier_string   # Modify the list
@@ -416,23 +422,58 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
 
         self.wiredtiger['wiredtiger_open'] = (wthooks.HOOK_ARGS, wiredtiger_open_tiered)
 
+# Strip matching parens, which act as a quoting mechanism.
+def strip_matching_parens(s):
+    if len(s) >= 2:
+        if s[0] == '(' and s[-1] == ')':
+            s = s[1:-1]
+    return s
+
+def config_split(config):
+    pos = config.index('=')
+    if pos >= 0:
+        left = config[:pos]
+        right = config[pos+1:]
+    else:
+        left = config
+        right = ''
+    return [left, strip_matching_parens(right)]
+
 # Override some platform APIs for this hook.
 class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
     def __init__(self, arg=None):
         self.tier_share_percent = 0
         self.tier_cache_percent = 0
         self.tier_storage_source = 'dir_store'
+        self.tier_storage_source_config = ''
         params = []
-        if arg:
-            params = [config.split('=') for config in arg.split(',')]
 
-        for param_key, param_value in params :
+        # We want to split args something like arg.split(','), except that we need
+        # to sometimes allow commas as part of the individual parameters, which we
+        # allow via parens.  For example, a developer can run:
+        #  run.py --hook \
+        #    'tiered=(tier_storage_source=dir_store,tier_storage_source_config=(force_delay=5,delay_ms=10))'
+        #
+        # and that should appear as two parameters to the tiered hook.
+        if arg:
+            arg = strip_matching_parens(arg)
+            # Note: this regular expression does not handle arbitrary nesting of parens
+            config_list = re.split(r",(?=(?:[^(]*[(][^)]*[)])*[^)]*$)", arg)
+            params = [config_split(config) for config in config_list]
+
+        import wttest
+        #wttest.WiredTigerTestCase.tty('Tiered hook params={}'.format(params))
+        for param_key, param_value in params:
             if param_key == 'tier_populate_share':
                 self.tier_share_percent = int(param_value)
             elif param_key == 'tier_populate_cache':
                 self.tier_cache_percent = int(param_value)
             elif param_key == 'tier_storage_source':
                 self.tier_storage_source = param_value
+            elif param_key == 'tier_storage_source_config':
+                self.tier_storage_source_config = param_value
+            else:
+                raise Exception('hook_tiered: unknown parameter {}'.format(param_key))
 
     def tableExists(self, name):
         for i in range(1, 9):
@@ -455,6 +496,9 @@ class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
 
     def getTierStorageSource(self):
         return self.tier_storage_source
+
+    def getTierStorageSourceConfig(self):
+        return self.tier_storage_source_config
 
 # Every hook file must have a top level initialize function,
 # returning a list of WiredTigerHook objects.

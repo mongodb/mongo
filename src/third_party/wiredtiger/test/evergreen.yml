@@ -2767,6 +2767,16 @@ tasks:
         vars:
           unit_test_args: -v 2 --hook tiered
 
+  - name: unit-test-hook-tiered-with-delays
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: -v 2 --hook 'tiered=(tier_storage_source=dir_store,tier_storage_source_config=(force_delay=1,delay_ms=10,verbose=1))'
+
   - name: unit-test-hook-tiered-s3
     tags: ["python"]
     commands:
@@ -6330,6 +6340,7 @@ buildvariants:
     - name: unit-test-zstd
     - name: unit-test-random-seed
     - name: unit-test-hook-tiered
+    - name: unit-test-hook-tiered-with-delays
     - name: unit-test-hook-tiered-timestamp
     - name: unit-test-hook-timestamp
     - name: test-prepare-hs03-hook-timestamp
