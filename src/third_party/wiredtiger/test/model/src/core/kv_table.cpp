@@ -62,6 +62,19 @@ kv_table::get(const data_value &key, timestamp_t timestamp)
 }
 
 /*
+ * kv_table::get --
+ *     Get the value. Note that this returns a copy of the object.
+ */
+data_value
+kv_table::get(kv_transaction_ptr txn, const data_value &key)
+{
+    kv_table_item *item = item_if_exists(key);
+    if (item == nullptr)
+        return NONE;
+    return item->get(txn);
+}
+
+/*
  * kv_table::insert --
  *     Insert into the table.
  */
@@ -70,6 +83,21 @@ kv_table::insert(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
     return item(key).add_update(std::move(kv_update(value, timestamp)), false, !overwrite);
+}
+
+/*
+ * kv_table::insert --
+ *     Insert into the table.
+ */
+int
+kv_table::insert(
+  kv_transaction_ptr txn, const data_value &key, const data_value &value, bool overwrite)
+{
+    std::shared_ptr<kv_update> update = std::make_shared<kv_update>(value, txn);
+    int ret = item(key).add_update(update, false, !overwrite);
+    if (ret == 0)
+        txn->add_update(*this, key, update);
+    return ret;
 }
 
 /*
@@ -86,6 +114,24 @@ kv_table::remove(const data_value &key, timestamp_t timestamp)
 }
 
 /*
+ * kv_table::remove --
+ *     Delete a value from the table.
+ */
+int
+kv_table::remove(kv_transaction_ptr txn, const data_value &key)
+{
+    kv_table_item *item = item_if_exists(key);
+    if (item == nullptr)
+        return WT_NOTFOUND;
+
+    std::shared_ptr<kv_update> update = std::make_shared<kv_update>(NONE, txn);
+    int ret = item->add_update(update, true, false);
+    if (ret == 0)
+        txn->add_update(*this, key, update);
+    return ret;
+}
+
+/*
  * kv_table::update --
  *     Update a key in the table.
  */
@@ -94,6 +140,42 @@ kv_table::update(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
     return item(key).add_update(std::move(kv_update(value, timestamp)), !overwrite, false);
+}
+
+/*
+ * kv_table::update --
+ *     Update a key in the table.
+ */
+int
+kv_table::update(
+  kv_transaction_ptr txn, const data_value &key, const data_value &value, bool overwrite)
+{
+    std::shared_ptr<kv_update> update = std::make_shared<kv_update>(value, txn);
+    int ret = item(key).add_update(update, !overwrite, false);
+    if (ret == 0)
+        txn->add_update(*this, key, update);
+    return ret;
+}
+
+/*
+ * kv_table::fix_commit_timestamp --
+ *     Fix the commit timestamp for the corresponding update. We need to do this, because WiredTiger
+ *     transaction API specifies the commit timestamp after performing the operations, not before.
+ */
+void
+kv_table::fix_commit_timestamp(const data_value &key, txn_id_t txn_id, timestamp_t timestamp)
+{
+    item(key).fix_commit_timestamp(txn_id, timestamp);
+}
+
+/*
+ * kv_table::rollback_updates --
+ *     Roll back updates of an aborted transaction.
+ */
+void
+kv_table::rollback_updates(const data_value &key, txn_id_t txn_id)
+{
+    item(key).rollback_updates(txn_id);
 }
 
 /*

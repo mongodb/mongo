@@ -55,7 +55,13 @@ public:
      * kv_table_item::add_update --
      *     Add an update.
      */
-    int add_update(kv_update &&update, bool must_exist, bool overwrite);
+    int add_update(kv_update &&update, bool must_exist, bool must_not_exist);
+
+    /*
+     * kv_table_item::add_update --
+     *     Add an update.
+     */
+    int add_update(std::shared_ptr<kv_update> update, bool must_exist, bool must_not_exist);
 
     /*
      * kv_table_item::contains_any --
@@ -69,6 +75,33 @@ public:
      *     Get the corresponding value. Note that this returns a copy of the object.
      */
     data_value get(timestamp_t timestamp = k_timestamp_latest);
+
+    /*
+     * kv_table_item::get --
+     *     Get the corresponding value. Note that this returns a copy of the object.
+     */
+    data_value get(kv_transaction_ptr txn);
+
+    /*
+     * kv_table_item::fix_commit_timestamp --
+     *     Fix the commit timestamp for the corresponding update. We need to do this, because
+     *     WiredTiger transaction API specifies the commit timestamp after performing the
+     *     operations, not before.
+     */
+    void fix_commit_timestamp(txn_id_t txn_id, timestamp_t timestamp);
+
+    /*
+     * kv_table_item::rollback_updates --
+     *     Roll back updates of an aborted transaction.
+     */
+    void rollback_updates(txn_id_t txn_id);
+
+protected:
+    /*
+     * kv_table_item::add_update_nolock --
+     *     Add an update but without taking a lock (this assumes the caller has it).
+     */
+    int add_update_nolock(std::shared_ptr<kv_update> update, bool must_exist, bool must_not_exist);
 
 private:
     std::mutex _lock;

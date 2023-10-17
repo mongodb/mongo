@@ -49,6 +49,14 @@
 #define WT_TS_NONE 0
 #endif
 
+/*
+ * WT_TXN_NONE --
+ *     No transaction ID.
+ */
+#ifndef WT_TXN_NONE
+#define WT_TXN_NONE 0
+#endif
+
 namespace model {
 
 /*
@@ -79,6 +87,71 @@ constexpr timestamp_t k_timestamp_latest = k_timestamp_max;
 static_assert(k_timestamp_latest == WT_TS_MAX);
 static_assert(k_timestamp_max == WT_TS_MAX);
 static_assert(k_timestamp_none == WT_TS_NONE);
+
+/*
+ * txn_id_t --
+ *     The transaction ID.
+ */
+using txn_id_t = uint64_t;
+
+/*
+ * k_txn_none --
+ *     No transaction ID.
+ */
+constexpr txn_id_t k_txn_none = std::numeric_limits<txn_id_t>::min();
+
+/* Verify that model's constants are numerically equal to WiredTiger's constants. */
+static_assert(k_txn_none == WT_TXN_NONE);
+
+/*
+ * model_exception --
+ *     A model exception.
+ */
+class model_exception : std::runtime_error {
+
+public:
+    /*
+     * model_exception::model_exception --
+     *     Create a new instance of the exception.
+     */
+    inline model_exception(const char *message) noexcept : std::runtime_error(message) {}
+
+    /*
+     * model_exception::model_exception --
+     *     Create a new instance of the exception.
+     */
+    inline model_exception(const std::string &message) noexcept : std::runtime_error(message) {}
+};
+
+/*
+ * wiredtiger_abort_exception --
+ *     An exception that models that WiredTiger would abort or panic, either at the point when this
+ *     exception is thrown or in the future (e.g., during reconciliation).
+ */
+class wiredtiger_abort_exception : std::runtime_error {
+
+public:
+    /*
+     * wiredtiger_abort_exception::wiredtiger_abort_exception --
+     *     Create a new instance of the exception.
+     */
+    inline wiredtiger_abort_exception(const char *message) noexcept : std::runtime_error(message) {}
+
+    /*
+     * wiredtiger_abort_exception::wiredtiger_abort_exception --
+     *     Create a new instance of the exception.
+     */
+    inline wiredtiger_abort_exception(const std::string &message) noexcept
+        : std::runtime_error(message)
+    {
+    }
+
+    /*
+     * wiredtiger_abort_exception::wiredtiger_abort_exception --
+     *     Create a new instance of the exception.
+     */
+    inline wiredtiger_abort_exception() noexcept : std::runtime_error("WiredTiger would abort") {}
+};
 
 } /* namespace model */
 #endif

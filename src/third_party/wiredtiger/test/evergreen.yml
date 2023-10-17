@@ -4738,7 +4738,7 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            ./test_model_basic
+            ./test_model.sh
 
   - name: format-stress-zseries-test
     tags: ["stress-test-zseries-1"]

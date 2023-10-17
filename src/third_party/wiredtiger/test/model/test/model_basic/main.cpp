@@ -38,7 +38,8 @@ extern "C" {
 #include "test_util.h"
 }
 
-#include "model/kv_table.h"
+#include "model/test/wiredtiger_util.h"
+#include "model/kv_database.h"
 
 /*
  * Command-line arguments.
@@ -62,158 +63,6 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
     "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(enabled,file_max=10M,remove=true),session_max=100," \
     "statistics=(all),statistics_log=(wait=1,json,on_close)"
-
-/*
- * wt_get --
- *     Read from WiredTiger.
- */
-static model::data_value
-wt_get(WT_SESSION *session, const char *uri, const model::data_value &key,
-  model::timestamp_t timestamp = UINT64_MAX)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    const char *value;
-    char cfg[64];
-
-    value = nullptr;
-
-    if (timestamp == 0)
-        testutil_check(session->begin_transaction(session, nullptr));
-    else {
-        testutil_snprintf(cfg, sizeof(cfg), "read_timestamp=%" PRIx64, timestamp);
-        testutil_check(session->begin_transaction(session, cfg));
-    }
-    testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
-
-    model::set_wt_cursor_key(cursor, key);
-    testutil_check_error_ok(ret = cursor->search(cursor), WT_NOTFOUND);
-    if (ret == 0)
-        testutil_check(cursor->get_value(cursor, &value));
-
-    testutil_check(cursor->close(cursor));
-    testutil_check(session->commit_transaction(session, nullptr));
-    return ret == 0 ? model::data_value(value) : model::NONE;
-}
-
-/*
- * wt_insert --
- *     Write to WiredTiger.
- */
-static int
-wt_insert(WT_SESSION *session, const char *uri, const model::data_value &key,
-  const model::data_value &value, model::timestamp_t timestamp = 0, bool overwrite = true)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    char cfg[64];
-
-    testutil_check(session->begin_transaction(session, nullptr));
-    testutil_check(session->open_cursor(
-      session, uri, nullptr, overwrite ? nullptr : "overwrite=false", &cursor));
-
-    model::set_wt_cursor_key(cursor, key);
-    model::set_wt_cursor_value(cursor, value);
-    testutil_check_error_ok(ret = cursor->insert(cursor), WT_DUPLICATE_KEY);
-
-    testutil_check(cursor->close(cursor));
-    if (timestamp == 0)
-        cfg[0] = '\0';
-    else
-        testutil_snprintf(cfg, sizeof(cfg), "commit_timestamp=%" PRIx64, timestamp);
-    testutil_check(session->commit_transaction(session, cfg));
-
-    return ret;
-}
-
-/*
- * wt_remove --
- *     Delete from WiredTiger.
- */
-static int
-wt_remove(WT_SESSION *session, const char *uri, const model::data_value &key,
-  model::timestamp_t timestamp = 0)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    char cfg[64];
-
-    testutil_check(session->begin_transaction(session, nullptr));
-    testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
-
-    model::set_wt_cursor_key(cursor, key);
-    testutil_check_error_ok(ret = cursor->remove(cursor), WT_NOTFOUND);
-
-    testutil_check(cursor->close(cursor));
-    if (timestamp == 0)
-        cfg[0] = '\0';
-    else
-        testutil_snprintf(cfg, sizeof(cfg), "commit_timestamp=%" PRIx64, timestamp);
-    testutil_check(session->commit_transaction(session, cfg));
-
-    return ret;
-}
-
-/*
- * wt_update --
- *     Update a key in WiredTiger.
- */
-static int
-wt_update(WT_SESSION *session, const char *uri, const model::data_value &key,
-  const model::data_value &value, model::timestamp_t timestamp = 0, bool overwrite = true)
-{
-    WT_CURSOR *cursor;
-    WT_DECL_RET;
-    char cfg[64];
-
-    testutil_check(session->begin_transaction(session, nullptr));
-    testutil_check(session->open_cursor(
-      session, uri, nullptr, overwrite ? nullptr : "overwrite=false", &cursor));
-
-    model::set_wt_cursor_key(cursor, key);
-    model::set_wt_cursor_value(cursor, value);
-    testutil_check_error_ok(ret = cursor->update(cursor), WT_NOTFOUND);
-
-    testutil_check(cursor->close(cursor));
-    if (timestamp == 0)
-        cfg[0] = '\0';
-    else
-        testutil_snprintf(cfg, sizeof(cfg), "commit_timestamp=%" PRIx64, timestamp);
-    testutil_check(session->commit_transaction(session, cfg));
-
-    return ret;
-}
-
-/*
- * wt_model_assert --
- *     Check that the key has the same value in the model as in the database.
- */
-#define wt_model_assert(table, uri, key, ...) \
-    testutil_assert(table.get(key, ##__VA_ARGS__) == wt_get(session, uri, key, ##__VA_ARGS__));
-
-/*
- * wt_model_insert_both --
- *     Insert both into the model and the database.
- */
-#define wt_model_insert_both(table, uri, key, value, ...)      \
-    testutil_assert(table.insert(key, value, ##__VA_ARGS__) == \
-      wt_insert(session, uri, key, value, ##__VA_ARGS__));
-
-/*
- * wt_model_remove_both --
- *     Remove both from the model and from the database.
- */
-#define wt_model_remove_both(table, uri, key, ...) \
-    testutil_assert(                               \
-      table.remove(key, ##__VA_ARGS__) == wt_remove(session, uri, key, ##__VA_ARGS__));
-
-/*
- * wt_model_update_both --
- *     Update both in the model and in the database.
- */
-#define wt_model_update_both(table, uri, key, value, ...)      \
-    testutil_assert(table.update(key, value, ##__VA_ARGS__) == \
-      wt_update(session, uri, key, value, ##__VA_ARGS__));
 
 /*
  * test_data_value --
@@ -294,101 +143,102 @@ test_data_value(void)
 static void
 test_model_basic(void)
 {
-    model::kv_table table("table");
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
 
     /* Keys. */
-    model::data_value key1("Key 1");
-    model::data_value key2("Key 2");
-    model::data_value keyX("Key X");
+    const model::data_value key1("Key 1");
+    const model::data_value key2("Key 2");
+    const model::data_value keyX("Key X");
 
     /* Values. */
-    model::data_value value1("Value 1");
-    model::data_value value2("Value 2");
-    model::data_value value3("Value 3");
-    model::data_value value4("Value 4");
+    const model::data_value value1("Value 1");
+    const model::data_value value2("Value 2");
+    const model::data_value value3("Value 3");
+    const model::data_value value4("Value 4");
 
     /* Populate the table with a few values and check that we get the expected results. */
-    testutil_check(table.insert(key1, value1, 10));
-    testutil_check(table.insert(key1, value2, 20));
-    testutil_check(table.remove(key1, 30));
-    testutil_check(table.insert(key1, value4, 40));
+    testutil_check(table->insert(key1, value1, 10));
+    testutil_check(table->insert(key1, value2, 20));
+    testutil_check(table->remove(key1, 30));
+    testutil_check(table->insert(key1, value4, 40));
 
-    testutil_assert(table.get(key1, 10) == value1);
-    testutil_assert(table.get(key1, 20) == value2);
-    testutil_assert(table.get(key1, 30) == model::NONE);
-    testutil_assert(table.get(key1, 40) == value4);
+    testutil_assert(table->get(key1, 10) == value1);
+    testutil_assert(table->get(key1, 20) == value2);
+    testutil_assert(table->get(key1, 30) == model::NONE);
+    testutil_assert(table->get(key1, 40) == value4);
 
-    testutil_assert(table.get(key1, 5) == model::NONE);
-    testutil_assert(table.get(key1, 15) == value1);
-    testutil_assert(table.get(key1, 25) == value2);
-    testutil_assert(table.get(key1, 35) == model::NONE);
-    testutil_assert(table.get(key1, 45) == value4);
-    testutil_assert(table.get(key1) == value4);
+    testutil_assert(table->get(key1, 5) == model::NONE);
+    testutil_assert(table->get(key1, 15) == value1);
+    testutil_assert(table->get(key1, 25) == value2);
+    testutil_assert(table->get(key1, 35) == model::NONE);
+    testutil_assert(table->get(key1, 45) == value4);
+    testutil_assert(table->get(key1) == value4);
 
     /* Test globally visible (non-timestamped) updates. */
-    testutil_check(table.insert(key2, value1));
-    testutil_assert(table.get(key2, 0) == value1);
-    testutil_assert(table.get(key2, 10) == value1);
-    testutil_assert(table.get(key2) == value1);
+    testutil_check(table->insert(key2, value1));
+    testutil_assert(table->get(key2, 0) == value1);
+    testutil_assert(table->get(key2, 10) == value1);
+    testutil_assert(table->get(key2) == value1);
 
-    testutil_check(table.remove(key2));
-    testutil_assert(table.get(key2) == model::NONE);
+    testutil_check(table->remove(key2));
+    testutil_assert(table->get(key2) == model::NONE);
 
     /* Try a missing key. */
-    testutil_assert(table.get(keyX) == model::NONE);
+    testutil_assert(table->get(keyX) == model::NONE);
 
-    testutil_assert(table.remove(keyX) == WT_NOTFOUND);
-    testutil_assert(table.get(keyX) == model::NONE);
+    testutil_assert(table->remove(keyX) == WT_NOTFOUND);
+    testutil_assert(table->get(keyX) == model::NONE);
 
     /* Try timestamped updates to the second key. */
-    testutil_check(table.insert(key2, value3, 30));
-    testutil_assert(table.get(key2, 5) == model::NONE);
-    testutil_assert(table.get(key2, 35) == value3);
-    testutil_assert(table.get(key2) == value3);
+    testutil_check(table->insert(key2, value3, 30));
+    testutil_assert(table->get(key2, 5) == model::NONE);
+    testutil_assert(table->get(key2, 35) == value3);
+    testutil_assert(table->get(key2) == value3);
 
     /* Test multiple inserts with the same timestamp. */
-    testutil_check(table.insert(key1, value1, 50));
-    testutil_check(table.insert(key1, value2, 50));
-    testutil_check(table.insert(key1, value3, 50));
-    testutil_check(table.insert(key1, value4, 60));
-    testutil_assert(table.get(key1, 50) == value3);
-    testutil_assert(table.get(key1, 55) == value3);
-    testutil_assert(table.get(key1) == value4);
+    testutil_check(table->insert(key1, value1, 50));
+    testutil_check(table->insert(key1, value2, 50));
+    testutil_check(table->insert(key1, value3, 50));
+    testutil_check(table->insert(key1, value4, 60));
+    testutil_assert(table->get(key1, 50) == value3);
+    testutil_assert(table->get(key1, 55) == value3);
+    testutil_assert(table->get(key1) == value4);
 
-    testutil_assert(!table.contains_any(key1, value1, 5));
-    testutil_assert(!table.contains_any(key1, value2, 5));
-    testutil_assert(!table.contains_any(key1, value3, 5));
-    testutil_assert(!table.contains_any(key1, value4, 5));
+    testutil_assert(!table->contains_any(key1, value1, 5));
+    testutil_assert(!table->contains_any(key1, value2, 5));
+    testutil_assert(!table->contains_any(key1, value3, 5));
+    testutil_assert(!table->contains_any(key1, value4, 5));
 
-    testutil_assert(table.contains_any(key1, value1, 50));
-    testutil_assert(table.contains_any(key1, value2, 50));
-    testutil_assert(table.contains_any(key1, value3, 50));
-    testutil_assert(!table.contains_any(key1, value4, 50));
+    testutil_assert(table->contains_any(key1, value1, 50));
+    testutil_assert(table->contains_any(key1, value2, 50));
+    testutil_assert(table->contains_any(key1, value3, 50));
+    testutil_assert(!table->contains_any(key1, value4, 50));
 
-    testutil_assert(table.contains_any(key1, value1, 55));
-    testutil_assert(table.contains_any(key1, value2, 55));
-    testutil_assert(table.contains_any(key1, value3, 55));
-    testutil_assert(!table.contains_any(key1, value4, 55));
+    testutil_assert(table->contains_any(key1, value1, 55));
+    testutil_assert(table->contains_any(key1, value2, 55));
+    testutil_assert(table->contains_any(key1, value3, 55));
+    testutil_assert(!table->contains_any(key1, value4, 55));
 
-    testutil_assert(!table.contains_any(key1, value1, 60));
-    testutil_assert(!table.contains_any(key1, value2, 60));
-    testutil_assert(!table.contains_any(key1, value3, 60));
-    testutil_assert(table.contains_any(key1, value4, 60));
+    testutil_assert(!table->contains_any(key1, value1, 60));
+    testutil_assert(!table->contains_any(key1, value2, 60));
+    testutil_assert(!table->contains_any(key1, value3, 60));
+    testutil_assert(table->contains_any(key1, value4, 60));
 
     /* Test insert without overwrite. */
-    testutil_assert(table.insert(key1, value1, 60, false) == WT_DUPLICATE_KEY);
-    testutil_assert(table.insert(key1, value1, 65, false) == WT_DUPLICATE_KEY);
-    testutil_check(table.remove(key1, 65));
-    testutil_check(table.insert(key1, value1, 70, false));
+    testutil_assert(table->insert(key1, value1, 60, false) == WT_DUPLICATE_KEY);
+    testutil_assert(table->insert(key1, value1, 65, false) == WT_DUPLICATE_KEY);
+    testutil_check(table->remove(key1, 65));
+    testutil_check(table->insert(key1, value1, 70, false));
 
     /* Test updates. */
-    testutil_check(table.update(key1, value2, 70));
-    testutil_check(table.update(key1, value3, 75));
-    testutil_assert(table.get(key1, 70) == value2);
-    testutil_assert(table.get(key1, 75) == value3);
-    testutil_check(table.remove(key1, 80));
-    testutil_assert(table.update(key1, value1, 80, false) == WT_NOTFOUND);
-    testutil_assert(table.update(key1, value1, 85, false) == WT_NOTFOUND);
+    testutil_check(table->update(key1, value2, 70));
+    testutil_check(table->update(key1, value3, 75));
+    testutil_assert(table->get(key1, 70) == value2);
+    testutil_assert(table->get(key1, 75) == value3);
+    testutil_check(table->remove(key1, 80));
+    testutil_assert(table->update(key1, value1, 80, false) == WT_NOTFOUND);
+    testutil_assert(table->update(key1, value1, 85, false) == WT_NOTFOUND);
 }
 
 /*
@@ -398,19 +248,19 @@ test_model_basic(void)
 static void
 test_model_basic_wt(void)
 {
-    /* Table. */
-    model::kv_table table("table");
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
 
     /* Keys. */
-    model::data_value key1("Key 1");
-    model::data_value key2("Key 2");
-    model::data_value keyX("Key X");
+    const model::data_value key1("Key 1");
+    const model::data_value key2("Key 2");
+    const model::data_value keyX("Key X");
 
     /* Values. */
-    model::data_value value1("Value 1");
-    model::data_value value2("Value 2");
-    model::data_value value3("Value 3");
-    model::data_value value4("Value 4");
+    const model::data_value value1("Value 1");
+    const model::data_value value2("Value 2");
+    const model::data_value value3("Value 3");
+    const model::data_value value4("Value 4");
 
     /* Create the test's home directory and database. */
     WT_CONNECTION *conn;
@@ -441,7 +291,7 @@ test_model_basic_wt(void)
     wt_model_assert(table, uri, key1, 45);
     wt_model_assert(table, uri, key1);
 
-    testutil_assert(table.verify_noexcept(conn));
+    testutil_assert(table->verify_noexcept(conn));
 
     /* Test globally visible (non-timestamped) updates. */
     wt_model_insert_both(table, uri, key2, value1);
@@ -475,7 +325,7 @@ test_model_basic_wt(void)
     wt_model_assert(table, uri, key1, 55);
     wt_model_assert(table, uri, key1);
 
-    testutil_assert(table.verify_noexcept(conn));
+    testutil_assert(table->verify_noexcept(conn));
 
     /* Test insert without overwrite. */
     wt_model_insert_both(table, uri, key1, value1, 60, false);
@@ -492,11 +342,11 @@ test_model_basic_wt(void)
     wt_model_update_both(table, uri, key1, value1, 80, false);
     wt_model_update_both(table, uri, key1, value1, 85, false);
 
-    testutil_assert(table.verify_noexcept(conn));
+    testutil_assert(table->verify_noexcept(conn));
 
     /* Now try to get the verification to fail. */
-    testutil_check(table.remove(key2, 1000));
-    testutil_assert(!table.verify_noexcept(conn));
+    testutil_check(table->remove(key2, 1000));
+    testutil_assert(!table->verify_noexcept(conn));
 
     /* Clean up. */
     testutil_check(session->close(session, nullptr));

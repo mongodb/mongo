@@ -29,9 +29,14 @@
 #ifndef MODEL_KV_UPDATE_H
 #define MODEL_KV_UPDATE_H
 
+#include <memory>
+
 #include "model/data_value.h"
+#include "model/kv_transaction.h"
 
 namespace model {
+
+class transaction;
 
 /*
  * kv_update --
@@ -119,7 +124,17 @@ public:
      *     Create a new instance.
      */
     inline kv_update(const data_value &value, timestamp_t timestamp) noexcept
-        : _value(value), _timestamp(timestamp)
+        : _value(value), _timestamp(timestamp), _txn_id(k_txn_none)
+    {
+    }
+
+    /*
+     * kv_update::kv_update --
+     *     Create a new instance.
+     */
+    inline kv_update(const data_value &value, kv_transaction_ptr txn) noexcept
+        : _value(value), _timestamp(txn ? txn->commit_timestamp() : k_timestamp_none), _txn(txn),
+          _txn_id(txn ? txn->id() : k_txn_none)
     {
     }
 
@@ -130,7 +145,7 @@ public:
     inline bool
     operator==(const kv_update &other) const noexcept
     {
-        return _value == other._value && _timestamp == other._timestamp;
+        return _value == other._value && _txn_id == other._txn_id && _timestamp == other._timestamp;
     }
 
     /*
@@ -152,6 +167,8 @@ public:
     {
         if (_timestamp != other._timestamp)
             return _timestamp < other._timestamp;
+        if (_txn_id != other._txn_id)
+            return _txn_id < other._txn_id;
         if (_value != other._value)
             return _value < other._value;
         return true;
@@ -217,9 +234,85 @@ public:
         return _timestamp;
     }
 
+    /*
+     * kv_update::committed --
+     *     Check whether the transaction is committed.
+     */
+    inline bool
+    committed() const noexcept
+    {
+        if (!_txn)
+            return true;
+        return _txn->state() == kv_transaction_state::committed;
+    }
+
+    /*
+     * kv_update::txn --
+     *     Get the transaction pointer, if available.
+     */
+    inline kv_transaction_ptr
+    txn() const noexcept
+    {
+        return _txn;
+    }
+
+    /*
+     * kv_update::txn_id --
+     *     Get the transaction ID.
+     */
+    inline txn_id_t
+    txn_id() const noexcept
+    {
+        return _txn_id;
+    }
+
+    /*
+     * kv_update::txn_state --
+     *     Get the update's transaction state.
+     */
+    inline kv_transaction_state
+    txn_state() const noexcept
+    {
+        if (!_txn)
+            return kv_transaction_state::committed;
+        return _txn->state();
+    }
+
+    /*
+     * kv_update::set_timestamp --
+     *     Set the timestamp. This can be called only when this object is not inserted in a sorted
+     *     list.
+     */
+    inline void
+    set_timestamp(timestamp_t timestamp) noexcept
+    {
+        _timestamp = timestamp;
+    }
+
+    /*
+     * kv_update::remove_txn --
+     *     Remove the transaction information. This can be only done if the transaction is already
+     *     committed to save memory.
+     */
+    inline void
+    remove_txn() noexcept
+    {
+        _txn.reset();
+    }
+
 private:
     timestamp_t _timestamp;
     data_value _value;
+
+    /*
+     * The transaction information: the transaction ID, and the pointer to the transaction object.
+     * The pointer can be a nullptr if the transaction has already committed so that we don't
+     * unnecessarily keep many transaction objects around. After the transaction has committed, we
+     * still remember the transaction ID so that we can determine whether the update should be
+     * included in a transaction snapshot.
+     */
+    txn_id_t _txn_id;
+    kv_transaction_ptr _txn;
 };
 
 } /* namespace model */

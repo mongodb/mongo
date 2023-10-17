@@ -82,11 +82,24 @@ public:
     data_value get(const data_value &key, timestamp_t timestamp = k_timestamp_latest);
 
     /*
+     * kv_table::get --
+     *     Get the value. Note that this returns a copy of the object.
+     */
+    data_value get(kv_transaction_ptr txn, const data_value &key);
+
+    /*
      * kv_table::insert --
      *     Insert into the table.
      */
     int insert(const data_value &key, const data_value &value,
       timestamp_t timestamp = k_timestamp_none, bool overwrite = true);
+
+    /*
+     * kv_table::insert --
+     *     Insert into the table.
+     */
+    int insert(kv_transaction_ptr txn, const data_value &key, const data_value &value,
+      bool overwrite = true);
 
     /*
      * kv_table::remove --
@@ -95,11 +108,38 @@ public:
     int remove(const data_value &key, timestamp_t timestamp = k_timestamp_none);
 
     /*
+     * kv_table::remove --
+     *     Delete a value from the table.
+     */
+    int remove(kv_transaction_ptr txn, const data_value &key);
+
+    /*
+     * kv_table::fix_commit_timestamp --
+     *     Fix the commit timestamp for the corresponding update. We need to do this, because
+     *     WiredTiger transaction API specifies the commit timestamp after performing the
+     *     operations, not before.
+     */
+    void fix_commit_timestamp(const data_value &key, txn_id_t txn_id, timestamp_t timestamp);
+
+    /*
+     * kv_table::rollback_updates --
+     *     Roll back updates of an aborted transaction.
+     */
+    void rollback_updates(const data_value &key, txn_id_t txn_id);
+
+    /*
      * kv_table::update --
      *     Update a key in the table.
      */
     int update(const data_value &key, const data_value &value,
       timestamp_t timestamp = k_timestamp_none, bool overwrite = true);
+
+    /*
+     * kv_table::update --
+     *     Update a key in the table.
+     */
+    int update(kv_transaction_ptr txn, const data_value &key, const data_value &value,
+      bool overwrite = true);
 
     /*
      * kv_table::verify --
@@ -167,6 +207,12 @@ private:
     std::mutex _lock;
     std::string _name;
 };
+
+/*
+ * kv_table_ptr --
+ *     A shared pointer to the table.
+ */
+using kv_table_ptr = std::shared_ptr<kv_table>;
 
 } /* namespace model */
 #endif
