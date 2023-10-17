@@ -486,6 +486,20 @@ void setCurOpInfoAndEnsureStarted(OperationContext* opCtx,
     }
 }
 
+void validateNamespaceForWrites(OperationContext* opCtx,
+                                int idx,
+                                const NamespaceString& ns,
+                                std::vector<int>& validatedNamespaces) {
+    if (validatedNamespaces[idx] == 1) {
+        // Already checked this namespace.
+        return;
+    }
+
+    uassertStatusOK(userAllowedWriteNS(opCtx, ns));
+    doTransactionValidationForWrites(opCtx, ns);
+    validatedNamespaces[idx] = 1;
+}
+
 std::tuple<int /*numMatched*/, int /*numDocsModified*/, boost::optional<IDLAnyTypeOwned>>
 getRetryResultForUpdate(OperationContext* opCtx,
                         const NamespaceString& nsString,
@@ -833,6 +847,7 @@ bool handleInsertOp(OperationContext* opCtx,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
+                    std::vector<int>& validatedNamespaces,
                     BulkWriteReplies& responses,
                     InsertGrouper& insertGrouper) {
     if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
@@ -842,8 +857,7 @@ bool handleInsertOp(OperationContext* opCtx,
     auto idx = op->getInsert();
     const auto& ns = nsInfo[idx].getNs();
 
-    uassertStatusOK(userAllowedWriteNS(opCtx, ns));
-    doTransactionValidationForWrites(opCtx, ns);
+    validateNamespaceForWrites(opCtx, idx, ns, validatedNamespaces);
 
     if (insertGrouper.group(op, currentOpIdx)) {
         return true;
@@ -946,6 +960,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
+                    std::vector<int>& validatedNamespaces,
                     BulkWriteReplies& responses) {
     if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
         return false;
@@ -962,8 +977,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         }
 
         const NamespaceString& nsString = nsEntry.getNs();
-        uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
-        doTransactionValidationForWrites(opCtx, nsString);
+        validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE updates.
         if (nsEntry.getEncryptionInformation().has_value()) {
@@ -1100,6 +1114,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
+                    std::vector<int>& validatedNamespaces,
                     BulkWriteReplies& responses) {
     if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
         return false;
@@ -1116,8 +1131,7 @@ bool handleDeleteOp(OperationContext* opCtx,
         }
 
         const NamespaceString& nsString = nsEntry.getNs();
-        uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
-        doTransactionValidationForWrites(opCtx, nsString);
+        validateNamespaceForWrites(opCtx, idx, nsString, validatedNamespaces);
 
         // Handle FLE deletes.
         if (nsEntry.getEncryptionInformation().has_value()) {
@@ -1599,7 +1613,6 @@ public:
 MONGO_REGISTER_COMMAND(BulkWriteCmd).forShard();
 
 }  // namespace
-
 namespace bulk_write {
 
 BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequest& req) {
@@ -1615,6 +1628,9 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     auto responses = BulkWriteReplies(req, ops.size());
 
     write_ops_exec::LastOpFixer lastOpFixer(opCtx);
+
+    std::vector<int> validatedNamespaces{0};
+    validatedNamespaces.reserve(req.getNsInfo().size());
 
     // Create an insertGrouper to group consecutive inserts to the same namespace.
     auto insertGrouper = InsertGrouper(req);
@@ -1681,8 +1697,14 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         auto opType = op.getType();
 
         if (opType == BulkWriteCRUDOp::kInsert) {
-            if (!handleInsertOp(
-                    opCtx, op.getInsert(), req, idx, lastOpFixer, responses, insertGrouper)) {
+            if (!handleInsertOp(opCtx,
+                                op.getInsert(),
+                                req,
+                                idx,
+                                lastOpFixer,
+                                validatedNamespaces,
+                                responses,
+                                insertGrouper)) {
                 // Insert write failed can no longer continue.
                 break;
             }
@@ -1698,7 +1720,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
                     "BulkWrite update with Queryable Encryption supports only a single operation.",
                     ops.size() == 1);
             }
-            if (!handleUpdateOp(opCtx, op.getUpdate(), req, idx, lastOpFixer, responses)) {
+            if (!handleUpdateOp(
+                    opCtx, op.getUpdate(), req, idx, lastOpFixer, validatedNamespaces, responses)) {
                 // Update write failed can no longer continue.
                 break;
             }
@@ -1714,7 +1737,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
                     "BulkWrite delete with Queryable Encryption supports only a single operation.",
                     ops.size() == 1);
             }
-            if (!handleDeleteOp(opCtx, op.getDelete(), req, idx, lastOpFixer, responses)) {
+            if (!handleDeleteOp(
+                    opCtx, op.getDelete(), req, idx, lastOpFixer, validatedNamespaces, responses)) {
                 // Delete write failed can no longer continue.
                 break;
             }
