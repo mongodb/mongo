@@ -31,6 +31,7 @@
 import os
 import wttest
 
+from wiredtiger import wiredtiger_strerror, WiredTigerError, WT_ROLLBACK
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -43,21 +44,51 @@ class test_salvage02(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(format_values)
 
+    uri = "table:salvage02"
+
+    def large_updates(self, value, ds, nrows, commit_ts):
+        # Update a large number of records.
+        session = self.session
+        try:
+            cursor = session.open_cursor(self.uri)
+            for i in range(1, nrows + 1):
+                if commit_ts == 0:
+                    session.begin_transaction('no_timestamp=true')
+                else:
+                    session.begin_transaction()
+                cursor[ds.key(i)] = value
+                if commit_ts == 0:
+                    session.commit_transaction()
+                else:
+                    session.commit_transaction('commit_timestamp=' + self.timestamp_str(commit_ts))
+            cursor.close()
+        except WiredTigerError as e:
+            rollback_str = wiredtiger_strerror(WT_ROLLBACK)
+            if rollback_str in str(e):
+                session.rollback_transaction()
+            raise(e)
+
     def test_hs_removed(self):
         nrows = 1000
 
+        if self.value_format == '8t':
+            valuea = 97
+            valueb = 98
+        else:
+            valuea = "aaaaa" * 100
+            valueb = "bbbbb" * 100
+
         # Start normally, insert data
-        uri = "table:salvage02"
-        ds = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format=self.value_format)
+        ds = SimpleDataSet(self, self.uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
-        ds.check()
+        self.large_updates(valuea, ds, nrows, 1)
 
         # Put some content in the history store
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
-        ds2 = SimpleDataSet(self, uri, nrows, key_format=self.key_format, value_format=self.value_format)
+        ds2 = SimpleDataSet(self, self.uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds2.populate()
-        ds2.check()
+        self.large_updates(valueb, ds2, nrows, 2)
 
         self.session.checkpoint()
 
@@ -65,7 +96,7 @@ class test_salvage02(wttest.WiredTigerTestCase):
         self.close_conn()
         os.remove('WiredTigerHS.wt')
         self.open_conn(config='salvage=true')
-        results = list(self.session.open_cursor(uri))
+        results = list(self.session.open_cursor(self.uri))
         assert(len(results) == nrows)
 
 if __name__ == '__main__':

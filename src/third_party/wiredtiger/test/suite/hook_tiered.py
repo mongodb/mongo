@@ -312,7 +312,7 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
                 "inmem",                # In memory tests don't make sense with tiered storage
                 "lsm",                  # If the test name tells us it uses lsm ignore it
                 "modify_smoke_recover", # Copying WT dir doesn't copy the bucket directory
-                "salvage01",            # Salvage tests directly name files ending in ".wt"
+                "test_salvage",         # Salvage tests directly name files ending in ".wt"
                 "test_config_json",     # create replacement can't handle a json config string
                 "test_cursor_big",      # Cursor caching verified with stats
                 "tiered",               # Tiered tests already do tiering.
