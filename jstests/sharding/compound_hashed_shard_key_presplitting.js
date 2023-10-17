@@ -1,11 +1,8 @@
 /**
  * Tests the pre-splitting behaviour of compound hashed shard key, for both the case where the
  * prefix field is hashed, and where the hashed field is not the prefix.
- *
- * @tags: [
- *   multiversion_incompatible,
- * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({name: jsTestName(), shards: 3});
@@ -101,18 +98,25 @@ checkValidChunks(coll, shardKey, (shardCountsMap) => {
     assert.eq(1, totalChunks, "Unexpected total amount of chunks");
 });
 
-// Default pre-splitting assigns two chunks per shard.
+// Default pre-splitting assigns one chunk per shard.
 coll = db.hashedDefaultPreSplit;
 assert.commandWorked(mongos.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
 checkValidChunks(coll, shardKey, (shardCountsMap) => {
+    let expectedChunkCountPerShard = 1;
+    // TODO SERVER-81884: update once 8.0 becomes last LTS.
+    if (!FeatureFlagUtil.isPresentAndEnabled(db,
+                                             "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+        expectedChunkCountPerShard = 2;
+    }
+
     assert.gte(shardCountsMap[st.shard0.shardName],
-               2,
+               expectedChunkCountPerShard,
                "Unexpected amount of chunks on " + st.shard0.shardName);
     assert.gte(shardCountsMap[st.shard1.shardName],
-               2,
+               expectedChunkCountPerShard,
                "Unexpected amount of chunks on " + st.shard1.shardName);
     assert.gte(shardCountsMap[st.shard2.shardName],
-               2,
+               expectedChunkCountPerShard,
                "Unexpected amount of chunks on " + st.shard2.shardName);
 });
 
@@ -177,11 +181,21 @@ assert.commandWorked(db.adminCommand({
     presplitHashedZones: true
 }));
 
-// By default, we create two chunks per shard for each shard that contains at least one zone.
+// By default, we create one chunk per shard for each shard that contains at least one zone.
 checkValidChunks(db.hashedPrefixColl, shardKey, (shardCountsMap) => {
     assert.eq(0, shardCountsMap[st.shard0.shardName], "Unexpected amount of chunks on shard0");
-    assert.eq(2, shardCountsMap[st.shard1.shardName], "Unexpected amount of chunks on shard1");
-    assert.eq(2, shardCountsMap[st.shard2.shardName], "Unexpected amount of chunks on shard2");
+    let expectedChunkCountPerShard = 1;
+    // TODO SERVER-81884: update once 8.0 becomes last LTS.
+    if (!FeatureFlagUtil.isPresentAndEnabled(db,
+                                             "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+        expectedChunkCountPerShard = 2;
+    }
+    assert.eq(expectedChunkCountPerShard,
+              shardCountsMap[st.shard1.shardName],
+              "Unexpected amount of chunks on shard1");
+    assert.eq(expectedChunkCountPerShard,
+              shardCountsMap[st.shard2.shardName],
+              "Unexpected amount of chunks on shard2");
 });
 
 // Verify that 'shardCollection' command will pre-split chunks equally among all the eligible

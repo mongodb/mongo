@@ -189,10 +189,10 @@ TEST(CalculateHashedSplitPointsTest, HashedPrefixChunksOneReturnsNoSplitPoints) 
 TEST(CalculateHashedSplitPointsTest, HashedPrefixChunksZeroUsesDefault) {
     const std::vector<BSONObj> expectedSplitPoints = {
         BSON("x" << -4611686018427387902LL), BSON("x" << 0), BSON("x" << 4611686018427387902LL)};
-    int expectNumChunkPerShard = 2;
+    int expectNumChunkPerShard = 1;
     checkCalculatedHashedSplitPoints(ShardKeyPattern(BSON("x"
                                                           << "hashed")),
-                                     2,
+                                     4,
                                      0,
                                      &expectedSplitPoints,
                                      expectNumChunkPerShard);
@@ -939,9 +939,9 @@ TEST_F(PresplitHashedZonesChunksTest, WithHashedPrefix) {
 
     // numInitialChunks = 0.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2 * 3});
+        buildExpectedChunkRanges(tags, shardKeyPattern, {3});
     std::vector<boost::optional<ShardId>> expectedShardIds = {
-        shardId("0"), shardId("0"), shardId("1"), shardId("1"), shardId("2"), shardId("2")};
+        shardId("0"), shardId("1"), shardId("2")};
     checkGeneratedInitialZoneChunks(
         tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 0 /* numInitialChunks*/);
 
@@ -978,9 +978,8 @@ TEST_F(PresplitHashedZonesChunksTest, SingleZone) {
 
     // numInitialChunks = 0.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2});
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1});
     std::vector<boost::optional<ShardId>> expectedShardIds = {boost::none,   // Lower bound.
-                                                              shardId("0"),  // Zone 0
                                                               shardId("0"),  // Zone 0
                                                               boost::none};  // Upper bound.
     checkGeneratedInitialZoneChunks(
@@ -1055,17 +1054,14 @@ TEST_F(PresplitHashedZonesChunksTest, WithMultipleZonesContiguous) {
             zoneName("2"))};
 
     // numInitialChunks = 0.
-    // This should have 8 chunks, 2 for each zone and 2 boundaries.
+    // This should have 5 chunks, 1 for each zone and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2, 2, 2});
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1});
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,   // Lower bound.
         shardId("0"),  // Zone 0
-        shardId("0"),  // Zone 0
         shardId("1"),  // Zone 1
-        shardId("1"),  // Zone 1
-        shardId("2"),  // Zone 2
         shardId("2"),  // Zone 2
         boost::none    // Upper bound.
     };
@@ -1158,21 +1154,16 @@ TEST_F(PresplitHashedZonesChunksTest, MultipleContiguousZonesWithEachZoneHavingM
                 zoneName("1"))};
 
     // numInitialChunks = 0.
-    // This should have 12 chunks, 6 for zone0, 4 for zone1 and 2 boundaries.
+    // This should have 7 chunks, 3 for zone0, 2 for zone1 and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {6, 4});
+        buildExpectedChunkRanges(tags, shardKeyPattern, {3, 2});
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,   // Lower bound.
         shardId("0"),  // zone 0.
-        shardId("0"),  // zone 0.
-        shardId("3"),  // zone 0.
         shardId("3"),  // zone 0.
         shardId("5"),  // zone 0.
-        shardId("5"),  // zone 0.
         shardId("2"),  // zone 1.
-        shardId("2"),  // zone 1.
-        shardId("4"),  // zone 1.
         shardId("4"),  // zone 1.
         boost::none    // Upper bound.
     };
@@ -1266,19 +1257,16 @@ TEST_F(PresplitHashedZonesChunksTest, MultipleZonesWithGaps) {
             zoneName("2"))};
 
     // numInitialChunks = 0.
-    // This should have 10 chunks, 2 for each zone (6), 2 gaps and 2 boundaries.
+    // This should have 7 chunks, 1 for each zone (3), 2 gaps and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {2, 2, 2});
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1});
     // The holes should use round-robin to choose a shard.
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,  // LowerBound.
         shardId("0"),
-        shardId("0"),
         boost::none,  // Hole.
         shardId("1"),
-        shardId("1"),
         boost::none,  // Hole.
-        shardId("2"),
         shardId("2"),
         boost::none,  // UpperBound.
     };
@@ -1535,9 +1523,9 @@ TEST_F(PresplitHashedZonesChunksTest, OneLargeZoneAndOtherSmallZonesSharingASing
             zoneName("4"))};
 
     // numInitialChunks = 0.
-    // This should have 20 chunks, 14 for all zones, 4 gaps and 2 boundaries.
+    // This should have 15 chunks, 9 for all zones, 4 gap and 2 boundaries.
     std::vector<ChunkRange> expectedChunkRanges =
-        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1, 2 * 5, 1} /* numChunksPerTag*/);
+        buildExpectedChunkRanges(tags, shardKeyPattern, {1, 1, 1, 5, 1} /* numChunksPerTag*/);
 
     std::vector<boost::optional<ShardId>> expectedShardForEachChunk = {
         boost::none,   // Lower bound.
@@ -1548,14 +1536,9 @@ TEST_F(PresplitHashedZonesChunksTest, OneLargeZoneAndOtherSmallZonesSharingASing
         shardId("0"),  // zone2.
         boost::none,   // hole.
         shardId("2"),  // zone3.
-        shardId("2"),  // zone3.
-        shardId("3"),  // zone3.
         shardId("3"),  // zone3.
         shardId("4"),  // zone3.
-        shardId("4"),  // zone3.
         shardId("5"),  // zone3.
-        shardId("5"),  // zone3.
-        shardId("6"),  // zone3.
         shardId("6"),  // zone3.
         boost::none,   // hole.
         shardId("0"),  // zone4.

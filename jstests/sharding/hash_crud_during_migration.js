@@ -20,13 +20,15 @@ assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard1.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
+jsTest.log("Test 'insert'");
+// Insert a doc while migrating the chunk that the doc belongs to.
+let doc = {x: 14};
+let hash = convertShardKeyToHashed(doc.x);
+// Create a chunk dedicated for the inserted document
+assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: hash}}));
 let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).toArray();
 let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
-jsTest.log("Test 'insert'");
-// Insert a doc while migrating the chunk that the doc belongs to.
-let doc = {x: 0};
-let hash = convertShardKeyToHashed(doc.x);
 let shardBoundsPair =
     chunkBoundsUtil.findShardAndChunkBoundsForShardKey(st, shardChunkBounds, {x: hash});
 let fromShard = shardBoundsPair.shard;

@@ -172,13 +172,7 @@ public:
      */
     SplitPointsBasedSplitPolicy(const ShardKeyPattern& shardKeyPattern,
                                 size_t numShards,
-                                size_t numInitialChunks) {
-        // If 'numInitialChunks' was not specified, use default value.
-        numInitialChunks = numInitialChunks ? numInitialChunks : numShards * 2;
-        _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numInitialChunks);
-        _numContiguousChunksPerShard =
-            std::max(numInitialChunks / numShards, static_cast<size_t>(1));
-    }
+                                size_t numInitialChunks);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,

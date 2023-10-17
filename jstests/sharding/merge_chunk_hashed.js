@@ -2,6 +2,7 @@
  * Test that merging chunks for hashed sharding via mongos works/doesn't work with
  * different chunk configurations.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -22,11 +23,20 @@ let coll = mongos.getCollection(ns);
 assert.commandWorked(admin.runCommand({shardCollection: ns, key: {x: 'hashed'}}));
 
 // Setup predictable chunk distribution:
-// Default chunks:
 // shard0: MIN                  -> -4611686018427387902,
 //         -4611686018427387902 -> 0
 // shard1: 0                    -> 4611686018427387902
 //         4611686018427387902  -> MAX
+
+// TODO SERVER-81884: update once 8.0 becomes last LTS.
+if (FeatureFlagUtil.isPresentAndEnabled(mongos.getDB(dbName),
+                                        "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+    assert.commandWorked(
+        st.s.adminCommand({split: ns, middle: {x: NumberLong("-4611686018427387902")}}))
+    assert.commandWorked(
+        st.s.adminCommand({split: ns, middle: {x: NumberLong("4611686018427387902")}}))
+}
+
 assert.commandWorked(admin.runCommand({
     moveChunk: ns,
     bounds: [{x: MinKey}, {x: NumberLong("-4611686018427387902")}],

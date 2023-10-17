@@ -1,6 +1,7 @@
 /**
  * Test that chunks and documents are moved correctly after zone changes.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
@@ -63,13 +64,10 @@ let shardKey = {x: "hashed"};
 assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
 
-jsTest.log(
-    "Shard the collection. The command creates two chunks on each of the shards by default.");
+jsTest.log("Shard the collection. The command creates one chunk on each of the shards by default.");
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
-let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
-let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
-jsTest.log("Insert docs (one for each chunk) and check that they end up on the right shards.");
+jsTest.log("Insert docs (one per chunk) and check that they end up on the right shards.");
 const bigString = 'X'.repeat(1024 * 1024);  // 1MB
 let docs = [
     {x: -25, s: bigString},
@@ -79,7 +77,21 @@ let docs = [
     {x: 5, s: bigString},
     {x: 10, s: bigString}
 ];
+// TODO SERVER-81884: update once 8.0 becomes last LTS.
+if (FeatureFlagUtil.isPresentAndEnabled(testDB,
+                                        "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+    // Make sure that there is one chunk dedicated for each inserted document
+    assert.commandWorked(
+        st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[1].x)}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[3].x)}}));
+    assert.commandWorked(
+        st.s.adminCommand({split: ns, middle: {x: convertShardKeyToHashed(docs[5].x)}}));
+}
 assert.commandWorked(coll.insert(docs));
+
+let chunkDocs = findChunksUtil.findChunksByNs(configDB, ns).sort({min: 1}).toArray();
+let shardChunkBounds = chunkBoundsUtil.findShardChunkBounds(chunkDocs);
 
 let docChunkBounds = [];
 let minHash = MaxKey;

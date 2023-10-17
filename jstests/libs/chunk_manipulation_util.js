@@ -38,6 +38,16 @@ export function moveChunkParallel(staticMongod,
 
         var mongos = new Mongo(mongosURL), admin = mongos.getDB('admin'), cmd = {moveChunk: ns};
 
+        // TODO SERVER-82068: Remove workaround
+        // Ensure that bounds are encoded without extra escape characters, when `MaxKey` or `MinKey`
+        // are used. For example, convert {\n\t\t\t\t\"$maxKey\" : 1\n\t\t\t} to {\"$maxKey\" : 1}.
+        if (JSON.stringify(tojson(bounds)).includes("maxKey")) {
+            bounds[1] = {[Object.keys(bounds[1])[0]]: MaxKey};
+        }
+        if (JSON.stringify(tojson(bounds)).includes("minKey")) {
+            bounds[0] = {[Object.keys(bounds[0])[0]]: MinKey};
+        }
+
         if (findCriteria) {
             cmd.find = findCriteria;
         } else {

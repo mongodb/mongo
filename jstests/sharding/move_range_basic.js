@@ -73,8 +73,15 @@ function testMoveRangeWithBigChunk(mongos, ns, skPattern, minBound) {
     const nChunksOnDonorAfter = chunksAfter.filter(chunk => chunk.shard == donor).length;
     const nChunksOnRecipientAfter = chunksAfter.filter(chunk => chunk.shard == recipient).length;
 
-    assert.eq(nChunksOnRecipientAfter,
-              nChunksOnRecipientBefore + 1,
+    let nExpectedChunksOnRecipientAfter = nChunksOnRecipientBefore + 1;
+    // For moveRange with a maxBound, the number of chunks on recipient and donor doesn't change
+    // if a shardKey that is a lower-bound of a pre-existing chunk was selected.
+    if (!minBound && chunkBoundsUtil.eq(bounds[0], randomSK)) {
+        nExpectedChunksOnRecipientAfter = nChunksOnRecipientBefore;
+    }
+
+    assert.eq(nExpectedChunksOnRecipientAfter,
+              nChunksOnRecipientAfter,
               "The number of chunks on the recipient shard did not increase following a moveRange");
     assert(nChunksOnDonorAfter == nChunksOnDonorBefore ||
                nChunksOnDonorAfter == nChunksOnDonorBefore + 1,

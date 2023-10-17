@@ -73,6 +73,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -454,6 +455,21 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnShardSplitPolicy::createF
     return {std::move(chunks)};
 }
 
+SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(const ShardKeyPattern& shardKeyPattern,
+                                                         size_t numShards,
+                                                         size_t numInitialChunks) {
+    int numInitialChunksPerShard = 1;
+    // TODO SERVER-81884: update once 8.0 becomes last LTS.
+    if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        numInitialChunksPerShard = 2;
+    }
+
+    numInitialChunks = numInitialChunks ? numInitialChunks : (numShards * numInitialChunksPerShard);
+    _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numInitialChunks);
+    _numContiguousChunksPerShard = std::max(numInitialChunks / numShards, static_cast<size_t>(1));
+}
+
 InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
@@ -569,6 +585,8 @@ AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSpl
         return (x / y) + (x % y != 0);
     };
 
+    // TODO: SERVER-74747 simplify this function
+
     // This strategy presplits each tag such that at least 1 chunk is placed on every shard to which
     // the tag is assigned. We distribute the chunks such that at least '_numInitialChunks' are
     // created across the cluster, and we make a best-effort attempt to ensure that an equal number
@@ -631,8 +649,15 @@ PresplitHashedZonesSplitPolicy::PresplitHashedZonesSplitPolicy(
     // created if they are associated with a zone and the zone has to be assigned to a shard.
     invariant(!_numTagsPerShard.empty());
 
+    int numInitialChunksPerShard = 1;
+    // TODO SERVER-81884: update once 8.0 becomes last LTS.
+    if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        numInitialChunksPerShard = 2;
+    }
     // If 'numInitialChunks' was not specified, use default value.
-    _numInitialChunks = numInitialChunks ? numInitialChunks : _numTagsPerShard.size() * 2;
+    _numInitialChunks =
+        numInitialChunks ? numInitialChunks : (_numTagsPerShard.size() * numInitialChunksPerShard);
 }
 
 /**

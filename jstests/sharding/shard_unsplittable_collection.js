@@ -7,6 +7,8 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const kDbName = "test";
 
 const st = new ShardingTest({shards: 2});
@@ -96,6 +98,13 @@ jsTest.log("Unsplittable --> Range based shard key, x, with different options");
     checkCollAndChunks(kColl, false, {x: 1}, 1);
 }
 
+let expectedNumChunks = 2;
+// TODO SERVER-81884: update once 8.0 becomes last LTS
+if (!FeatureFlagUtil.isPresentAndEnabled(st.s.getDB(kDbName),
+                                         "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+    expectedNumChunks = 4;
+}
+
 jsTest.log("Unsplittable --> Hashed shard key, _id");
 {
     const kColl = getNewCollName();
@@ -108,7 +117,7 @@ jsTest.log("Unsplittable --> Hashed shard key, _id");
     assert.commandWorked(
         st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {_id: "hashed"}}));
 
-    checkCollAndChunks(kColl, false, {_id: "hashed"}, 4);
+    checkCollAndChunks(kColl, false, {_id: "hashed"}, expectedNumChunks);
 }
 
 jsTest.log("Unsplittable --> Hashed shard key, x");
@@ -123,7 +132,7 @@ jsTest.log("Unsplittable --> Hashed shard key, x");
     assert.commandWorked(
         st.s.getDB(kDbName).adminCommand({shardCollection: kNss, key: {x: "hashed"}}));
 
-    checkCollAndChunks(kColl, false, {x: "hashed"}, 4);
+    checkCollAndChunks(kColl, false, {x: "hashed"}, expectedNumChunks);
 }
 
 st.stop();
