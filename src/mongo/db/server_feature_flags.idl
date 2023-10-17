@@ -110,3 +110,8 @@ feature_flags:
         default: true
         version: 7.2
         shouldBeFCVGated: true
+    featureFlagRearchitectUserAcquisition:
+        description: "Enable new flow for authentication and authorization"
+        cpp_varname: gFeatureFlagRearchitectUserAcquisition
+        default: false
+        shouldBeFCVGated: false
