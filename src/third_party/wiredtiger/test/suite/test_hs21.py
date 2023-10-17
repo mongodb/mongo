@@ -38,6 +38,7 @@ from wtscenario import make_scenarios
 # We want to ensure that when an active history file is idle closed we can continue reading the
 # correct version of data and their base write generation hasn't changed (since we haven't
 # restarted the system).
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_hs21(wttest.WiredTigerTestCase):
     # Configure handle sweeping to occur within a specific amount of time.
     conn_config = 'file_manager=(close_handle_minimum=0,close_idle_time=2,close_scan_interval=1),' + \

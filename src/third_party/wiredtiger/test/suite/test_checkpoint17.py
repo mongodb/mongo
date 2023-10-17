@@ -37,6 +37,7 @@ from wtscenario import make_scenarios
 # Make sure that if the history store is clean when a checkpoint is taken
 # that we can still access it via the checkpoint.
 
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 

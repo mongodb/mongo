@@ -33,6 +33,7 @@
 import wiredtiger, wttest
 from wiredtiger import stat
 
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_config09(wttest.WiredTigerTestCase):
     ntables = 50
     nentries = 5

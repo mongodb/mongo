@@ -111,10 +111,9 @@ class RollbackHookCreator(wthooks.WiredTigerHookCreator):
     def do_retry(self):
         return self.rand.randint(1, 1000000) % self.mod == 0
 
-    # No filtering needed
-    def filter_tests(self, tests):
-        #print('Filtering: ' + str(tests))
-        return tests
+    # No skipping needed
+    def register_skipped_tests(self, tests):
+        pass
 
     def setup_hooks(self):
         self.Session['begin_transaction'] = (wthooks.HOOK_NOTIFY, session_begin_transaction_notify)

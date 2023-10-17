@@ -39,6 +39,7 @@ from wtscenario import make_scenarios
 # Make sure each checkpoint has its own snapshot by creating two successive
 # inconsistent checkpoints and reading both of them.
 
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_checkpoint(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all),timing_stress_for_test=[checkpoint_slow]'
     session_config = 'isolation=snapshot'

@@ -86,6 +86,7 @@ class test_config05(wttest.WiredTigerTestCase):
         self.populate(self.session)
         self.verify_entries(self.session)
 
+    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
     def test_too_many_sessions(self):
         self.conn = self.wiredtiger_open('.', 'create,session_max=1')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

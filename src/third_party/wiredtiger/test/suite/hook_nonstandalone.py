@@ -38,7 +38,7 @@
 
 from __future__ import print_function
 
-import unittest, wthooks
+import unittest, wthooks, wttest
 from urllib.parse import parse_qsl
 
 # Every hook file must have one or more classes descended from WiredTigerHook
@@ -50,31 +50,11 @@ class NonStandAloneHookCreator(wthooks.WiredTigerHookCreator):
     def get_platform_api(self):
         return self.platform_api
 
-    # Is this test one we should skip?
-    def skip_test(self, test):
-        # Skip any test that contains one of these strings as a substring
-        skip = [
-                # Skip all tests that do timestamped truncate operations.
-                "test_checkpoint25.test_checkpoint",
-                "test_rollback_to_stable34.test_rollback_to_stable",
-                "test_rollback_to_stable36.test_rollback_to_stable36",
-                "test_truncate09.test_truncate09",
-                "test_truncate15.test_truncate15",
-
-                # This group fail within Python for various, sometimes unknown, reasons.
-                "test_bug018.test_bug018"
-                ]
-
-        for item in skip:
-            if item in str(test):
-                return True
-        return False
-
-    # Remove tests that won't work on non-standalone build
-    def filter_tests(self, tests):
-        new_tests = unittest.TestSuite()
-        new_tests.addTests([t for t in tests if not self.skip_test(t)])
-        return new_tests
+    # Skip tests that won't work on non-standalone build
+    def register_skipped_test(self, tests):
+        # There are no general categories of tests to skip for non-standalone. 
+        # Individual tests are skipped via the skip_for_hook decorator
+        pass
 
     def setup_hooks(self):
         pass

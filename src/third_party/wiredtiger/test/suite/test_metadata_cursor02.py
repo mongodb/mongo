@@ -35,6 +35,7 @@ from wtscenario import make_scenarios
 # Test metadata cursor semantics when the underlying metadata is invalid.
 # This can happen after a crash, or if part of a table is dropped separate
 # from dropping the whole table.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_metadata_cursor02(wttest.WiredTigerTestCase):
     """
     Test metadata cursor operations with invalid metadata

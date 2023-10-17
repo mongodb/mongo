@@ -33,6 +33,7 @@ from wtscenario import make_scenarios
 
 # test_drop.py
 #    session level drop operation
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_drop(wttest.WiredTigerTestCase):
     name = 'test_drop'
     extra_config = ''

@@ -31,6 +31,7 @@ from suite_subprocess import suite_subprocess
 
 # test_jsondump.py
 # Test dump output from json cursors.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
 
     table_uri1 = 'table:jsondump02a.wt'

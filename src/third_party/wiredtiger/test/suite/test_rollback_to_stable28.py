@@ -32,6 +32,7 @@ from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 from helper import simulate_crash_restart
 from rollback_to_stable_util import test_rollback_to_stable_base
+import wttest
 
 # test_rollback_to_stable28.py
 # Test the debug mode setting for update_restore_evict during recovery.
@@ -39,6 +40,7 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 # perform this in recovery to ensure that all the in-memory images have
 # the proper write generation number and we don't end up reading stale
 # transaction ID's stored on the page.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Causes python crash")
 class test_rollback_to_stable28(test_rollback_to_stable_base):
     conn_config = 'statistics=(all),verbose=(rts:5)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide

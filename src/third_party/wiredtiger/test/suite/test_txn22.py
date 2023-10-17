@@ -34,6 +34,7 @@ from wtscenario import make_scenarios
 from suite_subprocess import suite_subprocess
 import helper, wiredtiger, wttest
 
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_txn22(wttest.WiredTigerTestCase, suite_subprocess):
     base_config = 'cache_size=1GB'
     conn_config = base_config

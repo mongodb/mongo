@@ -27,13 +27,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import wiredtiger
+import wiredtiger, wttest
 from wtscenario import make_scenarios
 from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable09.py
 # Test that rollback to stable does not abort schema operations that are done
 # as they don't have transaction support
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_rollback_to_stable09(test_rollback_to_stable_base):
 
     # Don't bother testing FLCS tables as well as they're highly unlikely to

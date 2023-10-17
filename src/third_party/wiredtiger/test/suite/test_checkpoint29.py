@@ -31,6 +31,7 @@ import wiredtiger, wttest
 # test_checkpoint29.py
 #
 # Test opening a checkpoint cursor after bulk operations.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     def test_checkpoint(self):

@@ -923,6 +923,14 @@ def skip_for_hook(hookname, description):
     else:
         return runit_decorator
 
+# Override a test's setUp function to instead skip and report the reason for skipping
+def register_skipped_test(test, hook, skip_reason):
+
+    def _skip_test(self):
+        raise unittest.SkipTest(f"{test} for hook {hook}: {skip_reason}")
+
+    setattr(test, "setUp", lambda: _skip_test(test))
+
 def islongtest():
     return WiredTigerTestCase._longtest
 

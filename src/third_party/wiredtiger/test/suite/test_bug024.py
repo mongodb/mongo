@@ -38,6 +38,7 @@ import os, shutil
 # WT-6526: test that we can successfully open a readonly connection after it was stopped while
 # the temporary turtle file existed. We simulate that by copying the turtle file to its temporary name
 # and then opening the connection readonly.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Causes python crash")
 class test_bug024(wttest.WiredTigerTestCase):
     conn_config = ('cache_size=50MB')
 

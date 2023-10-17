@@ -38,6 +38,7 @@ from wtscenario import make_scenarios
 # Test what happens if we create an inconsistent checkpoint and then try to
 # open it for read. No timestamps in this version.
 
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 

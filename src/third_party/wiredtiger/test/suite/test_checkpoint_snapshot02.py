@@ -250,6 +250,7 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         self.assertGreater(inconsistent_ckpt, 0)
         self.assertGreaterEqual(keys_removed, 0)
 
+    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
     def test_checkpoint_snapshot_with_txnid_and_timestamp(self):
         self.moresetup()
 

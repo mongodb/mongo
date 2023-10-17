@@ -36,6 +36,7 @@ from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable35.py
 # Test that log is flushed for all writes that occurred in the checkpoint.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_rollback_to_stable35(test_rollback_to_stable_base):
 
     format_values = [

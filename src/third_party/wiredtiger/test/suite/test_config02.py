@@ -36,6 +36,7 @@ import wiredtiger, wttest
 
 # test_config02.py
 #    The home directory for wiredtiger_open
+@wttest.skip_for_hook("tiered", "using environment variable to set WT home")
 class test_config02(wttest.WiredTigerTestCase):
     table_name1 = 'test_config02'
     nentries = 100

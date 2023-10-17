@@ -103,6 +103,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # We expect nothing to have been closed.
         self.assertEqual(close1, 0)
 
+    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
     def test_disable_idle_timeout_drop_force(self):
         # Create a table to drop. A drop should close its associated handle
         drop_uri = '%s.%s' % (self.uri, "force_drop_test")
@@ -137,6 +138,7 @@ class test_sweep03(wttest.WiredTigerTestCase, suite_subprocess):
         # Ensure that any space was reclaimed from cache.
         self.assertLess(cache2, cache1)
 
+    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
     def test_disable_idle_timeout_drop(self):
         # Create a table to drop. A drop should close its associated handles
         drop_uri = '%s.%s' % (self.uri, "drop_test")

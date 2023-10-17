@@ -73,6 +73,7 @@ class test_stat_log02(wttest.WiredTigerTestCase):
 
         self.check_stats_file(".")
 
+    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Causes python crash")
     def test_stats_log_on_json_with_tables(self):
         self.conn = self.wiredtiger_open(None,
             "create,statistics=(fast)," +\

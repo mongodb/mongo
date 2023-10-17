@@ -40,6 +40,7 @@ from wiredtiger import stat
 
 # test_prepare_hs03.py
 # test to ensure salvage, verify & simulating crash are working for prepared transactions.
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_prepare_hs03(wttest.WiredTigerTestCase):
     # Force a small cache.
     conn_config = ('cache_size=50MB,statistics=(fast),'

@@ -55,7 +55,7 @@
 #
 from __future__ import print_function
 
-import os, re, unittest, wthooks
+import os, re, unittest, wthooks, wttest
 from wttest import WiredTigerTestCase
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 
@@ -300,89 +300,34 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
             return True
         return False
 
-    # Is this test one we should skip?
-    def skip_test(self, test):
-        # Skip any test that contains one of these strings as a substring
-        skip = ["backup",               # Can't backup a tiered table
-                "env01",                # Using environment variable to set WT home
-                "config02",             # Using environment variable to set WT home
-                "cursor13_ckpt",        # Checkpoint tests with cached cursors
-                "cursor13_dup",         # More cursor cache tests
-                "cursor13_reopens",     # More cursor cache tests
-                "inmem",                # In memory tests don't make sense with tiered storage
-                "lsm",                  # If the test name tells us it uses lsm ignore it
-                "modify_smoke_recover", # Copying WT dir doesn't copy the bucket directory
-                "test_salvage",         # Salvage tests directly name files ending in ".wt"
-                "test_config_json",     # create replacement can't handle a json config string
-                "test_cursor_big",      # Cursor caching verified with stats
-                "tiered",               # Tiered tests already do tiering.
-                "test_verify",          # Verify not supported on tiered tables (yet)
+    # Determine whether a test should be skipped, if it should also return the reason for skipping.
+    # Some features aren't supported with tiered storage currently. If they exist in 
+    # the test name (or scenario name) skip the test.
+    def should_skip(self, test) -> (bool, str):
+        skip_categories = [
+            ("backup",               "Can't backup a tiered table"),
+            ("inmem",                "In memory tests don't make sense with tiered storage"),
+            ("lsm",                  "LSM is not supported with tiering"),
+            ("modify_smoke_recover", "Copying WT dir doesn't copy the bucket directory"),
+            ("test_salvage",         "Salvage tests directly name files ending in '.wt'"),
+            ("test_config_json",     "Tiered hook's create function can't handle a json config string"),
+            ("test_cursor_big",      "Cursor caching verified with stats"),
+            ("tiered",               "Tiered tests already do tiering."),
+            ("test_verify",          "Verify not supported on tiered tables (yet)")
+        ]
 
-                # FIXME-WT-9809 The following failures should be triaged and potentially
-                # individually reticketed.
+        for (skip_string, skip_reason) in skip_categories:
+            if skip_string in str(test):
+                return (True, skip_reason)
 
-                # This first group currently cause severe errors, where Python crashes,
-                # whether from internal assertion or other causes.
-                "test_bug003.test_bug003",   # Triggers WT-9954
-                "test_bug024.test_bug024",
-                "test_bulk01.test_bulk_load",   # Triggers WT-9954
-                "test_durable_ts03.test_durable_ts03",
-                "test_rollback_to_stable20.test_rollback_to_stable",
-                "test_stat_log01_readonly.test_stat_log01_readonly",
-                "test_stat_log02.test_stats_log_on_json_with_tables",
-                "test_txn02.test_ops",
+        return (False, None)
 
-                # This group fail within Python for various, sometimes unknown, reasons.
-                "test_bug018.test_bug018",
-                "test_checkpoint.test_checkpoint",
-                "test_checkpoint_snapshot02.test_checkpoint_snapshot_with_txnid_and_timestamp",
-                "test_compat05.test_compat05",
-                "test_config05.test_too_many_sessions",
-                "test_config09.test_config09",
-                "test_drop.test_drop",
-                "test_empty.test_empty",     # looks at wt file names and uses column store
-                "test_encrypt06.test_encrypt",
-                "test_encrypt07.test_salvage_api",
-                "test_encrypt07.test_salvage_api_damaged",
-                "test_encrypt07.test_salvage_process_damaged",
-                "test_export01.test_export_restart",
-                "test_hs21.test_hs",
-                "test_import04.test_table_import",
-                "test_import09.test_import_table_repair",
-                "test_import09.test_import_table_repair",
-                "test_import11.test_file_import",
-                "test_import11.test_file_import",
-                "test_join03.test_join",
-                "test_join07.test_join_string",
-                "test_jsondump02.test_json_all_bytes",
-                "test_metadata_cursor02.test_missing",
-                "test_prepare02.test_prepare_session_operations",
-                "test_prepare_hs03.test_prepare_hs",
-                "test_prepare_hs03.test_prepare_hs",
-                "test_rename.test_rename",
-                "test_rollback_to_stable09.test_rollback_to_stable",
-                "test_rollback_to_stable28.test_update_restore_evict_recovery",
-                "test_rollback_to_stable34.test_rollback_to_stable",
-                "test_rollback_to_stable35.test_rollback_to_stable",
-                "test_rollback_to_stable36.test_rollback_to_stable",
-                "test_sweep03.test_disable_idle_timeout_drop",
-                "test_sweep03.test_disable_idle_timeout_drop_force",
-                "test_txn22.test_corrupt_meta",
-                "test_verbose01.test_verbose_single",
-                "test_verbose02.test_verbose_single",
-                "test_verify2.test_verify_ckpt",
-                ]
-
-        for item in skip:
-            if item in str(test):
-                return True
-        return False
-
-    # Remove tests that won't work on tiered cursors
-    def filter_tests(self, tests):
-        new_tests = unittest.TestSuite()
-        new_tests.addTests([t for t in tests if not self.skip_test(t)])
-        return new_tests
+    # Skip tests that won't work on tiered cursors
+    def register_skipped_tests(self, tests):
+        for t in tests:
+            (should_skip, skip_reason) = self.should_skip(t)
+            if should_skip:
+                wttest.register_skipped_test(t, "tiered", skip_reason)
 
     def get_platform_api(self):
         return self.platform_api

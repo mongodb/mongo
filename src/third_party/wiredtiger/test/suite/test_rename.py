@@ -33,6 +33,7 @@ from wtscenario import make_scenarios
 
 # test_rename.py
 #    session level rename operation
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_rename(wttest.WiredTigerTestCase):
     name1 = 'test_rename1'
     name2 = 'test_rename2'

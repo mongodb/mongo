@@ -31,6 +31,7 @@ import wttest
 # test_join03.py
 #    Join operations
 # Joins with a custom extractor
+@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
 class test_join03(wttest.WiredTigerTestCase):
     table_name1 = 'test_join03'
     nentries = 100

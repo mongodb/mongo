@@ -227,10 +227,9 @@ class WiredTigerHookManager(object):
             orig_func = getattr(clazz, method_name)
         return orig_func
 
-    def filter_tests(self, tests):
+    def register_skipped_tests(self, tests):
         for hook in self.hooks:
-            tests = hook.filter_tests(tests)
-        return tests
+            hook.register_skipped_tests(tests)
 
     def get_hook_names(self):
         return self.hook_names
@@ -275,9 +274,10 @@ class WiredTigerHookCreator(ABC):
         self.Session = HookCreatorProxy(self.hookmgr, wiredtiger.Session)
         self.Cursor = HookCreatorProxy(self.hookmgr, wiredtiger.Cursor)
 
-    # default version of filter_tests, can be overridden
-    def filter_tests(self, tests):
-        return tests
+    # Default version of register_skipped_tests, can be overridden.
+    # Walks the lists of tests in-place, modifying the tests that should be skipped
+    def register_skipped_tests(self, tests):
+        pass
 
     @abstractmethod
     def setup_hooks(self):

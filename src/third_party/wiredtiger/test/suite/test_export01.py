@@ -91,6 +91,7 @@ class test_export01(TieredConfigMixin, wttest.WiredTigerTestCase):
         # The export file should exist in the backup directory.
         self.assertTrue(os.path.isfile(os.path.join(self.dir, "WiredTiger.export")))
 
+    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
     def test_export_restart(self):
         uri_a = self.type + "exporta"
         uri_b = self.type + "exportb"
