@@ -230,6 +230,21 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 }
 
 /*
+ * __txn_swap_snapshot --
+ *     Swap the snapshot pointers.
+ */
+static inline void
+__txn_swap_snapshot(uint64_t **snap_a, uint64_t **snap_b)
+{
+    uint64_t *temp;
+    WT_UNUSED(temp);
+
+    temp = *snap_a;
+    *snap_a = *snap_b;
+    *snap_b = temp;
+}
+
+/*
  * __wt_txn_unmodify --
  *     If threads race making updates, they may discard the last referenced WT_UPDATE item while the
  *     transaction is still active. This function removes the last update item from the "log".
@@ -638,8 +653,9 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
      * opens.
      */
     if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
-        return (__wt_txn_visible_id_snapshot(
-          id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
+        return (
+          __wt_txn_visible_id_snapshot(id, txn->snapshot_data.snap_min, txn->snapshot_data.snap_max,
+            txn->snapshot_data.snapshot, txn->snapshot_data.snapshot_count));
     oldest_id = __wt_txn_oldest_id(session);
 
     return (WT_TXNID_LT(id, oldest_id));
@@ -841,8 +857,8 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
     /* Otherwise, we should be called with a snapshot. */
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT));
 
-    return (__wt_txn_visible_id_snapshot(
-      id, txn->snap_min, txn->snap_max, txn->snapshot, txn->snapshot_count));
+    return (__wt_txn_visible_id_snapshot(id, txn->snapshot_data.snap_min,
+      txn->snapshot_data.snap_max, txn->snapshot_data.snapshot, txn->snapshot_data.snapshot_count));
 }
 
 /*
@@ -889,7 +905,7 @@ __wt_txn_snap_min_visible(
   WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
 {
     /* Transaction snapshot minimum check. */
-    if (!WT_TXNID_LT(id, session->txn->snap_min))
+    if (!WT_TXNID_LT(id, session->txn->snapshot_data.snap_min))
         return (false);
 
     /* Transactions read their writes, regardless of timestamps. */
@@ -1610,13 +1626,16 @@ __wt_txn_modify_block(
             WT_ERR(__wt_scr_alloc(session, 1024, &buf));
             WT_ERR(__wt_buf_fmt(session, buf,
               "snapshot_min=%" PRIu64 ", snapshot_max=%" PRIu64 ", snapshot_count=%" PRIu32,
-              txn->snap_min, txn->snap_max, txn->snapshot_count));
-            if (txn->snapshot_count > 0) {
+              txn->snapshot_data.snap_min, txn->snapshot_data.snap_max,
+              txn->snapshot_data.snapshot_count));
+            if (txn->snapshot_data.snapshot_count > 0) {
                 WT_ERR(__wt_buf_catfmt(session, buf, ", snapshots=["));
-                for (snap_count = 0; snap_count < txn->snapshot_count - 1; ++snap_count)
-                    WT_ERR(
-                      __wt_buf_catfmt(session, buf, "%" PRIu64 ",", txn->snapshot[snap_count]));
-                WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "]", txn->snapshot[snap_count]));
+                for (snap_count = 0; snap_count < txn->snapshot_data.snapshot_count - 1;
+                     ++snap_count)
+                    WT_ERR(__wt_buf_catfmt(
+                      session, buf, "%" PRIu64 ",", txn->snapshot_data.snapshot[snap_count]));
+                WT_ERR(__wt_buf_catfmt(
+                  session, buf, "%" PRIu64 "]", txn->snapshot_data.snapshot[snap_count]));
             }
             __wt_verbose_debug1(session, WT_VERB_TRANSACTION, "%s", (const char *)buf->data);
         }
