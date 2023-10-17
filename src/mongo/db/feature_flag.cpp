@@ -92,22 +92,45 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv)
     return fcv.isGreaterThanOrEqualTo(_version);
 }
 
+bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
+    const ServerGlobalParams::FeatureCompatibility& fcv) const {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return isEnabled(fcv);
+    } else {
+        // (Generic FCV reference): This reference is needed for the feature flag check API.
+        return isEnabledOnVersion(multiversion::GenericFCV::kLastLTS);
+    }
+}
+
+bool FeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
+    const ServerGlobalParams::FeatureCompatibility& fcv) const {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        return isEnabled(fcv);
+    } else {
+        // (Generic FCV reference): This reference is needed for the feature flag check API.
+        return isEnabledOnVersion(multiversion::GenericFCV::kLatest);
+    }
+}
+
 // isEnabledAndIgnoreFCVUnsafe should NOT be used in general, as it checks if the feature flag is
 // turned on, regardless of which FCV we are on. It can result in unsafe scenarios
 // where we enable a feature on an FCV where it is not supported or where the feature has not been
 // fully implemented yet. In order to use isEnabledAndIgnoreFCVUnsafe, you **must** add a comment
 // above that line starting with "(Ignore FCV check):" describing why we can safely ignore checking
 // the FCV here.
+// isEnabled() is prefered over this function since it will prevent upgrade/downgrade issues,
+// or use isEnabledUseLatestFCVWhenUninitialized if your feature flag could be run while FCV
+// is uninitialized during initial sync.
 // Note that if the feature flag does not have any upgrade/downgrade concerns, then shouldBeFCVGated
 // should be set to false and FeatureFlag::isEnabled() should be used instead of this function.
 bool FeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
     return _enabled;
 }
 
-// isEnabledAndIgnoreFCVUnsafeAtStartup should only be used on startup, if we want to check if the
-// feature flag if the feature flag is turned on, regardless of which FCV we are on.
-// Note that if the feature flag does not have any upgrade/downgrade concerns, then shouldBeFCVGated
-// should be set to false and FeatureFlag::isEnabled() should be used instead of this function.
+// TODO SERVER-82270: Remove isEnabledAndIgnoreFCVUnsafeAtStartup and replace use cases with
+// isEnabledUseLatestFCVWhenUninitialized.
+// Please do not add new use cases of this function. Instead, use
+// isEnabledUseLatestFCVWhenUninitialized.
 bool FeatureFlag::isEnabledAndIgnoreFCVUnsafeAtStartup() const {
     return _enabled;
 }

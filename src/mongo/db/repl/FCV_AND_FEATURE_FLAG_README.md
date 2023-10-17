@@ -609,17 +609,32 @@ if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompat
 }
 ```
 
-Note that `isEnabled` checks if the feature flag is enabled on the input FCV, which is usually
-the server's current FCV `serverGlobalParams.featureCompatibility`. If the FCV has not been
-initialized yet, it will check if the feature flag is enabled on the lastLTS FCV.
 If the feature flag has `shouldBeFCVGated` set to false, then `isEnabled` will simply return
 whether the feature flag is enabled.
 
+### Feature Flag Gating During Initial Sync
+***IMPORTANT NOTE ABOUT INITIAL SYNC***:
 
-There are some places where we only want to check if the feature flag is turned on, regardless of
-which FCV we are on. For example, this could be the case if we need to perform the check in a spot
-in the code when the FCV has not been initialized yet during startup. In these cases we should use the 
-`isEnabledAndIgnoreFCVUnsafeAtStartup` helper.
+// TODO SERVER-82246: Update README once invariant is added back in.
+
+`isEnabled` checks if the feature flag is enabled on the input FCV, which is usually
+the server's current FCV `serverGlobalParams.featureCompatibility`. However, during initial sync, we temporarily reset the FCV to be uninintialized. 
+
+Currently, if the FCV has not been initialized yet, it will check if the feature flag is enabled on the lastLTS FCV. After SERVER-82246, 
+this function will instead throw an invariant if the FCV is uninitialized.
+
+Each feature team should think about whether the feature could be run during initial sync, for example: 
+ * if the feature is part of initial sync itself
+ * if the feature is in a background thread that runs during initial sync
+ * if the feature is run in a command that is allowed during initial sync, such as `hello`, etc 
+
+If the feature will never run during initial sync, it's fine to continue using `isEnabled`. However, if the feature could be run during initial sync, the feature team 
+should use one of these options instead: 
+ * Use `isEnabledUseLastLTSFCVWhenUninitialized`. This is currently the same as the `isEnabled` function. It checks against the default last LTS FCV version if the FCV version is unset, but note that this could result in the feature not being turned on even though the FCV will be set to latest once initial sync is complete.
+ * Use `isEnabledUseLatestFCVWhenUninitialized`. This instead checks against the 
+latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
+even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
+ * Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team. 
 
 There are some cases outside of startup where we also want to check if the feature flag is turned on,
 regardless of which FCV we are on. In these cases we can use the `isEnabledAndIgnoreFCVUnsafe`
@@ -654,7 +669,7 @@ const isToasterEnabled = db.adminCommand({getParameter: 1, featureFlagToaster: 1
 ```
 We can also use the FeatureFlagUtil library like so: 
 ```
-if (FeatureFlagUtil.isEnabled(db, "Toaster")) {
+if (FeatureFlagUtil.isPresentAndEnabled(db, "Toaster")) {
 }
 ```
 
