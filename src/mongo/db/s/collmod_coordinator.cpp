@@ -54,7 +54,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
-#include "mongo/db/s/sharded_collmod_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -116,10 +115,12 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShar
     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::vector<ShardId>& shardIds,
     const OperationSessionInfo& osi,
+    bool ignoreResponses,
     WriteConcernOptions wc = WriteConcernOptions()) {
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(opts->genericArgs, wc);
     async_rpc::AsyncRPCCommandHelpers::appendOSI(opts->genericArgs, osi);
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx, opts, shardIds, ignoreResponses);
 }
 
 }  // namespace
@@ -179,6 +180,7 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
         6522700, "Sharding information must be gathered after collection information", _collInfo);
     if (!_shardingInfo && _collInfo->isSharded) {
         ShardingInfo info;
+        info.isPrimaryOwningChunks = false;
         const auto [chunkManager, _] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
                 opCtx, _collInfo->nsForTargeting));
@@ -186,10 +188,73 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
         info.primaryShard = chunkManager.dbPrimary();
         std::set<ShardId> shardIdsSet;
         chunkManager.getAllShardIds(&shardIdsSet);
-        std::vector<ShardId> shardIdsVec{shardIdsSet.begin(), shardIdsSet.end()};
-        info.shardsOwningChunks = std::move(shardIdsVec);
+        std::vector<ShardId> participantsNotOwningChunks;
+
+        std::vector<ShardId> shardIdsVec;
+        shardIdsVec.reserve(shardIdsSet.size());
+        for (const auto& shard : shardIdsSet) {
+            if (shard != info.primaryShard) {
+                shardIdsVec.push_back(shard);
+            } else {
+                info.isPrimaryOwningChunks = true;
+            }
+        }
+
+        auto allShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        for (const auto& shard : allShards) {
+            if (std::find(shardIdsVec.begin(), shardIdsVec.end(), shard) == shardIdsVec.end() &&
+                shard != info.primaryShard) {
+                participantsNotOwningChunks.push_back(shard);
+            }
+        }
+
+        info.participantsOwningChunks = std::move(shardIdsVec);
+        info.participantsNotOwningChunks = std::move(participantsNotOwningChunks);
         _shardingInfo = std::move(info);
     }
+}
+
+std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToPrimaryShard(
+    OperationContext* opCtx,
+    ShardsvrCollModParticipant& request,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    // A view definition will only be present on the primary shard. So we pass an addition
+    // 'performViewChange' flag only to the primary shard.
+    request.setPerformViewChange(true);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+        request, **executor, token, async_rpc::GenericArgs());
+
+    return sendAuthenticatedCommandWithOsiToShards(opCtx,
+                                                   opts,
+                                                   {_shardingInfo->primaryShard},
+                                                   getNewSession(opCtx),
+                                                   !_shardingInfo->isPrimaryOwningChunks);
+}
+
+std::vector<AsyncRequestsSender::Response> CollModCoordinator::_sendCollModToParticipantShards(
+    OperationContext* opCtx,
+    ShardsvrCollModParticipant& request,
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& token) {
+    request.setPerformViewChange(false);
+    auto opts = std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+        request, **executor, token, async_rpc::GenericArgs());
+
+    // The collMod command targets all shards, regardless of whether they have chunks. The shards
+    // that have no chunks for the collection will not throw nor will be included in the responses.
+
+    sendAuthenticatedCommandWithOsiToShards(opCtx,
+                                            opts,
+                                            _shardingInfo->participantsNotOwningChunks,
+                                            getNewSession(opCtx),
+                                            true /* ignoreResponses */);
+
+    return sendAuthenticatedCommandWithOsiToShards(opCtx,
+                                                   opts,
+                                                   _shardingInfo->participantsOwningChunks,
+                                                   getNewSession(opCtx),
+                                                   false /* ignoreResponses */);
 }
 
 ExecutorFuture<void> CollModCoordinator::_runImpl(
@@ -263,8 +328,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             **executor,
                             token,
                             async_rpc::GenericArgs());
+                    std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
+                    if (_shardingInfo->isPrimaryOwningChunks) {
+                        shards.push_back(_shardingInfo->primaryShard);
+                    }
                     sendAuthenticatedCommandWithOsiToShards(
-                        opCtx, opts, _shardingInfo->shardsOwningChunks, getNewSession(opCtx));
+                        opCtx, opts, shards, getNewSession(opCtx), false /* ignoreResponses */);
                 }
             }))
         .then(_buildPhaseHandler(
@@ -325,12 +394,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
                         request.setNeedsUnblock(needsUnblock);
 
-                        std::vector<AsyncRequestsSender::Response> responses;
-                        auto shardsOwningChunks = _shardingInfo->shardsOwningChunks;
-                        auto primaryShardOwningChunk = std::find(shardsOwningChunks.begin(),
-                                                                 shardsOwningChunks.end(),
-                                                                 _shardingInfo->primaryShard);
-
                         // If trying to convert an index to unique, executes a dryRun first to find
                         // any duplicates without actually changing the indexes to avoid
                         // inconsistent index specs on different shards. Example:
@@ -348,34 +411,36 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             auto optsDryRun = std::make_shared<
                                 async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
                                 dryRunRequest, **executor, token, args);
+                            std::vector<ShardId> shards = _shardingInfo->participantsOwningChunks;
+                            if (_shardingInfo->isPrimaryOwningChunks) {
+                                shards.push_back(_shardingInfo->primaryShard);
+                            }
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
-                                opCtx, optsDryRun, shardsOwningChunks);
+                                opCtx, optsDryRun, shards);
                         }
 
-                        // A view definition will only be present on the primary shard. So we pass
-                        // an addition 'performViewChange' flag only to the primary shard.
-                        if (primaryShardOwningChunk != shardsOwningChunks.end()) {
-                            request.setPerformViewChange(true);
-                            auto opts = std::make_shared<
-                                async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                                request, **executor, token, async_rpc::GenericArgs());
-                            const auto& primaryResponse = sendAuthenticatedCommandWithOsiToShards(
-                                opCtx, opts, {_shardingInfo->primaryShard}, getNewSession(opCtx));
+                        std::vector<AsyncRequestsSender::Response> responses;
 
-                            responses.insert(
-                                responses.end(), primaryResponse.begin(), primaryResponse.end());
-                            shardsOwningChunks.erase(primaryShardOwningChunk);
+                        // In the case of the participants, we are broadcasting the collMod to all
+                        // the shards. On one hand, if the shard contains chunks for the
+                        // collections, we parse all the responses. On the other hand, if the shard
+                        // does not contain chunks, we make a best effort to not process the
+                        // returned responses or throw any errors.
+
+                        auto primaryResponse =
+                            _sendCollModToPrimaryShard(opCtx, request, executor, token);
+                        if (_shardingInfo->isPrimaryOwningChunks) {
+                            responses.insert(responses.end(),
+                                             std::make_move_iterator(primaryResponse.begin()),
+                                             std::make_move_iterator(primaryResponse.end()));
                         }
 
-                        request.setPerformViewChange(false);
-                        auto opts = std::make_shared<
-                            async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
-                            request, **executor, token, async_rpc::GenericArgs());
-                        const auto& secondaryResponses = sendAuthenticatedCommandWithOsiToShards(
-                            opCtx, opts, shardsOwningChunks, getNewSession(opCtx));
+                        auto participantsResponses =
+                            _sendCollModToParticipantShards(opCtx, request, executor, token);
+                        responses.insert(responses.end(),
+                                         std::make_move_iterator(participantsResponses.begin()),
+                                         std::make_move_iterator(participantsResponses.end()));
 
-                        responses.insert(
-                            responses.end(), secondaryResponses.begin(), secondaryResponses.end());
 
                         BSONObjBuilder builder;
                         std::string errmsg;
