@@ -385,12 +385,6 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
     Client::initThread("BalancerCommandsScheduler", getGlobalServiceContext()->getService());
 
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     bool stopWorkerRequested = false;
     LOGV2(5847205, "Balancer scheduler thread started");
 
