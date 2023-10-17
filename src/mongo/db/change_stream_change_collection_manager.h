@@ -240,19 +240,38 @@ public:
         Date_t expirationTime);
 
     /**
-     * Removes documents from a change collection whose wall time is less than the
-     * 'expirationTime'. Returns the number of documents deleted.
+     * Removes documents from a change collection which have expired given their wall time and the
+     * configured 'expireAfterSeconds'.
      *
      * The removal process is performed with a series of range truncate calls to the record
      * store. Some documents might survive this process as deletion happens in chunks and we can
-     * only delete a chunk if we guarantee it is fully expired.
+     * only delete a chunk if we guarantee it is fully expired, and does not contain holes.
      */
-    static size_t removeExpiredChangeCollectionsDocumentsWithTruncate(
-        OperationContext* opCtx,
-        const CollectionAcquisition& changeCollection,
-        Date_t expirationTime);
+    static size_t removeExpiredChangeCollectionsDocumentsWithTruncate(OperationContext* opCtx,
+                                                                      const TenantId& tenantId);
 
 private:
+    /**
+     * Verifies the change collection idenfitifed by 'dbAndUUID' still exists, and truncates data
+     * ranges for expired markers. 'numRecordsDeletedAccum' is incremented with the number of
+     * truncated records. Will throw NamespaceNotFound if the collection does no longer exist.
+     */
+    void _removeExpiredMarkers(OperationContext* opCtx,
+                               const NamespaceStringOrUUID& dbAndUUID,
+                               ChangeCollectionTruncateMarkers* truncateMarkers,
+                               int64_t& numRecordsDeletedAccum);
+
+    /**
+     * Removes documents from a change collection which have expired given their wall time and the
+     * configured 'expireAfterSeconds'.
+     *
+     * The removal process is performed with a series of range truncate calls to the record
+     * store. Some documents might survive this process as deletion happens in chunks and we can
+     * only delete a chunk if we guarantee it is fully expired, and does not contain holes.
+     */
+    size_t _removeExpiredChangeCollectionsDocumentsWithTruncate(OperationContext* opCtx,
+                                                                const TenantId& tenantId);
+
     // Change collections purging job stats.
     PurgingJobStats _purgingJobStats;
     ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>

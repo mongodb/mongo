@@ -742,82 +742,152 @@ Timestamp recordIdToTimestamp(const RecordId& rid) {
     return t;
 }
 
+auto acquireChangeCollectionForWrite(OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(std::move(nssOrUUID),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+}
+
+/**
+ * Given a 'tenantId', establishes the collection UUID for the tenant's change collection, and the
+ * associated truncate markers in 'truncateMap'. Returns a tuple with a NamespaceStringOrUUID
+ * containing the collection UUID, and the shared_ptr to ChangeCollectionTruncateMarkers. The caller
+ * must use the returned UUID to perform a collection acquisition to ensure the collection is still
+ * the same, and that it is correct to truncate based on the returned
+ * ChangeCollectionTruncateMarkers.
+ */
+auto establishCollUUIDAndTruncateMarkers(
+    OperationContext* opCtx,
+    const TenantId& tenantId,
+    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& truncateMap) {
+    const auto nss = NamespaceString::makeChangeCollectionNSS(tenantId);
+    return writeConflictRetry(opCtx, "initialise change collection truncate markers", nss, [&] {
+        auto changeCollection = acquireChangeCollectionForWrite(opCtx, nss);
+
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Tenant change collection not found. Namespace: "
+                              << nss.toStringForErrorMsg(),
+                changeCollection.exists());
+
+        const auto& changeCollectionPtr = changeCollection.getCollectionPtr();
+        auto truncateMarkers = truncateMap.find(changeCollectionPtr->uuid());
+        // No marker means it's a new collection, or we've just performed startup.
+        // Initialize the TruncateMarkers instance.
+        if (!truncateMarkers) {
+            truncateMarkers = initialiseTruncateMarkers(opCtx, changeCollection, truncateMap);
+        }
+        return std::make_tuple(NamespaceStringOrUUID{nss.dbName(), changeCollectionPtr->uuid()},
+                               truncateMarkers);
+    });
+}
+
+void expirePartialMarker(OperationContext* opCtx,
+                         const NamespaceStringOrUUID& dbAndUUID,
+                         ChangeCollectionTruncateMarkers* const truncateMarkers) {
+    writeConflictRetry(opCtx, "expire partial marker", dbAndUUID, [&] {
+        auto changeCollection = acquireChangeCollectionForWrite(opCtx, dbAndUUID);
+        const auto& changeCollectionPtr = changeCollection.getCollectionPtr();
+        truncateMarkers->expirePartialMarker(opCtx, changeCollectionPtr.get());
+    });
+}
+
 }  // namespace
 
-size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithTruncate(
-    OperationContext* opCtx, const CollectionAcquisition& changeCollection, Date_t expirationTime) {
-    auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
-    auto& truncateMap = changeCollectionManager._tenantTruncateMarkersMap;
+void ChangeStreamChangeCollectionManager::_removeExpiredMarkers(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& dbAndUUID,
+    ChangeCollectionTruncateMarkers* const truncateMarkers,
+    int64_t& numRecordsDeletedAccum) {
 
-    const auto& changeCollectionPtr = changeCollection.getCollectionPtr();
-    auto truncateMarkers = truncateMap.find(changeCollectionPtr->uuid());
-
-    // No marker means it's a new collection, or we've just performed startup. Initialize
-    // the TruncateMarkers instance.
-    if (!truncateMarkers) {
-        writeConflictRetry(
-            opCtx, "initialise change collection truncate markers", changeCollectionPtr->ns(), [&] {
-                truncateMarkers = initialiseTruncateMarkers(opCtx, changeCollection, truncateMap);
-            });
-    }
-
-    int64_t numRecordsDeleted = 0;
-
-    auto removeExpiredMarkers = [&] {
-        auto rs = changeCollectionPtr->getRecordStore();
-        const Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
-
-        while (auto marker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
-            if (recordIdToTimestamp(marker->lastRecord) > maxTSEligibleForTruncate) {
-                // The truncate marker contains part of a data range not yet consistent
-                // (i.e. there could be oplog holes or partially applied ranges of the oplog in the
-                // range).
-                return;
-            }
-
-            writeConflictRetry(opCtx, "truncate change collection", changeCollectionPtr->ns(), [&] {
-                // The session might be in use from marker initialisation so we must reset it
-                // here in order to allow an untimestamped write.
-                opCtx->recoveryUnit()->abandonSnapshot();
-                opCtx->recoveryUnit()->allowOneUntimestampedWrite();
-                WriteUnitOfWork wuow(opCtx);
-
-                auto bytesDeleted = marker->bytes;
-                auto docsDeleted = marker->records;
-
-                auto status =
-                    rs->rangeTruncate(opCtx,
-                                      // Truncate from the beginning of the collection, this will
-                                      // cover cases where some leftover documents are present.
-                                      RecordId(),
-                                      marker->lastRecord,
-                                      -bytesDeleted,
-                                      -docsDeleted);
-                invariantStatusOK(status);
-
-                wuow.commit();
-
-                truncateMarkers->popOldestMarker();
-                numRecordsDeleted += docsDeleted;
-
-                auto& purgingJobStats = changeCollectionManager.getPurgingJobStats();
-                purgingJobStats.docsDeleted.fetchAndAddRelaxed(docsDeleted);
-                purgingJobStats.bytesDeleted.fetchAndAddRelaxed(bytesDeleted);
-
-                auto millisWallTime = marker->wallTime.toMillisSinceEpoch();
-                if (purgingJobStats.maxStartWallTimeMillis.load() < millisWallTime) {
-                    purgingJobStats.maxStartWallTimeMillis.store(millisWallTime);
-                }
-            });
+    const Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
+    while (auto marker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
+        if (recordIdToTimestamp(marker->lastRecord) > maxTSEligibleForTruncate) {
+            // The truncate marker contains part of a data range not yet consistent
+            // (i.e. there could be oplog holes or partially applied ranges of the oplog in the
+            // range).
+            break;
         }
-    };
 
-    removeExpiredMarkers();
-    // We now create a partial marker that will shift the last entry to the next marker if it's
-    // present there. This will allow us to expire all entries up to the last one.
-    truncateMarkers->expirePartialMarker(opCtx, changeCollectionPtr.get());
-    // Second pass to remove the potentially new partial marker.
-    removeExpiredMarkers();
+        writeConflictRetry(opCtx, "truncate change collection", dbAndUUID, [&] {
+            opCtx->recoveryUnit()->allowOneUntimestampedWrite();
+            auto changeCollection = acquireChangeCollectionForWrite(opCtx, dbAndUUID);
+            WriteUnitOfWork wuow(opCtx);
+
+            auto bytesDeleted = marker->bytes;
+            auto docsDeleted = marker->records;
+
+            const auto rs = changeCollection.getCollectionPtr()->getRecordStore();
+            auto status =
+                rs->rangeTruncate(opCtx,
+                                  // Truncate from the beginning of the collection, this will
+                                  // cover cases where some leftover documents are present.
+                                  RecordId(),
+                                  marker->lastRecord,
+                                  -bytesDeleted,
+                                  -docsDeleted);
+            invariantStatusOK(status);
+
+            wuow.commit();
+
+            truncateMarkers->popOldestMarker();
+            numRecordsDeletedAccum += docsDeleted;
+
+            _purgingJobStats.docsDeleted.fetchAndAddRelaxed(docsDeleted);
+            _purgingJobStats.bytesDeleted.fetchAndAddRelaxed(bytesDeleted);
+
+            auto millisWallTime = marker->wallTime.toMillisSinceEpoch();
+            if (_purgingJobStats.maxStartWallTimeMillis.load() < millisWallTime) {
+                _purgingJobStats.maxStartWallTimeMillis.store(millisWallTime);
+            }
+        });
+    }
+}
+
+size_t ChangeStreamChangeCollectionManager::_removeExpiredChangeCollectionsDocumentsWithTruncate(
+    OperationContext* opCtx, const TenantId& tenantId) {
+    int64_t numRecordsDeleted = 0;
+    bool shouldWarn = false;
+    try {
+        // Initialize truncate markers if necessary, and fetch collection UUID. After this point, we
+        // must use UUID to acquire the collection to ensure it has not been recreated.
+        const auto [dbAndUUID, truncateMarkers] =
+            establishCollUUIDAndTruncateMarkers(opCtx, tenantId, _tenantTruncateMarkersMap);
+
+        // Only log a warning if the collection is dropped after the initial check.
+        shouldWarn = true;
+
+        // Even if the collection is concurrently dropped, we hold a shared_ptr to truncateMarkers,
+        // and the object remains valid. After attempting to acquire by UUID, and verifying the
+        // collection does no longer exist, we'll just exit.
+        _removeExpiredMarkers(opCtx, dbAndUUID, truncateMarkers.get(), numRecordsDeleted);
+
+        // We now create a partial marker that will shift the last entry to the next marker if
+        // it's present there. This will allow us to expire all entries up to the last one.
+        expirePartialMarker(opCtx, dbAndUUID, truncateMarkers.get());
+
+        // Second pass to remove the potentially new partial marker.
+        _removeExpiredMarkers(opCtx, dbAndUUID, truncateMarkers.get(), numRecordsDeleted);
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        // Do nothing. We'll just return the numRecordsDeleted up to the point where the collection
+        // was dropped.
+        if (shouldWarn) {
+            LOGV2_WARNING(8203100,
+                          "change collection dropped while truncating expired documents",
+                          "reason"_attr = ex.reason(),
+                          "tenantId"_attr = tenantId);
+        }
+    }
     return numRecordsDeleted;
+}
+
+size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithTruncate(
+    OperationContext* opCtx, const TenantId& tenantId) {
+    auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+    return changeCollectionManager._removeExpiredChangeCollectionsDocumentsWithTruncate(opCtx,
+                                                                                        tenantId);
 }
 }  // namespace mongo

@@ -129,9 +129,6 @@ void ChangeCollectionTruncateMarkers::expirePartialMarker(OperationContext* opCt
         return;
     }
 
-    // Abandon the snapshot so we can fetch the most recent version of the table. This increases the
-    // chances the last entry isn't present in the new partial marker.
-    opCtx->recoveryUnit()->abandonSnapshot();
     WriteUnitOfWork wuow(opCtx);
 
     auto backCursor = changeCollection->getRecordStore()->getCursor(opCtx, false);

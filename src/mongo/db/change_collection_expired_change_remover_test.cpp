@@ -226,19 +226,8 @@ protected:
     size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
                                                    const TenantId& tenantId,
                                                    Date_t expirationTime) {
-        // Acquire intent-exclusive lock on the change collection. Early exit if the collection
-        // doesn't exist.
-        const auto changeCollection = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest(NamespaceString::makeChangeCollectionNSS(tenantId),
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                         repl::ReadConcernArgs::get(opCtx),
-                                         AcquisitionPrerequisites::kWrite),
-            MODE_IX);
-
         return ChangeStreamChangeCollectionManager::
-            removeExpiredChangeCollectionsDocumentsWithTruncate(
-                opCtx, changeCollection, expirationTime);
+            removeExpiredChangeCollectionsDocumentsWithTruncate(opCtx, tenantId);
     }
 
     RAIIServerParameterControllerForTest truncateFeatureFlag{
