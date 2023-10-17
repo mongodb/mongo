@@ -302,22 +302,14 @@ void prepareSearchMetaParameters(PlanStageData* data, const CanonicalQuery& cq) 
 }
 }  // namespace
 
-sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
-                                         const PlanStageSlots& outputs,
-                                         const sbe::value::SlotVector& exclude) {
+sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
+                                             const PlanStageSlots& outputs) {
     std::vector<std::pair<PlanStageSlots::Name, sbe::value::SlotId>> pairs;
-    if (exclude.empty()) {
-        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
-            pairs.emplace_back(name, slot.slotId);
-        });
-    } else {
-        auto excludeSet = sbe::value::SlotSet{exclude.begin(), exclude.end()};
-        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
-            if (!excludeSet.count(slot.slotId)) {
-                pairs.emplace_back(name, slot.slotId);
-            }
-        });
-    }
+
+    outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+        pairs.emplace_back(name, slot.slotId);
+    });
+
     std::sort(pairs.begin(), pairs.end());
 
     auto outputSlots = sbe::makeSV();
@@ -325,7 +317,37 @@ sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
     for (auto&& p : pairs) {
         outputSlots.emplace_back(p.second);
     }
+
     return outputSlots;
+}
+
+sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
+                                         const PlanStageSlots& outputs,
+                                         const sbe::value::SlotVector& exclude) {
+    auto slots = sbe::makeSV();
+
+    if (exclude.empty()) {
+        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+            slots.emplace_back(slot.slotId);
+        });
+    } else {
+        auto excludeSet = sbe::value::SlotSet{exclude.begin(), exclude.end()};
+
+        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+            if (!excludeSet.count(slot.slotId)) {
+                slots.emplace_back(slot.slotId);
+            }
+        });
+    }
+
+    std::sort(slots.begin(), slots.end());
+
+    auto newEnd = std::unique(slots.begin(), slots.end());
+    if (newEnd != slots.end()) {
+        slots.erase(newEnd, slots.end());
+    }
+
+    return slots;
 }
 
 /**
@@ -1873,14 +1895,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         inputKeys.push_back(std::move(inputKeysForChild));
         inputStages.push_back(std::move(stage));
 
-        auto sv = getSlotsToForward(childReqs, outputs);
+        auto sv = getSlotsOrderedByName(childReqs, outputs);
 
         inputVals.push_back(std::move(sv));
     }
 
     PlanStageSlots outputs(childReqs, &_slotIdGenerator);
-
-    auto outputVals = getSlotsToForward(childReqs, outputs);
+    auto outputVals = getSlotsOrderedByName(childReqs, outputs);
 
     auto stage = sbe::makeS<sbe::SortedMergeStage>(std::move(inputStages),
                                                    std::move(inputKeys),
@@ -2283,12 +2304,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto [stage, outputs] = build(child.get(), childReqs);
 
         inputStages.emplace_back(std::move(stage));
-        inputSlots.emplace_back(getSlotsToForward(childReqs, outputs));
+        inputSlots.emplace_back(getSlotsOrderedByName(childReqs, outputs));
     }
 
     // Construct a union stage whose branches are translated children of the 'Or' node.
     PlanStageSlots outputs(childReqs, &_slotIdGenerator);
-    auto unionOutputSlots = getSlotsToForward(childReqs, outputs);
+    auto unionOutputSlots = getSlotsOrderedByName(childReqs, outputs);
 
     auto stage = sbe::makeS<sbe::UnionStage>(
         std::move(inputStages), std::move(inputSlots), std::move(unionOutputSlots), root->nodeId());
@@ -3437,7 +3458,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
         childReqs.setIsTailableCollScanResumeBranch(isTailableCollScanResumeBranch);
         auto [branch, outputs] = build(root, childReqs);
 
-        auto branchSlots = getSlotsToForward(childReqs, outputs);
+        auto branchSlots = getSlotsOrderedByName(childReqs, outputs);
 
         return {std::move(branchSlots), std::move(branch)};
     };
@@ -3467,7 +3488,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
                                                           std::move(resumeBranchSlots));
 
     PlanStageSlots outputs(reqs, &_slotIdGenerator);
-    auto unionOutputSlots = getSlotsToForward(reqs, outputs);
+    auto unionOutputSlots = getSlotsOrderedByName(reqs, outputs);
 
     // Branch output slots become the input slots to the union.
     auto unionStage =
@@ -3709,7 +3730,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // Calculate list of forward slots.
-    for (auto forwardSlot : getSlotsToForward(reqs, outputs)) {
+    for (auto forwardSlot : getSlotsOrderedByName(reqs, outputs)) {
         ensureSlotInBuffer(forwardSlot);
     }
 

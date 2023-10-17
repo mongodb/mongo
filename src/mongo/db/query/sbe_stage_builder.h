@@ -79,6 +79,23 @@ class PlanStageReqs;
 class PlanStageSlots;
 
 struct PlanStageData;
+
+/**
+ * Returns a vector of the slot IDs corresponding to 'reqs', ordered by slot name. This function
+ * is intended for use in situations where a branch or union is being constructed and the contents
+ * of multiple PlanStageSlots objects need to be merged together.
+ *
+ * Note that a given slot ID may appear more than once in the SlotVector returned. This is
+ * the intended behavior.
+ */
+sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
+                                             const PlanStageSlots& outputs);
+
+/**
+ * Returns a vector of the unique slot IDs needed by 'reqs', ordered by slot ID. This function is
+ * intended for use in situations where a join or sort or something else is being constructed and
+ * a PlanStageSlot's contents need to be "forwarded" through a PlanStage.
+ */
 sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
                                          const sbe::value::SlotVector& exclude = sbe::makeSV());
