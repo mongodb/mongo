@@ -111,3 +111,4 @@ __wt_bswap16
 __wt_verbose_error
 __wt_verbose_level
 __wt_verbose_level_multi
+wt_shared

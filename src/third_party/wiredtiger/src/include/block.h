@@ -260,9 +260,9 @@ struct __wt_block {
     bool readonly;              /* Underlying file was opened only for reading */
 
     /* Configuration information, set when the file is opened. */
-    uint32_t allocfirst; /* Allocation is first-fit */
-    uint32_t allocsize;  /* Allocation size */
-    size_t os_cache;     /* System buffer cache flush max */
+    wt_shared uint32_t allocfirst; /* Allocation is first-fit */
+    uint32_t allocsize;            /* Allocation size */
+    size_t os_cache;               /* System buffer cache flush max */
     size_t os_cache_max;
     size_t os_cache_dirty_max;
 
@@ -309,7 +309,7 @@ struct __wt_block {
     uint8_t *fragckpt;       /* Per-checkpoint frag tracking list */
 
     /* Multi-file support */
-    uint32_t read_count; /* Count of active read requests using this block handle */
+    wt_shared uint32_t read_count; /* Count of active read requests using this block handle */
 };
 
 /*

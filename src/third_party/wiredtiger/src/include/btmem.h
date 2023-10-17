@@ -324,8 +324,8 @@ struct __wt_page_modify {
     uint64_t update_txn;
 
     /* Dirty bytes added to the cache. */
-    size_t bytes_dirty;
-    size_t bytes_updates;
+    wt_shared size_t bytes_dirty;
+    wt_shared size_t bytes_updates;
 
     /*
      * When pages are reconciled, the result is one or more replacement blocks. A replacement block
@@ -390,7 +390,7 @@ struct __wt_page_modify {
              * page, but gaps created in the namespace by truncate operations can result in the
              * append lists of other pages becoming populated.
              */
-            WT_INSERT_HEAD **append;
+            wt_shared WT_INSERT_HEAD **append;
 
             /*
              * Updated items in column-stores: variable-length RLE entries can expand to multiple
@@ -399,7 +399,7 @@ struct __wt_page_modify {
              * there can be a very large number of bits on a single page, and the cost of the
              * WT_UPDATE array would be huge.
              */
-            WT_INSERT_HEAD **update;
+            wt_shared WT_INSERT_HEAD **update;
 
             /*
              * Split-saved last column-store page record. If a fixed-length column-store page is
@@ -417,10 +417,10 @@ struct __wt_page_modify {
 #define mod_col_split_recno u2.column_leaf.split_recno
         struct {
             /* Inserted items for row-store. */
-            WT_INSERT_HEAD **insert;
+            wt_shared WT_INSERT_HEAD **insert;
 
             /* Updated items for row-stores. */
-            WT_UPDATE **update;
+            wt_shared WT_UPDATE **update;
         } row_leaf;
 #undef mod_row_insert
 #define mod_row_insert u2.row_leaf.insert
@@ -461,7 +461,7 @@ struct __wt_page_modify {
 #define WT_PAGE_CLEAN 0
 #define WT_PAGE_DIRTY_FIRST 1
 #define WT_PAGE_DIRTY 2
-    uint32_t page_state;
+    wt_shared uint32_t page_state;
 
 #define WT_PM_REC_EMPTY 1      /* Reconciliation: no replacement */
 #define WT_PM_REC_MULTIBLOCK 2 /* Reconciliation: multiple blocks */
@@ -499,7 +499,7 @@ WT_PACKED_STRUCT_END
  */
 struct __wt_page_index {
     uint32_t entries;
-    uint32_t deleted_entries;
+    wt_shared uint32_t deleted_entries;
     WT_REF **index;
 };
 
@@ -590,7 +590,7 @@ struct __wt_page {
             WT_REF *parent_ref; /* Parent reference */
             uint64_t split_gen; /* Generation of last split */
 
-            WT_PAGE_INDEX *volatile __index; /* Collated children */
+            wt_shared WT_PAGE_INDEX *volatile __index; /* Collated children */
         } intl;
 #undef pg_intl_parent_ref
 #define pg_intl_parent_ref u.intl.parent_ref
@@ -700,7 +700,7 @@ struct __wt_page {
 #define WT_PAGE_SPLIT_INSERT 0x200u       /* A leaf page was split for append */
 #define WT_PAGE_UPDATE_IGNORE 0x400u      /* Ignore updates on page discard */
                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
-    uint16_t flags_atomic;                /* Atomic flags, use F_*_ATOMIC_16 */
+    wt_shared uint16_t flags_atomic;      /* Atomic flags, use F_*_ATOMIC_16 */
 
 #define WT_PAGE_IS_INTERNAL(page) \
     ((page)->type == WT_PAGE_COL_INT || (page)->type == WT_PAGE_ROW_INT)
@@ -716,13 +716,13 @@ struct __wt_page {
 
     /* 1 byte hole expected. */
 
-    size_t memory_footprint; /* Memory attached to the page */
+    wt_shared size_t memory_footprint; /* Memory attached to the page */
 
     /* Page's on-disk representation: NULL for pages created in memory. */
     const WT_PAGE_HEADER *dsk;
 
     /* If/when the page is modified, we need lots more information. */
-    WT_PAGE_MODIFY *modify;
+    wt_shared WT_PAGE_MODIFY *modify;
 
     /*
      * !!!
@@ -894,7 +894,7 @@ struct __wt_page_deleted {
      * from memory rather than using the local variable, mark the shared transaction IDs volatile to
      * prevent unexpected repeated/reordered reads.
      */
-    volatile uint64_t txnid; /* Transaction ID */
+    wt_shared volatile uint64_t txnid; /* Transaction ID */
 
     wt_timestamp_t timestamp; /* Timestamps */
     wt_timestamp_t durable_timestamp;
@@ -903,7 +903,7 @@ struct __wt_page_deleted {
      * The prepare state is used for transaction prepare to manage visibility and propagating the
      * prepare state to the updates generated at instantiation time.
      */
-    volatile uint8_t prepare_state;
+    wt_shared volatile uint8_t prepare_state;
 
     /*
      * The previous state of the WT_REF; if the fast-truncate transaction is rolled back without the
@@ -952,14 +952,14 @@ struct __wt_prefetch_queue_entry {
  *	A single in-memory page and state information.
  */
 struct __wt_ref {
-    WT_PAGE *page; /* Page */
+    wt_shared WT_PAGE *page; /* Page */
 
     /*
      * When the tree deepens as a result of a split, the home page value changes. Don't cache it, we
      * need to see that change when looking up our slot in the page's index structure.
      */
-    WT_PAGE *volatile home;        /* Reference page */
-    volatile uint32_t pindex_hint; /* Reference page index hint */
+    wt_shared WT_PAGE *volatile home;        /* Reference page */
+    wt_shared volatile uint32_t pindex_hint; /* Reference page index hint */
 
     uint8_t unused[2]; /* Padding: before the flags field so flags can be easily expanded. */
 
@@ -977,26 +977,26 @@ struct __wt_ref {
                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
-#define WT_REF_DISK 0       /* Page is on disk */
-#define WT_REF_DELETED 1    /* Page is on disk, but deleted */
-#define WT_REF_LOCKED 2     /* Page locked for exclusive access */
-#define WT_REF_MEM 3        /* Page is in cache and valid */
-#define WT_REF_SPLIT 4      /* Parent page split (WT_REF dead) */
-    volatile uint8_t state; /* Page state */
+#define WT_REF_DISK 0                 /* Page is on disk */
+#define WT_REF_DELETED 1              /* Page is on disk, but deleted */
+#define WT_REF_LOCKED 2               /* Page locked for exclusive access */
+#define WT_REF_MEM 3                  /* Page is in cache and valid */
+#define WT_REF_SPLIT 4                /* Parent page split (WT_REF dead) */
+    wt_shared volatile uint8_t state; /* Page state */
 
     /*
      * Address: on-page cell if read from backing block, off-page WT_ADDR if instantiated in-memory,
      * or NULL if page created in-memory.
      */
-    void *addr;
+    wt_shared void *addr;
 
     /*
      * The child page's key.  Do NOT change this union without reviewing
      * __wt_ref_key.
      */
     union {
-        uint64_t recno; /* Column-store: starting recno */
-        void *ikey;     /* Row-store: key */
+        uint64_t recno;       /* Column-store: starting recno */
+        wt_shared void *ikey; /* Row-store: key */
     } key;
 #undef ref_recno
 #define ref_recno key.recno
@@ -1116,7 +1116,7 @@ struct __wt_ref {
      * disk, a page instantiated after its parent was read from disk will always have inst_updates
      * set to NULL.
      */
-    WT_PAGE_DELETED *page_del; /* Page-delete information for a deleted page. */
+    wt_shared WT_PAGE_DELETED *page_del; /* Page-delete information for a deleted page. */
 
 #ifdef HAVE_REF_TRACK
 /*
@@ -1202,7 +1202,7 @@ struct __wt_ref {
  * to make sure we don't introduce this bug (again).
  */
 struct __wt_row { /* On-page key, on-page cell, or off-page WT_IKEY */
-    void *volatile __key;
+    wt_shared void *volatile __key;
 };
 #define WT_ROW_KEY_COPY(rip) ((rip)->__key)
 #define WT_ROW_KEY_SET(rip, v) ((rip)->__key) = (void *)(v)
@@ -1303,7 +1303,7 @@ struct __wt_update {
      * from memory rather than using the local variable, mark the shared transaction IDs volatile to
      * prevent unexpected repeated/reordered reads.
      */
-    volatile uint64_t txnid; /* transaction ID */
+    wt_shared volatile uint64_t txnid; /* transaction ID */
 
     wt_timestamp_t durable_ts; /* timestamps */
     wt_timestamp_t start_ts;
@@ -1315,7 +1315,7 @@ struct __wt_update {
      */
     wt_timestamp_t prev_durable_ts;
 
-    WT_UPDATE *next; /* forward-linked list */
+    wt_shared WT_UPDATE *next; /* forward-linked list */
 
     uint32_t size; /* data length */
 
@@ -1334,7 +1334,7 @@ struct __wt_update {
      * The update state is used for transaction prepare to manage visibility and transitioning
      * update structure state safely.
      */
-    volatile uint8_t prepare_state; /* prepare state */
+    wt_shared volatile uint8_t prepare_state; /* prepare state */
 
 /* When introducing a new flag, consider adding it to WT_UPDATE_SELECT_FOR_DS. */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -1489,7 +1489,7 @@ struct __wt_update_vector {
  * to re-implement, IMNSHO.)
  */
 struct __wt_insert {
-    WT_UPDATE *upd; /* value */
+    wt_shared WT_UPDATE *upd; /* value */
 
     union {
         uint64_t recno; /* column-store record number */
@@ -1503,7 +1503,7 @@ struct __wt_insert {
 #define WT_INSERT_KEY(ins) ((void *)((uint8_t *)(ins) + ((WT_INSERT *)(ins))->u.key.offset))
 #define WT_INSERT_RECNO(ins) (((WT_INSERT *)(ins))->u.recno)
 
-    WT_INSERT *next[0]; /* forward-linked skip list */
+    wt_shared WT_INSERT *next[0]; /* forward-linked skip list */
 };
 
 /*
@@ -1536,8 +1536,8 @@ struct __wt_insert {
  * 	The head of a skiplist of WT_INSERT items.
  */
 struct __wt_insert_head {
-    WT_INSERT *head[WT_SKIP_MAXDEPTH]; /* first item on skiplists */
-    WT_INSERT *tail[WT_SKIP_MAXDEPTH]; /* last item on skiplists */
+    wt_shared WT_INSERT *head[WT_SKIP_MAXDEPTH]; /* first item on skiplists */
+    wt_shared WT_INSERT *tail[WT_SKIP_MAXDEPTH]; /* last item on skiplists */
 };
 
 /*

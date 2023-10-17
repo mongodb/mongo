@@ -112,14 +112,14 @@ struct __wt_btree {
 
     uint32_t id; /* File ID, for logging */
 
-    uint32_t allocsize;        /* Allocation size */
-    uint32_t maxintlpage;      /* Internal page max size */
-    uint32_t maxleafpage;      /* Leaf page max size */
-    uint32_t maxleafkey;       /* Leaf page max key size */
-    uint32_t maxleafvalue;     /* Leaf page max value size */
-    uint64_t maxmempage;       /* In-memory page max size */
-    uint32_t maxmempage_image; /* In-memory page image max size */
-    uint64_t splitmempage;     /* In-memory split trigger size */
+    uint32_t allocsize;             /* Allocation size */
+    wt_shared uint32_t maxintlpage; /* Internal page max size */
+    uint32_t maxleafpage;           /* Leaf page max size */
+    uint32_t maxleafkey;            /* Leaf page max key size */
+    uint32_t maxleafvalue;          /* Leaf page max value size */
+    uint64_t maxmempage;            /* In-memory page max size */
+    uint32_t maxmempage_image;      /* In-memory page image max size */
+    uint64_t splitmempage;          /* In-memory split trigger size */
 
     void *huffman_value; /* Value huffman encoding */
 
@@ -160,9 +160,9 @@ struct __wt_btree {
 
     uint64_t last_recno; /* Column-store last record number */
 
-    WT_REF root;      /* Root page reference */
-    bool modified;    /* If the tree ever modified */
-    uint8_t original; /* Newly created: bulk-load possible
+    WT_REF root;                /* Root page reference */
+    wt_shared bool modified;    /* If the tree ever modified */
+    wt_shared uint8_t original; /* Newly created: bulk-load possible
                          (want a bool but needs atomic cas) */
 
     bool hs_entries;  /* Has entries in the history store table */
@@ -177,9 +177,9 @@ struct __wt_btree {
     uint64_t rec_max_txn;    /* Maximum txn seen (clean trees) */
     wt_timestamp_t rec_max_timestamp;
 
-    uint64_t checkpoint_gen;       /* Checkpoint generation */
-    WT_SESSION_IMPL *sync_session; /* Syncing session */
-    WT_BTREE_SYNC syncing;         /* Sync status */
+    wt_shared uint64_t checkpoint_gen; /* Checkpoint generation */
+    WT_SESSION_IMPL *sync_session;     /* Syncing session */
+    WT_BTREE_SYNC syncing;             /* Sync status */
 
 /*
  * Helper macros: WT_BTREE_SYNCING indicates if a sync is active (either waiting to start or already
@@ -193,12 +193,12 @@ struct __wt_btree {
 #define WT_SESSION_BTREE_SYNC_SAFE(session, btree) \
     ((btree)->syncing != WT_BTREE_SYNC_RUNNING || (btree)->sync_session == (session))
 
-    uint64_t bytes_dirty_intl;  /* Bytes in dirty internal pages. */
-    uint64_t bytes_dirty_leaf;  /* Bytes in dirty leaf pages. */
-    uint64_t bytes_dirty_total; /* Bytes ever dirtied in cache. */
-    uint64_t bytes_inmem;       /* Cache bytes in memory. */
-    uint64_t bytes_internal;    /* Bytes in internal pages. */
-    uint64_t bytes_updates;     /* Bytes in updates. */
+    wt_shared uint64_t bytes_dirty_intl;  /* Bytes in dirty internal pages. */
+    wt_shared uint64_t bytes_dirty_leaf;  /* Bytes in dirty leaf pages. */
+    wt_shared uint64_t bytes_dirty_total; /* Bytes ever dirtied in cache. */
+    wt_shared uint64_t bytes_inmem;       /* Cache bytes in memory. */
+    wt_shared uint64_t bytes_internal;    /* Bytes in internal pages. */
+    wt_shared uint64_t bytes_updates;     /* Bytes in updates. */
 
     /*
      * The maximum bytes allowed to be used for the table on disk. This is currently only used for
@@ -237,16 +237,16 @@ struct __wt_btree {
      * Eviction information is maintained in the btree handle, but owned by eviction, not the btree
      * code.
      */
-    WT_REF *evict_ref;            /* Eviction thread's location */
-    uint64_t evict_priority;      /* Relative priority of cached pages */
-    uint32_t evict_walk_progress; /* Eviction walk progress */
-    uint32_t evict_walk_target;   /* Eviction walk target */
-    u_int evict_walk_period;      /* Skip this many LRU walks */
-    u_int evict_walk_saved;       /* Saved walk skips for checkpoints */
-    u_int evict_walk_skips;       /* Number of walks skipped */
-    int32_t evict_disabled;       /* Eviction disabled count */
-    bool evict_disabled_open;     /* Eviction disabled on open */
-    volatile uint32_t evict_busy; /* Count of threads in eviction */
+    WT_REF *evict_ref;                      /* Eviction thread's location */
+    uint64_t evict_priority;                /* Relative priority of cached pages */
+    uint32_t evict_walk_progress;           /* Eviction walk progress */
+    uint32_t evict_walk_target;             /* Eviction walk target */
+    u_int evict_walk_period;                /* Skip this many LRU walks */
+    u_int evict_walk_saved;                 /* Saved walk skips for checkpoints */
+    u_int evict_walk_skips;                 /* Number of walks skipped */
+    wt_shared int32_t evict_disabled;       /* Eviction disabled count */
+    bool evict_disabled_open;               /* Eviction disabled on open */
+    wt_shared volatile uint32_t evict_busy; /* Count of threads in eviction */
     WT_EVICT_WALK_TYPE evict_start_type;
 
 /*

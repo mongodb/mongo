@@ -30,7 +30,7 @@ struct __wt_lsm_worker_args {
     u_int id;      /* My manager slot id */
     uint32_t type; /* Types of operations handled */
 
-    volatile bool running; /* Worker is running */
+    wt_shared volatile bool running; /* Worker is running */
 };
 
 /*
@@ -52,7 +52,7 @@ struct __wt_cursor_lsm {
     WT_CURSOR iface;
 
     WT_LSM_TREE *lsm_tree;
-    uint64_t dsk_gen;
+    wt_shared uint64_t dsk_gen;
 
     u_int nchunks;               /* Number of chunks in the cursor */
     u_int nupdates;              /* Updates needed (including
@@ -104,15 +104,15 @@ struct __wt_lsm_chunk {
                                       */
     WT_SPINLOCK timestamp_spinlock;
 
-    uint32_t id;            /* ID used to generate URIs */
-    uint32_t generation;    /* Merge generation */
-    uint32_t refcnt;        /* Number of worker thread references */
-    uint32_t bloom_busy;    /* Currently creating bloom filter */
-    uint32_t evict_enabled; /* Eviction allowed on the chunk */
+    uint32_t id;                      /* ID used to generate URIs */
+    uint32_t generation;              /* Merge generation */
+    wt_shared uint32_t refcnt;        /* Number of worker thread references */
+    wt_shared uint32_t bloom_busy;    /* Currently creating bloom filter */
+    wt_shared uint32_t evict_enabled; /* Eviction allowed on the chunk */
 
-    int8_t empty;     /* 1/0: checkpoint missing */
-    int8_t evicted;   /* 1/0: in-memory chunk was evicted */
-    uint8_t flushing; /* 1/0: chunk flush in progress */
+    int8_t empty;               /* 1/0: checkpoint missing */
+    int8_t evicted;             /* 1/0: in-memory chunk was evicted */
+    wt_shared uint8_t flushing; /* 1/0: chunk flush in progress */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_CHUNK_BLOOM 0x01u
@@ -175,11 +175,11 @@ struct __wt_lsm_manager {
     TAILQ_HEAD(__wt_lsm_work_switch_qh, __wt_lsm_work_unit) switchqh;
     TAILQ_HEAD(__wt_lsm_work_app_qh, __wt_lsm_work_unit) appqh;
     TAILQ_HEAD(__wt_lsm_work_manager_qh, __wt_lsm_work_unit) managerqh;
-    WT_SPINLOCK switch_lock;  /* Lock for switch queue */
-    WT_SPINLOCK app_lock;     /* Lock for application queue */
-    WT_SPINLOCK manager_lock; /* Lock for manager queue */
-    WT_CONDVAR *work_cond;    /* Used to notify worker of activity */
-    uint32_t lsm_workers;     /* Current number of LSM workers */
+    WT_SPINLOCK switch_lock;        /* Lock for switch queue */
+    WT_SPINLOCK app_lock;           /* Lock for application queue */
+    WT_SPINLOCK manager_lock;       /* Lock for manager queue */
+    WT_CONDVAR *work_cond;          /* Used to notify worker of activity */
+    wt_shared uint32_t lsm_workers; /* Current number of LSM workers */
     uint32_t lsm_workers_max;
 #define WT_LSM_MAX_WORKERS 20
 #define WT_LSM_MIN_WORKERS 3
@@ -188,7 +188,7 @@ struct __wt_lsm_manager {
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_LSM_MANAGER_SHUTDOWN 0x1u /* Manager has shut down */
                                      /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t flags;
+    wt_shared uint32_t flags;
 };
 
 /*
@@ -222,11 +222,11 @@ struct __wt_lsm_tree {
     const char *collator_name;
     int collator_owned;
 
-    uint32_t refcnt;               /* Number of users of the tree */
-    WT_SESSION_IMPL *excl_session; /* Session has exclusive lock */
+    wt_shared uint32_t refcnt;               /* Number of users of the tree */
+    wt_shared WT_SESSION_IMPL *excl_session; /* Session has exclusive lock */
 
 #define LSM_TREE_MAX_QUEUE 100
-    uint32_t queue_ref;
+    wt_shared uint32_t queue_ref;
     WT_RWLOCK rwlock;
     TAILQ_ENTRY(__wt_lsm_tree) q;
 
@@ -239,10 +239,10 @@ struct __wt_lsm_tree {
     uint64_t chunks_flushed;               /* Count of chunks flushed since open */
     struct timespec merge_aggressive_time; /* Time for merge aggression */
     uint64_t merge_progressing;            /* Bumped when merges are active */
-    uint32_t merge_syncing;                /* Bumped when merges are syncing */
+    wt_shared uint32_t merge_syncing;      /* Bumped when merges are syncing */
     struct timespec last_active;           /* Time last work unit added */
     uint64_t mgr_work_count;               /* Manager work count */
-    uint64_t work_count;                   /* Work units added */
+    wt_shared uint64_t work_count;         /* Work units added */
 
     /* Configuration parameters */
     uint32_t bloom_bit_count;
@@ -259,17 +259,17 @@ struct __wt_lsm_tree {
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t bloom; /* Bloom creation policy */
 
-    WT_LSM_CHUNK **chunk; /* Array of active LSM chunks */
-    size_t chunk_alloc;   /* Space allocated for chunks */
-    uint32_t nchunks;     /* Number of active chunks */
-    uint32_t last;        /* Last allocated ID */
-    bool modified;        /* Have there been updates? */
+    WT_LSM_CHUNK **chunk;    /* Array of active LSM chunks */
+    size_t chunk_alloc;      /* Space allocated for chunks */
+    uint32_t nchunks;        /* Number of active chunks */
+    wt_shared uint32_t last; /* Last allocated ID */
+    bool modified;           /* Have there been updates? */
 
-    WT_LSM_CHUNK **old_chunks;     /* Array of old LSM chunks */
-    size_t old_alloc;              /* Space allocated for old chunks */
-    u_int nold_chunks;             /* Number of old chunks */
-    uint32_t freeing_old_chunks;   /* Whether chunks are being freed */
-    uint32_t merge_aggressiveness; /* Increase amount of work per merge */
+    WT_LSM_CHUNK **old_chunks;             /* Array of old LSM chunks */
+    size_t old_alloc;                      /* Space allocated for old chunks */
+    u_int nold_chunks;                     /* Number of old chunks */
+    wt_shared uint32_t freeing_old_chunks; /* Whether chunks are being freed */
+    uint32_t merge_aggressiveness;         /* Increase amount of work per merge */
 
 /*
  * We maintain a set of statistics outside of the normal statistics area, copying them into place
@@ -295,7 +295,7 @@ struct __wt_lsm_tree {
     /*
      * Following fields used to be flags but are susceptible to races. Don't merge them with flags.
      */
-    bool active;                   /* The tree is open for business */
+    wt_shared bool active;         /* The tree is open for business */
     bool aggressive_timer_enabled; /* Timer for merge aggression enabled */
     bool need_switch;              /* New chunk needs creating */
 

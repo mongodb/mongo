@@ -94,11 +94,11 @@ struct __wt_data_handle {
      * references; sessions using a connection's data handle will have a non-zero in-use count.
      * Instances of cached cursors referencing the data handle appear in session_cache_ref.
      */
-    uint32_t references;           /* References to this handle */
-    int32_t session_inuse;         /* Sessions using this handle */
-    uint32_t excl_ref;             /* Refs of handle by excl_session */
-    uint64_t timeofdeath;          /* Use count went to 0 */
-    WT_SESSION_IMPL *excl_session; /* Session with exclusive use, if any */
+    wt_shared uint32_t references;   /* References to this handle */
+    wt_shared int32_t session_inuse; /* Sessions using this handle */
+    uint32_t excl_ref;               /* Refs of handle by excl_session */
+    uint64_t timeofdeath;            /* Use count went to 0 */
+    WT_SESSION_IMPL *excl_session;   /* Session with exclusive use, if any */
 
     WT_DATA_SOURCE *dsrc; /* Data source for this handle */
     void *handle;         /* Generic handle */
