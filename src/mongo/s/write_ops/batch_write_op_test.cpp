@@ -1864,8 +1864,6 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Delete) {
     std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
 
     auto status = batchOp.targetBatch(targeter, false, &targeted);
-    batchOp.forgetTargetedBatchesOnTransactionAbortingError();
-
     ASSERT_EQ(ErrorCodes::UnknownError, status.getStatus().code());
 
     BatchedCommandResponse response;
@@ -1895,8 +1893,6 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
     std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
 
     auto status = batchOp.targetBatch(targeter, false, &targeted);
-    batchOp.forgetTargetedBatchesOnTransactionAbortingError();
-
     ASSERT_EQ(ErrorCodes::UnknownError, status.getStatus().code());
 
     BatchedCommandResponse response;

@@ -708,9 +708,6 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
         return;
     }
 
-    // Stop tracking targeted batch
-    _targeted.erase(&targetedBatch);
-
     // Increment stats for this batch
     _incBatchStats(response);
 
@@ -858,10 +855,6 @@ void BatchWriteOp::abortBatch(const write_ops::WriteError& error) {
     }
 
     dassert(isFinished());
-}
-
-void BatchWriteOp::forgetTargetedBatchesOnTransactionAbortingError() {
-    _targeted.clear();
 }
 
 bool BatchWriteOp::isFinished() {

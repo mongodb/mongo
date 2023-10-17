@@ -225,8 +225,6 @@ bool processResponseFromRemote(OperationContext* opCtx,
             auto newStatus = batchStatus.withContext(
                 str::stream() << "Encountered error from " << shardInfo << " during a transaction");
 
-            batchOp.forgetTargetedBatchesOnTransactionAbortingError();
-
             // Throw when there is a transient transaction error since this
             // should be a top level error and not just a write error.
             if (hasTransientTransactionError(batchedCommandResponse)) {
@@ -295,8 +293,6 @@ bool processErrorResponseFromLocal(OperationContext* opCtx,
 
     // If we are in a transaction, we must stop immediately (even for unordered).
     if (TransactionRouter::get(opCtx)) {
-        batchOp.forgetTargetedBatchesOnTransactionAbortingError();
-
         // Throw when there is a transient transaction error since this should be a
         // top level error and not just a write error.
         if (isTransientTransactionError(status.code(), false, false)) {
@@ -799,8 +795,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             dassert(childBatches.size() == 0u);
 
             if (TransactionRouter::get(opCtx)) {
-                batchOp.forgetTargetedBatchesOnTransactionAbortingError();
-
                 // Throw when there is a transient transaction error since this should be a top
                 // level error and not just a write error.
                 if (isTransientTransactionError(statusWithWriteType.getStatus().code(),

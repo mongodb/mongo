@@ -185,13 +185,6 @@ public:
     void abortBatch(const write_ops::WriteError& error);
 
     /**
-     * Disposes of all tracked targeted batches when an error is encountered during a transaction.
-     * This is safe because any partially written data on shards will be rolled back if mongos
-     * decides to abort.
-     */
-    void forgetTargetedBatchesOnTransactionAbortingError();
-
-    /**
      * Returns false if the batch write op needs more processing.
      */
     bool isFinished();
@@ -230,10 +223,6 @@ private:
 
     // Array of ops being processed from the client request
     std::vector<WriteOp> _writeOps;
-
-    // Current outstanding batch op write requests
-    // Not owned here but tracked for reporting
-    std::set<const TargetedWriteBatch*> _targeted;
 
     // Write concern responses from all write batches so far
     std::vector<ShardWCError> _wcErrors;
