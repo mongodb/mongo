@@ -504,12 +504,6 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 void Balancer::_consumeActionStreamLoop() {
     Client::initThread("BalancerSecondary");
 
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnkillableByStepdown(lk);
-    }
-
     auto opCtx = cc().makeOperationContext();
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
@@ -964,12 +958,6 @@ void Balancer::_applyStreamingActionResponseToPolicy(const BalancerStreamAction&
                                                      ActionsStreamPolicy* policy) {
     invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
     ThreadClient tc("BalancerSecondaryThread::applyActionResponse", getGlobalServiceContext());
-
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnkillableByStepdown(lk);
-    }
 
     auto opCtx = tc->makeOperationContext();
     policy->applyActionResult(opCtx.get(), action, response);
