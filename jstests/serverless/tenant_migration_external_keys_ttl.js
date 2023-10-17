@@ -283,49 +283,6 @@ function makeTestParams() {
         teardown();
     }
 
-    // TODO SERVER-76128: Tenant Migrations are not robust to recipient failover.
-    // jsTestLog("Recipient failover before receiving forgetMigration");
-    // (() => {
-    //     const {tmt, teardown} = setup();
-    //     const [tenantId, migrationId, migrationOpts] = makeTestParams();
-    //     const recipientPrimary = tmt.getRecipientPrimary();
-    //     const fp = configureFailPoint(recipientPrimary,
-    //                                   "fpAfterConnectingTenantMigrationRecipientInstance",
-    //                                   {action: "hang"});
-
-    //     if (isShardMergeEnabled(tmt.getDonorPrimary().getDB("admin"))) {
-    //         jsTestLog(
-    //             "Skip: featureFlagShardMerge is enabled and shard merge is not resilient to
-    //             recipient failovers.");
-    //         teardown();
-    //         return;
-    //     }
-
-    //     assert.commandWorked(tmt.startMigration(migrationOpts));
-    //     fp.wait();
-
-    //     assert.commandWorked(recipientPrimary.adminCommand(
-    //         {replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
-    //     assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
-
-    //     fp.off();
-
-    //     TenantMigrationTest.assertCommitted(
-    //         tmt.waitForMigrationToComplete(migrationOpts, true /* retryOnRetryableErrors */));
-
-    //     // The keys should have been created without a TTL deadline.
-    //     verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: false});
-    //     verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: false});
-
-    //     assert.commandWorked(tmt.forgetMigration(migrationOpts.migrationIdString));
-
-    //     // After running donorForgetMigration, the TTL value should be updated. The default TTL
-    //     // buffer is 1 day so the keys will not have been deleted.
-    //     verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: true});
-    //     verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: true});
-    //     teardown();
-    // })();
-
     jsTestLog(
         "Donor failover after receiving forgetMigration before marking keys garbage collectable");
     {
@@ -361,43 +318,6 @@ function makeTestParams() {
         verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: true});
         teardown();
     }
-
-    // TODO SERVER-76128: Tenant Migrations are not robust to recipient failover.
-    // jsTestLog(
-    //     "Recipient failover after receiving forgetMigration before marking keys garbage
-    //     collectable");
-    // {
-    //     const {tmt, donorRst, teardown} = setup();
-    //     const [tenantId, migrationId, migrationOpts] = makeTestParams();
-    //     const recipientPrimary = tmt.getRecipientPrimary();
-
-    //     assert.commandWorked(tmt.startMigration(migrationOpts));
-    //     TenantMigrationTest.assertCommitted(
-    //         tmt.waitForMigrationToComplete(migrationOpts, true /* retryOnRetryableErrors */));
-
-    //     // The keys should have been created without a TTL deadline.
-    //     verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: false});
-    //     verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: false});
-
-    //     const fp = configureFailPoint(
-    //         recipientPrimary, "pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable");
-    //     const forgetMigrationThread = new Thread(
-    //         forgetMigrationAsync, migrationOpts.migrationIdString, createRstArgs(donorRst),
-    //         true);
-    //     forgetMigrationThread.start();
-    //     fp.wait();
-
-    //     assert.commandWorked(recipientPrimary.adminCommand(
-    //         {replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
-    //     assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
-    //     fp.off();
-
-    //     assert.commandWorked(forgetMigrationThread.returnData());
-
-    //     verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: true});
-    //     verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: true});
-    //     teardown();
-    // }
 
     jsTestLog("Donor failover after receiving forgetMigration after updating keys.");
     {
