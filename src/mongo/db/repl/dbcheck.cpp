@@ -418,7 +418,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         key_string::toBsonSafe(first.getBuffer(), first.getSize(), ordering, first.getTypeBits());
     auto lastBson =
         key_string::toBsonSafe(last.getBuffer(), last.getSize(), ordering, last.getTypeBits());
-    indexCursor->setEndPosition(lastBson, true);
+    indexCursor->setEndPosition(lastBson, true /*inclusive*/);
 
     // Iterate through index table.
     for (auto currEntry = indexCursor->seekForKeyString(first); currEntry;

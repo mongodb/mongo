@@ -91,6 +91,18 @@ function resetSnapshotSize() {
     setSnapshotSize(defaultSnapshotSize);
 }
 
+function getNumDocsChecked(nDocsInserted, start, end) {
+    let actualNumDocs = nDocsInserted;
+    // Assuming docs are inserted from 0 to nDocsInserted - 1.
+    if (start != null && start > 0) {
+        actualNumDocs = actualNumDocs - start;
+    }
+    if (end != null && end < nDocsInserted - 1) {
+        actualNumDocs = actualNumDocs - (nDocsInserted - 1 - end);
+    }
+    return actualNumDocs;
+}
+
 function checkNumBatchesAndSnapshots(
     healthLog, nDocs, batchSize, snapshotSize, inconsistentBatch = false) {
     const expectedNumBatches = Math.ceil(nDocs / batchSize);
@@ -103,8 +115,15 @@ function checkNumBatchesAndSnapshots(
     checkHealthLog(healthLog, query, expectedNumBatches);
 
     if (debugBuild) {
-        const expectedNumSnapshots =
-            Math.ceil((batchSize / Math.min(batchSize, snapshotSize)) * expectedNumBatches);
+        let expectedNumSnapshots = expectedNumBatches;
+        if (snapshotSize < batchSize) {
+            const snapshotsPerBatch = Math.ceil(batchSize / snapshotSize);
+            const lastBatchSize = nDocs % batchSize == 0 ? batchSize : nDocs % batchSize;
+            const lastBatchSnapshots = Math.ceil(lastBatchSize / snapshotSize);
+
+            expectedNumSnapshots =
+                ((expectedNumBatches - 1) * snapshotsPerBatch) + lastBatchSnapshots;
+        }
         const actualNumSnapshots =
             rawMongoProgramOutput()
                 .split(/7844808.*Catalog snapshot for extra index keys check ending/)
@@ -497,11 +516,13 @@ function keyNotFoundDuringReverseLookup(nDocs) {
     skipUpdatingIndexDocumentSecondary.off();
 }
 
-function noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
+function noExtraIndexKeys(
+    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start = null, end = null) {
     clearRawMongoProgramOutput();
     jsTestLog("Testing that a valid index will not result in any health log entries with " + nDocs +
-              "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
-              ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
+              " docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+              ", skipLookupForExtraKeys: " + skipLookupForExtraKeys + ", start:" + start +
+              ", end:" + end);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs);
     assert.commandWorked(primaryDB.runCommand({
@@ -520,24 +541,34 @@ function noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys
         batchWriteConcern: writeConcern,
         skipLookupForExtraKeys: skipLookupForExtraKeys
     };
+    if (start != null) {
+        dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+    }
+    if (end != null) {
+        dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+    }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /* awaitCompletion */);
 
     checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
     checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
+    const nDocsChecked = getNumDocsChecked(nDocs, start, end);
+
     jsTestLog("Checking for correct number of batches on primary");
-    checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, snapshotSize);
     jsTestLog("Checking for correct number of batches on secondary");
-    checkNumBatchesAndSnapshots(secondaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(secondaryHealthLog, nDocsChecked, batchSize, snapshotSize);
 
     resetSnapshotSize();
 }
 
-function recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
+function recordNotFound(
+    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start = null, end = null) {
     clearRawMongoProgramOutput();
     jsTestLog("Testing that an extra key will generate a health log entry with " + nDocs +
-              "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
-              ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
+              " docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+              ", skipLookupForExtraKeys: " + skipLookupForExtraKeys + ", start:" + start +
+              ", end:" + end);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs);
     const primaryColl = primaryDB.getCollection(collName);
@@ -567,15 +598,23 @@ function recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) 
         batchWriteConcern: writeConcern,
         skipLookupForExtraKeys: skipLookupForExtraKeys
     };
+    if (start != null) {
+        dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+    }
+    if (end != null) {
+        dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+    }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
+
+    const nDocsChecked = getNumDocsChecked(nDocs, start, end);
 
     if (skipLookupForExtraKeys) {
         checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
     } else {
         jsTestLog("Checking primary for record not found error");
-        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocs);
+        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocsChecked);
         // No other errors on primary.
-        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocsChecked);
     }
 
     jsTestLog(
@@ -583,21 +622,23 @@ function recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) 
     checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
     jsTestLog("Checking for correct number of batches on primary");
-    checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, snapshotSize);
     jsTestLog("Checking for correct number of batches on secondary");
-    checkNumBatchesAndSnapshots(secondaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(secondaryHealthLog, nDocsChecked, batchSize, snapshotSize);
 
     skipUnindexingDocumentWhenDeletedPrimary.off();
     skipUnindexingDocumentWhenDeletedSecondary.off();
     resetSnapshotSize();
 }
 
-function recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
+function recordDoesNotMatch(
+    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start = null, end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(
         "Testing that a key with a record that does not contain the expected keystring will generate a health log entry with " +
-        nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
-        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
+        nDocs + " docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
+        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys + ", start:" + start +
+        ", end:" + end);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs);
     const primaryColl = primaryDB.getCollection(collName);
@@ -629,25 +670,32 @@ function recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKe
         batchWriteConcern: writeConcern,
         skipLookupForExtraKeys: skipLookupForExtraKeys
     };
+    if (start != null) {
+        dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+    }
+    if (end != null) {
+        dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+    }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
+    const nDocsChecked = getNumDocsChecked(nDocs, start, end);
     if (skipLookupForExtraKeys) {
         checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
     } else {
         jsTestLog("Checking primary for record does not match error");
-        checkHealthLog(primaryHealthLog, recordDoesNotMatchQuery, nDocs);
+        checkHealthLog(primaryHealthLog, recordDoesNotMatchQuery, nDocsChecked);
 
         // No other errors on primary.
-        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocsChecked);
     }
     jsTestLog(
         "Checking secondary for record does not match error, should have 0 since secondary skips reverse lookup");
     checkHealthLog(secondaryHealthLog, allErrorsOrWarningsQuery, 0);
 
     jsTestLog("Checking for correct number of batches on primary");
-    checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, snapshotSize);
     jsTestLog("Checking for correct number of batches on secondary");
-    checkNumBatchesAndSnapshots(secondaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(secondaryHealthLog, nDocsChecked, batchSize, snapshotSize);
 
     skipUpdatingIndexDocumentPrimary.off();
     skipUpdatingIndexDocumentSecondary.off();
@@ -655,12 +703,13 @@ function recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKe
 }
 
 function hashingInconsistentExtraKeyOnPrimary(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys) {
+    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start = null, end = null) {
     clearRawMongoProgramOutput();
     jsTestLog(
         "Testing that an extra key on only the primary will log an inconsistent batch health log entry: " +
         nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
-        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys);
+        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys + ", start:" + start +
+        ", end:" + end);
 
     setSnapshotSize(snapshotSize);
     const primaryColl = primaryDB.getCollection(collName);
@@ -689,8 +738,15 @@ function hashingInconsistentExtraKeyOnPrimary(
         batchWriteConcern: writeConcern,
         skipLookupForExtraKeys: skipLookupForExtraKeys
     };
+    if (start != null) {
+        dbCheckParameters = {...dbCheckParameters, start: {a: start} }
+    }
+    if (end != null) {
+        dbCheckParameters = {...dbCheckParameters, end: {a: end} }
+    }
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
+    const nDocsChecked = getNumDocsChecked(nDocs, start, end);
     if (skipLookupForExtraKeys) {
         jsTestLog("Checking primary for errors");
         checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
@@ -699,19 +755,19 @@ function hashingInconsistentExtraKeyOnPrimary(
         checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
     } else {
         jsTestLog("Checking primary for record not found error");
-        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocs);
+        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocsChecked);
         jsTestLog("Checking secondary for record not found error, should have 0");
         checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
 
         // No other errors on primary.
-        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocs);
+        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocsChecked);
     }
 
     jsTestLog("Checking for correct number of batches on primary");
-    checkNumBatchesAndSnapshots(primaryHealthLog, nDocs, batchSize, snapshotSize);
+    checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, snapshotSize);
     jsTestLog("Checking for correct number of inconsistent batches on secondary");
     checkNumBatchesAndSnapshots(
-        secondaryHealthLog, nDocs, batchSize, snapshotSize, true /* inconsistentBatch */);
+        secondaryHealthLog, nDocsChecked, batchSize, snapshotSize, true /* inconsistentBatch */);
 
     skipUnindexingDocumentWhenDeleted.off();
     resetSnapshotSize();
@@ -728,13 +784,13 @@ indexNotFoundDuringReverseLookup();
 allIndexKeysNotFoundDuringReverseLookup(10);
 keyNotFoundDuringReverseLookup(10);
 
-function runMainTests(nDocs, batchSize, snapshotSize) {
+function runMainTests(nDocs, batchSize, snapshotSize, start = null, end = null) {
     [true, false].forEach((skipLookupForExtraKeys) => {
-        noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
-        recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
-        recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
+        noExtraIndexKeys(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start, end);
+        recordDoesNotMatch(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start, end);
+        recordNotFound(nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start, end);
         hashingInconsistentExtraKeyOnPrimary(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys);
+            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, start, end);
     });
 }
 
@@ -745,7 +801,21 @@ runMainTests(10, defaultMaxDocsPerBatch, defaultSnapshotSize);
 runMainTests(1000, defaultMaxDocsPerBatch, defaultSnapshotSize);
 
 // Test with snapshot size < batch size
-runMainTests(1000, defaultMaxDocsPerBatch, 20 /* snapshotSize */);
+runMainTests(1000, 99 /* batchSize */, 19 /* snapshotSize */);
+
+// Pass in start/end parameters with full range.
+runMainTests(10, defaultMaxDocsPerBatch, defaultSnapshotSize, 0, 9);
+// Test a specific range.
+runMainTests(10, defaultMaxDocsPerBatch, defaultSnapshotSize, 2, 8);
+// Start < first doc (a: 0)
+runMainTests(10, defaultMaxDocsPerBatch, defaultSnapshotSize, -1, 8);
+// End > last doc (a: 9)
+runMainTests(10, defaultMaxDocsPerBatch, defaultSnapshotSize, 3, 10);
+
+// Test with start/end parameters and multiple batches/snapshots
+runMainTests(1000, 99 /* batchSize */, 98 /* snapshotSize*/, 99, 901);
+runMainTests(1000, defaultMaxDocsPerBatch, 19 /* snapshotSize */, -1, 301);
+runMainTests(1000, 99 /* batchSize */, 20 /* snapshotSize */, 699, 1000);
 
 // TODO SERVER-79849 Add testing for:
 // * Reached bytes per batch ends batch.

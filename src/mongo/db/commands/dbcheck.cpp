@@ -668,9 +668,16 @@ private:
         const auto ordering = iam->getSortedDataInterface()->getOrdering();
         const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
 
-        key_string::Builder firstKeyString(
-            version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
-        return firstKeyString.getValueCopy();
+        if (SimpleBSONObjComparator::kInstance.evaluate(BSONObj::stripFieldNames(info.start) ==
+                                                        kMinBSONKey)) {
+            key_string::Builder firstKeyString(
+                version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
+            return firstKeyString.getValueCopy();
+        } else {
+            key_string::Builder firstKeyString(version);
+            firstKeyString.resetToKey(info.start, ordering);
+            return firstKeyString.getValueCopy();
+        }
     }
 
     void _extraIndexKeysCheck(OperationContext* opCtx, const DbCheckCollectionInfo& info) {
@@ -1091,12 +1098,9 @@ private:
         std::unique_ptr<SortedDataInterface::Cursor> indexCursor =
             iam->newCursor(opCtx, true /* forward */);
 
-        // TODO SERVER-80158: Handle when user specifies a maxKey for extra index key check.
-
-        // Creates a key greater than all other keys to set as the index cursor's end position.
-        BSONObjBuilder builder;
-        builder.appendMaxKey("");
-        auto maxKey = Helpers::toKeyFormat(builder.obj());
+        // Set the index cursor's end position based on the inputted end parameter for when to stop
+        // the dbcheck command.
+        auto maxKey = Helpers::toKeyFormat(info.end);
         indexCursor->setEndPosition(maxKey, true /*inclusive*/);
         int64_t numKeys = 0;
         int64_t numBytes = 0;
