@@ -22,6 +22,93 @@ __background_compact_server_run_chk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __background_compact_exclude_list_add --
+ *     Add the entry to the exclude hash table.
+ */
+static int
+__background_compact_exclude_list_add(WT_SESSION_IMPL *session, const char *name, size_t len)
+{
+    WT_BACKGROUND_COMPACT_EXCLUDE *new_entry;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    uint64_t bucket, hash;
+
+    conn = S2C(session);
+
+    /* Early exit if this allocation fails. */
+    WT_RET(__wt_calloc_one(session, &new_entry));
+    WT_ERR(__wt_strndup(session, name, len, &new_entry->name));
+
+    hash = __wt_hash_city64(name, len);
+    bucket = hash & (conn->hash_size - 1);
+    /* Insert entry into hash table. */
+    TAILQ_INSERT_HEAD(&conn->background_compact.exclude_list_hash[bucket], new_entry, hashq);
+
+    if (ret != 0) {
+err:
+        __wt_free(session, new_entry->name);
+        __wt_free(session, new_entry);
+    }
+
+    return (ret);
+}
+
+/*
+ * __background_compact_exclude_list_clear --
+ *     Clear the list of entries excluded from compaction.
+ */
+static void
+__background_compact_exclude_list_clear(WT_SESSION_IMPL *session, bool closing)
+{
+    WT_BACKGROUND_COMPACT_EXCLUDE *entry;
+    WT_CONNECTION_IMPL *conn;
+    uint64_t i;
+
+    conn = S2C(session);
+
+    for (i = 0; i < conn->hash_size; ++i) {
+        while (!TAILQ_EMPTY(&conn->background_compact.exclude_list_hash[i])) {
+            entry = TAILQ_FIRST(&conn->background_compact.exclude_list_hash[i]);
+            /* Remove entry from the hash table. */
+            TAILQ_REMOVE(&conn->background_compact.exclude_list_hash[i], entry, hashq);
+            __wt_free(session, entry->name);
+            __wt_free(session, entry);
+        }
+    }
+
+    if (closing)
+        __wt_free(session, conn->background_compact.exclude_list_hash);
+}
+
+/*
+ * __background_compact_exclude --
+ *     Search if the given URI is part of the excluded entries.
+ */
+static bool
+__background_compact_exclude(WT_SESSION_IMPL *session, const char *uri)
+{
+    WT_BACKGROUND_COMPACT_EXCLUDE *entry;
+    WT_CONNECTION_IMPL *conn;
+    uint64_t bucket, hash;
+    bool found;
+
+    conn = S2C(session);
+    found = false;
+
+    WT_PREFIX_SKIP_REQUIRED(session, uri, "file:");
+    hash = __wt_hash_city64(uri, strlen(uri));
+    bucket = hash & (conn->hash_size - 1);
+
+    TAILQ_FOREACH (entry, &conn->background_compact.exclude_list_hash[bucket], hashq) {
+        if (strcmp(uri, entry->name) == 0) {
+            found = true;
+            break;
+        }
+    }
+    return (found);
+}
+
+/*
  * __background_compact_list_insert --
  *     Insert compaction statistics for a file into the background compact list.
  */
@@ -114,6 +201,12 @@ __background_compact_should_run(WT_SESSION_IMPL *session, const char *uri, int64
     uint64_t cur_time;
 
     conn = S2C(session);
+
+    /* Check if the file is excluded. */
+    if (__background_compact_exclude(session, uri)) {
+        WT_STAT_CONN_INCR(session, background_compact_exclude);
+        return (false);
+    }
 
     /* If we haven't seen this file before we should try and compact it. */
     compact_stat = __background_compact_get_stat(session, uri, id);
@@ -466,6 +559,7 @@ __background_compact_server(void *arg)
     WT_STAT_CONN_SET(session, background_compact_running, 0);
 
 err:
+    __background_compact_exclude_list_clear(session, true);
     __background_compact_list_cleanup(session, BACKGROUND_CLEANUP_ALL_STAT);
 
     __wt_free(session, conn->background_compact.config);
@@ -498,8 +592,11 @@ __wt_background_compact_server_create(WT_SESSION_IMPL *session)
     FLD_SET(conn->server_flags, WT_CONN_SERVER_COMPACT);
 
     WT_RET(__wt_calloc_def(session, conn->hash_size, &conn->background_compact.stat_hash));
-    for (i = 0; i < conn->hash_size; i++)
+    WT_RET(__wt_calloc_def(session, conn->hash_size, &conn->background_compact.exclude_list_hash));
+    for (i = 0; i < conn->hash_size; i++) {
         TAILQ_INIT(&conn->background_compact.stat_hash[i]);
+        TAILQ_INIT(&conn->background_compact.exclude_list_hash[i]);
+    }
 
     /*
      * Compaction does enough I/O it may be called upon to perform slow operations for the block
@@ -557,7 +654,8 @@ __wt_background_compact_server_destroy(WT_SESSION_IMPL *session)
 int
 __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
 {
-    WT_CONFIG_ITEM cval;
+    WT_CONFIG exclude_config;
+    WT_CONFIG_ITEM cval, k, v;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const char *cfg[3] = {NULL, NULL, NULL}, *stripped_config;
@@ -592,13 +690,39 @@ __wt_background_compact_signal(WT_SESSION_IMPL *session, const char *config)
          */
         WT_ERR_MSG(
           session, EINVAL, "Background compaction is already %s", running ? "enabled" : "disabled");
-    conn->background_compact.running = !running;
 
-    /* Strip the background field from the configuration now it has been parsed. */
-    WT_ERR(__wt_config_merge(session, cfg, "background=", &stripped_config));
+    /* Update the excluded tables when the server is turned on. */
+    if (cval.val) {
+        __background_compact_exclude_list_clear(session, false);
+        WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "exclude", &cval), false);
+        if (cval.len != 0) {
+            /*
+             * Check that the configuration string only has table schema formats in the target list
+             * and construct the target hash table.
+             */
+            __wt_config_subinit(session, &exclude_config, &cval);
+            while ((ret = __wt_config_next(&exclude_config, &k, &v)) == 0) {
+                if (!WT_PREFIX_MATCH(k.str, "table:"))
+                    WT_ERR_MSG(session, EINVAL,
+                      "Background compaction can only exclude objects of type \"table\" formats in "
+                      "the exclude uri list, found %.*s instead.",
+                      (int)k.len, k.str);
+
+                WT_PREFIX_SKIP_REQUIRED(session, k.str, "table:");
+                WT_ERR(__background_compact_exclude_list_add(
+                  session, (char *)k.str, k.len - strlen("table:")));
+            }
+            WT_ERR_NOTFOUND_OK(ret, false);
+        }
+    }
+
+    /* Strip the unused fields from the configuration now it has been parsed. */
+    WT_ERR(__wt_config_merge(session, cfg, "background=,exclude=", &stripped_config));
+
+    /* The background compaction has been signalled successfully, update its state. */
+    conn->background_compact.running = !running;
     __wt_free(session, conn->background_compact.config);
     conn->background_compact.config = stripped_config;
-
     conn->background_compact.signalled = true;
 
 err:

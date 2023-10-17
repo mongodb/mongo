@@ -68,6 +68,16 @@ struct __wt_background_compact_stat {
 };
 
 /*
+ * WT_BACKGROUND_COMPACT_EXCLUDE --
+ *	An entry indicating this file should be excluded from background compaction.
+ */
+struct __wt_background_compact_exclude {
+    const char *name; /* File name */
+
+    TAILQ_ENTRY(__wt_background_compact_exclude) hashq; /* internal hash queue */
+};
+
+/*
  * WT_BACKGROUND_COMPACT --
  *	Structure dedicated to the background compaction server
  */
@@ -92,6 +102,9 @@ struct __wt_background_compact {
 
     /* List of files to track compaction statistics across background server iterations. */
     TAILQ_HEAD(__wt_background_compactstathash, __wt_background_compact_stat) * stat_hash;
+    /* List of files excluded from background compaction. */
+    TAILQ_HEAD(__wt_background_compactexcludelisthash, __wt_background_compact_exclude) *
+      exclude_list_hash;
 };
 
 /*

@@ -1388,6 +1388,12 @@ methods = {
     Config('background', '', r'''
         enable/disabled the background compaction server.''',
         type='boolean'),
+    Config('exclude', '', r'''
+        A list of table objects to be excluded from background compaction. The list is immutable and
+        only applied when the background compaction gets enabled. The list is not saved between the
+        calls and needs to be reapplied each time the service is enabled. The individual objects in
+        the list can only be of the \c table: URI type''',
+        type='list'),
     Config('free_space_target', '20MB', r'''
         minimum amount of space recoverable for compaction to proceed''',
         min='1MB'),

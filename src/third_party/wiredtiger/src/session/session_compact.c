@@ -407,18 +407,22 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
          * compaction server.
          */
         if (!cval.val) {
-            WT_ERR_NOTFOUND_OK(__wt_config_getones(session, config, "timeout", &cval), true);
-            if (ret == 0)
-                WT_ERR_MSG(session, EINVAL,
-                  "timeout configuration cannot be set when disabling the background compaction "
-                  "server.");
-
             WT_ERR_NOTFOUND_OK(
               __wt_config_getones(session, config, "free_space_target", &cval), true);
             if (ret == 0)
                 WT_ERR_MSG(session, EINVAL,
                   "free_space_target configuration cannot be set when disabling the background "
                   "compaction server.");
+            WT_ERR_NOTFOUND_OK(__wt_config_getones(session, config, "exclude", &cval), true);
+            if (ret == 0)
+                WT_ERR_MSG(session, EINVAL,
+                  "exclude configuration cannot be set when disabling the background compaction "
+                  "server.");
+            WT_ERR_NOTFOUND_OK(__wt_config_getones(session, config, "timeout", &cval), true);
+            if (ret == 0)
+                WT_ERR_MSG(session, EINVAL,
+                  "timeout configuration cannot be set when disabling the background compaction "
+                  "server.");
         }
 
         WT_ERR(__wt_background_compact_signal(session, config));
