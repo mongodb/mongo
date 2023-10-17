@@ -2666,8 +2666,6 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
                 if (swResult.isOK()) {
                     auto& insertResult = swResult.getValue();
 
-                    // If the InsertResult doesn't contain a batch, we failed to insert the
-                    // measurement into an open bucket and need to create/reopen a bucket.
                     if (auto* reopeningContext =
                             stdx::get_if<timeseries::bucket_catalog::ReopeningContext>(
                                 &insertResult)) {

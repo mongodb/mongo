@@ -640,7 +640,6 @@ TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
                          _getTimeseriesOptions(_ns1),
                          BSON(_timeField << Date_t::now()),
                          CombineWithInsertsFromOtherClients::kAllow);
-
     auto& batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT_BSONOBJ_EQ(BSONObj(), getMetadata(*_bucketCatalog, batch->bucketHandle));
 
@@ -1011,6 +1010,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           BSON(_timeField << Date_t::now()),
                           CombineWithInsertsFromOtherClients::kDisallow);
     auto batch2 = stdx::get<SuccessfulInsertion>(result2.getValue()).batch;
+
     auto result3 = insert(_makeOperationContext().second.get(),
                           *_bucketCatalog,
                           _ns1,
@@ -1019,6 +1019,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                           BSON(_timeField << Date_t::now()),
                           CombineWithInsertsFromOtherClients::kDisallow);
     auto batch3 = stdx::get<SuccessfulInsertion>(result3.getValue()).batch;
+
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch3->bucketHandle.bucketId);
 
@@ -1348,13 +1349,12 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement
                          ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},
                                                      "a":-100,"b":100})"),
                          CombineWithInsertsFromOtherClients::kAllow);
-    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
 
     // No buckets are closed.
     ASSERT(stdx::get<SuccessfulInsertion>(result.getValue()).closedBuckets.empty());
     ASSERT_EQ(0, _getExecutionStat(_ns1, kNumSchemaChanges));
 
-    batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
+    auto batch = stdx::get<SuccessfulInsertion>(result.getValue()).batch;
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
     ASSERT_EQ(batch->measurements.size(), 1);
