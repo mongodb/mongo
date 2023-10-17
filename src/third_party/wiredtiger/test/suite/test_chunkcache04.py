@@ -58,7 +58,7 @@ class test_chunkcache4(wttest.WiredTigerTestCase):
             os.mkdir('bucket2')
 
         return 'tiered_storage=(auth_token=Secret,bucket=bucket2,bucket_prefix=pfx_,name=dir_store),' \
-            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=20GB,pinned=' \
+            'chunk_cache=[enabled=true,chunk_size=512KB,capacity=1GB,pinned=' \
                 + '("' + '{}'.format("\",\"".join(self.pinned_uris)) \
                 + '"),type={},storage_path=WiredTigerChunkCache]'.format(self.chunk_cache_type)
 
