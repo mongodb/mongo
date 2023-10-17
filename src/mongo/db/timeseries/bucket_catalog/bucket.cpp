@@ -124,7 +124,7 @@ std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
         it = bucket.batches
                  .try_emplace(opId,
                               std::make_shared<WriteBatch>(
-                                  BucketHandle{bucket.bucketId, stripe}, opId, stats))
+                                  BucketHandle{bucket.bucketId, stripe}, bucket.key, opId, stats))
                  .first;
     }
     return it->second;

@@ -75,6 +75,12 @@ enum class IgnoreBucketState { kYes, kNo };
 enum class BucketPrepareAction { kPrepare, kUnprepare };
 
 /**
+ * Mode enum to control whether getReopeningCandidate() will allow query-based
+ * reopening of buckets when attempting to accommodate a new measurement.
+ */
+enum class AllowQueryBasedReopening { kAllow, kDisallow };
+
+/**
  * Maps bucket key to the stripe that is responsible for it.
  */
 StripeNumber getStripeNumber(const BucketKey& key);
@@ -143,6 +149,7 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
     const StringData::ComparatorInterface* comparator,
     const TimeseriesOptions& options,
     const BucketToReopen& bucketToReopen,
+    uint64_t catalogEra,
     const BucketKey* expectedKey);
 
 /**
@@ -200,7 +207,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,
                                 AllowBucketCreation mode,
-                                BucketFindResult bucketFindResult = {});
+                                ReopeningContext* reopeningContext = nullptr);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'
@@ -226,7 +233,7 @@ void archiveBucket(BucketCatalog& catalog,
                    ClosedBuckets& closedBuckets);
 
 /**
- * Identifies a previously archived bucket that may be able to accomodate the measurement
+ * Identifies a previously archived bucket that may be able to accommodate the measurement
  * represented by 'info', if one exists.
  */
 boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
@@ -235,16 +242,17 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                                            const CreationInfo& info);
 
 /**
- * Identifies a previously archived bucket that may be able to accomodate the measurement
- * represented by 'info', if one exists.
+ * Identifies a previously archived bucket that may be able to accommodate the measurement
+ * represented by 'info', if one exists. Otherwise returns a pipeline to use for query-based
+ * reopening if allowed.
  */
-stdx::variant<std::monostate, OID, std::vector<BSONObj>> getReopeningCandidate(
-    OperationContext* opCtx,
-    BucketCatalog& catalog,
-    Stripe& stripe,
-    WithLock stripeLock,
-    const CreationInfo& info,
-    bool allowQueryBasedReopening);
+ReopeningContext getReopeningContext(OperationContext* opCtx,
+                                     BucketCatalog& catalog,
+                                     Stripe& stripe,
+                                     WithLock stripeLock,
+                                     const CreationInfo& info,
+                                     uint64_t catalogEra,
+                                     AllowQueryBasedReopening allowQueryBasedReopening);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
@@ -320,7 +328,7 @@ Bucket& rollover(BucketCatalog& catalog,
                  RolloverAction action);
 
 /**
- * Determines if 'bucket' needs to be rolled over to accomodate 'doc'. If so, determines whether
+ * Determines if 'bucket' needs to be rolled over to accommodate 'doc'. If so, determines whether
  * to archive or close 'bucket'.
  */
 std::pair<RolloverAction, RolloverReason> determineRolloverAction(
