@@ -555,7 +555,7 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
         } else {
             key_string::HeapBuilder requestedKeyString(
                 getSortedDataInterface()->getKeyStringVersion(),
-                BSONObj::stripFieldNames(requestedKey),
+                requestedKey,
                 getSortedDataInterface()->getOrdering());
             return requestedKeyString.release();
         }

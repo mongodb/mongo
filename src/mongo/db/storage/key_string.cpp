@@ -646,7 +646,6 @@ void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
     BSONObjIterator it(obj);
     while (auto elem = it.next()) {
         appendBSONElement(elem);
-        dassert(elem.fieldNameSize() < 3);  // fieldNameSize includes the NUL
     }
     appendDiscriminator(discriminator);
 }

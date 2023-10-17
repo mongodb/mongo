@@ -567,11 +567,18 @@ public:
     explicit BuilderBase(Version version)
         : BuilderBase(version, ALL_ASCENDING, Discriminator::kInclusive) {}
 
+    /**
+     * Constructs a builder given an object and ordering, stripping out top-level field names.
+     * Appends the given record id to the end.
+     */
     BuilderBase(Version version, const BSONObj& obj, Ordering ord, const RecordId& recordId)
         : BuilderBase(version, ord) {
         resetToKey(obj, ord, recordId);
     }
 
+    /**
+     * Constructs a builder given an object and ordering, stripping out top-level field names.
+     */
     BuilderBase(Version version,
                 const BSONObj& obj,
                 Ordering ord,
@@ -618,8 +625,9 @@ public:
     void appendRecordId(const RecordId& loc);
     void appendTypeBits(const TypeBits& bits);
 
-    /*
-     * Function 'f' will be applied to all string elements contained in 'elem'.
+    /**
+     * Appends the given element, discarding the field name. The transformation function will be
+     * applied to all string values contained in the given element.
      */
     void appendBSONElement(const BSONElement& elem, const StringTransformFn& f = nullptr);
 
@@ -666,10 +674,19 @@ public:
         _transition(BuildState::kEmpty);
     }
 
+    /**
+     * Resets the state to the given object and ordering, stripping out top-level field names.
+     * Appends the given record id to the end.
+     */
     void resetToKey(const BSONObj& obj, Ordering ord, const RecordId& recordId);
+
+    /**
+     * Resets the state to the given object and ordering, stripping out top-level field names.
+     */
     void resetToKey(const BSONObj& obj,
                     Ordering ord,
                     Discriminator discriminator = Discriminator::kInclusive);
+
     void resetFromBuffer(const void* buffer, size_t size) {
         _buffer().reset();
         memcpy(_buffer().skip(size), buffer, size);
@@ -726,6 +743,9 @@ public:
     const Version version;
 
 protected:
+    /**
+     * Appends all elements in the given object, stripping out top-level field names.
+     */
     void _appendAllElementsForIndexing(const BSONObj& obj, Discriminator discriminator);
 
     void _appendBool(bool val, bool invert);
