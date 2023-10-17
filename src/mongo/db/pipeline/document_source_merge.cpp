@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -60,6 +59,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/namespace_string_util.h"
@@ -317,37 +317,22 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
 }
 
 StageConstraints DocumentSourceMerge::constraints(Pipeline::SplitState pipeState) const {
-    // A $merge to an unsharded collection should merge on the primary shard to perform local
-    // writes. A $merge to a sharded collection has no requirement, since each shard can perform its
-    // own portion of the write. We use 'kAnyShard' to direct it to execute on one of the shards in
-    // case some of the writes happen to end up being local.
-    //
-    // Note that this decision is inherently racy and subject to become stale. This is okay because
-    // either choice will work correctly, we are simply applying a heuristic optimization.
-    return {StreamType::kStreaming,
-            PositionRequirement::kLast,
-            pExpCtx->inMongos &&
-                    pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, getOutputNs())
-                ? HostTypeRequirement::kAnyShard
-                : HostTypeRequirement::kPrimaryShard,
-            DiskUseRequirement::kWritesPersistentData,
-            FacetRequirement::kNotAllowed,
-            TransactionRequirement::kNotAllowed,
-            LookupRequirement::kNotAllowed,
-            UnionRequirement::kNotAllowed};
+    StageConstraints result{StreamType::kStreaming,
+                            PositionRequirement::kLast,
+                            HostTypeRequirement::kNone,
+                            DiskUseRequirement::kWritesPersistentData,
+                            FacetRequirement::kNotAllowed,
+                            TransactionRequirement::kNotAllowed,
+                            LookupRequirement::kNotAllowed,
+                            UnionRequirement::kNotAllowed};
+    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
+        result.mergeShardId = _getMergeShardId();
+    }
+    return result;
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distributedPlanLogic() {
-    // It should always be faster to avoid splitting the pipeline if the output collection is
-    // sharded. If we avoid splitting the pipeline then each shard can perform the writes to the
-    // target collection in parallel.
-    //
-    // Note that this decision is inherently racy and subject to become stale. This is okay because
-    // either choice will work correctly, we are simply applying a heuristic optimization.
-    if (pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, getOutputNs())) {
-        return boost::none;
-    }
-    return DocumentSourceWriter::distributedPlanLogic();
+    return _getMergeShardId() ? DocumentSourceWriter::distributedPlanLogic() : boost::none;
 }
 
 Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
@@ -455,6 +440,24 @@ void DocumentSourceMerge::waitWhileFailPointEnabled() {
                 "Hanging aggregation due to 'hangWhileBuildingDocumentSourceMergeBatch' failpoint");
         },
         getOutputNs());
+}
+
+boost::optional<ShardId> DocumentSourceMerge::_getMergeShardId() const {
+    // If output collection resides on a single shard, we should route $merge to it to perform local
+    // writes. Note that this decision is inherently racy and subject to become stale. This is okay
+    // because either choice will work correctly, we are simply applying a heuristic optimization.
+    auto [cm, _] = uassertStatusOK(Grid::get(pExpCtx->opCtx)
+                                       ->catalogCache()
+                                       ->getCollectionRoutingInfo(pExpCtx->opCtx, getOutputNs()));
+    if (cm.hasRoutingTable()) {
+        if (cm.isUnsplittable()) {
+            return cm.getMinKeyShardIdWithSimpleCollation();
+        } else {
+            return boost::none;
+        }
+    } else {
+        return cm.dbPrimary();
+    }
 }
 
 }  // namespace mongo

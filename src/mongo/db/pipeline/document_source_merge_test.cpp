@@ -69,39 +69,8 @@ const StringData kDefaultWhenMatchedMode =
 const StringData kDefaultWhenNotMatchedMode =
     MergeWhenNotMatchedMode_serializer(MergeWhenNotMatchedModeEnum::kInsert);
 
-/**
- * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
- * setup. For example, to compute its constraints, the $merge stage needs to know if the output
- * collection is sharded.
- */
-class MongoProcessInterfaceForTest : public StubMongoProcessInterface {
-public:
-    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
-        return false;
-    }
-
-    /**
-     * For the purposes of these tests, assume each collection is unsharded and has a document key
-     * of just "_id".
-     */
-    std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
-        OperationContext* opCtx, const NamespaceString& nss) const override {
-        return {"_id"};
-    }
-
-    void checkRoutingInfoEpochOrThrow(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                      const NamespaceString&,
-                                      ChunkVersion) const override {
-        return;  // Assume it always matches for our tests here.
-    }
-};
-
 class DocumentSourceMergeTest : public AggregationContextFixture {
 public:
-    DocumentSourceMergeTest() : AggregationContextFixture() {
-        getExpCtx()->mongoProcessInterface = std::make_shared<MongoProcessInterfaceForTest>();
-    }
-
     intrusive_ptr<DocumentSourceMerge> createMergeStage(BSONObj spec) {
         auto specElem = spec.firstElement();
         intrusive_ptr<DocumentSourceMerge> mergeStage = dynamic_cast<DocumentSourceMerge*>(

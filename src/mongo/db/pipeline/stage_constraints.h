@@ -383,6 +383,9 @@ struct StageConstraints {
     // following merge sort.
     bool preservesOrderAndMetadata = false;
 
+    // If set, merge should be performed on the specified shard.
+    boost::optional<ShardId> mergeShardId = boost::none;
+
     bool operator==(const StageConstraints& other) const {
         return requiredPosition == other.requiredPosition &&
             hostRequirement == other.hostRequirement && diskRequirement == other.diskRequirement &&
@@ -398,7 +401,8 @@ struct StageConstraints {
             canAppearOnlyOnceInPipeline == other.canAppearOnlyOnceInPipeline &&
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
             unionRequirement == other.unionRequirement &&
-            preservesOrderAndMetadata == other.preservesOrderAndMetadata;
+            preservesOrderAndMetadata == other.preservesOrderAndMetadata &&
+            mergeShardId == other.mergeShardId;
     }
 };
 }  // namespace mongo

@@ -426,6 +426,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/executor/task_executor_cursor',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/analyze_shard_key_util',
+        '$BUILD_DIR/mongo/s/grid',
     ],
 )
 
@@ -765,6 +766,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/oplog_entry',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/s/shard_server_test_fixture',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',

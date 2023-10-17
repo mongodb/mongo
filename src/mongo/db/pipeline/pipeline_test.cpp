@@ -77,7 +77,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/unittest/assert.h"
@@ -3699,13 +3699,8 @@ TEST(PipelineOptimizationTest, MergeUnwindPipelineWithSortLimitPipelinePlacesLim
 
 namespace Sharded {
 
-class Base : public ScopedGlobalServiceContextForTest {
+class PipelineOptimizations : public ShardServerTestFixtureWithCatalogCacheMock {
 public:
-    // These all return json arrays of pipeline operators
-    virtual std::string inputPipeJson() = 0;
-    virtual std::string shardPipeJson() = 0;
-    virtual std::string mergePipeJson() = 0;
-
     // Allows tests to override the default resolvedNamespaces.
     virtual NamespaceString getLookupCollNs() {
         return NamespaceString::createNamespaceString_forTest("a", "lookupColl");
@@ -3714,10 +3709,11 @@ public:
     BSONObj pipelineFromJsonArray(const std::string& array) {
         return fromjson("{pipeline: " + array + "}");
     }
-    virtual void run() {
-        const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson());
-        const BSONObj shardPipeExpected = pipelineFromJsonArray(shardPipeJson());
-        const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson());
+
+    void doTest(std::string inputPipeJson, std::string shardPipeJson, std::string mergePipeJson) {
+        const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson);
+        const BSONObj shardPipeExpected = pipelineFromJsonArray(shardPipeJson);
+        const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson);
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
         std::vector<BSONObj> rawPipeline;
@@ -3751,158 +3747,109 @@ public:
         mergePipe = std::move(splitPipeline.mergePipeline);
     }
 
-    virtual ~Base() {}
-
     virtual boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(
         const AggregateCommandRequest& request) {
-        return new ExpressionContextForTest(_opCtx.get(), request);
+        return new ExpressionContextForTest(operationContext(), request);
     }
 
 protected:
     std::unique_ptr<Pipeline, PipelineDeleter> mergePipe;
     std::unique_ptr<Pipeline, PipelineDeleter> shardPipe;
-
-private:
-    ThreadClient _threadClient{getServiceContext()->getService()};
-    ServiceContext::UniqueOperationContext _opCtx{_threadClient->makeOperationContext()};
 };
 
-// General test to make sure all optimizations support empty pipelines
-class Empty : public Base {
-    std::string inputPipeJson() {
-        return "[]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[]";
-    }
-};
+TEST_F(PipelineOptimizations, Empty) {
+    doTest("[]" /*inputPipeJson*/, "[]" /*shardPipeJson*/, "[]" /*mergePipeJson*/);
+}
+
 
 // Since each shard has an identical copy of config.cache.chunks.* namespaces, $lookup from
 // config.cache.chunks.* should run on each shard in parallel.
-namespace lookupFromShardsInParallel {
-class LookupWithDBAndColl : public Base {
-    std::string inputPipeJson() {
-        return "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
-               "localField: 'x', foreignField: '_id'}}]";
-    }
-    std::string shardPipeJson() {
-        return inputPipeJson();
-    }
-
-    std::string mergePipeJson() {
-        return "[]";
-    }
-
+class PipelineOptimizationsLookupFromShardsInParallel : public PipelineOptimizations {
+public:
     NamespaceString getLookupCollNs() override {
-        return NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo");
+        return _fromLookupColl;
     }
+
+    void doTest(std::string inputPipeJson,
+                std::string shardPipeJson,
+                NamespaceString fromLookupColl) {
+        _fromLookupColl = fromLookupColl;
+        PipelineOptimizations::doTest(inputPipeJson, shardPipeJson, "[]");
+    }
+
+private:
+    NamespaceString _fromLookupColl;
 };
 
-class LookupWithLetWithDBAndColl : public Base {
-    std::string inputPipeJson() {
-        return "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
-               "let: {x_field: '$x'}, pipeline: []}}]";
-    }
-    std::string shardPipeJson() {
-        return inputPipeJson();
-    }
-
-    std::string mergePipeJson() {
-        return "[]";
-    }
-
-    NamespaceString getLookupCollNs() override {
-        return NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo");
-    }
+TEST_F(PipelineOptimizationsLookupFromShardsInParallel, LookupWithDBAndColl) {
+    static const std::string kInputPipeJson =
+        "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
+        "localField: 'x', foreignField: '_id'}}]";
+    doTest(kInputPipeJson,
+           kInputPipeJson /*shardPipeJson*/,
+           NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo"));
 };
 
-class CollectionCloningPipeline : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {$expr: {$gte: ['$_id', {$literal: 1}]}}}"
-               ",{$sort: {_id: 1}}"
-               ",{$replaceWith: {original: '$$ROOT'}}"
-               ",{$lookup: {from: {db: 'config', coll: 'cache.chunks.test'},"
-               "pipeline: [], as: 'intersectingChunk'}}"
-               ",{$match: {intersectingChunk: {$ne: []}}}"
-               ",{$replaceWith: '$original'}"
-               "]";
-    }
-
-    std::string shardPipeJson() {
-        return "[{$match: {$and: [{_id: {$_internalExprGte: 1}}, {$expr: {$gte: ['$_id', "
-               "{$const: 1}]}}]}}"
-               ", {$sort: {sortKey: {_id: 1}}}"
-               ", {$replaceRoot: {newRoot: {original: '$$ROOT'}}}"
-               ", {$lookup: {from: {db: 'config', coll: 'cache.chunks.test'}, as: "
-               "'intersectingChunk', let: {}, pipeline: []}}"
-               ", {$match: {intersectingChunk: {$not: {$eq: []}}}}"
-               ", {$replaceRoot: {newRoot: '$original'}}"
-               "]";
-    }
-
-    std::string mergePipeJson() {
-        return "[]";
-    }
-
-    NamespaceString getLookupCollNs() override {
-        return NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test");
-    }
+TEST_F(PipelineOptimizationsLookupFromShardsInParallel, LookupWithLetWithDBAndColl) {
+    static const std::string kInputPipeJson =
+        "[{$lookup: {from: {db: 'config', coll: 'cache.chunks.test.foo'}, as: 'results', "
+        "let: {x_field: '$x'}, pipeline: []}}]";
+    doTest(kInputPipeJson,
+           kInputPipeJson /*shardPipeJson*/,
+           NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test.foo"));
 };
 
-}  // namespace lookupFromShardsInParallel
+TEST_F(PipelineOptimizationsLookupFromShardsInParallel, CollectionCloningPipeline) {
+    static const std::string kInputPipeJson =
+        "[{$match: {$expr: {$gte: ['$_id', {$literal: 1}]}}}"
+        ",{$sort: {_id: 1}}"
+        ",{$replaceWith: {original: '$$ROOT'}}"
+        ",{$lookup: {from: {db: 'config', coll: 'cache.chunks.test'},"
+        "pipeline: [], as: 'intersectingChunk'}}"
+        ",{$match: {intersectingChunk: {$ne: []}}}"
+        ",{$replaceWith: '$original'}"
+        "]";
+    static const std::string kShardPipeJson =
+        "[{$match: {$and: [{_id: {$_internalExprGte: 1}}, {$expr: {$gte: ['$_id', "
+        "{$const: 1}]}}]}}"
+        ", {$sort: {sortKey: {_id: 1}}}"
+        ", {$replaceRoot: {newRoot: {original: '$$ROOT'}}}"
+        ", {$lookup: {from: {db: 'config', coll: 'cache.chunks.test'}, as: "
+        "'intersectingChunk', let: {}, pipeline: []}}"
+        ", {$match: {intersectingChunk: {$not: {$eq: []}}}}"
+        ", {$replaceRoot: {newRoot: '$original'}}"
+        "]";
+    doTest(kInputPipeJson,
+           kShardPipeJson,
+           NamespaceString::createNamespaceString_forTest("config", "cache.chunks.test"));
+};
 
 namespace moveFinalUnwindFromShardsToMerger {
 
-class OneUnwind : public Base {
-    std::string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}]}";
-    }
-    std::string shardPipeJson() {
-        return "[]}";
-    }
-    std::string mergePipeJson() {
-        return "[{$unwind: {path: '$a'}}]}";
-    }
+TEST_F(PipelineOptimizations, MoveFinalUnwindFromShardsToMerger) {
+    doTest("[{$unwind: {path: '$a'}}]" /*inputPipeJson*/,
+           "[]" /*shardPipeJson*/,
+           "[{$unwind: {path: '$a'}}]" /*mergePipeJson*/);
 };
 
-class TwoUnwind : public Base {
-    std::string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]}";
-    }
-    std::string shardPipeJson() {
-        return "[]}";
-    }
-    std::string mergePipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]}";
-    }
+TEST_F(PipelineOptimizations, MoveFinalUnwindTwoFromShardsToMerger) {
+    doTest("[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]" /*inputPipeJson*/,
+           "[]" /*shardPipeJson*/,
+           "[{$unwind: {path: '$a'}}, {$unwind: {path: '$b'}}]" /*mergePipeJson*/);
 };
 
-class UnwindNotFinal : public Base {
-    std::string inputPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$match: {a:1}}]}";
-    }
-    std::string shardPipeJson() {
-        return "[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]}";
-    }
-    std::string mergePipeJson() {
-        return "[]}";
-    }
+TEST_F(PipelineOptimizations, DontMoveNonFinalUnwindTwoFromShardsToMerger) {
+    doTest("[{$unwind: {path: '$a'}}, {$match: {a:1}}]" /*inputPipeJson*/,
+           "[{$unwind: {path: '$a'}}, {$match: {a:{$eq:1}}}]" /*shardPipeJson*/,
+           "[]" /*mergePipeJson*/);
 };
 
-class UnwindWithOther : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {a:1}}, {$unwind: {path: '$a'}}]}";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {a:{$eq:1}}}]}";
-    }
-    std::string mergePipeJson() {
-        return "[{$unwind: {path: '$a'}}]}";
-    }
+TEST_F(PipelineOptimizations, MoveFinalUnwindWithOtherShardsToMerger) {
+    doTest("[{$match: {a:1}}, {$unwind: {path: '$a'}}]" /*inputPipeJson*/,
+           "[{$match: {a: {$eq: 1}}}]" /*shardPipeJson*/,
+           "[{$unwind: {path: '$a'}}]" /*mergePipeJson*/);
 };
+
 }  // namespace moveFinalUnwindFromShardsToMerger
 
 namespace propagateDocLimitToShards {
@@ -3914,32 +3861,21 @@ namespace propagateDocLimitToShards {
  * documents than necessary. See the comment for propagateDocLimitToShard in
  * sharded_agg_helpers.cpp and the explanation in SERVER-36881.
  */
-class MatchWithSkipAndLimit : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}, {$limit: 15}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$skip: 10}, {$limit: 5}]";
-    }
+
+TEST_F(PipelineOptimizations, MatchWithSkipAndLimit) {
+    doTest("[{$match: {x: 4}}, {$skip: 10}, {$limit: 5}]" /*inputPipeJson*/,
+           "[{$match: {x: {$eq: 4}}}, {$limit: 15}]" /*shardPipeJson*/,
+           "[{$skip: 10}, {$limit: 5}]" /*mergePipeJson*/);
 };
 
 /**
  * When computing an upper bound on how many documents we need from each shard, make sure to count
  * all $skip stages in any pipeline that has more than one.
  */
-class MatchWithMultipleSkipsAndLimit : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {x: 4}}, {$skip: 7}, {$skip: 3}, {$limit: 5}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}, {$limit: 15}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$skip: 10}, {$limit: 5}]";
-    }
+TEST_F(PipelineOptimizations, MatchWithMultipleSkipsAndLimit) {
+    doTest("[{$match: {x: 4}}, {$skip: 7}, {$skip: 3}, {$limit: 5}]" /*inputPipeJson*/,
+           "[{$match: {x: {$eq: 4}}}, {$limit: 15}]" /*shardPipeJson*/,
+           "[{$skip: 10}, {$limit: 5}]" /*mergePipeJson*/);
 };
 
 /**
@@ -3947,33 +3883,20 @@ class MatchWithMultipleSkipsAndLimit : public Base {
  * pipelines. Make sure that the propagateDocLimitToShards() optimization does not add another
  * $limit to the shard pipeline.
  */
-class MatchWithLimitAndSkip : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {x: 4}}, {$limit: 10}, {$skip: 5}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}, {$limit: 10}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit: 10}, {$skip: 5}]";
-    }
+TEST_F(PipelineOptimizations, MatchWithLimitAndSkip) {
+    doTest("[{$match: {x: 4}}, {$limit: 10}, {$skip: 5}]" /*inputPipeJson*/,
+           "[{$match: {x: {$eq: 4}}}, {$limit: 10}]" /*shardPipeJson*/,
+           "[{$limit: 10}, {$skip: 5}]" /*mergePipeJson*/);
 };
-
 
 /**
  * The addition of an $addFields stage between the $skip and $limit stages does not prevent us from
  * propagating the limit to the shards.
  */
-class MatchWithSkipAddFieldsAndLimit : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {x: 4}}, {$skip: 10}, {$addFields: {y: 1}}, {$limit: 5}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}, {$limit: 15}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$skip: 10}, {$addFields: {y: {$const: 1}}}, {$limit: 5}]";
-    }
+TEST_F(PipelineOptimizations, MatchWithSkipAddFieldsAndLimit) {
+    doTest("[{$match: {x: 4}}, {$skip: 10}, {$addFields: {y: 1}}, {$limit: 5}]" /*inputPipeJson*/,
+           "[{$match: {x: {$eq: 4}}}, {$limit: 15}]" /*shardPipeJson*/,
+           "[{$skip: 10}, {$addFields: {y: {$const: 1}}}, {$limit: 5}]" /*mergePipeJson*/);
 };
 
 /**
@@ -3981,16 +3904,10 @@ class MatchWithSkipAddFieldsAndLimit : public Base {
  * propagating the limit to the shards. The merger will need to see all the documents from each
  * shard before it can apply the $limit.
  */
-class MatchWithSkipGroupAndLimit : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]";
-    }
+TEST_F(PipelineOptimizations, MatchWithSkipGroupAndLimit) {
+    doTest("[{$match: {x: 4}}, {$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]" /*inputPipeJson*/,
+           "[{$match: {x: {$eq: 4}}}, {$project: {y: true, _id: false}}]" /*shardPipeJson*/,
+           "[{$skip: 10}, {$group: {_id: '$y'}}, {$limit: 5}]" /*mergePipeJson*/);
 };
 
 /**
@@ -3998,376 +3915,270 @@ class MatchWithSkipGroupAndLimit : public Base {
  * propagating the limit to the shards. We don't know in advance how many documents will pass the
  * filter in the second $match, so we also don't know how many documents we'll need from the shards.
  */
-class MatchWithSkipSecondMatchAndLimit : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {x: 4}}, {$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {x: {$eq: 4}}}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]";
-    }
+TEST_F(PipelineOptimizations, MatchWithSkipSecondMatchAndLimit) {
+    doTest(
+        "[{$match: {x: 4}}, {$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]" /*inputPipeJson*/,
+        "[{$match: {x: {$eq: 4}}}]" /*shardPipeJson*/,
+        "[{$skip: 10}, {$match: {y: {$gt: 10}}}, {$limit: 5}]" /*mergePipeJson*/);
 };
 }  // namespace propagateDocLimitToShards
 
 namespace limitFieldsSentFromShardsToMerger {
 // These tests use $limit to split the pipelines between shards and merger as it is
 // always a split point and neutral in terms of needed fields.
-
-class NeedWholeDoc : public Base {
-    std::string inputPipeJson() {
-        return "[{$limit:1}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$limit:1}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit:1}]";
-    }
+TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNeedWholeDoc) {
+    doTest("[{$limit:1}]" /*inputPipeJson*/,
+           "[{$limit:1}]" /*shardPipeJson*/,
+           "[{$limit:1}]" /*mergePipeJson*/);
 };
 
-class JustNeedsId : public Base {
-    std::string inputPipeJson() {
-        return "[{$limit:1}, {$group: {_id: '$_id'}}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$limit:1}, {$project: {_id:true}}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit:1}, {$group: {_id: '$_id'}}]";
-    }
+TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerJustNeedsId) {
+    doTest("[{$limit:1}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
+           "[{$limit:1}, {$project: {_id:true}}]" /*shardPipeJson*/,
+           "[{$limit:1}, {$group: {_id: '$_id'}}]" /*mergePipeJson*/);
 };
 
-class JustNeedsNonId : public Base {
-    std::string inputPipeJson() {
-        return "[{$limit:1}, {$group: {_id: '$a.b'}}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$limit:1}, {$project: {a: {b: true}, _id: false}}]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit:1}, {$group: {_id: '$a.b'}}]";
-    }
+TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerJustNeedsNonId) {
+    doTest("[{$limit:1}, {$group: {_id: '$a.b'}}]" /*inputPipeJson*/,
+           "[{$limit:1}, {$project: {a: {b: true}, _id: false}}]" /*shardPipeJson*/,
+           "[{$limit:1}, {$group: {_id: '$a.b'}}]" /*mergePipeJson*/);
 };
 
-class NothingNeeded : public Base {
-    std::string inputPipeJson() {
-        return "[{$limit:1}"
-               ",{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$limit:1}"
-               ",{$project: {_id: true}}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit:1}"
-               ",{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}"
-               "]";
-    }
+TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerNothingNeeded) {
+    static const std::string kInputPipeJson =
+        "[{$limit:1},"
+        "{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}]";
+    doTest(kInputPipeJson,
+           "[{$limit:1}, {$project: {_id: true}}]" /*shardPipeJson*/,
+           kInputPipeJson /*mergePipeJson*/);
 };
 
-class ShardAlreadyExhaustive : public Base {
-    // No new project should be added. This test reflects current behavior where the
-    // 'a' field is still sent because it is explicitly asked for, even though it
-    // isn't actually needed. If this changes in the future, this test will need to
-    // change.
-    std::string inputPipeJson() {
-        return "[{$project: {_id:true, a:true}}"
-               ",{$group: {_id: '$_id'}}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$project: {_id:true, a:true}}"
-               ",{$group: {_id: '$_id'}}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}"
-               "]";
-    }
+// No new project should be added. This test reflects current behavior where the
+// 'a' field is still sent because it is explicitly asked for, even though it
+// isn't actually needed. If this changes in the future, this test will need to
+// change.
+TEST_F(PipelineOptimizations, LimitFieldsSentFromShardsToMergerShardAlreadyExhaustive) {
+    static const std::string kInputPipeJson =
+        "[{$project: {_id:true, a:true}},"
+        "{$group: {_id: '$_id'}}]";
+    doTest(kInputPipeJson,
+           kInputPipeJson /*shardPipeJson*/,
+           "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/);
 };
 
-class ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
-    std::string inputPipeJson() {
-        return "[{$sort: {a : 1}}"
-               ",{$match: {a: 1}}"
-               ",{$project : {a: 1}}"
-               ",{$skip : 3}"
-               ",{$limit: 5}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {a: {$eq : 1}}}"
-               ",{$sort: {sortKey: {a: 1}, limit: 8}}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit: 8}"
-               ",{$skip: 3}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
+TEST_F(PipelineOptimizations,
+       LimitFieldsSentFromShardsToMergerShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj) {
+    static const std::string kInputPipeJson =
+        "[{$sort: {a : 1}}"
+        ",{$match: {a: 1}}"
+        ",{$project : {a: 1}}"
+        ",{$skip : 3}"
+        ",{$limit: 5}"
+        "]";
+    static const std::string kShardPipeJson =
+        "[{$match: {a: {$eq : 1}}}"
+        ",{$sort: {sortKey: {a: 1}, limit: 8}}"
+        ",{$project: {_id: true, a: true}}"
+        "]";
+    static const std::string kMergePipeJson =
+        "[{$limit: 8}"
+        ",{$skip: 3}"
+        ",{$project: {_id: true, a: true}}"
+        "]";
+    doTest(kInputPipeJson, kShardPipeJson, kMergePipeJson);
 };
 
-class ShardedMatchProjLimDoesNotBecomeMatchLimProj : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {a: 1}}"
-               ",{$project : {a: 1}}"
-               ",{$limit: 5}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {a: {$eq : 1}}}"
-               ",{$project: {_id: true, a: true}}"
-               ",{$limit: 5}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit: 5}]";
-    }
+TEST_F(PipelineOptimizations,
+       LimitFieldsSentFromShardsToMergerShardedMatchProjLimDoesNotBecomeMatchLimProj) {
+    doTest(
+        "[{$match: {a: 1}}, {$project : {a: 1}}, {$limit: 5}]" /*inputPipeJson*/,
+        "[{$match: {a: {$eq : 1}}},{$project: {_id: true, a: true}},{$limit: 5}]" /*shardPipeJson*/,
+        "[{$limit: 5}]" /*mergePipeJson*/);
 };
 
-class ShardedSortProjLimBecomesTopKSortProj : public Base {
-    std::string inputPipeJson() {
-        return "[{$sort: {a : 1}}"
-               ",{$project : {a: 1}}"
-               ",{$limit: 5}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$sort: {sortKey: {a: 1}, limit: 5}}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit: 5}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
+TEST_F(PipelineOptimizations,
+       LimitFieldsSentFromShardsToMergerShardedSortProjLimBecomesTopKSortProj) {
+    doTest(
+        "[{$sort: {a: 1}}, {$project : {a: 1}}, {$limit: 5}]" /*inputPipeJson*/,
+        "[{$sort: {sortKey:{a: 1}, limit:5}},{$project: {_id: true, a: true}}]" /*shardPipeJson*/,
+        "[{$limit: 5}, {$project: {_id: true, a: true}}]" /*mergePipeJson*/);
 };
 
-class ShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup : public Base {
-    std::string inputPipeJson() {
-        return "[{$sort: {a : 1}}"
-               ",{$group : {_id: {a: '$a'}}}"
-               ",{$project : {a: 1}}"
-               ",{$limit: 5}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$sort: {sortKey: {a: 1}}}"
-               ",{$project : {a: true, _id: false}}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$group : {_id: {a: '$a'}}}"
-               ",{$project: {_id: true, a: true}}"
-               ",{$limit: 5}"
-               "]";
-    }
+TEST_F(PipelineOptimizations,
+       LimitFieldsSentFromShardsToMergerShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup) {
+    doTest(
+        "[{$sort:{a: 1}},{$group:{_id:{a:'$a'}}},{$project:{a: 1}},{$limit:5}]" /*inputPipeJson*/,
+        "[{$sort: {sortKey: {a: 1}}},{$project : {a: true, _id: false}}]" /*shardPipeJson*/,
+        "[{$group: {_id:{a: '$a'}}},{$project:{_id: true, a: true}},{$limit: 5}]" /*mergePipeJson*/);
 };
 
-class ShardedMatchSortProjLimBecomesMatchTopKSortProj : public Base {
-    std::string inputPipeJson() {
-        return "[{$match: {a: {$eq : 1}}}"
-               ",{$sort: {a: -1}}"
-               ",{$project : {a: 1}}"
-               ",{$limit: 6}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[{$match: {a: {$eq : 1}}}"
-               ",{$sort: {sortKey: {a: -1}, limit: 6}}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
-    std::string mergePipeJson() {
-        return "[{$limit: 6}"
-               ",{$project: {_id: true, a: true}}"
-               "]";
-    }
+TEST_F(PipelineOptimizations,
+       LimitFieldsSentFromShardsToMergerShardedMatchSortProjLimBecomesMatchTopKSortProj) {
+    doTest(
+        "[{$match:{a:{$eq: 1}}},{$sort:{a: -1}},{$project:{a: 1}},{$limit: 6}]" /*inputPipeJson*/,
+        "[{$match:{a:{$eq: 1}}},{$sort:{sortKey: {a: -1}, limit: 6}},{$project:{_id: true, a: "
+        "true}}]" /*shardPipeJson*/,
+        "[{$limit: 6},{$project: {_id: true, a: true}}]" /*mergePipeJson*/);
 };
 
 }  // namespace limitFieldsSentFromShardsToMerger
 
 namespace coalesceLookUpAndUnwind {
 
-class ShouldCoalesceUnwindOnAs : public Base {
-    std::string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same'}}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right', unwinding: {preserveNullAndEmptyArrays: false}}}]";
-    }
+TEST_F(PipelineOptimizations, ShouldCoalesceUnwindOnAs) {
+    doTest(
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}},{$unwind: {path: '$same'}}]" /*inputPipeJson*/,
+        "[]" /*shardPipeJson*/,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right', "
+        "unwinding: {preserveNullAndEmptyArrays: false}}}]" /*mergePipeJson*/);
 };
 
-class ShouldCoalesceUnwindOnAsWithPreserveEmpty : public Base {
-    std::string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right', unwinding: {preserveNullAndEmptyArrays: true}}}]";
-    }
+TEST_F(PipelineOptimizations, ShouldCoalesceUnwindOnAsWithPreserveEmpty) {
+    doTest(
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}},{$unwind: {path: '$same', preserveNullAndEmptyArrays: true}}]" /*inputPipeJson*/,
+        "[]" /*shardPipeJson*/,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right', "
+        "unwinding: {preserveNullAndEmptyArrays: true}}}]" /*mergePipeJson*/);
 };
 
-class ShouldCoalesceUnwindOnAsWithIncludeArrayIndex : public Base {
-    std::string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$same', includeArrayIndex: 'index'}}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right', unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: "
-               "'index'}}}]";
-    }
+TEST_F(PipelineOptimizations, ShouldCoalesceUnwindOnAsWithIncludeArrayIndex) {
+    doTest(
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}},{$unwind: {path: '$same', includeArrayIndex: 'index'}}]" /*inputPipeJson*/,
+        "[]" /*shardPipeJson*/,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right', "
+        "unwinding: {preserveNullAndEmptyArrays: false, includeArrayIndex: 'index'}}}]" /*mergePipeJson*/);
 };
 
-class ShouldNotCoalesceUnwindNotOnAs : public Base {
-    std::string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$from'}}"
-               "]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}"
-               ",{$unwind: {path: '$from'}}"
-               "]";
-    }
+TEST_F(PipelineOptimizations, ShouldNotCoalesceUnwindNotOnAs) {
+    doTest(
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}},{$unwind: {path: '$from'}}]" /*inputPipeJson*/,
+        "[]" /*shardPipeJson*/,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}},{$unwind: {path: '$from'}}]" /*mergePipeJson*/);
 };
 
 }  // namespace coalesceLookUpAndUnwind
 
 namespace needsPrimaryShardMerger {
 
-class ShardMergerBase : public Base {
+class PipelineOptimizationsShardMerger : public PipelineOptimizations {
 public:
-    void run() override {
-        Base::run();
-        ASSERT_EQUALS(mergePipe->needsPrimaryShardMerger(), needsPrimaryShardMerger());
+    void setUp() override {
+        PipelineOptimizations::setUp();
+        getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
+            DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, "a"),
+                         _myShardName,
+                         DatabaseVersion{}});
+    }
+
+    void doTest(std::string inputPipeJson,
+                std::string shardPipeJson,
+                std::string mergePipeJson,
+                bool needsPrimaryShardMerger,
+                boost::optional<ShardId> needsSpecificShardMerger = boost::none) {
+        PipelineOptimizations::doTest(
+            std::move(inputPipeJson), std::move(shardPipeJson), std::move(mergePipeJson));
+        ASSERT_EQUALS(mergePipe->needsPrimaryShardMerger(), needsPrimaryShardMerger);
+        ASSERT_EQUALS(mergePipe->needsSpecificShardMerger(), needsSpecificShardMerger);
         ASSERT(!shardPipe->needsPrimaryShardMerger());
     }
-    virtual bool needsPrimaryShardMerger() = 0;
-};
 
-class Out : public ShardMergerBase {
-    bool needsPrimaryShardMerger() {
-        return true;
-    }
-    std::string inputPipeJson() {
-        return "[{$out: 'outColl'}]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$out: {coll: 'outColl', db: 'a'}}]";
-    }
-};
+    void doMergeWithCollectionWithRoutingTableTest(bool unsplittable) {
+        const ChunkRange range = ChunkRange{BSON("_id" << MINKEY), BSON("_id" << MAXKEY)};
+        const UUID uuid = UUID::gen();
+        const OID epoch = OID::gen();
+        const Timestamp timestamp{1, 1};
 
-class MergeWithUnshardedCollection : public ShardMergerBase {
-    bool needsPrimaryShardMerger() {
-        return true;
-    }
-    std::string inputPipeJson() {
-        return "[{$merge: 'outColl'}]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
-               "whenMatched: 'merge', whenNotMatched: 'insert'}}]";
-    }
-};
+        auto rt = RoutingTableHistory::makeNew(
+            NamespaceString::createNamespaceString_forTest("a", "outColl"),
+            uuid,
+            KeyPattern{BSON("_id" << 1)},
+            unsplittable,
+            nullptr /* defaultCollator */,
+            false /* unique */,
+            epoch,
+            Timestamp(1, 1),
+            boost::none /* timeseriesFields */,
+            boost::none /* reshardingFields */,
+            true,
+            {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
 
-class MergeWithShardedCollection : public ShardMergerBase {
-    boost::intrusive_ptr<ExpressionContextForTest> createExpressionContext(
-        const AggregateCommandRequest& request) override {
-        class ProcessInterface : public StubMongoProcessInterface {
-            bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
-                return true;
-            }
-        };
+        getCatalogCacheMock()->setCollectionReturnValue(
+            NamespaceString::createNamespaceString_forTest("a.outColl"),
+            CollectionRoutingInfo{ChunkManager{_myShardName,
+                                               DatabaseVersion{UUID::gen(), timestamp},
+                                               makeStandaloneRoutingTableHistory(std::move(rt)),
+                                               timestamp},
+                                  boost::none});
 
-        auto expCtx = ShardMergerBase::createExpressionContext(request);
-        expCtx->inMongos = true;
-        expCtx->mongoProcessInterface = std::make_shared<ProcessInterface>();
-        return expCtx;
-    }
+        static const std::string kSentPipeJson =
+            "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
+            "whenMatched: 'merge', whenNotMatched: 'insert'}}]";
 
-    bool needsPrimaryShardMerger() {
-        return false;
-    }
-    std::string inputPipeJson() {
-        return "[{$merge: 'outColl'}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
-               "whenMatched: 'merge', whenNotMatched: 'insert'}}]";
-    }
-    std::string mergePipeJson() {
-        return "[]";
+        std::string shardPipeJson = unsplittable ? "[]" : kSentPipeJson;
+        std::string mergePipeJson = unsplittable ? kSentPipeJson : "[]";
+        boost::optional<ShardId> mergeShardId{unsplittable, _myShardName};
+
+        doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
+               std::move(shardPipeJson),
+               std::move(mergePipeJson),
+               false /*needsPrimaryShardMerger*/,
+               mergeShardId);
     }
 };
 
-class Project : public ShardMergerBase {
-    bool needsPrimaryShardMerger() {
-        return false;
-    }
-    std::string inputPipeJson() {
-        return "[{$project: {a : 1}}]";
-    }
-    std::string shardPipeJson() {
-        return "[{$project: {_id: true, a: true}}]";
-    }
-    std::string mergePipeJson() {
-        return "[]";
-    }
+TEST_F(PipelineOptimizationsShardMerger, Out) {
+    doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
+           "[]" /*shardPipeJson*/,
+           "[{$out: {coll: 'outColl', db: 'a'}}]" /*mergePipeJson*/,
+           true /*needsPrimaryShardMerger*/);
 };
 
-class LookUp : public ShardMergerBase {
-    bool needsPrimaryShardMerger() {
-        return true;
-    }
-    std::string inputPipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}]";
-    }
-    std::string shardPipeJson() {
-        return "[]";
-    }
-    std::string mergePipeJson() {
-        return "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
-               "'right'}}]";
-    }
+TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
+    const Timestamp timestamp{1, 1};
+    getCatalogCacheMock()->setCollectionReturnValue(
+        NamespaceString::createNamespaceString_forTest("a.outColl"),
+        CollectionRoutingInfo{
+            ChunkManager{_myShardName,
+                         DatabaseVersion{UUID::gen(), timestamp},
+                         RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
+                         timestamp},
+            boost::none});
+    doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
+           "[]" /*shardPipeJson*/,
+           "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
+           "whenMatched: 'merge', whenNotMatched: 'insert'}}]" /*mergePipeJson*/,
+           false /*needsPrimaryShardMerger*/,
+           _myShardName /*needsSpecificShardMerger*/);
+};
+
+TEST_F(PipelineOptimizationsShardMerger, MergeWithShardedCollection) {
+    doMergeWithCollectionWithRoutingTableTest(false /*unsplittable*/);
+};
+
+TEST_F(PipelineOptimizationsShardMerger, MergeWithUnsplittableCollection) {
+    doMergeWithCollectionWithRoutingTableTest(true /*unsplittable*/);
+};
+
+TEST_F(PipelineOptimizationsShardMerger, Project) {
+    doTest("[{$project: {a : 1}}]" /*inputPipeJson*/,
+           "[{$project: {_id: true, a: true}}]" /*shardPipeJson*/,
+           "[]" /*mergePipeJson*/,
+           false /*needsPrimaryShardMerger*/);
+};
+
+TEST_F(PipelineOptimizationsShardMerger, LookUp) {
+    doTest(
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /*inputPipeJson*/
+        ,
+        "[]" /*shardPipeJson*/,
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /*mergePipeJson*/
+        ,
+        true /*needsPrimaryShardMerger*/);
 };
 
 }  // namespace needsPrimaryShardMerger
@@ -5703,58 +5514,7 @@ TEST_F(InvolvedNamespacesTest, IncludesAllCollectionsWhenResolvingViews) {
     ASSERT(involvedNssSet.find(resolvedNss) != involvedNssSet.end());
     ASSERT(involvedNssSet.find(nssIncludedInResolvedView) != involvedNssSet.end());
     ASSERT(involvedNssSet.find(normalCollectionNss) != involvedNssSet.end());
-}
-
-class All : public OldStyleSuiteSpecification {
-public:
-    All() : OldStyleSuiteSpecification("PipelineOptimizations") {}
-
-    void setupTests() {
-        add<Optimizations::Sharded::Empty>();
-        add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
-        add<Optimizations::Sharded::coalesceLookUpAndUnwind::
-                ShouldCoalesceUnwindOnAsWithPreserveEmpty>();
-        add<Optimizations::Sharded::coalesceLookUpAndUnwind::
-                ShouldCoalesceUnwindOnAsWithIncludeArrayIndex>();
-        add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldNotCoalesceUnwindNotOnAs>();
-        add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::OneUnwind>();
-        add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::TwoUnwind>();
-        add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindNotFinal>();
-        add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindWithOther>();
-        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipAndLimit>();
-        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithMultipleSkipsAndLimit>();
-        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithLimitAndSkip>();
-        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipAddFieldsAndLimit>();
-        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipGroupAndLimit>();
-        add<Optimizations::Sharded::propagateDocLimitToShards::MatchWithSkipSecondMatchAndLimit>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::NeedWholeDoc>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsId>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsNonId>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::NothingNeeded>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
-                ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
-                ShardedMatchProjLimDoesNotBecomeMatchLimProj>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
-                ShardedSortProjLimBecomesTopKSortProj>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
-                ShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
-                ShardedMatchSortProjLimBecomesMatchTopKSortProj>();
-        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
-        add<Optimizations::Sharded::lookupFromShardsInParallel::LookupWithDBAndColl>();
-        add<Optimizations::Sharded::lookupFromShardsInParallel::LookupWithLetWithDBAndColl>();
-        add<Optimizations::Sharded::lookupFromShardsInParallel::CollectionCloningPipeline>();
-        add<Optimizations::Sharded::needsPrimaryShardMerger::Out>();
-        add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithUnshardedCollection>();
-        add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithShardedCollection>();
-        add<Optimizations::Sharded::needsPrimaryShardMerger::Project>();
-        add<Optimizations::Sharded::needsPrimaryShardMerger::LookUp>();
-    }
 };
-
-OldStyleSuiteInitializer<All> myall;
 
 }  // namespace
 }  // namespace mongo

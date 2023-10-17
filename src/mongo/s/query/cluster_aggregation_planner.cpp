@@ -178,14 +178,20 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
 
 ShardId pickMergingShard(OperationContext* opCtx,
                          bool needsPrimaryShardMerge,
+                         const boost::optional<ShardId>& pipelineMergeShardId,
                          const std::vector<ShardId>& targetedShards,
                          ShardId primaryShard) {
     auto& prng = opCtx->getClient()->getPrng();
     // If we cannot merge on mongoS, establish the merge cursor on a shard. Perform the merging
-    // command on random shard, unless the pipeline dictates that it needs to be run on the primary
+    // command on random shard, unless the pipeline dictates that it needs to be run on a specific
     // shard for the database.
-    return needsPrimaryShardMerge ? primaryShard
-                                  : targetedShards[prng.nextInt32(targetedShards.size())];
+    if (needsPrimaryShardMerge) {
+        return primaryShard;
+    } else if (pipelineMergeShardId) {
+        return *pipelineMergeShardId;
+    } else {
+        return targetedShards[prng.nextInt32(targetedShards.size())];
+    }
 }
 
 BSONObj createCommandForMergingShard(Document serializedCommand,
@@ -279,8 +285,11 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // therefore must have a valid routing table.
     invariant(cri);
 
-    const ShardId mergingShardId = pickMergingShard(
-        opCtx, shardDispatchResults.needsPrimaryShardMerge, targetedShards, cri->cm.dbPrimary());
+    const ShardId mergingShardId = pickMergingShard(opCtx,
+                                                    shardDispatchResults.needsPrimaryShardMerge,
+                                                    mergePipeline->needsSpecificShardMerger(),
+                                                    targetedShards,
+                                                    cri->cm.dbPrimary());
     const bool mergingShardContributesData =
         std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
         targetedShards.end();

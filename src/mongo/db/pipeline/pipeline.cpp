@@ -489,6 +489,15 @@ bool Pipeline::needsPrimaryShardMerger() const {
     });
 }
 
+boost::optional<ShardId> Pipeline::needsSpecificShardMerger() const {
+    for (const auto& stage : _sources) {
+        if (auto mergeShardId = stage->constraints(SplitState::kSplitForMerge).mergeShardId) {
+            return mergeShardId;
+        }
+    }
+    return boost::none;
+}
+
 bool Pipeline::needsMongosMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         return stage->constraints(SplitState::kSplitForMerge).resolvedHostTypeRequirement(pCtx) ==

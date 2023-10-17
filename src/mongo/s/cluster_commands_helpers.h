@@ -227,6 +227,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetConfigS
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     bool eligibleForSampling = false);
+
 /**
  * This overload is for callers which already have a fully initialized 'ExpressionContext' (e.g.
  * callers from the aggregation framework). Most callers should prefer the overload above.
@@ -265,6 +266,20 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const BSONObj& collation,
     const boost::optional<BSONObj>& letParameters,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
+
+/**
+ * Utility for dispatching versioned commands on a namespace to a passed set of shards.
+ */
+[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetSpecificShards(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const DatabaseName& dbName,
+    const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const std::set<ShardId>& shardIds,
+    bool eligibleForSampling = false);
 
 /**
  * Utility for dispatching commands against the primary of a database and attaching the appropriate

@@ -306,8 +306,9 @@ public:
                              boost::optional<BSONObj> mergeSortPatternIn = boost::none)
             : shardsStage(std::move(shardsStageIn)),
               mergeSortPattern(std::move(mergeSortPatternIn)) {
-            if (mergeStage)
+            if (mergeStage) {
                 mergingStages.emplace_back(std::move(mergeStage));
+            }
         }
 
         typedef std::function<bool(const DocumentSource&)> movePastFunctionType;
