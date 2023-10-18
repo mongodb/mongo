@@ -31,6 +31,8 @@
 
 #include "mongo/platform/compiler.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo {
 ScopedTimer::ScopedTimer(Nanoseconds* counter, TickSource* ts)
     : _counter(counter), _tickSource(ts), _clockSource(nullptr), _startTS(ts->getTicks()) {}
@@ -47,5 +49,26 @@ ScopedTimer::~ScopedTimer() {
     if (_tickSource) {
         *_counter += _tickSource->ticksTo<Nanoseconds>(_tickSource->getTicks() - _startTS);
     }
+}
+
+TimeElapsedBuilderScopedTimer::TimeElapsedBuilderScopedTimer(ClockSource* clockSource,
+                                                             StringData description,
+                                                             BSONObjBuilder* builder)
+    : _clockSource(clockSource),
+      _description(description),
+      _beginTime(clockSource->now()),
+      _builder(builder) {}
+
+TimeElapsedBuilderScopedTimer::~TimeElapsedBuilderScopedTimer() {
+    mongo::Milliseconds elapsedTime = _clockSource->now() - _beginTime;
+    _builder->append(_description, elapsedTime.toString());
+}
+
+boost::optional<TimeElapsedBuilderScopedTimer> createTimeElapsedBuilderScopedTimer(
+    ClockSource* clockSource, StringData description, BSONObjBuilder* builder) {
+    if (builder == nullptr) {
+        return boost::none;
+    }
+    return TimeElapsedBuilderScopedTimer(clockSource, description, builder);
 }
 }  // namespace mongo

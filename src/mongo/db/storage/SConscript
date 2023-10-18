@@ -415,6 +415,7 @@ env.Library(
     LIBDEPS=[],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/service_context',
         'storage_change_lock',
         'storage_control',

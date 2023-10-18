@@ -126,7 +126,11 @@ bool isWriteableStorageEngine() {
 }
 
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
-Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx) {
+// The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+// this function into one single builder that records the time elapsed during startup. Its default
+// value is nullptr because we only want to time this function when it is called during startup.
+Status restoreMissingFeatureCompatibilityVersionDocument(
+    OperationContext* opCtx, BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
     const NamespaceString fcvNss(NamespaceString::kServerConfigurationNamespace);
 
     // If the admin database, which contains the server configuration collection with the
@@ -148,6 +152,10 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with last LTS version.",
               "version"_attr = multiversion::toString(multiversion::GenericFCV::kLastLTS));
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Create new fcv document",
+                                                startupTimeElapsedBuilder);
         uassertStatusOK(createCollection(opCtx, fcvNss.dbName(), BSON("create" << fcvNss.coll())));
     }
 
@@ -166,6 +174,10 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
                           fcvColl.getCollectionPtr(),
                           BSON("_id" << multiversion::kParameterName),
                           featureCompatibilityVersion)) {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Restore fcv document",
+                                                startupTimeElapsedBuilder);
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         LOGV2(21000,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
@@ -549,15 +561,27 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
         });
 }
 
+// The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+// this function into one single builder that records the time elapsed during startup. Its default
+// value is nullptr because we only want to time this function when it is called during startup.
 void reconcileCatalogAndRebuildUnfinishedIndexes(
     OperationContext* opCtx,
     StorageEngine* storageEngine,
-    StorageEngine::LastShutdownState lastShutdownState) {
+    StorageEngine::LastShutdownState lastShutdownState,
+    BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
 
-    auto reconcileResult =
-        fassert(40593,
-                storageEngine->reconcileCatalogAndIdents(
-                    opCtx, storageEngine->getStableTimestamp(), lastShutdownState));
+    StorageEngine::ReconcileResult reconcileResult;
+    {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            opCtx->getServiceContext()->getFastClockSource(),
+            "Drop abandoned idents and get back indexes that need to be rebuilt or builds that "
+            "need to be restarted",
+            startupTimeElapsedBuilder);
+        reconcileResult =
+            fassert(40593,
+                    storageEngine->reconcileCatalogAndIdents(
+                        opCtx, storageEngine->getStableTimestamp(), lastShutdownState));
+    }
 
     auto tempDir = boost::filesystem::path(storageGlobalParams.dbpath).append("_tmp");
     if (reconcileResult.indexBuildsToResume.empty() ||
@@ -605,16 +629,23 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }
 
-    for (const auto& entry : nsToIndexNameObjMap) {
-        const auto collNss = entry.first;
+    {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Rebuild indexes for collections",
+                                                startupTimeElapsedBuilder);
+        for (const auto& entry : nsToIndexNameObjMap) {
+            const auto collNss = entry.first;
 
-        auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
-        for (const auto& indexName : entry.second.first) {
-            LOGV2(21004, "Rebuilding index", logAttrs(collNss), "index"_attr = indexName);
+            auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
+            for (const auto& indexName : entry.second.first) {
+                LOGV2(21004, "Rebuilding index", logAttrs(collNss), "index"_attr = indexName);
+            }
+
+            std::vector<BSONObj> indexSpecs = entry.second.second;
+            fassert(40592,
+                    rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
         }
-
-        std::vector<BSONObj> indexSpecs = entry.second.second;
-        fassert(40592, rebuildIndexesOnCollection(opCtx, collection, indexSpecs, RepairData::kNo));
     }
 
     // Two-phase index builds depend on an eventually-replicated 'commitIndexBuild' oplog entry to
@@ -666,8 +697,14 @@ void setReplSetMemberInStandaloneMode(OperationContext* opCtx, StartupRecoveryMo
 }
 
 // Perform startup procedures for --repair mode.
-void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
+// The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+// this function into one single builder that records the time elapsed during startup. Its default
+// value is nullptr because we only want to time this function when it is called during startup.
+void startupRepair(OperationContext* opCtx,
+                   StorageEngine* storageEngine,
+                   BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
     invariant(!storageGlobalParams.queryableBackupMode);
+    ServiceContext* svcCtx = opCtx->getServiceContext();
 
     if (MONGO_unlikely(exitBeforeDataRepair.shouldFail())) {
         LOGV2(21006, "Exiting because 'exitBeforeDataRepair' fail point was set.");
@@ -689,14 +726,24 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
             opCtx, NamespaceString::kServerConfigurationNamespace)) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
 
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(svcCtx->getFastClockSource(),
+                                                "Repair server configuration namespace",
+                                                startupTimeElapsedBuilder);
         databaseHolder->openDb(opCtx, fcvColl->ns().dbName());
         fassertNoTrace(4805000,
                        repair::repairCollection(
                            opCtx, storageEngine, NamespaceString::kServerConfigurationNamespace));
     }
-    uassertStatusOK(restoreMissingFeatureCompatibilityVersionDocument(opCtx));
-    FeatureCompatibilityVersion::initializeForStartup(opCtx);
-    abortRepairOnFCVErrors.dismiss();
+    uassertStatusOK(
+        restoreMissingFeatureCompatibilityVersionDocument(opCtx, startupTimeElapsedBuilder));
+
+    {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            svcCtx->getFastClockSource(), "Initialize FCV for startup", startupTimeElapsedBuilder);
+        FeatureCompatibilityVersion::initializeForStartup(opCtx);
+        abortRepairOnFCVErrors.dismiss();
+    }
 
     // The local database should be repaired before any other replicated collections so we know
     // whether not to rebuild unfinished two-phase index builds if this is a replica set node
@@ -704,6 +751,8 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
     auto dbNames = storageEngine->listDatabases();
     if (auto it = std::find(dbNames.begin(), dbNames.end(), DatabaseName::kLocal);
         it != dbNames.end()) {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            svcCtx->getFastClockSource(), "Repair the local database", startupTimeElapsedBuilder);
         fassertNoTrace(4805001, repair::repairDatabase(opCtx, storageEngine, *it));
 
         // This must be set before rebuilding index builds on replicated collections.
@@ -711,9 +760,14 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
         dbNames.erase(it);
     }
 
-    // Repair the remaining databases.
-    for (const auto& dbName : dbNames) {
-        fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, dbName));
+    {
+        // Repair the remaining databases.
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(svcCtx->getFastClockSource(),
+                                                               "Repair the remaining databases",
+                                                               startupTimeElapsedBuilder);
+        for (const auto& dbName : dbNames) {
+            fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, dbName));
+        }
     }
 
     openDatabases(opCtx, storageEngine, [&](auto dbName) {
@@ -753,22 +807,35 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
 }
 
 // Perform routine startup recovery procedure.
+// The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+// this function into one single builder that records the time elapsed during startup. Its default
+// value is nullptr because we only want to time this function when it is called during startup.
 void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
                      StorageEngine::LastShutdownState lastShutdownState,
-                     StartupRecoveryMode mode) {
+                     StartupRecoveryMode mode,
+                     BSONObjBuilder* startupTimeElapsedBuilder = nullptr) {
     invariant(!storageGlobalParams.repair);
+
+    ServiceContext* svcCtx = opCtx->getServiceContext();
 
     // Determine whether this is a replica set node running in standalone mode. This must be set
     // before determining whether to restart index builds.
     setReplSetMemberInStandaloneMode(opCtx, mode);
 
     // Initialize FCV before rebuilding indexes that may have features dependent on FCV.
-    FeatureCompatibilityVersion::initializeForStartup(opCtx);
+    {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(svcCtx->getFastClockSource(),
+                                                "Initialize FCV before rebuilding indexes",
+                                                startupTimeElapsedBuilder);
+        FeatureCompatibilityVersion::initializeForStartup(opCtx);
+    }
 
     // Drops abandoned idents. Rebuilds unfinished indexes and restarts incomplete two-phase
     // index builds.
-    reconcileCatalogAndRebuildUnfinishedIndexes(opCtx, storageEngine, lastShutdownState);
+    reconcileCatalogAndRebuildUnfinishedIndexes(
+        opCtx, storageEngine, lastShutdownState, startupTimeElapsedBuilder);
 
     const bool usingReplication =
         repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet();
@@ -813,9 +880,13 @@ namespace startup_recovery {
 /**
  * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error
  * if data files are incompatible with the current binary version.
+ * The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+ * this function into one single builder that records the time elapsed during startup. Its default
+ * value is nullptr because we only want to time this function when it is called during startup.
  */
 void repairAndRecoverDatabases(OperationContext* opCtx,
-                               StorageEngine::LastShutdownState lastShutdownState) {
+                               StorageEngine::LastShutdownState lastShutdownState,
+                               BSONObjBuilder* startupTimeElapsedBuilder) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
@@ -834,9 +905,13 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     }
 
     if (storageGlobalParams.repair) {
-        startupRepair(opCtx, storageEngine);
+        startupRepair(opCtx, storageEngine, startupTimeElapsedBuilder);
     } else {
-        startupRecovery(opCtx, storageEngine, lastShutdownState, StartupRecoveryMode::kAuto);
+        startupRecovery(opCtx,
+                        storageEngine,
+                        lastShutdownState,
+                        StartupRecoveryMode::kAuto,
+                        startupTimeElapsedBuilder);
     }
 }
 

@@ -46,9 +46,13 @@ static constexpr int64_t kChangeStreamPostUncleanShutdownExpiryExtensionSeconds{
 /**
  * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error
  * if data files are incompatible with the current binary version.
+ * The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+ * this function into one single builder that records the time elapsed during startup. Its default
+ * value is nullptr because we only want to time this function when it is called during startup.
  */
 void repairAndRecoverDatabases(OperationContext* opCtx,
-                               StorageEngine::LastShutdownState lastShutdownState);
+                               StorageEngine::LastShutdownState lastShutdownState,
+                               BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 /**
  * Runs startup recovery after system startup, specifying whether to recover as a replica set

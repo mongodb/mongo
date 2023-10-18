@@ -63,9 +63,14 @@ constexpr StorageEngineInitFlags operator|(StorageEngineInitFlags a,
 
 /**
  * Initializes the storage engine on "service".
+ * The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+ * this function into one single builder that records the time elapsed during startup. Its default
+ * value is nullptr because we only want to time this function when it is called during startup.
  */
-StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx,
-                                                         StorageEngineInitFlags initFlags);
+StorageEngine::LastShutdownState initializeStorageEngine(
+    OperationContext* opCtx,
+    StorageEngineInitFlags initFlags,
+    BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 /**
  * Shuts down storage engine cleanly and releases any locks on mongod.lock.

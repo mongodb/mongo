@@ -1111,6 +1111,7 @@ env.Library(
         'system_index.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/exec/scoped_timer',
         'catalog/index_key_validate',
         'catalog/multi_index_block',
         'index_builds_coordinator_interface',
