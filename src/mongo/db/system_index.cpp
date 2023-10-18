@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
@@ -127,7 +128,7 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
 
 }  // namespace
 
-Status verifySystemIndexes(OperationContext* opCtx) {
+Status verifySystemIndexes(OperationContext* opCtx, BSONObjBuilder* startupTimeElapsedBuilder) {
     const NamespaceString& systemUsers = NamespaceString::kAdminUsersNamespace;
     const NamespaceString& systemRoles = NamespaceString::kAdminRolesNamespace;
 
@@ -136,6 +137,10 @@ Status verifySystemIndexes(OperationContext* opCtx) {
         AutoGetCollection collection(opCtx, systemUsers, MODE_X);
 
         if (collection) {
+            auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+                opCtx->getServiceContext()->getFastClockSource(),
+                "Verify indexes for admin.system.users collection",
+                startupTimeElapsedBuilder);
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
@@ -172,6 +177,10 @@ Status verifySystemIndexes(OperationContext* opCtx) {
 
         // Ensure that system indexes exist for the roles collection, if it exists.
         if (collection) {
+            auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+                opCtx->getServiceContext()->getFastClockSource(),
+                "Verify indexes for admin.system.roles collection",
+                startupTimeElapsedBuilder);
             const IndexCatalog* indexCatalog = collection->getIndexCatalog();
             invariant(indexCatalog);
 
