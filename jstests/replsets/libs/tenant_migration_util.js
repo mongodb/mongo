@@ -404,7 +404,12 @@ export function checkTenantDBHashes({
                                                   !excludedDBs.includes(dbName)));
             combinedDBNames = new Set(combinedDBNames);
 
+            print(`checking db hash for tenant '${tenantId}' between donor: ${
+                donorPrimaryConn.host}, and recipient: ${recipientPrimaryConn.host}`);
+
             for (const dbName of combinedDBNames) {
+                print(`checking if tenant ${tenantId} owns db ${dbName}`);
+
                 // Pass in an empty array for the secondaries, since we only wish to compare
                 // the DB hashes between the donor and recipient primary in this test.
                 const donorDBHash = assert.commandWorked(
@@ -420,9 +425,6 @@ export function checkTenantDBHashes({
                 const recipientCollInfos =
                     new CollInfos(recipientPrimaryConn, 'recipientPrimary', dbName);
                 recipientCollInfos.filter(recipientCollections);
-
-                print(`checking db hash for tenant '${tenantId}' between donor: ${
-                    donorPrimaryConn.host}, and recipient: ${recipientPrimaryConn.host}`);
 
                 const collectionPrinted = new Set();
                 const success = DataConsistencyChecker.checkDBHash(donorDBHash,
