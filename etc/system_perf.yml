@@ -3878,8 +3878,8 @@ buildvariants:
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: initialsync-logkeeper
       workload_setup: 2022-11
-      # EBS logkeeper snapshot with FCV set to 7.1
-      snapshotId: snap-063661c31a4e4b812
+      # EBS logkeeper snapshot with FCV set to 7.2
+      snapshotId: snap-042ca2a003313ebc2
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -3896,29 +3896,29 @@ buildvariants:
 
   # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
   # patch builds.
-  #- name: linux-replSet-initialsync-logkeeper-snapshot-update
-  #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
-  #  cron: "0 0 * * 4"  # 00:00 on Thursday
-  #  modules: *modules
-  #  expansions:
-  #    mongodb_setup_release: 2022-11
-  #    mongodb_setup: initialsync-logkeeper-snapshot-update
-  #    infrastructure_provisioning_release: 2022-11
-  #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
-  #    # Update this to latest snapshot after each LTS release.
-  #    snapshotId: snap-063661c31a4e4b812
-  #    platform: linux
-  #    authentication: disabled
-  #    storageEngine: wiredTiger
-  #    project_dir: *project_dir
-  #    compile_variant: "-arm64"
-  #  run_on:
-  #    - "rhel70-perf-initialsync-logkeeper"
-  #  depends_on: *_compile_amazon_linux2_arm64
-  #  tasks:
-  #    - name: schedule_patch_auto_tasks
-  #    - name: schedule_variant_auto_tasks
-  #    - name: initialsync-logkeeper-snapshot-update
+  # - name: linux-replSet-initialsync-logkeeper-snapshot-update
+  #   display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
+  #   cron: "0 0 * * 4"  # 00:00 on Thursday
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup_release: 2022-11
+  #     mongodb_setup: initialsync-logkeeper-snapshot-update
+  #     infrastructure_provisioning_release: 2022-11
+  #     infrastructure_provisioning: initialsync-logkeeper-snapshot-update
+  #     # Update this to latest snapshot after each LTS release.
+  #     snapshotId: snap-042ca2a003313ebc2
+  #     platform: linux
+  #     authentication: disabled
+  #     storageEngine: wiredTiger
+  #     project_dir: *project_dir
+  #     compile_variant: "-arm64"
+  #   run_on:
+  #     - "rhel70-perf-initialsync-logkeeper"
+  #   depends_on: *_compile_amazon_linux2_arm64
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: initialsync-logkeeper-snapshot-update
 
   - name: linux-replSet-audit.2022-11
     display_name: Linux 3-Node ReplSet Audit 2022-11
