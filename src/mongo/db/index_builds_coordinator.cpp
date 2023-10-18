@@ -1754,7 +1754,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
     PromiseAndFuture<void> promiseAndFuture;
     _stepUpThread = stdx::thread([this, &promiseAndFuture] {
         Client::initThread("IndexBuildsCoordinator-StepUp",
-                           getGlobalServiceContext()->getService());
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
         auto threadCtx = Client::getCurrent()->makeOperationContext();
         threadCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         promiseAndFuture.promise.emplaceValue();
@@ -2688,7 +2688,8 @@ namespace {
 
 template <typename Func>
 void runOnAlternateContext(OperationContext* opCtx, std::string name, Func func) {
-    auto newClient = opCtx->getServiceContext()->getService()->makeClient(name);
+    auto newClient =
+        opCtx->getServiceContext()->getService(ClusterRole::ShardServer)->makeClient(name);
 
     // TODO(SERVER-74657): Please revisit if this thread could be made killable.
     {

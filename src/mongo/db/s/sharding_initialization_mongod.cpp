@@ -275,7 +275,8 @@ private:
                   "connectionString"_attr = update);
 
 
-            ThreadClient tc("updateShardIdentityConfigString", _serviceContext->getService());
+            ThreadClient tc("updateShardIdentityConfigString",
+                            _serviceContext->getService(ClusterRole::ShardServer));
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {

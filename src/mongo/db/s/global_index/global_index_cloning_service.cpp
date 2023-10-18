@@ -247,7 +247,8 @@ void GlobalIndexCloningService::CloningStateMachine::_init(
     _inserter = std::make_unique<GlobalIndexInserter>(
         _metadata.getNss(), indexSpec.getName(), _metadata.getIndexCollectionUUID(), **executor);
 
-    auto client = _serviceContext->getService()->makeClient("globalIndexClonerServiceInit");
+    auto client = _serviceContext->getService(ClusterRole::ShardServer)
+                      ->makeClient("globalIndexClonerServiceInit");
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {

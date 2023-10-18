@@ -130,7 +130,8 @@ public:
 
             ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor())
                 .then([svcCtx = opCtx->getServiceContext(), nss = ns()] {
-                    ThreadClient tc("FlushReshardingStateChange", svcCtx->getService());
+                    ThreadClient tc("FlushReshardingStateChange",
+                                    svcCtx->getService(ClusterRole::ShardServer));
                     auto opCtx = tc->makeOperationContext();
                     onCollectionPlacementVersionMismatch(
                         opCtx.get(), nss, boost::none /* chunkVersionReceived */);

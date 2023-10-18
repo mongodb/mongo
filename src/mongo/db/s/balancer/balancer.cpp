@@ -505,7 +505,8 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 }
 
 void Balancer::_consumeActionStreamLoop() {
-    Client::initThread("BalancerSecondary", getGlobalServiceContext()->getService());
+    Client::initThread("BalancerSecondary",
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     auto opCtx = cc().makeOperationContext();
     executor::ScopedTaskExecutor executor(
@@ -689,7 +690,7 @@ void Balancer::_mainThread() {
         _joinCond.notify_all();
     });
 
-    Client::initThread("Balancer", getGlobalServiceContext()->getService());
+    Client::initThread("Balancer", getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {
@@ -940,7 +941,7 @@ void Balancer::_applyStreamingActionResponseToPolicy(const BalancerStreamAction&
                                                      ActionsStreamPolicy* policy) {
     invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
     ThreadClient tc("BalancerSecondaryThread::applyActionResponse",
-                    getGlobalServiceContext()->getService());
+                    getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     auto opCtx = tc->makeOperationContext();
     policy->applyActionResult(opCtx.get(), action, response);

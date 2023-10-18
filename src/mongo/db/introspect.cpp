@@ -127,7 +127,9 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     try {
         // We create a new opCtx so that we aren't interrupted by having the original operation
         // killed or timed out. Those are the case we want to have profiling data.
-        auto newClient = opCtx->getServiceContext()->getService()->makeClient("profiling");
+        auto newClient = opCtx->getServiceContext()
+                             ->getService(ClusterRole::ShardServer)
+                             ->makeClient("profiling");
         auto newCtx = newClient->makeOperationContext();
 
         // TODO(SERVER-74657): Please revisit if this thread could be made killable.

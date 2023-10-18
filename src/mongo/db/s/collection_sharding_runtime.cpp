@@ -743,7 +743,7 @@ void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
     const auto oldShardVersion = _metadataManager->getActivePlacementVersion();
     ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, oldUUID, oldShardVersion] {
-            ThreadClient tc{"CleanUpShardedMetadata", svcCtx->getService()};
+            ThreadClient tc{"CleanUpShardedMetadata", svcCtx->getService(ClusterRole::ShardServer)};
             auto uniqueOpCtx{tc->makeOperationContext()};
             auto opCtx{uniqueOpCtx.get()};
 

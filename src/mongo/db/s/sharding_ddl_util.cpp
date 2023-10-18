@@ -729,8 +729,9 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // The Internal Transactions API receives the write concern option and osi through the
     // passed Operation context. We opt for creating a new one to avoid any possible side
     // effects.
-    auto newClient =
-        opCtx->getServiceContext()->getService()->makeClient("ShardingCatalogTransaction");
+    auto newClient = opCtx->getServiceContext()
+                         ->getService(ClusterRole::ShardServer)
+                         ->makeClient("ShardingCatalogTransaction");
 
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
     AlternativeClientRegion acr(newClient);

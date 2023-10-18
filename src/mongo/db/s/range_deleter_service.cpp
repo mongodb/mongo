@@ -174,7 +174,8 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_completedRangeDeletion(
 }
 
 void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
-    ThreadClient threadClient(rangedeletionutil::kRangeDeletionThreadName, _service->getService());
+    ThreadClient threadClient(rangedeletionutil::kRangeDeletionThreadName,
+                              _service->getService(ClusterRole::ShardServer));
 
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -379,7 +380,8 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
     _stepUpCompletedFuture =
         ExecutorFuture<void>(_executor)
             .then([serviceContext = opCtx->getServiceContext(), this] {
-                ThreadClient tc("ResubmitRangeDeletionsOnStepUp", serviceContext->getService());
+                ThreadClient tc("ResubmitRangeDeletionsOnStepUp",
+                                serviceContext->getService(ClusterRole::ShardServer));
 
                 {
                     auto lock = _acquireMutexUnconditionally();

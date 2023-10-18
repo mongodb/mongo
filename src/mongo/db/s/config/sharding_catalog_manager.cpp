@@ -207,7 +207,9 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
     // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
     // commit should not have a lock timeout.
-    auto newClient = getGlobalServiceContext()->getService()->makeClient("ShardingCatalogManager");
+    auto newClient = getGlobalServiceContext()
+                         ->getService(ClusterRole::ShardServer)
+                         ->makeClient("ShardingCatalogManager");
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -1008,8 +1010,9 @@ Status ShardingCatalogManager::_notifyClusterOnNewDatabases(
     try {
         // Setup an AlternativeClientRegion and a non-interruptible Operation Context to ensure that
         // the notification may be also sent out while the node is stepping down.
-        auto altClient =
-            opCtx->getServiceContext()->getService()->makeClient("_notifyClusterOnNewDatabases");
+        auto altClient = opCtx->getServiceContext()
+                             ->getService(ClusterRole::ShardServer)
+                             ->makeClient("_notifyClusterOnNewDatabases");
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
         {
             mongo::stdx::lock_guard<mongo::Client> lk(*altClient.get());
@@ -1394,8 +1397,9 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
     // (This operation includes a $merge stage writing into the config database, which requires
     // internal client credentials).
     {
-        auto altClient =
-            opCtx->getServiceContext()->getService()->makeClient("initializePlacementHistory");
+        auto altClient = opCtx->getServiceContext()
+                             ->getService(ClusterRole::ShardServer)
+                             ->makeClient("initializePlacementHistory");
         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
         {
             stdx::lock_guard<Client> lk(*altClient.get());

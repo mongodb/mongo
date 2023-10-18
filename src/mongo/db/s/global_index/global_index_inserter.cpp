@@ -97,7 +97,8 @@ void GlobalIndexInserter::processDoc(OperationContext* opCtx,
             .thenRunOn(txnExec)
             .then([this, service, indexKeyValues, documentKey, &txnClient, txnExec](
                       const auto& skipIdDocResults) {
-                auto client = service->getService()->makeClient("globalIndexInserter");
+                auto client = service->getService(ClusterRole::ShardServer)
+                                  ->makeClient("globalIndexInserter");
                 auto opCtx = service->makeOperationContext(client.get());
                 globalIndexInserterPauseAfterReadingSkipCollection.pauseWhileSet(opCtx.get());
 

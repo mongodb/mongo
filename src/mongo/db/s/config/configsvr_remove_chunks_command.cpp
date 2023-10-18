@@ -101,8 +101,9 @@ public:
             {
                 // Use an ACR because we will perform a {multi: true} delete, which is otherwise not
                 // supported on a session.
-                auto newClient =
-                    opCtx->getServiceContext()->getService()->makeClient("RemoveChunksMetadata");
+                auto newClient = opCtx->getServiceContext()
+                                     ->getService(ClusterRole::ShardServer)
+                                     ->makeClient("RemoveChunksMetadata");
                 AlternativeClientRegion acr(newClient);
                 auto executor =
                     Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

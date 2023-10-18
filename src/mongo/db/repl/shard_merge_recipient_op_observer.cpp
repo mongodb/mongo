@@ -98,7 +98,7 @@ void runOnAlternateClient(const std::string& name, Func func) {
         return !cc().canKillSystemOperationInStepdown(WithLock::withoutLock());
     }();
 
-    auto client = getGlobalServiceContext()->getService()->makeClient(name);
+    auto client = getGlobalServiceContext()->getService(ClusterRole::ShardServer)->makeClient(name);
     AlternativeClientRegion acr(client);
 
     if (parentClientUnkillableByStepDown) {

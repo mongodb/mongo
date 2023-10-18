@@ -214,7 +214,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
             ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                _service()->getService());
+                                _service()->getService(ClusterRole::ShardServer));
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {
@@ -380,7 +380,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
-                                _service()->getService(),
+                                _service()->getService(ClusterRole::ShardServer),
                                 nullptr);
             auto opCtxRaii = factory.makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
