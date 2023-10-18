@@ -79,6 +79,15 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  bool validateDecompression) try {
     CompressionResult result;
 
+    ON_BLOCK_EXIT([&] {
+        tassert(8000400,
+                fmt::format("Couldn't compress time-series bucket {} for collection {}",
+                            bucketDoc.toString(),
+                            nss.toStringForErrorMsg()),
+                result.compressedBucket ||
+                    MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail()));
+    });
+
     // Helper for uncompressed measurements
     struct Measurement {
         BSONElement timeField;

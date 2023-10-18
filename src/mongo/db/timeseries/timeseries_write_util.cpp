@@ -149,11 +149,13 @@ boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
 }
 
 // Builds a complete and new bucket document.
-BSONObj makeNewDocument(const OID& bucketId,
-                        const BSONObj& metadata,
-                        const BSONObj& min,
-                        const BSONObj& max,
-                        StringDataMap<BSONObjBuilder>& dataBuilders) {
+BucketDocument makeNewDocument(const OID& bucketId,
+                               const BSONObj& metadata,
+                               const BSONObj& min,
+                               const BSONObj& max,
+                               StringDataMap<BSONObjBuilder>& dataBuilders,
+                               StringData timeField,
+                               const NamespaceString& nss) {
     auto metadataElem = metadata.firstElement();
     BSONObjBuilder builder;
     builder.append("_id", bucketId);
@@ -174,7 +176,22 @@ BSONObj makeNewDocument(const OID& bucketId,
         }
     }
 
-    return builder.obj();
+    BucketDocument bucketDoc{builder.obj()};
+    if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return bucketDoc;
+    }
+
+    const bool validateCompression = gValidateTimeseriesCompression.load();
+    auto compressed = timeseries::compressBucket(
+        bucketDoc.uncompressedBucket, timeField, nss, validateCompression);
+    if (compressed.compressedBucket) {
+        bucketDoc.compressedBucket = std::move(*compressed.compressedBucket);
+    } else {
+        bucketDoc.compressionFailed = true;
+    }
+
+    return bucketDoc;
 }
 
 // Makes a write command request base and sets the statement Ids if provided a non-empty vector.
@@ -326,23 +343,6 @@ std::shared_ptr<bucket_catalog::WriteBatch>& extractFromSelf(
     return batch;
 }
 
-// Updates the batch->decompressed field and returns the compressed BSON to be applied in the
-// transform.
-BSONObj compressAndUpdateBatch(const BSONObj& updated,
-                               std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                               const NamespaceString& bucketsNs) {
-    auto compressedBucket = timeseries::compressBucket(
-        updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
-
-    if (!compressedBucket.compressedBucket) {
-        tasserted(7734700,
-                  fmt::format("Couldn't compress time-series bucket {}", updated.toString()));
-        return updated;
-    }
-
-    batch->decompressed = DecompressionResult{*compressedBucket.compressedBucket, updated};
-    return *compressedBucket.compressedBucket;
-}
 }  // namespace
 
 write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateCommandRequest& wholeOp,
@@ -365,49 +365,27 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
             bucketsColl->getTimeseriesOptions());
 }
 
-BSONObj makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                                const BSONObj& metadata) {
+BucketDocument makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
+                                       const BSONObj& metadata) {
     StringDataMap<BSONObjBuilder> dataBuilders;
     processTimeseriesMeasurements(
         {batch->measurements.begin(), batch->measurements.end()}, metadata, dataBuilders);
 
-    return makeNewDocument(
-        batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
+    return makeNewDocument(batch->bucketHandle.bucketId.oid,
+                           metadata,
+                           batch->min,
+                           batch->max,
+                           dataBuilders,
+                           batch->timeField,
+                           batch->bucketHandle.bucketId.ns);
 }
 
-BSONObj makeNewCompressedDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
-                                          const BSONObj& metadata,
-                                          const NamespaceString& nss,
-                                          StringData timeField) {
-    // Builds the data field of a bucket document.
-    StringDataMap<BSONObjBuilder> dataBuilders;
-    processTimeseriesMeasurements(
-        {batch->measurements.begin(), batch->measurements.end()}, metadata, dataBuilders);
-
-    BSONObj uncompressedDoc = makeNewDocument(
-        batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
-
-    const bool validateCompression = gValidateTimeseriesCompression.load();
-    auto compressed =
-        timeseries::compressBucket(uncompressedDoc, timeField, nss, validateCompression);
-    if (compressed.compressedBucket) {
-        batch->decompressed = DecompressionResult{compressed.compressedBucket->getOwned(),
-                                                  uncompressedDoc.getOwned()};
-        return *compressed.compressedBucket;
-    }
-
-    tasserted(7745400,
-              fmt::format("Couldn't compress time-series bucket {}", uncompressedDoc.toString()));
-
-    // Return the uncompressed document if compression has failed.
-    return uncompressedDoc;
-}
-
-BSONObj makeNewDocumentForWrite(
+BucketDocument makeNewDocumentForWrite(
+    const NamespaceString& nss,
     const OID& bucketId,
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
-    const boost::optional<TimeseriesOptions>& options,
+    const TimeseriesOptions& options,
     const boost::optional<const StringData::ComparatorInterface*>& comparator) {
     StringDataMap<BSONObjBuilder> dataBuilders;
     auto minmax =
@@ -415,7 +393,13 @@ BSONObj makeNewDocumentForWrite(
 
     invariant(minmax);
 
-    return makeNewDocument(bucketId, metadata, minmax->min(), minmax->max(), dataBuilders);
+    return makeNewDocument(bucketId,
+                           metadata,
+                           minmax->min(),
+                           minmax->max(),
+                           dataBuilders,
+                           options.getTimeField(),
+                           nss);
 }
 
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
@@ -427,24 +411,14 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
         nss, comparator, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
-    auto bucket = makeNewDocumentForWrite(
-        oid, measurements, res.first.metadata.toBSON(), options, comparator);
+    BucketDocument bucketDoc = makeNewDocumentForWrite(
+        nss, oid, measurements, res.first.metadata.toBSON(), options, comparator);
 
-    if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return bucket;
+    // TODO SERVER-80653: Handle bucket compression failure.
+    if (bucketDoc.compressedBucket) {
+        return *bucketDoc.compressedBucket;
     }
-
-    const bool validateCompression = gValidateTimeseriesCompression.load();
-    auto compressed = timeseries::compressBucket(
-        bucket, options.getTimeField(), nss.getTimeseriesViewNamespace(), validateCompression);
-    if (compressed.compressedBucket) {
-        return *compressed.compressedBucket;
-    } else {
-        tasserted(7735101,
-                  fmt::format("Couldn't compress time-series bucket {}", bucket.toString()));
-        return bucket;
-    }
+    return bucketDoc.uncompressedBucket;
 }
 
 stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
@@ -456,6 +430,8 @@ stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> 
         return op;
     }
     auto timeseriesOptions = coll->getTimeseriesOptions();
+    invariant(timeseriesOptions);
+
     auto metaFieldName = timeseriesOptions->getMetaField();
     auto metadata = [&] {
         if (!metaFieldName) {  // Collection has no metadata field.
@@ -465,32 +441,20 @@ stdx::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> 
         auto metaField = measurements[0].getField(*metaFieldName);
         return metaField ? metaField.wrap() : BSONObj();
     }();
-    auto replaceBucket = makeNewDocumentForWrite(
-        bucketId, measurements, metadata, timeseriesOptions, coll->getDefaultCollator());
 
-    // An update or partial deletion to the bucket document will replace the bucket with an
-    // uncompressed bucket. We attempt to compress this bucket.
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        const bool validateCompression = gValidateTimeseriesCompression.load();
-        auto compressed = timeseries::compressBucket(replaceBucket,
-                                                     timeseriesOptions->getTimeField(),
-                                                     coll->ns().getTimeseriesViewNamespace(),
-                                                     validateCompression);
-
-        // If compression fails, we fall back to writing the uncompressed document.
-        if (compressed.compressedBucket) {
-            replaceBucket = std::move(*compressed.compressedBucket);
-        } else {
-            LOGV2_DEBUG(7743300,
-                        1,
-                        "Bucket compression failed during update or delete",
-                        logAttrs(coll->ns()),
-                        "bucket"_attr = redact(replaceBucket));
-        }
+    // TODO SERVER-80653: Handle bucket compression failure.
+    BucketDocument bucketDoc = makeNewDocumentForWrite(coll->ns(),
+                                                       bucketId,
+                                                       measurements,
+                                                       metadata,
+                                                       *timeseriesOptions,
+                                                       coll->getDefaultCollator());
+    BSONObj bucketToReplace = bucketDoc.uncompressedBucket;
+    if (bucketDoc.compressedBucket) {
+        bucketToReplace = *bucketDoc.compressedBucket;
     }
 
-    write_ops::UpdateModification u(replaceBucket);
+    write_ops::UpdateModification u(bucketToReplace);
     write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
     write_ops::UpdateCommandRequest op(coll->ns(), {updateEntry});
     return op;
@@ -524,13 +488,16 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
-    write_ops::InsertCommandRequest op{
-        bucketsNs,
-        {feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-             serverGlobalParams.featureCompatibility)
-             ? makeNewCompressedDocumentForWrite(
-                   batch, metadata, bucketsNs.getTimeseriesViewNamespace(), batch->timeField)
-             : makeNewDocumentForWrite(batch, metadata)}};
+    // TODO SERVER-80653: Handle bucket compression failure.
+    BucketDocument bucketDoc = makeNewDocumentForWrite(batch, metadata);
+    BSONObj bucketToInsert = bucketDoc.uncompressedBucket;
+    if (bucketDoc.compressedBucket) {
+        batch->decompressed = DecompressionResult{bucketDoc.compressedBucket->getOwned(),
+                                                  bucketDoc.uncompressedBucket.getOwned()};
+        bucketToInsert = *bucketDoc.compressedBucket;
+    }
+
+    write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
 }
@@ -563,13 +530,25 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     // running.
     auto before = std::move(batch->decompressed.value().before);
 
+    CompressionResult compressionResult;
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // TODO SERVER-80653: Handle bucket compression failure.
+        compressionResult = timeseries::compressBucket(
+            updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
+        if (compressionResult.compressedBucket) {
+            batch->decompressed = DecompressionResult{*compressionResult.compressedBucket, updated};
+        } else {
+            // Clear the previous compression state if we're inserting an uncompressed bucket due to
+            // compression failure.
+            batch->decompressed = boost::none;
+        }
+    }
+
     // Holds the bucket document with the operations from the write batch applied when the always
     // use compressed buckets feature flag is disabled. When enabled, holds the compressed version
     // of the bucket document mentioned earlier.
-    auto after = feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                     serverGlobalParams.featureCompatibility)
-        ? compressAndUpdateBatch(updated, batch, bucketsNs)
-        : updated;
+    auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
 
     auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
                                         const BSONObj& bucketDoc) -> boost::optional<BSONObj> {

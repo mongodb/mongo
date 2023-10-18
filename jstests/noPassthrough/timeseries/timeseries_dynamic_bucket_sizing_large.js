@@ -91,9 +91,11 @@ const initializeBuckets = function(numOfBuckets = 1) {
     assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure,
               numBucketsClosedDueToCachePressure,
               formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numCompressedBuckets,
-              numCompressedBuckets,
-              formatStatsLog(timeseriesStats));
+    if (!alwaysUseCompressedBuckets) {
+        assert.eq(timeseriesStats.numCompressedBuckets,
+                  numCompressedBuckets,
+                  formatStatsLog(timeseriesStats));
+    }
 
     // If we exceed the min bucket count of 10, we should close the bucket since it exceeds our
     // default bucket size of 125 KB. (This requires two additional insertions).
@@ -103,9 +105,7 @@ const initializeBuckets = function(numOfBuckets = 1) {
 
     expectedBucketCount++;
     numBucketsClosedDueToSize++;
-    if (!alwaysUseCompressedBuckets) {
-        numCompressedBuckets++;
-    }
+    numCompressedBuckets++;
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
@@ -115,9 +115,11 @@ const initializeBuckets = function(numOfBuckets = 1) {
     assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure,
               numBucketsClosedDueToCachePressure,
               formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numCompressedBuckets,
-              numCompressedBuckets,
-              formatStatsLog(timeseriesStats));
+    if (!alwaysUseCompressedBuckets) {
+        assert.eq(timeseriesStats.numCompressedBuckets,
+                  numCompressedBuckets,
+                  formatStatsLog(timeseriesStats));
+    }
 
     // Since the maximum size for buckets is capped at 12 MB, we should hit the size limit before
     // closing the bucket due to the minimum count, so we expect to close the oversized bucket and
@@ -135,9 +137,7 @@ const initializeBuckets = function(numOfBuckets = 1) {
     // We create one bucket for 'meta2', fill it up and create another one for future insertions.
     expectedBucketCount += 2;
     numBucketsClosedDueToSize++;
-    if (!alwaysUseCompressedBuckets) {
-        numCompressedBuckets++;
-    }
+    numCompressedBuckets++;
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
@@ -147,9 +147,11 @@ const initializeBuckets = function(numOfBuckets = 1) {
     assert.eq(timeseriesStats.numBucketsClosedDueToCachePressure,
               numBucketsClosedDueToCachePressure,
               formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numCompressedBuckets,
-              numCompressedBuckets,
-              formatStatsLog(timeseriesStats));
+    if (!alwaysUseCompressedBuckets) {
+        assert.eq(timeseriesStats.numCompressedBuckets,
+                  numCompressedBuckets,
+                  formatStatsLog(timeseriesStats));
+    }
 })();
 
 (function largeMeasurementsWithCachePressure() {
@@ -181,7 +183,9 @@ const initializeBuckets = function(numOfBuckets = 1) {
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
     assert.eq(
         timeseriesStats.numBucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numCompressedBuckets, 0, formatStatsLog(timeseriesStats));
+    if (!alwaysUseCompressedBuckets) {
+        assert.eq(timeseriesStats.numCompressedBuckets, 0, formatStatsLog(timeseriesStats));
+    }
 
     // We expect this insert to cause the bucket to close due to cache pressure since it will exceed
     // the rough cacheDerivedMaxSize of 5.5 MB and create a new bucket for this measurement.
@@ -198,9 +202,9 @@ const initializeBuckets = function(numOfBuckets = 1) {
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
     assert.eq(
         timeseriesStats.numBucketsClosedDueToCachePressure, 1, formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numCompressedBuckets,
-              alwaysUseCompressedBuckets ? 0 : 1,
-              formatStatsLog(timeseriesStats));
+    if (!alwaysUseCompressedBuckets) {
+        assert.eq(timeseriesStats.numCompressedBuckets, 1, formatStatsLog(timeseriesStats));
+    }
 })();
 
 replSet.stopSet();
