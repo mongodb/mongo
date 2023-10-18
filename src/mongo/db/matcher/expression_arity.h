@@ -162,7 +162,10 @@ private:
                 // Since 'subExpression' is a reference to a member of the
                 // FixedArityMatchExpression's child array, this assignment replaces the original
                 // child with the optimized child.
-                subExpression = MatchExpression::optimize(std::move(subExpression));
+                // The Boolean simplifier is disabled since we don't want to simplify
+                // sub-expressions, but simplify the whole expression instead.
+                subExpression = MatchExpression::optimize(std::move(subExpression),
+                                                          /* enableSimplification */ false);
             }
 
             return expression;

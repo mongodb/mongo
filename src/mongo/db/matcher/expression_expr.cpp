@@ -220,7 +220,10 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
             andMatch->add(exprMatchExpr._rewriteResult->releaseMatchExpression());
             andMatch->add(std::move(expression));
             // Re-optimize the new AND in order to make sure that any AND children are absorbed.
-            expression = MatchExpression::optimize(std::move(andMatch));
+            // The Boolean simplifier is disabled since we don't want to simplify sub-expressions,
+            // but simplify the whole expression instead.
+            expression =
+                MatchExpression::optimize(std::move(andMatch), /* enableSimplification */ false);
         }
 
         // Replace trivially true expression with an empty AND since the planner doesn't always

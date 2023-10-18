@@ -313,23 +313,10 @@ public:
      *   - a pointer to a new MatchExpression.
      *
      * The value of 'expression' must not be nullptr.
+     * 'enableSimplification' parameter controls Boolean Expression Simplifier.
      */
-    static std::unique_ptr<MatchExpression> optimize(std::unique_ptr<MatchExpression> expression) {
-        // If the disableMatchExpressionOptimization failpoint is enabled, optimizations are skipped
-        // and the expression is left unmodified.
-        if (MONGO_unlikely(disableMatchExpressionOptimization.shouldFail())) {
-            return expression;
-        }
-
-        auto optimizer = expression->getOptimizer();
-
-        try {
-            return optimizer(std::move(expression));
-        } catch (DBException& ex) {
-            ex.addContext("Failed to optimize expression");
-            throw;
-        }
-    }
+    static std::unique_ptr<MatchExpression> optimize(std::unique_ptr<MatchExpression> expression,
+                                                     bool enableSimplification = true);
 
     /**
      * Traverses expression tree post-order. Sorts children at each non-leaf node by (MatchType,
@@ -340,11 +327,8 @@ public:
     /**
      * Convenience method which normalizes a MatchExpression tree by optimizing and then sorting it.
      */
-    static std::unique_ptr<MatchExpression> normalize(std::unique_ptr<MatchExpression> tree) {
-        tree = optimize(std::move(tree));
-        sortTree(tree.get());
-        return tree;
-    }
+    static std::unique_ptr<MatchExpression> normalize(std::unique_ptr<MatchExpression> tree,
+                                                      bool enableSimplification = true);
 
     /**
      * Assigns an optional input parameter ID to each node which is eligible for

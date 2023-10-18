@@ -63,7 +63,8 @@ public:
             MatchExpressionParser::parse(_matchAST, expCtx, *_extensionsCallback, allowedFeatures);
         uassertStatusOK(parseResult.getStatus());
         _matchExpr = optimizeExpression
-            ? MatchExpression::optimize(std::move(parseResult.getValue()))
+            ? MatchExpression::optimize(std::move(parseResult.getValue()),
+                                        /* enableSimplification */ true)
             : std::move(parseResult.getValue());
     }
 

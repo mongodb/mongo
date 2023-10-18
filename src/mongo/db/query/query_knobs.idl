@@ -1230,6 +1230,45 @@ server_parameters:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+  internalQueryEnableBooleanExpressionsSimplifier:
+    description: "Boolean expression simplifier converts filter expression into Disjunctive Normal 
+     Form and applies some simplifications."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryEnableBooleanExpressionsSimplifier
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
+  internalQueryMaximumNumberOfUniquePredicatesToSimplify:
+    description: "If the number of unique predicates in an expression is larger than
+     'maximumNumberOfUniquePredicates' the expression is considered too big to be simplified."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryMaximumNumberOfUniquePredicatesToSimplify
+    cpp_vartype: AtomicWord<int>
+    default: 64
+
+  internalQueryMaximumNumberOfMintermsInSimplifier:
+    description: "Maximum number of minterms allowed during boolean transformations."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryMaximumNumberOfMintermsInSimplifier
+    cpp_vartype: AtomicWord<int>
+    default: 1000
+
+  internalQueryMaxSizeFactorToSimplify:
+    description: "If the simplified expression is larger than the original expression's size times 
+      `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryMaxSizeFactorToSimplify
+    cpp_vartype: AtomicDouble
+    default: 1.0
+
+  internalQueryDoNotOpenContainedOrsInSimplifier:
+    description: "If the original expression contains AND operator it is still simplified but the
+     common predicate of the simplified conjunctive terms are taken out of brackets."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryDoNotOpenContainedOrsInSimplifier
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
   internalQueryMaxSpoolMemoryUsageBytes:
     description: "The maximum amount of memory a query or command is willing to use to execute a
       spool, measured in bytes. If disk use is allowed, then it may be possible to spool more data,

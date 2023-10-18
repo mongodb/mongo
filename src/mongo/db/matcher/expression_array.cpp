@@ -116,7 +116,10 @@ void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(BSONObjBuilde
 MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& elemExpression = static_cast<ElemMatchObjectMatchExpression&>(*expression);
-        elemExpression._sub = MatchExpression::optimize(std::move(elemExpression._sub));
+        // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
+        // simplify the whole expression instead.
+        elemExpression._sub = MatchExpression::optimize(std::move(elemExpression._sub),
+                                                        /* enableSimplification */ false);
 
         return expression;
     };
@@ -190,7 +193,10 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptim
         auto& subs = static_cast<ElemMatchValueMatchExpression&>(*expression)._subs;
 
         for (auto& subExpression : subs)
-            subExpression = MatchExpression::optimize(std::move(subExpression));
+            // The Boolean simplifier is disabled since we don't want to simplify sub-expressions,
+            // but simplify the whole expression instead.
+            subExpression = MatchExpression::optimize(std::move(subExpression),
+                                                      /* enableSimplification */ false);
 
         return expression;
     };

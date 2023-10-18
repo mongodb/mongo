@@ -37,10 +37,27 @@ namespace mongo {
  */
 struct ExpressionSimlifierSettings {
     /**
-     * Predefined settings without restrictions on boolean expression simplification. Useful
+     * Default contructor witn minimum restrictions on boolean expression simplification. Useful
      * for tests and benchmarks.
      */
-    static const ExpressionSimlifierSettings kPermissive;
+    ExpressionSimlifierSettings()
+        : ExpressionSimlifierSettings(
+              /*maximumNumberOfUniquePredicates*/ std::numeric_limits<size_t>::max(),
+              /*maximumNumberOfMinterms*/ std::numeric_limits<size_t>::max(),
+              /*maxSizeFactor*/ 1e6,
+              /*doNotOpenContainedOrs*/ false,
+              /*applyQuineMcCluskey*/ true) {}
+
+    ExpressionSimlifierSettings(size_t maximumNumberOfUniquePredicates,
+                                size_t maximumNumberOfMinterms,
+                                double maxSizeFactor,
+                                bool doNotOpenContainedOrs,
+                                bool applyQuineMcCluskey)
+        : maximumNumberOfUniquePredicates(maximumNumberOfUniquePredicates),
+          maximumNumberOfMinterms(maximumNumberOfMinterms),
+          maxSizeFactor(maxSizeFactor),
+          doNotOpenContainedOrs(doNotOpenContainedOrs),
+          applyQuineMcCluskey(applyQuineMcCluskey) {}
 
     /**
      * If the number of unique predicates in an expression is larger than
@@ -49,11 +66,15 @@ struct ExpressionSimlifierSettings {
     size_t maximumNumberOfUniquePredicates;
 
     /**
-     * If a simplified expression contains more conjunctive terms then the number of conjunctive
-     * terms in the original expression times 'maxNumberOfTermsFactor', the simplified expression is
-     * rejected.
+     * Maximum number of minterms allowed during boolean transformations.
      */
-    double maxNumberOfTermsFactor;
+    size_t maximumNumberOfMinterms;
+
+    /**
+     * If the simplified expression is larger than the original expression's size times
+     * `maxSizeFactor`, the simplified one will be rejected.
+     */
+    double maxSizeFactor;
 
     /**
      * If the original expression contains AND operator it is still simplified but the common

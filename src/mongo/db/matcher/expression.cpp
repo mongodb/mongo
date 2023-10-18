@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/expression_parameterization.h"
+#include "mongo/db/matcher/expression_simplifier.h"
 #include "mongo/db/matcher/schema/json_schema_parser.h"
 #include "mongo/db/query/tree_walker.h"
 
@@ -110,6 +111,38 @@ MatchExpression::MatchExpression(MatchType type, clonable_ptr<ErrorAnnotation> a
     : _errorAnnotation(std::move(annotation)), _matchType(type) {}
 
 // static
+std::unique_ptr<MatchExpression> MatchExpression::optimize(
+    std::unique_ptr<MatchExpression> expression, bool enableSimplification) {
+    // If the disableMatchExpressionOptimization failpoint is enabled, optimizations are skipped
+    // and the expression is left unmodified.
+    if (MONGO_unlikely(disableMatchExpressionOptimization.shouldFail())) {
+        return expression;
+    }
+
+    auto optimizer = expression->getOptimizer();
+
+    try {
+        auto optimizedExpr = optimizer(std::move(expression));
+        if (enableSimplification && internalQueryEnableBooleanExpressionsSimplifier.load()) {
+            ExpressionSimlifierSettings settings{
+                static_cast<size_t>(internalQueryMaximumNumberOfUniquePredicatesToSimplify.load()),
+                static_cast<size_t>(internalQueryMaximumNumberOfMintermsInSimplifier.load()),
+                internalQueryMaxSizeFactorToSimplify.load(),
+                internalQueryDoNotOpenContainedOrsInSimplifier.load(),
+                /*applyQuineMcCluskey*/ true};
+            auto simplifiedExpr = simplifyMatchExpression(optimizedExpr.get(), settings);
+            if (simplifiedExpr) {
+                return std::move(*simplifiedExpr);
+            }
+        }
+        return optimizedExpr;
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize expression");
+        throw;
+    }
+}
+
+// static
 void MatchExpression::sortTree(MatchExpression* tree) {
     for (size_t i = 0; i < tree->numChildren(); ++i) {
         sortTree(tree->getChild(i));
@@ -119,6 +152,14 @@ void MatchExpression::sortTree(MatchExpression* tree) {
             return matchExpressionLessThan(lhs.get(), rhs.get());
         });
     }
+}
+
+// static
+std::unique_ptr<MatchExpression> MatchExpression::normalize(std::unique_ptr<MatchExpression> tree,
+                                                            bool enableSimplification) {
+    tree = optimize(std::move(tree), enableSimplification);
+    sortTree(tree.get());
+    return tree;
 }
 
 // static

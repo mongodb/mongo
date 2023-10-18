@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/projection_parser.h"
@@ -72,6 +73,20 @@ boost::optional<size_t> loadMaxMatchExpressionParams() {
     }
 
     return boost::none;
+}
+
+bool isBonsaiEnabled(QueryFrameworkControlEnum frameworkControl) {
+    switch (frameworkControl) {
+        case QueryFrameworkControlEnum::kForceClassicEngine:
+        case QueryFrameworkControlEnum::kTrySbeEngine:
+            return false;
+        case QueryFrameworkControlEnum::kTryBonsai:
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
+        case QueryFrameworkControlEnum::kForceBonsai:
+            return true;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace
@@ -190,11 +205,14 @@ Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     _findCommand = std::move(parsedFind->findCommandRequest);
 
-    _forceClassicEngine =
-        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp() ==
-        QueryFrameworkControlEnum::kForceClassicEngine;
+    const auto frameworkControl =
+        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp();
+    _forceClassicEngine = frameworkControl == QueryFrameworkControlEnum::kForceClassicEngine;
 
-    _primaryMatchExpression = MatchExpression::normalize(std::move(parsedFind->filter));
+    // TODO SERVER-76509: Enable Boolean expression simplification in Bonsai.
+    _primaryMatchExpression =
+        MatchExpression::normalize(std::move(parsedFind->filter),
+                                   /* enableSimplification*/ !isBonsaiEnabled(frameworkControl));
     if (parsedFind->proj) {
         if (parsedFind->proj->requiresMatchDetails()) {
             // Sadly, in some cases the match details cannot be generated from the unoptimized

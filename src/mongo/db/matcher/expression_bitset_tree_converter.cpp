@@ -45,22 +45,6 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/matcher/expression_where_noop.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_root_doc_eq.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 
 namespace mongo {
 using boolean_simplification::BitsetTreeNode;
@@ -114,13 +98,17 @@ struct Context {
         return expressions.size();
     }
 
-    bool isMaximumNumberOfUniquePredicatesExceeded() const {
-        return _maximumNumberOfUniquePredicates < expressions.size();
+    bool isAborted() const {
+        return containsSchemaExpressions || _maximumNumberOfUniquePredicates <= expressions.size();
     }
 
     std::vector<ExpressionBitInfo> expressions;
 
     BitConflict bitConflict{None};
+
+    size_t expressionSize{0};
+
+    bool containsSchemaExpressions{false};
 
 private:
     ExpressionMap _map;
@@ -139,6 +127,8 @@ public:
         : _context(context), _parent(parent), _isNegated{isNegated} {}
 
     void visit(const AndMatchExpression* expr) final {
+        ++_context.expressionSize;
+
         BitsetTreeNode node{BitsetTreeNode::And, _isNegated};
 
         BitsetVisitor visitor{_context, node, /* isNegated */ false};
@@ -149,13 +139,15 @@ public:
                 case Context::None:
                     break;
                 case Context::AlwaysFalse:
+                    _context.bitConflict =
+                        node.isNegated ? Context::AlwaysTrue : Context::AlwaysFalse;
                     return;
                 case Context::AlwaysTrue:
                     _context.bitConflict = Context::None;
                     break;
             }
 
-            if (MONGO_unlikely(_context.isMaximumNumberOfUniquePredicatesExceeded())) {
+            if (MONGO_unlikely(_context.isAborted())) {
                 return;
             }
         }
@@ -164,6 +156,8 @@ public:
     }
 
     void visit(const OrMatchExpression* expr) final {
+        ++_context.expressionSize;
+
         BitsetTreeNode node{BitsetTreeNode::Or, _isNegated};
 
         BitsetVisitor visitor{_context, node, /* isNegated */ false};
@@ -177,10 +171,12 @@ public:
                     _context.bitConflict = Context::None;
                     break;
                 case Context::AlwaysTrue:
+                    _context.bitConflict =
+                        node.isNegated ? Context::AlwaysFalse : Context::AlwaysTrue;
                     return;
             }
 
-            if (MONGO_unlikely(_context.isMaximumNumberOfUniquePredicatesExceeded())) {
+            if (MONGO_unlikely(_context.isAborted())) {
                 return;
             }
         }
@@ -189,6 +185,8 @@ public:
     }
 
     void visit(const NorMatchExpression* expr) final {
+        ++_context.expressionSize;
+
         // NOR == NOT * OR == AND * NOT
         BitsetTreeNode node{BitsetTreeNode::Or, !_isNegated};
 
@@ -200,13 +198,15 @@ public:
                 case Context::None:
                     break;
                 case Context::AlwaysFalse:
-                    return;
-                case Context::AlwaysTrue:
                     _context.bitConflict = Context::None;
                     break;
+                case Context::AlwaysTrue:
+                    _context.bitConflict =
+                        node.isNegated ? Context::AlwaysFalse : Context::AlwaysTrue;
+                    return;
             }
 
-            if (MONGO_unlikely(_context.isMaximumNumberOfUniquePredicatesExceeded())) {
+            if (MONGO_unlikely(_context.isAborted())) {
                 return;
             }
         }
@@ -215,6 +215,8 @@ public:
     }
 
     void visit(const NotMatchExpression* expr) final {
+        // Don't increase 'expressionSize', because NOT is considered to be a part of its child.
+        // predicate.
         BitsetVisitor visitor{_context, _parent, !_isNegated};
         expr->getChild(0)->acceptVisitor(&visitor);
     }
@@ -276,10 +278,12 @@ public:
     }
 
     void visit(const AlwaysFalseMatchExpression* expr) final {
-        _context.bitConflict = Context::AlwaysFalse;
+        ++_context.expressionSize;
+        _context.bitConflict = _isNegated ? Context::AlwaysTrue : Context::AlwaysFalse;
     }
     void visit(const AlwaysTrueMatchExpression* expr) final {
-        _context.bitConflict = Context::AlwaysTrue;
+        ++_context.expressionSize;
+        _context.bitConflict = _isNegated ? Context::AlwaysFalse : Context::AlwaysTrue;
     }
 
     void visit(const ExistsMatchExpression* expr) final {
@@ -329,76 +333,79 @@ public:
         visitLeafNode(expr);
     }
 
-    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaBinDataSubTypeExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaCondMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaCondMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaEqMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaEqMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaFmodMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaFmodMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMaxItemsMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMaxLengthMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMaxPropertiesMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMinItemsMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMinLengthMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaMinPropertiesMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaObjectMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaObjectMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaRootDocEqMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaTypeExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaTypeExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaUniqueItemsMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
-    void visit(const InternalSchemaXorMatchExpression* expr) final {
-        visitLeafNode(expr);
+    void visit(const InternalSchemaXorMatchExpression*) final {
+        visitiInternalSchemaNode();
     }
     void visit(const InternalEqHashedKey* expr) final {
         visitLeafNode(expr);
     }
 
 private:
-    /**
-     * Returns the expressions's bit index if no conflicts happen.
-     */
-    boost::optional<size_t> visitLeafNode(const MatchExpression* expr) {
+    void visitLeafNode(const MatchExpression* expr) {
+        ++_context.expressionSize;
+
         const size_t bitIndex = _context.getOrAssignBitIndex(expr);
+        if (_context.isAborted()) {
+            return;
+        }
+
         // Process bit conflicts. See comments for BitConlict type for details.
         const bool hasConflict = _parent.leafChildren.size() > bitIndex &&
             _parent.leafChildren.mask[bitIndex] &&
@@ -406,11 +413,13 @@ private:
         if (hasConflict) {
             _context.bitConflict =
                 _parent.type == BitsetTreeNode::And ? Context::AlwaysFalse : Context::AlwaysTrue;
-            return boost::none;
         } else {
             _parent.leafChildren.set(bitIndex, !_isNegated);
-            return bitIndex;
         }
+    }
+
+    void visitiInternalSchemaNode() {
+        _context.containsSchemaExpressions = true;
     }
 
     Context& _context;
@@ -419,36 +428,41 @@ private:
 };
 }  // namespace
 
-boost::optional<std::pair<boolean_simplification::BitsetTreeNode, std::vector<ExpressionBitInfo>>>
-transformToBitsetTree(const MatchExpression* root, size_t maximumNumberOfUniquePredicates) {
+boost::optional<BitsetTreeTransformResult> transformToBitsetTree(
+    const MatchExpression* root, size_t maximumNumberOfUniquePredicates) {
     Context context{maximumNumberOfUniquePredicates};
 
     BitsetTreeNode bitsetRoot{BitsetTreeNode::And, false};
     BitsetVisitor visitor{context, bitsetRoot, false};
     root->acceptVisitor(&visitor);
 
-    if (MONGO_unlikely(context.isMaximumNumberOfUniquePredicatesExceeded())) {
+    if (MONGO_unlikely(context.isAborted())) {
         return boost::none;
     }
 
-    bitsetRoot.ensureBitsetSize(context.getMaxtermSize());
     switch (context.bitConflict) {
         case Context::None:
             break;
         case Context::AlwaysFalse:
             // Empty OR is always false.
-            return {{BitsetTreeNode{BitsetTreeNode::Or, false}, std::move(context.expressions)}};
+            return {{BitsetTreeNode{BitsetTreeNode::Or, false},
+                     std::move(context.expressions),
+                     context.expressionSize}};
         case Context::AlwaysTrue:
             // Empty AND is always true.
-            return {{BitsetTreeNode{BitsetTreeNode::And, false}, std::move(context.expressions)}};
+            return {{BitsetTreeNode{BitsetTreeNode::And, false},
+                     std::move(context.expressions),
+                     context.expressionSize}};
     }
 
     // If we have just one child return it to avoid unnecessary $and or $or nodes with only one
     // child.
     if (bitsetRoot.leafChildren.mask.count() == 0 && bitsetRoot.internalChildren.size() == 1) {
-        return {{std::move(bitsetRoot.internalChildren[0]), std::move(context.expressions)}};
+        return {{std::move(bitsetRoot.internalChildren[0]),
+                 std::move(context.expressions),
+                 context.expressionSize}};
     }
 
-    return {{std::move(bitsetRoot), std::move(context.expressions)}};
+    return {{std::move(bitsetRoot), std::move(context.expressions), context.expressionSize}};
 }
 }  // namespace mongo

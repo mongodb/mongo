@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -378,6 +379,12 @@ TEST_F(QueryPlannerTest, ContainedOrOfAndDoesNotCollapseIndenticalScans) {
 }
 
 TEST_F(QueryPlannerTest, ContainedOrOfAndCollapseIdenticalScansTwoFilters) {
+    // With the simplifer enabled the solution below will be simplified to "{a:1, b:2, c:1, $or:
+    // [{d:3}, {e:4}]}", with the common terms '{a:1, b:2}' moved out of the nested $or. See the
+    // test below for the behaviour with the enabled simplifier.
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", false);
+
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{c: 1, $or: [{a:1, b:2, d:3}, {a:1, b:2, e:4}]}"));
 
@@ -387,6 +394,24 @@ TEST_F(QueryPlannerTest, ContainedOrOfAndCollapseIdenticalScansTwoFilters) {
         "{fetch: {filter: {c: 1}, node: {fetch: {filter: {$or:[{e:4},{d:3}]},"
         "node: {ixscan: {pattern: {a: 1, b: 1}, filter: null,"
         "bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest,
+       SimplifedContainedOrOfAndCollapseIdenticalScansTwoFiltersAndTwoFecthesIntoOne) {
+    // With the simplifer enabled the solution below will be simplified to "{a:1, b:2, c:1, $or:
+    // [{d:3}, {e:4}]}" which allow the multiplanner to build more effective test with only one
+    // fecth instead of two.
+
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQuery(fromjson("{c: 1, $or: [{a:1, b:2, d:3}, {a:1, b:2, e:4}]}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+    assertSolutionExists(
+        R"--({fetch: {filter: {$and: [{$or:[{e:4},{d:3}]}, {c: 1}]}, 
+                      node: {ixscan: {pattern: {a: 1, b: 1}, 
+                                      filter: null, 
+                                      bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]]}}}}})--");
 }
 
 TEST_F(QueryPlannerTest, RootedOrOfAndCollapseScansExistingOrFilter) {
@@ -695,10 +720,10 @@ TEST_F(QueryPlannerTest, EquivalentAndsOne) {
 
 TEST_F(QueryPlannerTest, EquivalentAndsTwo) {
     addIndex(BSON("a" << 1 << "b" << 1));
-    runQuery(fromjson("{$and: [{a: 1, b: 10}, {a: 1, b: 20}]}"));
+    runQuery(fromjson("{$and: [{a: 1, b: 10}, {a: 2, b: 20}]}"));
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {$and:[{a:1},{a:1},{b:10},{b:20}]}}}");
+    assertSolutionExists("{cscan: {dir: 1, filter: {$and:[{a:1},{a:2},{b:10},{b:20}]}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: "
         "{filter: null, pattern: {a: 1, b: 1}}}}}");
@@ -2837,6 +2862,13 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIterationMix
 }
 
 TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
+    // Disable the simplifier since once the simplifier is emabled it will simplify the expression
+    // to a single $or and the test won't make sense: `{a: 1, $or: [{b: 2.1, c: 2.1}, {b:2.2,
+    // c: 2.2}, {unindexed: 'thisPredicateToEnsureNestedOrsAreNotCombined', x: 3.0, y: 3.0},
+    // {unindexed: 'thisPredicateToEnsureNestedOrsAreNotCombined', x: 3.1, y: 3.1}]}`.
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", false);
+
     params.options =
         QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
     ASSERT_EQ(internalQueryEnumerationMaxOrSolutions.load(), 10ul);

@@ -57,7 +57,7 @@ export function getWinningPlan(queryPlanner) {
  * into account that the plan may or may not have agg stages.
  */
 export function getWinningPlanFromExplain(explain) {
-    if (explain.hasOwnProperty("shards")) {
+    if ("shards" in explain) {
         for (const shardName in explain.shards) {
             let queryPlanner = getQueryPlanner(explain.shards[shardName]);
             return getWinningPlan(queryPlanner);

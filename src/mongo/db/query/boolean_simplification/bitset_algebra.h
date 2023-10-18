@@ -29,15 +29,10 @@
 
 #pragma once
 
-#include <boost/container_hash/extensions.hpp>
-#include <boost/container_hash/hash.hpp>
-#include <boost/dynamic_bitset.hpp>
-#include <boost/dynamic_bitset/dynamic_bitset.hpp>
-#include <cstddef>
+#include <bitset>
 #include <initializer_list>
 #include <iosfwd>
 #include <string>
-#include <variant>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -51,7 +46,8 @@ namespace mongo::boolean_simplification {
  * children conjunctive terms.
  */
 
-using Bitset = boost::dynamic_bitset<size_t>;
+constexpr size_t kBitsetNumberOfBits = 64;
+using Bitset = std::bitset<kBitsetNumberOfBits>;
 
 inline Bitset operator""_b(const char* bits, size_t len) {
     return Bitset{std::string{bits, len}};
@@ -61,32 +57,21 @@ inline Bitset operator""_b(const char* bits, size_t len) {
  * Represent a conjunctive or disjunctive term in a condensed bitset form.
  */
 struct BitsetTerm {
-    explicit BitsetTerm(size_t nbits) : predicates(nbits, 0), mask(nbits, 0) {}
+    explicit BitsetTerm() : predicates(0ul), mask(0ul) {}
 
     BitsetTerm(Bitset bitset, Bitset mask) : predicates(bitset), mask(mask) {}
 
-    BitsetTerm(size_t nbits, size_t bitIndex, bool val) : predicates(nbits, 0), mask(nbits, 0) {
-        predicates.set(bitIndex, val);
-        mask.set(bitIndex, true);
+    BitsetTerm(size_t bitIndex, bool val) : predicates(0ul), mask(0ul) {
+        set(bitIndex, val);
     }
 
     void set(size_t bitIndex, bool value) {
-        if (mask.size() <= bitIndex) {
-            constexpr size_t blockSize = sizeof(Bitset::block_type);
-            const size_t newSize = (1 + bitIndex / blockSize) * blockSize;
-            resize(newSize);
-        }
-        mask.set(bitIndex);
+        mask.set(bitIndex, true);
         predicates.set(bitIndex, value);
     }
 
     size_t size() const {
         return mask.size();
-    }
-
-    void resize(size_t newSize) {
-        predicates.resize(newSize);
-        mask.resize(newSize);
     }
 
     /**
@@ -108,7 +93,7 @@ struct Minterm;
  * list of children conjunctions. Each child conjunction is represented as a Minterm.
  */
 struct Maxterm {
-    explicit Maxterm(size_t size);
+    Maxterm() = default;
     Maxterm(std::initializer_list<Minterm> init);
 
     Maxterm& operator|=(const Minterm& rhs);
@@ -136,20 +121,11 @@ struct Maxterm {
      */
     void appendEmpty();
 
-    /**
-     * Returns the number of bits that each individual minterm in the maxterm contains.
-     */
-    size_t numberOfBits() const {
-        return _numberOfBits;
-    }
-
     std::string toString() const;
 
     std::vector<Minterm> minterms;
 
 private:
-    size_t _numberOfBits;
-
     friend Maxterm operator&(const Maxterm& lhs, const Maxterm& rhs);
 };
 
@@ -170,7 +146,6 @@ struct Minterm : private BitsetTerm {
     using BitsetTerm::BitsetTerm;
     using BitsetTerm::mask;
     using BitsetTerm::predicates;
-    using BitsetTerm::resize;
     using BitsetTerm::set;
     using BitsetTerm::size;
 
@@ -193,23 +168,28 @@ struct Minterm : private BitsetTerm {
      * & b'. See Absorption law for details.
      */
     bool canAbsorb(const Minterm& other) const {
-        return mask.is_subset_of(other.mask) && predicates == (mask & other.predicates);
+        return mask == (mask & other.mask) && predicates == (mask & other.predicates);
     }
 
     bool isAlwaysTrue() const {
         return mask.none();
     }
+
+    /**
+     * Flip the value of every predicate in the minterm.
+     */
+    void flip();
 };
 
 inline Maxterm operator&(const Minterm& lhs, const Minterm& rhs) {
     if (lhs.getConflicts(rhs).any()) {
-        return Maxterm{lhs.size()};
+        return Maxterm{};
     }
     return {{Minterm(lhs.predicates | rhs.predicates, lhs.mask | rhs.mask)}};
 }
 
 inline Maxterm operator&(const Maxterm& lhs, const Maxterm& rhs) {
-    Maxterm result{lhs.numberOfBits()};
+    Maxterm result{};
     result.minterms.reserve(lhs.minterms.size() * rhs.minterms.size());
     for (const auto& left : lhs.minterms) {
         for (const auto& right : rhs.minterms) {
@@ -225,20 +205,9 @@ bool operator==(const Minterm& lhs, const Minterm& rhs);
 std::ostream& operator<<(std::ostream& os, const Minterm& minterm);
 bool operator==(const Maxterm& lhs, const Maxterm& rhs);
 std::ostream& operator<<(std::ostream& os, const Maxterm& maxterm);
+
+template <typename H>
+H AbslHashValue(H h, const Minterm& mt) {
+    return H::combine(std::move(h), mt.predicates, mt.mask);
+}
 }  // namespace mongo::boolean_simplification
-
-namespace std {
-template <>
-struct hash<mongo::boolean_simplification::Minterm> {
-    using argument_type = mongo::boolean_simplification::Minterm;
-    using result_type = size_t;
-
-    result_type operator()(const argument_type& mt) const {
-        // Just some random value for the seed.
-        result_type seed{3037};
-        boost::hash_combine(seed, mt.predicates);
-        boost::hash_combine(seed, mt.mask);
-        return seed;
-    }
-};
-}  // namespace std

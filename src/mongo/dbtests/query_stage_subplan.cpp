@@ -531,7 +531,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     insert(BSON("_id" << 4));
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
+    findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:5}}]}"));
     findCommand->setSort(BSON("d" << 1));
     auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
 

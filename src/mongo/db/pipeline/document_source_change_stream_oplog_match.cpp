@@ -108,7 +108,8 @@ std::unique_ptr<MatchExpression> buildOplogMatchFilter(
     oplogFilter->add(std::move(eventFilter));
 
     // Perform a final optimization pass on the complete filter before returning.
-    return MatchExpression::optimize(std::move(oplogFilter));
+    // TODO SERVER-81846: Enable the Boolean Expression Simplifier in change streams.
+    return MatchExpression::optimize(std::move(oplogFilter), /* enableSimplification */ false);
 }
 }  // namespace change_stream_filter
 

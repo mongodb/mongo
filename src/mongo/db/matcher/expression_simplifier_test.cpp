@@ -55,7 +55,7 @@ inline void assertSimplification(const MatchExpression& expr,
 }
 
 inline void assertSimplification(const MatchExpression& expr, const MatchExpression& expected) {
-    ExpressionSimlifierSettings settings = ExpressionSimlifierSettings::kPermissive;
+    ExpressionSimlifierSettings settings{};
     settings.doNotOpenContainedOrs = true;
     assertSimplification(expr, expected, settings);
 }
@@ -76,6 +76,10 @@ inline std::unique_ptr<MatchExpression> parse(BSONObj bsonExpr) {
 
     ASSERT_OK(expr);
     return std::move(expr.getValue());
+}
+
+inline std::unique_ptr<MatchExpression> parse(const char* json) {
+    return parse(fromjson(json));
 }
 
 inline void assertSimplification(BSONObj bsonExpr, BSONObj bsonExpected) {
@@ -103,7 +107,7 @@ inline void assertSimplification(BSONObj bsonExpr) {
 }
 
 inline void assertDNFTransformation(const MatchExpression& expr, const MatchExpression& expected) {
-    ExpressionSimlifierSettings settings = ExpressionSimlifierSettings::kPermissive;
+    ExpressionSimlifierSettings settings{};
     settings.applyQuineMcCluskey = false;
     auto result = simplifyMatchExpression(&expr, settings);
     ASSERT_TRUE(result);
@@ -433,9 +437,9 @@ TEST(ExpressionSimplifierTests, StopOnTooManyPredicates) {
                        "{$or: [{c: 10}, {c: {$ne: 10}}]}"
                        "]}"));
 
-    ExpressionSimlifierSettings settings = ExpressionSimlifierSettings::kPermissive;
+    ExpressionSimlifierSettings settings{};
 
-    settings.maximumNumberOfUniquePredicates = 5;
+    settings.maximumNumberOfUniquePredicates = 10;
     auto result = simplifyMatchExpression(expr.get(), settings);
     ASSERT_TRUE(result);
 
@@ -449,14 +453,31 @@ TEST(ExpressionSimplifierTests, StopOnTooManyTerms) {
         parse(fromjson("{$and: [{$or: [{a: 1}, {b: 1}]}, {$or: [{a: 2}, {b: 2}]}, {$or: [{a: 3}, "
                        "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}"));
 
-    ExpressionSimlifierSettings settings = ExpressionSimlifierSettings::kPermissive;
+    ExpressionSimlifierSettings settings{};
     settings.doNotOpenContainedOrs = false;
 
-    settings.maxNumberOfTermsFactor = 10;
+    settings.maxSizeFactor = 10;
     auto result = simplifyMatchExpression(expr.get(), settings);
     ASSERT_TRUE(result);
 
-    settings.maxNumberOfTermsFactor = 1;
+    settings.maxSizeFactor = 1;
+    result = simplifyMatchExpression(expr.get(), settings);
+    ASSERT_FALSE(result);
+}
+
+TEST(ExpressionSimplifierTests, StopOnTooManyMinTerms) {
+    auto expr = parse(
+        "{$and: [{$or: [{a: 1}, {b: 1}]}, {$or: [{a: 2}, {b: 2}]}, {$or: [{a: 3}, "
+        "{b: 3}]}, {$or: [{a: 4}, {b: 4}]}]}");
+
+    ExpressionSimlifierSettings settings{};
+    settings.doNotOpenContainedOrs = false;
+
+    settings.maximumNumberOfMinterms = 1000;
+    auto result = simplifyMatchExpression(expr.get(), settings);
+    ASSERT_TRUE(result);
+
+    settings.maxSizeFactor = 2;
     result = simplifyMatchExpression(expr.get(), settings);
     ASSERT_FALSE(result);
 }
@@ -465,5 +486,17 @@ TEST(ExpressionSimplifierTests, AbsorbedTerm) {
     auto expr = fromjson("{$or: [{a: 1, b: 1}, {a: 1, b: 1, c: 2}]}");
     auto expected = fromjson("{a: 1, b: 1}");
     assertSimplification(expr, expected);
+}
+
+TEST(ExpressionSimplifierTests, NorAlwaysBoolean) {
+    AndMatchExpression alwaysTrue{};
+    AlwaysFalseMatchExpression alwaysFalse{};
+
+    assertSimplification(*parse("{$nor: [{$alwaysFalse: 1}]}"), alwaysTrue);
+    assertSimplification(*parse("{$nor: [{$alwaysTrue: 1}]}"), alwaysFalse);
+    assertSimplification(*parse("{$nor: [{a: 1}, {a: {$ne: 1}}]}"), alwaysFalse);
+    assertSimplification(*parse("{$nor: [{$and: [{a: 1}, {a: {$ne: 1}}]}]}"), alwaysTrue);
+    assertSimplification(*parse("{$nor: [{$or: [{a: 1}, {a: {$ne: 1}}]}]}"), alwaysFalse);
+    assertSimplification(*parse("{$nor: [{$alwaysFalse: 1}, {$alwaysTrue: 1}]}"), alwaysFalse);
 }
 }  // namespace mongo

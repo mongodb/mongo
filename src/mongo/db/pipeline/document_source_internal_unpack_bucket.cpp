@@ -1732,7 +1732,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                                                              pExpCtx,
                                                              ExtensionsCallbackNoop(),
                                                              Pipeline::kAllowedMatcherFeatures));
-            _wholeBucketFilter = MatchExpression::optimize(std::move(_wholeBucketFilter));
+            _wholeBucketFilter = MatchExpression::optimize(std::move(_wholeBucketFilter),
+                                                           /* enableSimplification */ false);
         }
 
         if (!predicates.rewriteProvidesExactMatchPredicate) {
@@ -1743,7 +1744,8 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                                                              pExpCtx,
                                                              ExtensionsCallbackNoop(),
                                                              Pipeline::kAllowedMatcherFeatures));
-            _eventFilter = MatchExpression::optimize(std::move(_eventFilter));
+            _eventFilter = MatchExpression::optimize(std::move(_eventFilter),
+                                                     /* enableSimplification */ false);
             _eventFilterDeps = {};
             match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
         }

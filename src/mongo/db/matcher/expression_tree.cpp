@@ -157,7 +157,10 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
 
         // Recursively apply optimizations to child expressions.
         for (auto& childExpression : children)
-            childExpression = MatchExpression::optimize(std::move(childExpression));
+            // The Boolean simplifier is disabled since we don't want to simplify sub-expressions,
+            // but simplify the whole expression instead.
+            childExpression = MatchExpression::optimize(std::move(childExpression),
+                                                        /* enableSimplification */ false);
 
         // Associativity of AND and OR: an AND absorbs the children of any ANDs among its children
         // (and likewise for any OR with OR children).
@@ -621,7 +624,10 @@ bool NotMatchExpression::equivalent(const MatchExpression* other) const {
 MatchExpression::ExpressionOptimizerFunc NotMatchExpression::getOptimizer() const {
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& notExpression = static_cast<NotMatchExpression&>(*expression);
-        notExpression._exp = MatchExpression::optimize(std::move(notExpression._exp));
+        // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
+        // simplify the whole expression instead.
+        notExpression._exp = MatchExpression::optimize(std::move(notExpression._exp),
+                                                       /* enableSimplification */ false);
 
         return expression;
     };

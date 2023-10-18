@@ -125,8 +125,8 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
         return nullptr;
     }
 
-    _matchProcessor->setExpression(
-        MatchExpression::optimize(std::move(_matchProcessor->getExpression())));
+    _matchProcessor->setExpression(MatchExpression::optimize(
+        std::move(_matchProcessor->getExpression()), /* enableSimplification */ false));
 
     return this;
 }

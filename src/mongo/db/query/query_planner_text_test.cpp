@@ -35,6 +35,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/framework.h"
 
@@ -164,12 +165,12 @@ TEST_F(QueryPlannerTest, RemoveFromSubtree) {
                       << "text"
                       << "_ftsx" << 1 << "b" << 1));
 
-    runQuery(fromjson("{a:1, $or: [{a:1}, {b:7}], $text:{$search: 'blah'}}"));
+    runQuery(fromjson("{a:2, $or: [{a:1}, {b:7}], $text:{$search: 'blah'}}"));
     assertNumSolutions(1);
 
     assertSolutionExists(
         "{fetch: {filter: {$or:[{a:1},{b:7}]},"
-        "node: {text: {prefix: {a:1}, search: 'blah'}}}}");
+        "node: {text: {prefix: {a:2}, search: 'blah'}}}}");
 }
 
 // Text is quite often multikey.  None of the prefixes can be arrays, and suffixes are indexed
@@ -290,6 +291,30 @@ TEST_F(QueryPlannerTest, TextInsideOrOfAnd) {
 
 // SERVER-13039
 TEST_F(QueryPlannerTest, TextInsideAndOrAnd) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    addIndex(BSON("_fts"
+                  << "text"
+                  << "_ftsx" << 1));
+    runQuery(
+        fromjson("{a: 1, $or: [{a:2}, {b:2}, "
+                 "{a: 1, $text: {$search: 'foo'}}]}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        R"--({fetch: {filter: {a: 1}, node: {or: {nodes: [
+                {text: {search: 'foo'}},
+                {ixscan: {pattern: {a: 1}}},
+                {ixscan: {pattern: {b: 1}}}
+            ]}}}})--");
+}
+
+// SERVER-13039
+TEST_F(QueryPlannerTest, TextInsideAndOrAnd_DisabledSimplifier) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", false);
+
     params.options = QueryPlannerParams::NO_TABLE_SCAN;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));

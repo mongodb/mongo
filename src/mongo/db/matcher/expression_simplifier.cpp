@@ -29,7 +29,10 @@
 
 #include "mongo/db/matcher/expression_simplifier.h"
 #include "mongo/db/matcher/expression_restorer.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
+#include "mongo/db/query/tree_walker.h"
 
 #include "mongo/logv2/log.h"
 
@@ -41,15 +44,131 @@ using boolean_simplification::Maxterm;
 using boolean_simplification::Minterm;
 
 namespace {
-Maxterm quineMcCluskey(const BitsetTreeNode& tree, const ExpressionSimlifierSettings& settings) {
-    auto maxterm = boolean_simplification::convertToDNF(tree);
-    maxterm.removeRedundancies();
+struct Context {
+    /**
+     * An expression cannot contain more than one operator that uses a special index (geo, text).
+     */
+    bool isExpressionValid() const {
+        return numberOfSpecialIndexOperators < 2;
+    };
+
+    size_t numberOfSpecialIndexOperators{0};
+};
+
+class ValidateVisitor : public MatchExpressionConstVisitor {
+public:
+    ValidateVisitor(Context& context) : _context{context} {}
+
+    void visit(const AndMatchExpression* expr) final {}
+    void visit(const OrMatchExpression* expr) final {}
+    void visit(const NorMatchExpression* expr) final {}
+    void visit(const NotMatchExpression* expr) final {}
+    void visit(const ElemMatchValueMatchExpression* expr) final {}
+    void visit(const ElemMatchObjectMatchExpression* expr) final {}
+
+    void visit(const BitsAllClearMatchExpression* expr) final {}
+    void visit(const BitsAllSetMatchExpression* expr) final {}
+    void visit(const BitsAnyClearMatchExpression* expr) final {}
+    void visit(const BitsAnySetMatchExpression* expr) final {}
+    void visit(const EqualityMatchExpression* expr) final {}
+    void visit(const GTEMatchExpression* expr) final {}
+    void visit(const GTMatchExpression* expr) final {}
+    void visit(const LTEMatchExpression* expr) final {}
+    void visit(const LTMatchExpression* expr) final {}
+
+    void visit(const InMatchExpression* expr) final {}
+    void visit(const ModMatchExpression* expr) final {}
+    void visit(const RegexMatchExpression* expr) final {}
+    void visit(const SizeMatchExpression* expr) final {}
+    void visit(const TypeMatchExpression* expr) final {}
+
+    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysTrueMatchExpression* expr) final {}
+
+    void visit(const ExistsMatchExpression* expr) final {}
+    void visit(const ExprMatchExpression* expr) final {}
+
+    void visit(const GeoMatchExpression* expr) final {
+        ++_context.numberOfSpecialIndexOperators;
+    }
+    void visit(const GeoNearMatchExpression* expr) final {
+        ++_context.numberOfSpecialIndexOperators;
+    }
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {
+        ++_context.numberOfSpecialIndexOperators;
+    }
+
+    void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
+
+    void visit(const TextMatchExpression* expr) final {
+        ++_context.numberOfSpecialIndexOperators;
+    }
+    void visit(const TextNoOpMatchExpression* expr) final {
+        ++_context.numberOfSpecialIndexOperators;
+    }
+
+    void visit(const TwoDPtInAnnulusExpression* expr) final {
+        ++_context.numberOfSpecialIndexOperators;
+    }
+
+    void visit(const WhereMatchExpression* expr) final {}
+    void visit(const WhereNoOpMatchExpression* expr) final {}
+
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
+    void visit(const InternalSchemaCondMatchExpression* expr) final {}
+    void visit(const InternalSchemaEqMatchExpression* expr) final {}
+    void visit(const InternalSchemaFmodMatchExpression* expr) final {}
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaObjectMatchExpression* expr) final {}
+    void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
+    void visit(const InternalSchemaTypeExpression* expr) final {}
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaXorMatchExpression* expr) final {}
+
+    void visit(const InternalEqHashedKey* expr) final {}
+
+private:
+    Context& _context;
+};
+
+bool isExpressionValid(const MatchExpression* root) {
+    Context context{};
+    ValidateVisitor visitor{context};
+    MatchExpressionWalker walker{&visitor, nullptr, nullptr};
+    tree_walker::walk<true, MatchExpression>(root, &walker);
+    return context.isExpressionValid();
+}
+
+boost::optional<Maxterm> quineMcCluskey(const BitsetTreeNode& tree,
+                                        const ExpressionSimlifierSettings& settings) {
+    auto maxterm = boolean_simplification::convertToDNF(tree, settings.maximumNumberOfMinterms);
+    if (!maxterm) {
+        LOGV2_DEBUG(
+            8113912, 2, "The number of minterms has exceeded the 'maximumNumberOfMinterms' limit");
+        return boost::none;
+    }
+
+    maxterm->removeRedundancies();
 
     LOGV2_DEBUG(
-        7767001, 5, "MatchExpression in DNF representation", "maxterm"_attr = maxterm.toString());
+        7767001, 5, "MatchExpression in DNF representation", "maxterm"_attr = maxterm->toString());
 
     if (settings.applyQuineMcCluskey) {
-        maxterm = boolean_simplification::quineMcCluskey(std::move(maxterm));
+        maxterm = boolean_simplification::quineMcCluskey(std::move(*maxterm));
     }
 
     return maxterm;
@@ -76,47 +195,76 @@ boost::optional<BitsetTreeNode> handleRootedAndCase(Maxterm dnfExpression) {
 boost::optional<BitsetTreeNode> simplifyBitsetTree(const BitsetTreeNode& tree,
                                                    const ExpressionSimlifierSettings& settings) {
     auto maxterm = quineMcCluskey(tree, settings);
-
-    // 1 root OR term + number child conjuctive terms.
-    const size_t numberOfTerms = 1 + maxterm.minterms.size();
-    if (tree.calculateNumberOfTerms() * settings.maxNumberOfTermsFactor < numberOfTerms) {
-        LOGV2_DEBUG(
-            8113910, 2, "The number of predicates has exceeded the 'maxNumberOfTermsFactor' limit");
+    if (!maxterm) {
         return boost::none;
     }
 
     if (tree.type == BitsetTreeNode::And && settings.doNotOpenContainedOrs) {
-        return handleRootedAndCase(std::move(maxterm));
+        return handleRootedAndCase(std::move(*maxterm));
     }
 
-    return {boolean_simplification::convertToBitsetTree(maxterm)};
+    return {boolean_simplification::convertToBitsetTree(*maxterm)};
 }
 }  // namespace
 
-const ExpressionSimlifierSettings ExpressionSimlifierSettings::kPermissive{
-    std::numeric_limits<size_t>::max(), 1e6, false, true};
-
 boost::optional<std::unique_ptr<MatchExpression>> simplifyMatchExpression(
     const MatchExpression* root, const ExpressionSimlifierSettings& settings) {
+    if (!isExpressionValid(root)) {
+        LOGV2_DEBUG(8163000,
+                    5,
+                    "Skipping the expression for it is not suitable for simplification.",
+                    "expression"_attr = root->debugString());
+        return boost::none;
+    }
+
     LOGV2_DEBUG(7767000,
                 5,
                 "Converting MatchExpression to corresponding DNF",
                 "expression"_attr = root->debugString());
 
-    auto result = transformToBitsetTree(root, settings.maximumNumberOfUniquePredicates);
+    auto result = transformToBitsetTree(root,
+                                        std::min(boolean_simplification::kBitsetNumberOfBits,
+                                                 settings.maximumNumberOfUniquePredicates));
 
     if (MONGO_unlikely(!result.has_value())) {
-        LOGV2_DEBUG(8113911, 2, "Maximum number of unique predicates in DNF transformer exceeded");
+        LOGV2_DEBUG(8113911,
+                    2,
+                    "The query contains schema expressions or maximum number of unique predicates "
+                    "in DNF transformer exceeded");
         return boost::none;
     }
 
     auto bitsetAndExpressions = std::move(*result);
 
-    auto bitsetTreeResult = simplifyBitsetTree(bitsetAndExpressions.first, settings);
+    auto bitsetTreeResult = simplifyBitsetTree(bitsetAndExpressions.bitsetTree, settings);
     if (MONGO_unlikely(!bitsetTreeResult.has_value())) {
         return boost::none;
     }
 
-    return restoreMatchExpression(*bitsetTreeResult, bitsetAndExpressions.second);
+    if (bitsetAndExpressions.expressionSize * settings.maxSizeFactor <=
+        bitsetTreeResult->calculateSize()) {
+        LOGV2_DEBUG(8113910, 2, "The number of predicates has exceeded the 'maxSizeFactor' limit");
+        return boost::none;
+    }
+
+    auto simplifiedExpression =
+        restoreMatchExpression(*bitsetTreeResult, bitsetAndExpressions.expressions);
+
+    // Check here if we still have a valid query, e.g. no more than one special index operator (geo,
+    // text).
+    if (!isExpressionValid(simplifiedExpression.get())) {
+        LOGV2_DEBUG(
+            8163001,
+            5,
+            "Failed to simplify the expression since the simplified expression is not valid.",
+            "simplifiedExpression"_attr = root->debugString());
+        return boost::none;
+    }
+
+    LOGV2_DEBUG(7767002,
+                5,
+                "Simplified MatchExpression",
+                "expression"_attr = simplifiedExpression->debugString());
+    return simplifiedExpression;
 }
 }  // namespace mongo

@@ -54,7 +54,7 @@ TEST(MintermOperationsTest, AAndNotB) {
 TEST(MintermOperationsTest, AAndNotA) {
     Minterm a{"1", "1"};
     Minterm na{"0", "1"};
-    Maxterm expectedResult{a.size()};
+    Maxterm expectedResult{};
 
     auto result = a & na;
     ASSERT_EQ(expectedResult, result);
@@ -81,7 +81,7 @@ TEST(MintermOperationsTest, ACDAndB) {
 TEST(MintermOperationsTest, ComplexExpr) {
     Minterm acnbd{"1101", "1111"};
     Minterm b{"0010", "0010"};
-    Maxterm expectedResult{b.size()};
+    Maxterm expectedResult{};
 
     auto result = acnbd & b;
     ASSERT_EQ(expectedResult, result);
@@ -216,6 +216,24 @@ TEST(MaxtermOperationsTest, ComplexAnd2) {
     ASSERT_EQ(expectedResult, result);
 }
 
+TEST(MaxtermOperationsTest, NotTrue) {
+    Maxterm alwaysTrue{};
+    alwaysTrue.appendEmpty();
+
+    Maxterm alwaysFalse{};
+
+    ASSERT_EQ(alwaysFalse, ~alwaysTrue);
+}
+
+TEST(MaxtermOperationsTest, NotFalse) {
+    Maxterm alwaysFalse{};
+
+    Maxterm alwaysTrue{};
+    alwaysTrue.appendEmpty();
+
+    ASSERT_EQ(alwaysTrue, ~alwaysFalse);
+}
+
 // not (BC | A~D)
 TEST(MaxtermOperationsTest, ComplexNot) {
     Maxterm bcOrAnd{
@@ -325,7 +343,7 @@ TEST(ExtractCommonPredicatesTest, NoCommonPredicates) {
 }
 
 TEST(ExtractCommonPredicatesTest, AlwaysFalseInput) {
-    Maxterm maxterm{0};
+    Maxterm maxterm{};
 
     ASSERT_TRUE(maxterm.isAlwaysFalse());
 
@@ -335,7 +353,7 @@ TEST(ExtractCommonPredicatesTest, AlwaysFalseInput) {
 }
 
 TEST(ExtractCommonPredicatesTest, AlwaysTrueInput) {
-    Maxterm maxterm{0};
+    Maxterm maxterm{};
     maxterm.appendEmpty();
 
     ASSERT_TRUE(maxterm.isAlwaysTrue());

@@ -102,7 +102,7 @@ for (var i = 0; i < 3; i++) {
     assert.writeError(upsertedResult({_id: {$eq: undefined}}, expr));
     assert.writeError(upsertedResult({_id: {$all: [1, 2]}}, expr));
     // All below fail in v2.6, non-_id fields completely ignored
-    assert.writeError(upsertedResult({$and: [{_id: 1}, {_id: 1}]}, expr));
+    assert.writeError(upsertedResult({$and: [{_id: 1}, {_id: 2}]}, expr));
     assert.writeError(upsertedResult({$and: [{_id: {$eq: 1}}, {_id: 2}]}, expr));
     assert.writeError(upsertedResult({_id: 1, "_id.x": 1}, expr));
     assert.writeError(upsertedResult({_id: {x: 1}, "_id.x": 1}, expr));
@@ -176,7 +176,7 @@ for (var i = 0; i < 3; i++) {
 
     if (!isReplStyle) {
         assert.writeError(upsertedResult({x: {$all: [1, 2]}}, expr));
-        assert.writeError(upsertedResult({$and: [{x: 1}, {x: 1}]}, expr));
+        assert.writeError(upsertedResult({$and: [{x: 1}, {x: 2}]}, expr));
         assert.writeError(upsertedResult({$and: [{x: {$eq: 1}}, {x: 2}]}, expr));
     } else {
         assert.eq(undefined, upsertedXVal({x: {'x.x': 1}}, expr));

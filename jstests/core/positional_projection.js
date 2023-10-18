@@ -261,6 +261,5 @@ err = assert.throws(function() {
 }, []);
 assert.commandFailedWithCode(err, 5392900);
 
-err = assert.throws(
-    () => coll.find({a: {$not: {$not: {$elemMatch: {$eq: 1}}}}}, {'a.$': 1}).toArray());
+err = assert.throws(() => coll.find({a: {$not: {$elemMatch: {$eq: 100}}}}, {'a.$': 1}).toArray());
 assert.commandFailedWithCode(err, 51246);

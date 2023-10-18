@@ -95,8 +95,10 @@ MatchExpression::ExpressionOptimizerFunc InternalSchemaObjectMatchExpression::ge
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& objectMatchExpression =
             static_cast<InternalSchemaObjectMatchExpression&>(*expression);
-        objectMatchExpression._sub =
-            MatchExpression::optimize(std::move(objectMatchExpression._sub));
+        // The Boolean simplifier does not support schema expressions for we haven't figured out how
+        // to simplify them and whether we want them to be simplified or not.
+        objectMatchExpression._sub = MatchExpression::optimize(
+            std::move(objectMatchExpression._sub), /* enableSimplification */ false);
 
         return expression;
     };

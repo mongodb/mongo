@@ -150,7 +150,7 @@ QmcTable combine(QmcTable& qmc) {
 }
 
 size_t getCoverageCost(const std::vector<uint32_t>& coverage, const Maxterm& maxterm) {
-    size_t cost = coverage.size() * maxterm.numberOfBits();
+    size_t cost = coverage.size() * kBitsetNumberOfBits;
     for (const auto& mintermIndex : coverage) {
         cost += maxterm.minterms[mintermIndex].mask.count();
     }
@@ -171,8 +171,7 @@ const std::vector<uint32_t>& findOptimalCoverage(
 }  // namespace
 
 std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> findPrimeImplicants(Maxterm maxterm) {
-    std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> result{Maxterm{maxterm.numberOfBits()},
-                                                                    {}};
+    std::pair<Maxterm, std::vector<CoveredOriginalMinterms>> result{Maxterm{}, {}};
     QmcTable qmc{std::move(maxterm.minterms)};
     stdx::unordered_set<Minterm> seenMinterms{};
 

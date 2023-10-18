@@ -113,5 +113,7 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
 bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq);
 bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline);
 
+bool isBonsaiEnabled(OperationContext* opCtx);
+
 }  // namespace mongo
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

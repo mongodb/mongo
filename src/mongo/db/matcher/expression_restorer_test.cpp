@@ -33,6 +33,7 @@
 #include "mongo/db/matcher/expression_restorer.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/boolean_simplification/bitset_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -56,21 +57,70 @@ std::unique_ptr<MatchExpression> restoreMatchExpression(
 }
 }  // namespace
 
+DEATH_TEST_REGEX(RestoreSingleMatchExpressionTests,
+                 AssertOnRestoringNegativeNodes,
+                 "Tripwire assertion.*8163020") {
+    auto operand = BSON("$gt" << 5);
+    std::vector<ExpressionBitInfo> expressions{};
+    expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]));
+
+    BitsetTreeNode root{BitsetTreeNode::And, /* isNegated */ true};
+    root.leafChildren.set(0, true);
+
+    restoreMatchExpression(root, expressions);
+}
+
 TEST(RestoreSingleMatchExpressionTests, AlwaysTrue) {
     std::vector<ExpressionBitInfo> expressions{};
-    Maxterm maxterm{Minterm{expressions.size()}};
+
+    BitsetTreeNode root{BitsetTreeNode::And, /* isNegated */ false};
+
     AndMatchExpression expectedExpr{};
 
-    auto expr = restoreMatchExpression(maxterm, expressions);
+    auto expr = restoreMatchExpression(root, expressions);
+    ASSERT_EXPR(expectedExpr, expr);
+}
+
+TEST(RestoreSingleMatchExpressionTests, NotAlwaysTrue) {
+    std::vector<ExpressionBitInfo> expressions{};
+
+    BitsetTreeNode root{BitsetTreeNode::And, /* isNegated */ true};
+
+    // We cannot restore negative nodes, so let's transform them first.
+    auto dnf = boolean_simplification::convertToDNF(root, 10000);
+    ASSERT_TRUE(dnf);
+    auto transformedBitsetTree = boolean_simplification::convertToBitsetTree(*dnf);
+
+    AlwaysFalseMatchExpression expectedExpr{};
+
+    auto expr = restoreMatchExpression(transformedBitsetTree, expressions);
     ASSERT_EXPR(expectedExpr, expr);
 }
 
 TEST(RestoreSingleMatchExpressionTests, AlwaysFalse) {
     std::vector<ExpressionBitInfo> expressions{};
-    Maxterm maxterm{expressions.size()};
+
+    BitsetTreeNode root{BitsetTreeNode::Or, /* isNegated */ false};
+
     AlwaysFalseMatchExpression expectedExpr{};
 
-    auto expr = restoreMatchExpression(maxterm, expressions);
+    auto expr = restoreMatchExpression(root, expressions);
+    ASSERT_EXPR(expectedExpr, expr);
+}
+
+TEST(RestoreSingleMatchExpressionTests, NotAlwaysFalse) {
+    std::vector<ExpressionBitInfo> expressions{};
+
+    BitsetTreeNode root{BitsetTreeNode::Or, /* isNegated */ true};
+
+    // We cannot restore negative nodes, so let's transform them first.
+    auto dnf = boolean_simplification::convertToDNF(root, 1000);
+    ASSERT_TRUE(dnf);
+    auto transformedBitsetTree = boolean_simplification::convertToBitsetTree(*dnf);
+
+    AndMatchExpression expectedExpr{};
+
+    auto expr = restoreMatchExpression(transformedBitsetTree, expressions);
     ASSERT_EXPR(expectedExpr, expr);
 }
 

@@ -68,7 +68,10 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
                     5,
                     "Post-rewrite MatchExpression",
                     "expression"_attr = matchExpression->debugString());
-        matchExpression = MatchExpression::optimize(std::move(matchExpression));
+        // The Boolean simplifier is disabled since we don't want to simplify sub-expressions, but
+        // simplify the whole expression instead.
+        matchExpression =
+            MatchExpression::optimize(std::move(matchExpression), /* enableSimplification */ false);
         LOGV2_DEBUG(20727,
                     5,
                     "Post-rewrite/post-optimized MatchExpression",

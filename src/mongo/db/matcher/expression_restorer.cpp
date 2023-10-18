@@ -48,7 +48,7 @@ public:
 
     std::unique_ptr<MatchExpression> restore() const {
         if (_root.type == BitsetTreeNode::Or && _root.internalChildren.empty() &&
-            _root.leafChildren.mask.empty()) {
+            _root.leafChildren.mask.none()) {
             return std::make_unique<AlwaysFalseMatchExpression>();
         }
         return restore(_root);
@@ -56,11 +56,15 @@ public:
 
 private:
     std::unique_ptr<MatchExpression> restore(const BitsetTreeNode& node) const {
+        tassert(8163020,
+                "BitsetTreeNode must be non-negative to be restored to MatchExpression",
+                !node.isNegated);
+
         std::vector<std::unique_ptr<MatchExpression>> children{};
-        for (size_t bitIndex = node.leafChildren.mask.find_first();
-             bitIndex < node.leafChildren.mask.size();
-             bitIndex = node.leafChildren.mask.find_next(bitIndex)) {
-            children.emplace_back(restoreOneLeaf(node.leafChildren, bitIndex));
+        for (size_t bitIndex = 0; bitIndex < node.leafChildren.mask.size(); ++bitIndex) {
+            if (node.leafChildren.mask[bitIndex]) {
+                children.emplace_back(restoreOneLeaf(node.leafChildren, bitIndex));
+            }
         }
 
         for (const auto& child : node.internalChildren) {

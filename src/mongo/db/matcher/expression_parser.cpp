@@ -2161,7 +2161,10 @@ std::unique_ptr<MatchExpression> MatchExpressionParser::parseAndNormalize(
     const ExtensionsCallback& extensionsCallback,
     AllowedFeatureSet allowedFeatures) {
     auto parsedTree = uassertStatusOK(parse(obj, expCtx, extensionsCallback, allowedFeatures));
-    return MatchExpression::normalize(std::move(parsedTree));
+
+    // TODO SERVER-81846: Enable Boolean Expression Simplifier in change streams.
+    // TODO SERVER-81847: Enable the boolean expression simplifier for index partial filters.
+    return MatchExpression::normalize(std::move(parsedTree), /* enableSimplification */ false);
 }
 
 namespace {

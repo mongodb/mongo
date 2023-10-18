@@ -41,6 +41,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -458,6 +459,9 @@ TEST(CanonicalQueryTest, NorWithOneChildNormalizedToNot) {
 }
 
 TEST(CanonicalQueryTest, NorWithTwoChildrenNotNormalized) {
+    RAIIServerParameterControllerForTest controller(
+        "internalQueryEnableBooleanExpressionsSimplifier", false);
+
     unique_ptr<CanonicalQuery> cq(canonicalize("{$nor: [{a: 1}, {b: 1}]}"));
     auto root = cq->getPrimaryMatchExpression();
     ASSERT_EQ(MatchExpression::NOR, root->matchType());

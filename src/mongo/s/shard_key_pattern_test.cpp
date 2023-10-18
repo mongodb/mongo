@@ -366,8 +366,8 @@ TEST_F(ShardKeyPatternTest, ExtractQueryShardKeySingle) {
                       fromjson("{a:10}"));
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{$all:[10]}}")), fromjson("{a:10}"));
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{$or:[{a:{$eq:10}},{a:10}]}")), BSONObj());
-    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{$and:[{a:10},{a:10}]}")), BSONObj());
-    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{$all:[10,10]}}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{$and:[{a:10},{a:11}]}")), BSONObj());
+    ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{a:{$all:[10,11]}}")), BSONObj());
     ASSERT_BSONOBJ_EQ(queryKey(pattern, fromjson("{$or:[{a:{$eq:10}},{b:'20'}]}")), BSONObj());
 
     // Regex can't be extracted from query

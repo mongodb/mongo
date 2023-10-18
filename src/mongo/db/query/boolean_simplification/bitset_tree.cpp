@@ -34,15 +34,37 @@
 
 namespace mongo::boolean_simplification {
 namespace {
-Minterm makeMintermFromConjunction(const BitsetTerm& conjunctionTerm) {
-    return Minterm{conjunctionTerm.predicates, conjunctionTerm.mask};
+/**
+ * Return the index of thefirst set bit or the bitset's size if no bit is set.
+ */
+size_t findFirst(const Bitset& bitset) {
+    for (size_t i = 0; i < bitset.size(); ++i) {
+        if (bitset[i]) {
+            return i;
+        }
+    }
+
+    return bitset.size();
 }
 
-Maxterm makeMaxtermFromDisjunction(const BitsetTerm& disjunctionTerm) {
-    Maxterm result{disjunctionTerm.size()};
-    for (size_t pos = disjunctionTerm.mask.find_first(); pos < disjunctionTerm.mask.size();
-         pos = disjunctionTerm.mask.find_next(pos)) {
-        result.append(pos, disjunctionTerm.predicates[pos]);
+boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node,
+                                      size_t maximumNumberOfMinterms,
+                                      bool isNegated);
+
+Minterm makeMintermFromConjunction(const BitsetTerm& conjunctionTerm, bool isNegated) {
+    Minterm result{conjunctionTerm.predicates, conjunctionTerm.mask};
+    if (isNegated) {
+        result.flip();
+    }
+    return result;
+}
+
+Maxterm makeMaxtermFromDisjunction(const BitsetTerm& disjunctionTerm, bool isNegated) {
+    Maxterm result{};
+    for (size_t pos = 0; pos < disjunctionTerm.mask.size(); ++pos) {
+        if (disjunctionTerm.mask[pos]) {
+            result.append(pos, disjunctionTerm.predicates[pos] ^ isNegated);
+        }
     }
 
     return result;
@@ -51,19 +73,76 @@ Maxterm makeMaxtermFromDisjunction(const BitsetTerm& disjunctionTerm) {
 /**
  * Append children of AND term to the given Maxterm.
  */
-void appendAndTerm(const std::vector<BitsetTreeNode>& children, Maxterm& maxterm) {
+bool appendAndTerm(const std::vector<BitsetTreeNode>& children,
+                   Maxterm& maxterm,
+                   size_t maximumNumberOfMinterms,
+                   bool isNegated) {
     for (const auto& child : children) {
-        maxterm &= convertToDNF(child);
+        auto dnfChild = convertToDNF(child, maximumNumberOfMinterms, isNegated);
+        if (!dnfChild ||
+            maxterm.minterms.size() * dnfChild->minterms.size() > maximumNumberOfMinterms) {
+            return false;
+        }
+
+        maxterm &= *dnfChild;
     }
+
+    return true;
 }
 
 /**
  * Append children of OR term to the given Maxterm.
  */
-void appendOrTerm(const std::vector<BitsetTreeNode>& children, Maxterm& maxterm) {
+bool appendOrTerm(const std::vector<BitsetTreeNode>& children,
+                  Maxterm& maxterm,
+                  size_t maximumNumberOfMinterms,
+                  bool isNegated) {
     for (const auto& child : children) {
-        maxterm |= convertToDNF(child);
+        auto dnfChild = convertToDNF(child, maximumNumberOfMinterms, isNegated);
+        if (!dnfChild ||
+            maxterm.minterms.size() + dnfChild->minterms.size() > maximumNumberOfMinterms) {
+            return false;
+        }
+        maxterm |= *dnfChild;
     }
+
+    return true;
+}
+
+boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node,
+                                      size_t maximumNumberOfMinterms,
+                                      bool isNegated) {
+    isNegated = node.isNegated ^ isNegated;
+    BitsetTreeNode::Type nodeType;
+    switch (node.type) {
+        case BitsetTreeNode::And:
+            nodeType = isNegated ? BitsetTreeNode::Or : BitsetTreeNode::And;
+            break;
+        case BitsetTreeNode::Or:
+            nodeType = isNegated ? BitsetTreeNode::And : BitsetTreeNode::Or;
+            break;
+        default:
+            MONGO_UNREACHABLE_TASSERT(8163010);
+    }
+
+    Maxterm result{};
+
+    switch (nodeType) {
+        case BitsetTreeNode::And:
+            result.minterms.emplace_back(makeMintermFromConjunction(node.leafChildren, isNegated));
+            if (!appendAndTerm(node.internalChildren, result, maximumNumberOfMinterms, isNegated)) {
+                return boost::none;
+            }
+            break;
+        case BitsetTreeNode::Or:
+            result = makeMaxtermFromDisjunction(node.leafChildren, isNegated);
+            if (!appendOrTerm(node.internalChildren, result, maximumNumberOfMinterms, isNegated)) {
+                return boost::none;
+            }
+            break;
+    };
+
+    return result;
 }
 
 std::ostream& operator<<(std::ostream& os, const BitsetTreeNode::Type& type) {
@@ -88,28 +167,8 @@ BitsetTreeNode restoreBitsetTree(const Minterm& minterm) {
 }
 }  // namespace
 
-void BitsetTreeNode::ensureBitsetSize(size_t size) {
-    leafChildren.resize(size);
-    for (auto& child : internalChildren) {
-        child.ensureBitsetSize(size);
-    }
-}
-
-Maxterm convertToDNF(const BitsetTreeNode& node) {
-    Maxterm result{node.leafChildren.size()};
-
-    switch (node.type) {
-        case BitsetTreeNode::And:
-            result.minterms.emplace_back(makeMintermFromConjunction(node.leafChildren));
-            appendAndTerm(node.internalChildren, result);
-            break;
-        case BitsetTreeNode::Or:
-            result = makeMaxtermFromDisjunction(node.leafChildren);
-            appendOrTerm(node.internalChildren, result);
-            break;
-    };
-
-    return node.isNegated ? ~result : result;
+boost::optional<Maxterm> convertToDNF(const BitsetTreeNode& node, size_t maximumNumberOfMinterms) {
+    return convertToDNF(node, maximumNumberOfMinterms, /* isNegated */ false);
 }
 
 BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
@@ -119,7 +178,7 @@ BitsetTreeNode convertToBitsetTree(const Maxterm& maxterm) {
         BitsetTreeNode node{BitsetTreeNode::Or, false};
         for (const auto& minterm : maxterm.minterms) {
             if (minterm.mask.count() == 1) {
-                const size_t bitIndex = minterm.mask.find_first();
+                const size_t bitIndex = findFirst(minterm.mask);
                 node.leafChildren.set(bitIndex, minterm.predicates[bitIndex]);
             } else {
                 node.internalChildren.emplace_back(restoreBitsetTree(minterm));

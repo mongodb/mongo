@@ -37,14 +37,15 @@ namespace mongo::boolean_simplification {
 namespace {
 std::pair<boolean_simplification::Maxterm, std::vector<ExpressionBitInfo>> transformToDNF(
     const MatchExpression* root) {
-    auto settings = ExpressionSimlifierSettings::kPermissive;
-    auto bsResult = transformToBitsetTree(root, settings.maximumNumberOfUniquePredicates);
+    ExpressionSimlifierSettings settings{};
+    auto bsResult = transformToBitsetTree(root, kBitsetNumberOfBits);
     tassert(8113900, "Failed to transform to bitset tree", bsResult.has_value());
 
     auto bitsetAndExpressions = std::move(*bsResult);
-    auto maxterm = convertToDNF(bitsetAndExpressions.first);
-    maxterm.removeRedundancies();
-    return {std::move(maxterm), std::move(bitsetAndExpressions.second)};
+    auto maxterm = convertToDNF(bitsetAndExpressions.bitsetTree, 10000000);
+    tassert(8113901, "Failed to transform to DNF", maxterm.has_value());
+    maxterm->removeRedundancies();
+    return {std::move(*maxterm), std::move(bitsetAndExpressions.expressions)};
 }
 }  // namespace
 /**

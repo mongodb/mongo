@@ -126,7 +126,7 @@ void quineMcCluskey_4predicates_complex(benchmark::State& state) {
  */
 void quineMcCluskey_noSimplifications(benchmark::State& state) {
     const auto numPredicates = static_cast<size_t>(state.range());
-    Maxterm maxterm{numPredicates};
+    Maxterm maxterm{};
     for (size_t predicateIndex = 0; predicateIndex < numPredicates; ++predicateIndex) {
         maxterm.append(predicateIndex, true);
     }
@@ -141,7 +141,7 @@ void quineMcCluskey_noSimplifications(benchmark::State& state) {
  */
 void quineMcCluskey_someSimplifications(benchmark::State& state) {
     const auto numPredicates = static_cast<size_t>(state.range());
-    Maxterm maxterm{numPredicates};
+    Maxterm maxterm{};
     for (size_t predicateIndex = 0; predicateIndex < numPredicates - 1; predicateIndex += 2) {
         maxterm.append(predicateIndex, true);
         maxterm.minterms.back().set(predicateIndex + 1, true);
@@ -161,7 +161,7 @@ void quineMcCluskey_someSimplifications(benchmark::State& state) {
 void quineMcCluskey_degenerate(benchmark::State& state) {
     const auto numPredicates = static_cast<size_t>(state.range());
     const size_t step = numPredicates / 10;
-    Maxterm maxterm{numPredicates};
+    Maxterm maxterm{};
     for (size_t predicateIndex = 0; predicateIndex < numPredicates - step + 1;
          predicateIndex += step) {
         maxterm.append(predicateIndex, true);

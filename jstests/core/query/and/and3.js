@@ -29,7 +29,7 @@ checkScanMatch({$and: [{a: /o/}]}, 1, 1);
 checkScanMatch({$and: [{a: /a/}]}, 0, 0);
 checkScanMatch({$and: [{a: {$not: /o/}}]}, 2, 1);
 checkScanMatch({$and: [{a: {$not: /a/}}]}, 2, 2);
-checkScanMatch({$and: [{a: /o/}, {a: {$not: /o/}}]}, 1, 0);
+checkScanMatch({$and: [{a: /oo/}, {a: {$not: /o/}}]}, 1, 0);
 checkScanMatch({$and: [{a: /o/}, {a: {$not: /a/}}]}, 1, 1);
 checkScanMatch({$or: [{a: /o/}]}, 1, 1);
 checkScanMatch({$or: [{a: /a/}]}, 0, 0);
