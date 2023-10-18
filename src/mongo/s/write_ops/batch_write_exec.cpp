@@ -87,6 +87,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingWriteWithoutShardkeyWithId);
+
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
 // Helper to note several stale shard errors from a response
@@ -665,6 +667,8 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
             break;
         }
     }
+
+    hangBeforeCompletingWriteWithoutShardkeyWithId.pauseWhileSet();
 }
 
 void executeNonOrdinaryWriteChildBatches(OperationContext* opCtx,

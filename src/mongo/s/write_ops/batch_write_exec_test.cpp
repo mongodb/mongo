@@ -29,6 +29,7 @@
 
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/util/fail_point.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -2155,6 +2156,9 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyWithMatch) {
         return updateOp;
     }());
 
+    FailPoint* fp =
+        globalFailPointRegistry().find("hangBeforeCompletingWriteWithoutShardkeyWithId");
+    auto timesEntered = fp->setMode(FailPoint::alwaysOn, 0);
     auto future = launchAsync([&] {
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
@@ -2183,6 +2187,8 @@ TEST_F(BatchWriteExecTest, UpdateOneWithIdWithoutShardKeyWithMatch) {
         return response.toBSON();
     });
 
+    fp->waitForTimesEntered(timesEntered + 1);
+    fp->setMode(FailPoint::off);
     auto response = future.default_timed_get();
     ASSERT_OK(response.getTopLevelStatus());
     ASSERT_EQ(response.getN(), 1);
