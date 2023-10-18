@@ -110,6 +110,11 @@ public:
                                   << " if in read-only mode",
                     !opCtx->readOnly());
 
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "Can only call " << Derived::Request::kCommandName
+                                  << " on collections",
+                    !ns().coll().empty());
+
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {

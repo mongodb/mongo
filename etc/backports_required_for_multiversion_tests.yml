@@ -419,6 +419,8 @@ last-continuous:
     ticket: SERVER-77506
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
+  - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
+    ticket: SERVER-81985
   suites: null
 last-lts:
   all:
@@ -884,4 +886,6 @@ last-lts:
     ticket: SERVER-77506
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
+  - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
+    ticket: SERVER-81985
   suites: null
