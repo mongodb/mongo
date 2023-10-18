@@ -52,6 +52,7 @@ TypeSignature TypeSignature::kAnyBSONType = getTypeSignature(sbe::value::TypeTag
                                                              sbe::value::TypeTags::StringBig,
                                                              sbe::value::TypeTags::Array,
                                                              sbe::value::TypeTags::ArraySet,
+                                                             sbe::value::TypeTags::ArrayMultiSet,
                                                              sbe::value::TypeTags::Object,
                                                              sbe::value::TypeTags::ObjectId,
                                                              sbe::value::TypeTags::MinKey,
@@ -69,8 +70,10 @@ TypeSignature TypeSignature::kAnyBSONType = getTypeSignature(sbe::value::TypeTag
                                                              sbe::value::TypeTags::bsonCodeWScope);
 TypeSignature TypeSignature::kAnyScalarType = TypeSignature{~0}.exclude(
     getTypeSignature(sbe::value::TypeTags::cellBlock, sbe::value::TypeTags::valueBlock));
-TypeSignature TypeSignature::kArrayType = getTypeSignature(
-    sbe::value::TypeTags::Array, sbe::value::TypeTags::ArraySet, sbe::value::TypeTags::bsonArray);
+TypeSignature TypeSignature::kArrayType = getTypeSignature(sbe::value::TypeTags::Array,
+                                                           sbe::value::TypeTags::ArraySet,
+                                                           sbe::value::TypeTags::ArrayMultiSet,
+                                                           sbe::value::TypeTags::bsonArray);
 TypeSignature TypeSignature::kBlockType = getTypeSignature(sbe::value::TypeTags::valueBlock);
 TypeSignature TypeSignature::kBooleanType = getTypeSignature(sbe::value::TypeTags::Boolean);
 TypeSignature TypeSignature::kCellType = getTypeSignature(sbe::value::TypeTags::cellBlock);

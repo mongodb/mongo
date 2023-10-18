@@ -180,6 +180,7 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
 
         case sbe::value::TypeTags::Array:
         case sbe::value::TypeTags::ArraySet:
+        case sbe::value::TypeTags::ArrayMultiSet:
         case sbe::value::TypeTags::bsonArray:
             if (isMin) {
                 return {Constant::array(), true};

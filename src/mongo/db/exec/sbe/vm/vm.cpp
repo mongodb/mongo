@@ -1177,7 +1177,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::TypeT
 
         auto [tag, val] = value::getArrayView(arrValue)->getAt(convertedIdx);
         return {false, tag, val};
-    } else if (arrTag == value::TypeTags::bsonArray || arrTag == value::TypeTags::ArraySet) {
+    } else if (arrTag == value::TypeTags::bsonArray || arrTag == value::TypeTags::ArraySet ||
+               arrTag == value::TypeTags::ArrayMultiSet) {
         value::ArrayEnumerator enumerator(arrTag, arrValue);
 
         if (!isNegative) {
@@ -1630,6 +1631,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getArraySize(value::Typ
         }
         case value::TypeTags::ArraySet: {
             result = value::getArraySetView(val)->size();
+            break;
+        }
+        case value::TypeTags::ArrayMultiSet: {
+            result = value::getArrayMultiSetView(val)->size();
             break;
         }
         case value::TypeTags::bsonArray: {
@@ -2328,7 +2333,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
                 break;
             }
             case value::TypeTags::Array:
-            case value::TypeTags::ArraySet: {
+            case value::TypeTags::ArraySet:
+            case value::TypeTags::ArrayMultiSet: {
                 value::ArrayEnumerator enumerator{tag, val};
                 BSONArrayBuilder arrayBuilder;
                 bson::convertToBsonArr(arrayBuilder, enumerator);
@@ -8591,7 +8597,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
                     value::TypeTags::NumberInt32,
                     value::bitcastFrom<int32_t>(accMultiSetSize - elSize));
 
-    elGuard.reset();
     accMultiSet->remove(elTag, elVal);
     stateGuard.reset();
     return {true, stateTag, stateVal};
@@ -8604,7 +8609,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     auto [stateArr, accMultiSet, _] = addToSetState(stateTag, stateVal);
 
     // Convert the multiSet to Set.
-    auto [accSetTag, accSetVal] = value::makeCopyArraySetFromArrayMultiSet(*accMultiSet);
+    auto [accSetTag, accSetVal] = value::makeNewArraySet(accMultiSet->getCollator());
+    value::ValueGuard resGuard{accSetTag, accSetVal};
+    auto accSet = value::getArraySetView(accSetVal);
+    for (const auto& p : accMultiSet->values()) {
+        auto [cTag, cVal] = copyValue(p.first, p.second);
+        accSet->push_back(cTag, cVal);
+    }
+    resGuard.reset();
     return {true, accSetTag, accSetVal};
 }
 

@@ -614,7 +614,8 @@ Value convertToValue(sbe::value::TypeTags tag, sbe::value::Value val) {
             return Value(sbe::value::getStringOrSymbolView(tag, val));
 
         case sbe::value::TypeTags::Array:
-        case sbe::value::TypeTags::ArraySet: {
+        case sbe::value::TypeTags::ArraySet:
+        case sbe::value::TypeTags::ArrayMultiSet: {
             std::vector<Value> vals;
             auto enumerator = sbe::value::ArrayEnumerator{tag, val};
             while (!enumerator.atEnd()) {

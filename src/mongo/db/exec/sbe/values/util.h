@@ -72,6 +72,13 @@ bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
                 return true;
             }
         }
+    } else if (tag == TypeTags::ArrayMultiSet) {
+        auto arrayMultiSet = getArrayMultiSetView(val);
+        for (auto [t, v] : arrayMultiSet->values()) {
+            if (cb(t, v)) {
+                return true;
+            }
+        }
     } else {
         MONGO_UNREACHABLE;
     }
@@ -119,6 +126,17 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             auto [t, v] = *it;
             if constexpr (MoveOrCopy) {
                 arraySet->values().erase(it++);
+            } else {
+                ++it;
+            }
+            cb(t, v);
+        }
+    } else if (tag == TypeTags::ArrayMultiSet) {
+        auto arrayMultiSet = getArrayMultiSetView(val);
+        for (auto it = arrayMultiSet->values().begin(); it != arrayMultiSet->values().end();) {
+            auto [t, v] = *it;
+            if constexpr (MoveOrCopy) {
+                arrayMultiSet->values().erase(it++);
             } else {
                 ++it;
             }

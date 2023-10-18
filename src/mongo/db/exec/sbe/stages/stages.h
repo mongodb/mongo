@@ -253,6 +253,7 @@ protected:
             case value::TypeTags::StringBig:
             case value::TypeTags::Array:
             case value::TypeTags::ArraySet:
+            case value::TypeTags::ArrayMultiSet:
             case value::TypeTags::Object:
             case value::TypeTags::ObjectId:
             case value::TypeTags::RecordId:

@@ -436,8 +436,8 @@ void ConstEval::transport(ABT& n, const FunctionCall& op, std::vector<ABT>& args
     } else if (op.name() == "isArray") {
         if (args.size() == 1 && args[0].is<Constant>()) {
             const auto tag = args[0].cast<Constant>()->get().first;
-            const bool v =
-                tag == sbe::value::TypeTags::Array || tag == sbe::value::TypeTags::ArraySet;
+            const bool v = tag == sbe::value::TypeTags::Array ||
+                tag == sbe::value::TypeTags::ArraySet || tag == sbe::value::TypeTags::ArrayMultiSet;
             swapAndUpdate(n, Constant::boolean(v));
         }
     }

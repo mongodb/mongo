@@ -103,6 +103,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::ArraySet:
             stream << "ArraySet";
             break;
+        case TypeTags::ArrayMultiSet:
+            stream << "ArrayMultiSet";
+            break;
         case TypeTags::Object:
             stream << "Object";
             break;
@@ -430,6 +433,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             writeArrayToStream(tag, val, depth);
             break;
         case TypeTags::ArraySet:
+        case TypeTags::ArrayMultiSet:
             if (options.normalizeOutput()) {
                 writeSortedArraySetToStream(tag, val, depth);
             } else {

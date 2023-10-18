@@ -991,8 +991,6 @@ public:
         }
     }
 
-    ArraySet(const ArrayMultiSet& other);
-
     ArraySet(ArraySet&&) = default;
 
     ~ArraySet() {
@@ -1067,9 +1065,10 @@ public:
     }
     ArrayMultiSet(ArrayMultiSet&&) = default;
     ~ArrayMultiSet() {
-        for (const auto& p : _values) {
-            releaseValue(p.first, p.second);
+        for (auto [tag, val] : _values) {
+            releaseValue(tag, val);
         }
+        _values.clear();
     }
 
     /**
@@ -1435,11 +1434,6 @@ inline std::pair<TypeTags, Value> makeCopyArraySet(const ArraySet& inA) {
 inline std::pair<TypeTags, Value> makeCopyArrayMultiSet(const ArrayMultiSet& inA) {
     auto a = new ArrayMultiSet(inA);
     return {TypeTags::ArrayMultiSet, reinterpret_cast<Value>(a)};
-}
-
-inline std::pair<TypeTags, Value> makeCopyArraySetFromArrayMultiSet(const ArrayMultiSet& inA) {
-    auto a = new ArraySet(inA);
-    return {TypeTags::ArraySet, reinterpret_cast<Value>(a)};
 }
 
 inline Array* getArrayView(Value val) noexcept {

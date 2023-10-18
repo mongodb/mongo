@@ -229,6 +229,9 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::ArraySet:
             delete getArraySetView(val);
             break;
+        case TypeTags::ArrayMultiSet:
+            delete getArrayMultiSetView(val);
+            break;
         case TypeTags::Object:
             delete getObjectView(val);
             break;
@@ -439,6 +442,7 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             return getKeyStringView(val)->hash();
         case TypeTags::Array:
         case TypeTags::ArraySet:
+        case TypeTags::ArrayMultiSet:
         case TypeTags::bsonArray: {
             auto arr = ArrayEnumerator{tag, val};
             auto res = hashInit();
@@ -779,17 +783,6 @@ bool isNaN(TypeTags tag, Value val) noexcept {
 bool isInfinity(TypeTags tag, Value val) noexcept {
     return (tag == TypeTags::NumberDouble && std::isinf(bitcastTo<double>(val))) ||
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isInfinite());
-}
-
-ArraySet::ArraySet(const ArrayMultiSet& other)
-    : _values(0, other._values.hash_function(), other._values.key_eq()) {
-    reserve(other._values.size());
-    for (const auto& p : other._values) {
-        const auto copy = copyValue(p.first, p.second);
-        ValueGuard guard{copy.first, copy.second};
-        _values.insert(copy);
-        guard.reset();
-    }
 }
 
 bool ArraySet::push_back(TypeTags tag, Value val) {
