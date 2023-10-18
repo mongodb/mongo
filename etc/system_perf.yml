@@ -3906,7 +3906,7 @@ buildvariants:
   #     infrastructure_provisioning_release: 2022-11
   #     infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #     # Update this to latest snapshot after each LTS release.
-  #     snapshotId: snap-063661c31a4e4b812
+  #     snapshotId: snap-042ca2a003313ebc2
   #     platform: linux
   #     authentication: disabled
   #     storageEngine: wiredTiger
