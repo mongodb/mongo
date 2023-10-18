@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings_utils.h"
 
 namespace mongo {
 
@@ -44,6 +45,23 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(querySettings,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagQuerySettings);
 
+namespace {
+BSONObj createDebugQueryShape(const BSONObj& representativeQuery,
+                              OperationContext* opCtx,
+                              const boost::optional<TenantId>& tenantId) {
+    // Get the serialized query shape by creating the representative information for the given
+    // representative query.
+    const auto representativeInfo =
+        query_settings::createRepresentativeInfo(representativeQuery, opCtx, tenantId);
+    // Erase the nested 'tenantId' so that information doesn't get leaked to the user.
+    MutableDocument mutableDocument(Document{representativeInfo.serializedQueryShape});
+    mutableDocument.setNestedField("cmdNs.tenantId", Value());
+    return mutableDocument.freeze().toBson();
+}
+}  // namespace
+
+// TODO SERVER-82128 Re-implement this stage using 'DocumentSourceDeferredQueue' to address the
+// potentially infinite recursion loop.
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceQuerySettings::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(7746801,
@@ -60,16 +78,23 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceQuerySettings::cre
         querySettingsManager.getAllQueryShapeConfigurations(expCtx->opCtx, expCtx->ns.tenantId());
     std::deque<DocumentSource::GetNextResult> queuedElements;
     for (auto&& queryShapeConfig : settingsArray) {
-        queuedElements.emplace_back(Document{queryShapeConfig.toBSON()});
+        BSONObjBuilder bob;
+        queryShapeConfig.serialize(&bob);
+
+        // Append the 'debugQueryShape' query shape representation if the user explicitly requested
+        // so.
+        if (spec.getShowDebugQueryShape()) {
+            bob.append(kDebugQueryShapeFieldName,
+                       createDebugQueryShape(queryShapeConfig.getRepresentativeQuery(),
+                                             expCtx->opCtx,
+                                             expCtx->ns.tenantId()));
+        }
+        queuedElements.emplace_back(Document{bob.obj()});
     }
     stages.push_back(make_intrusive<DocumentSourceQueue>(std::move(queuedElements), expCtx));
 
-    // Append $addFields stage which will produce an extra field 'debugQueryShape' with the
-    // DebugQueryShape value of the 'representativeQuery'.
-    if (spec.getShowDebugQueryShape()) {
-        // TODO: SERVER-77790 Implement $_internalDebugQueryShape expression.
-    }
     return stages;
 }
+
 
 }  // namespace mongo

@@ -41,6 +41,7 @@ namespace mongo {
 class DocumentSourceQuerySettings final {
 public:
     static constexpr StringData kStageName = "$querySettings"_sd;
+    static constexpr StringData kDebugQueryShapeFieldName = "debugQueryShape"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:

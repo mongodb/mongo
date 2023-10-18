@@ -22,7 +22,7 @@ const collName = jsTestName();
 assert.commandWorked(db.createCollection(collName));
 
 const primaryQSU = new QuerySettingsUtils(db, collName);
-const query = primaryQSU.makeQueryInstance({a: 1});
+const query = primaryQSU.makeFindQueryInstance({a: 1});
 const smallerQuerySetting = {
     indexHints: {allowedIndexes: ["a_1"]}
 };

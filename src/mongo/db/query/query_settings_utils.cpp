@@ -38,6 +38,8 @@
 
 namespace mongo::query_settings {
 
+using namespace query_shape;
+
 namespace {
 // Explicitly defines the `SerializationContext` to be used in `RepresentativeQueryInfo` factory
 // methods. This was done as part of SERVER-79909 to ensure that inner query commands correctly
@@ -76,15 +78,18 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
             nssOrUuid.isNamespaceString());
     stdx::unordered_set<NamespaceString> involvedNamespaces{nssOrUuid.nss()};
 
-    auto queryShapeHash =
-        std::make_unique<query_shape::FindCmdShape>(*parsedFindCommand, expCtx)
-            ->sha256Hash(expCtx->opCtx,
-                         parsedFindCommand->findCommandRequest->getSerializationContext());
+    FindCmdShape findCmdShape{*parsedFindCommand, expCtx};
+    const auto serializationContext =
+        parsedFindCommand->findCommandRequest->getSerializationContext();
 
-    return RepresentativeQueryInfo{std::move(queryShapeHash),
-                                   std::move(involvedNamespaces),
-                                   std::move(encryptionInformation),
-                                   isIdHackEligibleQuery};
+    return RepresentativeQueryInfo{
+        findCmdShape.toBson(expCtx->opCtx,
+                            SerializationOptions::kDebugQueryShapeSerializeOptions,
+                            serializationContext),
+        findCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        std::move(involvedNamespaces),
+        std::move(encryptionInformation),
+        isIdHackEligibleQuery};
 }
 
 /*
@@ -122,27 +127,31 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
 
     auto pipeline = Pipeline::parse(aggregateCommandRequest.getPipeline(), expCtx);
     const auto& ns = aggregateCommandRequest.getNamespace();
-    const auto sc = aggregateCommandRequest.getSerializationContext();
-    auto queryShapeHash =
-        std::make_unique<query_shape::AggCmdShape>(
-            std::move(aggregateCommandRequest), ns, involvedNamespaces, *pipeline, expCtx)
-            ->sha256Hash(expCtx->opCtx, sc);
+
+    const auto serializationContext = aggregateCommandRequest.getSerializationContext();
+    AggCmdShape aggCmdShape{
+        std::move(aggregateCommandRequest), ns, involvedNamespaces, *pipeline, expCtx};
 
     // For aggregate queries, the check for IDHACK should not be taken into account due to the
     // complexity of determining if a pipeline is eligible or not for IDHACK.
-    return RepresentativeQueryInfo{std::move(queryShapeHash),
-                                   std::move(involvedNamespaces),
-                                   std::move(encryptionInformation),
-                                   false};
+    return RepresentativeQueryInfo{
+        aggCmdShape.toBson(expCtx->opCtx,
+                           SerializationOptions::kDebugQueryShapeSerializeOptions,
+                           serializationContext),
+        aggCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        std::move(involvedNamespaces),
+        std::move(encryptionInformation),
+        false /* isIdHackEligibleQuery */};
 }
 
 // TODO: SERVER-79105 Ensure setQuerySettings and removeQuerySettings commands can take distinct
 // commands as arguments - a similar function can be added for `distinct` command.
 
-RepresentativeQueryInfo createRepresentativeInfo(
-    const BSONObj& cmd,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::optional<TenantId>& tenantId) {
+RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
+                                                 OperationContext* opCtx,
+                                                 const boost::optional<TenantId>& tenantId) {
+
+    auto expCtx = ExpressionContext::makeBlankExpressionContext(opCtx, NamespaceString());
     if (cmd.firstElementFieldName() == FindCommandRequest::kCommandName) {
         return createRepresentativeInfoFind(cmd, expCtx, tenantId);
     }
@@ -156,7 +165,7 @@ namespace utils {
 
 /**
  * Returns the namespace field of the hint, in case it is present. In case it is not present, it
- * returns the infered namespace or throws an error if multiple collections are involved.
+ * returns the inferred namespace or throws an error if multiple collections are involved.
  */
 NamespaceString getHintNamespace(const mongo::query_settings::IndexHintSpec& hint,
                                  const stdx::unordered_set<NamespaceString>& namespacesSet,
@@ -173,7 +182,7 @@ NamespaceString getHintNamespace(const mongo::query_settings::IndexHintSpec& hin
                              "collection is involved the query",
             namespacesSet.size() == 1);
     // In case the namespace is not defined but there is only one collection involved,
-    // we can infere the namespace.
+    // we can infer the namespace.
     return *namespacesSet.begin();
 }
 
@@ -237,7 +246,7 @@ void validateQuerySettingsEncryptionInformation(
                     [](const NamespaceString& ns) { return ns.isFLE2StateCollection(); });
 
     uassert(7746601,
-            "setQuerrySettings command is not allowed on queryable encryption state collections",
+            "setQuerySettings command is not allowed on queryable encryption state collections",
             !containsFLE2StateCollection);
 }
 
@@ -246,14 +255,14 @@ void validateQuerySettings(const QueryShapeConfiguration& config,
                            const boost::optional<TenantId>& tenantId) {
     // Validates that the settings field for query settings is not empty.
     uassert(7746604,
-            "settings field in setQuerrySettings command cannot be empty",
+            "settings field in setQuerySettings command cannot be empty",
             !config.getSettings().toBSON().isEmpty());
 
     validateQuerySettingsEncryptionInformation(config, representativeQueryInfo);
 
     // Validates that the query settings' representative is not eligible for IDHACK.
     uassert(7746606,
-            "setQuerrySettings command cannot be used on find queries eligible for IDHACK",
+            "setQuerySettings command cannot be used on find queries eligible for IDHACK",
             !representativeQueryInfo.isIdHackQuery);
 
     validateQuerySettingsNamespacesNotAmbiguous(config, representativeQueryInfo, tenantId);

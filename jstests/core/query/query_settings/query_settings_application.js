@@ -28,7 +28,7 @@ assert.commandWorked(coll.insertMany([
     {a: 5, b: 1},
 ]))
 
-const query = qsutils.makeQueryInstance({a: 1, b: 1});
+const query = qsutils.makeFindQueryInstance({a: 1, b: 1});
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1"]}
 };
