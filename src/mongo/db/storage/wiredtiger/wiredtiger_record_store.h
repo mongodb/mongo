@@ -218,7 +218,7 @@ public:
 
     virtual Timestamp getPinnedOplog() const final;
 
-    Status doCompact(OperationContext* opCtx) final;
+    Status doCompact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) final;
 
     virtual void validate(OperationContext* opCtx, bool full, ValidateResults* results);
 

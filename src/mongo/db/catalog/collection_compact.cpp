@@ -90,6 +90,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx, const NamespaceSt
 }  // namespace
 
 StatusWith<int64_t> compactCollection(OperationContext* opCtx,
+                                      boost::optional<int64_t> freeSpaceTargetMB,
                                       const NamespaceString& collectionNss) {
     AutoGetDb autoDb(opCtx, collectionNss.dbName(), MODE_IX);
     Database* database = autoDb.getDb();
@@ -134,7 +135,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     pauseCompactCommandBeforeWTCompact.pauseWhileSet();
 
-    Status status = recordStore->compact(opCtx);
+    Status status = recordStore->compact(opCtx, freeSpaceTargetMB);
     if (!status.isOK())
         return status;
 

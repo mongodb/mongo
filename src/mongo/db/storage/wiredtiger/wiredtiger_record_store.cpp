@@ -1561,7 +1561,8 @@ Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
+Status WiredTigerRecordStore::doCompact(OperationContext* opCtx,
+                                        boost::optional<int64_t> freeSpaceTargetMB) {
     dassert(opCtx->lockState()->isWriteLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
@@ -1573,7 +1574,11 @@ Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
         // check for interrupts.
         SessionDataRAII sessionRaii(s, opCtx);
 
-        int ret = s->compact(s, getURI().c_str(), "timeout=0");
+        std::string config = "timeout=0";
+        if (freeSpaceTargetMB) {
+            config += ",free_space_target=" + std::to_string(*freeSpaceTargetMB) + "MB";
+        }
+        int ret = s->compact(s, getURI().c_str(), config.c_str());
         if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
             return Status(ErrorCodes::Interrupted,
                           str::stream()

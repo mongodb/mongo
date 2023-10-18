@@ -45,6 +45,7 @@ namespace mongo {
  * size decreased, the return value is positive. Otherwise, the return value is negative.
  */
 StatusWith<int64_t> compactCollection(OperationContext* opCtx,
+                                      boost::optional<int64_t> freeSpaceTargetMB,
                                       const NamespaceString& collectionNss);
 
 }  // namespace mongo

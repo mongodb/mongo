@@ -613,11 +613,13 @@ public:
     }
 
     /**
-     * Attempt to reduce the storage space used by this RecordStore.
+     * Attempt to reduce the storage space used by this RecordStore. If the freeSpaceTargetMB is
+     * provided, compaction will only proceed if the free storage space available is greater than
+     * the provided value.
      *
      * Only called if compactSupported() returns true.
      */
-    Status compact(OperationContext* opCtx);
+    Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB);
 
     /**
      * Performs record store specific validation to ensure consistency of underlying data
@@ -785,7 +787,7 @@ protected:
                                        const RecordId& end,
                                        bool inclusive,
                                        const AboutToDeleteRecordCallback& aboutToDelete) = 0;
-    virtual Status doCompact(OperationContext* opCtx) {
+    virtual Status doCompact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) {
         MONGO_UNREACHABLE;
     }
 

@@ -87,7 +87,7 @@ public:
         return "compact collection\n"
                "warning: this operation locks the database and is slow. you can cancel with "
                "killOp()\n"
-               "{ compact : <collection_name>, [force:<bool>] }\n"
+               "{ compact : <collection_name>, [force:<bool>], [freeSpaceTargetMB:<int64_t>] }\n"
                "  force - allows to run on a replica set primary\n";
     }
 
@@ -112,7 +112,7 @@ public:
                 "other running operations. use force:true to force",
                 !replCoord->getMemberState().primary() || force);
 
-        StatusWith<int64_t> status = compactCollection(opCtx, nss);
+        StatusWith<int64_t> status = compactCollection(opCtx, params.getFreeSpaceTargetMB(), nss);
         uassertStatusOK(status.getStatus());
 
         int64_t bytesFreed = status.getValue();

@@ -44,5 +44,10 @@ commands:
                 description: "Allows to run on a replica set primary"
                 optional: true
                 type: bool
+            freeSpaceTargetMB:
+                description: "Minimum amount of space recoverable for compaction to proceed."
+                optional: true
+                type: safeInt64
+                validator: { gte: 1 }
         namespace: concatenate_with_db
         strict: true
