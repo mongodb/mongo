@@ -87,8 +87,6 @@ selector:
   # Queryable encryption test requires an internal connection for the keyvault that does not
   # inject a $tenant.
   - jstests/core/queryable_encryption/**/*.js
-  # TODO SERVER-77463: determine whether or not query_settings_cmds.js should be excluded
-  - jstests/core/query/query_settings/query_settings_cmds.js
 
 executor:
   archive:
