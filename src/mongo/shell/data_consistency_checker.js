@@ -492,6 +492,24 @@ var {DataConsistencyChecker} = (function() {
                             delete syncingInfo.idIndex.ns;
                         }
 
+                        // If the servers are using encryption and they specify an encryption option
+                        // in versions <7.2 this is stored on the primary but not the secondary.
+                        // This is not an actual failure since the data is correct on all nodes. We
+                        // can safely ignore this element in the configString.
+                        const encryptionRegex = /encryption=\(?[^)]*\),?/;
+
+                        if (sourceInfo.options?.storageEngine?.wiredTiger?.configString) {
+                            sourceInfo.options.storageEngine.wiredTiger.configString =
+                                sourceInfo.options.storageEngine.wiredTiger.configString.replace(
+                                    encryptionRegex, "");
+                        }
+
+                        if (syncingInfo.options?.storageEngine?.wiredTiger?.configString) {
+                            syncingInfo.options.storageEngine.wiredTiger.configString =
+                                syncingInfo.options.storageEngine.wiredTiger.configString.replace(
+                                    encryptionRegex, "");
+                        }
+
                         if (!this.bsonCompareFunction(syncingInfo, sourceInfo)) {
                             prettyPrint(
                                 `the two nodes have different attributes for the collection or view ${
