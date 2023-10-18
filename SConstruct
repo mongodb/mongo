@@ -3868,6 +3868,9 @@ def doConfigure(myenv):
     if get_option('cxx-std') == "20" and not conf.CheckCxx20():
         myenv.ConfError('C++20 support is required to build MongoDB')
 
+    if get_option('cxx-std') == "20" and conf.CheckCxx20():
+        myenv.Append(CPPDEFINES=["ASIO_HAS_STD_INVOKE_RESULT"])
+
     conf.Finish()
 
     # C11 memset_s - a secure memset
