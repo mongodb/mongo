@@ -17,16 +17,28 @@ function assertContainsLog(expectLog, severityCode) {
         // We should get precisely one match.
         // Too few and we didn't log,
         // too many and we didn't make the message unique enough.
-        const count = cat(mongo.fullOptions.logFile)
-                          .split("\n")
-                          .filter((l) => l != '')
-                          .map((l) => JSON.parse(l))
-                          .filter((l) => (l.id === 5060500) && (l.s === severityCode) &&
-                                      (0 === bsonWoCompare(l.attr, expectLog)))
-                          .length;
+        const splitFile = cat(mongo.fullOptions.logFile).split("\n").filter((l) => l != '');
 
-        assert.lt(count, 2, "Repeated log entry: " + assertMsg);
-        return count === 1;
+        const mapped = [];
+
+        for (const line in splitFile) {
+            try {
+                mapped.push(JSON.parse(splitFile[line]));
+            } catch (e) {
+                jsTest.log(`Failed to parse JSON: [${
+                    e}] : complete unfiltered file contents as follows:\n ${
+                    cat(mongo.fullOptions.logFile)}`);
+                assert(false, `Failed to parse JSON for log line [${splitFile[line]}]`);
+            }
+        }
+
+        const res = mapped
+                        .filter((l) => (l.id === 5060500) && (l.s === severityCode) &&
+                                    (0 === bsonWoCompare(l.attr, expectLog)))
+                        .length;
+
+        assert.lt(res, 2, "Repeated log entry: " + assertMsg);
+        return res === 1;
     }, "Expected log not found: " + assertMsg, 20 * 1000);
 }
 
