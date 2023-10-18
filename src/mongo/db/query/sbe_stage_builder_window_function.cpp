@@ -41,6 +41,18 @@ std::vector<std::unique_ptr<sbe::EExpression>> emptyInitializer(
     return std::vector<std::unique_ptr<sbe::EExpression>>{N};
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> addDocument() {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("sum", makeInt64Constant(1)));
+    return exprs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> removeDocument() {
+    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
+    exprs.push_back(makeFunction("sum", makeInt64Constant(-1)));
+    return exprs;
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddSum(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
@@ -232,17 +244,14 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddDerivative(
     const WindowFunctionStatement& stmt,
     StringDataMap<std::unique_ptr<sbe::EExpression>> args,
     boost::optional<sbe::value::SlotId> collatorSlot) {
-    auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildAccumulator(accStmt, std::move(args), collatorSlot, *state.frameIdGenerator);
+    return addDocument();
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveDerivative(
     StageBuilderState& state,
     const WindowFunctionStatement& stmt,
     StringDataMap<std::unique_ptr<sbe::EExpression>> args) {
-    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(nullptr);
-    return exprs;
+    return removeDocument();
 }
 
 std::unique_ptr<sbe::EExpression> buildWindowFinalizeDerivative(
@@ -365,9 +374,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddFirstLast(
     const WindowFunctionStatement& stmt,
     std::unique_ptr<sbe::EExpression> args,
     boost::optional<sbe::value::SlotId> collatorSlot) {
-    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(nullptr);
-    return exprs;
+    return addDocument();
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveFirstLast(
@@ -375,9 +382,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemoveFirstLast(
     const WindowFunctionStatement& stmt,
     std::unique_ptr<sbe::EExpression> args,
     boost::optional<sbe::value::SlotId> collatorSlot) {
-    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(nullptr);
-    return exprs;
+    return removeDocument();
 }
 
 std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstLast(
@@ -386,13 +391,20 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstLast(
     sbe::value::SlotVector slots,
     StringDataMap<std::unique_ptr<sbe::EExpression>> args,
     boost::optional<sbe::value::SlotId> collatorSlot) {
+    tassert(8085500, "Expected a single slot", slots.size() == 1);
     auto it = args.find(AccArgs::kInput);
-    tassert(8085500,
+    tassert(8085501,
             str::stream() << "Window function " << AccumulatorFirst::kName << " expects '"
                           << AccArgs::kInput << "' argument",
             it != args.end());
 
-    return makeFillEmptyNull(std::move(it->second));
+    return sbe::makeE<sbe::EIf>(
+        makeBinaryOp(
+            sbe::EPrimBinary::logicAnd,
+            makeFunction("exists", makeVariable(slots[0])),
+            makeBinaryOp(sbe::EPrimBinary::greater, makeVariable(slots[0]), makeInt64Constant(0))),
+        makeFillEmptyNull(std::move(it->second)),
+        makeNullConstant());
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeFirstN(

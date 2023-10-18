@@ -4026,7 +4026,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // Build bound expressions and create window definitions.
 
         // Create frame first and last slots if the window requires.
-        bool frameFirstLastAccumulators = true;
         if (outputField.expr->getOpName() == "$derivative") {
             windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
             windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
@@ -4037,7 +4036,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             windowFrameFirstSlotIdx.push_back(boost::none);
             windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
         } else {
-            frameFirstLastAccumulators = false;
             windowFrameFirstSlotIdx.push_back(boost::none);
             windowFrameLastSlotIdx.push_back(boost::none);
         }
@@ -4236,27 +4234,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
 
         // Deal with empty window for finalize expressions.
-        if (!frameFirstLastAccumulators) {
-            auto emptyWindowExpr = [](StringData accExprName) {
-                if (accExprName == "$sum") {
-                    return makeConstant(sbe::value::TypeTags::NumberInt32, 0);
-                } else if (accExprName == "$push" || accExprName == AccumulatorAddToSet::kName) {
-                    auto [tag, val] = sbe::value::makeNewArray();
-                    return makeConstant(tag, val);
-                } else {
-                    return makeConstant(sbe::value::TypeTags::Null, 0);
-                }
-            }(outputField.expr->getOpName());
-            if (finalExpr) {
-                finalExpr = sbe::makeE<sbe::EIf>(
-                    makeFunction("exists", makeVariable(window.windowExprSlots[0])),
-                    std::move(finalExpr),
-                    std::move(emptyWindowExpr));
+        auto emptyWindowExpr = [](StringData accExprName) {
+            if (accExprName == "$sum") {
+                return makeConstant(sbe::value::TypeTags::NumberInt32, 0);
+            } else if (accExprName == "$push" || accExprName == AccumulatorAddToSet::kName) {
+                auto [tag, val] = sbe::value::makeNewArray();
+                return makeConstant(tag, val);
             } else {
-                finalExpr = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                                         makeVariable(window.windowExprSlots[0]),
-                                         std::move(emptyWindowExpr));
+                return makeConstant(sbe::value::TypeTags::Null, 0);
             }
+        }(outputField.expr->getOpName());
+        if (finalExpr) {
+            finalExpr = sbe::makeE<sbe::EIf>(
+                makeFunction("exists", makeVariable(window.windowExprSlots[0])),
+                std::move(finalExpr),
+                std::move(emptyWindowExpr));
+        } else {
+            finalExpr = makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                                     makeVariable(window.windowExprSlots[0]),
+                                     std::move(emptyWindowExpr));
         }
         auto finalSlot = _slotIdGenerator.generate();
         windowFinalProjects.emplace_back(finalSlot, std::move(finalExpr));

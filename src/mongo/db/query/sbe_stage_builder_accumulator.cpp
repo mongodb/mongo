@@ -1145,7 +1145,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorDerivative(
     boost::optional<sbe::value::SlotId> collatorSlot,
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(nullptr);
+    exprs.push_back(makeFunction("sum", makeInt64Constant(1)));
     return exprs;
 }
 
@@ -1156,6 +1156,7 @@ std::unique_ptr<sbe::EExpression> buildFinalizeDerivative(
     StringDataMap<std::unique_ptr<sbe::EExpression>> args,
     boost::optional<sbe::value::SlotId> collatorSlot,
     sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(8085504, "Expected a single slot", slots.size() == 1);
     auto it = args.find(AccArgs::kUnit);
     tassert(7993403,
             str::stream() << "Window function expects '" << AccArgs::kUnit << "' argument",
@@ -1190,12 +1191,18 @@ std::unique_ptr<sbe::EExpression> buildFinalizeDerivative(
             it != args.end());
     auto sortByLast = std::move(it->second);
 
-    return makeFunction("aggDerivativeFinalize",
-                        std::move(unit),
-                        std::move(inputFirst),
-                        std::move(sortByFirst),
-                        std::move(inputLast),
-                        std::move(sortByLast));
+    return sbe::makeE<sbe::EIf>(
+        makeBinaryOp(
+            sbe::EPrimBinary::logicAnd,
+            makeFunction("exists", makeVariable(slots[0])),
+            makeBinaryOp(sbe::EPrimBinary::greater, makeVariable(slots[0]), makeInt64Constant(0))),
+        makeFunction("aggDerivativeFinalize",
+                     std::move(unit),
+                     std::move(inputFirst),
+                     std::move(sortByFirst),
+                     std::move(inputLast),
+                     std::move(sortByLast)),
+        makeNullConstant());
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitializeLinearFill(
