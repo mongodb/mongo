@@ -5123,7 +5123,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: move_collection_fuzzer_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name", "feature_flag_guarded"]
+  tags: ["require_npm", "random_name", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5136,7 +5136,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: unshard_collection_fuzzer_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name", "feature_flag_guarded"]
+  tags: ["require_npm", "random_name", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
