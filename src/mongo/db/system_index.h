@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo {
 
 class CollectionWriter;
@@ -44,7 +46,11 @@ void createSystemIndexes(OperationContext* opCtx, CollectionWriter& collection, 
 /**
  * Verifies that only the appropriate indexes to support authentication, authorization, and
  * sessions are present in the admin database. Will create new indexes, if they are missing.
+ * The optional parameter `startupTimeElapsedBuilder` is for adding time elapsed of tasks done in
+ * this function into one single builder that records the time elapsed during startup. Its default
+ * value is nullptr because we only want to time this function when it is called during startup.
  */
-Status verifySystemIndexes(OperationContext* opCtx);
+Status verifySystemIndexes(OperationContext* opCtx,
+                           BSONObjBuilder* startupTimeElapsedBuilder = nullptr);
 
 }  // namespace mongo

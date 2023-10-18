@@ -346,6 +346,23 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 
+void logMongodStartupTimeElapsedStatistics(ServiceContext* serviceContext,
+                                           Date_t beginInitAndListen,
+                                           BSONObjBuilder* startupTimeElapsedBuilder,
+                                           BSONObjBuilder* startupInfoBuilder,
+                                           StorageEngine::LastShutdownState lastShutdownState) {
+    mongo::Milliseconds elapsedInitAndListen =
+        serviceContext->getFastClockSource()->now() - beginInitAndListen;
+    startupTimeElapsedBuilder->append("_initAndListen total elapsed time",
+                                      elapsedInitAndListen.toString());
+    startupInfoBuilder->append("Startup from clean shutdown?",
+                               lastShutdownState == StorageEngine::LastShutdownState::kClean);
+    startupInfoBuilder->append("Statistics", startupTimeElapsedBuilder->obj());
+    LOGV2_INFO(8423403,
+               "mongod startup complete",
+               "Summary of time elapsed"_attr = startupInfoBuilder->obj());
+}
+
 // Important:
 // _initAndListen among its other tasks initializes the storage subsystem.
 // File Copy Based Initial Sync will restart the storage subsystem and may need to repeat some
@@ -355,6 +372,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     Client::initThread("initandlisten");
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
+
+    BSONObjBuilder startupTimeElapsedBuilder;
+    BSONObjBuilder startupInfoBuilder;
+
+    Date_t beginInitAndListen = serviceContext->getFastClockSource()->now();
 
     DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
         return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
@@ -399,6 +421,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 #endif
 
     if (!storageGlobalParams.repair) {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Transport layer setup",
+                                                  &startupTimeElapsedBuilder);
         auto tl =
             transport::TransportLayerManager::createWithConfig(&serverGlobalParams, serviceContext);
         auto res = tl->setup();
@@ -417,15 +442,33 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
 
     // If a crash occurred during file-copy based initial sync, we may need to finish or clean up.
-    repl::InitialSyncerFactory::get(serviceContext)->runCrashRecovery();
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Run initial syncer crash recovery",
+                                                  &startupTimeElapsedBuilder);
+        repl::InitialSyncerFactory::get(serviceContext)->runCrashRecovery();
+    }
 
     // Creating the operation context before initializing the storage engine allows the storage
     // engine initialization to make use of the lock manager. As the storage engine is not yet
     // initialized, a noop recovery unit is used until the initialization is complete.
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    auto lastShutdownState = initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags{});
+    auto lastShutdownState = initializeStorageEngine(
+        startupOpCtx.get(), StorageEngineInitFlags{}, &startupTimeElapsedBuilder);
     StorageControl::startStorageControls(serviceContext);
+
+    ScopeGuard logStartupStats([serviceContext,
+                                beginInitAndListen,
+                                &startupTimeElapsedBuilder,
+                                &startupInfoBuilder,
+                                lastShutdownState] {
+        logMongodStartupTimeElapsedStatistics(serviceContext,
+                                              beginInitAndListen,
+                                              &startupTimeElapsedBuilder,
+                                              &startupInfoBuilder,
+                                              lastShutdownState);
+    });
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
     if (EncryptionHooks::get(serviceContext)->restartRequired()) {
@@ -501,7 +544,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     startWatchdog(serviceContext);
 
     try {
-        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(), lastShutdownState);
+        startup_recovery::repairAndRecoverDatabases(
+            startupOpCtx.get(), lastShutdownState, &startupTimeElapsedBuilder);
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(
             20573,
@@ -551,7 +595,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     HealthLogInterface::get(startupOpCtx.get())->startup();
 
     auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
-    uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Build user and roles graph",
+                                                  &startupTimeElapsedBuilder);
+        uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
+    }
 
     if (audit::initializeManager) {
         audit::initializeManager(startupOpCtx.get());
@@ -561,7 +610,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));
 
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
-        Status status = verifySystemIndexes(startupOpCtx.get());
+        Status status = verifySystemIndexes(startupOpCtx.get(), &startupTimeElapsedBuilder);
         if (!status.isOK()) {
             LOGV2_WARNING(20538,
                           "Unable to verify system indexes: {error}",
@@ -622,7 +671,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "**          This mode should only be used to manually repair corrupted auth data");
     }
 
-    WaitForMajorityService::get(serviceContext).startup(serviceContext);
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(
+            serviceContext->getFastClockSource(),
+            "Set up the background thread pool responsible for "
+            "waiting for opTimes to be majority committed",
+            &startupTimeElapsedBuilder);
+        WaitForMajorityService::get(serviceContext).startup(serviceContext);
+    }
 
     // This function may take the global lock.
     auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())
@@ -671,6 +727,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot use queryableBackupMode in a replica set",
                 !replCoord->isReplEnabled());
+        TimeElapsedBuilderScopedTimer scopedTimer(
+            serviceContext->getFastClockSource(),
+            "Start up the replication coordinator for queryable backup mode",
+            &startupTimeElapsedBuilder);
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
 
@@ -691,6 +751,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 }
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            TimeElapsedBuilderScopedTimer scopedTimer(
+                serviceContext->getFastClockSource(),
+                "Initialize the sharding components for a config server",
+                &startupTimeElapsedBuilder);
+
             initializeGlobalShardingStateForMongoD(
                 startupOpCtx.get(), ShardId::kConfigServerId, ConnectionString::forLocal());
 
@@ -711,6 +776,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             // shardsvr replica set that has initialized its sharding identity, the keys manager is
             // by design initialized separately with a sharded keys client when the sharding state
             // is initialized.
+            TimeElapsedBuilderScopedTimer scopedTimer(
+                serviceContext->getFastClockSource(),
+                "Start up cluster time keys manager with a local/direct keys client",
+                &startupTimeElapsedBuilder);
             auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>();
             auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
@@ -726,7 +795,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 
-        replCoord->startup(startupOpCtx.get(), lastShutdownState);
+        {
+            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                      "Start up the replication coordinator",
+                                                      &startupTimeElapsedBuilder);
+            replCoord->startup(startupOpCtx.get(), lastShutdownState);
+        }
+
         // 'getOldestActiveTimestamp', which is called in the background by the checkpoint thread,
         // requires a read on 'config.transactions' at the stableTimestamp. If this read occurs
         // while applying prepared transactions at the end of replication recovery, it's possible to
@@ -757,6 +832,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         if (replSettings.usingReplSets()) {
+            TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                      "Create an oplog view for tenant migrations",
+                                                      &startupTimeElapsedBuilder);
             Lock::GlobalWrite lk(startupOpCtx.get());
             OldClientContext ctx(startupOpCtx.get(), NamespaceString::kRsOplogNamespace.ns());
             tenant_migration_util::createOplogViewForTenantMigrations(startupOpCtx.get(), ctx.db());
@@ -787,6 +865,14 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             LOGV2_WARNING(4747501, "Not starting periodic jobs as shutdown is in progress");
             // Shutdown has already started before initialization is complete. Wait for the
             // shutdown task to complete and return.
+
+            logStartupStats.dismiss();
+            logMongodStartupTimeElapsedStatistics(serviceContext,
+                                                  beginInitAndListen,
+                                                  &startupTimeElapsedBuilder,
+                                                  &startupInfoBuilder,
+                                                  lastShutdownState);
+
             MONGO_IDLE_THREAD_BLOCK;
             return waitForShutdown();
         }
@@ -829,6 +915,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     if (!storageGlobalParams.repair) {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Start transport layer",
+                                                  &startupTimeElapsedBuilder);
         start = serviceContext->getTransportLayer()->start();
         if (!start.isOK()) {
             LOGV2_ERROR(20572,
@@ -854,6 +943,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         LOGV2(20556, "Starting clean exit via failpoint");
         exitCleanly(EXIT_CLEAN);
     }
+
+    logStartupStats.dismiss();
+    logMongodStartupTimeElapsedStatistics(serviceContext,
+                                          beginInitAndListen,
+                                          &startupTimeElapsedBuilder,
+                                          &startupInfoBuilder,
+                                          lastShutdownState);
 
     MONGO_IDLE_THREAD_BLOCK;
     return waitForShutdown();

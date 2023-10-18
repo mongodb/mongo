@@ -39,6 +39,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -65,8 +66,10 @@ namespace {
 void createLockFile(ServiceContext* service);
 }  // namespace
 
-StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx,
-                                                         const StorageEngineInitFlags initFlags) {
+StorageEngine::LastShutdownState initializeStorageEngine(
+    OperationContext* opCtx,
+    const StorageEngineInitFlags initFlags,
+    BSONObjBuilder* startupTimeElapsedBuilder) {
     ServiceContext* service = opCtx->getServiceContext();
 
     if (storageGlobalParams.restore) {
@@ -80,6 +83,10 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         invariant(!service->getStorageEngine());
 
     if ((initFlags & StorageEngineInitFlags::kAllowNoLockFile) == StorageEngineInitFlags{}) {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(),
+            "Create storage engine lock file in the data directory",
+            startupTimeElapsedBuilder);
         createLockFile(service);
     }
 
@@ -144,6 +151,10 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
 
     std::unique_ptr<StorageEngineMetadata> metadata;
     if ((initFlags & StorageEngineInitFlags::kSkipMetadataFile) == StorageEngineInitFlags{}) {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(service->getFastClockSource(),
+                                                "Get metadata describing storage engine",
+                                                startupTimeElapsedBuilder);
         metadata = StorageEngineMetadata::forPath(dbpath);
     }
 
@@ -156,6 +167,10 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
 
     // Validate options in metadata against current startup options.
     if (metadata.get()) {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(),
+            "Validate options in metadata against current startup options",
+            startupTimeElapsedBuilder);
         uassertStatusOK(factory->validateMetadata(*metadata, storageGlobalParams));
     }
 
@@ -201,20 +216,26 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     });
 
     auto& lockFile = StorageEngineLockFile::get(service);
-    if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
-        auto storageEngine = std::unique_ptr<StorageEngine>(
-            factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
-        service->setStorageEngine(std::move(storageEngine));
-    } else {
-        auto storageEngineChangeContext = StorageEngineChangeContext::get(service);
-        auto token = storageEngineChangeContext->killOpsForStorageEngineChange(service);
-        auto storageEngine = std::unique_ptr<StorageEngine>(
-            factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
-        storageEngineChangeContext->changeStorageEngine(
-            service, std::move(token), std::move(storageEngine));
+    {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(), "Create storage engine", startupTimeElapsedBuilder);
+        if ((initFlags & StorageEngineInitFlags::kForRestart) == StorageEngineInitFlags{}) {
+            auto storageEngine = std::unique_ptr<StorageEngine>(
+                factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
+            service->setStorageEngine(std::move(storageEngine));
+        } else {
+            auto storageEngineChangeContext = StorageEngineChangeContext::get(service);
+            auto token = storageEngineChangeContext->killOpsForStorageEngineChange(service);
+            auto storageEngine = std::unique_ptr<StorageEngine>(
+                factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr));
+            storageEngineChangeContext->changeStorageEngine(
+                service, std::move(token), std::move(storageEngine));
+        }
     }
 
     if (lockFile) {
+        auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+            service->getFastClockSource(), "Write current PID to file", startupTimeElapsedBuilder);
         uassertStatusOK(lockFile->writePid());
     }
 
@@ -222,6 +243,10 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     if (!metadata.get() &&
         (initFlags & StorageEngineInitFlags::kSkipMetadataFile) == StorageEngineInitFlags{}) {
         invariant(!storageGlobalParams.readOnly);
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(service->getFastClockSource(),
+                                                "Write a new metadata for storage engine",
+                                                startupTimeElapsedBuilder);
         metadata.reset(new StorageEngineMetadata(storageGlobalParams.dbpath));
         metadata->setStorageEngine(factory->getCanonicalName().toString());
         metadata->setStorageEngineOptions(factory->createMetadataOptions(storageGlobalParams));
