@@ -2251,6 +2251,11 @@ void tryPerformTimeseriesBucketCompression(
     TimeseriesStats::CompressedBucketInfo compressionStats;
 
     auto bucketCompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+        // Skip compression if the bucket is already compressed.
+        if (timeseries::isCompressedBucket(bucketDoc)) {
+            return boost::none;
+        }
+
         beforeSize = bucketDoc.objsize();
         // Reset every time we run to ensure we never use a stale value
         compressionStats = {};

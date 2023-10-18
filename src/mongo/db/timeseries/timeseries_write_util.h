@@ -73,20 +73,21 @@ write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateComma
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl);
 
 /**
- * Returns the document for writing a new bucket with a write batch.
+ * Holds the bucket document used for writing to disk. The uncompressed bucket document is always
+ * set. If the 'gTimeseriesAlwaysUseCompressedBuckets' feature flag is enabled then the compressed
+ * bucket document is also set unless compression fails.
  */
-BSONObj makeNewDocumentForWrite(std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
-                                const BSONObj& metadata);
+struct BucketDocument {
+    BSONObj uncompressedBucket;
+    boost::optional<BSONObj> compressedBucket;
+    bool compressionFailed = false;
+};
 
 /**
- * Returns a new document, compressed, with which to initialize a new bucket containing only the
- * given 'batch'. If compression fails for any reason, an uncompressed document will be returned.
+ * Returns the document for writing a new bucket with a write batch.
  */
-BSONObj makeNewCompressedDocumentForWrite(
-    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
-    const BSONObj& metadata,
-    const NamespaceString& nss,
-    StringData timeField);
+BucketDocument makeNewDocumentForWrite(
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch, const BSONObj& metadata);
 
 /**
  * Returns the document for writing a new bucket with 'measurements'. Calculates the min and max
@@ -94,11 +95,12 @@ BSONObj makeNewCompressedDocumentForWrite(
  *
  * The measurements must already be known to fit in the same bucket. No checks will be done.
  */
-BSONObj makeNewDocumentForWrite(
+BucketDocument makeNewDocumentForWrite(
+    const NamespaceString& nss,
     const OID& bucketId,
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
-    const boost::optional<TimeseriesOptions>& options,
+    const TimeseriesOptions& options,
     const boost::optional<const StringData::ComparatorInterface*>& comparator);
 
 /**

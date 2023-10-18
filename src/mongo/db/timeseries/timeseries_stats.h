@@ -61,9 +61,15 @@ public:
     void onBucketClosed(int uncompressedSize, const CompressedBucketInfo& compressed) const;
 
     /**
+     * Records the uncompressed and compressed size statistics for a closed time-series bucket that
+     * only wrote out the compressed BSON column format.
+     */
+    void onBucketClosedForAlwaysCompressed(int uncompressedSize, int compressedSize) const;
+
+    /**
      * Appends current stats to the given BSONObjBuilder.
      */
-    void append(BSONObjBuilder* builder) const;
+    void append(OperationContext* opCtx, BSONObjBuilder* builder) const;
 
 private:
     // We need to be able to record stats on a time-series bucket collection without requiring a

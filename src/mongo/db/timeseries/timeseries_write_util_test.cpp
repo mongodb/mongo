@@ -100,7 +100,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
     batch->max = fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})");
 
     // Makes the new document for write.
-    auto newDoc = timeseries::makeNewDocumentForWrite(batch, /*metadata=*/{});
+    auto newDoc = timeseries::makeNewDocumentForWrite(batch, /*metadata=*/{}).uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(
@@ -133,7 +133,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
     auto metadata = fromjson(R"({"meta":{"tag":1}})");
 
     // Makes the new document for write.
-    auto newDoc = timeseries::makeNewDocumentForWrite(batch, metadata);
+    auto newDoc = timeseries::makeNewDocumentForWrite(batch, metadata).uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(
@@ -152,6 +152,9 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatchWithMeta) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+
     NamespaceString ns = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_util_test", "MakeNewCompressedBucketFromWriteBatch");
 
@@ -166,20 +169,20 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
     batch->max = fromjson(R"({"time":{"$date":"2022-06-06T15:34:50.000Z"},"a":3,"b":3})");
 
     // Makes the new compressed document for write.
-    auto compressedDoc = timeseries::makeNewCompressedDocumentForWrite(
-        batch, /*metadata=*/{}, ns, kTimeseriesOptions.getTimeField());
+    auto bucketDoc = timeseries::makeNewDocumentForWrite(batch, /*metadata=*/{});
 
-    // makeNewCompressedDocumentForWrite() can return the uncompressed bucket if an error was
-    // encountered during compression. Check that compression was successful.
+    // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
+    // during compression. Check that compression was successful.
+    ASSERT(!bucketDoc.compressionFailed);
     ASSERT_EQ(timeseries::kTimeseriesControlCompressedVersion,
-              compressedDoc.getObjectField(timeseries::kBucketControlFieldName)
+              bucketDoc.compressedBucket->getObjectField(timeseries::kBucketControlFieldName)
                   .getIntField(timeseries::kBucketControlVersionFieldName));
 
-    auto decompressedDoc = decompressBucket(compressedDoc);
+    auto decompressedDoc = decompressBucket(*bucketDoc.compressedBucket);
     ASSERT(decompressedDoc);
 
     // Checks the measurements are stored in the bucket format.
-    const BSONObj bucketDoc = fromjson(
+    const BSONObj expectedDoc = fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
                                    "max":{"time":{"$date":"2022-06-06T15:34:50.000Z"},"a":3,"b":3}},
@@ -190,10 +193,13 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(*decompressedDoc, bucketDoc));
+    ASSERT_EQ(0, comparator.compare(*decompressedDoc, expectedDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+
     NamespaceString ns = NamespaceString::createNamespaceString_forTest(
         "db_timeseries_write_util_test", "MakeNewCompressedBucketFromWriteBatchWithMeta");
 
@@ -209,20 +215,20 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
     auto metadata = fromjson(R"({"meta":{"tag":1}})");
 
     // Makes the new compressed document for write.
-    auto compressedDoc = timeseries::makeNewCompressedDocumentForWrite(
-        batch, metadata, ns, kTimeseriesOptions.getTimeField());
+    auto bucketDoc = timeseries::makeNewDocumentForWrite(batch, metadata);
 
-    // makeNewCompressedDocumentForWrite() can return the uncompressed bucket if an error was
-    // encountered during compression. Check that compression was successful.
+    // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
+    // during compression. Check that compression was successful.
+    ASSERT(!bucketDoc.compressionFailed);
     ASSERT_EQ(timeseries::kTimeseriesControlCompressedVersion,
-              compressedDoc.getObjectField(timeseries::kBucketControlFieldName)
+              bucketDoc.compressedBucket->getObjectField(timeseries::kBucketControlFieldName)
                   .getIntField(timeseries::kBucketControlVersionFieldName));
 
-    auto decompressedDoc = decompressBucket(compressedDoc);
+    auto decompressedDoc = decompressBucket(*bucketDoc.compressedBucket);
     ASSERT(decompressedDoc);
 
     // Checks the measurements are stored in the bucket format.
-    const BSONObj bucketDoc = fromjson(
+    const BSONObj expectedDoc = fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
                                    "max":{"time":{"$date":"2022-06-06T15:34:50.000Z"},"a":3,"b":3}},
@@ -234,10 +240,12 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
                     "b":{"0":1,"1":2,"2":3}}})");
 
     UnorderedFieldsBSONObjComparator comparator;
-    ASSERT_EQ(0, comparator.compare(*decompressedDoc, bucketDoc));
+    ASSERT_EQ(0, comparator.compare(*decompressedDoc, expectedDoc));
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "MakeNewBucketFromMeasurements");
     OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
     TimeseriesOptions options("time");
     options.setGranularity(BucketGranularityEnum::Seconds);
@@ -248,7 +256,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
 
     // Makes the new document for write.
     auto newDoc = timeseries::makeNewDocumentForWrite(
-        oid, measurements, /*metadata=*/{}, options, /*comparator=*/nullptr);
+                      ns, oid, measurements, /*metadata=*/{}, options, /*comparator=*/nullptr)
+                      .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(
@@ -266,6 +275,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurements) {
 }
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest(
+        "db_timeseries_write_util_test", "MakeNewBucketFromMeasurementsWithMeta");
     OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
     TimeseriesOptions options("time");
     options.setGranularity(BucketGranularityEnum::Seconds);
@@ -277,7 +288,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromMeasurementsWithMeta) {
 
     // Makes the new document for write.
     auto newDoc = timeseries::makeNewDocumentForWrite(
-        oid, measurements, metadata, options, /*comparator=*/nullptr);
+                      ns, oid, measurements, metadata, options, /*comparator=*/nullptr)
+                      .uncompressedBucket;
 
     // Checks the measurements are stored in the bucket format.
     const BSONObj bucketDoc = fromjson(

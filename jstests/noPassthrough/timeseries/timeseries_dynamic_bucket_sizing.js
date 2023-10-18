@@ -108,9 +108,7 @@ while (bucketsClosedDueToSize == 0) {
 // buckets should be closed due to cache pressure.
 assert.eq(bucketsClosedDueToSize, cardinalityForCachePressure, formatStatsLog(timeseriesStats));
 assert.eq(bucketsClosedDueToCachePressure, 0, formatStatsLog(timeseriesStats));
-if (alwaysUseCompressedBuckets) {
-    assert.eq(compressedBuckets, 0, formatStatsLog(timeseriesStats));
-} else {
+if (!alwaysUseCompressedBuckets) {
     assert.eq(compressedBuckets, cardinalityForCachePressure, formatStatsLog(timeseriesStats));
 }
 
@@ -142,9 +140,7 @@ assert.eq(bucketsClosedDueToSize, cardinalityForCachePressure, formatStatsLog(ti
 assert.eq(
     bucketsClosedDueToCachePressure, cardinalityForCachePressure, formatStatsLog(timeseriesStats));
 
-if (alwaysUseCompressedBuckets) {
-    assert.eq(compressedBuckets, 0, formatStatsLog(timeseriesStats));
-} else {
+if (!alwaysUseCompressedBuckets) {
     // We expect the number of compressed buckets to double (independent to whether the buckets were
     // closed due to size or cache pressure).
     assert.eq(compressedBuckets, 2 * cardinalityForCachePressure, formatStatsLog(timeseriesStats));
