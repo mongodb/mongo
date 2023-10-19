@@ -15,8 +15,11 @@ var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT, oplogSize: 10}}});
 var replTest = st.rs0;
 var mongos = st.s;
 
-var shardDoc = mongos.getDB('config').shards.findOne();
-assert.eq(NODE_COUNT, shardDoc.host.split(',').length);  // seed list should contain all nodes
+var shardDoc;
+assert.soon(() => {
+    shardDoc = mongos.getDB('config').shards.findOne();
+    return NODE_COUNT == shardDoc.host.split(',').length;  // seed list should contain all nodes
+});
 
 /* Make sure that the first node is not the primary (by making the second one primary).
  * We need to do this since the ReplicaSetMonitor iterates over the nodes one
