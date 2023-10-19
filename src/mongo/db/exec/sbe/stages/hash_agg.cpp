@@ -308,16 +308,33 @@ void HashAggStage::makeTemporaryRecordStore() {
 
 void HashAggStage::spillRowToDisk(const value::MaterializedRow& key,
                                   const value::MaterializedRow& val) {
+    CollatorInterface* collator = nullptr;
+    if (_collatorAccessor) {
+        auto [colTag, colVal] = _collatorAccessor->getViewOfValue();
+        collator = value::getCollatorView(colVal);
+    }
+
     key_string::Builder kb{key_string::Version::kLatestVersion};
-    key.serializeIntoKeyString(kb);
+    // Serialize the key that will be used as the record id (rid) when storing the record in the
+    // record store. Use a keystring for the spilled entry's rid such that partial aggregates are
+    // guaranteed to have identical keystrings when their keys are equal with respect to the
+    // collation.
+    key.serializeIntoKeyString(kb, collator);
     // Add a unique integer to the end of the key, since record ids must be unique. We want equal
     // keys to be adjacent in the 'RecordStore' so that we can merge the partial aggregates with a
     // single pass.
     kb.appendNumberLong(_ridCounter++);
-    auto typeBits = kb.getTypeBits();
     auto rid = RecordId(kb.getBuffer(), kb.getSize());
 
-    upsertToRecordStore(_opCtx, _recordStore->rs(), rid, val, typeBits, false /*update*/);
+    if (collator) {
+        // The keystring cannot always be deserialized back to the original keys when a collation is
+        // in use, so we also store the unmodified key in the data part of the spilled record.
+        upsertToRecordStore(_opCtx, _recordStore->rs(), rid, key, val, false /*update*/);
+    } else {
+        auto typeBits = kb.getTypeBits();
+        upsertToRecordStore(_opCtx, _recordStore->rs(), rid, val, typeBits, false /*update*/);
+    }
+
     _specificStats.spilledRecords++;
 }
 
@@ -550,12 +567,8 @@ HashAggStage::SpilledRow HashAggStage::deserializeSpilledRecord(const Record& re
                                                                 BufBuilder& keyBuffer) {
     // Read the values and type bits out of the value part of the record.
     BufReader valReader(record.data.data(), record.data.size());
-    CollatorInterface* collator = nullptr;
-    if (_collatorAccessor) {
-        auto [tag, val] = _collatorAccessor->getViewOfValue();
-        collator = value::getCollatorView(val);
-    }
-    auto val = value::MaterializedRow::deserializeForSorter(valReader, {collator});
+
+    auto val = value::MaterializedRow::deserializeForSorter(valReader, {nullptr /*collator*/});
     auto typeBits =
         key_string::TypeBits::fromBuffer(key_string::Version::kLatestVersion, &valReader);
 
@@ -565,7 +578,33 @@ HashAggStage::SpilledRow HashAggStage::deserializeSpilledRecord(const Record& re
     return {std::move(key), std::move(val)};
 }
 
+HashAggStage::SpilledRow HashAggStage::deserializeSpilledRecord(const Record& record,
+                                                                const CollatorInterface& collator) {
+    BufReader valReader(record.data.data(), record.data.size());
+
+    // When a collator has been defined, both the key and the value are stored in the data part of
+    // the record. First read the key and then read the value.
+    auto key = value::MaterializedRow::deserializeForSorter(valReader, {&collator});
+    auto val = value::MaterializedRow::deserializeForSorter(valReader, {&collator});
+    return {std::move(key), std::move(val)};
+}
+
 PlanState HashAggStage::getNextSpilled() {
+    CollatorInterface* collator = nullptr;
+    if (_collatorAccessor) {
+        auto [colTag, colVal] = _collatorAccessor->getViewOfValue();
+        collator = value::getCollatorView(colVal);
+    }
+
+    // Use the appropriate method to deserialize the record based on whether a collator is used.
+    auto recoverSpilledRecord =
+        [this](const Record& record, BufBuilder& keyBuffer, const CollatorInterface* collator) {
+            if (collator) {
+                return deserializeSpilledRecord(record, *collator);
+            }
+            return deserializeSpilledRecord(record, keyBuffer);
+        };
+
     if (_stashedNextRow.first.isEmpty()) {
         auto nextRecord = _rsCursor->next();
         if (!nextRecord) {
@@ -573,7 +612,7 @@ PlanState HashAggStage::getNextSpilled() {
         }
 
         // We are just starting the process of merging the spilled file segments.
-        auto recoveredRow = deserializeSpilledRecord(*nextRecord, _outKeyRowRSBuffer);
+        auto recoveredRow = recoverSpilledRecord(*nextRecord, _outKeyRowRSBuffer, collator);
 
         _outKeyRowRecordStore = std::move(recoveredRow.first);
         _outAggRowRecordStore = std::move(recoveredRow.second);
@@ -589,7 +628,7 @@ PlanState HashAggStage::getNextSpilled() {
     // Find additional partial aggregates for the same key and merge them in order to compute the
     // final output.
     for (auto nextRecord = _rsCursor->next(); nextRecord; nextRecord = _rsCursor->next()) {
-        auto recoveredRow = deserializeSpilledRecord(*nextRecord, _stashedKeyBuffer);
+        auto recoveredRow = recoverSpilledRecord(*nextRecord, _stashedKeyBuffer, collator);
         if (!_keyEq(recoveredRow.first, _outKeyRowRecordStore)) {
             // The newly recovered spilled row belongs to a new key, so we're done merging partial
             // aggregates for the old key. Save the new row for later and return advanced.

@@ -418,7 +418,10 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     }
 }
 
-static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, Value val) {
+static void serializeValueIntoKeyString(key_string::Builder& buf,
+                                        TypeTags tag,
+                                        Value val,
+                                        const CollatorInterface* collator) {
     switch (tag) {
         case TypeTags::Nothing: {
             buf.appendBool(false);
@@ -485,13 +488,21 @@ static void serializeValueIntoKeyString(key_string::Builder& buf, TypeTags tag, 
             // Small strings cannot contain null bytes, so it is safe to serialize them as plain
             // C-strings with a null terminator.
             buf.appendBool(true);
-            buf.appendString(getStringView(tag, val));
+            if (collator) {
+                buf.appendString(collator->getComparisonString(getStringView(tag, val)));
+            } else {
+                buf.appendString(getStringView(tag, val));
+            }
             break;
         }
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
             buf.appendBool(true);
-            buf.appendString(getStringOrSymbolView(tag, val));
+            if (collator) {
+                buf.appendString(collator->getComparisonString(getStringOrSymbolView(tag, val)));
+            } else {
+                buf.appendString(getStringOrSymbolView(tag, val));
+            }
             break;
         }
         case TypeTags::bsonSymbol: {
@@ -632,11 +643,12 @@ void RowBase<RowType>::serializeForSorter(BufBuilder& buf) const {
 
 
 template <typename RowType>
-void RowBase<RowType>::serializeIntoKeyString(key_string::Builder& buf) const {
+void RowBase<RowType>::serializeIntoKeyString(key_string::Builder& buf,
+                                              const CollatorInterface* collator) const {
     const RowType& self = *static_cast<const RowType*>(this);
     for (size_t idx = 0; idx < self.size(); ++idx) {
         auto [tag, val] = self.getViewOfValue(idx);
-        serializeValueIntoKeyString(buf, tag, val);
+        serializeValueIntoKeyString(buf, tag, val, collator);
     }
 }
 

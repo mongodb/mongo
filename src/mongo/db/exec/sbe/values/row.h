@@ -131,12 +131,16 @@ public:
      * If 'numPrefixValsToRead' is provided, then only the given number of values from 'keyString'
      * are decoded into the resulting 'MaterializedRow'. The remaining suffix values in the
      * 'keyString' are ignored.
+     *
+     * If non-null 'collator' is provided during serialization, then any strings in the row are
+     * encoded as ICU collation keys prior to being KeyString-encoded.
      */
     static RowType deserializeFromKeyString(
         const key_string::Value& keyString,
         BufBuilder* valueBufferBuilder,
         boost::optional<size_t> numPrefixValsToRead = boost::none);
-    void serializeIntoKeyString(key_string::Builder& builder) const;
+    void serializeIntoKeyString(key_string::Builder& builder,
+                                const CollatorInterface* collator = nullptr) const;
 
 protected:
     void release() {

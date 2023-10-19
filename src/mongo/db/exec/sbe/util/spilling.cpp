@@ -84,26 +84,8 @@ boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* op
     return boost::none;
 }
 
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& key,
-                        const value::MaterializedRow& val,
-                        const key_string::TypeBits& typeBits,  // recover type of value.
-                        bool update) {
-    BufBuilder bufValue;
-    val.serializeForSorter(bufValue);
-    return upsertToRecordStore(opCtx, rs, key, bufValue, typeBits, update);
-}
-
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& key,
-                        BufBuilder& buf,
-                        const key_string::TypeBits& typeBits,  // recover type of value.
-                        bool update) {
-    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
-    // draining HashAgg.
-    buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+static int upsertToRecordStore(
+    OperationContext* opCtx, RecordStore* rs, const RecordId& key, BufBuilder& buf, bool update) {
 
     assertIgnorePrepareConflictsBehavior(opCtx);
 
@@ -122,6 +104,44 @@ int upsertToRecordStore(OperationContext* opCtx,
         return 0;
     }
     return buf.len();
+}
+
+int upsertToRecordStore(OperationContext* opCtx,
+                        RecordStore* rs,
+                        const RecordId& key,
+                        const value::MaterializedRow& val,
+                        const key_string::TypeBits& typeBits,  // recover type of value.
+                        bool update) {
+    BufBuilder buf;
+    val.serializeForSorter(buf);
+    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
+    // draining HashAgg.
+    buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+    return upsertToRecordStore(opCtx, rs, key, buf, update);
+}
+
+int upsertToRecordStore(OperationContext* opCtx,
+                        RecordStore* rs,
+                        const RecordId& recordKey,
+                        const value::MaterializedRow& key,
+                        const value::MaterializedRow& val,
+                        bool update) {
+    BufBuilder buf;
+    key.serializeForSorter(buf);
+    val.serializeForSorter(buf);
+    return upsertToRecordStore(opCtx, rs, recordKey, buf, update);
+}
+
+int upsertToRecordStore(OperationContext* opCtx,
+                        RecordStore* rs,
+                        const RecordId& key,
+                        BufBuilder& buf,
+                        const key_string::TypeBits& typeBits,  // recover type of value.
+                        bool update) {
+    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
+    // draining HashAgg.
+    buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+    return upsertToRecordStore(opCtx, rs, key, buf, update);
 }
 }  // namespace sbe
 }  // namespace mongo
