@@ -254,7 +254,6 @@ public:
                 numRepliesInFirstBatch++;
                 responseSizeTracker.add(nextObj);
             }
-            CurOp::get(opCtx)->setEndOfOpMetrics(numRepliesInFirstBatch);
             if (numRepliesInFirstBatch == replyItems.size()) {
                 reply.setCursor(BulkWriteCommandResponseCursor(
                     0, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));

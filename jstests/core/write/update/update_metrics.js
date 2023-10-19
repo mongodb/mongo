@@ -27,44 +27,51 @@ assert.commandWorked(coll.update({key: 1}, {$set: {value: 0}}));
 
 let serverStatusBeforeTest = testDB.serverStatus();
 
-// Verify that the metrics.commands.update.pipeline counter is present.
-assert.gte(
-    serverStatusBeforeTest.metrics.commands.update.pipeline, 0, tojson(serverStatusBeforeTest));
+// bulkWrite handles UpdateMetrics but it puts them in in
+// serverStatus.metrics.commands.bulkWrite instead of
+// serverStatus.metrics.commands.update.
+const updateField = TestData.runningWithBulkWriteOverride ? 'bulkWrite' : 'update';
+
+// Verify that the metrics.commands[updateField].pipeline counter is present.
+assert.gte(serverStatusBeforeTest.metrics.commands[updateField].pipeline,
+           0,
+           tojson(serverStatusBeforeTest));
 
 // Verify that that update command without aggregation pipeline-style update does not increment the
 // counter.
 assert.commandWorked(coll.update({key: 1}, {$set: {value: 5}}));
 let serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.update.pipeline,
-          serverStatusAfterTest.metrics.commands.update.pipeline,
+assert.eq(serverStatusBeforeTest.metrics.commands[updateField].pipeline,
+          serverStatusAfterTest.metrics.commands[updateField].pipeline,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
 
 // Verify that that update command with aggregation pipeline-style update increments the counter.
 assert.commandWorked(coll.update({key: 1}, [{$set: {value: 10}}]));
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.update.pipeline + 1,
-          serverStatusAfterTest.metrics.commands.update.pipeline,
+assert.eq(serverStatusBeforeTest.metrics.commands[updateField].pipeline + 1,
+          serverStatusAfterTest.metrics.commands[updateField].pipeline,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
 
 serverStatusBeforeTest = testDB.serverStatus();
 
-// Verify that the metrics.commands.update.arrayFilters counter is present.
-assert.gte(
-    serverStatusBeforeTest.metrics.commands.update.arrayFilters, 0, tojson(serverStatusBeforeTest));
+// Verify that the metrics.commands[updateField].arrayFilters counter is present.
+assert.gte(serverStatusBeforeTest.metrics.commands[updateField].arrayFilters,
+           0,
+           tojson(serverStatusBeforeTest));
 
 // Verify that that update command without arrayFilters does not increment the counter.
 assert.commandWorked(coll.update({key: 1}, {$set: {value: 5}}));
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.update.arrayFilters,
-          serverStatusAfterTest.metrics.commands.update.arrayFilters,
+assert.eq(serverStatusBeforeTest.metrics.commands[updateField].arrayFilters,
+          serverStatusAfterTest.metrics.commands[updateField].arrayFilters,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
 
 // Verify that that update command with arrayFilters increments the counter.
 assert.commandWorked(coll.update(
     {key: 1}, {$set: {"array.$[element]": 20}}, {arrayFilters: [{"element": {$gt: 6}}]}));
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.update.arrayFilters + 1,
-          serverStatusAfterTest.metrics.commands.update.arrayFilters,
+assert.eq(serverStatusBeforeTest.metrics.commands[updateField].arrayFilters + 1,
+          serverStatusAfterTest.metrics.commands[updateField].arrayFilters,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);
 
 // Verify that that a multi-document update command with arrayFilters increments the counter.
@@ -73,6 +80,6 @@ assert.commandWorked(
 assert.commandWorked(coll.update(
     {}, {$set: {"array.$[element]": 20}}, {multi: true, arrayFilters: [{"element": {$gt: 6}}]}));
 serverStatusAfterTest = testDB.serverStatus();
-assert.eq(serverStatusBeforeTest.metrics.commands.update.arrayFilters + 2,
-          serverStatusAfterTest.metrics.commands.update.arrayFilters,
+assert.eq(serverStatusBeforeTest.metrics.commands[updateField].arrayFilters + 2,
+          serverStatusAfterTest.metrics.commands[updateField].arrayFilters,
           `Before:  ${tojson(serverStatusBeforeTest)}, after: ${tojson(serverStatusAfterTest)}`);

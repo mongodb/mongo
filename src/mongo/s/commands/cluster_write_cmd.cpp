@@ -44,6 +44,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
@@ -638,20 +639,10 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
 
             invariant(_updateMetrics);
             for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
-                // If this was a pipeline style update, record that pipeline-style was used and
-                // which stages were being used.
-                auto updateMod = update.getU();
-                if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
-                    auto pipeline =
-                        LiteParsedPipeline(_batchedRequest.getNS(), updateMod.getUpdatePipeline());
-                    pipeline.tickGlobalStageCounters();
-                    _updateMetrics->incrementExecutedWithAggregationPipeline();
-                }
-
-                // If this command had arrayFilters option, record that it was used.
-                if (update.getArrayFilters()) {
-                    _updateMetrics->incrementExecutedWithArrayFilters();
-                }
+                incrementUpdateMetrics(update.getU(),
+                                       _batchedRequest.getNS(),
+                                       *_updateMetrics,
+                                       update.getArrayFilters());
             }
             break;
         case BatchedCommandRequest::BatchType_Delete:

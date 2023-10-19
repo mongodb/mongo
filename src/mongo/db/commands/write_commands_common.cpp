@@ -43,6 +43,8 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -112,4 +114,24 @@ void checkAuthForDeleteCommand(AuthorizationSession* authzSession,
 }
 
 }  // namespace auth
+
+void incrementUpdateMetrics(const write_ops::UpdateModification& updateMod,
+                            const mongo::NamespaceString& ns,
+                            UpdateMetrics& updateMetrics,
+                            const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters) {
+    // If this was a pipeline style update, record that pipeline-style was used and
+    // which stages were being used.
+    if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
+        AggregateCommandRequest aggCmd(ns, updateMod.getUpdatePipeline());
+        LiteParsedPipeline pipeline(aggCmd);
+        pipeline.tickGlobalStageCounters();
+        updateMetrics.incrementExecutedWithAggregationPipeline();
+    }
+
+    // If this command had arrayFilters option, record that it was used.
+    if (arrayFilters) {
+        updateMetrics.incrementExecutedWithArrayFilters();
+    }
+}
+
 }  // namespace mongo

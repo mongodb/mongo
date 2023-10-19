@@ -551,21 +551,10 @@ public:
 
             // Collect metrics.
             for (auto&& update : request().getUpdates()) {
-                // If this was a pipeline style update, record that pipeline-style was used and
-                // which stages were being used.
-                auto& updateMod = update.getU();
-                if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
-                    AggregateCommandRequest aggCmd(request().getNamespace(),
-                                                   updateMod.getUpdatePipeline());
-                    LiteParsedPipeline pipeline(aggCmd);
-                    pipeline.tickGlobalStageCounters();
-                    CmdUpdate::updateMetrics.incrementExecutedWithAggregationPipeline();
-                }
-
-                // If this command had arrayFilters option, record that it was used.
-                if (update.getArrayFilters()) {
-                    CmdUpdate::updateMetrics.incrementExecutedWithArrayFilters();
-                }
+                incrementUpdateMetrics(update.getU(),
+                                       request().getNamespace(),
+                                       CmdUpdate::updateMetrics,
+                                       update.getArrayFilters());
             }
 
             return updateReply;

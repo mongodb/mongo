@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -52,4 +53,10 @@ void checkAuthForDeleteCommand(AuthorizationSession* authzSession,
                                const write_ops::DeleteCommandRequest& op);
 
 }  // namespace auth
+
+void incrementUpdateMetrics(const write_ops::UpdateModification& updateMod,
+                            const mongo::NamespaceString& ns,
+                            UpdateMetrics& updateMetrics,
+                            const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters);
+
 }  // namespace mongo

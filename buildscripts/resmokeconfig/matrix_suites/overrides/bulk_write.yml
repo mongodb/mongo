@@ -19,8 +19,6 @@
     - jstests/core/**/profile*.js
     - jstests/core/comment_field.js
     - jstests/core/fsync.js
-    # TODO (SERVER-79610) Enable these when we support updateMetrics in bulkWrite.
-    - jstests/core/write/update/update_metrics.js
     # Runs an update with illegal format (no 'updates'). We could work around this in the override
     # but it is very annoying.
     - jstests/core/write/insert/batch_write_command_insert.js

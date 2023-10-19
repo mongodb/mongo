@@ -42,6 +42,31 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='update_metrics',
+    source=[
+        'update_metrics.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        'server_status_core',
+    ],
+)
+
+env.Library(
+    target='write_commands_common',
+    source=[
+        'write_commands_common.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
+        'update_metrics',
+    ],
+)
+
 # Commands available in every process that executes commands
 env.Library(
     target='core',
@@ -66,9 +91,8 @@ env.Library(
         'server_status_command.cpp',
         'sessions_commands.idl',
         'start_session_command.cpp',
-        'update_metrics.cpp',
-        'write_commands_common.cpp',
     ],
+    LIBDEPS=['update_metrics', 'write_commands_common'],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
@@ -81,6 +105,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/kill_sessions',
         '$BUILD_DIR/mongo/db/session/logical_session_cache',
@@ -366,6 +391,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/logv2/logv2_options',
         '$BUILD_DIR/mongo/s/grid',
@@ -373,6 +399,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'bulk_write_common',
         'bulk_write_parser',
+        'update_metrics',
+        'write_commands_common',
     ],
 )
 

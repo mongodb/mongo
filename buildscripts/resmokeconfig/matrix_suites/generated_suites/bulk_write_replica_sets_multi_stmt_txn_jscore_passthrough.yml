@@ -187,7 +187,6 @@ selector:
   - jstests/core/**/profile*.js
   - jstests/core/comment_field.js
   - jstests/core/fsync.js
-  - jstests/core/write/update/update_metrics.js
   - jstests/core/write/insert/batch_write_command_insert.js
   - jstests/core/write/update/batch_write_command_update.js
   - jstests/core/write/delete/batch_write_command_delete.js
