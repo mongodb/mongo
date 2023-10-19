@@ -6641,7 +6641,7 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: native_tenant_data_isolation_with_security_token_jscore_passthrough_gen
+  name: multitenancy_with_mongoq_jscore_passthrough_gen
   tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
@@ -6673,7 +6673,7 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: multitenancy_security_token_with_expect_prefix_jscore_passthrough_gen
+  name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
   tags: ["serverless"]
   commands:
   - func: "generate resmoke tasks"
