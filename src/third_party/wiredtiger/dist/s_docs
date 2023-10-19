@@ -91,7 +91,20 @@ structurechk()
 spellchk()
 {
     # If aspell has been installed, run a spell check.
-    type aspell > /dev/null 2>&1 || return
+    type aspell > /dev/null 2>&1 || (echo "Cannot find aspell!"; exit 1)
+
+    # Make sure custom spellings are sorted.
+    custom_spellings=../src/docs/spell.ok
+
+    # We need to remove the required header first.
+    sed -i '/personal_ws-1.1 en 200/d' $custom_spellings
+    if ! sort -c $custom_spellings; then
+        echo "Sorting $custom_spellings ..."
+        sort -u -o $custom_spellings $custom_spellings
+    fi
+
+    # Add the header back.
+    sed -i '1 i\personal_ws-1.1 en 200' $custom_spellings
 
     (cd ../src/docs &&
     # - Separate quoted newlines "line\nline" so "nline" is not reported.

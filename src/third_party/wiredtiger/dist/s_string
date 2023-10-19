@@ -9,6 +9,8 @@ trap 'rm -f $t' 0 1 2 3 13 15
 LC_ALL=C
 export LC_ALL
 
+custom_words=s_string.ok
+
 # If aspell has not been installed, quit
 type aspell > /dev/null 2>&1 || {
     echo "$0 skipped: aspell not found"
@@ -24,7 +26,7 @@ type aspell > /dev/null 2>&1 || {
 replace() {
     aspell --mode=ccpp --lang=en_US list < ../$1 |
     sort -u |
-    comm -12 /dev/stdin s_string.ok
+    comm -12 /dev/stdin $custom_words
 }
 
 # check:
@@ -37,7 +39,7 @@ check() {
     sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$2 |
     aspell --lang=en_US $1 list |
     sort -u |
-    comm -23 /dev/stdin s_string.ok > $t
+    comm -23 /dev/stdin $custom_words > $t
     test -s $t && {
         echo "==== $2"
         cat $t
@@ -67,7 +69,7 @@ while :
         # Between aspell versions 0.60.7-20110707 and 0.60.8 the following program names have been
         # added to the dictionary and are no longer considered spelling errors. This means
         # that building a replacement list of words with the newer version of aspell will omit them
-        # from s_string.ok, and subsequently running s_string with older aspell version will
+        # from our custom words file, and subsequently running s_string with older aspell version will
         # report spelling errors. Manually whitelist these names to address this.
         prog_names="AWS AWS's MongoDB MONGODB PostgreSQL sanitizer sanitizers"
         for name in $prog_names; do
@@ -75,12 +77,12 @@ while :
         done
         sort -u -o $t $t
 
-	if ! diff $t s_string.ok >/dev/null 2>&1; then
-            echo "The string.ok list will be updated to remove words that are no longer needed."
-            cp $t s_string.ok
+	if ! diff $t $custom_words >/dev/null 2>&1; then
+            echo "The $custom_words list will be updated to remove words that are no longer needed."
+            cp $t $custom_words
             exit_val=1
         else
-            echo "No need to update the string.ok list."
+            echo "No need to update the $custom_words list."
         fi
         shift;;
     *)
@@ -88,6 +90,12 @@ while :
         break;;
     esac
 done
+
+# Check custom words are sorted.
+if ! sort -c $custom_words; then
+    echo "Sorting $custom_words ..."
+    sort -u -o $custom_words $custom_words
+fi
 
 # Check source files.
 for f in $l; do
