@@ -156,6 +156,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     --taskName=${task_name} \
     --variantName=${build_variant} \
     --versionId=${version_id} \
+    --projectConfigPath ${evergreen_config_file_path} \
     --reportFile=report.json \
     --perfReportFile=perf.json \
     --cedarReportFile=cedar_report.json

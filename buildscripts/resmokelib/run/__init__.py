@@ -302,7 +302,7 @@ class TestRunner(Subcommand):
             print("Skipping local invocation because evergreen task id was not provided.")
             return
 
-        evg_conf = parse_evergreen_file("etc/evergreen.yml")
+        evg_conf = parse_evergreen_file(config.EVERGREEN_PROJECT_CONFIG_PATH)
 
         suite = self._get_suites()[0]
         suite_name = config.ORIGIN_SUITE or suite.get_name()
@@ -1326,6 +1326,10 @@ class RunPlugin(PluginInterface):
 
         evergreen_options.add_argument("--versionId", dest="version_id", metavar="VERSION_ID",
                                        help="Sets the version ID of the task.")
+
+        evergreen_options.add_argument(
+            "--projectConfigPath", dest="evg_project_config_path",
+            help="Sets the path to evergreen project configuration yaml.")
 
         benchmark_options = parser.add_argument_group(
             title=_BENCHMARK_ARGUMENT_TITLE,
