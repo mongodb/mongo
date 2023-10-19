@@ -4,6 +4,10 @@ t=__wt.$$
 t2=__wt.$$.2
 trap 'rm -f $t $t2' 0 1 2 3 13 15
 
+# Insulate against locale-specific sort order
+LC_ALL=C
+export LC_ALL
+
 # Skip this when building release packages: docs are built separately
 test -n "$WT_RELEASE_BUILD" && exit 0
 
