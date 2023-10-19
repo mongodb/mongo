@@ -165,6 +165,8 @@ all:
   ticket: SERVER-78793
 - test_file: jstests/sharding/fsync_lock_unlock.js
   ticket: SERVER-78149
+- test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
+  ticket: SERVER-81985
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null
