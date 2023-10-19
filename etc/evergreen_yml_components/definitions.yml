@@ -2727,7 +2727,7 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
   - func: "fetch bazel"
   - func: "scons compile"
     vars:
@@ -2761,7 +2761,7 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
   - func: "fetch bazel"
   - func: "bazel compile (gcc)"
     vars:
@@ -2777,7 +2777,7 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-80380: Remove "fetch bazel" once bazelisk is added to the toolchain
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
   - func: "fetch bazel"
   - func: "scons compile"
     vars:
