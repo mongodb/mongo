@@ -1772,55 +1772,56 @@ void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
     auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     const auto signalCommitQuorumAndRetrySkippedRecords =
         [this, opCtx](const std::shared_ptr<ReplIndexBuildState>& replState) {
-            if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
-                return;
-            }
-
-            // We don't need to check if we are primary because the opCtx is interrupted at
-            // stepdown, so it is guaranteed that if taking the locks succeeds, we are primary.
-            // Take an intent lock, the actual index build should keep running in parallel.
-            // This also prevents the concurrent index build from aborting or committing
-            // while we check if the commit quorum has to be signaled or check the skipped records.
-            const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-            AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_IX);
-
-            // The index build hasn't yet completed its initial setup, and persisted state like
-            // commit quorum information is absent. There's nothing to do here.
-            if (replState->isSettingUp()) {
-                return;
-            }
-
-            // The index build might have committed or aborted while looping and not holding the
-            // collection lock. Re-checking if it is still active after taking locks would not solve
-            // the issue, as build can still be registered as active, even if it is in an aborted or
-            // committed state.
-            if (replState->isAborting() || replState->isAborted() || replState->isCommitted()) {
-                return;
-            }
-
-            if (!_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
-                // This reads from system.indexBuilds collection to see if commit quorum got
-                // satisfied.
-                try {
-                    hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum.pauseWhileSet();
-
-                    if (_signalIfCommitQuorumIsSatisfied(opCtx, replState)) {
-                        // The index build has been signalled to commit. As retrying skipped records
-                        // during step-up is done to prevent waiting until commit time, if the build
-                        // has already been signalled to commit, we may skip the retry during
-                        // step-up.
-                        return;
-                    }
-                } catch (DBException& ex) {
-                    // If the operation context is interrupted (shutdown, stepdown, killOp), stop
-                    // the verification process and exit.
-                    opCtx->checkForInterrupt();
-
-                    fassert(31440, ex.toStatus());
-                }
-            }
-
             try {
+                if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
+                    return;
+                }
+
+                // We don't need to check if we are primary because the opCtx is interrupted at
+                // stepdown, so it is guaranteed that if taking the locks succeeds, we are primary.
+                // Take an intent lock, the actual index build should keep running in parallel.
+                // This also prevents the concurrent index build from aborting or committing
+                // while we check if the commit quorum has to be signaled or check the skipped
+                // records.
+                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+                AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_IX);
+
+                // The index build hasn't yet completed its initial setup, and persisted state like
+                // commit quorum information is absent. There's nothing to do here.
+                if (replState->isSettingUp()) {
+                    return;
+                }
+
+                // The index build might have committed or aborted while looping and not holding the
+                // collection lock. Re-checking if it is still active after taking locks would not
+                // solve the issue, as build can still be registered as active, even if it is in an
+                // aborted or committed state.
+                if (replState->isAborting() || replState->isAborted() || replState->isCommitted()) {
+                    return;
+                }
+
+                if (!_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
+                    // This reads from system.indexBuilds collection to see if commit quorum got
+                    // satisfied.
+                    try {
+                        hangOnStepUpAsyncTaskBeforeCheckingCommitQuorum.pauseWhileSet();
+
+                        if (_signalIfCommitQuorumIsSatisfied(opCtx, replState)) {
+                            // The index build has been signalled to commit. As retrying skipped
+                            // records during step-up is done to prevent waiting until commit time,
+                            // if the build has already been signalled to commit, we may skip the
+                            // retry during step-up.
+                            return;
+                        }
+                    } catch (DBException& ex) {
+                        // If the operation context is interrupted (shutdown, stepdown, killOp),
+                        // stop the verification process and exit.
+                        opCtx->checkForInterrupt();
+
+                        fassert(31440, ex.toStatus());
+                    }
+                }
+
                 // Unlike the primary, secondaries cannot fail immediately when detecting key
                 // generation errors; they instead temporarily store them in the 'skipped records'
                 // table, to validate them on commit. As an optimisation to potentially detect
