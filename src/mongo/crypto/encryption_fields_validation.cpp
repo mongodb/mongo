@@ -293,20 +293,21 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config) {
 
 bool validateDoublePrecisionRange(double d, uint32_t precision) {
     double maybe_integer = d * pow(10.0, precision);
-    double floor_integer = floor(maybe_integer);
+    // We truncate here as that is what is specified in the FLE OST document.
+    double trunc_integer = trunc(maybe_integer);
 
     // We want to prevent users from making mistakes by specifing extra precision in the bounds.
     // Since floating point is inaccurate, we need to account for this when testing for equality by
     // considering the values almost equal to likely mean the bounds are within the precision range.
     auto e = std::numeric_limits<double>::epsilon();
-    return fabs(maybe_integer - floor_integer) <= (e * floor_integer);
+    return fabs(maybe_integer - trunc_integer) <= fabs(e * trunc_integer);
 }
 
 bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision) {
     Decimal128 maybe_integer = dec.scale(precision);
-    Decimal128 floor_integer = maybe_integer.round();
+    Decimal128 trunc_integer = maybe_integer.round(Decimal128::kRoundTowardZero);
 
-    return maybe_integer == floor_integer;
+    return maybe_integer == trunc_integer;
 }
 
 }  // namespace mongo

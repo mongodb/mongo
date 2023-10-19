@@ -39,19 +39,32 @@ namespace mongo {
 
 
 TEST(FLEValidationUtils, ValidateDoublePrecisionRange) {
-
-
     ASSERT(validateDoublePrecisionRange(3.000, 0));
     ASSERT(validateDoublePrecisionRange(3.000, 1));
     ASSERT(validateDoublePrecisionRange(3.000, 2));
+    ASSERT(validateDoublePrecisionRange(-3.000, 0));
+    ASSERT(validateDoublePrecisionRange(-3.000, 1));
+    ASSERT(validateDoublePrecisionRange(-3.000, 2));
 
     ASSERT_FALSE(validateDoublePrecisionRange(3.100, 0));
     ASSERT(validateDoublePrecisionRange(3.100, 1));
     ASSERT(validateDoublePrecisionRange(3.100, 2));
+    ASSERT_FALSE(validateDoublePrecisionRange(-3.100, 0));
+    ASSERT(validateDoublePrecisionRange(-3.100, 1));
+    ASSERT(validateDoublePrecisionRange(-3.100, 2));
 
     ASSERT(validateDoublePrecisionRange(1.000, 3));
+    ASSERT(validateDoublePrecisionRange(-1.000, 3));
 
     ASSERT_FALSE(validateDoublePrecisionRange(3.140, 1));
+    ASSERT_FALSE(validateDoublePrecisionRange(-3.140, 1));
+
+    ASSERT(validateDoublePrecisionRange(0.000, 0));
+    ASSERT(validateDoublePrecisionRange(0.000, 1));
+    ASSERT(validateDoublePrecisionRange(0.000, 50));
+    ASSERT(validateDoublePrecisionRange(-0.000, 0));
+    ASSERT(validateDoublePrecisionRange(-0.000, 1));
+    ASSERT(validateDoublePrecisionRange(-0.000, 50));
 }
 
 bool validateDecimal128PrecisionRangeTest(std::string s, uint32_t precision) {
@@ -64,12 +77,26 @@ TEST(FLEValidationUtils, ValidateDecimalPrecisionRange) {
     ASSERT(validateDecimal128PrecisionRangeTest("3.000", 0));
     ASSERT(validateDecimal128PrecisionRangeTest("3.000", 1));
     ASSERT(validateDecimal128PrecisionRangeTest("3.000", 2));
+    ASSERT(validateDecimal128PrecisionRangeTest("-3.000", 0));
+    ASSERT(validateDecimal128PrecisionRangeTest("-3.000", 1));
+    ASSERT(validateDecimal128PrecisionRangeTest("-3.000", 2));
 
     ASSERT_FALSE(validateDecimal128PrecisionRangeTest("3.100", 0));
     ASSERT(validateDecimal128PrecisionRangeTest("3.100", 1));
     ASSERT(validateDecimal128PrecisionRangeTest("3.100", 2));
+    ASSERT_FALSE(validateDecimal128PrecisionRangeTest("-3.100", 0));
+    ASSERT(validateDecimal128PrecisionRangeTest("-3.100", 1));
+    ASSERT(validateDecimal128PrecisionRangeTest("-3.100", 2));
 
     ASSERT_FALSE(validateDecimal128PrecisionRangeTest("3.140", 1));
+    ASSERT_FALSE(validateDecimal128PrecisionRangeTest("-3.140", 1));
+
+    ASSERT(validateDecimal128PrecisionRangeTest("0.000", 0));
+    ASSERT(validateDecimal128PrecisionRangeTest("0.000", 1));
+    ASSERT(validateDecimal128PrecisionRangeTest("0.000", 50));
+    ASSERT(validateDecimal128PrecisionRangeTest("-0.000", 0));
+    ASSERT(validateDecimal128PrecisionRangeTest("-0.000", 1));
+    ASSERT(validateDecimal128PrecisionRangeTest("-0.000", 50));
 }
 
 }  // namespace mongo
