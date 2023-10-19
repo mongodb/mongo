@@ -1,7 +1,11 @@
 /**
  * Performs range deletions while chunks are being moved.
- *
- * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
+ * @tags: [
+ *   requires_sharding,
+ *   assumes_balancer_on,
+ *   antithesis_incompatible,
+ *   does_not_support_stepdowns,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
