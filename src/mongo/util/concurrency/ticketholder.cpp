@@ -72,20 +72,13 @@ void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
 }  // namespace
 
 TicketHolder::TicketHolder(int32_t numTickets, ServiceContext* svcCtx)
-    : _outof(numTickets), _serviceContext(svcCtx) {
-
-    auto concurrencyAlgorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
-        IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
-        gStorageEngineConcurrencyAdjustmentAlgorithm);
-
-    // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
-    _usingDynamicConcurrencyAdjustment =
-        (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() ||
-         concurrencyAlgorithm ==
-             StorageEngineConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions)
-        ? false
-        : true;
-}
+    : _outof(numTickets),
+      _usingDynamicConcurrencyAdjustment(
+          StorageEngineConcurrencyAdjustmentAlgorithm_parse(
+              IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
+              gStorageEngineConcurrencyAdjustmentAlgorithm) !=
+          StorageEngineConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions),
+      _serviceContext(svcCtx) {}
 
 void TicketHolder::resize(int32_t newSize) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);

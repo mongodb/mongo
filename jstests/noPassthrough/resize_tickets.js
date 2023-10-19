@@ -7,7 +7,6 @@
  *   requires_wiredtiger,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 jsTestLog("Start a replica set with execution control enabled by default");
 let replTest = new ReplSetTest({
@@ -18,13 +17,11 @@ replTest.startSet();
 replTest.initiate();
 let mongod = replTest.getPrimary();
 
-// TODO (SERVER-67104): Remove the feature flag check.
 let algorithm = assert
                     .commandWorked(mongod.adminCommand(
                         {getParameter: 1, storageEngineConcurrencyAdjustmentAlgorithm: 1}))
                     .storageEngineConcurrencyAdjustmentAlgorithm;
-if (FeatureFlagUtil.isPresentAndEnabled(mongod, 'ExecutionControl') &&
-    algorithm === 'throughputProbing') {
+if (algorithm === 'throughputProbing') {
     // Users cannot manually adjust read/write tickets once execution control is enabled at startup.
     assert.commandFailedWithCode(
         mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 10}),

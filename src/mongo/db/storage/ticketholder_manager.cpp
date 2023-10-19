@@ -62,10 +62,6 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
     : _readTicketHolder(std::move(readTicketHolder)),
       _writeTicketHolder(std::move(writeTicketHolder)),
       _monitor([this, svcCtx]() -> std::unique_ptr<TicketHolderMonitor> {
-          // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
-          if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe()) {
-              return nullptr;
-          }
           switch (StorageEngineConcurrencyAdjustmentAlgorithm_parse(
               IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
               gStorageEngineConcurrencyAdjustmentAlgorithm)) {
@@ -101,9 +97,7 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
                           "storage engine");
         }
 
-        auto& monitor = ticketHolderManager->_monitor;
-        // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
-        if (monitor && feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() &&
+        if (ticketHolderManager->_monitor &&
             concurrencyAlgorithm ==
                 StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing) {
             // In order to manually set the number of read/write tickets, users must set the
@@ -145,9 +139,7 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
                           "storage engine");
         }
 
-        auto& monitor = ticketHolderManager->_monitor;
-        // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
-        if (monitor && feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() &&
+        if (ticketHolderManager->_monitor &&
             concurrencyAlgorithm ==
                 StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing) {
             // In order to manually set the number of read/write tickets, users must set the

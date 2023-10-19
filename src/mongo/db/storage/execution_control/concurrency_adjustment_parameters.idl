@@ -50,8 +50,6 @@ server_parameters:
   storageEngineConcurrencyAdjustmentAlgorithm:
     description: >-
       The algorithm to be used for adjusting the number of concurrent storage engine transactions.
-      This is gated behind featureFlagExecutionControl and will have no effect if that feature is
-      not enabled.
     set_at: startup
     cpp_vartype: std::string
     cpp_varname: gStorageEngineConcurrencyAdjustmentAlgorithm
