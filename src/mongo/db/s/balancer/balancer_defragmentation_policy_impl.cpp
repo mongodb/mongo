@@ -157,8 +157,8 @@ bool areMergeable(const ChunkType& firstChunk,
                   const ChunkType& secondChunk,
                   const ZoneInfo& collectionZones) {
     return firstChunk.getShard() == secondChunk.getShard() &&
-        collectionZones.getZoneForRange(firstChunk.getRange()) ==
-        collectionZones.getZoneForRange(secondChunk.getRange()) &&
+        collectionZones.getZoneForChunk(firstChunk.getRange()) ==
+        collectionZones.getZoneForChunk(secondChunk.getRange()) &&
         SimpleBSONObjComparator::kInstance.evaluate(firstChunk.getMax() == secondChunk.getMin());
 }
 
@@ -886,8 +886,8 @@ private:
         std::list<ChunkRangeInfoIterator> siblings;
         auto canBeMoveAndMerged = [this](const ChunkRangeInfoIterator& chunkIt,
                                          const ChunkRangeInfoIterator& siblingIt) {
-            auto onSameZone = _zoneInfo.getZoneForRange(chunkIt->range) ==
-                _zoneInfo.getZoneForRange(siblingIt->range);
+            auto onSameZone = _zoneInfo.getZoneForChunk(chunkIt->range) ==
+                _zoneInfo.getZoneForChunk(siblingIt->range);
             auto destinationAvailable = chunkIt->shard == siblingIt->shard ||
                 !_shardInfos.at(siblingIt->shard).isDraining();
             return (onSameZone && destinationAvailable);

@@ -94,6 +94,15 @@ public:
     virtual StatusWith<boost::optional<MigrateInfo>> selectSpecificChunkToMove(
         OperationContext* opCtx, const NamespaceString& nss, const ChunkType& chunk) = 0;
 
+    /**
+     * Asks the chunk selection policy to validate that the specified chunk migration is allowed
+     * given the current rules. Returns OK if the migration won't violate any rules or any other
+     * failed status otherwise.
+     */
+    virtual Status checkMoveAllowed(OperationContext* opCtx,
+                                    const ChunkType& chunk,
+                                    const ShardId& newShardId) = 0;
+
 protected:
     BalancerChunkSelectionPolicy();
 };

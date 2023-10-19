@@ -85,7 +85,7 @@ ShardId selectBestShard(const ChunkDistributionMap& chunkMap,
                         const ZoneInfo& zoneInfo,
                         const ZoneShardMap& zoneToShards,
                         const ChunkRange& chunkRange) {
-    auto zone = zoneInfo.getZoneForRange(chunkRange);
+    auto zone = zoneInfo.getZoneForChunk(chunkRange);
     auto iter = zoneToShards.find(zone);
 
     uassert(4952605,

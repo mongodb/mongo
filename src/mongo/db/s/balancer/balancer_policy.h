@@ -39,12 +39,13 @@
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
+
+
 struct ZoneRange {
     ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone);
 
@@ -193,7 +194,7 @@ typedef stdx::variant<Status, StatusWith<DataSizeResponse>, StatusWith<NumMerged
     BalancerStreamActionResponse;
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;
-typedef std::map<ShardId, StringMap<size_t>> ShardToZoneSizeMap;
+typedef std::map<ShardId, std::vector<ChunkType>> ShardToChunksMap;
 
 /*
  * Keeps track of info needed for data size aware balancing.
@@ -212,8 +213,6 @@ struct CollectionDataSizeInfoForBalancing {
  */
 class ZoneInfo {
 public:
-    static const std::string kNoZoneName;
-
     ZoneInfo();
     ZoneInfo(ZoneInfo&&) = default;
 
@@ -231,24 +230,16 @@ public:
     }
 
     /**
-     * Using the set of zones added so far, returns what zone corresponds to the specified range.
+     * Using the set of zones added so far, returns what zone corresponds to the specified chunk.
      * Returns an empty string if the chunk doesn't fall into any zone.
      */
-    std::string getZoneForRange(const ChunkRange& chunkRange) const;
+    std::string getZoneForChunk(const ChunkRange& chunkRange) const;
 
     /**
      * Returns all zone ranges defined.
      */
     const BSONObjIndexedMap<ZoneRange>& zoneRanges() const {
         return _zoneRanges;
-    }
-
-    const ZoneRange& getZoneRange(const std::string& zoneName) const {
-        for (const auto& [_, zoneRange] : _zoneRanges) {
-            if (zoneRange.zone == zoneName)
-                return zoneRange;
-        }
-        MONGO_UNREACHABLE;
     }
 
 private:
@@ -277,7 +268,7 @@ class DistributionStatus final {
     DistributionStatus& operator=(const DistributionStatus&) = delete;
 
 public:
-    DistributionStatus(NamespaceString nss, ZoneInfo zoneInfo, const ChunkManager& chunkMngr);
+    DistributionStatus(NamespaceString nss, ShardToChunksMap shardToChunksMap, ZoneInfo zoneInfo);
     DistributionStatus(DistributionStatus&&) = default;
     ~DistributionStatus() {}
 
@@ -289,9 +280,27 @@ public:
     }
 
     /**
+     * Appends the specified range to the set of ranges tracked for this collection and checks if
+     * it overlaps with existing ranges.
+     */
+    Status addRangeToZone(const ZoneRange& range);
+
+    /**
      * Returns number of chunks in the specified shard.
      */
     size_t numberOfChunksInShard(const ShardId& shardId) const;
+
+    /**
+     * Returns all chunks for the specified shard.
+     */
+    const std::vector<ChunkType>& getChunks(const ShardId& shardId) const;
+
+    /**
+     * Returns all zone ranges defined for the collection.
+     */
+    const BSONObjIndexedMap<ZoneRange>& zoneRanges() const {
+        return _zoneInfo.zoneRanges();
+    }
 
     /**
      * Returns all zones defined for the collection.
@@ -300,34 +309,28 @@ public:
         return _zoneInfo.allZones();
     }
 
-    const ChunkManager& getChunkManager() const {
-        return _chunkMngr;
-    }
-
-    const std::vector<ZoneRange>& getNormalizedZones() const {
-        return _normalizedZones;
-    }
-
-    const ZoneInfo& getZoneInfo() const {
+    /**
+     * Direct access to zone info
+     */
+    ZoneInfo& zoneInfo() {
         return _zoneInfo;
     }
 
-    const StringMap<size_t>& getChunksPerZoneMap(const ShardId& shardId) const;
+    /**
+     * Using the set of zones defined for the collection, returns what zone corresponds to the
+     * specified chunk. If the chunk doesn't fall into any zone returns the empty string.
+     */
+    std::string getZoneForChunk(const ChunkType& chunk) const;
 
 private:
     // Namespace for which this distribution applies
     NamespaceString _nss;
 
-    // Map that tracks how many chunks every shard is owning in each zone
-    // shardId -> zoneName -> numChunks
-    ShardToZoneSizeMap _shardToZoneSizeMap;
+    // Map of what chunks are owned by each shard
+    ShardToChunksMap _shardChunks;
 
     // Info for zones.
     ZoneInfo _zoneInfo;
-
-    std::vector<ZoneRange> _normalizedZones;
-
-    ChunkManager _chunkMngr;
 };
 
 class BalancerPolicy {
@@ -379,6 +382,7 @@ private:
      */
     static std::tuple<ShardId, int64_t> _getLeastLoadedReceiverShard(
         const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
         const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
         const std::string& zone,
         const stdx::unordered_set<ShardId>& availableShards);
@@ -389,6 +393,7 @@ private:
      */
     static std::tuple<ShardId, int64_t> _getMostOverloadedShard(
         const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
         const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
         const std::string& zone,
         const stdx::unordered_set<ShardId>& availableShards);
