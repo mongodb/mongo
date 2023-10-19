@@ -252,8 +252,8 @@ TEST_F(ServiceExecutorSynchronousTest, SpawnsWorkerThread) {
         bp.await();
         events->push_back("caller");
         bp.resume();
+        ASSERT_DOES_NOT_THROW(pf.future.get());
     }
-    ASSERT_DOES_NOT_THROW(pf.future.get());
     ASSERT_OK(executor.shutdown(kShutdownTime));
 
     ASSERT_THAT(**events, m::ElementsAre(m::Eq("caller"), m::Eq("task")));
