@@ -42,7 +42,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
@@ -67,7 +66,7 @@
 namespace mongo::timeseries::bucket_catalog {
 namespace {
 
-class BucketStateRegistryTest : public BucketCatalog, public CatalogTestFixture {
+class BucketStateRegistryTest : public BucketCatalog, public unittest::Test {
 public:
     BucketStateRegistryTest() {}
 
@@ -94,8 +93,7 @@ public:
     }
 
     Bucket& createBucket(const internal::CreationInfo& info) {
-        auto ptr = &internal::allocateBucket(
-            operationContext(), *this, stripes[info.stripe], withLock, info);
+        auto ptr = &internal::allocateBucket(*this, stripes[info.stripe], withLock, info);
         ASSERT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
@@ -619,12 +617,8 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
     auto bucketId = bucket.bucketId;
 
     ClosedBuckets closedBuckets;
-    internal::archiveBucket(operationContext(),
-                            *this,
-                            stripes[info1.stripe],
-                            WithLock::withoutLock(),
-                            bucket,
-                            closedBuckets);
+    internal::archiveBucket(
+        *this, stripes[info1.stripe], WithLock::withoutLock(), bucket, closedBuckets);
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 }
@@ -659,7 +653,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         // this and closes the bucket.
         bucket.rolloverAction = RolloverAction::kHardClose;
         CommitInfo commitInfo{};
-        auto closedBucket = finish(operationContext(), *this, batch, commitInfo);
+        auto closedBucket = finish(nullptr, *this, batch, commitInfo);
         ASSERT(closedBucket.has_value());
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 

@@ -184,8 +184,7 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket
  * as open.
  */
-StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
-                                                        BucketCatalog& catalog,
+StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
                                                         Stripe& stripe,
                                                         WithLock stripeLock,
                                                         ExecutionStatsController& stats,
@@ -255,8 +254,7 @@ void removeBucket(
  * Archives the given bucket, minimizing the memory footprint but retaining the necessary
  * information required to efficiently identify it as a candidate for future insertions.
  */
-void archiveBucket(OperationContext* opCtx,
-                   BucketCatalog& catalog,
+void archiveBucket(BucketCatalog& catalog,
                    Stripe& stripe,
                    WithLock stripeLock,
                    Bucket& bucket,
@@ -320,8 +318,7 @@ void markBucketNotIdle(Stripe& stripe, WithLock stripeLock, Bucket& bucket);
 /**
  * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
  */
-void expireIdleBuckets(OperationContext* opCtx,
-                       BucketCatalog& catalog,
+void expireIdleBuckets(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        ExecutionStatsController& stats,
@@ -341,8 +338,7 @@ void resetBucketOIDCounter();
 /**
  * Allocates a new bucket and adds it to the catalog.
  */
-Bucket& allocateBucket(OperationContext* opCtx,
-                       BucketCatalog& catalog,
+Bucket& allocateBucket(BucketCatalog& catalog,
                        Stripe& stripe,
                        WithLock stripeLock,
                        const CreationInfo& info);
@@ -352,8 +348,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
  *
  * Writes information about the closed bucket to the 'info' parameter.
  */
-Bucket& rollover(OperationContext* opCtx,
-                 BucketCatalog& catalog,
+Bucket& rollover(BucketCatalog& catalog,
                  Stripe& stripe,
                  WithLock stripeLock,
                  Bucket& bucket,
@@ -408,8 +403,7 @@ Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid
 /**
  * Close an open bucket, setting the state appropriately and removing it from the catalog.
  */
-void closeOpenBucket(OperationContext* opCtx,
-                     BucketCatalog& catalog,
+void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,
@@ -417,8 +411,7 @@ void closeOpenBucket(OperationContext* opCtx,
 /**
  * Close an open bucket, setting the state appropriately and removing it from the catalog.
  */
-void closeOpenBucket(OperationContext* opCtx,
-                     BucketCatalog& catalog,
+void closeOpenBucket(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
                      Bucket& bucket,

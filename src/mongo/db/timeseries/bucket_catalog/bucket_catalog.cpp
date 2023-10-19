@@ -321,13 +321,12 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         switch (bucket->rolloverAction) {
             case RolloverAction::kHardClose:
             case RolloverAction::kSoftClose: {
-                internal::closeOpenBucket(
-                    opCtx, catalog, stripe, stripeLock, *bucket, closedBucket);
+                internal::closeOpenBucket(catalog, stripe, stripeLock, *bucket, closedBucket);
                 break;
             }
             case RolloverAction::kArchive: {
                 ClosedBuckets closedBuckets;
-                internal::archiveBucket(opCtx, catalog, stripe, stripeLock, *bucket, closedBuckets);
+                internal::archiveBucket(catalog, stripe, stripeLock, *bucket, closedBuckets);
                 if (!closedBuckets.empty()) {
                     closedBucket = std::move(closedBuckets[0]);
                 }

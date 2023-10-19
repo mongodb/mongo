@@ -73,21 +73,20 @@ write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateComma
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl);
 
 /**
- * Holds the bucket document used for writing to disk. The uncompressed bucket document is always
- * set. If the 'gTimeseriesAlwaysUseCompressedBuckets' feature flag is enabled then the compressed
- * bucket document is also set unless compression fails.
- */
-struct BucketDocument {
-    BSONObj uncompressedBucket;
-    boost::optional<BSONObj> compressedBucket;
-    bool compressionFailed = false;
-};
-
-/**
  * Returns the document for writing a new bucket with a write batch.
  */
-BucketDocument makeNewDocumentForWrite(
-    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch, const BSONObj& metadata);
+BSONObj makeNewDocumentForWrite(std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+                                const BSONObj& metadata);
+
+/**
+ * Returns a new document, compressed, with which to initialize a new bucket containing only the
+ * given 'batch'. If compression fails for any reason, an uncompressed document will be returned.
+ */
+BSONObj makeNewCompressedDocumentForWrite(
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+    const BSONObj& metadata,
+    const NamespaceString& nss,
+    StringData timeField);
 
 /**
  * Returns the document for writing a new bucket with 'measurements'. Calculates the min and max
@@ -95,12 +94,11 @@ BucketDocument makeNewDocumentForWrite(
  *
  * The measurements must already be known to fit in the same bucket. No checks will be done.
  */
-BucketDocument makeNewDocumentForWrite(
-    const NamespaceString& nss,
+BSONObj makeNewDocumentForWrite(
     const OID& bucketId,
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
-    const TimeseriesOptions& options,
+    const boost::optional<TimeseriesOptions>& options,
     const boost::optional<const StringData::ComparatorInterface*>& comparator);
 
 /**

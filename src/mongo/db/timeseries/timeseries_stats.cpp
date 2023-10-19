@@ -32,7 +32,6 @@
 #include <utility>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -64,21 +63,9 @@ void TimeseriesStats::onBucketClosed(int uncompressedSize,
     }
 }
 
-void TimeseriesStats::onBucketClosedForAlwaysCompressed(int uncompressedSize,
-                                                        int compressedSize) const {
-    _uncompressedSize.fetchAndAddRelaxed(uncompressedSize);
-    _compressedSize.fetchAndAddRelaxed(compressedSize);
-}
-
-void TimeseriesStats::append(OperationContext* opCtx, BSONObjBuilder* builder) const {
+void TimeseriesStats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("numBytesUncompressed", _uncompressedSize.load());
     builder->appendNumber("numBytesCompressed", _compressedSize.load());
-
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return;
-    }
-
     builder->appendNumber("numSubObjCompressionRestart", _compressedSubObjRestart.load());
     builder->appendNumber("numCompressedBuckets", _numCompressedBuckets.load());
     builder->appendNumber("numUncompressedBuckets", _numUncompressedBuckets.load());

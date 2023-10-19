@@ -10,7 +10,7 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 const coll = db.getCollection('t');
 
-// TODO SERVER-70605: Remove this test.
+// TODO SERVER-80004: Re-enable.
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     jsTestLog("Skipping test as the always use compressed buckets feature is enabled");
     MongoRunner.stopMongod(conn);

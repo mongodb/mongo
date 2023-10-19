@@ -131,7 +131,7 @@ void _appendRecordStats(OperationContext* opCtx,
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
         timeseries::bucket_catalog::appendExecutionStats(
             bucketCatalog, collNss.getTimeseriesViewNamespace(), bob);
-        TimeseriesStats::get(collection.get()).append(opCtx, &bob);
+        TimeseriesStats::get(collection.get()).append(&bob);
     } else {
         result->appendNumber("count", numRecords);
         if (numRecords) {

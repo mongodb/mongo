@@ -339,8 +339,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     stdx::lock_guard stripeLock{stripe.mutex};
 
     ClosedBuckets closedBuckets;
-    return internal::reopenBucket(_opCtx,
-                                  *_bucketCatalog,
+    return internal::reopenBucket(*_bucketCatalog,
                                   stripe,
                                   stripeLock,
                                   stats,
