@@ -2,6 +2,9 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_non_retryable_writes,
+//   # This test expects particular plans, creating unanticipated indexes can lead to generating
+//   # unexpected plans.
+//   assumes_no_implicit_index_creation,
 // ]
 import {assertCoveredQueryAndCount} from "jstests/libs/analyze_plan.js";
 

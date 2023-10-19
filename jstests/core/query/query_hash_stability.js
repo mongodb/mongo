@@ -12,6 +12,9 @@
  *   # cache key is allowed to change between versions. Therefore, this test cannot run in
  *   # passthroughs that do upgrade/downgrade.
  *   cannot_run_during_upgrade_downgrade,
+ *   # This test expects stable query plans, creating unanticipated indexes can lead to variations
+ *   # in the plans.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
