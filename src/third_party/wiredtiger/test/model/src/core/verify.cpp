@@ -47,7 +47,7 @@ kv_table_verify_cursor::has_next()
     auto i = _iterator;
 
     /* Skip over any deleted items. */
-    while (i != _data.end() && i->second.get() == NONE)
+    while (i != _data.end() && !i->second.exists())
         i++;
 
     return i != _data.end();
@@ -65,7 +65,7 @@ kv_table_verify_cursor::verify_next(const data_value &key, const data_value &val
         return false;
 
     /* Skip over any deleted items. */
-    while (_iterator != _data.end() && _iterator->second.get() == NONE)
+    while (_iterator != _data.end() && !_iterator->second.exists())
         _iterator++;
     if (_iterator == _data.end())
         return false;

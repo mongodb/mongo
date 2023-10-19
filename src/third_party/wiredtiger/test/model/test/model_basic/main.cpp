@@ -372,6 +372,7 @@ int
 main(int argc, char *argv[])
 {
     int ch;
+    WT_DECL_RET;
 
     (void)testutil_set_progname(argv);
 
@@ -398,9 +399,15 @@ main(int argc, char *argv[])
     /*
      * Tests.
      */
-    test_data_value();
-    test_model_basic();
-    test_model_basic_wt();
+    try {
+        ret = EXIT_SUCCESS;
+        test_data_value();
+        test_model_basic();
+        test_model_basic_wt();
+    } catch (std::exception &e) {
+        std::cerr << "Test failed with exception: " << e.what() << std::endl;
+        ret = EXIT_FAILURE;
+    }
 
     /*
      * Clean up.
@@ -410,5 +417,5 @@ main(int argc, char *argv[])
         testutil_remove(home);
 
     testutil_cleanup(opts);
-    return EXIT_SUCCESS;
+    return ret;
 }

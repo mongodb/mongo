@@ -59,7 +59,7 @@ public:
         bool
         operator()(const kv_update &left, const kv_update &right) const noexcept
         {
-            return left._timestamp < right._timestamp;
+            return left._commit_timestamp < right._commit_timestamp;
         }
 
         /*
@@ -69,7 +69,7 @@ public:
         bool
         operator()(const kv_update &left, timestamp_t timestamp) const noexcept
         {
-            return left._timestamp < timestamp;
+            return left._commit_timestamp < timestamp;
         }
 
         /*
@@ -79,7 +79,7 @@ public:
         bool
         operator()(timestamp_t timestamp, const kv_update &right) const noexcept
         {
-            return timestamp < right._timestamp;
+            return timestamp < right._commit_timestamp;
         }
 
         /*
@@ -91,7 +91,7 @@ public:
         {
             if (!left) /* handle nullptr */
                 return !right ? false : true;
-            return left->_timestamp < right->_timestamp;
+            return left->_commit_timestamp < right->_commit_timestamp;
         }
 
         /*
@@ -103,7 +103,7 @@ public:
         {
             if (!left) /* handle nullptr */
                 return true;
-            return left->_timestamp < timestamp;
+            return left->_commit_timestamp < timestamp;
         }
 
         /*
@@ -115,7 +115,7 @@ public:
         {
             if (!right) /* handle nullptr */
                 return false;
-            return timestamp < right->_timestamp;
+            return timestamp < right->_commit_timestamp;
         }
     };
 
@@ -124,7 +124,7 @@ public:
      *     Create a new instance.
      */
     inline kv_update(const data_value &value, timestamp_t timestamp) noexcept
-        : _value(value), _timestamp(timestamp), _txn_id(k_txn_none)
+        : _value(value), _commit_timestamp(timestamp), _txn_id(k_txn_none)
     {
     }
 
@@ -133,7 +133,8 @@ public:
      *     Create a new instance.
      */
     inline kv_update(const data_value &value, kv_transaction_ptr txn) noexcept
-        : _value(value), _timestamp(txn ? txn->commit_timestamp() : k_timestamp_none), _txn(txn),
+        : _value(value), _commit_timestamp(txn ? txn->commit_timestamp() : k_timestamp_none),
+          _durable_timestamp(txn ? txn->durable_timestamp() : k_timestamp_none), _txn(txn),
           _txn_id(txn ? txn->id() : k_txn_none)
     {
     }
@@ -145,7 +146,9 @@ public:
     inline bool
     operator==(const kv_update &other) const noexcept
     {
-        return _value == other._value && _txn_id == other._txn_id && _timestamp == other._timestamp;
+        return _value == other._value && _txn_id == other._txn_id &&
+          _commit_timestamp == other._commit_timestamp &&
+          _durable_timestamp == other._durable_timestamp;
     }
 
     /*
@@ -165,10 +168,12 @@ public:
     inline bool
     operator<(const kv_update &other) const noexcept
     {
-        if (_timestamp != other._timestamp)
-            return _timestamp < other._timestamp;
+        if (_commit_timestamp != other._commit_timestamp)
+            return _commit_timestamp < other._commit_timestamp;
         if (_txn_id != other._txn_id)
             return _txn_id < other._txn_id;
+        if (_durable_timestamp != other._durable_timestamp)
+            return _durable_timestamp < other._durable_timestamp;
         if (_value != other._value)
             return _value < other._value;
         return true;
@@ -221,17 +226,27 @@ public:
     inline bool
     global() const noexcept
     {
-        return _timestamp == k_timestamp_none;
+        return _commit_timestamp == k_timestamp_none;
     }
 
     /*
-     * kv_update::value --
-     *     Get the value.
+     * kv_update::commit_timestamp --
+     *     Get the commit timestamp.
      */
     inline timestamp_t
-    timestamp() const noexcept
+    commit_timestamp() const noexcept
     {
-        return _timestamp;
+        return _commit_timestamp;
+    }
+
+    /*
+     * kv_update::durable_timestamp --
+     *     Get the durable timestamp.
+     */
+    inline timestamp_t
+    durable_timestamp() const noexcept
+    {
+        return _durable_timestamp;
     }
 
     /*
@@ -244,6 +259,18 @@ public:
         if (!_txn)
             return true;
         return _txn->state() == kv_transaction_state::committed;
+    }
+
+    /*
+     * kv_update::prepared --
+     *     Check whether the transaction is prepared.
+     */
+    inline bool
+    prepared() const noexcept
+    {
+        if (!_txn)
+            return false;
+        return _txn->state() == kv_transaction_state::prepared;
     }
 
     /*
@@ -279,14 +306,15 @@ public:
     }
 
     /*
-     * kv_update::set_timestamp --
-     *     Set the timestamp. This can be called only when this object is not inserted in a sorted
-     *     list.
+     * kv_update::set_timestamps --
+     *     Set the commit and durable timestamps. This can be called only when this object is not
+     *     inserted in a sorted list.
      */
     inline void
-    set_timestamp(timestamp_t timestamp) noexcept
+    set_timestamps(timestamp_t timestamp, timestamp_t durable_timestamp) noexcept
     {
-        _timestamp = timestamp;
+        _commit_timestamp = timestamp;
+        _durable_timestamp = durable_timestamp;
     }
 
     /*
@@ -301,7 +329,8 @@ public:
     }
 
 private:
-    timestamp_t _timestamp;
+    timestamp_t _commit_timestamp;
+    timestamp_t _durable_timestamp;
     data_value _value;
 
     /*

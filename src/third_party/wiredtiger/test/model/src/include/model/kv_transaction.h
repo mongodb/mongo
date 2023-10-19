@@ -53,6 +53,7 @@ class kv_update;
  */
 enum class kv_transaction_state {
     in_progress,
+    prepared,
     committed,
     rolled_back,
 };
@@ -78,6 +79,7 @@ public:
     inline kv_transaction(kv_database &database, txn_id_t id, kv_transaction_snapshot &&snapshot,
       timestamp_t read_timestamp = k_timestamp_latest) noexcept
         : _database(database), _id(id), _commit_timestamp(k_initial_commit_timestamp),
+          _durable_timestamp(k_timestamp_none), _prepare_timestamp(k_timestamp_none),
           _failed(false), _read_timestamp(read_timestamp), _snapshot(snapshot),
           _state(kv_transaction_state::in_progress)
     {
@@ -101,6 +103,26 @@ public:
     commit_timestamp() const noexcept
     {
         return _commit_timestamp;
+    }
+
+    /*
+     * kv_transaction::durable_timestamp --
+     *     Get the transaction's durable timestamp, if set.
+     */
+    inline timestamp_t
+    durable_timestamp() const noexcept
+    {
+        return _durable_timestamp;
+    }
+
+    /*
+     * kv_transaction::prepare_timestamp --
+     *     Get the transaction's prepare timestamp, if set.
+     */
+    inline timestamp_t
+    prepare_timestamp() const noexcept
+    {
+        return _prepare_timestamp;
     }
 
     /*
@@ -153,7 +175,14 @@ public:
      * kv_transaction::commit --
      *     Commit the transaction.
      */
-    void commit(timestamp_t commit_timestamp = k_timestamp_none);
+    void commit(timestamp_t commit_timestamp = k_timestamp_none,
+      timestamp_t durable_timestamp = k_timestamp_none);
+
+    /*
+     * kv_transaction::prepare --
+     *     Prepare the transaction.
+     */
+    void prepare(timestamp_t prepare_timestamp);
 
     /*
      * kv_transaction::fail --
@@ -178,10 +207,17 @@ public:
     void rollback();
 
     /*
-     * kv_transaction::set_timestamp --
-     *     Set the timestamp for all subsequent updates.
+     * kv_transaction::set_commit_timestamp --
+     *     Set the commit timestamp for all subsequent updates.
      */
-    void set_timestamp(timestamp_t commit_timestamp);
+    void set_commit_timestamp(timestamp_t commit_timestamp);
+
+protected:
+    /*
+     * kv_transaction::assert_in_progress_or_prepared --
+     *     Assert that the transaction is in progress or prepared.
+     */
+    void assert_in_progress_or_prepared();
 
 private:
     txn_id_t _id;
@@ -189,13 +225,15 @@ private:
     std::atomic<kv_transaction_state> _state;
 
     timestamp_t _commit_timestamp;
+    timestamp_t _durable_timestamp;
+    timestamp_t _prepare_timestamp;
     timestamp_t _read_timestamp;
     kv_transaction_snapshot _snapshot;
 
     /* The lifetime of the transaction must not exceed the lifetime of the database. */
     kv_database &_database;
 
-    std::mutex _lock;
+    mutable std::mutex _lock;
     std::list<std::shared_ptr<kv_transaction_update>> _updates;
     std::list<std::shared_ptr<kv_transaction_update>> _nontimestamped_updates;
 };

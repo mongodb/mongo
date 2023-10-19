@@ -40,9 +40,9 @@ namespace model {
  *     associated with the given timestamp, return true if any of them match.
  */
 bool
-kv_table::contains_any(const data_value &key, const data_value &value, timestamp_t timestamp)
+kv_table::contains_any(const data_value &key, const data_value &value, timestamp_t timestamp) const
 {
-    kv_table_item *item = item_if_exists(key);
+    const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return false;
     return item->contains_any(value, timestamp);
@@ -50,12 +50,13 @@ kv_table::contains_any(const data_value &key, const data_value &value, timestamp
 
 /*
  * kv_table::get --
- *     Get the value. Note that this returns a copy of the object.
+ *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+ *     exception on error.
  */
 data_value
-kv_table::get(const data_value &key, timestamp_t timestamp)
+kv_table::get(const data_value &key, timestamp_t timestamp) const
 {
-    kv_table_item *item = item_if_exists(key);
+    const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
     return item->get(timestamp);
@@ -63,15 +64,58 @@ kv_table::get(const data_value &key, timestamp_t timestamp)
 
 /*
  * kv_table::get --
- *     Get the value. Note that this returns a copy of the object.
+ *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+ *     exception on error.
  */
 data_value
-kv_table::get(kv_transaction_ptr txn, const data_value &key)
+kv_table::get(kv_transaction_ptr txn, const data_value &key) const
 {
-    kv_table_item *item = item_if_exists(key);
+    const kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return NONE;
     return item->get(txn);
+}
+
+/*
+ * kv_table::get_ext --
+ *     Get the value and return the error code instead of throwing an exception.
+ */
+int
+kv_table::get_ext(const data_value &key, data_value &out, timestamp_t timestamp) const
+{
+    const kv_table_item *item = item_if_exists(key);
+    if (item == nullptr) {
+        out = NONE;
+        return WT_NOTFOUND;
+    }
+    try {
+        out = item->get(timestamp);
+        return out == NONE ? WT_NOTFOUND : 0;
+    } catch (wiredtiger_exception &e) {
+        out = NONE;
+        return e.error();
+    }
+}
+
+/*
+ * kv_table::get_ext --
+ *     Get the value and return the error code instead of throwing an exception.
+ */
+int
+kv_table::get_ext(kv_transaction_ptr txn, const data_value &key, data_value &out) const
+{
+    const kv_table_item *item = item_if_exists(key);
+    if (item == nullptr) {
+        out = NONE;
+        return WT_NOTFOUND;
+    }
+    try {
+        out = item->get(txn);
+        return out == NONE ? WT_NOTFOUND : 0;
+    } catch (wiredtiger_exception &e) {
+        out = NONE;
+        return e.error();
+    }
 }
 
 /*
@@ -82,7 +126,12 @@ int
 kv_table::insert(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
-    return item(key).add_update(std::move(kv_update(value, timestamp)), false, !overwrite);
+    try {
+        item(key).add_update(std::move(kv_update(value, timestamp)), false, !overwrite);
+        return 0;
+    } catch (wiredtiger_exception &e) {
+        return e.error();
+    }
 }
 
 /*
@@ -94,10 +143,13 @@ kv_table::insert(
   kv_transaction_ptr txn, const data_value &key, const data_value &value, bool overwrite)
 {
     std::shared_ptr<kv_update> update = std::make_shared<kv_update>(value, txn);
-    int ret = item(key).add_update(update, false, !overwrite);
-    if (ret == 0)
+    try {
+        item(key).add_update(update, false, !overwrite);
         txn->add_update(*this, key, update);
-    return ret;
+        return 0;
+    } catch (wiredtiger_exception &e) {
+        return e.error();
+    }
 }
 
 /*
@@ -110,7 +162,12 @@ kv_table::remove(const data_value &key, timestamp_t timestamp)
     kv_table_item *item = item_if_exists(key);
     if (item == nullptr)
         return WT_NOTFOUND;
-    return item->add_update(std::move(kv_update(NONE, timestamp)), true, false);
+    try {
+        item->add_update(std::move(kv_update(NONE, timestamp)), true, false);
+        return 0;
+    } catch (wiredtiger_exception &e) {
+        return e.error();
+    }
 }
 
 /*
@@ -125,10 +182,13 @@ kv_table::remove(kv_transaction_ptr txn, const data_value &key)
         return WT_NOTFOUND;
 
     std::shared_ptr<kv_update> update = std::make_shared<kv_update>(NONE, txn);
-    int ret = item->add_update(update, true, false);
-    if (ret == 0)
+    try {
+        item->add_update(update, true, false);
         txn->add_update(*this, key, update);
-    return ret;
+        return 0;
+    } catch (wiredtiger_exception &e) {
+        return e.error();
+    }
 }
 
 /*
@@ -139,7 +199,12 @@ int
 kv_table::update(
   const data_value &key, const data_value &value, timestamp_t timestamp, bool overwrite)
 {
-    return item(key).add_update(std::move(kv_update(value, timestamp)), !overwrite, false);
+    try {
+        item(key).add_update(std::move(kv_update(value, timestamp)), !overwrite, false);
+        return 0;
+    } catch (wiredtiger_exception &e) {
+        return e.error();
+    }
 }
 
 /*
@@ -151,21 +216,26 @@ kv_table::update(
   kv_transaction_ptr txn, const data_value &key, const data_value &value, bool overwrite)
 {
     std::shared_ptr<kv_update> update = std::make_shared<kv_update>(value, txn);
-    int ret = item(key).add_update(update, !overwrite, false);
-    if (ret == 0)
+    try {
+        item(key).add_update(update, !overwrite, false);
         txn->add_update(*this, key, update);
-    return ret;
+        return 0;
+    } catch (wiredtiger_exception &e) {
+        return e.error();
+    }
 }
 
 /*
- * kv_table::fix_commit_timestamp --
- *     Fix the commit timestamp for the corresponding update. We need to do this, because WiredTiger
- *     transaction API specifies the commit timestamp after performing the operations, not before.
+ * kv_table::fix_timestamps --
+ *     Fix the commit and durable timestamps for the corresponding update. We need to do this,
+ *     because WiredTiger transaction API specifies the commit timestamp after performing the
+ *     operations, not before.
  */
 void
-kv_table::fix_commit_timestamp(const data_value &key, txn_id_t txn_id, timestamp_t timestamp)
+kv_table::fix_timestamps(const data_value &key, txn_id_t txn_id, timestamp_t commit_timestamp,
+  timestamp_t durable_timestamp)
 {
-    item(key).fix_commit_timestamp(txn_id, timestamp);
+    item(key).fix_timestamps(txn_id, commit_timestamp, durable_timestamp);
 }
 
 /*

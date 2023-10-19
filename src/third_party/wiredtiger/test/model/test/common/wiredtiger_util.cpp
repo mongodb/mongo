@@ -70,6 +70,44 @@ wt_get(
 }
 
 /*
+ * wt_get_ext --
+ *     Read from WiredTiger, but also return the error code.
+ */
+int
+wt_get_ext(WT_SESSION *session, const char *uri, const model::data_value &key,
+  model::data_value &out, model::timestamp_t timestamp)
+{
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    const char *value;
+    char cfg[64];
+
+    value = nullptr;
+
+    if (timestamp == 0)
+        testutil_check(session->begin_transaction(session, nullptr));
+    else {
+        testutil_snprintf(cfg, sizeof(cfg), "read_timestamp=%" PRIx64, timestamp);
+        testutil_check(session->begin_transaction(session, cfg));
+    }
+    testutil_check(session->open_cursor(session, uri, nullptr, nullptr, &cursor));
+
+    model::set_wt_cursor_key(cursor, key);
+    ret = cursor->search(cursor);
+    if (ret != WT_NOTFOUND && ret != WT_ROLLBACK && ret != WT_PREPARE_CONFLICT)
+        testutil_check(ret);
+    if (ret == 0) {
+        testutil_check(cursor->get_value(cursor, &value));
+        out = model::data_value(value);
+    } else
+        out = model::NONE;
+
+    testutil_check(cursor->close(cursor));
+    testutil_check(session->commit_transaction(session, nullptr));
+    return ret;
+}
+
+/*
  * wt_insert --
  *     Write to WiredTiger.
  */
@@ -184,15 +222,34 @@ wt_txn_begin(WT_SESSION *session, model::timestamp_t read_timestamp)
  *     Commit a transaction.
  */
 void
-wt_txn_commit(WT_SESSION *session, model::timestamp_t commit_timestamp)
+wt_txn_commit(
+  WT_SESSION *session, model::timestamp_t commit_timestamp, model::timestamp_t durable_timestamp)
 {
     char cfg[64];
-    if (commit_timestamp == 0)
+    if (commit_timestamp == model::k_timestamp_none) {
+        testutil_assert(durable_timestamp == model::k_timestamp_none);
         testutil_check(session->commit_transaction(session, nullptr));
-    else {
+    } else if (durable_timestamp == model::k_timestamp_none) {
         testutil_snprintf(cfg, sizeof(cfg), "commit_timestamp=%" PRIx64, commit_timestamp);
         testutil_check(session->commit_transaction(session, cfg));
+    } else {
+        testutil_snprintf(cfg, sizeof(cfg),
+          "commit_timestamp=%" PRIx64 ",durable_timestamp=%" PRIx64, commit_timestamp,
+          durable_timestamp);
+        testutil_check(session->commit_transaction(session, cfg));
     }
+}
+
+/*
+ * wt_txn_prepare --
+ *     Prepare a transaction.
+ */
+void
+wt_txn_prepare(WT_SESSION *session, model::timestamp_t prepare_timestamp)
+{
+    char cfg[64];
+    testutil_snprintf(cfg, sizeof(cfg), "prepare_timestamp=%" PRIx64, prepare_timestamp);
+    testutil_check(session->prepare_transaction(session, cfg));
 }
 
 /*
@@ -216,11 +273,11 @@ wt_txn_rollback(WT_SESSION *session)
 }
 
 /*
- * wt_txn_set_timestamp --
- *     Set the timestamp for all subsequent updates.
+ * wt_txn_set_commit_timestamp --
+ *     Set the commit timestamp for all subsequent updates.
  */
 void
-wt_txn_set_timestamp(WT_SESSION *session, model::timestamp_t commit_timestamp)
+wt_txn_set_commit_timestamp(WT_SESSION *session, model::timestamp_t commit_timestamp)
 {
     char cfg[64];
     testutil_snprintf(cfg, sizeof(cfg), "commit_timestamp=%" PRIx64, commit_timestamp);
@@ -237,7 +294,6 @@ wt_txn_get(WT_SESSION *session, const char *uri, const model::data_value &key)
     WT_CURSOR *cursor;
     WT_DECL_RET;
     const char *value;
-    char cfg[64];
 
     value = nullptr;
 

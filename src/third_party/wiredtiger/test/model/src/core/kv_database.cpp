@@ -107,7 +107,7 @@ kv_transaction_snapshot
 kv_database::txn_snapshot_nolock(txn_id_t do_not_exclude)
 {
     std::unordered_set<txn_id_t> active_txn_ids;
-    for (auto p : _active_transactions) {
+    for (auto &p : _active_transactions) {
         if (p.first == do_not_exclude)
             continue;
         kv_transaction_state state = p.second->state();

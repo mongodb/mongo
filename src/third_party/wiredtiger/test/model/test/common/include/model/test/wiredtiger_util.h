@@ -41,6 +41,13 @@ model::data_value wt_get(WT_SESSION *session, const char *uri, const model::data
   model::timestamp_t timestamp = model::k_timestamp_latest);
 
 /*
+ * wt_get_ext --
+ *     Read from WiredTiger, but also return the error code.
+ */
+int wt_get_ext(WT_SESSION *session, const char *uri, const model::data_value &key,
+  model::data_value &out, model::timestamp_t timestamp = model::k_timestamp_latest);
+
+/*
  * wt_insert --
  *     Write to WiredTiger.
  */
@@ -72,7 +79,14 @@ void wt_txn_begin(
  * wt_txn_commit --
  *     Commit a transaction.
  */
-void wt_txn_commit(WT_SESSION *session, model::timestamp_t commit_timestamp);
+void wt_txn_commit(WT_SESSION *session, model::timestamp_t commit_timestamp,
+  model::timestamp_t durable_timestamp = model::k_timestamp_none);
+
+/*
+ * wt_txn_prepare --
+ *     Prepare a transaction.
+ */
+void wt_txn_prepare(WT_SESSION *session, model::timestamp_t prepare_timestamp);
 
 /*
  * wt_txn_reset_snapshot --
@@ -87,10 +101,10 @@ void wt_txn_reset_snapshot(WT_SESSION *session);
 void wt_txn_rollback(WT_SESSION *session);
 
 /*
- * wt_txn_set_timestamp --
- *     Set the timestamp for all subsequent updates.
+ * wt_txn_set_commit_timestamp --
+ *     Set the commit timestamp for all subsequent updates.
  */
-void wt_txn_set_timestamp(WT_SESSION *session, model::timestamp_t commit_timestamp);
+void wt_txn_set_commit_timestamp(WT_SESSION *session, model::timestamp_t commit_timestamp);
 
 /*
  * wt_txn_get --
@@ -109,8 +123,15 @@ int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value 
  * wt_model_assert --
  *     Check that the key has the same value in the model as in the database.
  */
-#define wt_model_assert(table, uri, key, ...) \
-    testutil_assert(table->get(key, ##__VA_ARGS__) == wt_get(session, uri, key, ##__VA_ARGS__));
+#define wt_model_assert(table, uri, key, ...)                              \
+    {                                                                      \
+        model::data_value __out_model, __out_wt;                           \
+        int __ret_model, __ret_wt;                                         \
+        __ret_model = table->get_ext(key, __out_model, ##__VA_ARGS__);     \
+        __ret_wt = wt_get_ext(session, uri, key, __out_wt, ##__VA_ARGS__); \
+        testutil_assert(__ret_model == __ret_wt);                          \
+        testutil_assert(__out_model == __out_wt);                          \
+    }
 
 /*
  * wt_model_insert_both --
@@ -165,6 +186,16 @@ int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value 
     }
 
 /*
+ * wt_model_txn_prepare_both --
+ *     Prepare transaction in both the model and the database.
+ */
+#define wt_model_txn_prepare_both(txn, session, ...) \
+    {                                                \
+        wt_txn_prepare(session, ##__VA_ARGS__);      \
+        txn->prepare(__VA_ARGS__);                   \
+    }
+
+/*
  * wt_model_txn_reset_snapshot_both --
  *     Reset transaction snapshot in both the model and the database.
  */
@@ -188,10 +219,10 @@ int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value 
  * wt_model_txn_set_timestamp_both --
  *     Set the timestamp in both the model and the database.
  */
-#define wt_model_txn_set_timestamp_both(txn, session, ...) \
-    {                                                      \
-        wt_txn_set_timestamp(session, ##__VA_ARGS__);      \
-        txn->set_timestamp(__VA_ARGS__);                   \
+#define wt_model_txn_set_timestamp_both(txn, session, ...)   \
+    {                                                        \
+        wt_txn_set_commit_timestamp(session, ##__VA_ARGS__); \
+        txn->set_commit_timestamp(__VA_ARGS__);              \
     }
 
 /*

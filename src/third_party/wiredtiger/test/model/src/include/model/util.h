@@ -31,58 +31,10 @@
 
 #include <stdexcept>
 #include <string>
+#include "model/core.h"
 #include "wiredtiger.h"
 
 namespace model {
-
-/*
- * wiredtiger_exception --
- *     A WiredTiger exception.
- */
-class wiredtiger_exception : std::runtime_error {
-
-public:
-    /*
-     * wiredtiger_exception::wiredtiger_exception --
-     *     Create a new instance of the exception.
-     */
-    inline wiredtiger_exception(WT_SESSION *session, const char *message, int error) noexcept
-        : std::runtime_error(std::string(message) + session->strerror(session, error)),
-          _error(error)
-    {
-    }
-
-    /*
-     * wiredtiger_exception::wiredtiger_exception --
-     *     Create a new instance of the exception.
-     */
-    inline wiredtiger_exception(WT_SESSION *session, int error) noexcept
-        : std::runtime_error(session->strerror(session, error)), _error(error)
-    {
-    }
-
-    /*
-     * wiredtiger_exception::wiredtiger_exception --
-     *     Create a new instance of the exception. This constructor is not thread-safe.
-     */
-    inline wiredtiger_exception(int error) noexcept
-        : std::runtime_error(wiredtiger_strerror(error)), _error(error)
-    {
-    }
-
-    /*
-     * wiredtiger_exception::error --
-     *     Get the error code.
-     */
-    inline int
-    error() const noexcept
-    {
-        return _error;
-    }
-
-private:
-    int _error;
-};
 
 /*
  * wiredtiger_cursor_guard --

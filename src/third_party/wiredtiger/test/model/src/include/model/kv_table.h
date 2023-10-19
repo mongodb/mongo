@@ -72,20 +72,35 @@ public:
      *     Check whether the table contains the given key-value pair. If there are multiple values
      *     associated with the given timestamp, return true if any of them match.
      */
-    bool contains_any(
-      const data_value &key, const data_value &value, timestamp_t timestamp = k_timestamp_latest);
+    bool contains_any(const data_value &key, const data_value &value,
+      timestamp_t timestamp = k_timestamp_latest) const;
 
     /*
      * kv_table::get --
-     *     Get the value. Note that this returns a copy of the object.
+     *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+     *     exception on error.
      */
-    data_value get(const data_value &key, timestamp_t timestamp = k_timestamp_latest);
+    data_value get(const data_value &key, timestamp_t timestamp = k_timestamp_latest) const;
 
     /*
      * kv_table::get --
-     *     Get the value. Note that this returns a copy of the object.
+     *     Get the value. Return a copy of the value if is found, or NONE if not found. Throw an
+     *     exception on error.
      */
-    data_value get(kv_transaction_ptr txn, const data_value &key);
+    data_value get(kv_transaction_ptr txn, const data_value &key) const;
+
+    /*
+     * kv_table::get_ext --
+     *     Get the value and return the error code instead of throwing an exception.
+     */
+    int get_ext(
+      const data_value &key, data_value &out, timestamp_t timestamp = k_timestamp_latest) const;
+
+    /*
+     * kv_table::get_ext --
+     *     Get the value and return the error code instead of throwing an exception.
+     */
+    int get_ext(kv_transaction_ptr txn, const data_value &key, data_value &out) const;
 
     /*
      * kv_table::insert --
@@ -114,12 +129,13 @@ public:
     int remove(kv_transaction_ptr txn, const data_value &key);
 
     /*
-     * kv_table::fix_commit_timestamp --
-     *     Fix the commit timestamp for the corresponding update. We need to do this, because
-     *     WiredTiger transaction API specifies the commit timestamp after performing the
+     * kv_table::fix_timestamps --
+     *     Fix the commit and durable timestamps for the corresponding update. We need to do this,
+     *     because WiredTiger transaction API specifies the commit timestamp after performing the
      *     operations, not before.
      */
-    void fix_commit_timestamp(const data_value &key, txn_id_t txn_id, timestamp_t timestamp);
+    void fix_timestamps(const data_value &key, txn_id_t txn_id, timestamp_t commit_timestamp,
+      timestamp_t durable_timestamp);
 
     /*
      * kv_table::rollback_updates --
@@ -195,6 +211,20 @@ protected:
         return &i->second;
     }
 
+    /*
+     * kv_table::item_if_exists --
+     *     Get the item that corresponds to the given key, if it exists.
+     */
+    inline const kv_table_item *
+    item_if_exists(const data_value &key) const
+    {
+        std::lock_guard lock_guard(_lock);
+        auto i = _data.find(key);
+        if (i == _data.end())
+            return nullptr;
+        return &i->second;
+    }
+
 private:
     /*
      * This data structure is designed so that the global lock is only necessary for the map
@@ -204,7 +234,7 @@ private:
      * WiredTiger's state. It would also help us in the future if we decide to model range scans.
      */
     std::map<data_value, kv_table_item> _data;
-    std::mutex _lock;
+    mutable std::mutex _lock;
     std::string _name;
 };
 

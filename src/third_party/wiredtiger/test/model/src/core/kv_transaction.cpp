@@ -57,16 +57,38 @@ kv_transaction::add_update(
  *     Commit the transaction.
  */
 void
-kv_transaction::commit(timestamp_t commit_timestamp)
+kv_transaction::commit(timestamp_t commit_timestamp, timestamp_t durable_timestamp)
 {
     std::lock_guard lock_guard(_lock);
+    kv_transaction_state txn_state = state();
 
     if (_failed && !_updates.empty())
         throw model_exception("Failed transaction requires rollback");
 
+    assert_in_progress_or_prepared();
+
+    if (txn_state == kv_transaction_state::prepared) {
+        if (durable_timestamp == k_timestamp_none)
+            throw wiredtiger_abort_exception(
+              "Durable timestamp is required for a prepared transaction");
+    } else {
+        if (durable_timestamp != k_timestamp_none)
+            throw model_exception(
+              "Durable timestamp cannot be specified for a non-prepared transaction");
+        durable_timestamp = commit_timestamp;
+    }
+
+    if (durable_timestamp < commit_timestamp)
+        throw model_exception("The durable timestamp cannot be older than the commit timestamp");
+
+    /* Remember the timestamps. */
+    _commit_timestamp = commit_timestamp;
+    _durable_timestamp = durable_timestamp;
+
     /* Fix commit timestamps. */
     for (auto &u : _nontimestamped_updates)
-        _database.table(u->table_name())->fix_commit_timestamp(u->key(), _id, commit_timestamp);
+        _database.table(u->table_name())
+          ->fix_timestamps(u->key(), _id, commit_timestamp, durable_timestamp);
 
     /* Mark the transaction as committed. */
     _state.store(kv_transaction_state::committed, std::memory_order_release);
@@ -77,6 +99,30 @@ kv_transaction::commit(timestamp_t commit_timestamp)
 
     /* Remove from the list of active transactions. */
     _database.remove_inactive_transaction(_id);
+}
+
+/*
+ * kv_transaction::prepare --
+ *     Prepare the transaction.
+ */
+void
+kv_transaction::prepare(timestamp_t prepare_timestamp)
+{
+    std::lock_guard lock_guard(_lock);
+
+    if (_failed)
+        throw wiredtiger_abort_exception("Failed transaction requires rollback");
+
+    if (_commit_timestamp != k_initial_commit_timestamp)
+        throw model_exception("Cannot prepare a transaction with a commit timestamp");
+
+    if (state() != kv_transaction_state::in_progress)
+        throw model_exception("The transaction must be in progress");
+
+    _prepare_timestamp = prepare_timestamp;
+
+    /* Mark the transaction as prepared. */
+    _state.store(kv_transaction_state::prepared, std::memory_order_release);
 }
 
 /*
@@ -99,6 +145,8 @@ kv_transaction::rollback()
 {
     std::lock_guard lock_guard(_lock);
 
+    assert_in_progress_or_prepared();
+
     /* Mark the transaction as rolled back. */
     _state.store(kv_transaction_state::rolled_back, std::memory_order_release);
 
@@ -111,14 +159,38 @@ kv_transaction::rollback()
 }
 
 /*
- * kv_transaction::set_timestamp --
- *     Set the timestamp for all subsequent updates.
+ * kv_transaction::set_commit_timestamp --
+ *     Set the commit timestamp for all subsequent updates.
  */
 void
-kv_transaction::set_timestamp(timestamp_t commit_timestamp)
+kv_transaction::set_commit_timestamp(timestamp_t commit_timestamp)
 {
     std::lock_guard lock_guard(_lock);
+
+    if (commit_timestamp == k_initial_commit_timestamp)
+        throw model_exception("Invalid commit timestamp");
+    assert_in_progress_or_prepared();
+
+    /*
+     * In non-prepared transactions, updates will have the durable timestamp the same as the commit
+     * timestamp. We don't have to worry about prepared transactions, because after we set the
+     * commit timestamp, the transaction can be no longer prepared.
+     */
     _commit_timestamp = commit_timestamp;
+    _durable_timestamp = commit_timestamp;
+}
+
+/*
+ * kv_transaction::assert_in_progress_or_prepared --
+ *     Assert that the transaction is in progress or prepared.
+ */
+void
+kv_transaction::assert_in_progress_or_prepared()
+{
+    kv_transaction_state txn_state = state();
+    if (txn_state != kv_transaction_state::in_progress &&
+      txn_state != kv_transaction_state::prepared)
+        throw model_exception("The transaction must be either in progress or prepared");
 }
 
 } /* namespace model */

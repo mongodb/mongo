@@ -60,6 +60,12 @@ public:
      * data_value::data_value --
      *     Create a new instance.
      */
+    inline data_value() : base_data_value(std::monostate{}) {}
+
+    /*
+     * data_value::data_value --
+     *     Create a new instance.
+     */
     inline data_value(const base_data_value &data) : base_data_value(data) {}
 
     /*
@@ -87,13 +93,6 @@ public:
      *     Get the WiredTiger type.
      */
     const char *wt_type() const;
-
-private:
-    /*
-     * data_value::data_value --
-     *     Create a new instance.
-     */
-    inline data_value() : base_data_value(std::monostate{}) {}
 };
 
 /*

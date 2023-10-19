@@ -146,9 +146,9 @@ test_transaction_basic(void)
     /* Set timestamp. */
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value4));
-    txn1->set_timestamp(42);
+    txn1->set_commit_timestamp(42);
     testutil_check(table->insert(txn1, key2, value5));
-    txn1->set_timestamp(44);
+    txn1->set_commit_timestamp(44);
     testutil_check(table->insert(txn1, key3, value6));
     txn1->commit(50);
 
@@ -161,12 +161,12 @@ test_transaction_basic(void)
 
     /* Set timestamp: Check timestamp order within the same key. */
     txn1 = database.begin_transaction();
-    txn1->set_timestamp(52);
+    txn1->set_commit_timestamp(52);
     testutil_check(table->insert(txn1, key1, value1));
     testutil_check(table->insert(txn1, key1, value2));
-    txn1->set_timestamp(55);
+    txn1->set_commit_timestamp(55);
     testutil_check(table->insert(txn1, key1, value3));
-    txn1->set_timestamp(53);
+    txn1->set_commit_timestamp(53);
     model_testutil_assert_exception(table->insert(txn1, key1, value3),
       model::wiredtiger_abort_exception); /* WT aborts at commit. */
     txn1->commit(60);
@@ -176,7 +176,7 @@ test_transaction_basic(void)
 
     txn1 = database.begin_transaction();
     testutil_check(table->insert(txn1, key1, value1));
-    txn1->set_timestamp(65);
+    txn1->set_commit_timestamp(65);
     model_testutil_assert_exception(table->insert(txn1, key1, value4),
       model::wiredtiger_abort_exception); /* WT aborts at checkpoint. */
     txn1->commit(70);
@@ -361,6 +361,207 @@ test_transaction_basic_wt(void)
 }
 
 /*
+ * test_transaction_prepared --
+ *     Test prepared transactions.
+ */
+static void
+test_transaction_prepared(void)
+{
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
+    model::data_value v;
+
+    /* Keys. */
+    const model::data_value key1("Key 1");
+    const model::data_value key2("Key 2");
+    const model::data_value key3("Key 3");
+
+    /* Values. */
+    const model::data_value value1("Value 1");
+    const model::data_value value2("Value 2");
+    const model::data_value value3("Value 3");
+    const model::data_value value4("Value 4");
+    const model::data_value value5("Value 5");
+    const model::data_value value6("Value 6");
+
+    /* Transactions. */
+    model::kv_transaction_ptr txn1, txn2;
+
+    /* A basic test with two transactions. */
+    txn1 = database.begin_transaction();
+    txn2 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value1));
+    testutil_check(table->insert(txn2, key2, value2));
+    testutil_assert(table->get(txn1, key1) == value1);
+    testutil_assert(table->get(txn2, key2) == value2);
+    testutil_assert(table->get(txn2, key1) == model::NONE);
+    testutil_assert(table->get(txn1, key2) == model::NONE);
+    txn1->prepare(5);
+    txn2->prepare(5);
+    testutil_assert(txn1->state() == model::kv_transaction_state::prepared);
+    testutil_assert(txn2->state() == model::kv_transaction_state::prepared);
+    txn1->commit(10, 10);
+    txn2->commit(10, 15);
+    testutil_assert(table->get(key1) == value1);
+    testutil_assert(table->get(key2) == value2);
+    testutil_assert(table->get(key1, 10) == value1);
+    testutil_assert(table->get(key2, 10) == value2);
+
+    /* Check transaction conflicts: Concurrent update. */
+    txn1 = database.begin_transaction();
+    txn2 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value3));
+    testutil_check(table->insert(txn1, key1, value1));
+    txn1->prepare(20);
+    testutil_assert(table->insert(txn2, key1, value4) == WT_ROLLBACK);
+    testutil_assert(!txn1->failed());
+    testutil_assert(txn2->failed());
+    txn1->commit(20, 20);
+    txn2->commit(20);
+    testutil_assert(table->get(key1) == value1);
+
+    txn1 = database.begin_transaction();
+    txn2 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value3));
+    txn1->prepare(30);
+    txn1->commit(30, 30);
+    testutil_assert(table->insert(txn2, key1, value4) == WT_ROLLBACK);
+    txn2->commit(30);
+    testutil_assert(table->get(key1) == value3);
+
+    /* Check prepare conflicts: Reading a prepared, but uncommitted update. */
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value1));
+    txn1->prepare(40);
+    testutil_assert(table->get_ext(key1, v) == WT_PREPARE_CONFLICT);
+    testutil_assert(table->get_ext(key1, v, 40) == WT_PREPARE_CONFLICT);
+    testutil_assert(table->get(key1, 39) == value3);
+    testutil_assert(table->get(key1, 20) == value1);
+    txn1->commit(40, 40);
+    testutil_assert(table->get(key1, 40) == value1);
+
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value1));
+    txn1->prepare(50);
+    txn1->commit(50, 50);
+    testutil_assert(table->get(key1) == value1);
+
+    txn1 = database.begin_transaction();
+    testutil_check(table->insert(txn1, key1, value2));
+    txn1->prepare(60);
+    txn1->rollback();
+    testutil_assert(table->get(key1) == value1);
+}
+
+/*
+ * test_transaction_prepared_wt --
+ *     Test prepared transactions, also in WiredTiger.
+ */
+static void
+test_transaction_prepared_wt(void)
+{
+    model::kv_database database;
+    model::kv_table_ptr table = database.create_table("table");
+
+    /* Keys. */
+    const model::data_value key1("Key 1");
+    const model::data_value key2("Key 2");
+    const model::data_value key3("Key 3");
+
+    /* Values. */
+    const model::data_value value1("Value 1");
+    const model::data_value value2("Value 2");
+    const model::data_value value3("Value 3");
+    const model::data_value value4("Value 4");
+    const model::data_value value5("Value 5");
+    const model::data_value value6("Value 6");
+
+    /* Transactions. */
+    model::kv_transaction_ptr txn1, txn2;
+
+    /* Create the test's home directory and database. */
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    WT_SESSION *session1;
+    WT_SESSION *session2;
+    const char *uri = "table:table";
+
+    testutil_recreate_dir(home);
+    testutil_wiredtiger_open(opts, home, ENV_CONFIG, nullptr, &conn, false, false);
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session1));
+    testutil_check(conn->open_session(conn, nullptr, nullptr, &session2));
+    testutil_check(
+      session->create(session, uri, "key_format=S,value_format=S,log=(enabled=false)"));
+
+    /* A basic test with two transactions. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value1);
+    wt_model_txn_insert_both(table, uri, txn2, session2, key2, value2);
+    wt_model_txn_assert(table, uri, txn1, session1, key1);
+    wt_model_txn_assert(table, uri, txn2, session2, key2);
+    wt_model_txn_assert(table, uri, txn1, session1, key2);
+    wt_model_txn_assert(table, uri, txn2, session2, key1);
+    wt_model_txn_prepare_both(txn1, session1, 5);
+    wt_model_txn_prepare_both(txn2, session2, 5);
+    wt_model_txn_commit_both(txn1, session1, 10, 10);
+    wt_model_txn_commit_both(txn2, session2, 10, 15);
+    wt_model_assert(table, uri, key1, 10);
+    wt_model_assert(table, uri, key2, 10);
+
+    /* Check transaction conflicts: Concurrent update. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value3);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value4);
+    wt_model_txn_prepare_both(txn1, session1, 20);
+    wt_model_txn_insert_both(table, uri, txn2, session2, key1, value4); /* Rollback. */
+    wt_model_txn_commit_both(txn1, session1, 20, 20);
+    wt_model_txn_commit_both(txn2, session2, 20);
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_begin_both(txn2, session2);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value3);
+    wt_model_txn_prepare_both(txn1, session1, 30);
+    wt_model_txn_commit_both(txn1, session1, 30, 30);
+    wt_model_txn_insert_both(table, uri, txn2, session2, key1, value4); /* Rollback. */
+    wt_model_txn_commit_both(txn2, session2, 30);
+
+    /* Check prepare conflicts: Reading a prepared, but uncommitted update. */
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value1);
+    wt_model_txn_prepare_both(txn1, session1, 40);
+    wt_model_assert(table, uri, key1);     /* Prepare conflict. */
+    wt_model_assert(table, uri, key1, 40); /* Prepare conflict. */
+    wt_model_assert(table, uri, key1, 39); /* Success. */
+    wt_model_assert(table, uri, key1, 20); /* Success. */
+    wt_model_txn_commit_both(txn1, session1, 40, 40);
+    wt_model_assert(table, uri, key1, 40);
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value1);
+    wt_model_txn_prepare_both(txn1, session1, 50);
+    wt_model_txn_commit_both(txn1, session1, 50, 50);
+    wt_model_assert(table, uri, key1, 50); /* Success. */
+
+    wt_model_txn_begin_both(txn1, session1);
+    wt_model_txn_insert_both(table, uri, txn1, session1, key1, value2);
+    wt_model_txn_prepare_both(txn1, session1, 60);
+    wt_model_txn_rollback_both(txn1, session1);
+    wt_model_assert(table, uri, key1, 60); /* Success. */
+
+    /* Verify. */
+    testutil_assert(table->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(session->close(session, nullptr));
+    testutil_check(session1->close(session1, nullptr));
+    testutil_check(session2->close(session2, nullptr));
+    testutil_check(conn->close(conn, nullptr));
+}
+
+/*
  * usage --
  *     Print usage help for the program.
  */
@@ -379,6 +580,7 @@ int
 main(int argc, char *argv[])
 {
     int ch;
+    WT_DECL_RET;
 
     (void)testutil_set_progname(argv);
 
@@ -405,8 +607,16 @@ main(int argc, char *argv[])
     /*
      * Tests.
      */
-    test_transaction_basic();
-    test_transaction_basic_wt();
+    try {
+        ret = EXIT_SUCCESS;
+        test_transaction_basic();
+        test_transaction_basic_wt();
+        test_transaction_prepared();
+        test_transaction_prepared_wt();
+    } catch (std::exception &e) {
+        std::cerr << "Test failed with exception: " << e.what() << std::endl;
+        ret = EXIT_FAILURE;
+    }
 
     /*
      * Clean up.
@@ -416,5 +626,5 @@ main(int argc, char *argv[])
         testutil_remove(home);
 
     testutil_cleanup(opts);
-    return EXIT_SUCCESS;
+    return ret;
 }
