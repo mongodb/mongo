@@ -59,8 +59,9 @@ def if_set_should_match(existing: Dict, current: Dict, key: str):
     current_data = current.get(key)
 
     if existing_data and current_data and existing_data != current_data:
-        raise Exception(
-            f"Expected data to match - existing: {existing_data}, current: {current_data}")
+        print(
+            f"WARNING: Expected data to match - existing: {existing_data}, current: {current_data}",
+            file=sys.stderr)
 
     elif not existing_data and current_data:
         existing[key] = current_data
@@ -110,9 +111,9 @@ def extend_list_no_dups(existing: Dict, current: Dict, key: str, list_unqiue_key
                 # this check.
                 pass
             else:
-                raise Exception(
-                    f"Expected data to match - existing: {unique_list[elem[list_unqiue_key]]}, current: {elem}"
-                )
+                print(
+                    f"WARNING: Expected data to match - existing: {unique_list[elem[list_unqiue_key]]}, current: {elem}",
+                    file=sys.stderr)
 
     existing[key] = list(unique_list.values())
 

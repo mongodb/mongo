@@ -2,6 +2,7 @@
 import sys
 import os
 import unittest
+import io
 
 sys.path.append(os.path.dirname(__file__))
 
@@ -47,7 +48,11 @@ class CombineUnittests(unittest.TestCase):
         if_set_should_match(self.existing, self.current, 'match_same')
         self.assertEqual(self.existing['match_same'], 'test')
         self.current['match_same'] = 'test2'
-        self.assertRaises(Exception, if_set_should_match, self.existing, self.current, 'match_same')
+        capturedOutput = io.StringIO()
+        sys.stderr = capturedOutput
+        if_set_should_match(self.existing, self.current, 'match_same')
+        sys.stderr = sys.__stderr__
+        self.assertTrue("WARNING: Expected data to match - existing:" in capturedOutput.getvalue())
 
     def test_recalc_list_indexes(self):
         recalc_list_indexes(self.existing['recalc_list'])
@@ -71,8 +76,12 @@ class CombineUnittests(unittest.TestCase):
     def test_extend_list_no_dups_bad_data(self):
         if sys.platform != 'win32':
             self.current['extend_list'][0]['val'] = 'bad_data'
-            self.assertRaises(Exception, extend_list_no_dups, self.existing, self.current,
-                              'extend_list', 'key')
+            capturedOutput = io.StringIO()
+            sys.stderr = capturedOutput
+            extend_list_no_dups(self.existing, self.current, 'extend_list', 'key')
+            sys.stderr = sys.__stderr__
+            self.assertTrue(
+                "WARNING: Expected data to match - existing:" in capturedOutput.getvalue())
 
 
 unittest.main()
