@@ -708,7 +708,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     tsp.tv_sec = 0;
     tsp.tv_nsec = WT_MILLION;
     __checkpoint_timing_stress(session, WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY, &tsp);
-    original_snap_min = session->txn->snap_min;
+    original_snap_min = session->txn->snapshot_data.snap_min;
 
     WT_DIAGNOSTIC_YIELD;
 
@@ -742,7 +742,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      */
     __wt_writelock(session, &txn_global->rwlock);
     txn_global->checkpoint_txn_shared = *txn_shared;
-    txn_global->checkpoint_txn_shared.pinned_id = txn->snap_min;
+    txn_global->checkpoint_txn_shared.pinned_id = txn->snapshot_data.snap_min;
 
     /*
      * Sanity check that the oldest ID hasn't moved on before we have cleared our entry.
@@ -796,7 +796,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     __wt_txn_bump_snapshot(session);
 
     /* Assert that our snapshot min didn't somehow move backwards. */
-    WT_ASSERT(session, session->txn->snap_min >= original_snap_min);
+    WT_ASSERT(session, session->txn->snapshot_data.snap_min >= original_snap_min);
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(original_snap_min);
 

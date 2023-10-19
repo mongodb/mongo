@@ -500,15 +500,15 @@ __wt_txn_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_
         break;
     case WT_TXN_LOG_CKPT_START:
         /* Take a copy of the transaction snapshot. */
-        txn->ckpt_nsnapshot = txn->snapshot_count;
+        txn->ckpt_nsnapshot = txn->snapshot_data.snapshot_count;
         recsize = (size_t)txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
         WT_ERR(__wt_scr_alloc(session, recsize, &txn->ckpt_snapshot));
         end = p = txn->ckpt_snapshot->mem;
         /* There many not be any snapshot entries. */
         if (end != NULL) {
             end += recsize;
-            for (i = 0; i < txn->snapshot_count; i++)
-                WT_ERR(__wt_vpack_uint(&p, WT_PTRDIFF(end, p), txn->snapshot[i]));
+            for (i = 0; i < txn->snapshot_data.snapshot_count; i++)
+                WT_ERR(__wt_vpack_uint(&p, WT_PTRDIFF(end, p), txn->snapshot_data.snapshot[i]));
         }
         break;
     case WT_TXN_LOG_CKPT_STOP:
