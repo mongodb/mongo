@@ -3626,7 +3626,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     }
 
     // Normalize the specs' collations, wildcard projections, and any other fields as applicable.
-    auto normalSpecs = normalizeIndexSpecs(opCtx, collection, indexSpecs);
+    auto normalSpecs = indexCatalog->normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
     // Remove any index specifications which already exist in the catalog.
     auto resultSpecs = indexCatalog->removeExistingIndexes(
@@ -3640,38 +3640,6 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     }
 
     return resultSpecs;
-}
-
-// Returns normalized versions of 'indexSpecs' for the catalog.
-std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const std::vector<BSONObj>& indexSpecs) {
-    // This helper function may be called before the collection is created, when we are attempting
-    // to check whether the candidate index collides with any existing indexes. If 'collection' is
-    // nullptr, skip normalization. Since the collection does not exist there cannot be a conflict,
-    // and we will normalize once the candidate spec is submitted to the IndexBuildsCoordinator.
-    if (!collection) {
-        return indexSpecs;
-    }
-
-    // Add collection-default collation where needed and normalize the collation in each index spec.
-    auto normalSpecs =
-        uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
-
-    // We choose not to normalize the spec's partialFilterExpression at this point, if it exists.
-    // Doing so often reduces the legibility of the filter to the end-user, and makes it difficult
-    // for clients to validate (via the listIndexes output) whether a given partialFilterExpression
-    // is equivalent to the filter that they originally submitted. Omitting this normalization does
-    // not impact our internal index comparison semantics, since we compare based on the parsed
-    // MatchExpression trees rather than the serialized BSON specs.
-    //
-    // For similar reasons we do not normalize index projection objects here, if any, so their
-    // original forms get persisted in the catalog. Projection normalization to detect whether a
-    // candidate new index would duplicate an existing index is done only in the memory-only
-    // 'IndexDescriptor._normalizedProjection' field.
-
-    return normalSpecs;
 }
 
 }  // namespace mongo

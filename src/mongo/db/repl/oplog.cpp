@@ -299,19 +299,12 @@ void createIndexForApplyOps(OperationContext* opCtx,
 
     // Check for conflict with two-phase index builds during initial sync. It is possible that
     // this index may have been dropped and recreated after inserting documents into the collection.
-    auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
     if (OplogApplication::Mode::kInitialSync == mode) {
-        auto normalSpecs =
-            indexBuildsCoordinator->normalizeIndexSpecs(opCtx, indexCollection, {indexSpec});
-        invariant(
-            1U == normalSpecs.size(),
-            str::stream() << "Unexpected result from normalizeIndexSpecs - ns: "
-                          << indexNss.toStringForErrorMsg() << "; uuid: " << indexCollection->uuid()
-                          << "; original index spec: " << indexSpec
-                          << "; normalized index specs: " << BSON("normalSpecs" << normalSpecs));
+        const auto normalSpec =
+            IndexCatalog::normalizeIndexSpecs(opCtx, indexCollection, indexSpec);
         auto indexCatalog = indexCollection->getIndexCatalog();
         auto prepareSpecResult =
-            indexCatalog->prepareSpecForCreate(opCtx, indexCollection, normalSpecs[0], {});
+            indexCatalog->prepareSpecForCreate(opCtx, indexCollection, normalSpec, {});
         if (ErrorCodes::IndexBuildAlreadyInProgress == prepareSpecResult) {
             LOGV2(4924900,
                   "Index build: already in progress during initial sync",
@@ -344,6 +337,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
     IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
     auto collUUID = indexCollection->uuid();
     auto fromMigrate = false;
+    auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
     if (indexCollection->isEmpty(opCtx)) {
         WriteUnitOfWork wuow(opCtx);
         CollectionWriter coll(opCtx, indexNss);

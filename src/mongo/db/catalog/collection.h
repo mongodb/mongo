@@ -719,6 +719,8 @@ public:
      * specifications will match the form stored in the IndexCatalog should any of these indexes
      * already exist.
      */
+    virtual StatusWith<BSONObj> addCollationDefaultsToIndexSpecsForCreate(
+        OperationContext* opCtx, const BSONObj& indexSpec) const = 0;
     virtual StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
         OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const = 0;
 

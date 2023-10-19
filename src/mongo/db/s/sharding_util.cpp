@@ -203,8 +203,8 @@ Status createIndexOnCollection(OperationContext* opCtx,
         auto indexSpecs = indexCatalog->removeExistingIndexes(
             opCtx,
             CollectionPtr(collection),
-            uassertStatusOK(
-                collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, {index.toBSON()})),
+            uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(
+                opCtx, std::vector<BSONObj>{index.toBSON()})),
             removeIndexBuildsToo);
 
         if (indexSpecs.empty()) {

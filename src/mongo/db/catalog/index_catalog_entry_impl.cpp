@@ -387,6 +387,162 @@ void IndexCatalogEntryImpl::setIdent(std::shared_ptr<Ident> newIdent) {
     _shared->_accessMethod->setIdent(std::move(newIdent));
 }
 
+namespace {
+
+class NormalizedIndexCatalogEntry : public IndexCatalogEntry {
+public:
+    NormalizedIndexCatalogEntry(OperationContext* opCtx,
+                                const CollectionPtr& collection,
+                                const IndexCatalogEntry* entry)
+        : IndexCatalogEntry(),
+          _original(entry),
+          _indexDescriptor([&] {
+              auto desc = entry->descriptor();
+              auto normalizedSpec =
+                  IndexCatalog::normalizeIndexSpecs(opCtx, collection, desc->infoObj());
+              return IndexDescriptor{desc->getAccessMethodName(), std::move(normalizedSpec)};
+          }()),
+          _collator([&]() -> std::unique_ptr<CollatorInterface> {
+              const auto& collation = _indexDescriptor.collation();
+              if (!entry->getCollator() && !collation.isEmpty()) {
+                  auto statusWithCollator =
+                      CollatorFactoryInterface::get(opCtx->getServiceContext())
+                          ->makeFromBSON(collation);
+
+                  invariantStatusOK(statusWithCollator.getStatus());
+                  // Index spec should have already been validated.
+                  return std::move(statusWithCollator.getValue());
+              }
+              return nullptr;
+          }()) {}
+
+    NormalizedIndexCatalogEntry(const NormalizedIndexCatalogEntry& other)
+        : IndexCatalogEntry(other),
+          _original(other._original),
+          _indexDescriptor(other._indexDescriptor),
+          _collator(other._collator->clone()) {}
+
+    const std::string& getIdent() const final {
+        return _original->getIdent();
+    }
+
+    std::shared_ptr<Ident> getSharedIdent() const final {
+        return _original->getSharedIdent();
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) final {
+        MONGO_UNREACHABLE;
+    }
+
+    IndexDescriptor* descriptor() final {
+        MONGO_UNREACHABLE;
+    }
+
+    const IndexDescriptor* descriptor() const final {
+        return &_indexDescriptor;
+    }
+
+    IndexAccessMethod* accessMethod() const final {
+        return _original->accessMethod();
+    }
+
+    void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isHybridBuilding() const final {
+        return _original->isHybridBuilding();
+    }
+
+    IndexBuildInterceptor* indexBuildInterceptor() const final {
+        return _original->indexBuildInterceptor();
+    }
+
+    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+        MONGO_UNREACHABLE;
+    }
+
+    const Ordering& ordering() const final {
+        return _original->ordering();
+    }
+
+    const MatchExpression* getFilterExpression() const final {
+        return _original->getFilterExpression();
+    }
+
+    const CollatorInterface* getCollator() const final {
+        return _collator ? _collator.get() : _original->getCollator();
+    }
+
+    NamespaceString getNSSFromCatalog(OperationContext* opCtx) const final {
+        return _original->getNSSFromCatalog(opCtx);
+    }
+
+    void setIsReady(bool newIsReady) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void setIsFrozen(bool newIsFrozen) final {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const final {
+        return _original->isMultikey(opCtx, collection);
+    }
+
+    MultikeyPaths getMultikeyPaths(OperationContext* opCtx,
+                                   const CollectionPtr& collection) const final {
+        return _original->getMultikeyPaths(opCtx, collection);
+    }
+
+    void setMultikey(OperationContext* opCtx,
+                     const CollectionPtr& coll,
+                     const KeyStringSet& multikeyMetadataKeys,
+                     const MultikeyPaths& multikeyPaths) const final {
+        return _original->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
+    }
+
+    void forceSetMultikey(OperationContext* opCtx,
+                          const CollectionPtr& coll,
+                          bool isMultikey,
+                          const MultikeyPaths& multikeyPaths) const final {
+        return _original->forceSetMultikey(opCtx, coll, isMultikey, multikeyPaths);
+    }
+
+    bool isReady() const final {
+        return _original->isReady();
+    }
+
+    bool isFrozen() const final {
+        return _original->isFrozen();
+    }
+
+    bool shouldValidateDocument() const final {
+        return _original->shouldValidateDocument();
+    }
+
+    const UpdateIndexData& getIndexedPaths() const final {
+        return _original->getIndexedPaths();
+    }
+
+    std::unique_ptr<const IndexCatalogEntry> getNormalizedEntry(
+        OperationContext* opCtx, const CollectionPtr& coll) const final {
+        return std::make_unique<NormalizedIndexCatalogEntry>(*this);
+    };
+
+private:
+    const IndexCatalogEntry* _original;
+    IndexDescriptor _indexDescriptor;
+    std::unique_ptr<CollatorInterface> _collator;
+};
+
+}  // namespace
+
+std::unique_ptr<const IndexCatalogEntry> IndexCatalogEntryImpl::getNormalizedEntry(
+    OperationContext* opCtx, const CollectionPtr& coll) const {
+    return std::make_unique<NormalizedIndexCatalogEntry>(opCtx, coll, this);
+}
+
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {

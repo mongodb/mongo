@@ -4110,28 +4110,36 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
     UUID uuid = UUID::gen();
 
     auto runOpsAndValidate = [this, uuid]() {
-        auto options = BSON("collation"
-                            << BSON("locale"
-                                    << "en"
-                                    << "caseLevel" << false << "caseFirst"
-                                    << "off"
-                                    << "strength" << 1 << "numericOrdering" << false << "alternate"
-                                    << "non-ignorable"
-                                    << "maxVariable"
-                                    << "punct"
-                                    << "normalization" << false << "backwards" << false << "version"
-                                    << "57.1")
-                            << "uuid" << uuid);
+        auto collationOpts = BSON("locale"
+                                  << "en"
+                                  << "caseLevel" << false << "caseFirst"
+                                  << "off"
+                                  << "strength" << 1 << "numericOrdering" << false << "alternate"
+                                  << "non-ignorable"
+                                  << "maxVariable"
+                                  << "punct"
+                                  << "normalization" << false << "backwards" << false << "version"
+                                  << "57.1");
+        auto options = BSON("collation" << collationOpts << "uuid" << uuid << "idIndex"
+                                        << BSON("collation" << collationOpts << "key"
+                                                            << BSON("_id" << 1) << "name"
+                                                            << "_id_"
+                                                            << "v" << 2));
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options);
         auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
+        auto updateOp1 = update("foo",
+                                update_oplog_entry::makeDeltaOplogEntry(
+                                    BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 2}"))));
+        auto deleteOp1 =
+            makeDeleteDocumentOplogEntry(nextOpTime(), _nss, fromjson("{ _id: 'foo' }"));
         auto insertOp2 = insert(fromjson("{ _id: 'Foo', x: 1 }"));
-        auto updateOp = update("foo",
-                               update_oplog_entry::makeDeltaOplogEntry(
-                                   BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 2}"))));
+        auto updateOp2 = update("Foo",
+                                update_oplog_entry::makeDeltaOplogEntry(
+                                    BSON(doc_diff::kUpdateSectionFieldName << fromjson("{x: 2}"))));
 
         // We don't drop and re-create the collection since we don't have ways
         // to wait until second-phase drop to completely finish.
-        auto ops = {createColl, insertOp1, insertOp2, updateOp};
+        auto ops = {createColl, insertOp1, updateOp1, deleteOp1, insertOp2, updateOp2};
         ASSERT_OK(runOpsInitialSync(ops));
         auto state = validate(_nss);
 

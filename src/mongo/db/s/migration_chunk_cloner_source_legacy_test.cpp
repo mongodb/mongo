@@ -563,6 +563,11 @@ public:
         return _coll->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs);
     }
 
+    StatusWith<BSONObj> addCollationDefaultsToIndexSpecsForCreate(OperationContext* opCtx,
+                                                                  const BSONObj& indexSpecs) const {
+        return _coll->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs);
+    }
+
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) override {
         MONGO_UNREACHABLE;
     }

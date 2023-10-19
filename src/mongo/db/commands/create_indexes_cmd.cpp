@@ -312,7 +312,7 @@ std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* o
                                                              const CollectionPtr& collection,
                                                              std::vector<BSONObj> indexSpecs) {
     // Normalize the specs' collations, wildcard projections, and partial filters as applicable.
-    auto normalSpecs = IndexBuildsCoordinator::normalizeIndexSpecs(opCtx, collection, indexSpecs);
+    auto normalSpecs = IndexCatalog::normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
     return collection->getIndexCatalog()->removeExistingIndexes(
         opCtx, collection, normalSpecs, false /*removeIndexBuildsToo*/);

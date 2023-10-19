@@ -538,6 +538,12 @@ public:
         return _options;
     }
 
+    StatusWith<BSONObj> addCollationDefaultsToIndexSpecsForCreate(
+        OperationContext* opCtx, const BSONObj& indexSpecs) const final {
+        unimplementedTasserted();
+        return Status(ErrorCodes::UnknownError, "unknown");
+    }
+
     StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
         OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const final {
         unimplementedTasserted();

@@ -166,6 +166,11 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    std::unique_ptr<const IndexCatalogEntry> getNormalizedEntry(
+        OperationContext* opCtx, const CollectionPtr& coll) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
 private:
     IndexDescriptor* _descriptor;
 };

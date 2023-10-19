@@ -1251,60 +1251,84 @@ const CollectionOptions& CollectionImpl::getCollectionOptions() const {
     return _metadata->options;
 }
 
+namespace {
+StatusWith<BSONObj> addCollationToIndexSpec(OperationContext* opCtx,
+                                            const CollatorInterface* collator,
+                                            CollatorFactoryInterface* collatorFactory,
+                                            const BSONObj& originalIndexSpec) {
+    auto validateResult =
+        index_key_validate::validateIndexSpecCollation(opCtx, originalIndexSpec, collator);
+    if (!validateResult.isOK()) {
+        return validateResult.getStatus()
+            .withContext(str::stream()
+                         << "failed to add collation information to index spec for index creation: "
+                         << originalIndexSpec);
+    }
+    BSONObj newIndexSpec = validateResult.getValue();
+
+    auto keyPattern = newIndexSpec[IndexDescriptor::kKeyPatternFieldName].Obj();
+    if (IndexDescriptor::isIdIndexPattern(keyPattern)) {
+        std::unique_ptr<CollatorInterface> indexCollator;
+        if (auto collationElem = newIndexSpec[IndexDescriptor::kCollationFieldName]) {
+            auto indexCollatorResult = collatorFactory->makeFromBSON(collationElem.Obj());
+            // validateIndexSpecCollation() should have checked that the index collation spec is
+            // valid.
+            invariant(indexCollatorResult.getStatus(),
+                      str::stream() << "invalid collation in index spec: " << newIndexSpec);
+            indexCollator = std::move(indexCollatorResult.getValue());
+        }
+        if (!CollatorInterface::collatorsMatch(collator, indexCollator.get())) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The _id index must have the same collation as the "
+                                     "collection. Index collation: "
+                                  << (indexCollator.get() ? indexCollator->getSpec().toBSON()
+                                                          : CollationSpec::kSimpleSpec)
+                                  << ", collection collation: "
+                                  << (collator ? collator->getSpec().toBSON()
+                                               : CollationSpec::kSimpleSpec)};
+        }
+    }
+
+    if (originalIndexSpec.hasField(IndexDescriptor::kOriginalSpecFieldName)) {
+        // Validation was already performed above.
+        BSONObj newOriginalIndexSpec = invariant(index_key_validate::validateIndexSpecCollation(
+            opCtx,
+            originalIndexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
+            collator));
+
+        BSONObj specToAdd = BSON(IndexDescriptor::kOriginalSpecFieldName << newOriginalIndexSpec);
+        newIndexSpec = newIndexSpec.addField(specToAdd.firstElement());
+    }
+
+    return newIndexSpec;
+}
+}  // namespace
+
+StatusWith<BSONObj> CollectionImpl::addCollationDefaultsToIndexSpecsForCreate(
+    OperationContext* opCtx, const BSONObj& originalIndexSpec) const {
+
+    auto collator = getDefaultCollator();  // could be null.
+    auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
+
+    return addCollationToIndexSpec(opCtx, collator, collatorFactory, originalIndexSpec);
+}
+
 StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpecsForCreate(
     OperationContext* opCtx, const std::vector<BSONObj>& originalIndexSpecs) const {
     std::vector<BSONObj> newIndexSpecs;
+    newIndexSpecs.reserve(originalIndexSpecs.size());
 
     auto collator = getDefaultCollator();  // could be null.
     auto collatorFactory = CollatorFactoryInterface::get(opCtx->getServiceContext());
 
     for (const auto& originalIndexSpec : originalIndexSpecs) {
-        auto validateResult =
-            index_key_validate::validateIndexSpecCollation(opCtx, originalIndexSpec, collator);
-        if (!validateResult.isOK()) {
-            return validateResult.getStatus().withContext(
-                str::stream()
-                << "failed to add collation information to index spec for index creation: "
-                << originalIndexSpec);
+        auto newIndexSpec =
+            addCollationToIndexSpec(opCtx, collator, collatorFactory, originalIndexSpec);
+
+        if (!newIndexSpec.isOK()) {
+            return newIndexSpec.getStatus();
         }
-        BSONObj newIndexSpec = validateResult.getValue();
-
-        auto keyPattern = newIndexSpec[IndexDescriptor::kKeyPatternFieldName].Obj();
-        if (IndexDescriptor::isIdIndexPattern(keyPattern)) {
-            std::unique_ptr<CollatorInterface> indexCollator;
-            if (auto collationElem = newIndexSpec[IndexDescriptor::kCollationFieldName]) {
-                auto indexCollatorResult = collatorFactory->makeFromBSON(collationElem.Obj());
-                // validateIndexSpecCollation() should have checked that the index collation spec is
-                // valid.
-                invariant(indexCollatorResult.getStatus(),
-                          str::stream() << "invalid collation in index spec: " << newIndexSpec);
-                indexCollator = std::move(indexCollatorResult.getValue());
-            }
-            if (!CollatorInterface::collatorsMatch(collator, indexCollator.get())) {
-                return {ErrorCodes::BadValue,
-                        str::stream() << "The _id index must have the same collation as the "
-                                         "collection. Index collation: "
-                                      << (indexCollator.get() ? indexCollator->getSpec().toBSON()
-                                                              : CollationSpec::kSimpleSpec)
-                                      << ", collection collation: "
-                                      << (collator ? collator->getSpec().toBSON()
-                                                   : CollationSpec::kSimpleSpec)};
-            }
-        }
-
-        if (originalIndexSpec.hasField(IndexDescriptor::kOriginalSpecFieldName)) {
-            // Validation was already performed above.
-            BSONObj newOriginalIndexSpec = invariant(index_key_validate::validateIndexSpecCollation(
-                opCtx,
-                originalIndexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
-                collator));
-
-            BSONObj specToAdd =
-                BSON(IndexDescriptor::kOriginalSpecFieldName << newOriginalIndexSpec);
-            newIndexSpec = newIndexSpec.addField(specToAdd.firstElement());
-        }
-
-        newIndexSpecs.push_back(newIndexSpec);
+        newIndexSpecs.emplace_back(std::move(newIndexSpec.getValue()));
     }
 
     return newIndexSpecs;

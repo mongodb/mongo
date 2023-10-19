@@ -187,22 +187,12 @@ env.Library(
     target='index_catalog',
     source=[
         'index_catalog.cpp',
+        'index_catalog_entry.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        'index_catalog_entry',
-    ],
-)
-
-env.Library(
-    target='index_catalog_entry',
-    source=[
-        'index_catalog_entry.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -435,7 +425,6 @@ env.Library(
         'health_log_interface',
         'index_build_block',
         'index_catalog',
-        'index_catalog_entry',
         'index_key_validate',
         'index_repair',
         'local_oplog_info',

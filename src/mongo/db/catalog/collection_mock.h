@@ -336,6 +336,11 @@ public:
         return _options;
     }
 
+    StatusWith<BSONObj> addCollationDefaultsToIndexSpecsForCreate(OperationContext* opCtx,
+                                                                  const BSONObj& indexSpecs) const {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
         OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const {
         MONGO_UNREACHABLE;

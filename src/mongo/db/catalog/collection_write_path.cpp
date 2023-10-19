@@ -593,7 +593,12 @@ void updateDocument(OperationContext* opCtx,
     SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
 
     BSONElement oldId = oldDoc.value()["_id"];
-    if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
+    // We accept equivalent _id according to the collation defined in the collection. 'foo' and
+    // 'Foo' could be equivalent but not byte-identical according to the collation of the
+    // collection.
+    BSONElementComparator eltCmp{BSONElementComparator::FieldNamesMode::kConsider,
+                                 collection->getDefaultCollator()};
+    if (!oldId.eoo() && eltCmp.evaluate(oldId != newDoc["_id"]))
         uasserted(13596, "in Collection::updateDocument _id mismatch");
 
     args->changeStreamPreAndPostImagesEnabledForCollection =

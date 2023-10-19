@@ -579,6 +579,24 @@ public:
     virtual void indexBuildSuccess(OperationContext* opCtx,
                                    Collection* coll,
                                    IndexCatalogEntry* index) = 0;
+
+    /**
+     * Helper function which normalizes index specs. This function will populate a complete
+     * collation spec in cases where the index spec specifies a collation, and will add the
+     * collection-default collation, if present, in cases where collation is omitted. If the index
+     * spec omits the collation and the collection does not have a default, the collation field is
+     * omitted from the spec.
+     *
+     * If 'collection' is null, no changes are made to the input specs.
+     *
+     * This function throws on error.
+     */
+    static BSONObj normalizeIndexSpecs(OperationContext* opCtx,
+                                       const CollectionPtr& collection,
+                                       const BSONObj& indexSpec);
+    static std::vector<BSONObj> normalizeIndexSpecs(OperationContext* opCtx,
+                                                    const CollectionPtr& collection,
+                                                    const std::vector<BSONObj>& indexSpecs);
 };
 
 inline IndexCatalog::InclusionPolicy operator|(IndexCatalog::InclusionPolicy lhs,

@@ -1606,7 +1606,6 @@ execEnv.Library(
         'bson/dotted_path_support',
         'catalog/collection_query_info',
         'catalog/index_catalog',
-        'catalog/index_catalog_entry',
         'commands',
         'curop_failpoint_helpers',
         'cursor_server_params',
