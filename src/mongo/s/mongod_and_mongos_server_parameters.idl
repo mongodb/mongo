@@ -78,4 +78,4 @@ server_parameters:
     cpp_varname: "gRoutingTableCacheChunkBucketSize"
     default: 500
     validator:
-      gte: 0
+      gt: 0
