@@ -498,7 +498,7 @@ process if one of the tables is damaged. Currently, the verify operation is not 
 tiered tables and the history store file.
 
 @subsection util_verify_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] verify [-acstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages ] [uri]`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] verify [-acSstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages ] [uri]`
 
 @subsection util_verify_options Options
 The following are command-specific options for the \c verify command:
@@ -513,6 +513,9 @@ Continue to the next page after encountering error during verification.
 \c -d [config]
 This option allows you to specify values which you want to be displayed
 when verification is run. See the WT_SESSION::verify configuration options.
+
+\c -S
+This option enables strict mode and treats any verification problem as an error.
 
 \c -s
 This option allows you to verify against the stable timestamp, valid only after a

@@ -24,7 +24,7 @@ usage(void)
       "-?", "show this message", NULL, NULL};
 
     util_usage(
-      "verify [-acstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
+      "verify [-acSstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
       "| dump_pages] [uri]",
       "options:", options);
 
@@ -62,12 +62,12 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     int ch;
     char *config, *dump_offsets, *key, *uri;
     bool abort_on_error, do_not_clear_txn_id, dump_address, dump_app_data, dump_blocks, dump_layout,
-      dump_pages, read_corrupt, stable_timestamp;
+      dump_pages, read_corrupt, stable_timestamp, strict;
 
     abort_on_error = do_not_clear_txn_id = dump_address = dump_app_data = dump_blocks =
-      dump_layout = dump_pages = read_corrupt = stable_timestamp = false;
+      dump_layout = dump_pages = read_corrupt = stable_timestamp = strict = false;
     config = dump_offsets = uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "acd:stu?")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "acd:Sstu?")) != EOF)
         switch (ch) {
         case 'a':
             abort_on_error = true;
@@ -94,14 +94,17 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
             else
                 return (usage());
             break;
+        case 'S':
+            strict = true;
+            break;
         case 's':
             stable_timestamp = true;
             break;
-        case 'u':
-            dump_app_data = true;
-            break;
         case 't':
             do_not_clear_txn_id = true;
+            break;
+        case 'u':
+            dump_app_data = true;
             break;
         case '?':
             usage();
@@ -109,28 +112,29 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
         default:
             return (usage());
         }
+
     argc -= __wt_optind;
     argv += __wt_optind;
 
     if (do_not_clear_txn_id || dump_address || dump_app_data || dump_blocks || dump_layout ||
-      dump_offsets != NULL || dump_pages || read_corrupt || stable_timestamp) {
-        size = strlen("do_not_clear_txn_id,") + strlen("dump_address,") +
-          +strlen("dump_app_data,") + strlen("dump_blocks,") + strlen("dump_layout,") +
-          strlen("dump_pages,") + strlen("dump_offsets[],") +
-          (dump_offsets == NULL ? 0 : strlen(dump_offsets)) + strlen("history_store") +
-          +strlen("read_corrupt,") + strlen("stable_timestamp,") + 20;
+      dump_offsets != NULL || dump_pages || read_corrupt || stable_timestamp || strict) {
+        size = strlen("do_not_clear_txn_id,") + strlen("dump_address,") + strlen("dump_app_data,") +
+          strlen("dump_blocks,") + strlen("dump_layout,") + strlen("dump_pages,") +
+          strlen("dump_offsets[],") + (dump_offsets == NULL ? 0 : strlen(dump_offsets)) +
+          strlen("history_store") + strlen("read_corrupt,") + strlen("stable_timestamp,") +
+          strlen("strict") + 20;
         if ((config = util_malloc(size)) == NULL) {
             ret = util_err(session, errno, NULL);
             goto err;
         }
-        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s%s%s",
+        if ((ret = __wt_snprintf(config, size, "%s%s%s%s%s%s%s%s%s%s%s%s",
                do_not_clear_txn_id ? "do_not_clear_txn_id," : "",
                dump_address ? "dump_address," : "", dump_app_data ? "dump_app_data," : "",
                dump_blocks ? "dump_blocks," : "", dump_layout ? "dump_layout," : "",
                dump_offsets != NULL ? "dump_offsets=[" : "",
                dump_offsets != NULL ? dump_offsets : "", dump_offsets != NULL ? "]," : "",
                dump_pages ? "dump_pages," : "", read_corrupt ? "read_corrupt," : "",
-               stable_timestamp ? "stable_timestamp," : "")) != 0) {
+               stable_timestamp ? "stable_timestamp," : "", strict ? "strict," : "")) != 0) {
             (void)util_err(session, ret, NULL);
             goto err;
         }
