@@ -1724,7 +1724,7 @@ void ExecCommandDatabase::_initiateCommand() {
         const auto maxTimeMS =
             Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
         const auto maxTimeMSOpOnly =
-            Milliseconds{uassertStatusOK(parseMaxTimeMS(maxTimeMSOpOnlyField))};
+            Milliseconds{uassertStatusOK(parseMaxTimeMSOpOnly(maxTimeMSOpOnlyField))};
 
         if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
             command->getLogicalOp() != LogicalOp::opGetMore) {

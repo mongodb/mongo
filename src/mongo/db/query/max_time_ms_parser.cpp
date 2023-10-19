@@ -41,11 +41,12 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt) {
+StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt, long long maxValue) {
     if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
         return StatusWith<int>(
             ErrorCodes::BadValue,
@@ -53,16 +54,12 @@ StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt) {
     }
     long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong();  // returns 0 on EOO
 
-    const long long maxVal = maxTimeMSElt.fieldNameStringData() == kMaxTimeMSOpOnlyField
-        ? (long long)(INT_MAX) + kMaxTimeMSOpOnlyMaxPadding
-        : INT_MAX;
-
     using namespace fmt::literals;
 
-    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > maxVal)
+    if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > maxValue)
         return Status(ErrorCodes::BadValue,
                       "{} value for {} is out of range [{}, {}]"_format(
-                          maxTimeMSLongLong, maxTimeMSElt.fieldNameStringData(), 0, maxVal));
+                          maxTimeMSLongLong, maxTimeMSElt.fieldNameStringData(), 0, maxValue));
 
     double maxTimeMSDouble = maxTimeMSElt.numberDouble();
     if (maxTimeMSElt.type() == mongo::NumberDouble && floor(maxTimeMSDouble) != maxTimeMSDouble) {
@@ -74,11 +71,15 @@ StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt) {
     return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
 }
 
-/**
- * IMPORTANT: The method should not be modified, as API version input/output guarantees could
- * break because of it.
- */
-int32_t parseMaxTimeMSForIDL(BSONElement maxTimeMSElt) {
-    return static_cast<int32_t>(uassertStatusOK(parseMaxTimeMS(maxTimeMSElt)));
+StatusWith<int> parseMaxTimeMSOpOnly(BSONElement maxTimeMSElt) {
+    if (maxTimeMSElt &&
+        maxTimeMSElt.fieldNameStringData() != query_request_helper::kMaxTimeMSOpOnlyField) {
+        return StatusWith<int>(ErrorCodes::BadValue,
+                               (StringBuilder() << "FieldName should be "
+                                                << query_request_helper::kMaxTimeMSOpOnlyField)
+                                   .str());
+    }
+    return parseMaxTimeMS(maxTimeMSElt,
+                          (long long)(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding);
 }
 }  // namespace mongo

@@ -170,6 +170,24 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'bulkWrite-param-hint'
 ]
 
+# Permit a parameter to move from bson serialisation type any
+# to a non-any serialisation type.
+IGNORE_ANY_TO_NON_ANY_LIST: List[str] = [
+    # These parameters were type-checked "by hand" previously;
+    # enforcing this from IDL instead does not narrow the range
+    # of permitted values
+    'find-param-maxTimeMS',
+    'count-param-maxTimeMS',
+]
+
+# Permit the cpp type of a parameter to change
+ALLOW_CPP_TYPE_CHANGE_LIST: List[str] = [
+    # maxTimeMS has been widened for consistency with
+    # equivalent params for other commands (aggregate)
+    'find-param-maxTimeMS-std::int32_t-std::int64_t',
+    'count-param-maxTimeMS-std::int32_t-std::int64_t',
+]
+
 # Do not add user visible fields already released in earlier versions.
 # We generally don't allow changing a field from stable to unstable, but we permit it in special cases,
 # such as when we want to avoid making internal fields part of the stable API.
@@ -195,6 +213,8 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     'newReplyFieldTypeStructIgnoreList-reply-unstableNewFieldIgnoreList',
 
     # Real use cases for changing a field from 'stable' to 'unstable'.
+    'find-param-maxTimeMS',
+    'count-param-maxTimeMS',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable
@@ -820,10 +840,11 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 
     # If bson_serialization_type switches from 'any' to non-any type.
     if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
-        ctxt.add_old_command_or_param_type_bson_any_error(cmd_name, old_type.name, new_type.name,
-                                                          old_field.idl_file_path, param_name,
-                                                          is_command_parameter)
-        return
+        if ignore_list_name not in IGNORE_ANY_TO_NON_ANY_LIST:
+            ctxt.add_old_command_or_param_type_bson_any_error(
+                cmd_name, old_type.name, new_type.name, old_field.idl_file_path, param_name,
+                is_command_parameter)
+            return
 
     # If bson_serialization_type switches from non-any to 'any' type.
     if "any" not in old_type.bson_serialization_type and "any" in new_type.bson_serialization_type:
@@ -841,8 +862,11 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 
         # If cpp_type is changed, it's a potential breaking change.
         if old_type.cpp_type != new_type.cpp_type:
-            ctxt.add_command_or_param_cpp_type_not_equal_error(
-                cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
+            ignore_list_name_with_types: str = f"{ignore_list_name}-{old_type.cpp_type}-{new_type.cpp_type}"
+            if ignore_list_name_with_types not in ALLOW_CPP_TYPE_CHANGE_LIST:
+                ctxt.add_command_or_param_cpp_type_not_equal_error(cmd_name, new_type.name,
+                                                                   new_field.idl_file_path,
+                                                                   param_name, is_command_parameter)
 
         # If serializer is changed, it's a potential breaking change.
         if (not is_unstable(old_field.stability)

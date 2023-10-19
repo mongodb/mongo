@@ -60,11 +60,6 @@ types:
         serializer: "::mongo::serializeBSONWhenNotEmpty"
         deserializer: "::mongo::parseOwnedBSON"
         default: mongo::BSONObj()
-    maxTimeMS:
-        bson_serialization_type: any
-        description: "An int representing max time ms."
-        cpp_type: "std::int32_t"
-        deserializer: "::mongo::parseMaxTimeMSForIDL"
 
 commands:
   find:
@@ -220,9 +215,9 @@ commands:
       maxTimeMS:
         description: "The cumulative time limit in milliseconds for processing operations on the
         cursor."
-        type: maxTimeMS
+        type: safeInt64
         optional: true
-        validator: { gte: 0 }
+        validator: {gte: 0}
         stability: stable
       readConcern:
         description: "Specifies the read concern."

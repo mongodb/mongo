@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,37 +27,44 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/max_time_ms_parser.h"
 
-#pragma once
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "query_request_helper.h"
+#include <fmt/format.h>
 
-#include <cstdint>
-
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
+namespace {
 
-/**
- * Parses maxTimeMS from the BSONElement containing its value.
- *
- * Ensures the value is within the range [0, maxValue].
- */
-StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt, long long maxValue = INT_MAX);
+TEST(MaxTimeMSParser, maxTimeMSOpOnlyOK) {
+    BSONObjBuilder builder;
+    builder.append("maxTimeMSOpOnly", 1);
+    ASSERT_OK(parseMaxTimeMSOpOnly(builder.obj().firstElement()));
+}
 
-/**
- * Parses maxTimeMSOpOnly from the BSONElement containing its value.
- *
- * 'maxTimeMSOpOnly' needs a slightly higher max value than regular 'maxTimeMS' to account for
- * the case where a user provides the max possible value for 'maxTimeMS' to one server process
- * (mongod or mongos), then that server process passes the max time on to another server as
- * 'maxTimeMSOpOnly', but after adding a small amount to the max time to account for clock
- * precision.  This can push the 'maxTimeMSOpOnly' sent to the mongod over the max value allowed
- * for users to provide. This is safe because 'maxTimeMSOpOnly' is only allowed to be provided
- * for internal intra-cluster requests.
- *
- * Thus, this method ensures the value is within the range [0, INT_MAX+kMaxTimeMSOpOnlyMaxPadding]
- */
-StatusWith<int> parseMaxTimeMSOpOnly(BSONElement maxTimeMSElt);
+TEST(MaxTimeMSParser, maxTimeMSOpOnlyMisnamedField) {
+    BSONObjBuilder builder;
+    builder.append("maxTimeMS", INT_MAX);
+    auto status = parseMaxTimeMSOpOnly(builder.obj().firstElement());
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(ErrorCodes::BadValue, status.getStatus().code());
+    ASSERT_EQ("FieldName should be maxTimeMSOpOnly", status.getStatus().reason());
+}
 
+TEST(MaxTimeMSParser, maxTimeMSOpOnlyOutOfRange) {
+    auto badValue = double(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding + 1;
+
+    BSONObjBuilder builder;
+    builder.append("maxTimeMSOpOnly", badValue);
+    auto status = parseMaxTimeMSOpOnly(builder.obj().firstElement());
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(ErrorCodes::BadValue, status.getStatus().code());
+    ASSERT_EQ("{} value for maxTimeMSOpOnly is out of range [{}, {}]"_format(
+                  badValue, 0, double(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding),
+              status.getStatus().reason());
+}
+
+}  // namespace
 }  // namespace mongo

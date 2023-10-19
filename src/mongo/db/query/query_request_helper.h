@@ -62,8 +62,6 @@ class StatusWith;
  */
 namespace query_request_helper {
 
-static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
-
 // Field names for sorting options.
 static constexpr auto kNaturalSortField = "$natural";
 
@@ -132,6 +130,9 @@ static constexpr auto metaGeoNearPoint = "geoNearPoint";
 static constexpr auto metaRecordId = "recordId";
 static constexpr auto metaSortKey = "sortKey";
 static constexpr auto metaTextScore = "textScore";
+
+
+static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 
 // A constant by which 'maxTimeMSOpOnly' values are allowed to exceed the max allowed value for
 // 'maxTimeMS'.  This is because mongod and mongos server processes add a small amount to the

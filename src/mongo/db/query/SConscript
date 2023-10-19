@@ -530,6 +530,7 @@ env.CppUnitTest(
         "util/memory_util_test.cpp",
         "view_response_formatter_test.cpp",
         'map_reduce_output_format_test.cpp',
+        'max_time_ms_parser_test.cpp',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",

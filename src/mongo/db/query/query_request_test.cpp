@@ -719,7 +719,7 @@ TEST(QueryRequestTest, ParseFromCommandMaxTimeMSWrongType) {
 
     ASSERT_THROWS_CODE(query_request_helper::makeFromFindCommandForTests(cmdObj),
                        DBException,
-                       ErrorCodes::BadValue);
+                       ErrorCodes::TypeMismatch);
 }
 
 
@@ -1253,74 +1253,66 @@ TEST(QueryRequestTest, ParseFromCommandForbidExtraOption) {
 
 TEST(QueryRequestTest, ParseMaxTimeMSStringValueFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << "foo");
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSBoolValueFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << true);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSNullValueFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << BSONNULL);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSUndefinedValueFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << BSONUndefined);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSEmptyObjectValueFails) {
     const auto emptyObj = BSONObjBuilder().obj();
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << emptyObj);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSNonIntegralValueFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << 100.3);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSOutOfRangeDoubleFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << 1e200);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSNegativeValueFails) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << -400);
-    ASSERT_THROWS_CODE(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]).getStatus(),
+              ErrorCodes::BadValue);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSZeroSucceeds) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << 0);
-    ASSERT_EQ(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]), 0);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]), 0);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSEmptyElementSucceeds) {
     const auto emptyElem = BSONElement();
-    ASSERT_EQ(parseMaxTimeMSForIDL(emptyElem), 0);
+    ASSERT_EQ(parseMaxTimeMS(emptyElem), 0);
 }
 
 TEST(QueryRequestTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
     BSONObj maxTimeObj = BSON(query_request_helper::cmdOptionMaxTimeMS << 300);
-    ASSERT_EQ(parseMaxTimeMSForIDL(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]), 300);
+    ASSERT_EQ(parseMaxTimeMS(maxTimeObj[query_request_helper::cmdOptionMaxTimeMS]), 300);
 }
 
 TEST(QueryRequestTest, ConvertToAggregationSucceeds) {

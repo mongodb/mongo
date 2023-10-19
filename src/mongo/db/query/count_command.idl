@@ -47,12 +47,6 @@ types:
         cpp_type: "std::int64_t"
         deserializer: ::count_request::countParseLimit
 
-    maxTimeMS:
-        bson_serialization_type: any
-        description: "An int representing max time ms."
-        cpp_type: "std::int32_t"
-        deserializer: "::mongo::parseMaxTimeMSForIDL"
-
 commands:
     count:
         description: "Parser for the 'count' command."
@@ -112,7 +106,8 @@ commands:
                 optional: true
                 stability: stable
             maxTimeMS:
-                type: maxTimeMS
+                type: safeInt64
+                validator: {gte: 0}
                 optional: true
                 stability: stable
             $queryOptions:
