@@ -488,7 +488,7 @@ void logStartupTimeElapsedStatistics(ServiceContext* serviceContext,
 // of the initialization steps within.  If you add or change any of these steps, make sure
 // any necessary changes are also made to File Copy Based Initial Sync.
 ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
-    Client::initThread("initandlisten", serviceContext->getService(ClusterRole::ShardServer));
+    Client::initThread("initandlisten", serviceContext->getService());
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
     {
@@ -534,8 +534,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     initializeCommandHooks(serviceContext);
 
     serviceContext->setSessionManager(std::make_unique<SessionManagerMongod>(serviceContext));
-    serviceContext->getService(ClusterRole::ShardServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
 
     // Set up the periodic runner for background job execution. This is required to be running
     // before both the storage engine or the transport layer are initialized.
@@ -1341,8 +1340,7 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
     tpOptions.poolName = "ReplNodeDbWorkerThreadPool";
     tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
     tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName.c_str(),
-                           serviceContext->getService(ClusterRole::ShardServer));
+        Client::initThread(threadName.c_str(), serviceContext->getService());
 
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
@@ -1361,8 +1359,7 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     tpOptions.poolName = "ReplCoordThreadPool";
     tpOptions.maxThreads = 50;
     tpOptions.onCreateThread = [serviceContext](const std::string& threadName) {
-        Client::initThread(threadName.c_str(),
-                           serviceContext->getService(ClusterRole::ShardServer));
+        Client::initThread(threadName.c_str(), serviceContext->getService());
 
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
@@ -1586,8 +1583,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (Client::getCurrent()) {
         oldClient = Client::releaseCurrent();
     }
-    Client::setCurrent(
-        serviceContext->getService(ClusterRole::ShardServer)->makeClient("shutdownTask"));
+    Client::setCurrent(serviceContext->getService()->makeClient("shutdownTask"));
     const auto client = Client::getCurrent();
     {
         stdx::lock_guard<Client> lk(*client);
@@ -1964,8 +1960,7 @@ int mongod_main(int argc, char* argv[]) {
     setUpReplication(service);
     setUpObservers(service);
     setUpMultitenancyCheck(service, gMultitenancySupport);
-    service->getService(ClusterRole::ShardServer)
-        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
+    service->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>());
     service->setSessionManager(std::make_unique<SessionManagerMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();

@@ -120,7 +120,7 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
                 if (!data["useUninterruptibleSleep"].eoo()) {
                     failpoint.pauseWhileSet();
                 } else {
-                    ThreadClient tc(failPointName, service->getService(ClusterRole::ShardServer));
+                    ThreadClient tc(failPointName, service->getService());
 
                     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
                     {

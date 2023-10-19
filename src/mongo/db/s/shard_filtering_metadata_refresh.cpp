@@ -219,8 +219,7 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
         .then([=,
                serviceCtx = opCtx->getServiceContext(),
                forwardableOpMetadata = ForwardableOperationMetadata(opCtx)] {
-            ThreadClient tc("DbMetadataRefreshThread",
-                            serviceCtx->getService(ClusterRole::ShardServer));
+            ThreadClient tc("DbMetadataRefreshThread", serviceCtx->getService());
             const auto opCtxHolder =
                 CancelableOperationContext(tc->makeOperationContext(), cancellationToken, executor);
             auto opCtx = opCtxHolder.get();
@@ -402,8 +401,7 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
     auto executor = Grid::get(serviceContext)->getExecutorPool()->getFixedExecutor();
     return ExecutorFuture<void>(executor)
         .then([=] {
-            ThreadClient tc("RecoverRefreshThread",
-                            serviceContext->getService(ClusterRole::ShardServer));
+            ThreadClient tc("RecoverRefreshThread", serviceContext->getService());
 
             if (MONGO_unlikely(hangInRecoverRefreshThread.shouldFail())) {
                 hangInRecoverRefreshThread.pauseWhileSet();

@@ -203,8 +203,7 @@ private:
     }
 
     static void onCreateThread(const std::string& threadName) {
-        Client::initThread(threadName,
-                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        Client::initThread(threadName, getGlobalServiceContext()->getService());
     }
 
 };  // namespace mongo

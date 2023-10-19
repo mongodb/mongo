@@ -87,9 +87,8 @@ public:
                 // Using the original operation context, the write operation to exit the critical
                 // section would fail since retryable writes cannot have limit=0. A tactical
                 // solution is to use an alternative client as well as a new operation context.
-                auto newClient = getGlobalServiceContext()
-                                     ->getService(ClusterRole::ShardServer)
-                                     ->makeClient("ShardsvrMovePrimaryExitCriticalSection");
+                auto newClient = getGlobalServiceContext()->getService()->makeClient(
+                    "ShardsvrMovePrimaryExitCriticalSection");
                 AlternativeClientRegion acr(newClient);
                 auto newOpCtx = CancelableOperationContext(
                     cc().makeOperationContext(),

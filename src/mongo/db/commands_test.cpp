@@ -750,7 +750,7 @@ TEST_F(CommandConstructionPlanTest, ExecutePlanPredicateFalse) {
 }
 
 /** Create a ServiceContext for each supported ClusterRole mask. */
-class BasicCommandRegistryTest : public ServiceContextTest {
+class BasicCommandRegistryTest : public ServiceContextMongoDTest {
 public:
     struct ExecutePlanForServiceResult {
         TypeInfoSet fullSet;

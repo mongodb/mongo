@@ -200,9 +200,8 @@ void killSessionsAbortAllPreparedTransactions(OperationContext* opCtx) {
 
 void yieldLocksForPreparedTransactions(OperationContext* opCtx) {
     // Create a new opCtx because we need an empty locker to refresh the locks.
-    auto newClient = opCtx->getServiceContext()
-                         ->getService(ClusterRole::ShardServer)
-                         ->makeClient("prepared-txns-yield-locks");
+    auto newClient =
+        opCtx->getServiceContext()->getService()->makeClient("prepared-txns-yield-locks");
 
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();

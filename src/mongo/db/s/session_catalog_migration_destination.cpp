@@ -290,7 +290,7 @@ void SessionCatalogMigrationDestination::join() {
  */
 void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(ServiceContext* service) {
     Client::initThread("sessionCatalogMigrationProducer-" + _migrationSessionId.toString(),
-                       service->getService(ClusterRole::ShardServer),
+                       service->getService(),
                        Client::noSession());
     bool oplogDrainedAfterCommiting = false;
     ProcessOplogResult lastResult;

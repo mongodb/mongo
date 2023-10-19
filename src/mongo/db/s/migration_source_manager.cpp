@@ -802,9 +802,8 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                 _coordinator->setMigrationDecision(DecisionEnum::kAborted);
             }
 
-            auto newClient = _opCtx->getServiceContext()
-                                 ->getService(ClusterRole::ShardServer)
-                                 ->makeClient("MigrationCoordinator");
+            auto newClient =
+                _opCtx->getServiceContext()->getService()->makeClient("MigrationCoordinator");
             AlternativeClientRegion acr(newClient);
             auto newOpCtxPtr = cc().makeOperationContext();
             auto newOpCtx = newOpCtxPtr.get();

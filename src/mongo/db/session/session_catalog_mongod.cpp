@@ -146,7 +146,7 @@ void killSessionTokens(OperationContext* opCtx,
          sessionKillTokens = std::move(sessionKillTokens)](auto status) mutable {
             invariant(status);
 
-            ThreadClient tc("Kill-Sessions", service->getService(ClusterRole::ShardServer));
+            ThreadClient tc("Kill-Sessions", service->getService());
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {
@@ -568,9 +568,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     if (sessionsToReacquireLocks.size() > 0) {
         LOGV2(8083200, "Reacquiring locks for prepared transactions on step-up.");
         // Create a new opCtx because we need an empty locker to refresh the locks.
-        auto newClient = opCtx->getServiceContext()
-                             ->getService(ClusterRole::ShardServer)
-                             ->makeClient("restore-prepared-txn");
+        auto newClient =
+            opCtx->getServiceContext()->getService()->makeClient("restore-prepared-txn");
 
         {
             stdx::lock_guard<Client> lk(*newClient.get());

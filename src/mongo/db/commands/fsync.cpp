@@ -415,7 +415,7 @@ void FSyncLockThread::shutdown(stdx::unique_lock<Latch>& stateLock) {
 }
 
 void FSyncLockThread::run() {
-    ThreadClient tc("fsyncLockWorker", _serviceContext->getService(ClusterRole::ShardServer));
+    ThreadClient tc("fsyncLockWorker", _serviceContext->getService());
     stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
     stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 

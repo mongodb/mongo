@@ -86,8 +86,7 @@ void dropAggTempCollections(OperationContext* opCtx) {
     ExecutorFuture<void>(executor)
         .then([serviceContext, tempCollectionsToDrop] {
             for (const auto& nss : tempCollectionsToDrop) {
-                ThreadClient tc{"dropAggTempCollections",
-                                serviceContext->getService(ClusterRole::ShardServer)};
+                ThreadClient tc{"dropAggTempCollections", serviceContext->getService()};
                 const auto opCtx = tc->makeOperationContext();
 
                 try {

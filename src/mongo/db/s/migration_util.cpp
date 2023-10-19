@@ -717,8 +717,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
     return ExecutorFuture<void>(executor).then([=] {
-        ThreadClient tc("releaseRecipientCritSec",
-                        serviceContext->getService(ClusterRole::ShardServer));
+        ThreadClient tc("releaseRecipientCritSec", serviceContext->getService());
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 
@@ -856,7 +855,7 @@ void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                                                  const NamespaceString& nss) noexcept {
     ExecutorFuture<void>{Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()}
         .then([svcCtx{opCtx->getServiceContext()}, nss] {
-            ThreadClient tc{"MigrationRecovery", svcCtx->getService(ClusterRole::ShardServer)};
+            ThreadClient tc{"MigrationRecovery", svcCtx->getService()};
             auto uniqueOpCtx{tc->makeOperationContext()};
             auto opCtx{uniqueOpCtx.get()};
 

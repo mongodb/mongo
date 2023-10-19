@@ -366,8 +366,7 @@ public:
     }
 
     void run() {
-        ThreadClient tc("clientcursormon",
-                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+        ThreadClient tc("clientcursormon", getGlobalServiceContext()->getService());
 
         while (!globalInShutdownDeprecated()) {
             {

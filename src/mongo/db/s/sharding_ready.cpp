@@ -100,9 +100,7 @@ void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
     // Since this function is async, we need to create a new client and operation context to run
     // 'transitionFromDedicatedConfigServer'.
     auto clientGuard =
-        ClientStrand::make(
-            serviceContext->getService(ClusterRole::ShardServer)->makeClient("ShardingReady"))
-            ->bind();
+        ClientStrand::make(serviceContext->getService()->makeClient("ShardingReady"))->bind();
     auto uniqueOpCtx = clientGuard->makeOperationContext();
 
     auto as = AuthorizationSession::get(uniqueOpCtx->getClient());
