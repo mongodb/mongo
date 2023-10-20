@@ -697,12 +697,26 @@ stopReplicationAndEnforceNewPrimaryToCatchUp = function(rst, node) {
     const oldSecondaries = rst.getSecondaries();
     const oldPrimary = rst.getPrimary();
 
-    // In the case that the old primary has just stepped up and is running internal writes from
-    // PrimaryOnlyService, wait for those to be replicated. This is because there could be a race
-    // between stopping one of the secondaries, while the other secondary is still able to replicate
-    // the internal writes from PrimaryOnlyService before stopping replication.
+    // It's possible for the old primary to be running internal writes from the PrimaryOnlyService
+    // at random. This means that when we halt replication on the secondaries, a race may occur
+    // in which one secondary may have replicated the internal write already while the other hasn't
+    // yet. Therefore, we ensure that the passed in 'node' is ahead of the other secondaries through
+    // some writes to a junk collection 'junk_coll' to guarantee that 'node' can get elected.
+    assert.commandWorked(oldPrimary.getDB("test").junk_coll.remove({}));
     rst.awaitReplication();
     stopServerReplication(oldSecondaries);
+    // Restart replication on just the selected node, and allow it to progress ahead of the other
+    // secondaries before stopping replication on it again.
+    restartServerReplication(node);
+    assert.commandWorked(oldPrimary.getDB("test").junk_coll.insert({junk: 0}));
+    assert.soon(
+        () => {
+            return node.getDB("test").junk_coll.find().readConcern("local").itcount() == 1;
+        },
+        `Unexpected document count: ${
+            node.getDB("test").junk_coll.find().readConcern("local").itcount()}`);
+    stopServerReplication(node);
+
     for (let i = 0; i < 3; i++) {
         assert.commandWorked(oldPrimary.getDB("test").foo.insert({x: i}));
     }
