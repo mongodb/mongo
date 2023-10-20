@@ -40,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
@@ -145,13 +146,17 @@ void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
 
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
     invariant(_opCtx);
+    bool debugLoggingThreeEnabled =
+        logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3));
     for (auto& change : _changesForTwoPhaseDrop) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
-            LOGV2_DEBUG(7789501,
-                        3,
-                        "Custom commit",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            if (debugLoggingThreeEnabled) {
+                LOGV2_DEBUG(7789501,
+                            3,
+                            "Custom commit",
+                            "changeName"_attr = redact(demangleName(typeid(*change))));
+            }
             change->commit(_opCtx, commitTimestamp);
         } catch (...) {
             std::terminate();
@@ -160,10 +165,12 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
     for (auto& change : _changesForCatalogVisibility) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
-            LOGV2_DEBUG(5255701,
-                        3,
-                        "Custom commit",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            if (debugLoggingThreeEnabled) {
+                LOGV2_DEBUG(5255701,
+                            3,
+                            "Custom commit",
+                            "changeName"_attr = redact(demangleName(typeid(*change))));
+            }
             change->commit(_opCtx, commitTimestamp);
         } catch (...) {
             std::terminate();
@@ -172,10 +179,12 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
     for (auto& change : _changes) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
-            LOGV2_DEBUG(22244,
-                        3,
-                        "Custom commit",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            if (debugLoggingThreeEnabled) {
+                LOGV2_DEBUG(22244,
+                            3,
+                            "Custom commit",
+                            "changeName"_attr = redact(demangleName(typeid(*change))));
+            }
             change->commit(_opCtx, commitTimestamp);
         } catch (...) {
             std::terminate();
@@ -199,15 +208,19 @@ void RecoveryUnit::_executeRollbackHandlers() {
     invariant(_opCtx ||
               (_changes.empty() && _changesForCatalogVisibility.empty() &&
                _changesForTwoPhaseDrop.empty()));
+    bool debugLoggingTwoEnabled =
+        logv2::shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(2));
     try {
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
             Change* change = it->get();
-            LOGV2_DEBUG(22245,
-                        2,
-                        "Custom rollback",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            if (debugLoggingTwoEnabled) {
+                LOGV2_DEBUG(22245,
+                            2,
+                            "Custom rollback",
+                            "changeName"_attr = redact(demangleName(typeid(*change))));
+            }
             change->rollback(_opCtx);
         }
 
@@ -216,10 +229,12 @@ void RecoveryUnit::_executeRollbackHandlers() {
              it != end;
              ++it) {
             Change* change = it->get();
-            LOGV2_DEBUG(7789502,
-                        2,
-                        "Custom rollback",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            if (debugLoggingTwoEnabled) {
+                LOGV2_DEBUG(7789502,
+                            2,
+                            "Custom rollback",
+                            "changeName"_attr = redact(demangleName(typeid(*change))));
+            }
             change->rollback(_opCtx);
         }
 
@@ -228,10 +243,12 @@ void RecoveryUnit::_executeRollbackHandlers() {
              it != end;
              ++it) {
             Change* change = it->get();
-            LOGV2_DEBUG(5255702,
-                        2,
-                        "Custom rollback",
-                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            if (debugLoggingTwoEnabled) {
+                LOGV2_DEBUG(5255702,
+                            2,
+                            "Custom rollback",
+                            "changeName"_attr = redact(demangleName(typeid(*change))));
+            }
             change->rollback(_opCtx);
         }
 
