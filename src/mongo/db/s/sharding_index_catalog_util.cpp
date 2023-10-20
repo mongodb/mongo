@@ -126,9 +126,6 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     IndexModificationCallback callback) {
     // Stop migrations so the cluster is in a steady state.
     sharding_ddl_util::stopMigrations(opCtx, userCollectionNss, collectionUUID);
-    // Resume migrations no matter what.
-    ON_BLOCK_EXIT(
-        [&] { sharding_ddl_util::resumeMigrations(opCtx, userCollectionNss, collectionUUID); });
 
     // Get an up to date shard distribution.
     auto [routingInfo, _] = uassertStatusOK(
@@ -173,8 +170,10 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
         CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON({})),
         shardIdsVec,
         executor);
-}
 
+    // Resume migrations after committing.
+    sharding_ddl_util::resumeMigrations(opCtx, userCollectionNss, collectionUUID);
+}
 }  // namespace
 
 void registerIndexCatalogEntry(OperationContext* opCtx,

@@ -4,6 +4,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   featureFlagGlobalIndexesShardingCatalog,
+ *   does_not_support_stepdowns,
  * ]
  */
 
