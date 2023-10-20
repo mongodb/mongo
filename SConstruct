@@ -1064,6 +1064,12 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'BAZEL_FLAGS',
+    help='Flags specific to bazel to pass through to the underlying bazel build command.',
+    default="",
+)
+
+env_vars.Add(
     'DSYMUTIL',
     help='Path to the dsymutil utility',
 )

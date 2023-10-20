@@ -17,4 +17,5 @@ set -o verbose
 # Use `eval` to force evaluation of the environment variables in the echo statement:
 eval echo "Execution environment: Compiler: ${compiler} Targets: ${targets}"
 
-./bazelisk build --verbose_failures --//bazel/config:compiler_type=${compiler} ${targets}
+# TODO SERVER-79852 remove "--config=local" flag
+./bazelisk build --verbose_failures --config=local --//bazel/config:compiler_type=${compiler} ${targets}

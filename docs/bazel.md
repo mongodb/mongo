@@ -2,7 +2,15 @@
 
 To perform a Bazel build via SCons:
 * You must be on a arm64 virtual workstation
+* You must generate engflow credentials and store them in the correct location (see below)
 * Build the Bazel-compatible target: `python3 ./buildscripts/scons.py BAZEL_BUILD_ENABLED=1 --build-profile=fast --ninja=disabled --link-model=static -j 200  --modules= build/fast/mongo/db/commands/libfsync_locked.a`
+
+To generate and install the engflow credentials:
+* Navigate to and log in with your mongodb gmail account: https://sodalite.cluster.engflow.com/gettingstarted
+* Generate and download the credentials; you will need to move them to the workstation machine (scp, copy paste plain text, etc...)
+* Store them (the same filename they downloaded as) on your machine at the default location our build expects: `/engflow/creds/`
+* You should run `chmod 600` on them to make sure they are readable only by your user
+* If you don't want to use the cluster you can pass `BAZEL_FLAGS=--config=local` on the SCons command line or `--config=local` on the bazel command line
 
 To perform a Bazel build and *bypass* SCons:
 * Install Bazelisk: `curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 --output /tmp/bazelisk && chmod +x /tmp/bazelisk`

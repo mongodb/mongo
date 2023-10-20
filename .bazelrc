@@ -8,3 +8,37 @@ build --incompatible_strict_action_env=true
 build --platforms=@mongo_toolchain//:platform
 build --host_platform=@mongo_toolchain//:platform
 build --crosstool_top=@mongo_toolchain//:toolchain_suite
+
+# remote execution is the default, but only mongodb employees will be able to access
+# the engflow cluster. External builders should use the local option below
+# remote execution configs
+build --remote_executor=grpcs://sodalite.cluster.engflow.com
+build --remote_cache=grpcs://sodalite.cluster.engflow.com
+build --bes_backend=grpcs://sodalite.cluster.engflow.com
+build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
+build --experimental_remote_cache_compression=true 
+build --grpc_keepalive_time=30s
+build --nolegacy_important_outputs
+
+# Authenticate to the EngFlow cluster using mTLS certificate
+# For mongodb employees, certs can be generated at 
+# https://sodalite.cluster.engflow.com/gettingstarted
+# then place in the appropriate location as shown below
+build --tls_client_certificate=/engflow/creds/engflow.crt
+build --tls_client_key=/engflow/creds/engflow.key
+
+# if you don't have access to the remote execution cluster above, use the local config
+# described below.
+# pass local config to SCons like:
+# > buildscripts/scons.py BAZEL_FLAGS=--config=local <others args>
+# or if invoking bazel directly pass "--config=local" on the bazel command line
+--config=local
+build:local --remote_executor=
+build:local --remote_cache=
+build:local --bes_backend=
+build:local --bes_results_url=
+build:local --tls_client_certificate=
+build:local --tls_client_key=
+build:local --experimental_remote_cache_compression=false
+build:local --grpc_keepalive_time=0s
+build:local --legacy_important_outputs

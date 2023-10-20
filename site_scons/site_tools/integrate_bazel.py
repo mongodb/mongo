@@ -49,15 +49,15 @@ class BazelRunner:
     def set_link_args(self, link_args: typing.List):
         self.link_args = link_args
 
-    def invoke_build(self):
+    def invoke_build(self, env):
         # Only run once at most.
         # Note that we're not using a Python synchronization mechanism, because testing has shown
         # that SCons will *not* invoke this function in parallel.
         if self.executed:
             return
 
-        args = [BAZELISK_PATH, 'build'] + list(self.bazel_targets) + list(self.compile_args) + list(
-            self.link_args)
+        args = [BAZELISK_PATH, 'build'] + list(self.bazel_targets) + list(self.compile_args) + \
+            list(self.link_args) + SCons.Util.CLVar(env.get("BAZEL_FLAGS", []))
         print("Running bazel build command:", *args)
 
         # Build it and copy output.
@@ -71,7 +71,7 @@ class BazelRunner:
 
 
 BAZEL_RUNNER = BazelRunner()
-BAZEL_ACTION = SCons.Action.Action(lambda target, source, env: BAZEL_RUNNER.invoke_build())
+BAZEL_ACTION = SCons.Action.Action(lambda target, source, env: BAZEL_RUNNER.invoke_build(env))
 
 
 # Establishes logic for BazelLibrary build rule
