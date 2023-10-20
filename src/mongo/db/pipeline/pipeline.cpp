@@ -834,6 +834,18 @@ boost::intrusive_ptr<DocumentSource> Pipeline::popFrontWithNameAndCriteria(
     return popFront();
 }
 
+void Pipeline::appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPipeline) {
+    auto& otherPipelineSources = otherPipeline->getSources();
+    while (!otherPipelineSources.empty()) {
+        _sources.push_back(std::move(otherPipelineSources.front()));
+        otherPipelineSources.pop_front();
+    }
+    constexpr bool alreadyOptimized = false;
+    validateCommon(alreadyOptimized);
+    stitch();
+}
+
+
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

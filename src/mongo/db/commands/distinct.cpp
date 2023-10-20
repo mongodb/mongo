@@ -251,7 +251,7 @@ public:
             // An empty PrivilegeVector is acceptable because these privileges are only checked
             // on getMore and explain will not open a cursor.
             return runAggregate(
-                opCtx, nss, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
+                opCtx, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
         }
 
         const auto& collection = collectionOrView->getCollectionPtr();

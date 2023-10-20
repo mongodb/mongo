@@ -1579,7 +1579,6 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
         AggregateCommandRequest aggRequest(usersNSS(dbname.tenantId()), std::move(pipeline));
         // Impose no cursor privilege requirements, as cursor is drained internally
         uassertStatusOK(runAggregate(opCtx,
-                                     usersNSS(dbname.tenantId()),
                                      aggRequest,
                                      aggregation_request_helper::serializeToCommandObj(aggRequest),
                                      PrivilegeVector(),

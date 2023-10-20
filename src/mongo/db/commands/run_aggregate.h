@@ -53,26 +53,31 @@ namespace mongo {
  * 'privileges' contains the privileges that were required to run this aggregation, to be used later
  * for re-checking privileges for getMore commands.
  *
+ * If the query over a view that's already been resolved, the resolved view and the original
+ * user-provided request both must be provided.
+ *
  * On success, fills out 'result' with the command response.
  */
 Status runAggregate(OperationContext* opCtx,
-                    const NamespaceString& nss,
                     AggregateCommandRequest& request,
                     const LiteParsedPipeline& liteParsedPipeline,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result,
-                    ExternalDataSourceScopeGuard externalDataSourceGuard);
+                    ExternalDataSourceScopeGuard externalDataSourceGuard,
+                    boost::optional<const ResolvedView&> resolvedView = boost::none,
+                    boost::optional<const AggregateCommandRequest&> origRequest = boost::none);
 
 /**
  * Convenience version that internally constructs the LiteParsedPipeline.
  */
 Status runAggregate(OperationContext* opCtx,
-                    const NamespaceString& nss,
                     AggregateCommandRequest& request,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result);
+                    rpc::ReplyBuilderInterface* result,
+                    boost::optional<const ResolvedView&> resolvedView = boost::none,
+                    boost::optional<const AggregateCommandRequest&> origRequest = boost::none);
 
 /**
  * Tracks explicit use of allowDiskUse:false with find and aggregate commands.

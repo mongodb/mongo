@@ -456,6 +456,12 @@ public:
         StringData targetStageName, std::function<bool(const DocumentSource* const)> predicate);
 
     /**
+     * Appends another pipeline to the existing pipeline.
+     * NOTE: The other pipeline will be destroyed.
+     */
+    void appendPipeline(std::unique_ptr<Pipeline, PipelineDeleter> otherPipeline);
+
+    /**
      * Performs common validation for top-level or facet pipelines. Throws if the pipeline is
      * invalid.
      *

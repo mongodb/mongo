@@ -483,8 +483,8 @@ public:
                 try {
                     // An empty PrivilegeVector is acceptable because these privileges are only
                     // checked on getMore and explain will not open a cursor.
-                    uassertStatusOK(runAggregate(
-                        opCtx, nss, aggRequest, _request.body, PrivilegeVector(), result));
+                    uassertStatusOK(
+                        runAggregate(opCtx, aggRequest, _request.body, PrivilegeVector(), result));
                 } catch (DBException& error) {
                     if (error.code() == ErrorCodes::InvalidPipelineOperator) {
                         uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -733,12 +733,7 @@ public:
                                                     aggRequest.getNamespace(),
                                                     aggRequest,
                                                     false));
-                auto status = runAggregate(opCtx,
-                                           aggRequest.getNamespace(),
-                                           aggRequest,
-                                           _request.body,
-                                           privileges,
-                                           result);
+                auto status = runAggregate(opCtx, aggRequest, _request.body, privileges, result);
                 if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                     uasserted(ErrorCodes::InvalidPipelineOperator,
                               str::stream() << "Unsupported in view pipeline: " << status.reason());

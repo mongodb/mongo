@@ -92,6 +92,10 @@ public:
         return _defaultCollation;
     }
 
+    bool timeseries() const {
+        return _timeseriesOptions.has_value();
+    }
+
     // ErrorExtraInfo API
     static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
     static constexpr StringData kTimeseriesMayContainMixedData = "timeseriesMayContainMixedData"_sd;

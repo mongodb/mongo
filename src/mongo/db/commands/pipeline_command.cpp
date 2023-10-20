@@ -267,7 +267,6 @@ public:
             // collection could not be created.
             ExternalDataSourceScopeGuard dropVcollGuard(opCtx, _usedExternalDataSources);
             uassertStatusOK(runAggregate(opCtx,
-                                         _aggregationRequest.getNamespace(),
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
@@ -295,7 +294,6 @@ public:
             // See run() method for details.
             ExternalDataSourceScopeGuard dropVcollGuard(opCtx, _usedExternalDataSources);
             uassertStatusOK(runAggregate(opCtx,
-                                         _aggregationRequest.getNamespace(),
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
