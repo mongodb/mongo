@@ -48,6 +48,7 @@ function assertExistenceOfRequiredCacheEntryFields(entry) {
     assert(entry.hasOwnProperty("timeOfCreation"), entry);
     assert(entry.hasOwnProperty("indexFilterSet"), entry);
     assert(entry.hasOwnProperty("estimatedSizeBytes"), entry);
+    assert(!entry.hasOwnProperty("querySettings"), entry);
 }
 
 const debugInfoFields =

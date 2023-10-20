@@ -80,6 +80,10 @@ public:
         return _info.toString();
     }
 
+    const query_settings::QuerySettings& querySettings() const {
+        return _info.querySettings();
+    }
+
 private:
     PlanCacheKeyInfo _info;
 };

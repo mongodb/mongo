@@ -644,7 +644,7 @@ public:
      */
     std::vector<BSONObj> getMatchingStats(
         const std::function<bool(const KeyType&)>& cacheKeyFilterFunc,
-        const std::function<BSONObj(const Entry&)>& serializationFunc,
+        const std::function<BSONObj(const KeyType&, const Entry&)>& serializationFunc,
         const std::function<bool(const BSONObj&)>& filterFunc) const {
         tassert(6033900,
                 "serialization function and filter function are required when retrieving plan "
@@ -657,7 +657,7 @@ public:
             if (cacheKeyFilterFunc && !cacheKeyFilterFunc(key)) {
                 return;
             }
-            auto serializedEntry = serializationFunc(*entry);
+            auto serializedEntry = serializationFunc(key, *entry);
             if (filterFunc(serializedEntry)) {
                 results.push_back(serializedEntry);
             }

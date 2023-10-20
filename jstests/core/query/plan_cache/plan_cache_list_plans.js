@@ -22,6 +22,9 @@
 //   # This tests perform queries and expect a particular number of candidate plans to be evaluated,
 //   # creating unanticipated indexes can lead to a different number of candidate plans.
 //   assumes_no_implicit_index_creation,
+//   # Query settings are atlas proxy and direct shard execution incompatible.
+//   directly_against_shardsvrs_incompatible,
+//   simulate_atlas_proxy_incompatible,
 // ]
 
 import {
@@ -29,6 +32,8 @@ import {
     getPlanCacheKeyFromShape,
     getPlanStage
 } from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 let coll = db.jstests_plan_cache_list_plans;
@@ -40,7 +45,7 @@ function dumpPlanCacheState() {
     return coll.aggregate([{$planCacheStats: {}}]).toArray();
 }
 
-function getPlansForCacheEntry(query, sort, projection) {
+function getPlansForCacheEntry(query = {}, sort = {}, projection = {}) {
     const keyHash = getPlanCacheKeyFromShape(
         {query: query, projection: projection, sort: sort, collection: coll, db: db});
 
@@ -124,7 +129,7 @@ if (!isSbeEnabled) {
 // Test the queryHash and planCacheKey property by comparing entries for two different
 // query shapes.
 assert.eq(0, coll.find({a: 123}).sort({b: -1, a: 1}).itcount(), 'unexpected document count');
-let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1}, {});
+let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1});
 assert.eq(entry.hasOwnProperty("queryHash"), true);
 assert.eq(entryNewShape.hasOwnProperty("queryHash"), true);
 assert.neq(entry["queryHash"], entryNewShape["queryHash"]);
@@ -196,4 +201,25 @@ if (!isSbeEnabled) {
     // cached $lookup plans.
     const res = foreignColl.aggregate([{$planCacheStats: {}}]).toArray();
     assert.eq(0, res.length, dumpPlanCacheState());
+}
+
+// Ensure query setting entry is present in $planCacheStats output.
+// TODO: SERVER-71537 Remove Feature Flag for PM-412.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings")) {
+    // Set query settings for a query to use 'settings.indexHints.allowedIndexes' indexes.
+    const qsutils = new QuerySettingsUtils(db, coll.getName());
+    const settings = {indexHints: {allowedIndexes: ["a_1", "a_1_b_1"]}};
+    const filter = {a: 1};
+    const query = qsutils.makeFindQueryInstance(filter);
+    assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: settings}));
+    qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(settings, query)]);
+
+    // Run the query, such that a plan cache entry is created.
+    assert.eq(3, coll.find(filter).itcount());
+
+    // Ensure plan cache entry contains 'settings'.
+    const planCacheEntry = getPlansForCacheEntry(filter);
+    assert.eq(settings, planCacheEntry.querySettings, planCacheEntry);
+
+    qsutils.removeAllQuerySettings();
 }

@@ -618,9 +618,12 @@ BackupCursorExtendState CommonMongodProcessInterface::extendBackupCursor(
 
 std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStats(
     OperationContext* opCtx, const NamespaceString& nss, const MatchExpression* matchExp) const {
-    const auto serializer = [](const auto& entry) {
+    const auto serializer = [](const auto& key, const auto& entry) {
         BSONObjBuilder out;
         Explain::planCacheEntryToBSON(entry, &out);
+        if (auto querySettings = key.querySettings().toBSON(); !querySettings.isEmpty()) {
+            out.append("querySettings"_sd, querySettings);
+        }
         return out.obj();
     };
 

@@ -101,6 +101,10 @@ public:
         return _key;
     }
 
+    const query_settings::QuerySettings& querySettings() const {
+        return _querySettings;
+    }
+
 private:
     // Key is broken into two parts:
     // <query shape key> | <indexability discriminators>

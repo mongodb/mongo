@@ -172,6 +172,10 @@ public:
             container_size_helper::estimateObjectSizeInBytes(_secondaryCollectionStates);
     }
 
+    const query_settings::QuerySettings& querySettings() const {
+        return _info.querySettings();
+    }
+
 private:
     // Contains the actual encoding of the query shape as well as the index discriminators.
     const PlanCacheKeyInfo _info;

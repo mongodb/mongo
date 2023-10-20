@@ -877,7 +877,7 @@ TEST_F(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
     ASSERT_EQ(2U, planCache.size());
 
     // Define a serialization function which just serializes the number of works.
-    const auto serializer = [](const PlanCacheEntry& entry) {
+    const auto serializer = [](const auto key, const PlanCacheEntry& entry) {
         ASSERT_TRUE(entry.works);
         return BSON("works" << static_cast<int>(entry.works.value()));
     };

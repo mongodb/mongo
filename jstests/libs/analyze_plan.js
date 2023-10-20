@@ -622,16 +622,8 @@ export function getQueryHashFromExplain(explainRes, db) {
  * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
  * result.
  */
-export function getPlanCacheKeyFromShape({
-    query = {},
-    projection = {},
-    sort = {},
-    collation = {
-        locale: "simple"
-    },
-    collection,
-    db
-}) {
+export function getPlanCacheKeyFromShape(
+    {query = {}, projection = {}, sort = {}, collation = {}, collection, db}) {
     const explainRes = assert.commandWorked(
         collection.explain().find(query, projection).collation(collation).sort(sort).finish());
 
