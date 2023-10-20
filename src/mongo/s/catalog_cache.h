@@ -283,10 +283,15 @@ public:
     void invalidateEntriesThatReferenceShard(const ShardId& shardId);
 
     /**
-     * Non-blocking method, which removes the entire specified collection from the cache (resulting
-     * in full refresh on subsequent access)
+     * Non-blocking method, which removes the entire specified collection from the cache.
      */
     void purgeCollection(const NamespaceString& nss);
+
+    /**
+     * Non-blocking method, which purges the routing info of the specified collection and marks the
+     * entry as to "needs refresh"
+     */
+    void resetCollection(const NamespaceString& nss);
 
     /**
      * Non-blocking method, which removes the entire specified database (including its collections)
