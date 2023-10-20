@@ -38,9 +38,8 @@ namespace mongo {
  * 'expression' member.
  */
 struct ExpressionBitInfo {
-    explicit ExpressionBitInfo(std::unique_ptr<MatchExpression> expression)
-        : expression(std::move(expression)) {}
-    std::unique_ptr<MatchExpression> expression;
+    explicit ExpressionBitInfo(const MatchExpression* expr) : expression(expr) {}
+    const MatchExpression* expression;
 };
 
 /**

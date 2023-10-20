@@ -61,8 +61,8 @@ DEATH_TEST_REGEX(RestoreSingleMatchExpressionTests,
                  AssertOnRestoringNegativeNodes,
                  "Tripwire assertion.*8163020") {
     auto operand = BSON("$gt" << 5);
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]));
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]);
+    std::vector<ExpressionBitInfo> expressions{ExpressionBitInfo{gtExpr.get()}};
 
     BitsetTreeNode root{BitsetTreeNode::And, /* isNegated */ true};
     root.leafChildren.set(0, true);
@@ -126,8 +126,8 @@ TEST(RestoreSingleMatchExpressionTests, NotAlwaysFalse) {
 
 TEST(RestoreSingleMatchExpressionTests, GtExpression) {
     auto operand = BSON("$gt" << 5);
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]));
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, operand["$gt"]);
+    std::vector<ExpressionBitInfo> expressions{ExpressionBitInfo{gtExpr.get()}};
 
     Maxterm maxterm{
         {"1", "1"},
@@ -142,20 +142,20 @@ TEST(RestoreSingleMatchExpressionTests, GtExpression) {
 TEST(RestoreSingleMatchExpressionTests, AndExpression) {
     auto firstOperand = BSON("$gt" << 5);
     auto secondOperand = BSON("$eq" << 10);
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(
-        ExpressionBitInfo{std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"])});
-    expressions.emplace_back(
-        ExpressionBitInfo{std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"])});
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
+    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
+    std::vector<ExpressionBitInfo> expressions{
+        ExpressionBitInfo{gtExpr.get()},
+        ExpressionBitInfo{eqExpr.get()},
+    };
 
     Maxterm maxterm{
         {"01", "11"},
     };
 
     AndMatchExpression expectedExpr{};
-    expectedExpr.add(std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]));
-    expectedExpr.add(std::make_unique<NotMatchExpression>(
-        std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"])));
+    expectedExpr.add(gtExpr->clone());
+    expectedExpr.add(std::make_unique<NotMatchExpression>(eqExpr->clone()));
 
     auto expr = restoreMatchExpression(maxterm, expressions);
     ASSERT_EXPR(expectedExpr, expr);
@@ -165,13 +165,14 @@ TEST(RestoreSingleMatchExpressionTests, OrExpression) {
     auto firstOperand = BSON("$gt" << 5);
     auto secondOperand = BSON("$eq" << 10);
     auto thirdOperand = BSON("$lt" << 10);
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(
-        ExpressionBitInfo{std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"])});
-    expressions.emplace_back(
-        ExpressionBitInfo{std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"])});
-    expressions.emplace_back(
-        ExpressionBitInfo{std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"])});
+    auto gtExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
+    auto eqExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
+    auto ltExpr = std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"]);
+    std::vector<ExpressionBitInfo> expressions{
+        ExpressionBitInfo{gtExpr.get()},
+        ExpressionBitInfo{eqExpr.get()},
+        ExpressionBitInfo{ltExpr.get()},
+    };
 
     Maxterm maxterm{
         {"001", "011"},
@@ -179,14 +180,13 @@ TEST(RestoreSingleMatchExpressionTests, OrExpression) {
     };
 
     auto and1 = std::make_unique<AndMatchExpression>();
-    and1->add(std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]));
-    and1->add(std::make_unique<NotMatchExpression>(
-        std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"])));
+    and1->add(gtExpr->clone());
+    and1->add(std::make_unique<NotMatchExpression>(eqExpr->clone()));
 
     auto and2 = std::make_unique<AndMatchExpression>();
-    and2->add(std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]));
-    and2->add(std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]));
-    and2->add(std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"]));
+    and2->add(gtExpr->clone());
+    and2->add(eqExpr->clone());
+    and2->add(ltExpr->clone());
 
     OrMatchExpression expectedExpr{};
     expectedExpr.add(std::move(and1));
@@ -204,10 +204,11 @@ TEST(RestoreSingleMatchExpressionTests, NorExpression) {
     auto firstExpr = std::make_unique<GTMatchExpression>("a"_sd, firstOperand["$gt"]);
     auto secondExpr = std::make_unique<EqualityMatchExpression>("b"_sd, secondOperand["$eq"]);
     auto thirdExpr = std::make_unique<LTMatchExpression>("c"_sd, thirdOperand["$lt"]);
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(ExpressionBitInfo{firstExpr->clone()});
-    expressions.emplace_back(ExpressionBitInfo{secondExpr->clone()});
-    expressions.emplace_back(ExpressionBitInfo{thirdExpr->clone()});
+    std::vector<ExpressionBitInfo> expressions{
+        ExpressionBitInfo{firstExpr.get()},
+        ExpressionBitInfo{secondExpr.get()},
+        ExpressionBitInfo{thirdExpr.get()},
+    };
 
     Maxterm maxterm{
         Minterm{"000", "001"},
@@ -259,8 +260,7 @@ TEST(RestoreSingleMatchExpressionTests, ElemMatch) {
     expr->add(std::make_unique<EqualityMatchExpression>(""_sd, secondOperand["$eq"]));
     expr->add(std::make_unique<LTMatchExpression>(""_sd, thirdOperand["$lt"]));
 
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(ExpressionBitInfo{expr->clone()});
+    std::vector<ExpressionBitInfo> expressions{ExpressionBitInfo{expr.get()}};
 
     Maxterm maxterm{
         Minterm{"1", "1"},
@@ -283,8 +283,7 @@ TEST(RestoreSingleMatchExpressionTests, ElemMatchObject) {
 
     auto expr = std::make_unique<ElemMatchObjectMatchExpression>("a"_sd, std::move(child));
 
-    std::vector<ExpressionBitInfo> expressions{};
-    expressions.emplace_back(ExpressionBitInfo{expr->clone()});
+    std::vector<ExpressionBitInfo> expressions{ExpressionBitInfo{expr.get()}};
 
     Maxterm maxterm{
         Minterm{"1", "1"},

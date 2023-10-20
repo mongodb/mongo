@@ -88,8 +88,8 @@ struct Context {
         }
 
         const size_t bitIndex = expressions.size();
-        expressions.emplace_back(expr->clone());
-        _map[expressions.back().expression.get()] = bitIndex;
+        expressions.emplace_back(expr);
+        _map[expressions.back().expression] = bitIndex;
 
         return bitIndex;
     }
