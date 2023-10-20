@@ -84,9 +84,6 @@ def get_core_analyzer_commands(task_id: str, execution: str,
                         "src/core-analyzer/core-dumps/*.core", "src/core-analyzer/core-dumps/*.mdmp"
                     ])
             }),
-        BuiltInCommand("attach.results", {
-            "file_location": "src/report.json",
-        }),
     ]
 
 
