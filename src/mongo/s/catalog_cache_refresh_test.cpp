@@ -661,5 +661,57 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunk) {
     ASSERT_EQ(version, cm->getVersion({"1"}));
 }
 
+TEST_F(CatalogCacheRefreshTest, CachedCollectionShouldRefreshAfterResetCollection) {
+    const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+
+    auto initalChunkManager(makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}));
+    ASSERT_EQ(1, initalChunkManager->numChunks());
+    setupNShards(2);
+
+    // 1 - purge the collection: expect the collection to be unsharded after an unforced refresh
+    Grid::get(getServiceContext())->catalogCache()->purgeCollection(kNss);
+    auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
+    auto newRoutingInfo = future.default_timed_get();
+    ASSERT(!newRoutingInfo->cm());
+
+    // 2 - forced refresh - to refill the cache
+    future = scheduleRoutingInfoForcedRefresh(kNss);
+    auto version = initalChunkManager->getVersion();
+    expectGetCollection(version.epoch(), shardKeyPattern);
+    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+        version.incMajor();
+        ChunkType chunk1(kNss,
+                         {shardKeyPattern.getKeyPattern().globalMin(),
+                          shardKeyPattern.getKeyPattern().globalMax()},
+                         version,
+                         {"1"});
+        chunk1.setName(OID::gen());
+
+        return std::vector<BSONObj>{chunk1.toConfigBSON()};
+    }());
+    auto newRoutingInfo2 = future.default_timed_get();
+    ASSERT(newRoutingInfo2->cm());
+
+    // 3 - reset the collection: expect the collection to be sharded even if the refresh is unforced
+    Grid::get(getServiceContext())->catalogCache()->resetCollection(kNss);
+    future = scheduleRoutingInfoUnforcedRefresh(kNss);
+    version = newRoutingInfo2->cm()->getVersion();
+    expectGetCollection(version.epoch(), shardKeyPattern);
+    // Return set of chunks, which represent a move
+    expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+        version.incMajor();
+        ChunkType chunk1(kNss,
+                         {shardKeyPattern.getKeyPattern().globalMin(),
+                          shardKeyPattern.getKeyPattern().globalMax()},
+                         version,
+                         {"1"});
+        chunk1.setName(OID::gen());
+
+        return std::vector<BSONObj>{chunk1.toConfigBSON()};
+    }());
+    auto newRoutingInfo3 = future.default_timed_get();
+    ASSERT(newRoutingInfo3->cm());
+}
+
 }  // namespace
 }  // namespace mongo
