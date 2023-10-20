@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,15 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/plan_yield_policy_sbe.h"
+#include <utility>
+
+#include "mongo/db/query/plan_yield_policy_remote_cursor.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/restore_context.h"
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
-std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
+
+std::unique_ptr<PlanYieldPolicyRemoteCursor> PlanYieldPolicyRemoteCursor::make(
     OperationContext* opCtx,
     PlanYieldPolicy::YieldPolicy policy,
     const MultipleCollectionAccessor& collections,
-    NamespaceString nss) {
-
+    NamespaceString nss,
+    PlanExecutor* exec) {
     stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
     if (collections.isAcquisition()) {
         yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
@@ -43,52 +52,38 @@ std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
         yieldable = &collections.getMainCollection();
     }
 
-    return make(opCtx,
-                policy,
-                opCtx->getServiceContext()->getFastClockSource(),
-                internalQueryExecYieldIterations.load(),
-                Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                yieldable,
-                std::make_unique<YieldPolicyCallbacksImpl>(nss));
+    auto yieldPolicy = std::unique_ptr<PlanYieldPolicyRemoteCursor>(new PlanYieldPolicyRemoteCursor(
+        opCtx, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(nss)));
+    yieldPolicy->registerPlanExecutor(exec);
+    return yieldPolicy;
 }
 
-std::unique_ptr<PlanYieldPolicySBE> PlanYieldPolicySBE::make(
+PlanYieldPolicyRemoteCursor::PlanYieldPolicyRemoteCursor(
     OperationContext* opCtx,
-    YieldPolicy policy,
-    ClockSource* clockSource,
-    int yieldFrequency,
-    Milliseconds yieldPeriod,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-    std::unique_ptr<YieldPolicyCallbacks> callbacks) {
-    return std::unique_ptr<PlanYieldPolicySBE>(new PlanYieldPolicySBE(
-        opCtx, policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)));
-}
-
-PlanYieldPolicySBE::PlanYieldPolicySBE(
-    OperationContext* opCtx,
-    YieldPolicy policy,
-    ClockSource* clockSource,
-    int yieldFrequency,
-    Milliseconds yieldPeriod,
+    PlanYieldPolicy::YieldPolicy policy,
     stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
-    : PlanYieldPolicy(
-          opCtx, policy, clockSource, yieldFrequency, yieldPeriod, yieldable, std::move(callbacks)),
-      _useExperimentalCommitTxnBehavior(gYieldingSupportForSBE) {
-    uassert(4822879,
-            "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
-            policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
-}
+    : PlanYieldPolicy(opCtx,
+                      policy,
+                      opCtx->getServiceContext()->getFastClockSource(),
+                      internalQueryExecYieldIterations.load(),
+                      Milliseconds{internalQueryExecYieldPeriodMS.load()},
+                      yieldable,
+                      std::move(callbacks)) {}
 
-void PlanYieldPolicySBE::saveState(OperationContext* opCtx) {
-    for (auto&& root : _yieldingPlans) {
-        root->saveState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
+void PlanYieldPolicyRemoteCursor::saveState(OperationContext* opCtx) {
+    if (_exec) {
+        _exec->saveState();
     }
 }
 
-void PlanYieldPolicySBE::restoreState(OperationContext* opCtx, const Yieldable*) {
-    for (auto&& root : _yieldingPlans) {
-        root->restoreState(!_useExperimentalCommitTxnBehavior /* relinquish cursor */);
+void PlanYieldPolicyRemoteCursor::restoreState(OperationContext* opCtx,
+                                               const Yieldable* yieldable) {
+    if (_exec) {
+        // collPtr is expected to be null, if yieldable is not CollectionPtr.
+        auto collPtr = dynamic_cast<const CollectionPtr*>(yieldable);
+        _exec->restoreState({RestoreContext::RestoreType::kYield, collPtr});
     }
 }
+
 }  // namespace mongo

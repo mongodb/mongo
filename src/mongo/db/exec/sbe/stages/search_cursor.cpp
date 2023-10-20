@@ -46,12 +46,12 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
                                      value::SlotVector metadataSlots,
                                      std::vector<std::string> fieldNames,
                                      value::SlotVector fieldSlots,
-                                     value::SlotId cursorIdSlot,
-                                     value::SlotId firstBatchSlot,
-                                     boost::optional<value::SlotId> searchQuerySlot,
+                                     size_t remoteCursorId,
+                                     bool isStoredSource,
                                      boost::optional<value::SlotId> sortSpecSlot,
                                      boost::optional<value::SlotId> limitSlot,
-                                     boost::optional<value::SlotId> protocolVersionSlot,
+                                     boost::optional<value::SlotId> sortKeySlot,
+                                     boost::optional<value::SlotId> collatorSlot,
                                      boost::optional<ExplainOptions::Verbosity> explain,
                                      PlanYieldPolicy* yieldPolicy,
                                      PlanNodeId planNodeId)
@@ -63,12 +63,12 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
       _metadataSlots(std::move(metadataSlots)),
       _fieldNames(std::move(fieldNames)),
       _fieldSlots(std::move(fieldSlots)),
-      _cursorIdSlot(cursorIdSlot),
-      _firstBatchSlot(firstBatchSlot),
-      _searchQuerySlot(searchQuerySlot),
+      _remoteCursorId(remoteCursorId),
+      _isStoredSource(isStoredSource),
       _sortSpecSlot(sortSpecSlot),
       _limitSlot(limitSlot),
-      _protocolVersionSlot(protocolVersionSlot),
+      _sortKeySlot(sortKeySlot),
+      _collatorSlot(collatorSlot),
       _explain(explain) {
     _docsReturnedStats = getCommonStats();
 }
@@ -81,12 +81,12 @@ std::unique_ptr<PlanStage> SearchCursorStage::clone() const {
                                                _metadataSlots,
                                                _fieldNames.getUnderlyingVector(),
                                                _fieldSlots,
-                                               _cursorIdSlot,
-                                               _firstBatchSlot,
-                                               _searchQuerySlot,
+                                               _remoteCursorId,
+                                               _isStoredSource,
                                                _sortSpecSlot,
                                                _limitSlot,
-                                               _protocolVersionSlot,
+                                               _sortKeySlot,
+                                               _collatorSlot,
                                                _explain,
                                                _yieldPolicy,
                                                _commonStats.nodeId);
@@ -135,26 +135,30 @@ void SearchCursorStage::prepare(CompileCtx& ctx) {
         _metadataAccessors, _metadataAccessorsMap, _metadataNames, _metadataSlots);
     initializeAccessorsVector(_fieldAccessors, _fieldAccessorsMap, _fieldNames, _fieldSlots);
 
-    _cursorIdAccessor = ctx.getAccessor(_cursorIdSlot);
-    _firstBatchAccessor = ctx.getAccessor(_firstBatchSlot);
-    if (_searchQuerySlot) {
-        _searchQueryAccessor = ctx.getAccessor(*_searchQuerySlot);
-    }
     if (_limitSlot) {
         _limitAccessor = ctx.getAccessor(*_limitSlot);
-    }
-    if (_protocolVersionSlot) {
-        _protocolVersionAccessor = ctx.getAccessor(*_protocolVersionSlot);
     }
     if (_sortSpecSlot) {
         _sortSpecAccessor = ctx.getAccessor(*_sortSpecSlot);
     }
+    if (_collatorSlot) {
+        _collatorAccessor = ctx.getAccessor(*_collatorSlot);
+    }
+
+    tassert(7816103,
+            "RemoteCursors must be established",
+            ctx.remoteCursors && ctx.remoteCursors->count(_remoteCursorId));
+    _cursor = ctx.remoteCursors->at(_remoteCursorId).get();
 }
 
 value::SlotAccessor* SearchCursorStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     // Allow access to the outputs for this stage.
     if (_resultSlot && *_resultSlot == slot) {
         return &_resultAccessor;
+    }
+
+    if (_sortKeySlot && *_sortKeySlot == slot) {
+        return &_sortKeyAccessor;
     }
 
     if (auto it = _metadataAccessorsMap.find(slot); it != _metadataAccessorsMap.end()) {
@@ -182,57 +186,34 @@ void SearchCursorStage::open(bool reOpen) {
         }
     }
 
-    boost::optional<int> protocolVersion;
-    if (_protocolVersionAccessor) {
-        auto [protocolVersionTag, protocolVersionVal] = _protocolVersionAccessor->getViewOfValue();
-        if (protocolVersionTag != value::TypeTags::Nothing) {
-            tassert(7816105,
-                    "protocolVersion should be an integer",
-                    protocolVersionTag == value::TypeTags::NumberInt32);
-            protocolVersion = value::bitcastTo<int>(protocolVersionVal);
+    tassert(7816111, "The cursor should yield a non-null value", _cursor);
+    if (_limit != 0) {
+        _cursor->updateGetMoreFunc(
+            getSearchHelpers(_opCtx->getServiceContext())->buildSearchGetMoreFunc([this] {
+                return calcDocsNeeded();
+            }));
+    }
+
+    if (_sortSpecAccessor) {
+        auto [sortTag, sortVal] = _sortSpecAccessor->getViewOfValue();
+        if (sortTag != value::TypeTags::Nothing) {
+            tassert(
+                7856005, "Incorrect search sort spec type", sortTag == value::TypeTags::sortSpec);
+            auto sortSpec = value::bitcastTo<SortSpec*>(sortVal);
+            const CollatorInterface* collatorView = nullptr;
+            if (_collatorAccessor) {
+                auto [collatorTag, collatorVal] = _collatorAccessor->getViewOfValue();
+                uassert(7856006,
+                        "collatorSlot must be of collator type",
+                        collatorTag == value::TypeTags::collator ||
+                            collatorTag == value::TypeTags::Nothing);
+                if (collatorTag == value::TypeTags::collator) {
+                    collatorView = value::getCollatorView(collatorVal);
+                }
+            }
+            _sortKeyGen.emplace(sortSpec->getSortPattern(), collatorView);
         }
     }
-
-    std::vector<BSONObj> batchVec;
-    auto [batchTag, batchVal] = _firstBatchAccessor->getViewOfValue();
-    tassert(7816109, "First batch should be a BSONArray", batchTag == value::TypeTags::bsonArray);
-    value::ArrayEnumerator enumerator{batchTag, batchVal};
-    while (!enumerator.atEnd()) {
-        auto [tag, value] = enumerator.getViewOfValue();
-        auto be = value::bitcastTo<const char*>(value);
-        batchVec.push_back(BSONObj(be).getOwned());
-        enumerator.advance();
-    }
-
-    auto [cursorIdTag, cursorIdVal] = _cursorIdAccessor->getViewOfValue();
-    tassert(7816104,
-            "Cursor ID should be an integer",
-            cursorIdTag == value::TypeTags::NumberInt32 ||
-                cursorIdTag == value::TypeTags::NumberInt64);
-    auto cursorId = value::bitcastTo<CursorId>(cursorIdVal);
-
-    if (_searchQueryAccessor) {
-        auto [queryTag, queryVal] = _searchQueryAccessor->getViewOfValue();
-        _searchQuery = BSONObj(value::bitcastTo<char*>(queryVal));
-    }
-
-    // Establish the cursor that comes from cursorIdSlot.
-    tassert(7816103, "Cursor should not be established yet", !_cursor);
-    CursorResponse resp = CursorResponse(_namespace, cursorId, std::move(batchVec));
-    _cursor.emplace(getSearchHelpers(_opCtx->getServiceContext())
-                        ->establishSearchCursor(
-                            _opCtx,
-                            _namespace,
-                            _collUuid,
-                            _explain,
-                            _searchQuery,
-                            std::move(resp),
-                            _limit != 0 ? boost::optional<long long>(_limit) : boost::none,
-                            [this] { return calcDocsNeeded(); },
-                            protocolVersion)
-                        .value());
-    tassert(7816111, "Establishing the cursor should yield a non-null value.", _cursor.has_value());
-    _isStoredSource = _searchQuery.getBoolField(kReturnStoredSourceArg);
 }
 
 bool SearchCursorStage::shouldReturnEOF() {
@@ -244,8 +225,8 @@ bool SearchCursorStage::shouldReturnEOF() {
         return true;
     }
 
-    // Return EOF if pExpCtx->uuid is unset here; the collection we are searching over has not been
-    // created yet.
+    // Return EOF if uuid is unset here; the collection we are searching over has not been created
+    // yet.
     if (!_collUuid) {
         return true;
     }
@@ -331,6 +312,23 @@ PlanState SearchCursorStage::getNext() {
                                   value::bitcastFrom<const char*>(_resultObj->objdata()));
         }
     }
+
+    if (_sortKeySlot) {
+        _sortKeyAccessor.reset();
+        if (_sortSpecSlot && _sortKeyGen) {
+            auto sortKey = _sortKeyGen->computeSortKeyFromDocument(Document(*_response));
+            auto [tag, val] = value::makeValue(sortKey);
+            _sortKeyAccessor.reset(tag, val);
+        } else if (_response->hasField(Document::metaFieldSearchScore)) {
+            // If this stage is getting metadata documents from mongot, those don't include
+            // searchScore.
+            _sortKeyAccessor.reset(
+                value::TypeTags::NumberDouble,
+                value::bitcastFrom<double>(
+                    _response->getField(Document::metaFieldSearchScore).number()));
+        }
+    }
+
     return trackPlanState(PlanState::ADVANCED);
 }
 
@@ -348,10 +346,7 @@ boost::optional<long long> SearchCursorStage::calcDocsNeeded() {
 
 void SearchCursorStage::close() {
     auto optTimer(getOptTimer(_opCtx));
-
     trackClose();
-    // Reset all the extraneous members that aren't needed after getNext() is done
-    _cursor.reset();
 }
 
 std::unique_ptr<PlanStageStats> SearchCursorStage::getStats(bool includeDebugInfo) const {
@@ -372,10 +367,20 @@ std::unique_ptr<PlanStageStats> SearchCursorStage::getStats(bool includeDebugInf
         bob.append("fieldNames", _fieldNames.getUnderlyingVector());
         bob.append("fieldSlots", _fieldSlots.begin(), _fieldSlots.end());
 
-        bob.appendNumber("cursorIdSlot", static_cast<long long>(_cursorIdSlot));
-        bob.appendNumber("firstBatchSlot", static_cast<long long>(_firstBatchSlot));
+        bob.appendNumber("remoteCursorId", static_cast<long long>(_remoteCursorId));
+        bob.appendBool("isStoredSource", _isStoredSource);
+
+        if (_sortSpecSlot) {
+            bob.appendNumber("sortSpecSlot", static_cast<long long>(*_sortSpecSlot));
+        }
         if (_limitSlot) {
             bob.appendNumber("limitSlot", static_cast<long long>(*_limitSlot));
+        }
+        if (_sortKeySlot) {
+            bob.appendNumber("sortKeySlot", static_cast<long long>(*_sortKeySlot));
+        }
+        if (_collatorSlot) {
+            bob.appendNumber("collatorSlot", static_cast<long long>(*_collatorSlot));
         }
 
         ret->debugInfo = bob.obj();
@@ -396,9 +401,12 @@ std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint() const {
     addDebugSlotVector(ret, _metadataSlots);
     addDebugSlotVector(ret, _fieldSlots);
 
-    DebugPrinter::addIdentifier(ret, _cursorIdSlot);
-    DebugPrinter::addIdentifier(ret, _firstBatchSlot);
+    DebugPrinter::addIdentifier(ret, _remoteCursorId);
+    DebugPrinter::addIdentifier(ret, _isStoredSource);
+    addDebugOptionalSlotIdentifier(ret, _sortSpecSlot);
     addDebugOptionalSlotIdentifier(ret, _limitSlot);
+    addDebugOptionalSlotIdentifier(ret, _sortKeySlot);
+    addDebugOptionalSlotIdentifier(ret, _collatorSlot);
 
     return ret;
 }

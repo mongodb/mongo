@@ -42,12 +42,15 @@
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/util/search_mongot_mock.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -100,31 +103,60 @@ const BSONArray resultStoredSource = BSON_ARRAY(fromjson(R"(
     "metaB" : 3
 })"));
 
+std::unique_ptr<executor::TaskExecutorCursor> mockTaskExecutorCursor(OperationContext* opCtx,
+                                                                     CursorId cursorId,
+                                                                     const BSONArray& firstBatch) {
+    auto networkInterface = std::make_unique<executor::NetworkInterfaceMock>();
+    auto testExecutor = executor::makeSharedThreadPoolTestExecutor(std::move(networkInterface));
+    executor::RemoteCommandRequest req = executor::RemoteCommandRequest();
+    req.opCtx = opCtx;
+
+    std::vector<BSONObj> batchVec;
+    for (const auto& ele : firstBatch) {
+        batchVec.push_back(ele.Obj());
+    }
+
+    executor::TaskExecutorCursor::Options opts;
+    opts.preFetchNextBatch = false;
+    return std::make_unique<executor::TaskExecutorCursor>(
+        testExecutor,
+        nullptr /* underlyingExec */,
+        CursorResponse{NamespaceString::kEmpty, cursorId, batchVec},
+        req,
+        std::move(opts));
+}
+
+std::unique_ptr<PlanStage> makeSearchCursorStage(value::SlotId resultSlot,
+                                                 std::vector<std::string> metadataNames,
+                                                 value::SlotVector metadataSlots,
+                                                 std::vector<std::string> fieldNames,
+                                                 value::SlotVector fieldSlots,
+                                                 bool isStoredSource,
+                                                 value::SlotId limitSlot) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    expCtx->uuid = UUID::gen();
+    return makeS<SearchCursorStage>(NamespaceString::kEmpty,
+                                    expCtx->uuid,
+                                    resultSlot,
+                                    metadataNames,
+                                    metadataSlots,
+                                    fieldNames,
+                                    fieldSlots,
+                                    0,
+                                    isStoredSource,
+                                    boost::none, /* sortSpecSlot */
+                                    limitSlot,
+                                    boost::none, /* sortKeySlot */
+                                    boost::none, /* collatorSlot */
+                                    expCtx->explain,
+                                    nullptr /* yieldPolicy */,
+                                    kEmptyPlanNodeId);
+}
+
 TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     // Register and fill input slots in the runtime environment.
-    auto cursorIdSlot = env->registerSlot("cursorId"_sd,
-                                          sbe::value::TypeTags::NumberInt32,
-                                          0 /* val */,
-                                          true /* owned */,
-                                          getSlotIdGenerator());
-
-    auto firstBatchSlot = env->registerSlot("firstBatch"_sd,
-                                            sbe::value::TypeTags::bsonArray,
-                                            stage_builder::makeValue(resultArray).second,
-                                            true /* owned */,
-                                            getSlotIdGenerator());
-    auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
-                                             sbe::value::TypeTags::bsonObject,
-                                             stage_builder::makeValue(query).second,
-                                             true /* owned */,
-                                             getSlotIdGenerator());
-    auto protocolVersionSlot = env->registerSlot("protocolVersion"_sd,
-                                                 sbe::value::TypeTags::Nothing,
-                                                 0 /* val */,
-                                                 false /* owned */,
-                                                 getSlotIdGenerator());
     auto limitSlot = env->registerSlot("limit"_sd,
                                        sbe::value::TypeTags::NumberInt64,
                                        10 /* val */,
@@ -142,24 +174,14 @@ TEST_F(SearchCursorStageTest, SearchTestOutputs) {
     expCtx->uuid = UUID::gen();
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeS<SearchCursorStage>(NamespaceString::kEmpty,
-                                                 expCtx->uuid,
-                                                 resultSlot,
-                                                 metadataNames,
-                                                 metadataSlots,
-                                                 fieldNames,
-                                                 fieldSlots,
-                                                 std::move(cursorIdSlot),
-                                                 std::move(firstBatchSlot),
-                                                 std::move(searchQuerySlot),
-                                                 boost::none, /* sortSpecSlot*/
-                                                 std::move(limitSlot),
-                                                 std::move(protocolVersionSlot),
-                                                 expCtx->explain,
-                                                 nullptr /* yieldPolicy */,
-                                                 kEmptyPlanNodeId);
+    auto searchCursor = makeSearchCursorStage(
+        resultSlot, metadataNames, metadataSlots, fieldNames, fieldSlots, false, limitSlot);
 
     auto ctx = makeCompileCtx(std::move(env));
+    auto remoteCursors = std::make_unique<RemoteCursorMap>();
+    remoteCursors->insert({0, mockTaskExecutorCursor(expCtx->opCtx, 0, resultArray)});
+    ctx->remoteCursors = remoteCursors.get();
+
     prepareTree(ctx.get(), searchCursor.get());
 
     // Test that all of the output slots are filled correctly.
@@ -195,27 +217,6 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     // Register and fill input slots in the runtime environment.
-    auto cursorIdSlot = env->registerSlot("cursorId"_sd,
-                                          sbe::value::TypeTags::NumberInt32,
-                                          0 /* val */,
-                                          true /* owned */,
-                                          getSlotIdGenerator());
-
-    auto firstBatchSlot = env->registerSlot("firstBatch"_sd,
-                                            sbe::value::TypeTags::bsonArray,
-                                            stage_builder::makeValue(resultStoredSource).second,
-                                            true /* owned */,
-                                            getSlotIdGenerator());
-    auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
-                                             sbe::value::TypeTags::bsonObject,
-                                             stage_builder::makeValue(queryStoredSource).second,
-                                             true /* owned */,
-                                             getSlotIdGenerator());
-    auto protocolVersionSlot = env->registerSlot("protocolVersion"_sd,
-                                                 sbe::value::TypeTags::Nothing,
-                                                 0 /* val */,
-                                                 false /* owned */,
-                                                 getSlotIdGenerator());
     auto limitSlot = env->registerSlot("limit"_sd,
                                        sbe::value::TypeTags::NumberInt64,
                                        1 /* val */,
@@ -234,24 +235,14 @@ TEST_F(SearchCursorStageTest, SearchTestLimit) {
 
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeS<SearchCursorStage>(NamespaceString::kEmpty,
-                                                 expCtx->uuid,
-                                                 resultSlot,
-                                                 metadataNames,
-                                                 metadataSlots,
-                                                 fieldNames,
-                                                 fieldSlots,
-                                                 std::move(cursorIdSlot),
-                                                 std::move(firstBatchSlot),
-                                                 std::move(searchQuerySlot),
-                                                 boost::none, /* sortSpecSlot*/
-                                                 std::move(limitSlot),
-                                                 std::move(protocolVersionSlot),
-                                                 expCtx->explain,
-                                                 nullptr /* yieldPolicy */,
-                                                 kEmptyPlanNodeId);
+    auto searchCursor = makeSearchCursorStage(
+        resultSlot, metadataNames, metadataSlots, fieldNames, fieldSlots, true, limitSlot);
 
     auto ctx = makeCompileCtx(std::move(env));
+    auto remoteCursors = std::make_unique<RemoteCursorMap>();
+    remoteCursors->insert({0, mockTaskExecutorCursor(expCtx->opCtx, 0, resultStoredSource)});
+    ctx->remoteCursors = remoteCursors.get();
+
     prepareTree(ctx.get(), searchCursor.get());
 
     // Test that the limit of the query is 1 and the second doc will not be returned.
@@ -266,27 +257,6 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     auto env = std::make_unique<RuntimeEnvironment>();
 
     // Register and fill input slots in the runtime environment.
-    auto cursorIdSlot = env->registerSlot("cursorId"_sd,
-                                          sbe::value::TypeTags::NumberInt32,
-                                          0 /* val */,
-                                          true /* owned */,
-                                          getSlotIdGenerator());
-
-    auto firstBatchSlot = env->registerSlot("firstBatch"_sd,
-                                            sbe::value::TypeTags::bsonArray,
-                                            stage_builder::makeValue(resultStoredSource).second,
-                                            true /* owned */,
-                                            getSlotIdGenerator());
-    auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
-                                             sbe::value::TypeTags::bsonObject,
-                                             stage_builder::makeValue(queryStoredSource).second,
-                                             true /* owned */,
-                                             getSlotIdGenerator());
-    auto protocolVersionSlot = env->registerSlot("protocolVersion"_sd,
-                                                 sbe::value::TypeTags::Nothing,
-                                                 0 /* val */,
-                                                 false /* owned */,
-                                                 getSlotIdGenerator());
     auto limitSlot = env->registerSlot("limit"_sd,
                                        sbe::value::TypeTags::NumberInt64,
                                        10 /* val */,
@@ -304,24 +274,14 @@ TEST_F(SearchCursorStageTest, SearchTestStoredSource) {
     expCtx->uuid = UUID::gen();
 
     // Build and prepare for execution of the search cursor stage.
-    auto searchCursor = makeS<SearchCursorStage>(NamespaceString::kEmpty,
-                                                 expCtx->uuid,
-                                                 resultSlot,
-                                                 metadataNames,
-                                                 metadataSlots,
-                                                 fieldNames,
-                                                 fieldSlots,
-                                                 std::move(cursorIdSlot),
-                                                 std::move(firstBatchSlot),
-                                                 std::move(searchQuerySlot),
-                                                 boost::none, /* sortSpecSlot*/
-                                                 std::move(limitSlot),
-                                                 std::move(protocolVersionSlot),
-                                                 expCtx->explain,
-                                                 nullptr /* yieldPolicy */,
-                                                 kEmptyPlanNodeId);
+    auto searchCursor = makeSearchCursorStage(
+        resultSlot, metadataNames, metadataSlots, fieldNames, fieldSlots, true, limitSlot);
 
     auto ctx = makeCompileCtx(std::move(env));
+    auto remoteCursors = std::make_unique<RemoteCursorMap>();
+    remoteCursors->insert({0, mockTaskExecutorCursor(expCtx->opCtx, 0, resultStoredSource)});
+    ctx->remoteCursors = remoteCursors.get();
+
     prepareTree(ctx.get(), searchCursor.get());
 
     // Test that all of the output slots are filled correctly.

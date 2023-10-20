@@ -87,7 +87,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  NamespaceString nss,
                                  bool isOpen,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-                                 bool generatedByBonsai)
+                                 bool generatedByBonsai,
+                                 std::unique_ptr<RemoteCursorMap> remoteCursors)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -98,7 +99,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _stash{std::move(candidates.winner().results)},
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)),
-      _generatedByBonsai(generatedByBonsai) {
+      _generatedByBonsai(generatedByBonsai),
+      _remoteCursors(std::move(remoteCursors)) {
     invariant(!_nss.isEmpty());
     invariant(_root);
 
@@ -162,6 +164,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   isMultiPlan,
                                                   isCachedCandidate,
                                                   _rootData.debugInfo);
+    _cursorType = _rootData.staticData->cursorType;
 }
 
 void PlanExecutorSBE::saveState() {
@@ -182,15 +185,21 @@ void PlanExecutorSBE::saveState() {
         _root->saveState(relinquishCursor, discardSlotState);
     }
 
-    if (!_yieldPolicy->usesCollectionAcquisitions()) {
+    if (_yieldPolicy && !_yieldPolicy->usesCollectionAcquisitions()) {
         _yieldPolicy->setYieldable(nullptr);
     }
     _lastGetNext = BSONObj();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
-    if (!_yieldPolicy->usesCollectionAcquisitions()) {
+    if (_yieldPolicy && !_yieldPolicy->usesCollectionAcquisitions()) {
         _yieldPolicy->setYieldable(context.collection());
+    }
+
+    if (_remoteCursors) {
+        for (auto& [_, cursor] : *_remoteCursors) {
+            cursor->setYieldable(context.collection());
+        }
     }
 
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
@@ -370,7 +379,8 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
                 planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
             }
 
-            if (!insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
+            if (!_yieldPolicy ||
+                !insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
                 return PlanExecutor::ExecState::IS_EOF;
             }
 
@@ -466,112 +476,7 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
 }
 
 bool PlanExecutorSBE::usesCollectionAcquisitions() const {
-    return _yieldPolicy->usesCollectionAcquisitions();
-}
-
-void PlanExecutorSBE::initializeAccessors(
-    MetaDataAccessor& accessor, const stage_builder::PlanStageMetadataSlots& metadataSlots) {
-    if (auto slot = metadataSlots.searchScoreSlot) {
-        accessor.metadataSearchScore = _root->getAccessor(_rootData.env.ctx, *slot);
-    }
-    if (auto slot = metadataSlots.searchHighlightsSlot) {
-        accessor.metadataSearchHighlights = _root->getAccessor(_rootData.env.ctx, *slot);
-    }
-    if (auto slot = metadataSlots.searchDetailsSlot) {
-        accessor.metadataSearchDetails = _root->getAccessor(_rootData.env.ctx, *slot);
-    }
-    if (auto slot = metadataSlots.searchSortValuesSlot) {
-        accessor.metadataSearchSortValues = _root->getAccessor(_rootData.env.ctx, *slot);
-    }
-    if (auto slot = metadataSlots.searchSequenceToken) {
-        accessor.metadataSearchSequenceToken = _root->getAccessor(_rootData.env.ctx, *slot);
-    }
-}
-
-BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson(BSONObj doc) const {
-    if (metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
-        metadataSearchSortValues || metadataSearchSequenceToken) {
-        BSONObjBuilder bb(std::move(doc));
-        if (metadataSearchScore) {
-            auto [tag, val] = metadataSearchScore->getViewOfValue();
-            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchScore, tag, val);
-        }
-        if (metadataSearchHighlights) {
-            auto [tag, val] = metadataSearchHighlights->getViewOfValue();
-            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchHighlights, tag, val);
-        }
-        if (metadataSearchDetails) {
-            auto [tag, val] = metadataSearchDetails->getViewOfValue();
-            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchScoreDetails, tag, val);
-        }
-        if (metadataSearchSortValues) {
-            auto [tag, val] = metadataSearchSortValues->getViewOfValue();
-            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchSortValues, tag, val);
-        }
-        if (metadataSearchSequenceToken) {
-            auto [tag, val] = metadataSearchSequenceToken->getViewOfValue();
-            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchSequenceToken, tag, val);
-        }
-        return bb.obj();
-    }
-    return doc;
-}
-Document PlanExecutorSBE::MetaDataAccessor::appendToDocument(Document doc) const {
-    if (metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
-        metadataSearchSortValues || metadataSearchSequenceToken) {
-        MutableDocument out(std::move(doc));
-        if (metadataSearchScore) {
-            auto [tag, val] = metadataSearchScore->getViewOfValue();
-            if (tag != sbe::value::TypeTags::Nothing) {
-                uassert(7856601,
-                        "Metadata search score must be double.",
-                        tag == sbe::value::TypeTags::NumberDouble);
-                out.metadata().setSearchScore(sbe::value::bitcastTo<double>(val));
-            }
-        }
-        if (metadataSearchHighlights) {
-            auto [tag, val] = metadataSearchHighlights->getViewOfValue();
-            if (tag != sbe::value::TypeTags::Nothing) {
-                uassert(7856602,
-                        "Metadata search highlights must be bson array.",
-                        tag == sbe::value::TypeTags::bsonArray);
-                out.metadata().setSearchHighlights(
-                    Value(BSONArray{BSONObj{sbe::value::bitcastTo<const char*>(val)}}));
-            }
-        }
-        if (metadataSearchDetails) {
-            auto [tag, val] = metadataSearchDetails->getViewOfValue();
-            if (tag != sbe::value::TypeTags::Nothing) {
-                uassert(7856603,
-                        "Metadata search score details must be bson object.",
-                        tag == sbe::value::TypeTags::bsonObject);
-                out.metadata().setSearchScoreDetails(
-                    BSONObj{sbe::value::bitcastTo<const char*>(val)});
-            }
-        }
-        if (metadataSearchSortValues) {
-            auto [tag, val] = metadataSearchSortValues->getViewOfValue();
-            if (tag != sbe::value::TypeTags::Nothing) {
-                uassert(7856604,
-                        "Metadata search sort value must be bson object.",
-                        tag == sbe::value::TypeTags::bsonObject);
-                out.metadata().setSearchSortValues(
-                    BSONObj{sbe::value::bitcastTo<const char*>(val)});
-            }
-        }
-        if (metadataSearchSequenceToken) {
-            auto [tag, val] = metadataSearchSequenceToken->getViewOfValue();
-            if (tag != sbe::value::TypeTags::Nothing) {
-                uassert(8104600,
-                        "Metadata search sequence token must be string",
-                        tag == sbe::value::TypeTags::bsonString);
-                out.metadata().setSearchSequenceToken(
-                    Value(sbe::value::getStringOrSymbolView(tag, val)));
-            }
-        }
-        return out.freeze();
-    }
-    return doc;
+    return _yieldPolicy && _yieldPolicy->usesCollectionAcquisitions();
 }
 
 namespace {
@@ -689,6 +594,140 @@ Document convertToDocument(const sbe::value::Object& obj) {
 }
 
 }  // namespace
+
+void PlanExecutorSBE::initializeAccessors(
+    MetaDataAccessor& accessor, const stage_builder::PlanStageMetadataSlots& metadataSlots) {
+    if (auto slot = metadataSlots.searchScoreSlot) {
+        accessor.metadataSearchScore = _root->getAccessor(_rootData.env.ctx, *slot);
+    }
+    if (auto slot = metadataSlots.searchHighlightsSlot) {
+        accessor.metadataSearchHighlights = _root->getAccessor(_rootData.env.ctx, *slot);
+    }
+    if (auto slot = metadataSlots.searchDetailsSlot) {
+        accessor.metadataSearchDetails = _root->getAccessor(_rootData.env.ctx, *slot);
+    }
+    if (auto slot = metadataSlots.searchSortValuesSlot) {
+        accessor.metadataSearchSortValues = _root->getAccessor(_rootData.env.ctx, *slot);
+    }
+    if (auto slot = metadataSlots.sortKeySlot) {
+        accessor.sortKey = _root->getAccessor(_rootData.env.ctx, *slot);
+        if (auto sortSpecSlot = _rootData.env->getSlotIfExists("searchSortSpec"_sd)) {
+            auto [sortSpecTag, sortSpecVal] =
+                _root->getAccessor(_rootData.env.ctx, *sortSpecSlot)->getViewOfValue();
+            if (sortSpecTag != sbe::value::TypeTags::Nothing) {
+                tassert(7856004,
+                        "Incorrect search sort spec type.",
+                        sortSpecTag == sbe::value::TypeTags::sortSpec);
+                auto sortSpec = sbe::value::bitcastTo<sbe::SortSpec*>(sortSpecVal);
+                accessor.isSingleSortKey = sortSpec->getSortPattern().isSingleElementKey();
+            }
+        }
+    }
+    if (auto slot = metadataSlots.searchSequenceToken) {
+        accessor.metadataSearchSequenceToken = _root->getAccessor(_rootData.env.ctx, *slot);
+    }
+}
+
+BSONObj PlanExecutorSBE::MetaDataAccessor::appendToBson(BSONObj doc) const {
+    if (metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
+        metadataSearchSortValues || sortKey) {
+        BSONObjBuilder bb(std::move(doc));
+        if (metadataSearchScore) {
+            auto [tag, val] = metadataSearchScore->getViewOfValue();
+            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchScore, tag, val);
+        }
+        if (metadataSearchHighlights) {
+            auto [tag, val] = metadataSearchHighlights->getViewOfValue();
+            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchHighlights, tag, val);
+        }
+        if (metadataSearchDetails) {
+            auto [tag, val] = metadataSearchDetails->getViewOfValue();
+            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchScoreDetails, tag, val);
+        }
+        if (metadataSearchSortValues) {
+            auto [tag, val] = metadataSearchSortValues->getViewOfValue();
+            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchSortValues, tag, val);
+        }
+        if (sortKey) {
+            auto [tag, val] = sortKey->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                bb.append(Document::metaFieldSortKey,
+                          DocumentMetadataFields::serializeSortKey(isSingleSortKey,
+                                                                   convertToValue(tag, val)));
+            }
+        }
+        if (metadataSearchSequenceToken) {
+            auto [tag, val] = metadataSearchSequenceToken->getViewOfValue();
+            sbe::bson::appendValueToBsonObj(bb, Document::metaFieldSearchSequenceToken, tag, val);
+        }
+        return bb.obj();
+    }
+    return doc;
+}
+
+Document PlanExecutorSBE::MetaDataAccessor::appendToDocument(Document doc) const {
+    if (metadataSearchScore || metadataSearchHighlights || metadataSearchDetails ||
+        metadataSearchSortValues || sortKey) {
+        MutableDocument out(std::move(doc));
+        if (metadataSearchScore) {
+            auto [tag, val] = metadataSearchScore->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                uassert(7856601,
+                        "Metadata search score must be double.",
+                        tag == sbe::value::TypeTags::NumberDouble);
+                out.metadata().setSearchScore(sbe::value::bitcastTo<double>(val));
+            }
+        }
+        if (metadataSearchHighlights) {
+            auto [tag, val] = metadataSearchHighlights->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                uassert(7856602,
+                        "Metadata search highlights must be bson array.",
+                        tag == sbe::value::TypeTags::bsonArray);
+                out.metadata().setSearchHighlights(
+                    Value(BSONArray{BSONObj{sbe::value::bitcastTo<const char*>(val)}}));
+            }
+        }
+        if (metadataSearchDetails) {
+            auto [tag, val] = metadataSearchDetails->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                uassert(7856603,
+                        "Metadata search score details must be bson object.",
+                        tag == sbe::value::TypeTags::bsonObject);
+                out.metadata().setSearchScoreDetails(
+                    BSONObj{sbe::value::bitcastTo<const char*>(val)});
+            }
+        }
+        if (metadataSearchSortValues) {
+            auto [tag, val] = metadataSearchSortValues->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                uassert(7856604,
+                        "Metadata search sort value must be bson object.",
+                        tag == sbe::value::TypeTags::bsonObject);
+                out.metadata().setSearchSortValues(
+                    BSONObj{sbe::value::bitcastTo<const char*>(val)});
+            }
+        }
+        if (sortKey) {
+            auto [tag, val] = sortKey->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                out.metadata().setSortKey(convertToValue(tag, val), isSingleSortKey);
+            }
+        }
+        if (metadataSearchSequenceToken) {
+            auto [tag, val] = metadataSearchSequenceToken->getViewOfValue();
+            if (tag != sbe::value::TypeTags::Nothing) {
+                uassert(8104600,
+                        "Metadata search sequence token must be string",
+                        tag == sbe::value::TypeTags::bsonString);
+                out.metadata().setSearchSequenceToken(
+                    Value(sbe::value::getStringOrSymbolView(tag, val)));
+            }
+        }
+        return out.freeze();
+    }
+    return doc;
+}
 
 template <typename ObjectType>
 sbe::PlanState fetchNextImpl(sbe::PlanStage* root,

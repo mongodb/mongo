@@ -308,6 +308,10 @@ public:
         return _cqPipeline;
     }
 
+    std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline() {
+        return _cqPipeline;
+    }
+
     /**
      * Returns true if the query is a count-like query, i.e. has no dependencies on inputs (see
      * DepsTracker::hasNoRequirements()). These queries can be served without accessing the source

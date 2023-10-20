@@ -285,14 +285,13 @@ public:
 
 protected:
     std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
-        return std::make_unique<PlanYieldPolicySBE>(
+        return PlanYieldPolicySBE::make(
             operationContext(),
             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
             operationContext()->getServiceContext()->getFastClockSource(),
             0,
             Milliseconds::zero(),
-            &_yieldable,
-            nullptr);
+            &_yieldable);
     }
 
 private:

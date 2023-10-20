@@ -753,13 +753,15 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
     auto hasGeoNearStage = !pipeline->getSources().empty() &&
         dynamic_cast<DocumentSourceGeoNear*>(pipeline->peekFront());
 
-    // Prepare a PlanExecutor to provide input into the pipeline, if needed.
-    auto attachExecutorCallback =
+    // Prepare a PlanExecutor to provide input into the pipeline, if needed; and additional
+    // executors if needed to serve the aggregation, this currently only includes search commands
+    // that generate metadata.
+    auto [executor, attachCallback, additionalExecutors] =
         PipelineD::buildInnerQueryExecutor(collections, nss, &request, pipeline.get());
 
     std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     if (canOptimizeAwayPipeline(pipeline.get(),
-                                attachExecutorCallback.second.get(),
+                                executor.get(),
                                 request,
                                 hasGeoNearStage,
                                 liteParsedPipeline.hasChangeStream())) {
@@ -768,15 +770,13 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         // more than forward the results of its cursor document source, we can use the
         // PlanExecutor by itself. The resulting cursor will look like what the client would
         // have gotten from find command.
-        execs.emplace_back(std::move(attachExecutorCallback.second));
+        execs.emplace_back(std::move(executor));
     } else {
         getSearchHelpers(expCtx->opCtx->getServiceContext())
             ->prepareSearchForTopLevelPipeline(pipeline.get());
         // Complete creation of the initial $cursor stage, if needed.
-        PipelineD::attachInnerQueryExecutorToPipeline(collections,
-                                                      attachExecutorCallback.first,
-                                                      std::move(attachExecutorCallback.second),
-                                                      pipeline.get());
+        PipelineD::attachInnerQueryExecutorToPipeline(
+            collections, attachCallback, std::move(executor), pipeline.get());
 
         auto pipelines = createAdditionalPipelinesIfNeeded(
             expCtx->opCtx, expCtx, request, std::move(pipeline), expCtx->uuid, resetContextFn);
@@ -797,6 +797,10 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
         // below), and in order to execute the initial getNext() call in 'handleCursorCommand',
         // we need to hold the collection lock.
         resetContextFn();
+    }
+
+    for (auto& exec : additionalExecutors) {
+        execs.emplace_back(std::move(exec));
     }
     return execs;
 }

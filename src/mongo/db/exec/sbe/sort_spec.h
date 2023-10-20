@@ -46,9 +46,11 @@ public:
     using Value = value::Value;
     using ValueGuard = value::ValueGuard;
 
-    SortSpec(const BSONObj& sortPatternBson)
+    explicit SortSpec(
+        const BSONObj& sortPatternBson,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr /* needed for meta sorts */)
         : _sortPatternBson(sortPatternBson.getOwned()),
-          _sortPattern(_sortPatternBson, nullptr /* expCtx, needed for meta sorts */),
+          _sortPattern(_sortPatternBson, expCtx),
           _sortKeyGen(_sortPattern, nullptr /* collator */) {
         _localBsonEltStorage.resize(_sortPattern.size());
         _localSortKeyComponentStorage.elts.resize(_sortPattern.size());
@@ -92,6 +94,10 @@ public:
 
     const BSONObj& getPattern() const {
         return _sortPatternBson;
+    }
+
+    const SortPattern& getSortPattern() const {
+        return _sortPattern;
     }
 
     size_t getApproximateSize() const;

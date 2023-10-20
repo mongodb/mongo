@@ -114,7 +114,15 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
-                                    bool preparingFromCache);
+                                    bool preparingFromCache,
+                                    RemoteCursorMap* remoteCursors = nullptr);
+
+std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
+buildSearchMetadataExecutorSBE(OperationContext* opCtx,
+                               const CanonicalQuery& cq,
+                               size_t remoteCursorId,
+                               RemoteCursorMap* remoteCursors,
+                               PlanYieldPolicySBE* yieldPolicy);
 
 /**
  * Associate a slot with a signature representing all the possible types that the value stored at

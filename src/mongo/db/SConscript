@@ -1563,6 +1563,7 @@ execEnv.Library(
         'query/plan_insert_listener.cpp',
         'query/plan_ranker.cpp',
         'query/plan_yield_policy_impl.cpp',
+        'query/plan_yield_policy_remote_cursor.cpp',
         'query/plan_yield_policy_sbe.cpp',
         'query/sbe_cached_solution_planner.cpp',
         'query/sbe_multi_planner.cpp',

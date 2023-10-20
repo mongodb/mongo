@@ -147,7 +147,6 @@ env.Library(
     target='sbe_plan_stage_test',
     source=[
         'sbe_plan_stage_test.cpp',
-        'util/search_mongot_mock.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',

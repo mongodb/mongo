@@ -29,30 +29,43 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/search_helper.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_cursor.h"
+#include <memory>
 
-namespace mongo::search_mongot_mock {
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+
+namespace mongo {
 
 /**
- * A class that contains methods that are mock implementations of mongot search.
- * This will be used in SearchCursorStage unit tests to avoid remote call to mongot or mongot_mock.
+ * A PlanYieldPolicy for remote cursors to yield and release storage resources during network call.
  */
-class SearchMockHelperFunctions : public SearchDefaultHelperFunctions {
+class PlanYieldPolicyRemoteCursor final : public PlanYieldPolicy {
 public:
-    boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
+    static std::unique_ptr<PlanYieldPolicyRemoteCursor> make(
         OperationContext* opCtx,
-        const NamespaceString& nss,
-        const boost::optional<UUID>& uuid,
-        const boost::optional<ExplainOptions::Verbosity>& explain,
-        const BSONObj& query,
-        CursorResponse&& response,
-        boost::optional<long long> docsRequested = boost::none,
-        std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
-        const boost::optional<int>& protocolVersion = boost::none,
-        bool requiresSearchSequenceToken = false) override;
+        PlanYieldPolicy::YieldPolicy policy,
+        const MultipleCollectionAccessor& collections,
+        NamespaceString nss,
+        PlanExecutor* exec = nullptr);
+
+    void registerPlanExecutor(PlanExecutor* exec) {
+        _exec = exec;
+    }
+
+private:
+    PlanYieldPolicyRemoteCursor(OperationContext* opCtx,
+                                PlanYieldPolicy::YieldPolicy policy,
+                                stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                                std::unique_ptr<YieldPolicyCallbacks> callbacks);
+
+    void saveState(OperationContext* opCtx) override;
+
+    void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;
+
+    // The plan executor which this yield policy is responsible for yielding.
+    PlanExecutor* _exec;
 };
 
-}  // namespace mongo::search_mongot_mock
+}  // namespace mongo

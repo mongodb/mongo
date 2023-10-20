@@ -38,6 +38,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/label.h"
+#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo::sbe {
@@ -85,6 +86,7 @@ struct CompileCtx {
     stdx::unordered_map<SpoolId, std::shared_ptr<SpoolBuffer>> spoolBuffers;
     bool aggExpression{false};
     vm::LabelId lastLabelId{0};
+    RemoteCursorMap* remoteCursors{nullptr};
 
 private:
     // Any data that a PlanStage needs from the RuntimeEnvironment should not be accessed directly

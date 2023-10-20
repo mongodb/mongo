@@ -133,6 +133,7 @@ struct PlanStageMetadataSlots {
     boost::optional<sbe::value::SlotId> searchHighlightsSlot;
     boost::optional<sbe::value::SlotId> searchDetailsSlot;
     boost::optional<sbe::value::SlotId> searchSortValuesSlot;
+    boost::optional<sbe::value::SlotId> sortKeySlot;
     boost::optional<sbe::value::SlotId> searchSequenceToken;
 };
 

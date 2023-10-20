@@ -71,6 +71,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/executor/task_executor_cursor.h"
 
 namespace mongo {
 
@@ -239,6 +240,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     bool permitYield = false,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    const CanonicalQuery& cq,
+    executor::TaskExecutorCursor metadataCursor);
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode

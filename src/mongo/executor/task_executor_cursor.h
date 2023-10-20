@@ -48,6 +48,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/remote_command_request.h"
@@ -60,6 +61,9 @@
 #include "mongo/util/future_impl.h"
 
 namespace mongo {
+
+class PlanYieldPolicy;
+
 namespace executor {
 
 /**
@@ -92,6 +96,11 @@ public:
         // This function, if specified, may modify a getMore request to include additional
         // information.
         std::function<void(BSONObjBuilder& bob)> getMoreAugmentationWriter;
+
+        // Optional yield policy allows us to yield(release storage resources) during remote call.
+        // Using shared_ptr to allow tries on network failure, don't share the pointer on other
+        // purpose.
+        std::shared_ptr<PlanYieldPolicy> yieldPolicy{nullptr};
 
         Options() {}
     };
@@ -170,7 +179,7 @@ public:
         return _cursorVars;
     }
 
-    auto getType() const {
+    boost::optional<std::string> getType() const {
         return _cursorType;
     }
 
@@ -188,6 +197,20 @@ public:
 
     auto getNumAdditionalCursors() {
         return _additionalCursors.size();
+    }
+
+    void updateGetMoreFunc(std::function<void(BSONObjBuilder& bob)> func) {
+        _options.getMoreAugmentationWriter = func;
+    }
+
+    void updateYieldPolicy(std::unique_ptr<PlanYieldPolicy> yieldPolicy) {
+        _options.yieldPolicy = std::move(yieldPolicy);
+    }
+
+    void setYieldable(const Yieldable* yieldable) {
+        if (_options.yieldPolicy && !_options.yieldPolicy->usesCollectionAcquisitions()) {
+            _options.yieldPolicy->setYieldable(yieldable);
+        }
     }
 
 private:
@@ -229,7 +252,7 @@ private:
     // Used as a scratch pad for the successive scheduleRemoteCommand calls
     RemoteCommandRequest _rcr;
 
-    const Options _options;
+    Options _options;
 
     // If the opCtx is in our initial request, re-use it for all subsequent operations
     boost::optional<LogicalSessionId> _lsid;

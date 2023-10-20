@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor_cursor.h"
 #include "mongo/util/decorable.h"
@@ -46,6 +47,8 @@
 
 namespace mongo {
 static constexpr auto kReturnStoredSourceArg = "returnStoredSource"_sd;
+
+using RemoteCursorMap = absl::flat_hash_map<size_t, std::unique_ptr<executor::TaskExecutorCursor>>;
 
 /**
  * A class that contains any functions needed to run $seach queries when the enterprise module
@@ -122,23 +125,6 @@ public:
     }
 
     /**
-     * Establish a cursor given the search query and CursorResponse from the initial execution.
-     */
-    virtual boost::optional<executor::TaskExecutorCursor> establishSearchCursor(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const boost::optional<UUID>& uuid,
-        const boost::optional<ExplainOptions::Verbosity>& explain,
-        const BSONObj& query,
-        CursorResponse&& response,
-        boost::optional<long long> docsRequested = boost::none,
-        std::function<boost::optional<long long>()> calcDocsNeeded = nullptr,
-        const boost::optional<int>& protocolVersion = boost::none,
-        bool requiresSearchSequenceToken = false) {
-        return boost::none;
-    }
-
-    /**
      * Check if this is a $searchMeta stage.
      */
     virtual bool isSearchStage(DocumentSource* stage) {
@@ -154,21 +140,17 @@ public:
 
     /**
      * Gets the information for the search QSN from DocumentSourceSearch.
-     * The results are returned as a tuple of the format:
-     * <limit, mongotDocsRequested, searchQuery, taskExecutor, intermediateResultsProtocolVersion>
      */
     virtual std::unique_ptr<SearchNode> getSearchNode(DocumentSource* stage) {
         return nullptr;
     }
 
     /**
-     * Executes the initial $search query to get the cursor id and first batch for building the
-     * $search SBE plan.
+     * Executes the cursor for $search query.
      */
-    virtual std::pair<CursorResponse, CursorResponse> establishSearchQueryCursors(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const SearchNode* searchNode) {
-        return {CursorResponse(), CursorResponse()};
-    }
+    virtual void establishSearchQueryCursors(boost::intrusive_ptr<ExpressionContext> expCtx,
+                                             DocumentSource* stage,
+                                             std::unique_ptr<PlanYieldPolicy> yieldPolicy) {}
 
     /**
      * Encode $search/$searchMeta to SBE plan cache.
@@ -178,9 +160,26 @@ public:
         return false;
     }
 
-    virtual boost::optional<CursorResponse> establishSearchMetaCursor(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const SearchNode* node) {
+    virtual boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(
+        DocumentSource* ds) {
         return boost::none;
+    }
+
+    virtual std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
+        std::function<boost::optional<long long>()> calcDocsNeeded) {
+        return nullptr;
+    }
+
+    /**
+     * Executes the metadata cursor for $search query.
+     */
+    virtual void establishSearchMetaCursor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           DocumentSource* stage,
+                                           std::unique_ptr<PlanYieldPolicy>) {}
+
+    virtual std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline) {
+        return nullptr;
     }
 };
 

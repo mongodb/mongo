@@ -1779,13 +1779,15 @@ struct SearchNode : public QuerySolutionNode {
     SearchNode(bool isSearchMeta,
                BSONObj searchQuery,
                boost::optional<long long> limit,
-               boost::optional<int> intermediateResultsProtocolVersion,
-               bool requiresSearchSequenceToken = false)
+               boost::optional<BSONObj> sortSpec,
+               size_t remoteCursorId,
+               boost::optional<BSONObj> remoteCursorVars)
         : isSearchMeta(isSearchMeta),
           searchQuery(searchQuery),
           limit(limit),
-          intermediateResultsProtocolVersion(intermediateResultsProtocolVersion),
-          requiresSearchSequenceToken(requiresSearchSequenceToken) {}
+          sortSpec(sortSpec),
+          remoteCursorId(remoteCursorId),
+          remoteCursorVars(remoteCursorVars) {}
 
     StageType getType() const override {
         return STAGE_SEARCH;
@@ -1825,14 +1827,9 @@ struct SearchNode : public QuerySolutionNode {
      */
     boost::optional<long long> limit;
 
-    /**
-     * Protocol version if it must be communicated via the search request.
-     * If we are in a sharded environment but are targeting unsharded collection we may have a
-     * protocol version even though it should not be sent to mongot.
-     */
-    boost::optional<int> intermediateResultsProtocolVersion;
-
-    bool requiresSearchSequenceToken = false;
+    boost::optional<BSONObj> sortSpec;
+    size_t remoteCursorId;
+    boost::optional<BSONObj> remoteCursorVars;
 };
 
 /**

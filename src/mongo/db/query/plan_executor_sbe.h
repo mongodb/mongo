@@ -77,6 +77,9 @@ public:
         sbe::value::SlotAccessor* metadataSearchDetails{nullptr};
         sbe::value::SlotAccessor* metadataSearchSortValues{nullptr};
         sbe::value::SlotAccessor* metadataSearchSequenceToken{nullptr};
+
+        sbe::value::SlotAccessor* sortKey{nullptr};
+        bool isSingleSortKey{true};
     };
 
     PlanExecutorSBE(OperationContext* opCtx,
@@ -87,7 +90,8 @@ public:
                     NamespaceString nss,
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-                    bool generatedByBonsai);
+                    bool generatedByBonsai,
+                    std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
@@ -200,6 +204,13 @@ public:
 
     bool usesCollectionAcquisitions() const override final;
 
+    /**
+     * For queries that have multiple executors, this can be used to differentiate between them.
+     */
+    boost::optional<StringData> getExecutorType() const override final {
+        return CursorType_serializer(_cursorType);
+    }
+
 private:
     template <typename ObjectType>
     ExecState getNextImpl(ObjectType* out, RecordId* dlOut);
@@ -274,6 +285,14 @@ private:
 
     // Indicates whether this executor was constructed via Bonsai/CQF.
     bool _generatedByBonsai{false};
+
+    /**
+     * For commands that return multiple cursors, this value will contain the type of cursor.
+     * Default to a regular result cursor.
+     */
+    CursorTypeEnum _cursorType = CursorTypeEnum::DocumentResult;
+
+    std::unique_ptr<RemoteCursorMap> _remoteCursors;
 };
 
 /**

@@ -1842,7 +1842,7 @@ void SentinelNode::appendToString(str::stream* ss, int indent) const {
 
 std::unique_ptr<QuerySolutionNode> SearchNode::clone() const {
     return std::make_unique<SearchNode>(
-        isSearchMeta, searchQuery, limit, intermediateResultsProtocolVersion);
+        isSearchMeta, searchQuery, limit, sortSpec, remoteCursorId, remoteCursorVars);
 }
 
 void SearchNode::appendToString(str::stream* ss, int indent) const {
@@ -1852,6 +1852,7 @@ void SearchNode::appendToString(str::stream* ss, int indent) const {
     *ss << "isSearchMeta = " << isSearchMeta << '\n';
     addIndent(ss, indent + 1);
     *ss << "searchQuery = " << searchQuery << '\n';
+    *ss << "remoteCursorId = " << remoteCursorId << '\n';
     if (limit) {
         addIndent(ss, indent + 1);
         *ss << "limit = " << limit << '\n';

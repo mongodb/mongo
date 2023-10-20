@@ -36,7 +36,9 @@
 
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -46,25 +48,19 @@ namespace mongo {
 
 class PlanYieldPolicySBE final : public PlanYieldPolicy {
 public:
-    PlanYieldPolicySBE(OperationContext* opCtx,
-                       YieldPolicy policy,
-                       ClockSource* clockSource,
-                       int yieldFrequency,
-                       Milliseconds yieldPeriod,
-                       stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-                       std::unique_ptr<YieldPolicyCallbacks> callbacks)
-        : PlanYieldPolicy(opCtx,
-                          policy,
-                          clockSource,
-                          yieldFrequency,
-                          yieldPeriod,
-                          yieldable,
-                          std::move(callbacks)),
-          _useExperimentalCommitTxnBehavior(gYieldingSupportForSBE) {
-        uassert(4822879,
-                "WRITE_CONFLICT_RETRY_ONLY yield policy is not supported in SBE",
-                policy != YieldPolicy::WRITE_CONFLICT_RETRY_ONLY);
-    }
+    static std::unique_ptr<PlanYieldPolicySBE> make(OperationContext* opCtx,
+                                                    PlanYieldPolicy::YieldPolicy policy,
+                                                    const MultipleCollectionAccessor& collections,
+                                                    NamespaceString nss);
+
+    static std::unique_ptr<PlanYieldPolicySBE> make(
+        OperationContext* opCtx,
+        YieldPolicy policy,
+        ClockSource* clockSource,
+        int yieldFrequency,
+        Milliseconds yieldPeriod,
+        stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+        std::unique_ptr<YieldPolicyCallbacks> callbacks = nullptr);
 
     /**
      * Registers the tree rooted at 'plan' to yield, in addition to all other plans that have been
@@ -82,6 +78,14 @@ public:
     }
 
 private:
+    PlanYieldPolicySBE(OperationContext* opCtx,
+                       YieldPolicy policy,
+                       ClockSource* clockSource,
+                       int yieldFrequency,
+                       Milliseconds yieldPeriod,
+                       stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                       std::unique_ptr<YieldPolicyCallbacks> callbacks);
+
     void saveState(OperationContext* opCtx) override;
 
     void restoreState(OperationContext* opCtx, const Yieldable* yieldable) override;

@@ -97,6 +97,17 @@ public:
                            Pipeline*)>;
 
     /**
+     * A tuple to represent the result of query executors, includes a main executor, its pipeline
+     * attaching callback function, and a vector of additional executors that help to serve the
+     * aggregation.
+     */
+    struct BuildQueryExecutorResult {
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> mainExecutor;
+        AttachExecutorCallback attachExecutorCallback;
+        std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> additionalExecutors;
+    };
+
+    /**
      * This method looks for early pipeline stages that can be folded into the underlying
      * PlanExecutor, and removes those stages from the pipeline when they can be absorbed by the
      * PlanExecutor. For example, an early $match can be removed and replaced with a
@@ -115,11 +126,11 @@ public:
      * If the pipeline doesn't require a $cursor stage, the plan executor will be returned as
      * 'nullptr'.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutor(const MultipleCollectionAccessor& collections,
-                            const NamespaceString& nss,
-                            const AggregateCommandRequest* aggRequest,
-                            Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutor(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
 
     /**
      * Completes creation of the $cursor stage using the given callback pair obtained by calling
@@ -165,11 +176,17 @@ private:
      * Build a PlanExecutor and prepare callback to create a generic DocumentSourceCursor for
      * the 'pipeline'.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& collections,
-                                   const NamespaceString& nss,
-                                   const AggregateCommandRequest* aggRequest,
-                                   Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutorGeneric(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
+
+    static BuildQueryExecutorResult buildInnerQueryExecutorSearch(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
 
     /**
      * Creates a PlanExecutor to be used in the initial cursor source. This function will try to
@@ -211,11 +228,11 @@ private:
      * DocumentSourceGeoNearCursor only operates over a single collection because the underlying
      * execution API expects a 'MultipleCollectionAccessor'.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& collections,
-                                   const NamespaceString& nss,
-                                   const AggregateCommandRequest* aggRequest,
-                                   Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutorGeoNear(
+        const MultipleCollectionAccessor& collections,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
 
     /**
      * Build a PlanExecutor and prepare a callback to create a special DocumentSourceSample or a
@@ -224,11 +241,11 @@ private:
      * the optimized $sample plan cannot or should not be produced, returns a null PlanExecutor
      * pointer.
      */
-    static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-    buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
-                                  DocumentSourceInternalUnpackBucket* unpackBucketStage,
-                                  const CollectionPtr& collection,
-                                  Pipeline* pipeline);
+    static BuildQueryExecutorResult buildInnerQueryExecutorSample(
+        DocumentSourceSample* sampleStage,
+        DocumentSourceInternalUnpackBucket* unpackBucketStage,
+        const CollectionPtr& collection,
+        Pipeline* pipeline);
 
     /**
      * Returns a 'PlanExecutor' which uses a random cursor to sample documents if successful as

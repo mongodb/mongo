@@ -119,6 +119,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_remote_cursor.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
@@ -1091,11 +1092,11 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     return std::move(execStatus.getValue());
 }
 
-std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
-                                         DocumentSourceInternalUnpackBucket* unpackBucketStage,
-                                         const CollectionPtr& collection,
-                                         Pipeline* pipeline) {
+PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSample(
+    DocumentSourceSample* sampleStage,
+    DocumentSourceInternalUnpackBucket* unpackBucketStage,
+    const CollectionPtr& collection,
+    Pipeline* pipeline) {
     tassert(5422105, "sampleStage cannot be a nullptr", sampleStage);
 
     auto expCtx = pipeline->getContext();
@@ -1129,16 +1130,16 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
                     collections, std::move(exec), pipeline->getContext(), cursorType);
                 pipeline->addInitialSource(std::move(cursor));
             };
-        return std::pair(std::move(attachExecutorCallback), std::move(exec));
+        return {std::move(exec), std::move(attachExecutorCallback), {}};
     }
-    return std::pair(std::move(attachExecutorCallback), nullptr);
+    return {nullptr, std::move(attachExecutorCallback), {}};
 }
 
-std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections,
-                                   const NamespaceString& nss,
-                                   const AggregateCommandRequest* aggRequest,
-                                   Pipeline* pipeline) {
+PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutor(
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    const AggregateCommandRequest* aggRequest,
+    Pipeline* pipeline) {
     auto expCtx = pipeline->getContext();
 
     // We will be modifying the source vector as we go.
@@ -1161,10 +1162,10 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
 
         // Optimize an initial $sample stage if possible.
         if (collection && sampleStage) {
-            auto [attachExecutorCallback, exec] =
+            auto queryExecutors =
                 buildInnerQueryExecutorSample(sampleStage, unpackBucketStage, collection, pipeline);
-            if (exec) {
-                return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
+            if (queryExecutors.mainExecutor) {
+                return queryExecutors;
             }
         }
     }
@@ -1175,6 +1176,10 @@ PipelineD::buildInnerQueryExecutor(const MultipleCollectionAccessor& collections
         sources.empty() ? nullptr : dynamic_cast<DocumentSourceGeoNear*>(sources.front().get());
     if (geoNearStage) {
         return buildInnerQueryExecutorGeoNear(collections, nss, aggRequest, pipeline);
+    } else if (auto& searchHelper = getSearchHelpers(expCtx->opCtx->getServiceContext());
+               searchHelper->isSearchPipeline(pipeline) ||
+               searchHelper->isSearchMetaPipeline(pipeline)) {
+        return buildInnerQueryExecutorSearch(collections, nss, aggRequest, pipeline);
     } else {
         return buildInnerQueryExecutorGeneric(collections, nss, aggRequest, pipeline);
     }
@@ -1199,9 +1204,10 @@ void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
     const AggregateCommandRequest* aggRequest,
     Pipeline* pipeline) {
 
-    auto callback = PipelineD::buildInnerQueryExecutor(collections, nss, aggRequest, pipeline);
-    PipelineD::attachInnerQueryExecutorToPipeline(
-        collections, callback.first, std::move(callback.second), pipeline);
+    auto [executor, callback, additionalExec] =
+        buildInnerQueryExecutor(collections, nss, aggRequest, pipeline);
+    tassert(7856010, "Unexpected additional executors", additionalExec.empty());
+    attachInnerQueryExecutorToPipeline(collections, callback, std::move(executor), pipeline);
 }
 
 namespace {
@@ -1599,13 +1605,58 @@ boost::optional<TraversalPreference> createTimeSeriesTraversalPreference(
     return traversalPreference;
 }
 
-std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& collections,
-                                          const NamespaceString& nss,
-                                          const AggregateCommandRequest* aggRequest,
-                                          Pipeline* pipeline) {
-    // Make a last effort to optimize pipeline stages before potentially detaching them to be pushed
-    // down into the query executor.
+PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    const AggregateCommandRequest* aggRequest,
+    Pipeline* pipeline) {
+    auto expCtx = pipeline->getContext();
+    auto& searchHelper = getSearchHelpers(expCtx->opCtx->getServiceContext());
+
+    DocumentSource* searchStage = pipeline->peekFront();
+    auto yieldPolicy = PlanYieldPolicyRemoteCursor::make(
+        expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
+    auto yieldPolicyPtr = yieldPolicy.get();
+
+    if (searchHelper->isSearchPipeline(pipeline)) {
+        searchHelper->establishSearchQueryCursors(expCtx, searchStage, std::move(yieldPolicy));
+    } else if (searchHelper->isSearchMetaPipeline(pipeline)) {
+        searchHelper->establishSearchMetaCursor(expCtx, searchStage, std::move(yieldPolicy));
+    } else {
+        tasserted(7856008, "Not search pipeline in buildInnerQueryExecutorSearch");
+    }
+
+    auto [executor, callback, additionalExecutors] =
+        buildInnerQueryExecutorGeneric(collections, nss, aggRequest, pipeline);
+
+    yieldPolicyPtr->registerPlanExecutor(executor.get());
+    const CanonicalQuery* cq = executor->getCanonicalQuery();
+
+    if (!cq->cqPipeline().empty() &&
+        searchHelper->isSearchStage(cq->cqPipeline().front()->documentSource())) {
+        // The $search is pushed down into SBE executor.
+        if (auto cursor = searchHelper->getSearchMetadataCursor(searchStage)) {
+            // Create a yield policy for metadata cursor.
+            auto metadataYieldPolicy = PlanYieldPolicyRemoteCursor::make(
+                expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
+            auto metadataYieldPolicyPtr = metadataYieldPolicy.get();
+            cursor->updateYieldPolicy(std::move(metadataYieldPolicy));
+
+            additionalExecutors.push_back(uassertStatusOK(getSearchMetadataExecutorSBE(
+                expCtx->opCtx, collections, nss, *cq, std::move(*cursor))));
+            metadataYieldPolicyPtr->registerPlanExecutor(additionalExecutors.back().get());
+        }
+    }
+    return {std::move(executor), callback, std::move(additionalExecutors)};
+}
+
+PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    const AggregateCommandRequest* aggRequest,
+    Pipeline* pipeline) {
+    // Make a last effort to optimize pipeline stages before potentially detaching them to be
+    // pushed down into the query executor.
     pipeline->optimizePipeline();
 
     Pipeline::SourceContainer& sources = pipeline->_sources;
@@ -1924,14 +1975,14 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
             collections, std::move(exec), pipeline->getContext(), cursorType, resumeTrackingType);
         pipeline->addInitialSource(std::move(cursor));
     };
-    return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
+    return {std::move(exec), std::move(attachExecutorCallback), {}};
 }
 
-std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& collections,
-                                          const NamespaceString& nss,
-                                          const AggregateCommandRequest* aggRequest,
-                                          Pipeline* pipeline) {
+PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    const AggregateCommandRequest* aggRequest,
+    Pipeline* pipeline) {
     // $geoNear can only run over the main collection.
     const auto& collection = collections.getMainCollection();
     uassert(ErrorCodes::NamespaceNotFound,
@@ -1988,7 +2039,7 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& coll
     };
     // Remove the initial $geoNear; it will be replaced by $geoNearCursor.
     sources.pop_front();
-    return std::make_pair(std::move(attachExecutorCallback), std::move(exec));
+    return {std::move(exec), std::move(attachExecutorCallback), {}};
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prepareExecutor(

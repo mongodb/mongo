@@ -1476,20 +1476,6 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
-std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
-    OperationContext* opCtx,
-    PlanYieldPolicy::YieldPolicy policy,
-    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable,
-    NamespaceString nss) {
-    return std::make_unique<PlanYieldPolicySBE>(opCtx,
-                                                policy,
-                                                opCtx->getServiceContext()->getFastClockSource(),
-                                                internalQueryExecYieldIterations.load(),
-                                                Milliseconds{internalQueryExecYieldPeriodMS.load()},
-                                                yieldable,
-                                                std::make_unique<YieldPolicyCallbacksImpl>(nss));
-}
-
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExecutor(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
@@ -1562,9 +1548,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         plan_cache_util::updatePlanCache(opCtx, collections, *cq, *solutions[0], *root, data);
     }
 
+    auto remoteCursors = getSearchHelpers(cq->getOpCtx()->getServiceContext())
+                             ->getSearchRemoteCursors(cq->cqPipeline());
+
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(
-        opCtx, root.get(), &data, *cq, collections, yieldPolicy.get(), true);
+        opCtx, root.get(), &data, *cq, collections, yieldPolicy.get(), true, remoteCursors.get());
 
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
@@ -1575,7 +1564,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(nss),
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
-                                       false /* generatedByBonsai */);
+                                       false /* generatedByBonsai */,
+                                       std::move(remoteCursors));
 }  // getSlotBasedExecutor
 
 /**
@@ -1654,14 +1644,8 @@ attemptToGetSlotBasedExecutor(
     // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
     // default. Either way, try to construct an SBE plan executor.
     if (canUseRegularSbe || sbeFull) {
-        stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
-        if (collections.isAcquisition()) {
-            yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
-        } else {
-            yieldable = &collections.getMainCollection();
-        }
         auto sbeYieldPolicy =
-            makeSbeYieldPolicy(opCtx, yieldPolicy, yieldable, canonicalQuery->nss());
+            PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
             opCtx,
             collections,
@@ -1867,6 +1851,36 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                            std::move(extractAndAttachPipelineStages),
                            permitYield,
                            QueryPlannerParams{plannerOptions});
+}
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetadataExecutorSBE(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    const CanonicalQuery& cq,
+    executor::TaskExecutorCursor metadataCursor) {
+    // For metadata executor, we always have only one remote cursor, any id will work.
+    const size_t metadataCursorId = 0;
+    auto remoteCursors = std::make_unique<RemoteCursorMap>();
+    remoteCursors->insert(
+        {metadataCursorId,
+         std::make_unique<executor::TaskExecutorCursor>(std::move(metadataCursor))});
+
+    auto sbeYieldPolicy =
+        PlanYieldPolicySBE::make(opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
+    auto root = stage_builder::buildSearchMetadataExecutorSBE(
+        opCtx, cq, metadataCursorId, remoteCursors.get(), sbeYieldPolicy.get());
+    return plan_executor_factory::make(opCtx,
+                                       nullptr /* cq */,
+                                       nullptr /* solution */,
+                                       std::move(root),
+                                       nullptr /* optimizerData */,
+                                       {} /* plannerOptions */,
+                                       cq.nss(),
+                                       std::move(sbeYieldPolicy),
+                                       false /* planIsFromCache */,
+                                       false /* generatedByBonsai */,
+                                       std::move(remoteCursors));
 }
 
 namespace {

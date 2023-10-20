@@ -133,7 +133,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool isFromPlanCache,
-    bool generatedByBonsai);
+    bool generatedByBonsai,
+    std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr);
 
 /**
  * Similar to the factory function above in that it also constructs an executor for the winning SBE

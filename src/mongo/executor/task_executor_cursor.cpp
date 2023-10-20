@@ -309,7 +309,15 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     auto dateStart = clock->now();
     // pull out of the pipe before setting cursor id so we don't spoil this object if we're opCtx
     // interrupted
-    auto out = _cmdState->promise.getFuture().getNoThrow(opCtx);
+    StatusOrStatusWith<mongo::BSONObj> out = Status{ErrorCodes::Error::BadValue, ""};
+    auto getDataFunc = [&]() {
+        out = _cmdState->promise.getFuture().getNoThrow(opCtx);
+    };
+    if (_options.yieldPolicy) {
+        uassertStatusOK(_options.yieldPolicy->yieldOrInterrupt(opCtx, getDataFunc));
+    } else {
+        getDataFunc();
+    }
     auto dateEnd = clock->now();
     _millisecondsWaiting += std::max(Milliseconds(0), dateEnd - dateStart);
     uassertStatusOK(out);

@@ -111,7 +111,6 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -168,45 +167,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
     return {std::move(stage), std::move(outputs)};
 }
 
-// Establish the search query cursor and fill in the search slots.
+// Fill in the search slots based on initial cursor response from mongot.
 void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq) {
     if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->uuid) {
         return;
     }
     auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
     auto stage = cq.cqPipeline().front()->documentSource();
-    if (!searchHelper->isSearchStage(stage)) {
-        return;
-    }
 
     // Build a SearchNode in order to retrieve the search info.
     auto sn = searchHelper->getSearchNode(stage);
     auto& env = data->env;
-
-    // TODO: SERVER-78560 handle the second cursor (search metadata cursor).
-    auto [cursor, _] = searchHelper->establishSearchQueryCursors(cq.getExpCtxRaw(), sn.get());
-    auto firstBatch = cursor.releaseBatch();
-    auto cursorId = cursor.getCursorId();
-
-    // Set values for cursorId and first batch slots.
-    env->resetSlot(env->getSlot("searchCursorId"_sd),
-                   sbe::value::TypeTags::NumberInt64,
-                   cursorId,
-                   true /* owned */);
-
-    BSONArrayBuilder firstBatchBuilder;
-    for (const auto& obj : firstBatch) {
-        firstBatchBuilder.append(obj);
-    }
-
-    auto [firstBatchTag, firstBatchVal] = stage_builder::makeValue(firstBatchBuilder.arr());
-    env->resetSlot(
-        env->getSlot("searchFirstBatch"_sd), firstBatchTag, firstBatchVal, true /* owned */);
-
-    // Set value for search query.
-    auto [searchQueryTag, searchQueryVal] = stage_builder::makeValue(sn->searchQuery);
-    env->resetSlot(
-        env->getSlot("searchQuery"_sd), searchQueryTag, searchQueryVal, true /* owned */);
 
     // Set values for QSN slots.
     if (sn->limit) {
@@ -216,88 +187,27 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
                        true /* owned */);
     }
 
-    if (sn->intermediateResultsProtocolVersion) {
-        env->resetSlot(env->getSlot("searchProtocolVersion"_sd),
-                       sbe::value::TypeTags::NumberInt32,
-                       *sn->intermediateResultsProtocolVersion,
+    if (sn->sortSpec) {
+        auto sortSpec = std::make_unique<sbe::SortSpec>(*sn->sortSpec, cq.getExpCtx());
+        env->resetSlot(env->getSlot("searchSortSpec"_sd),
+                       sbe::value::TypeTags::sortSpec,
+                       sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()),
                        true /* owned */);
     }
 
-    if (cursor.getVarsField()) {
+    if (auto remoteVars = sn->remoteCursorVars) {
         auto name = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
         // Variables on the cursor must be an object.
-        auto varsObj = cursor.getVarsField()->getField(name);
+        auto varsObj = remoteVars->getField(name);
         if (varsObj.ok()) {
             auto [tag, val] = sbe::bson::convertFrom<false /* View */>(varsObj);
-            env->resetSlot(env->getSlot(name), tag, val, true);
+            env->resetSlot(env->getSlot(name), tag, val, true /* owned */);
+            // Both the SBE and the classic portions of the query can reference the same value,
+            // and this is the only place to set the value if using SBE so we don't worry about
+            // inconsistency.
             cq.getExpCtx()->variables.setReservedValue(
-                Variables::kSearchMetaId, mongo::Value(varsObj), true);
+                Variables::kSearchMetaId, mongo::Value(varsObj), true /* isConstant */);
         }
-    }
-}
-
-// Fill in the search slots based on initial cursor response from mongot for $searchMeta.
-void prepareSearchMetaParameters(PlanStageData* data, const CanonicalQuery& cq) {
-    if (cq.cqPipeline().empty() || !cq.isSearchQuery() || !cq.getExpCtxRaw()->uuid) {
-        return;
-    }
-    auto& searchHelper = getSearchHelpers(cq.getOpCtx()->getServiceContext());
-    auto stage = cq.cqPipeline().front()->documentSource();
-    if (!searchHelper->isSearchMetaStage(stage)) {
-        return;
-    }
-
-    // Build a SearchNode in order to retrieve the search info.
-    auto sn = searchHelper->getSearchNode(stage);
-    auto cursorResponse = searchHelper->establishSearchMetaCursor(cq.getExpCtx(), sn.get());
-    tassert(7856201, "searchMeta cursor is none", cursorResponse.has_value());
-    auto& env = data->env;
-
-    if (!cq.getExpCtx()->needsMerge) {
-        if (cursorResponse->getVarsField()) {
-            auto name = Variables::getBuiltinVariableName(Variables::kSearchMetaId);
-            // Variables on the cursor must be an object.
-            auto varsObj = cursorResponse->getVarsField()->getField(name);
-            if (varsObj.ok()) {
-                auto [tag, val] = sbe::bson::convertFrom<false /* View */>(varsObj);
-                env->resetSlot(env->getSlot(name), tag, val, true /* owned */);
-                // Both the SBE and the classic portions of the query can reference the same value,
-                // and this is the only place to set the value if using SBE so we don't worry about
-                // inconsistency.
-                cq.getExpCtx()->variables.setReservedValue(
-                    Variables::kSearchMetaId, mongo::Value(varsObj), true /* isConstant */);
-            }
-        }
-        return;
-    }
-    auto firstBatch = cursorResponse->releaseBatch();
-    auto cursorId = cursorResponse->getCursorId();
-
-    // Set values for cursorId and first batch slots.
-    env->resetSlot(env->getSlot("searchCursorId"_sd),
-                   sbe::value::TypeTags::NumberInt64,
-                   cursorId,
-                   true /* owned */);
-
-    BSONArrayBuilder firstBatchBuilder;
-    for (const auto& obj : firstBatch) {
-        firstBatchBuilder.append(obj);
-    }
-
-    auto [firstBatchTag, firstBatchVal] = stage_builder::makeValue(firstBatchBuilder.arr());
-    env->resetSlot(
-        env->getSlot("searchFirstBatch"_sd), firstBatchTag, firstBatchVal, true /* owned */);
-
-    // Set value for search query.
-    auto [searchQueryTag, searchQueryVal] = stage_builder::makeValue(sn->searchQuery);
-    env->resetSlot(
-        env->getSlot("searchQuery"_sd), searchQueryTag, searchQueryVal, true /* owned */);
-
-    if (sn->intermediateResultsProtocolVersion) {
-        env->resetSlot(env->getSlot("searchProtocolVersion"_sd),
-                       sbe::value::TypeTags::NumberInt32,
-                       *sn->intermediateResultsProtocolVersion,
-                       true /* owned */);
     }
 }
 }  // namespace
@@ -365,7 +275,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                                     const CanonicalQuery& cq,
                                     const MultipleCollectionAccessor& collections,
                                     PlanYieldPolicySBE* yieldPolicy,
-                                    const bool preparingFromCache) {
+                                    const bool preparingFromCache,
+                                    RemoteCursorMap* remoteCursors) {
     tassert(6183502, "PlanStage cannot be null", root);
     tassert(6142205, "PlanStageData cannot be null", data);
     tassert(6142206, "yieldPolicy cannot be null", yieldPolicy);
@@ -384,6 +295,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     yieldPolicy->registerPlan(root);
 
     auto& env = data->env;
+    env.ctx.remoteCursors = remoteCursors;
 
     root->prepare(env.ctx);
 
@@ -442,8 +354,43 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     }
 
     prepareSearchQueryParameters(data, cq);
-    prepareSearchMetaParameters(data, cq);
 }  // prepareSlotBasedExecutableTree
+
+std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
+buildSearchMetadataExecutorSBE(OperationContext* opCtx,
+                               const CanonicalQuery& cq,
+                               size_t remoteCursorId,
+                               RemoteCursorMap* remoteCursors,
+                               PlanYieldPolicySBE* yieldPolicy) {
+    auto expCtx = cq.getExpCtxRaw();
+    Environment env(std::make_unique<sbe::RuntimeEnvironment>());
+    std::unique_ptr<PlanStageStaticData> data(std::make_unique<PlanStageStaticData>());
+    sbe::value::SlotIdGenerator slotIdGenerator;
+    data->resultSlot = slotIdGenerator.generate();
+
+    auto stage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
+                                                    expCtx->uuid,
+                                                    data->resultSlot,
+                                                    std::vector<std::string>() /* metadataNames */,
+                                                    sbe::makeSV() /* metadataSlots */,
+                                                    std::vector<std::string>() /* fieldNames */,
+                                                    sbe::makeSV() /* fieldSlots */,
+                                                    remoteCursorId,
+                                                    false /* isStoredSource */,
+                                                    boost::none /* sortSpecSlot */,
+                                                    boost::none /* limitSlot */,
+                                                    boost::none /* sortKeySlot */,
+                                                    boost::none /* collatorSlot */,
+                                                    boost::none /* explain */,
+                                                    yieldPolicy,
+                                                    PlanNodeId{} /* planNodeId */);
+
+    env.ctx.remoteCursors = remoteCursors;
+    stage->attachToOperationContext(opCtx);
+    stage->prepare(env.ctx);
+    data->cursorType = CursorTypeEnum::SearchMetaResult;
+    return std::make_pair(std::move(stage), PlanStageData(std::move(env), std::move(data)));
+}
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                sbe::value::SlotIdGenerator* slotIdGenerator) {
@@ -4335,29 +4282,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
         return {std::move(stage), std::move(outputs)};
     }
 
-    // Register search query parameter slots.
-    auto cursorIdSlot = env->registerSlot("searchCursorId"_sd,
-                                          sbe::value::TypeTags::Nothing,
-                                          0 /* val */,
-                                          false /* owned */,
-                                          slotIdGenerator);
-    auto firstBatchSlot = env->registerSlot("searchFirstBatch"_sd,
-                                            sbe::value::TypeTags::Nothing,
-                                            0 /* val */,
-                                            false /* owned */,
-                                            slotIdGenerator);
-    auto searchQuerySlot = env->registerSlot("searchQuery"_sd,
-                                             sbe::value::TypeTags::Nothing,
-                                             0 /* val */,
-                                             false /* owned */,
-                                             slotIdGenerator);
-
-    auto protocolVersionSlot = env->registerSlot("searchProtocolVersion"_sd,
-                                                 sbe::value::TypeTags::Nothing,
-                                                 0 /* val */,
-                                                 false /* owned */,
-                                                 slotIdGenerator);
-
     auto searchResultSlot = slotIdGenerator->generate();
 
     auto stage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
@@ -4367,12 +4291,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
                                                     sbe::makeSV() /* metadataSlots */,
                                                     std::vector<std::string>() /* fieldNames */,
                                                     sbe::makeSV() /* fieldSlots */,
-                                                    cursorIdSlot,
-                                                    firstBatchSlot,
-                                                    searchQuerySlot,
+                                                    root->remoteCursorId,
+                                                    false /* isStoredSource */,
                                                     boost::none /* sortSpecSlot */,
                                                     boost::none /* limitSlot */,
-                                                    protocolVersionSlot,
+                                                    boost::none /* sortKeySlot */,
+                                                    boost::none /* collatorSlot */,
                                                     expCtx->explain,
                                                     yieldPolicy,
                                                     root->nodeId());
@@ -4392,32 +4316,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto expCtx = _cq.getExpCtxRaw();
 
     // Register search query parameter slots.
-    auto cursorIdSlot = _env->registerSlot("searchCursorId"_sd,
-                                           sbe::value::TypeTags::Nothing,
-                                           0 /* val */,
-                                           false /* owned */,
-                                           &_slotIdGenerator);
-    auto firstBatchSlot = _env->registerSlot("searchFirstBatch"_sd,
-                                             sbe::value::TypeTags::Nothing,
-                                             0 /* val */,
-                                             false /* owned */,
-                                             &_slotIdGenerator);
-    auto searchQuerySlot = _env->registerSlot("searchQuery"_sd,
-                                              sbe::value::TypeTags::Nothing,
-                                              0 /* val */,
-                                              false /* owned */,
-                                              &_slotIdGenerator);
     auto limitSlot = _env->registerSlot("searchLimit"_sd,
                                         sbe::value::TypeTags::Nothing,
                                         0 /* val */,
                                         false /* owned */,
                                         &_slotIdGenerator);
 
-    auto protocolVersionSlot = _env->registerSlot("searchProtocolVersion"_sd,
-                                                  sbe::value::TypeTags::Nothing,
-                                                  0 /* val */,
-                                                  false /* owned */,
-                                                  &_slotIdGenerator);
+    auto sortSpecSlot = _env->registerSlot(
+        "searchSortSpec"_sd, sbe::value::TypeTags::Nothing, 0 /* val */, false, &_slotIdGenerator);
 
     bool isStoredSource = sn->searchQuery.getBoolField(kReturnStoredSourceArg);
 
@@ -4453,11 +4359,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     _data->metadataSlots.searchSortValuesSlot = metadataSlots[3];
     _data->metadataSlots.searchSequenceToken = metadataSlots[4];
 
+    _data->metadataSlots.sortKeySlot = _slotIdGenerator.generate();
+
     std::vector<std::string> fieldNames =
         isStoredSource ? topLevelFields : std::vector<std::string>{"_id"};
     auto fieldSlots =
         isStoredSource ? topLevelFieldSlots : _slotIdGenerator.generateMultiple(fieldNames.size());
 
+    auto collatorSlot = _state.getCollatorSlot();
     auto searchCursorStage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
                                                                 expCtx->uuid,
                                                                 searchResultSlot,
@@ -4465,12 +4374,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                                 metadataSlots,
                                                                 fieldNames,
                                                                 fieldSlots,
-                                                                cursorIdSlot,
-                                                                firstBatchSlot,
-                                                                searchQuerySlot,
-                                                                boost::none /* sortSpecSlot */,
+                                                                sn->remoteCursorId,
+                                                                isStoredSource,
+                                                                sortSpecSlot,
                                                                 limitSlot,
-                                                                protocolVersionSlot,
+                                                                _data->metadataSlots.sortKeySlot,
+                                                                collatorSlot,
                                                                 expCtx->explain,
                                                                 _yieldPolicy,
                                                                 sn->nodeId());
@@ -4492,7 +4401,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto version = sortedData->getKeyStringVersion();
     auto ordering = sortedData->getOrdering();
 
-    auto collatorSlot = _state.getCollatorSlot();
     auto makeNewKeyFunc = [&](key_string::Discriminator discriminator) {
         StringData functionName = collatorSlot ? "collKs" : "ks";
         sbe::EExpression::Vector args;
@@ -4549,11 +4457,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                            sbe::makeSV() /* slotsToForward */);
 
     // Join the search_cursor+project stage with idx_scan+fetch stage.
+    auto outerProjVec = metadataSlots;
+    outerProjVec.push_back(*_data->metadataSlots.sortKeySlot);
     auto stage = sbe::makeS<sbe::LoopJoinStage>(
         std::move(searchCursorStage),
         sbe::makeS<sbe::LimitSkipStage>(
             std::move(fetchStage), 1, boost::none /* skip */, sn->nodeId()),
-        metadataSlots,
+        std::move(outerProjVec),
         sbe::makeSV(fieldSlots[0]),
         nullptr /* predicate */,
         sn->nodeId());
