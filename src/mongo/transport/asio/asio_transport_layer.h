@@ -211,6 +211,10 @@ public:
 
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
 
+    StringData getNameForLogging() const override {
+        return "asio"_sd;
+    }
+
     int listenerPort() const {
         return _listenerPort;
     }

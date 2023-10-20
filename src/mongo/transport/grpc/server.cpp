@@ -33,8 +33,12 @@
 #include <grpc/grpc_security_constants.h>
 #include <grpcpp/resource_quota.h>
 #include <grpcpp/security/credentials.h>
-#include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server_builder.h>
+
+#include <src/core/lib/security/credentials/ssl/ssl_credentials.h>
+#include <src/core/lib/security/security_connector/ssl_utils.h>
+#include <src/core/tsi/ssl_transport_security.cc>
+#include <src/cpp/server/secure_server_credentials.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
@@ -56,27 +60,149 @@ Server::~Server() {
     invariant(!isRunning());
 }
 
-std::shared_ptr<::grpc::ServerCredentials> _makeServerCredentials(const Server::Options& options) {
-    auto clientCertPolicy = ::grpc_ssl_client_certificate_request_type::
-        GRPC_SSL_REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_AND_VERIFY;
+namespace {
+StatusWith<Server::Certificates> _readCertificatesFromDisk(boost::optional<StringData> tlsCAFile,
+                                                           StringData tlsPEMKeyFile) {
+    Server::Certificates certs;
+    if (tlsCAFile) {
+        StatusWith<std::string> swCAFileContents = ssl_util::readPEMFile(tlsCAFile.get());
+        if (!swCAFileContents.isOK()) {
+            return swCAFileContents.getStatus();
+        }
+        if (swCAFileContents.getValue().empty()) {
+            return Status(ErrorCodes::InvalidSSLConfiguration, "Empty CA file.");
+        }
 
+        certs.caCert = swCAFileContents.getValue();
+    }
+
+    try {
+        certs.keyCertPair = util::parsePEMKeyFile(tlsPEMKeyFile);
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+    return certs;
+}
+
+/**
+ * Convert the Server::Options to a certificate request type understandable by gRPC.
+ */
+grpc_ssl_client_certificate_request_type _getClientCertPolicy(const Server::Options& options) {
     if (options.tlsAllowConnectionsWithoutCertificates && options.tlsAllowInvalidCertificates) {
-        clientCertPolicy =
-            ::grpc_ssl_client_certificate_request_type::GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE;
+        return ::grpc_ssl_client_certificate_request_type::GRPC_SSL_DONT_REQUEST_CLIENT_CERTIFICATE;
     } else if (options.tlsAllowConnectionsWithoutCertificates) {
-        clientCertPolicy = ::grpc_ssl_client_certificate_request_type::
+        return ::grpc_ssl_client_certificate_request_type::
             GRPC_SSL_REQUEST_CLIENT_CERTIFICATE_AND_VERIFY;
     } else if (options.tlsAllowInvalidCertificates) {
-        clientCertPolicy = ::grpc_ssl_client_certificate_request_type::
+        return ::grpc_ssl_client_certificate_request_type::
             GRPC_SSL_REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_BUT_DONT_VERIFY;
+    } else {
+        return ::grpc_ssl_client_certificate_request_type::
+            GRPC_SSL_REQUEST_AND_REQUIRE_CLIENT_CERTIFICATE_AND_VERIFY;
+    }
+}
+
+/**
+ * Utilize gRPC's ssl_server_handshaker_factory to verify that the user has provided valid SSL
+ * certificates.
+ * Leaves encryption-specific options as their defaults.
+ */
+Status _verifySSLCredentialsWithGRPC(grpc_ssl_server_certificate_config* config,
+                                     grpc_ssl_client_certificate_request_type clientCertOpts) {
+    tsi_ssl_server_handshaker_factory* handshakerFactory = nullptr;
+    tsi_ssl_server_handshaker_options options;
+    options.pem_key_cert_pairs =
+        grpc_convert_grpc_to_tsi_cert_pairs(config->pem_key_cert_pairs, config->num_key_cert_pairs);
+    options.num_key_cert_pairs = config->num_key_cert_pairs;
+    ON_BLOCK_EXIT([&]() {
+        grpc_tsi_ssl_pem_key_cert_pairs_destroy(
+            const_cast<tsi_ssl_pem_key_cert_pair*>(options.pem_key_cert_pairs),
+            options.num_key_cert_pairs);
+    });
+
+    options.pem_client_root_certs = config->pem_root_certs;
+    options.client_certificate_request =
+        grpc_get_tsi_client_certificate_request_type(clientCertOpts);
+
+    tsi_result result =
+        tsi_create_ssl_server_handshaker_factory_with_options(&options, &handshakerFactory);
+    if (result != TSI_OK) {
+        return Status(ErrorCodes::InvalidSSLConfiguration, "Invalid certificates provided.");
+    }
+    ON_BLOCK_EXIT([&]() { tsi_ssl_server_handshaker_factory_unref(handshakerFactory); });
+
+    return Status::OK();
+}
+}  // namespace
+
+/**
+ * Callback that gRPC invokes on each new connection to fetch the server's TLS certificates.
+ */
+grpc_ssl_certificate_config_reload_status Server::_certificateConfigCallback(
+    void* certState, grpc_ssl_server_certificate_config** config) {
+    CertificateState* certStatePtr = reinterpret_cast<CertificateState*>(certState);
+    {
+        stdx::lock_guard<Latch> lk(certStatePtr->_mutex);
+        if (certStatePtr->shouldReload) {
+            // gRPC library will take ownership of and free the certificate config.
+            *config = certStatePtr->cache.toGRPCConfig().release();
+            certStatePtr->shouldReload = false;
+            return grpc_ssl_certificate_config_reload_status::
+                GRPC_SSL_CERTIFICATE_CONFIG_RELOAD_NEW;
+        } else {
+            return GRPC_SSL_CERTIFICATE_CONFIG_RELOAD_UNCHANGED;
+        }
+    }
+}
+
+/**
+ * Make the initial SSL credentials for the gRPC server with a callback attatched to refetch the
+ * certificates on future connections. Additionally, create a CertificateState to pass to the
+ * callback, initialize its cache, and add it to the maintained _certificateStates vector.
+ */
+std::shared_ptr<::grpc::ServerCredentials> Server::_makeServerCredentialsWithFetcher() {
+    ::grpc::SslServerCredentialsOptions sslOps{_getClientCertPolicy(_options)};
+    auto certState = std::make_unique<CertificateState>();
+
+    // Load the initial certificates into the certificate state cache.
+    auto newCertificates =
+        uassertStatusOK(_readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsPEMKeyFile));
+    certState->cache = newCertificates;
+
+    grpc_ssl_server_credentials_options* opts =
+        grpc_ssl_server_credentials_create_options_using_config_fetcher(
+            sslOps.client_certificate_request, _certificateConfigCallback, certState.get());
+
+    _certificateStates.push_back(std::move(certState));
+
+    // Create the credentials to pass to the builder, for use on startup.
+    grpc_server_credentials* creds = grpc_ssl_server_credentials_create_with_options(opts);
+    invariant(creds != nullptr);
+
+    return std::shared_ptr<::grpc::ServerCredentials>(new ::grpc::SecureServerCredentials(creds));
+}
+
+Status Server::rotateCertificates() {
+    auto swNewCertificates = _readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsPEMKeyFile);
+    if (!swNewCertificates.isOK()) {
+        return swNewCertificates.getStatus();
     }
 
-    ::grpc::SslServerCredentialsOptions sslOps{clientCertPolicy};
-    sslOps.pem_key_cert_pairs = {util::parsePEMKeyFile(options.tlsPEMKeyFile)};
-    if (options.tlsCAFile) {
-        sslOps.pem_root_certs = uassertStatusOK(ssl_util::readPEMFile(*options.tlsCAFile));
+    if (auto res = _verifySSLCredentialsWithGRPC(swNewCertificates.getValue().toGRPCConfig().get(),
+                                                 _getClientCertPolicy(_options));
+        !res.isOK()) {
+        return res;
     }
-    return ::grpc::SslServerCredentials(sslOps);
+
+    // Set the cache to the new certs and update each port's certificate state to notify gRPC to
+    // rotate them on the next new connection.
+    for (auto& certState : _certificateStates) {
+        stdx::lock_guard<Latch> lk(certState->_mutex);
+        certState->cache = swNewCertificates.getValue();
+        certState->shouldReload = true;
+    }
+    return Status::OK();
 }
 
 void Server::start() {
@@ -86,9 +212,8 @@ void Server::start() {
 
     ::grpc::ServerBuilder builder;
 
-    auto credentials = _makeServerCredentials(_options);
-
     for (auto& address : _options.addresses) {
+        auto credentials = _makeServerCredentialsWithFetcher();
         builder.AddListeningPort(util::formatHostAndPortForGRPC(address), credentials);
     }
     for (auto& service : _services) {

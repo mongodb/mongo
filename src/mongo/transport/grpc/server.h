@@ -31,7 +31,8 @@
 
 #include <memory>
 
-#include <grpcpp/server.h>
+#include <grpc/grpc_security.h>
+#include <grpcpp/security/server_credentials.h>
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/transport/grpc/service.h"
@@ -52,6 +53,24 @@ public:
         bool tlsAllowInvalidCertificates;
     };
 
+    struct Certificates {
+        auto toGRPCConfig() {
+            grpc_ssl_pem_key_cert_pair pemKeyCertPair = {keyCertPair.private_key.c_str(),
+                                                         keyCertPair.cert_chain.c_str()};
+
+            grpc_ssl_server_certificate_config* config = grpc_ssl_server_certificate_config_create(
+                caCert.c_str(), &pemKeyCertPair, /* num_key_cert_pairs */ 1);
+            auto deleter = [](grpc_ssl_server_certificate_config* config) {
+                grpc_ssl_server_certificate_config_destroy(config);
+            };
+            return std::unique_ptr<grpc_ssl_server_certificate_config, decltype(deleter)>(config,
+                                                                                          deleter);
+        }
+
+        std::string caCert;
+        ::grpc::SslServerCredentialsOptions::PemKeyCertPair keyCertPair;
+    };
+
     Server(std::vector<std::unique_ptr<Service>> services, Options options);
 
     ~Server();
@@ -66,11 +85,24 @@ public:
 
     bool isRunning() const;
 
+    Status rotateCertificates();
+
 private:
+    struct CertificateState {
+        Certificates cache;
+        bool shouldReload = true;
+        Mutex _mutex = MONGO_MAKE_LATCH("CertificateStateHolder::_mutex");
+    };
+
+    static grpc_ssl_certificate_config_reload_status _certificateConfigCallback(
+        void* certState, grpc_ssl_server_certificate_config** config);
+    std::shared_ptr<::grpc::ServerCredentials> _makeServerCredentialsWithFetcher();
+
     Options _options;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("grpc::Server::_mutex");
     std::vector<std::unique_ptr<Service>> _services;
     std::unique_ptr<::grpc::Server> _server;
+    std::vector<std::unique_ptr<CertificateState>> _certificateStates;
     bool _shutdown;
 };
 

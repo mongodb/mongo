@@ -137,6 +137,8 @@ public:
     /** Allows a `TransportLayer` to contribute to a FTDC readout. */
     virtual void appendStatsForFTDC(BSONObjBuilder& bob) const {}
 
+    virtual StringData getNameForLogging() const = 0;
+
     enum WhichReactor { kIngress, kEgress, kNewReactor };
     virtual ReactorHandle getReactor(WhichReactor which) = 0;
 

@@ -192,7 +192,9 @@ public:
                   ::grpc::internal::RpcMethod::BIDI_STREAMING,
                   channel) {}
 
-        ::grpc::Status connect() {
+        ::grpc::Status connect(
+            Milliseconds connectTimeout = CommandServiceTestFixtures::kDefaultConnectTimeout) {
+            _channel->WaitForConnected((Date_t::now() + connectTimeout).toSystemTimePoint());
             ::grpc::ClientContext ctx;
             CommandServiceTestFixtures::addAllClientMetadata(ctx);
             auto stream = unauthenticatedCommandStream(&ctx);
@@ -209,6 +211,14 @@ public:
             return std::shared_ptr<ClientStream>{
                 ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
                     Create(_channel.get(), _unauthenticatedCommandStreamMethod, context)};
+        }
+
+        void assertConnected() {
+            ASSERT_EQ(connect().error_code(), ::grpc::StatusCode::OK);
+        }
+
+        void assertNotConnected() {
+            ASSERT_EQ(connect(Milliseconds(50)).error_code(), ::grpc::StatusCode::UNAVAILABLE);
         }
 
     private:
@@ -370,6 +380,13 @@ public:
 
     static Stub makeStub(boost::optional<Stub::Options> options = boost::none) {
         return makeStub("localhost:{}"_format(kBindPort), options);
+    }
+
+    static Stub makeStubWithCerts(std::string caFile, std::string clientCertFile) {
+        auto stubOptions = CommandServiceTestFixtures::Stub::Options{};
+        stubOptions.tlsCAFile = caFile;
+        stubOptions.tlsCertificateKeyFile = clientCertFile;
+        return makeStub(stubOptions);
     }
 
     static CommandService::RPCHandler makeEchoHandler() {

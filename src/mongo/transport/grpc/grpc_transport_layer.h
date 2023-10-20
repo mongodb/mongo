@@ -95,6 +95,10 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    StringData getNameForLogging() const override {
+        return "gRPC"_sd;
+    }
+
     /**
      * Not applicable to gRPC networking.
      */

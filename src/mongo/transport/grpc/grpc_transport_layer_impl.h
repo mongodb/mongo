@@ -64,12 +64,8 @@ public:
         boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
 
 #ifdef MONGO_CONFIG_SSL
-    /**
-     * gRPC's C++ library does not currently support rotating TLS certificates manually, so this
-     * just does nothing and logs a message.
-     */
-    virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
-                                      bool asyncOCSPStaple) override;
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                              bool asyncOCSPStaple) override;
 #endif
 
 private:

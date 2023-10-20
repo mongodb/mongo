@@ -33,10 +33,15 @@
 #include <memory>
 #include <queue>
 
+#include <boost/filesystem.hpp>
+
+#include "mongo/db/dbmessage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
+#include "mongo/unittest/temp_dir.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -185,6 +190,48 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 };
+
+class TempCertificatesDir {
+public:
+    TempCertificatesDir(std::string directoryPrefix) {
+        _dir = std::make_unique<unittest::TempDir>(directoryPrefix + "_certs_test");
+        boost::filesystem::path directoryPath(_dir->path());
+        boost::filesystem::path filePathCA(directoryPath / "ca.pem");
+        boost::filesystem::path filePathPEM(directoryPath / "server_pem.pem");
+        _filePathCA = filePathCA.string();
+        _filePathPEM = filePathPEM.string();
+    }
+
+    StringData getCAFile() const {
+        return _filePathPEM;
+    }
+
+    StringData getPEMKeyFile() const {
+        return _filePathCA;
+    }
+
+private:
+    std::unique_ptr<unittest::TempDir> _dir;
+    std::string _filePathCA;
+    std::string _filePathPEM;
+};
+
+/**
+ * Creates a temporary directory and copies the certificates at the provided filepaths into two new
+ * files in the temporary directory, which the caller can access through TempCertificatesDir. Allows
+ * tests to modify certificate contents mid-test to mimic the actions taken by a user when they call
+ * rotateCertificates.
+ */
+inline std::unique_ptr<TempCertificatesDir> copyCertsToTempDir(std::string caFile,
+                                                               std::string pemFile,
+                                                               std::string directoryPrefix) {
+    auto tempDir = std::make_unique<TempCertificatesDir>(directoryPrefix);
+
+    boost::filesystem::copy_file(caFile, tempDir->getCAFile().toString());
+    boost::filesystem::copy_file(pemFile, tempDir->getPEMKeyFile().toString());
+
+    return tempDir;
+}
 
 }  // namespace mongo::transport::test
 

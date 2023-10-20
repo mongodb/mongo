@@ -206,8 +206,7 @@ void GRPCTransportLayerImpl::shutdown() {
 #ifdef MONGO_CONFIG_SSL
 Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                   bool asyncOCSPStaple) {
-    LOGV2_INFO(7402001, "Ignoring request to rotate TLS certificates for the gRPC transport layer");
-    return Status::OK();
+    return _server->rotateCertificates();
 }
 #endif
 

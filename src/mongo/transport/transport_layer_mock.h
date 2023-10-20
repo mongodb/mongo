@@ -86,6 +86,9 @@ public:
     void shutdown() override;
     bool inShutdown() const;
 
+    StringData getNameForLogging() const override {
+        return "mock"_sd;
+    }
 
     virtual ReactorHandle getReactor(WhichReactor which) override;
 

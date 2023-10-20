@@ -131,9 +131,32 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
 #ifdef MONGO_CONFIG_SSL
 Status TransportLayerManagerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                      bool asyncOCSPStaple) {
+    std::vector<StringData> successfulRotations;
     for (auto&& tl : _tls) {
         if (auto status = tl->rotateCertificates(manager, asyncOCSPStaple); !status.isOK()) {
-            return status;
+            LOGV2_INFO(8074101,
+                       "Failed to rotate certificates for transport layer",
+                       "transportLayer"_attr = tl->getNameForLogging(),
+                       "status"_attr = status);
+            StringBuilder failureMessage;
+            failureMessage << "Certificate rotation failed. " << status.reason();
+
+            if (successfulRotations.size() > 0) {
+                failureMessage << " Before rotation failed for " << tl->getNameForLogging()
+                               << ", other transport layer(s) succeeded and are currently "
+                                  "using rotated certificates: [ ";
+                for (StringData s : successfulRotations) {
+                    failureMessage << s << " ";
+                }
+                failureMessage << "]";
+            }
+
+            return status.withContext(failureMessage.str());
+        } else {
+            successfulRotations.push_back(tl->getNameForLogging());
+            LOGV2_INFO(8074102,
+                       "Successfully rotated certificates for transport layer",
+                       "transportLayer"_attr = tl->getNameForLogging());
         }
     }
     return Status::OK();
