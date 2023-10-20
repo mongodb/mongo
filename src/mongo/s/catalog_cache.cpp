@@ -555,6 +555,17 @@ void CatalogCache::purgeCollection(const NamespaceString& nss) {
     itDb->second.erase(nss.ns());
 }
 
+void CatalogCache::resetCollection(const NamespaceString& nss) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    auto itDb = _collectionsByDb.find(nss.db());
+    if (itDb == _collectionsByDb.end()) {
+        return;
+    }
+
+    itDb->second[nss.ns()] = std::make_shared<CollectionRoutingInfoEntry>();
+}
+
 void CatalogCache::purgeDatabase(StringData dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
     _databases.erase(dbName);
