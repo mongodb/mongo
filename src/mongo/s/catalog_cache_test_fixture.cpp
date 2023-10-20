@@ -165,6 +165,7 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
     const std::vector<BSONObj>& splitPoints,
     const std::vector<BSONObj>& globalIndexes,
     boost::optional<ReshardingFields> reshardingFields,
+    boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
     boost::optional<bool> unsplittable) {
     ChunkVersion version({OID::gen(), Timestamp(42)}, {1, 0});
 
@@ -188,6 +189,10 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeCollectionRoutingInfo(
 
         if (reshardingFields) {
             coll.setReshardingFields(std::move(reshardingFields));
+        }
+
+        if (timeseriesFields) {
+            coll.setTimeseriesFields(std::move(timeseriesFields));
         }
 
         if (indexVersion) {
@@ -255,6 +260,7 @@ CollectionRoutingInfo CoreCatalogCacheTestFixture::makeUnshardedCollectionRoutin
                                      {} /* splitPoints */,
                                      {} /* globalIndexes */,
                                      boost::none /* reshardingFields */,
+                                     boost::none /* timeseriesFields */,
                                      true /* unsplittable */);
 }
 

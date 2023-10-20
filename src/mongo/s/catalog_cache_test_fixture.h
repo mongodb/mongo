@@ -76,6 +76,7 @@ protected:
         const std::vector<BSONObj>& splitPoints,
         const std::vector<BSONObj>& globalIndexes,
         boost::optional<ReshardingFields> reshardingFields = boost::none,
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none,
         boost::optional<bool> unsplittable = boost::none);
 
     /**
