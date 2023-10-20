@@ -105,7 +105,7 @@ structs:
                               the query, the update subsystem will insert the document supplied as
                               'constants.new' rather than generating a new document from the update spec."
                 type: optionalBool
-                stability: unstable
+                stability: internal
             arrayFilters:
                 description: "Specifies which array elements an update modifier should apply to"
                 type: array<object>
