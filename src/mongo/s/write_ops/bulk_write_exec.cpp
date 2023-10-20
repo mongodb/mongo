@@ -1198,8 +1198,6 @@ void BulkWriteOp::noteStaleResponses(
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
     // For simplicity, we build a dummy bulk write command request that contains all the common
     // fields and serialize it to get the base command size.
-    // TODO SERVER-78301: Re-evaluate this estimation method and consider switching to a more
-    // efficient approach.
     // We only bother to copy over variable-size and/or optional fields, since the value of fields
     // that are fixed-size and always present (e.g. 'ordered') won't affect the size calculation.
     BulkWriteCommandRequest request;
