@@ -552,6 +552,7 @@ void ShardingDDLCoordinator::_performNoopRetryableWriteOnAllShardsAndConfigsvr(
 bool ShardingDDLCoordinator::_isRetriableErrorForDDLCoordinator(const Status& status) {
     return status.isA<ErrorCategory::CursorInvalidatedError>() ||
         status.isA<ErrorCategory::ShutdownError>() || status.isA<ErrorCategory::RetriableError>() ||
+        status.isA<ErrorCategory::Interruption>() ||
         status.isA<ErrorCategory::CancellationError>() ||
         status.isA<ErrorCategory::ExceededTimeLimitError>() ||
         status.isA<ErrorCategory::WriteConcernError>() ||
