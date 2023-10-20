@@ -109,6 +109,6 @@ assert.commandWorked(sessionDb.runCommand({
 
 fpForceSyncSource.off();
 sessionDb.getSession().endSession();
-replTest.stopSet();
 
 st.stop();
+replTest.stopSet();

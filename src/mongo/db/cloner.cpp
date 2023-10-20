@@ -425,7 +425,6 @@ Status DefaultClonerImpl::_createCollectionsForDb(
                 const auto& existingOpts = collection->getCollectionOptions();
                 const UUID clonedUUID =
                     uassertStatusOK(UUID::parse(params.collectionInfo["info"]["uuid"]));
-
                 if (clonedUUID == existingOpts.uuid)
                     return Status::OK();
 
@@ -443,7 +442,7 @@ Status DefaultClonerImpl::_createCollectionsForDb(
             // exist and is unsharded, we create a new collection with its own UUID and
             // copy the options and secondary indexes of the original collection.
 
-            if (params.shardedOrTrackedOutsideDbPrimary) {
+            if (params.shardedOrTrackedOutsideDbPrimary || params.forceSameUUIDAsSource) {
                 optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
             }
 
@@ -544,6 +543,7 @@ Status DefaultClonerImpl::copyDb(
     const DatabaseName& dbName,
     const std::string& masterHost,
     const std::vector<NamespaceString>& shardedOrTrackedOutsideDbPrimary,
+    bool forceSameUUIDAsSource,
     std::set<std::string>* clonedColls) {
     invariant(clonedColls && clonedColls->empty(),
               str::stream() << masterHost << ":" << dbName.toStringForErrorMsg());
@@ -572,6 +572,7 @@ Status DefaultClonerImpl::copyDb(
                       nss) != shardedOrTrackedOutsideDbPrimary.end()) {
             params.shardedOrTrackedOutsideDbPrimary = true;
         }
+        params.forceSameUUIDAsSource = forceSameUUIDAsSource;
         createCollectionParams.push_back(params);
     }
 
@@ -655,9 +656,14 @@ Status Cloner::copyDb(OperationContext* opCtx,
                       const DatabaseName& dbName,
                       const std::string& masterHost,
                       const std::vector<NamespaceString>& shardedOrTrackedOutsideDbPrimary,
+                      bool forceSameUUIDAsSource,
                       std::set<std::string>* clonedColls) {
-    return _clonerImpl->copyDb(
-        opCtx, dbName, masterHost, shardedOrTrackedOutsideDbPrimary, clonedColls);
+    return _clonerImpl->copyDb(opCtx,
+                               dbName,
+                               masterHost,
+                               shardedOrTrackedOutsideDbPrimary,
+                               forceSameUUIDAsSource,
+                               clonedColls);
 }
 
 StatusWith<std::vector<BSONObj>> Cloner::getListOfCollections(OperationContext* opCtx,

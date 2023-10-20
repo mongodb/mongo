@@ -80,7 +80,6 @@ assert.eq(2,
           "wrong chunk number after splitting collection that existed before");
 assert.eq(numObjs, sdb1.foo.count(), "wrong count after splitting collection that existed before");
 
+s.stop();
 rs1.stopSet();
 rs2.stopSet();
-
-s.stop();

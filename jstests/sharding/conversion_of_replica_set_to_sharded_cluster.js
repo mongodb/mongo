@@ -8,6 +8,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {waitForAllMembers} from "jstests/replsets/rslib.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
@@ -319,21 +320,26 @@ rst0.restart(0, {shardsvr: ''});
 rst0.restart(1, {shardsvr: ''});
 rst0.awaitReplication();
 
-checkCRUDCommands(rst0.getPrimary().getDB(dbName));
-checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
+// TODO SERVER-82316: currently we don't have full compatibility for direct connections.
+if (!FeatureFlagUtil.isPresentAndEnabled(rst0.getPrimary(),
+                                         "TrackUnshardedCollectionsOnShardingCatalog")) {
+    checkCRUDCommands(rst0.getPrimary().getDB(dbName));
+    checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 
-jsTest.log("Third test, using the rs connection directly.");
-let addShardRes = st.s.adminCommand({addShard: rst0.getURL(), name: rst0.name});
-assertAddShardSucceeded(addShardRes, rst0.name);
+    jsTest.log("Third test, using the rs connection directly.");
+    let addShardRes = st.s.adminCommand({addShard: rst0.getURL(), name: rst0.name});
+    assertAddShardSucceeded(addShardRes, rst0.name);
 
-checkCRUDCommands(rst0.getPrimary().getDB(dbName));
-checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
+    checkCRUDCommands(rst0.getPrimary().getDB(dbName));
+    checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 
-jsTest.log("Fourth test, using the router.");
-checkCRUDCommands(st.s0.getDB(dbName));
-checkDDLCommands(st.s0.getDB(DDLDbName));
+    jsTest.log("Fourth test, using the router.");
+    checkCRUDCommands(st.s0.getDB(dbName));
+    checkDDLCommands(st.s0.getDB(DDLDbName));
+}
 
 // Cleaning up.
-rst0.stopSet();
-
+jsTest.log("Finished test, stopping sharding test");
 st.stop();
+jsTest.log("Finished test, stopping replica set");
+rst0.stopSet();

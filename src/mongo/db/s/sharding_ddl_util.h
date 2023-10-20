@@ -320,6 +320,11 @@ void runTransactionOnShardingCatalog(
     bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& inputExecutor = nullptr);
 
+/**
+ * Returns the default key pattern value for unsplittable collections.
+ */
+const KeyPattern& unsplittableCollectionShardKey();
+
 boost::optional<CollectionType> getCollectionFromConfigServer(OperationContext* opCtx,
                                                               const NamespaceString& nss);
 

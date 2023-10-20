@@ -1,9 +1,12 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const st = new ShardingTest({shards: 3, chunkSize: 1});
 const configDB = st.s.getDB('config');
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
 const shard2 = st.shard2.shardName;
+const checkUnsplittableMetadata = FeatureFlagUtil.isPresentAndEnabled(
+    st.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
 
 function getInfoFromConfigDatabases(dbName) {
     const configDBsQueryResults = configDB.databases.find({_id: dbName}).toArray();
@@ -387,7 +390,12 @@ function testAddShard() {
     assert.commandWorked(st.s.adminCommand({addShard: newReplicaSet.getURL(), name: newShardName}));
 
     for (const dbName of dbsOnNewReplicaSet) {
-        assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + preExistingCollName));
+        if (checkUnsplittableMetadata) {
+            getValidatedPlacementInfoForCollection(
+                dbName, preExistingCollName, [newShardName], true);
+        } else {
+            assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + preExistingCollName));
+        }
         const dbPlacementEntry = getValidatedPlacementInfoForDB(dbName);
         assert.sameMembers([newShardName], dbPlacementEntry.shards);
     }

@@ -1,3 +1,5 @@
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 function sortByName(a, b) {
     if (a.name < b.name)
         return -1;
@@ -25,7 +27,8 @@ function checkOptions(c, expectedOptions) {
         c.options, expectedOptions, 'Missing expected option(s) for collection ' + c.name);
 }
 
-function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, fooUUID) {
+function checkCollectionsCopiedCorrectly(
+    fromShard, toShard, sharded, barUUID, fooUUID, sameUUID = false) {
     var c1, c2;
     [c1, c2] = getCollections(toShard);
 
@@ -95,16 +98,18 @@ function checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, barUUID, f
         checkCount(fromShard, 'bar', 3);
         checkCount(toShard, 'foo', 0);
         checkCount(toShard, 'bar', 0);
-
-        // UUIDs should be the same as the original
-        checkUUIDsEqual(c1, barUUID);
-        checkUUIDsEqual(c2, fooUUID);
     } else {
         checkCount(toShard, 'foo', 3);
         checkCount(toShard, 'bar', 3);
         checkCount(fromShard, 'foo', 0);
         checkCount(fromShard, 'bar', 0);
+    }
 
+    if (sharded || sameUUID) {
+        // UUIDs should be the same as the original
+        checkUUIDsEqual(c1, barUUID);
+        checkUUIDsEqual(c2, fooUUID);
+    } else {
         // UUIDs should not be the same as the original
         checkUUIDsNotEqual(c1, barUUID);
         checkUUIDsNotEqual(c2, fooUUID);
@@ -135,7 +140,7 @@ function createCollections(sharded) {
     }
 }
 
-function movePrimaryWithFailpoint(sharded) {
+function movePrimaryWithFailpoint(sharded, sameUUID = false) {
     var db = st.getDB('test1');
     createCollections(sharded);
 
@@ -166,7 +171,7 @@ function movePrimaryWithFailpoint(sharded) {
         // If the collections are sharded, the UUID of the collection on the donor should be
         // copied over and the options should be the same so retrying the move should succeed.
         assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
-        checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid);
+        checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid, sameUUID);
 
         // Now change an option on the toShard, and verify that calling clone again succeeds
         // when the options don't match.
@@ -184,7 +189,7 @@ function movePrimaryWithFailpoint(sharded) {
         checkOptions(barOnFromShard, Object.keys(barOptions));
 
         // The docs should still be on the original primary shard (fromShard).
-        checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid);
+        checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid, sameUUID);
 
         // Now drop and recreate the collection on the toShard. The collection should now have
         // a different UUID, so we should fail on movePrimary.
@@ -200,7 +205,7 @@ function movePrimaryWithFailpoint(sharded) {
     }
 }
 
-function movePrimaryNoFailpoint(sharded) {
+function movePrimaryNoFailpoint(sharded, sameUUID = false) {
     var db = st.getDB('test1');
     createCollections(sharded);
 
@@ -220,10 +225,13 @@ function movePrimaryNoFailpoint(sharded) {
 
     assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
 
-    checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid);
+    checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid, sameUUID);
 }
 
 var st = new ShardingTest({shards: 2});
+
+const sameUUID =
+    FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsOnShardingCatalog");
 
 var fooOptions = {validationLevel: "off"};
 var barOptions = {validator: {$jsonSchema: {required: ['a']}}};
@@ -231,9 +239,9 @@ var barOptions = {validator: {$jsonSchema: {required: ['a']}}};
 var fooIndexes = [{key: {a: 1}, name: 'index1', expireAfterSeconds: 5000}];
 var barIndexes = [{key: {a: -1}, name: 'index2'}];
 
-movePrimaryWithFailpoint(true);
-movePrimaryWithFailpoint(false);
-movePrimaryNoFailpoint(true);
-movePrimaryNoFailpoint(false);
+movePrimaryWithFailpoint(true, sameUUID);
+movePrimaryWithFailpoint(false, sameUUID);
+movePrimaryNoFailpoint(true, sameUUID);
+movePrimaryNoFailpoint(false, sameUUID);
 
 st.stop();

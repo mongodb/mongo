@@ -37,5 +37,5 @@ assert.commandWorked(st.s.adminCommand({addShard: newShard.getURL()}));
 
 assert.neq(null, configDB.databases.findOne({_id: 'unshardedDB'}));
 
-newShard.stopSet();
 st.stop();
+newShard.stopSet();
