@@ -75,7 +75,7 @@ class ServiceEntryPoint;
 
 namespace transport {
 class SessionManager;
-class TransportLayer;
+class TransportLayerManager;
 }  // namespace transport
 
 /**
@@ -551,12 +551,12 @@ public:
     //
 
     /**
-     * Get the master TransportLayer. Routes to all other TransportLayers that
+     * Get the master TransportLayerManager. Routes to all other TransportLayers that
      * may be in use within this service.
      *
      * See TransportLayerManager for more details.
      */
-    transport::TransportLayer* getTransportLayer() const;
+    transport::TransportLayerManager* getTransportLayerManager() const;
 
     /**
      * Get the SessionManager.
@@ -646,12 +646,12 @@ public:
     void setSessionManager(std::unique_ptr<transport::SessionManager> sm);
 
     /**
-     * Binds the TransportLayer to the service context. The TransportLayer should have already
-     * had setup() called successfully, but not startup().
+     * Binds the TransportLayerManager to the service context. The TransportLayerManager should have
+     * already had setup() called successfully, but not startup().
      *
      * This should be a TransportLayerManager created with the global server configuration.
      */
-    void setTransportLayer(std::unique_ptr<transport::TransportLayer> tl);
+    void setTransportLayerManager(std::unique_ptr<transport::TransportLayerManager> tl);
 
     /**
      * Creates a delayed execution baton with basic functionality
@@ -746,7 +746,7 @@ private:
     /**
      * The TransportLayer.
      */
-    SyncUnique<transport::TransportLayer> _transportLayer;
+    SyncUnique<transport::TransportLayerManager> _transportLayerManager;
 
     /**
      * The storage engine, if any.

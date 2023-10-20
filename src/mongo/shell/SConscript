@@ -332,7 +332,7 @@ if not has_option('noshell') and jsEngine:
             # please add that library as a private libdep of
             # mongo_initializers.
             "$BUILD_DIR/mongo/s/write_ops/batch_write_types",
-            "$BUILD_DIR/mongo/transport/transport_layer",
+            "$BUILD_DIR/mongo/transport/transport_layer_manager",
             "$BUILD_DIR/mongo/util/net/ssl_manager",
             "$BUILD_DIR/mongo/util/pcre_wrapper",
             "$BUILD_DIR/mongo/util/periodic_runner_factory",

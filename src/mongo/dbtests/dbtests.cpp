@@ -71,7 +71,7 @@
 #include "mongo/dbtests/framework.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
@@ -251,8 +251,8 @@ int dbtestsMain(int argc, char** argv) {
     CursorManager::get(service)->setPreciseClockSource(preciseClock.get());
     service->setPreciseClockSource(std::move(preciseClock));
 
-    service->setTransportLayer(
-        transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer());
+    service->setTransportLayerManager(
+        transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer());
 
     repl::ReplicationCoordinator::set(
         service,

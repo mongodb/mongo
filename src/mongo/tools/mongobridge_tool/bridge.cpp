@@ -74,6 +74,7 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -331,9 +332,9 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
             auto now = getGlobalServiceContext()->getFastClockSource()->now();
             const auto connectExpiration = now + kConnectTimeout;
             while (now < connectExpiration) {
-                auto tl = getGlobalServiceContext()->getTransportLayer();
-                auto sws =
-                    tl->connect(destAddr, transport::kGlobalSSLMode, connectExpiration - now);
+                auto tl = getGlobalServiceContext()->getTransportLayerManager();
+                auto sws = tl->getEgressLayer()->connect(
+                    destAddr, transport::kGlobalSSLMode, connectExpiration - now);
                 auto status = sws.getStatus();
                 if (!status.isOK()) {
                     LOGV2_WARNING(22924,
@@ -506,8 +507,8 @@ int bridgeMain(int argc, char** argv) {
         // existence of threads.
         if (hasGlobalServiceContext()) {
             auto sc = getGlobalServiceContext();
-            if (sc->getTransportLayer())
-                sc->getTransportLayer()->shutdown();
+            if (sc->getTransportLayerManager())
+                sc->getTransportLayerManager()->shutdown();
 
             if (auto mgr = sc->getSessionManager()) {
                 mgr->endAllSessions(Client::kEmptyTagMask);
@@ -534,7 +535,9 @@ int bridgeMain(int argc, char** argv) {
 
         auto tl = std::make_unique<mongo::transport::AsioTransportLayer>(
             opts, serviceContext->getSessionManager());
-        serviceContext->setTransportLayer(std::move(tl));
+
+        serviceContext->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
     }
 
     transport::ServiceExecutor::startupAll(serviceContext);
@@ -544,12 +547,12 @@ int bridgeMain(int argc, char** argv) {
         return static_cast<int>(ExitCode::netError);
     }
 
-    if (auto status = serviceContext->getTransportLayer()->setup(); !status.isOK()) {
+    if (auto status = serviceContext->getTransportLayerManager()->setup(); !status.isOK()) {
         LOGV2(22922, "Error setting up transport layer", "error"_attr = status);
         return static_cast<int>(ExitCode::netError);
     }
 
-    if (auto status = serviceContext->getTransportLayer()->start(); !status.isOK()) {
+    if (auto status = serviceContext->getTransportLayerManager()->start(); !status.isOK()) {
         LOGV2(22923, "Error starting transport layer", "error"_attr = status);
         return static_cast<int>(ExitCode::netError);
     }

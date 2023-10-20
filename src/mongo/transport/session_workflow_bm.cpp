@@ -64,6 +64,7 @@
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -285,7 +286,9 @@ public:
         sc->getService()->setServiceEntryPoint(
             std::make_unique<MockCoordinator::Sep>(_coordinator.get()));
         sc->setSessionManager(std::make_unique<SessionManagerCommon>(sc));
-        sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());
+        auto tl = std::make_unique<TransportLayerMockWithReactor>();
+        sc->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
         LOGV2_DEBUG(7015136, 3, "About to start sep");
         invariant(_coordinator->sessionManager()->start());
     }

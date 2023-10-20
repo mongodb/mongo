@@ -46,8 +46,8 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/icu.h"
@@ -382,7 +382,7 @@ void SSLManagerCoordinator::rotate() {
             StringData(manager->getSSLConfiguration().clientSubjectName.toString())));
     }
 
-    auto tl = svcCtx->getTransportLayer();
+    auto tl = svcCtx->getTransportLayerManager();
     invariant(tl != nullptr);
     uassertStatusOK(tl->rotateCertificates(manager, false));
 

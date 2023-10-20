@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,22 +28,9 @@
  */
 
 
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 
-#include <algorithm>
-#include <memory>
-#include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
-#include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -52,8 +39,8 @@
 namespace mongo {
 namespace transport {
 
-TransportLayerManager::TransportLayerManager(std::vector<std::unique_ptr<TransportLayer>> tls,
-                                             TransportLayer* egressLayer)
+TransportLayerManagerImpl::TransportLayerManagerImpl(
+    std::vector<std::unique_ptr<TransportLayer>> tls, TransportLayer* egressLayer)
     : _tls(std::move(tls)), _egressLayer(egressLayer) {
     invariant(_egressLayer);
     invariant(find_if(_tls.begin(), _tls.end(), [&](auto& tl) {
@@ -61,32 +48,14 @@ TransportLayerManager::TransportLayerManager(std::vector<std::unique_ptr<Transpo
               }) != _tls.end());
 }
 
-StatusWith<std::shared_ptr<Session>> TransportLayerManager::connect(
-    HostAndPort peer,
-    ConnectSSLMode sslMode,
-    Milliseconds timeout,
-    boost::optional<TransientSSLParams> transientSSLParams) {
-    return _egressLayer->connect(peer, sslMode, timeout, transientSSLParams);
-}
-
-Future<std::shared_ptr<Session>> TransportLayerManager::asyncConnect(
-    HostAndPort peer,
-    ConnectSSLMode sslMode,
-    const ReactorHandle& reactor,
-    Milliseconds timeout,
-    std::shared_ptr<ConnectionMetrics> connectionMetrics,
-    std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
-    return _egressLayer->asyncConnect(
-        peer, sslMode, reactor, timeout, connectionMetrics, transientSSLContext);
-}
-
-ReactorHandle TransportLayerManager::getReactor(WhichReactor which) {
-    return _egressLayer->getReactor(which);
+TransportLayerManagerImpl::TransportLayerManagerImpl(std::unique_ptr<TransportLayer> tl) {
+    _tls.push_back(std::move(tl));
+    _egressLayer = _tls[0].get();
 }
 
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server
 // exits with an error and this isn't an issue, but we should make this more robust.
-Status TransportLayerManager::start() {
+Status TransportLayerManagerImpl::start() {
     invariant(_state.swap(State::kStarted) == State::kSetUp);
     for (auto&& tl : _tls) {
         auto status = tl->start();
@@ -98,14 +67,14 @@ Status TransportLayerManager::start() {
     return Status::OK();
 }
 
-void TransportLayerManager::shutdown() {
+void TransportLayerManagerImpl::shutdown() {
     invariant(_state.swap(State::kShutdown) != State::kShutdown);
     for (auto&& tl : _tls) {
         tl->shutdown();
     }
 }
 
-Status TransportLayerManager::setup() {
+Status TransportLayerManagerImpl::setup() {
     invariant(_state.swap(State::kSetUp) == State::kNotInitialized);
     for (auto&& tl : _tls) {
         auto status = tl->setup();
@@ -117,30 +86,32 @@ Status TransportLayerManager::setup() {
     return Status::OK();
 }
 
-void TransportLayerManager::appendStatsForServerStatus(BSONObjBuilder* bob) const {
+void TransportLayerManagerImpl::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     for (auto&& tl : _tls) {
         tl->appendStatsForServerStatus(bob);
     }
 }
 
-void TransportLayerManager::appendStatsForFTDC(BSONObjBuilder& bob) const {
+void TransportLayerManagerImpl::appendStatsForFTDC(BSONObjBuilder& bob) const {
     for (auto&& tl : _tls) {
         tl->appendStatsForFTDC(bob);
     }
 }
 
-std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgressTransportLayer() {
+std::unique_ptr<TransportLayerManager>
+TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer() {
     transport::AsioTransportLayer::Options opts(&serverGlobalParams);
     opts.mode = transport::AsioTransportLayer::Options::kEgress;
     opts.ipList.clear();
 
-    auto ret = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
+    std::unique_ptr<TransportLayerManager> ret = std::make_unique<TransportLayerManagerImpl>(
+        std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
     uassertStatusOK(ret->setup());
     uassertStatusOK(ret->start());
     return ret;
 }
 
-std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
+std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConfig(
     const ServerGlobalParams* config,
     ServiceContext* svcCtx,
     boost::optional<int> loadBalancerPort,
@@ -154,12 +125,12 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     retVector.push_back(
         std::make_unique<transport::AsioTransportLayer>(opts, svcCtx->getSessionManager()));
     auto egress = retVector[0].get();
-    return std::make_unique<TransportLayerManager>(std::move(retVector), egress);
+    return std::make_unique<TransportLayerManagerImpl>(std::move(retVector), egress);
 }
 
 #ifdef MONGO_CONFIG_SSL
-Status TransportLayerManager::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
-                                                 bool asyncOCSPStaple) {
+Status TransportLayerManagerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+                                                     bool asyncOCSPStaple) {
     for (auto&& tl : _tls) {
         if (auto status = tl->rotateCertificates(manager, asyncOCSPStaple); !status.isOK()) {
             return status;
@@ -167,12 +138,6 @@ Status TransportLayerManager::rotateCertificates(std::shared_ptr<SSLManagerInter
     }
     return Status::OK();
 }
-
-StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
-TransportLayerManager::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
-    return _egressLayer->createTransientSSLContext(transientSSLParams);
-}
-
 #endif
 
 }  // namespace transport

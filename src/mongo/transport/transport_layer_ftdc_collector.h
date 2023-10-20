@@ -31,13 +31,14 @@
 
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/transport/transport_layer_manager.h"
 
 namespace mongo::transport {
 
 class TransportLayerFTDCCollector final : public FTDCCollectorInterface {
 public:
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) override {
-        if (auto tl = opCtx->getServiceContext()->getTransportLayer()) {
+        if (auto tl = opCtx->getServiceContext()->getTransportLayerManager()) {
             tl->appendStatsForFTDC(builder);
         }
     }

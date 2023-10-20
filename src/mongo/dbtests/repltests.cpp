@@ -98,6 +98,7 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -160,9 +161,12 @@ public:
         auto* const sc = _opCtx.getServiceContext();
         transport::AsioTransportLayer::Options opts;
         opts.mode = transport::AsioTransportLayer::Options::kEgress;
-        sc->setTransportLayer(std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
-        ASSERT_OK(sc->getTransportLayer()->setup());
-        ASSERT_OK(sc->getTransportLayer()->start());
+        auto tl = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
+
+        sc->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
+        ASSERT_OK(sc->getTransportLayerManager()->setup());
+        ASSERT_OK(sc->getTransportLayerManager()->start());
 
         ReplSettings replSettings;
         replSettings.setReplSetString("rs0/host1");
@@ -213,7 +217,7 @@ public:
                 ->setFollowerMode(repl::MemberState::RS_PRIMARY)
                 .ignore();
 
-            sc->getTransportLayer()->shutdown();
+            sc->getTransportLayerManager()->shutdown();
         } catch (...) {
             FAIL("Exception while cleaning up test");
         }

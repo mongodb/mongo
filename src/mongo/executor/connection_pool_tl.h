@@ -64,7 +64,7 @@ public:
     class Type;
 
     TLTypeFactory(transport::ReactorHandle reactor,
-                  transport::TransportLayer* tl,
+                  transport::TransportLayerManager* tl,
                   std::unique_ptr<NetworkConnectionHook> onConnectHook,
                   const ConnectionPool::Options& connPoolOptions,
                   std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext)
@@ -95,7 +95,7 @@ private:
     auto reactor();
 
     std::shared_ptr<OutOfLineExecutor> _executor;  // This is always a transport::Reactor
-    transport::TransportLayer* _tl;
+    transport::TransportLayerManager* _tl;
     std::unique_ptr<NetworkConnectionHook> _onConnectHook;
     // Options originated from instance of NetworkInterfaceTL.
     const ConnectionPool::Options _connPoolOptions;

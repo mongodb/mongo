@@ -30,7 +30,7 @@
 #include <memory>
 
 #include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -78,7 +78,7 @@ TEST_F(TransportLayerManagerTest, StartAndShutdown) {
         layers.push_back(std::move(layer));
     }
 
-    TransportLayerManager manager(std::move(layers), layerPtrs[0]);
+    TransportLayerManagerImpl manager(std::move(layers), layerPtrs[0]);
     ASSERT_OK(manager.setup());
     ASSERT_OK(manager.start());
     for (auto layer : layerPtrs) {
@@ -99,10 +99,10 @@ TEST_F(TransportLayerManagerTest, ConnectEgressLayer) {
     layers.push_back(std::move(egress));
     layers.push_back(std::make_unique<TransportLayerMock>());
 
-    TransportLayerManager manager(std::move(layers), egressPtr);
+    TransportLayerManagerImpl manager(std::move(layers), egressPtr);
     uassertStatusOK(manager.setup());
     uassertStatusOK(manager.start());
-    auto swSession = manager.connect(
+    auto swSession = manager.getEgressLayer()->connect(
         HostAndPort("localhost:1234"), ConnectSSLMode::kDisableSSL, Milliseconds(100), boost::none);
     ASSERT_OK(swSession);
     ASSERT_TRUE(egressPtr->owns(swSession.getValue()->id()));

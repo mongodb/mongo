@@ -46,6 +46,7 @@
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -260,14 +261,14 @@ void ServiceExecutorFixed::start() {
         return;
     }
 
-    auto tl = _svcCtx->getTransportLayer();
+    auto tl = _svcCtx->getTransportLayerManager();
     if (!tl) {
         // For some tests, we do not have a TransportLayer.
         invariant(TestingProctor::instance().isEnabled());
         return;
     }
 
-    auto reactor = tl->getReactor(TransportLayer::WhichReactor::kIngress);
+    auto reactor = tl->getEgressLayer()->getReactor(TransportLayer::WhichReactor::kIngress);
     invariant(reactor);
     _threadPool->schedule([this, reactor](Status) {
         {
@@ -382,14 +383,14 @@ void ServiceExecutorFixed::_checkForShutdown() {
         return;
     }
 
-    auto tl = _svcCtx->getTransportLayer();
+    auto tl = _svcCtx->getTransportLayerManager();
     if (!tl) {
         // For some tests, we do not have a TransportLayer.
         invariant(TestingProctor::instance().isEnabled());
         return;
     }
 
-    auto reactor = tl->getReactor(TransportLayer::WhichReactor::kIngress);
+    auto reactor = tl->getEgressLayer()->getReactor(TransportLayer::WhichReactor::kIngress);
     invariant(reactor);
     reactor->stop();
 }

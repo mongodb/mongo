@@ -105,6 +105,7 @@
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/duration.h"
@@ -823,7 +824,8 @@ int mongo_main(int argc, char* argv[]) {
         parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
 #endif
 
-// Configure the correct TL based on URI options.
+        // Configure the correct TL based on URI options.
+        std::unique_ptr<transport::TransportLayer> tl;
 #ifdef MONGO_CONFIG_GRPC
         if (parsedURI.isGRPC() || shellGlobalParams.gRPC) {
             // Create the client metadata.
@@ -836,20 +838,20 @@ int mongo_main(int argc, char* argv[]) {
             transport::grpc::GRPCTransportLayer::Options grpcOpts;
             grpcOpts.enableEgress = true;
             grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
-
-            serviceContext->setTransportLayer(
-                std::make_unique<transport::grpc::GRPCTransportLayerImpl>(serviceContext,
-                                                                          grpcOpts));
+            tl =
+                std::make_unique<transport::grpc::GRPCTransportLayerImpl>(serviceContext, grpcOpts);
         } else
 #endif
         {
             transport::AsioTransportLayer::Options opts;
             opts.enableIPv6 = shellGlobalParams.enableIPv6;
             opts.mode = transport::AsioTransportLayer::Options::kEgress;
-            serviceContext->setTransportLayer(
-                std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
+            tl = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
         }
-        auto tlPtr = serviceContext->getTransportLayer();
+        serviceContext->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
+
+        auto tlPtr = serviceContext->getTransportLayerManager();
         uassertStatusOK(tlPtr->setup());
         uassertStatusOK(tlPtr->start());
 

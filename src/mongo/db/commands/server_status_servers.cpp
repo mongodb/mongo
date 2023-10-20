@@ -44,6 +44,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/socket_utils.h"
@@ -97,7 +98,7 @@ public:
             transport::ServiceExecutor::appendAllServerStats(&section, svcCtx);
         }
 
-        if (auto tl = svcCtx->getTransportLayer())
+        if (auto tl = svcCtx->getTransportLayerManager())
             tl->appendStatsForServerStatus(&b);
 
         return b.obj();

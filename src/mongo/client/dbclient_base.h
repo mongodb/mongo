@@ -70,7 +70,6 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"

@@ -67,7 +67,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/ssl_connection_context.h"
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point.h"
@@ -214,7 +214,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
       _metadataHook(std::move(metadataHook)),
       _state(kDefault) {
     if (_svcCtx) {
-        _tl = _svcCtx->getTransportLayer();
+        _tl = _svcCtx->getTransportLayerManager();
     }
 
     // Even if you have a service context, it may not have a transport layer (mostly for unittests).
@@ -223,21 +223,21 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
             LOGV2_WARNING(22601, "No TransportLayer configured during NetworkInterface startup");
         }
         _ownedTransportLayer =
-            transport::TransportLayerManager::makeAndStartDefaultEgressTransportLayer();
+            transport::TransportLayerManagerImpl::makeAndStartDefaultEgressTransportLayer();
         _tl = _ownedTransportLayer.get();
     }
 
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
 #ifdef MONGO_CONFIG_SSL
     if (_connPoolOpts.transientSSLParams) {
-        auto statusOrContext =
-            _tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.value());
+        auto statusOrContext = _tl->getEgressLayer()->createTransientSSLContext(
+            _connPoolOpts.transientSSLParams.value());
         uassertStatusOK(statusOrContext.getStatus());
         transientSSLContext = std::move(statusOrContext.getValue());
     }
 #endif
 
-    _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
+    _reactor = _tl->getEgressLayer()->getReactor(transport::TransportLayer::kNewReactor);
     auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
         _reactor, _tl, std::move(_onConnectHook), _connPoolOpts, transientSSLContext);
     _pool = std::make_shared<ConnectionPool>(

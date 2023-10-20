@@ -32,6 +32,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -43,11 +44,8 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientGRPCStream::_makeSession
     transport::ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    // TODO: SERVER-81549: Make this call ->getEgressLayer() on TransportLayerManager, and
-    // dynamic_cast that to the gRPC TL so that we are not making incorrect assumptions about the
-    // ingress transport layer.
     auto tl = dynamic_cast<transport::grpc::GRPCTransportLayer*>(
-        getGlobalServiceContext()->getTransportLayer());
+        getGlobalServiceContext()->getTransportLayerManager()->getEgressLayer());
     invariant(tl,
               "DBClientGRPCStream can only be used with a gRPC transport layer configured as the "
               "egress transport layer.");

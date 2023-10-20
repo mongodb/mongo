@@ -140,7 +140,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
@@ -511,7 +511,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         // Shutdown the TransportLayer so that new connections aren't accepted
-        if (auto tl = serviceContext->getTransportLayer()) {
+        if (auto tl = serviceContext->getTransportLayerManager()) {
             LOGV2_OPTIONS(
                 22843, {LogComponent::kNetwork}, "shutdown: going to close all sockets...");
 
@@ -778,14 +778,14 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         quickExit(ExitCode::badOptions);
     }
 
-    auto tl = transport::TransportLayerManager::createWithConfig(
+    auto tl = transport::TransportLayerManagerImpl::createWithConfig(
         &serverGlobalParams, serviceContext, loadBalancerPort);
     auto res = tl->setup();
     if (!res.isOK()) {
         LOGV2_ERROR(22856, "Error setting up listener", "error"_attr = res);
         return ExitCode::netError;
     }
-    serviceContext->setTransportLayer(std::move(tl));
+    serviceContext->setTransportLayerManager(std::move(tl));
 
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
@@ -897,7 +897,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         return ExitCode::netError;
     }
 
-    status = serviceContext->getTransportLayer()->start();
+    status = serviceContext->getTransportLayerManager()->start();
     if (!status.isOK()) {
         LOGV2_ERROR(22861, "Error starting transport layer", "error"_attr = redact(status));
         return ExitCode::netError;

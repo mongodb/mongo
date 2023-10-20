@@ -262,7 +262,7 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/clock_source.h"
@@ -332,7 +332,7 @@ auto makeTransportLayer(ServiceContext* svcCtx) {
         // TODO SERVER-78730: add support for load-balanced connections.
     }
 
-    return transport::TransportLayerManager::createWithConfig(
+    return transport::TransportLayerManagerImpl::createWithConfig(
         &serverGlobalParams, svcCtx, std::move(loadBalancerPort), std::move(routerPort));
 }
 
@@ -562,7 +562,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             LOGV2_ERROR(20568, "Error setting up listener", "error"_attr = res);
             return ExitCode::netError;
         }
-        serviceContext->setTransportLayer(std::move(tl));
+        serviceContext->setTransportLayerManager(std::move(tl));
     }
 
     FlowControl::set(serviceContext,
@@ -1122,7 +1122,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Start transport layer",
                                                   &startupTimeElapsedBuilder);
-        start = serviceContext->getTransportLayer()->start();
+        start = serviceContext->getTransportLayerManager()->start();
         if (!start.isOK()) {
             LOGV2_ERROR(20572, "Error starting listener", "error"_attr = start);
             return ExitCode::netError;
@@ -1662,7 +1662,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     }
 
     // Shutdown the TransportLayer so that new connections aren't accepted
-    if (auto tl = serviceContext->getTransportLayer()) {
+    if (auto tl = serviceContext->getTransportLayerManager()) {
         LOGV2_OPTIONS(
             20562, {LogComponent::kNetwork}, "Shutdown: going to close listening sockets");
         tl->shutdown();

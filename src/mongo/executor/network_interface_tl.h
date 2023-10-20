@@ -66,6 +66,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
@@ -420,9 +421,9 @@ private:
 
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;
-    transport::TransportLayer* _tl = nullptr;
+    transport::TransportLayerManager* _tl = nullptr;
     // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup
-    std::unique_ptr<transport::TransportLayer> _ownedTransportLayer;
+    std::unique_ptr<transport::TransportLayerManager> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
     const ConnectionPool::Options _connPoolOpts;

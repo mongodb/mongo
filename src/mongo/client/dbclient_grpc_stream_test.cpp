@@ -32,6 +32,7 @@
 #include "mongo/transport/grpc/grpc_transport_layer_mock.h"
 #include "mongo/transport/grpc/mock_wire_version_provider.h"
 #include "mongo/transport/grpc/test_fixtures.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 
 /**
  * This file contains tests for DBClientGRPCStream. It utilizes the mocking framework provided by
@@ -59,15 +60,17 @@ public:
             CommandServiceTestFixtures::makeTLOptions(),
             resolver,
             HostAndPort(MockStubTestFixtures::kClientAddress));
-        uassertStatusOK(tl->setup());
-        getServiceContext()->setTransportLayer(std::move(tl));
-        uassertStatusOK(getServiceContext()->getTransportLayer()->start());
+
+        getServiceContext()->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
+        uassertStatusOK(getServiceContext()->getTransportLayerManager()->setup());
+        uassertStatusOK(getServiceContext()->getTransportLayerManager()->start());
 
         _server = std::make_unique<MockServer>(std::move(_pipe.consumer));
     }
 
     void tearDown() {
-        getServiceContext()->getTransportLayer()->shutdown();
+        getServiceContext()->getTransportLayerManager()->shutdown();
         ServiceContextTest::tearDown();
     }
 

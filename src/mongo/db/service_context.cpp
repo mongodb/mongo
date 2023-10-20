@@ -53,7 +53,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
@@ -245,8 +245,8 @@ PeriodicRunner* ServiceContext::getPeriodicRunner() const {
     return _runner.get();
 }
 
-transport::TransportLayer* ServiceContext::getTransportLayer() const {
-    return _transportLayer.get();
+transport::TransportLayerManager* ServiceContext::getTransportLayerManager() const {
+    return _transportLayerManager.get();
 }
 
 transport::SessionManager* ServiceContext::getSessionManager() const {
@@ -279,8 +279,9 @@ void ServiceContext::setSessionManager(std::unique_ptr<transport::SessionManager
     _sessionManager = std::move(sm);
 }
 
-void ServiceContext::setTransportLayer(std::unique_ptr<transport::TransportLayer> tl) {
-    _transportLayer = std::move(tl);
+void ServiceContext::setTransportLayerManager(
+    std::unique_ptr<transport::TransportLayerManager> tl) {
+    _transportLayerManager = std::move(tl);
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {
@@ -322,8 +323,8 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
     // The baton must be attached before attaching to a client
-    if (_transportLayer) {
-        _transportLayer->makeBaton(opCtx.get());
+    if (_transportLayerManager) {
+        _transportLayerManager->getEgressLayer()->makeBaton(opCtx.get());
     } else {
         makeBaton(opCtx.get());
     }

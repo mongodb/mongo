@@ -72,6 +72,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/database_name_util.h"
@@ -112,11 +113,12 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
     transport::ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    auto swSession = getGlobalServiceContext()->getTransportLayer()->connect(
-        host,
-        transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
-        _socketTimeout.value_or(Milliseconds(5000)),
-        transientSSLParams);
+    auto swSession =
+        getGlobalServiceContext()->getTransportLayerManager()->getEgressLayer()->connect(
+            host,
+            transientSSLParams ? transport::kEnableSSL : getURI().getSSLMode(),
+            _socketTimeout.value_or(Milliseconds(5000)),
+            transientSSLParams);
     return swSession;
 }
 

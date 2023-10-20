@@ -39,7 +39,7 @@
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_manager.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
@@ -86,20 +86,20 @@ public:
         _grpcTL = grpcTL.get();
         layers.push_back(std::move(grpcTL));
 
-        getServiceContext()->setTransportLayer(
-            std::make_unique<TransportLayerManager>(std::move(layers), _asioTL));
-        uassertStatusOK(getServiceContext()->getTransportLayer()->setup());
-        uassertStatusOK(getServiceContext()->getTransportLayer()->start());
+        getServiceContext()->setTransportLayerManager(
+            std::make_unique<TransportLayerManagerImpl>(std::move(layers), _asioTL));
+        uassertStatusOK(getServiceContext()->getTransportLayerManager()->setup());
+        uassertStatusOK(getServiceContext()->getTransportLayerManager()->start());
     }
 
     void tearDown() override {
         getServiceContext()->getSessionManager()->endAllSessions({});
-        getServiceContext()->getTransportLayer()->shutdown();
+        getServiceContext()->getTransportLayerManager()->shutdown();
         ServiceContextTest::tearDown();
     }
 
     TransportLayerManager& getTransportLayerManager() {
-        return checked_cast<TransportLayerManager&>(*getServiceContext()->getTransportLayer());
+        return *getServiceContext()->getTransportLayerManager();
     }
 
     AsioTransportLayer& getAsioTransportLayer() {
@@ -195,11 +195,11 @@ TEST_F(AsioGRPCTransportLayerManagerTest, EgressAsio) {
         uassertStatusOK(session.sinkMessage(swMsg.getValue()));
     });
 
-    auto swSession =
-        getTransportLayerManager().connect(HostAndPort("localhost", 27017),
-                                           ConnectSSLMode::kGlobalSSLMode,
-                                           grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                           boost::none);
+    auto swSession = getTransportLayerManager().getEgressLayer()->connect(
+        HostAndPort("localhost", 27017),
+        ConnectSSLMode::kGlobalSSLMode,
+        grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+        boost::none);
     ASSERT_OK(swSession);
     ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
     grpc::assertEchoSucceeds(*swSession.getValue());

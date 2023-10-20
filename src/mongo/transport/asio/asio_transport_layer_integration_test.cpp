@@ -41,6 +41,7 @@
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -106,7 +107,8 @@ TEST(AsioTransportLayer, ShortReadsAndWritesWork) {
     auto server = connectionString.getServers().front();
 
     auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
+    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
+        transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
     const ScopeGuard threadGuard([&] {
@@ -143,7 +145,8 @@ TEST(AsioTransportLayer, asyncConnectTimeoutCleansUpSocket) {
     auto server = connectionString.getServers().front();
 
     auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
+    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
+        transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
 
@@ -165,7 +168,8 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldReceiveMultipleReplies) {
     auto server = connectionString.getServers().front();
 
     auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
+    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
+        transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
     const ScopeGuard threadGuard([&] {
@@ -249,7 +253,8 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldStopOnFailure) {
     auto server = connectionString.getServers().front();
 
     auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayer()->getReactor(transport::TransportLayer::kNewReactor);
+    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
+        transport::TransportLayer::kNewReactor);
 
     stdx::thread thread([&] { reactor->run(); });
     const ScopeGuard threadGuard([&] {

@@ -57,6 +57,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
@@ -770,17 +771,19 @@ public:
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
         svcCtx->setSessionManager(std::make_unique<test::MockSessionManager>());
-        svcCtx->setTransportLayer(makeTLA(svcCtx->getSessionManager()));
+        auto tl = makeTLA(svcCtx->getSessionManager());
+        svcCtx->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
     }
 
     void tearDown() override {
         auto* svcCtx = getServiceContext();
         svcCtx->getSessionManager()->shutdown(Seconds{1});
-        svcCtx->getTransportLayer()->shutdown();
+        svcCtx->getTransportLayerManager()->shutdown();
     }
 
     AsioTransportLayer& tla() {
-        auto tl = getServiceContext()->getTransportLayer();
+        auto tl = getServiceContext()->getTransportLayerManager()->getEgressLayer();
         return *checked_cast<AsioTransportLayer*>(tl);
     }
 };
@@ -1023,7 +1026,8 @@ public:
         svcCtx->getService()->setServiceEntryPoint(
             std::make_unique<test::ServiceEntryPointUnimplemented>());
         svcCtx->setSessionManager(std::move(sessionManager));
-        svcCtx->setTransportLayer(std::move(tl));
+        svcCtx->setTransportLayerManager(
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
 
         _connThread = std::make_unique<ConnectionThread>(listenerPort);
         _client = svcCtx->getService()->makeClient("NetworkBatonTest", pf.future.get());
@@ -1033,7 +1037,7 @@ public:
         _connThread.reset();
         auto* svcCtx = getServiceContext();
         svcCtx->getSessionManager()->shutdown(Seconds{0});
-        svcCtx->getTransportLayer()->shutdown();
+        svcCtx->getTransportLayerManager()->shutdown();
     }
 
     Client& client() {
@@ -1317,7 +1321,8 @@ class EgressSessionWithScopedReactor {
 public:
     EgressSessionWithScopedReactor(ServiceContext* sc)
         : _sc(sc),
-          _reactor(sc->getTransportLayer()->getReactor(TransportLayer::kNewReactor)),
+          _reactor(sc->getTransportLayerManager()->getEgressLayer()->getReactor(
+              TransportLayer::kNewReactor)),
           _reactorThread([&] { _reactor->run(); }),
           _session(_makeEgressSession()) {}
 
@@ -1332,11 +1337,13 @@ public:
 
 private:
     std::shared_ptr<Session> _makeEgressSession() {
-        auto tla = checked_cast<AsioTransportLayer*>(_sc->getTransportLayer());
+        auto tla =
+            checked_cast<AsioTransportLayer*>(_sc->getTransportLayerManager()->getEgressLayer());
 
         HostAndPort localTarget(testHostName(), tla->listenerPort());
 
-        return _sc->getTransportLayer()
+        return _sc->getTransportLayerManager()
+            ->getEgressLayer()
             ->asyncConnect(localTarget,
                            ConnectSSLMode::kGlobalSSLMode,
                            _reactor,

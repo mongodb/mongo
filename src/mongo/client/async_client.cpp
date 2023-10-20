@@ -70,6 +70,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
@@ -100,8 +101,8 @@ Future<AsyncDBClient::Handle> AsyncDBClient::connect(
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext) {
-    auto tl = context->getTransportLayer();
-    return tl
+    auto tl = context->getTransportLayerManager();
+    return tl->getEgressLayer()
         ->asyncConnect(peer,
                        sslMode,
                        reactor,
