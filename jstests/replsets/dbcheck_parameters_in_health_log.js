@@ -6,7 +6,6 @@
  * ]
  */
 
-import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {checkHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const dbName = "dbCheckParametersInHealthLog";
@@ -39,8 +38,6 @@ function testParametersInHealthlog() {
     let dbCheckParameters = {maxDocsPerBatch: maxDocsPerBatch, batchWriteConcern: writeConcern};
     runDbCheck(replSet, db, colName, dbCheckParameters);
     let query = {
-        namespace: dbName + "." + colName,
-        collectionUUID: getUUIDFromListCollections(db, colName),
         data: {validateMode: "dataConsistency", secondaryIndex: "", skipLookupForExtraKeys: false}
     };
     checkHealthLog(primaryHealthlog, query, 2);
@@ -56,8 +53,6 @@ function testParametersInHealthlog() {
     };
     runDbCheck(replSet, db, colName, dbCheckParameters);
     query = {
-        namespace: dbName + "." + colName,
-        collectionUUID: getUUIDFromListCollections(db, colName),
         data: {
             validateMode: "dataConsistencyAndMissingIndexKeysCheck",
             secondaryIndex: "",
@@ -79,8 +74,6 @@ function testParametersInHealthlog() {
     };
     runDbCheck(replSet, db, colName, dbCheckParameters);
     query = {
-        namespace: dbName + "." + colName,
-        collectionUUID: getUUIDFromListCollections(db, colName),
         data: {
             validateMode: "extraIndexKeysCheck",
             secondaryIndex: "secondaryIndex",

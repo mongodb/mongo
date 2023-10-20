@@ -917,8 +917,6 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                 invocation.getSecondaryIndexCheckParameters();
             if (secondaryIndexCheckParameters) {
                 healthLogEntry->setData(secondaryIndexCheckParameters.value().toBSON());
-                healthLogEntry->setNss(invocation.getNss());
-                healthLogEntry->setCollectionUUID(invocation.getUuid());
             }
             HealthLogInterface::get(Client::getCurrent()->getServiceContext())
                 ->log(*healthLogEntry);

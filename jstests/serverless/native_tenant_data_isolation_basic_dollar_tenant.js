@@ -472,9 +472,7 @@ const testColl = testDb.getCollection(kCollName);
         return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1)
     });
     const tenantNss = kTenant + "_" + kDbName + "." + kCollName;
-    assert.soon(function() {
-        return (healthlog.find({"namespace": tenantNss}).itcount() == 3)
-    });
+    assert.eq(1, healthlog.find({"namespace": tenantNss}).count());
 }
 
 // fail server-side javascript commands/stages, all unsupported in serverless
