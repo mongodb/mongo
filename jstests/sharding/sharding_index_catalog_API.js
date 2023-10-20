@@ -6,6 +6,7 @@
  *   multiversion_incompatible,
  *   featureFlagGlobalIndexesShardingCatalog,
  *   config_shard_incompatible,
+ *   does_not_support_stepdowns,
  * ]
  */
 
