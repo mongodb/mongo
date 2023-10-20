@@ -8,6 +8,7 @@ import copy
 import threading
 import time
 import unittest
+from logging import Logger
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import logging
@@ -73,7 +74,11 @@ class TestReport(unittest.TestResult):
                     if test_info.status is None or test_info.return_code is None:
                         # Mark the test as having timed out if it was interrupted. It might have
                         # passed if the suite ran to completion, but we wouldn't know for sure.
-                        #
+                        for logger in test_info.loggers:
+                            if "AFTER_TIMEOUT" not in logger.name:
+                                logger.name = f"{logger.name}:AFTER_TIMEOUT"
+                            logger.error(
+                                "HIT EVERGREEN TIMEOUT: Hang analyzer will kill or abort processes")
                         # Until EVG-1536 is completed, we shouldn't distinguish between failures and
                         # interrupted tests in the report.json file. In Evergreen, the behavior to
                         # sort tests with the "timeout" test status after tests with the "pass" test
@@ -130,6 +135,8 @@ class TestReport(unittest.TestResult):
                                                                       test.logger, self.job_num,
                                                                       test.id(), self.job_logger)
 
+        test_info.add_logger(test_logger)
+        test_info.add_logger(self.job_logger)
         # Set up logging handlers to capture exceptions.
         test_info.exception_extractors = logging.loggers.configure_exception_capture(test_logger)
 
@@ -393,6 +400,7 @@ class TestInfo(object):
         self.test_file = test_file
         self.display_test_name = None
         self.dynamic = dynamic
+        self.loggers = []
 
         self.group_id = None
         self.start_time = None
@@ -403,6 +411,10 @@ class TestInfo(object):
         self.url_endpoint = None
         self.exception_extractors = []
         self.error = None
+
+    def add_logger(self, logger: Logger) -> None:
+        """Add logger instance."""
+        self.loggers.append(logger)
 
 
 def test_order(test_name):
