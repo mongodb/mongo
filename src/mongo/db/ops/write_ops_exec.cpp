@@ -758,6 +758,12 @@ UpdateResult performUpdate(OperationContext* opCtx,
                            UpdateRequest* updateRequest) {
     auto [isTimeseriesViewUpdate, nsString] =
         timeseries::isTimeseriesViewRequest(opCtx, *updateRequest);
+
+    if (isTimeseriesViewUpdate) {
+        checkCollectionUUIDMismatch(
+            opCtx, nsString.getTimeseriesViewNamespace(), nullptr, collectionUUID);
+    }
+
     // TODO SERVER-76583: Remove this check.
     uassert(7314600,
             "Retryable findAndModify on a timeseries is not supported",
@@ -892,6 +898,12 @@ long long performDelete(OperationContext* opCtx,
                         boost::optional<BSONObj>& docFound) {
     auto [isTimeseriesViewDelete, nsString] =
         timeseries::isTimeseriesViewRequest(opCtx, *deleteRequest);
+
+    if (isTimeseriesViewDelete) {
+        checkCollectionUUIDMismatch(
+            opCtx, nsString.getTimeseriesViewNamespace(), nullptr, collectionUUID);
+    }
+
     // TODO SERVER-76583: Remove this check.
     uassert(7308305,
             "Retryable findAndModify on a timeseries is not supported",
@@ -1424,6 +1436,9 @@ void runTimeseriesRetryableUpdates(OperationContext* opCtx,
                                    const write_ops::UpdateCommandRequest& wholeOp,
                                    std::shared_ptr<executor::TaskExecutor> executor,
                                    write_ops_exec::WriteResult* reply) {
+    checkCollectionUUIDMismatch(
+        opCtx, bucketNs.getTimeseriesViewNamespace(), nullptr, wholeOp.getCollectionUUID());
+
     size_t nextOpIndex = 0;
     for (auto&& singleOp : wholeOp.getUpdates()) {
         auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, nextOpIndex);
@@ -1480,9 +1495,14 @@ WriteResult performUpdates(OperationContext* opCtx,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
     NamespaceString originalNs;
-    if (source == OperationSource::kTimeseriesUpdate && !ns.isTimeseriesBucketsCollection()) {
-        originalNs = ns;
-        ns = ns.makeTimeseriesBucketsNamespace();
+    if (source == OperationSource::kTimeseriesUpdate) {
+        if (!ns.isTimeseriesBucketsCollection()) {
+            originalNs = ns;
+            ns = ns.makeTimeseriesBucketsNamespace();
+        }
+
+        checkCollectionUUIDMismatch(
+            opCtx, ns.getTimeseriesViewNamespace(), nullptr, wholeOp.getCollectionUUID());
     }
 
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
@@ -1740,8 +1760,13 @@ WriteResult performDeletes(OperationContext* opCtx,
                            const write_ops::DeleteCommandRequest& wholeOp,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
-    if (source == OperationSource::kTimeseriesDelete && !ns.isTimeseriesBucketsCollection()) {
-        ns = ns.makeTimeseriesBucketsNamespace();
+    if (source == OperationSource::kTimeseriesDelete) {
+        if (!ns.isTimeseriesBucketsCollection()) {
+            ns = ns.makeTimeseriesBucketsNamespace();
+        }
+
+        checkCollectionUUIDMismatch(
+            opCtx, ns.getTimeseriesViewNamespace(), nullptr, wholeOp.getCollectionUUID());
     }
 
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
@@ -2876,8 +2901,12 @@ write_ops::InsertCommandReply performTimeseriesWrites(
     OperationContext* opCtx, const write_ops::InsertCommandRequest& request, CurOp* curOp) {
     // If an expected collection UUID is provided, always fail because the user-facing time-series
     // namespace does not have a UUID.
-    checkCollectionUUIDMismatch(
-        opCtx, request.getNamespace(), nullptr, request.getCollectionUUID());
+    checkCollectionUUIDMismatch(opCtx,
+                                request.getNamespace().isTimeseriesBucketsCollection()
+                                    ? request.getNamespace().getTimeseriesViewNamespace()
+                                    : request.getNamespace(),
+                                nullptr,
+                                request.getCollectionUUID());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot insert into a time-series collection in a multi-document "

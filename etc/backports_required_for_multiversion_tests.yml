@@ -493,6 +493,8 @@ last-continuous:
     ticket: SERVER-80776
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
     ticket: SERVER-81985
+  - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
+    ticket: SERVER-81379
   suites: null
 last-lts:
   all:
@@ -1048,4 +1050,6 @@ last-lts:
     ticket: SERVER-81939
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
     ticket: SERVER-81985
+  - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
+    ticket: SERVER-81379
   suites: null

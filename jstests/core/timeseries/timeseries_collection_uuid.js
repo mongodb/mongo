@@ -6,31 +6,80 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const dbName = jsTestName();
 const collName = "coll";
+const bucketsCollName = "system.buckets." + collName;
 
 const testDB = db.getSiblingDB(dbName);
 testDB.dropDatabase();
 
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
-const coll = testDB[collName];
-const bucketsColl = testDB["system.buckets." + collName];
 
 const nonexistentUUID = UUID();
-const bucketsCollUUID = testDB.getCollectionInfos({name: bucketsColl.getName()})[0].info.uuid;
+const bucketsCollUUID = testDB.getCollectionInfos({name: bucketsCollName})[0].info.uuid;
+
+const checkResult = function(res, uuid) {
+    assert.commandFailedWithCode(res, ErrorCodes.CollectionUUIDMismatch);
+
+    if (res.writeErrors) {
+        assert.eq(res.writeErrors.length, 1);
+        res = res.writeErrors[0];
+    }
+
+    assert.eq(res.db, dbName);
+    assert.eq(res.collectionUUID, uuid);
+    assert.eq(res.expectedCollection, collName);
+    assert.eq(res.actualCollection, uuid === bucketsCollUUID ? bucketsCollName : null);
+};
 
 const testInsert = function(uuid, ordered) {
-    assert.commandFailedWithCode(testDB.runCommand({
+    checkResult(testDB.runCommand({
         insert: collName,
         documents: [{t: ISODate()}],
         collectionUUID: uuid,
         ordered: ordered,
     }),
-                                 ErrorCodes.CollectionUUIDMismatch);
+                uuid);
 };
 
-testInsert(nonexistentUUID, true);
-testInsert(nonexistentUUID, false);
-testInsert(bucketsCollUUID, true);
-testInsert(bucketsCollUUID, false);
+const testUpdate = function(uuid, field) {
+    assert.commandWorked(testDB[collName].insert({t: ISODate(), m: 1, a: 1}));
+    checkResult(testDB.runCommand({
+        update: collName,
+        updates: [{
+            q: {[field]: 1},
+            u: {$set: {[field]: 1}},
+        }],
+        collectionUUID: uuid,
+    }),
+                uuid);
+};
+
+const testDelete = function(uuid, field) {
+    assert.commandWorked(testDB[collName].insert({t: ISODate(), m: 1, a: 1}));
+    checkResult(testDB.runCommand({
+        delete: collName,
+        deletes: [{
+            q: {[field]: 1},
+            limit: 1,
+        }],
+        collectionUUID: uuid,
+    }),
+                uuid);
+};
+
+for (const uuid of [nonexistentUUID, bucketsCollUUID]) {
+    testInsert(uuid, true);
+    testInsert(uuid, false);
+
+    if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
+        testUpdate(uuid, "m");
+        testUpdate(uuid, "a");
+    }
+
+    testDelete(uuid, "m");
+    testDelete(uuid, "a");
+}
