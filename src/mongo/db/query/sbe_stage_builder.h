@@ -154,11 +154,14 @@ public:
     //    Typically, this is requested by stages that wish to avoid generating duplicate
     //    expressions for path traversal (for example, $group stages which reference the same
     //    field path across multiple accumulators).
+    // 5) kFilterCellField slots represent the value obtained from evaluating a dotted path on top
+    //    of a timeseries bucket, expanding arrays as they are encountered during the traversal.
     enum class Type {
         kMeta,
         kField,
         kSortKey,
         kPathExpr,
+        kFilterCellField,
     };
 
     using Name = std::pair<Type, StringData>;
@@ -168,6 +171,7 @@ public:
     static constexpr auto kField = Type::kField;
     static constexpr auto kSortKey = Type::kSortKey;
     static constexpr auto kPathExpr = Type::kPathExpr;
+    static constexpr auto kFilterCellField = Type::kFilterCellField;
 
     static constexpr Name kResult = {kMeta, "result"_sd};
     static constexpr Name kRecordId = {kMeta, "recordId"_sd};

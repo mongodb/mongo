@@ -48,6 +48,7 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_vectorizer.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -59,7 +60,6 @@ struct CellPathReqsRet {
     std::vector<sv::CellBlock::PathRequest> topLevelPaths;
     std::vector<sv::CellBlock::PathRequest> traversePaths;
 };
-
 
 // The set of fields specified in a bucket spec contains the fields that should be available after
 // bucket-level processing _and_ unpacking of this bucket is done. This means that it includes the
@@ -75,23 +75,57 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
     ret.traversePaths.reserve(fieldSet.size() - computedFromMeta.size());
     for (const auto& field : fieldSet) {
         if (computedFromMeta.find(field) == computedFromMeta.end()) {
-            // For each path we generated a "traversed" version, which, when accessed, has array
-            // elements flattened. We also generate a 'topLevelPath' version, which is just the
-            // value of the top level field, with no traversal.
-
-            ret.traversePaths.emplace_back(sv::CellBlock::PathRequest{
-                {sv::CellBlock::Get{field}, sv::CellBlock::Traverse{}, sv::CellBlock::Id{}}});
+            // For each path requested by the query we generate a 'topLevelPath' version, which is
+            // just the value of the top level field, with no traversal.
 
             ret.topLevelPaths.emplace_back(
                 sv::CellBlock::PathRequest{{sv::CellBlock::Get{field}, sv::CellBlock::Id{}}});
         }
     }
 
+    // The event filter must work on top of "traversed" version of the data, which, when accessed,
+    // has array elements flattened.
+    if (unpackNode->eventFilter) {
+        DepsTracker eventFilterDeps = {};
+        match_expression::addDependencies(unpackNode->eventFilter.get(), &eventFilterDeps);
+        for (const auto& path : eventFilterDeps.fields) {
+            auto rootField = FieldPath::extractFirstFieldFromDottedPath(path).toString();
+            // Check that the collected path doesn't start from a metadata field, and that it's one
+            // of the fields that the query uses.
+            if (fieldSet.find(rootField) != fieldSet.end() &&
+                computedFromMeta.find(rootField) == computedFromMeta.end()) {
+
+                FieldPath fp(path);
+                sv::CellBlock::PathRequest pReq;
+                for (size_t i = 0; i < fp.getPathLength(); i++) {
+                    pReq.path.insert(pReq.path.end(),
+                                     {sv::CellBlock::Get{fp.getFieldName(i).toString()},
+                                      sv::CellBlock::Traverse{}});
+                }
+                pReq.path.emplace_back(sv::CellBlock::Id{});
+                ret.traversePaths.emplace_back(std::move(pReq));
+            }
+        }
+    }
+
     return ret;
-};
+}
 
 const std::string& getTopLevelField(const sv::CellBlock::PathRequest& pathReq) {
     return std::get<sv::CellBlock::Get>(pathReq.path[0]).field;
+}
+
+std::string getFullPath(const sv::CellBlock::PathRequest& pathReq) {
+    StringBuilder sb;
+    for (const auto& path : pathReq.path) {
+        if (std::holds_alternative<sv::CellBlock::Get>(path)) {
+            if (sb.len() != 0) {
+                sb.append(".");
+            }
+            sb.append(std::get<sv::CellBlock::Get>(path).field);
+        }
+    }
+    return sb.str();
 }
 
 // TODO SERVER-80243: Remove this function once the stage builder is stable.
@@ -179,15 +213,14 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // a sequence of "rows" with fields, extracted from the bucket's data. The stages between these
     // two do block processing over the cells.
     auto [topLevelReqs, traverseReqs] = getCellPathReqs(unpackNode);
-    invariant(topLevelReqs.size() == traverseReqs.size());
     auto allReqs = topLevelReqs;
     allReqs.insert(allReqs.end(), traverseReqs.begin(), traverseReqs.end());
 
     auto allCellSlots = _slotIdGenerator.generateMultiple(allReqs.size());
-    auto topLevelSlots = sbe::value::SlotVector(allCellSlots.begin(),
-                                                allCellSlots.begin() + allCellSlots.size() / 2);
+    auto topLevelSlots =
+        sbe::value::SlotVector(allCellSlots.begin(), allCellSlots.begin() + topLevelReqs.size());
     auto traversedCellSlots =
-        sbe::value::SlotVector(allCellSlots.begin() + allCellSlots.size() / 2, allCellSlots.end());
+        sbe::value::SlotVector(allCellSlots.begin() + topLevelReqs.size(), allCellSlots.end());
 
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(childStage),
@@ -201,14 +234,15 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
 
     // Adds slots from CellBlocks, but only the traversed ones which can be used for evaluating
     // $match.  Later we're going to reset the outputs to scalar slots anyway.
-    for (size_t i = 0; i < topLevelReqs.size(); ++i) {
-        auto field = getTopLevelField(topLevelReqs[i]);
+    for (size_t i = 0; i < traverseReqs.size(); ++i) {
+        auto field = getFullPath(traverseReqs[i]);
+        auto key = std::make_pair(PlanStageSlots::kFilterCellField, field);
         if (field == unpackNode->bucketSpec.timeField()) {
-            outputs.set(std::make_pair(PlanStageSlots::kField, field),
+            outputs.set(key,
                         TypedSlot{traversedCellSlots[i],
                                   TypeSignature::kCellType.include(TypeSignature::kDateTimeType)});
         } else {
-            outputs.set(std::make_pair(PlanStageSlots::kField, field),
+            outputs.set(key,
                         TypedSlot{traversedCellSlots[i],
                                   TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
         }
@@ -291,6 +325,11 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
     }
 
+    // Remove the precomputed paths that we used in the match stage.
+    for (size_t i = 0; i < traverseReqs.size(); ++i) {
+        auto field = getFullPath(traverseReqs[i]);
+        outputs.clear(std::make_pair(PlanStageSlots::kFilterCellField, field));
+    }
     auto unpackedSlots = _slotIdGenerator.generateMultiple(topLevelReqs.size());
 
     // Adds the BlockToRowStage.

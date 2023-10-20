@@ -224,15 +224,14 @@ TEST(VectorizerTest, ConvertBooleanOpOnCell) {
 TEST(VectorizerTest, ConvertFilter) {
     auto tmpVar = getABTLocalVariableName(7, 0);
     auto tree1 = make<FunctionCall>(
-        "traverseF",
+        "blockTraverseFPlaceholder",
         makeSeq(make<Variable>("inputVar"),
                 make<LambdaAbstraction>(
                     tmpVar,
                     make<BinaryOp>(
                         Operations::FillEmpty,
                         make<BinaryOp>(Operations::Gt, make<Variable>(tmpVar), Constant::int32(9)),
-                        Constant::boolean(false))),
-                Constant::boolean(false)));
+                        Constant::boolean(false)))));
 
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;

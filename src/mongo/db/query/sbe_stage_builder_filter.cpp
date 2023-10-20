@@ -371,9 +371,26 @@ void generatePredicate(MatchExpressionVisitorContext* context,
             }
         }
 
-        // Search for a kField slot whose path matches the first part of 'path'.
-        topLevelFieldSlot =
-            slots->getIfExists(std::make_pair(PlanStageSlots::kField, path.getPart(0)));
+        // Check if this operation is supposed to work only on the array elements and that the
+        // navigation of the full path has been made available via the dedicated slot type; in this
+        // case generate a special version of traverseF that doesn't have a runtime counterpart and
+        // can only be processed by the block vectorizer.
+        if (auto slot = slots->getIfExists(
+                std::make_pair(PlanStageSlots::kFilterCellField, path.dottedField()));
+            slot && mode == LeafTraversalMode::kArrayElementsOnly) {
+            SbExprBuilder b(context->state);
+            auto lambdaFrameId = context->state.frameIdGenerator->generate();
+            auto traverseFExpr = b.makeFunction(
+                "blockTraverseFPlaceholder"_sd,
+                b.makeVariable(slot->slotId),
+                b.makeLocalLambda(lambdaFrameId, makePredicate(SbExpr{SbVar{lambdaFrameId, 0}})));
+            frame.pushExpr(std::move(traverseFExpr));
+            return;
+        } else {
+            // Search for a kField slot whose path matches the first part of 'path'.
+            topLevelFieldSlot =
+                slots->getIfExists(std::make_pair(PlanStageSlots::kField, path.getPart(0)));
+        }
     }
 
     tassert(7097205,

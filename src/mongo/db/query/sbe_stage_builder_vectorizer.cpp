@@ -350,8 +350,15 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                                         const optimizer::FunctionCall& op) {
     size_t arity = op.nodes().size();
 
-    if (op.name() == "traverseF" && arity == 3 && op.nodes()[2].is<optimizer::Constant>() &&
-        op.nodes()[2].cast<optimizer::Constant>()->getValueBool() == false) {
+    if (op.name() == "blockTraverseFPlaceholder" && arity == 2) {
+        // This placeholder function is injected when a tree like "traverseF(block_slot, <lambda>,
+        // false)" would be used on scalar values. The traverseF would execute the lambda on the
+        // current value in the slot if it is not an array; if it contains an array, it would
+        // run the lambda on each element, picking as final result "true" (if at least one of
+        // the outputs of the lambda is "true") otherwise "false". This behavior on a cell slot
+        // is guaranteed by applying the lambda on the block representing the expanded cell
+        // values and then invoking the valueBlockCellFold_F operation on the result.
+
         auto argument = op.nodes()[0].visit(*this);
         if (!argument.expr.has_value()) {
             return argument;
@@ -359,13 +366,6 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
 
         if (TypeSignature::kBlockType.isSubset(argument.typeSignature) &&
             argument.sourceCell.has_value()) {
-            // A tree like "traverseF(block_slot, <lambda>, false)" would execute the lambda on the
-            // current value in the slot if it is not an array; if it contains an array, it would
-            // run the lambda on each element, picking as final result "true" (if at least one of
-            // the outputs of the lambda is "true") otherwise "false". This behavior on a cell slot
-            // is guaranteed by applying the lambda on the block representing the expanded cell
-            // values and then invoking the valueBlockCellFold_F operation on the result.
-
             const optimizer::LambdaAbstraction* lambda =
                 op.nodes()[1].cast<optimizer::LambdaAbstraction>();
             // Reuse the variable name of the lambda so that we don't have to manipulate the code
