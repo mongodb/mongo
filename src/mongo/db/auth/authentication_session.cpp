@@ -67,16 +67,28 @@ Status crossVerifyUserNames(const UserName& oldUser,
         return Status::OK();
     }
 
-    if (!getTestCommandsEnabled()) {
-        // Authenticating the __system@local user to the admin database on mongos is required
-        // by the auth passthrough test suite, hence we forgive this set of errors in testing.
-
-        if (oldUser.getDB() != newUser.getDB()) {
-            return {ErrorCodes::ProtocolError,
-                    str::stream()
-                        << "Attempt to switch database target during SASL authentication from "
-                        << oldUser << " to " << newUser};
+    // There are some special cases around __system where a switch in the username is acceptable.
+    if (oldUser.getUser() == "__system") {
+        // If the new user is on $external and X.509 auth is being used, then any username is
+        // allowed.
+        if (newUser.getDB() == "$external" && isMechX509) {
+            return Status::OK();
         }
+    }
+
+    // Allow a switch from an empty user on admin to __system@local if enableTestCommands is true.
+    // This is needed for auth passthrough suites on mongos.
+    if (getTestCommandsEnabled() && oldUser.getUser().empty() && oldUser.getDB() == "admin" &&
+        newUser.getUser() == "__system" && newUser.getDB() == "local") {
+        return Status::OK();
+    }
+
+    // Barring special cases, both the database and the username must be the same.
+    if (oldUser.getDB() != newUser.getDB()) {
+        return {
+            ErrorCodes::ProtocolError,
+            str::stream() << "Attempt to switch database target during SASL authentication from "
+                          << oldUser << " to " << newUser};
     }
 
     if (oldUser.getUser().empty() || newUser.getUser().empty()) {
@@ -84,11 +96,7 @@ Status crossVerifyUserNames(const UserName& oldUser,
         return Status::OK();
     }
 
-    // In the case where we are executing X509 authentication, we want to allow the user to change
-    // from __system (which, if this is the case, means that the initial hello command specified
-    // the saslSupportedMechs field) to the user specified in the certificate for X509.
-    bool isSystemX509BypassingNameConstraints = oldUser.getUser() == "__system" && isMechX509;
-    if (oldUser.getUser() != newUser.getUser() && !isSystemX509BypassingNameConstraints) {
+    if (oldUser.getUser() != newUser.getUser()) {
         return {ErrorCodes::ProtocolError,
                 str::stream() << "Attempt to switch user during SASL authentication from "
                               << oldUser << " to " << newUser};
