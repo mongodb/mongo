@@ -6,7 +6,7 @@
 
 load("jstests/libs/log.js");  // For findMatchingLogLine.
 
-var x509_options = {
+const x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     sslCAFile: "jstests/libs/ca.pem",
@@ -14,27 +14,34 @@ var x509_options = {
     sslAllowInvalidHostnames: "",
     clusterAuthMode: "x509"
 };
-
-const mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
-
 const CLIENT_USER = "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
-const ext = mongo.getDB("$external");
-ext.createUser({user: CLIENT_USER, roles: []});
 
-assert.commandWorked(ext.runCommand({
-    hello: 1,
-    saslSupportedMechs: "local.__system",
-    speculativeAuthenticate: {authenticate: "1", mechanism: "MONGODB-X509", db: "$external"}
-}));
+function runTest() {
+    const mongo = MongoRunner.runMongod(Object.merge(x509_options, {auth: ""}));
 
-const profileLevelDB = mongo.getDB("x509_basic");
-const globalLog = assert.commandWorked(profileLevelDB.adminCommand({getLog: 'global'}));
-const fieldMatcher = {
-    msg: "Different user name was supplied to saslSupportedMechs"
-};
-assert.eq(
-    null,
-    findMatchingLogLine(globalLog.log, fieldMatcher),
-    "Found log line concerning \"Different user name was supplied to saslSupportedMechs\" when we did not expect to.");
-MongoRunner.stopMongod(mongo);
+    const ext = mongo.getDB("$external");
+    ext.createUser({user: CLIENT_USER, roles: []});
+
+    assert.commandWorked(ext.runCommand({
+        hello: 1,
+        saslSupportedMechs: "local.__system",
+        speculativeAuthenticate: {authenticate: "1", mechanism: "MONGODB-X509", db: "$external"}
+    }));
+
+    const profileLevelDB = mongo.getDB("x509_basic");
+    const globalLog = assert.commandWorked(profileLevelDB.adminCommand({getLog: 'global'}));
+    const fieldMatcher = {msg: "Different user name was supplied to saslSupportedMechs"};
+    assert.eq(
+        null,
+        findMatchingLogLine(globalLog.log, fieldMatcher),
+        "Found log line concerning \"Different user name was supplied to saslSupportedMechs\" when we did not expect to.");
+    MongoRunner.stopMongod(mongo);
+}
+
+// Since the logic around this log has special-casing around enableTestCommands, assert that the log
+// is absent both when in test-mode and normal mode.
+TestData.enableTestCommands = true;
+runTest();
+TestData.enableTestCommands = false;
+runTest();
 })();
