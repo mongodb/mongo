@@ -143,6 +143,11 @@
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
+#include <linux/hw_breakpoint.h> /* Definition of HW_* constants */
+#include <linux/perf_event.h>    /* Definition of PERF_* constants */
+#include <sys/syscall.h>         /* Definition of SYS_* constants */
+#include <unistd.h>
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 
@@ -515,6 +520,50 @@ public:
                 exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
         }
 
+        std::pair<int, struct perf_event_attr*> openPerfCounter() {
+
+            struct perf_event_attr* attr =
+                (struct perf_event_attr*)calloc(1, sizeof(struct perf_event_attr));
+
+            attr->config = PERF_COUNT_HW_INSTRUCTIONS;
+            attr->type = PERF_TYPE_HARDWARE;
+            attr->disabled = 0;
+            attr->inherit = 0;
+            attr->pinned = 0;
+            attr->exclude_kernel = 1;
+            attr->exclude_hv = 1;
+            attr->size = sizeof(*attr);
+
+            int perfFd = syscall(__NR_perf_event_open, attr, 0, -1, -1, 0);
+            if (perfFd < 0) {
+                LOGV2_ERROR(111111, "Failed to open HW performance counter", "errno"_attr = errno);
+                free(attr);
+                uasserted(ErrorCodes::InternalError, "Failed to open HW performance counter");
+            } else {
+                LOGV2(11111, "Opened HW performance counter", "fd"_attr = perfFd);
+            }
+
+            return {perfFd, attr};
+        }
+
+        uint64_t readPerfCounter(const std::pair<int, struct perf_event_attr*>& perfPair) {
+            uint64_t val;
+            uassert(ErrorCodes::InternalError, "Invalid perf fd", perfPair.first > 0);
+            const int rc = read(perfPair.first, &val, sizeof(val));
+            uassert(
+                ErrorCodes::InternalError, "Failed to read to required size", rc == sizeof(val));
+            return val;
+        }
+
+        void closePerf(std::pair<int, struct perf_event_attr*> perfPair) {
+            free(perfPair.second);
+
+            int res = close(perfPair.first);
+            uassert(ErrorCodes::InternalError,
+                    str::stream() << "Failed to close perf fd :" << res << " with errno:" << errno,
+                    res == 0);
+        }
+
         /**
          * Runs a query using the following steps:
          *   --Parsing.
@@ -525,6 +574,10 @@ public:
          *   --Generate response to send to the client.
          */
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+            LOGV2(11111, "Collecting performance counter for query", "query"_attr = _request.body);
+            auto perfPair = openPerfCounter();
+            const uint64_t initialValue = readPerfCounter(perfPair);
+
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
             const BSONObj& cmdObj = _request.body;
@@ -926,6 +979,12 @@ public:
             metricsCollector.incrementDocUnitsReturned(toStringForLogging(nss), docUnitsReturned);
             query_request_helper::validateCursorResponse(
                 result->getBodyBuilder().asTempObj(), nss.tenantId(), respSc);
+
+            const uint64_t finalValue = readPerfCounter(perfPair);
+            closePerf(perfPair);
+            LOGV2(111111,
+                  "Number of HW instructions executed",
+                  "instructions"_attr = (finalValue - initialValue));
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
