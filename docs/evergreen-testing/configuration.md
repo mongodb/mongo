@@ -13,11 +13,11 @@ section of the Evergreen wiki.
 ### `mongodb-mongo-master`
 The main project for testing MongoDB's dev environments with a number build variants,
 each one corresponding to a particular compile or testing environment to support development.
-Each build variant runs a set of tasks; each task ususally runs one or more tests.
+Each build variant runs a set of tasks; each task usually runs one or more tests.
 
 ### `mongodb-mongo-master-nightly
 Tracks the same branch as `mongodb-mongo-master`, each build variant corresponds to a
-(version, OS, architecure) triplet for a supported MongoDB nightly release.
+(version, OS, architecture) triplet for a supported MongoDB nightly release.
 
 ### `sys_perf`
 The system performance project.

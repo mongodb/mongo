@@ -293,7 +293,7 @@ outputRootPattern:
     type: String
     optional: true
     description:
-         Root path patten that will be used to write expected and actual test outputs for all tests 
+         Root path pattern that will be used to write expected and actual test outputs for all tests 
          in the test run.
          If not specified a temporary folder location will be used.
          Path pattern string may use '%' characters in the last part of the path. '%' characters in

@@ -174,7 +174,7 @@ using.
 #### Adding tests to a suite
 #### Running individual tests
 
-## Modifying the buid system
+## Modifying the build system
 ### What is SCons?
 #### `SConstruct` and `SConscripts`
 #### `Environments `and their `Clone`s

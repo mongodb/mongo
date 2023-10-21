@@ -14,7 +14,7 @@ protocol standard.
 e.g., when connecting to a local `mongos` instance, if the `loadBalancerPort` server parameter was set to 20100, the
 connection string must be of the form `"mongodb://localhost:20100/?loadBalanced=true"`.
 
-`mongos` will emit appropiate error messages on connection attempts if these requirements are not
+`mongos` will emit appropriate error messages on connection attempts if these requirements are not
 met.
 
 There are some subtle behavioral differences that these configuration options enable, chief of
