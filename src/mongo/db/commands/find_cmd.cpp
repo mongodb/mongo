@@ -555,6 +555,7 @@ public:
             return val;
         }
 
+        // Todo : replace manual call by RAII to avoid leak issues
         void closePerf(std::pair<int, struct perf_event_attr*> perfPair) {
             free(perfPair.second);
 
