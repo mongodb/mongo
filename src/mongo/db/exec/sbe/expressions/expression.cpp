@@ -637,6 +637,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"collAddToSet", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::collAddToSet, true}},
     {"collAddToSetCapped",
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::collAddToSetCapped, true}},
+    {"setToArray", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::setToArray, false}},
     {"doubleDoubleSum",
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::doubleDoubleSum, false}},
     {"aggDoubleDoubleSum",

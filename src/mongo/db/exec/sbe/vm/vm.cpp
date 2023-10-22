@@ -4877,6 +4877,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIsSubset(Arit
     return setIsSubset(lhsTag, lhsVal, rhsTag, rhsVal);
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetToArray(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [owned, tag, val] = getFromStack(0);
+
+    if (tag != value::TypeTags::ArraySet && tag != value::TypeTags::ArrayMultiSet) {
+        // passthrough if its not a set
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {owned, tag, val};
+    }
+
+    auto [resTag, resVal] = value::makeNewArray();
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resView = value::getArrayView(resVal);
+
+    value::arrayForEach<true>(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
+        resView->push_back(elTag, elVal);
+    });
+
+    resGuard.reset();
+    return {true, resTag, resVal};
+}
+
 namespace {
 /**
  * A helper function to extract the next match in the subject string using the compiled regex
@@ -8901,6 +8924,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:
             return builtinArrayToObject(arity);
+        case Builtin::setToArray:
+            return builtinSetToArray(arity);
         case Builtin::aggFirstNNeedsMoreInput:
             return builtinAggFirstNNeedsMoreInput(arity);
         case Builtin::aggFirstN:
@@ -9353,6 +9378,8 @@ std::string builtinToString(Builtin b) {
             return "objectToArray";
         case Builtin::arrayToObject:
             return "arrayToObject";
+        case Builtin::setToArray:
+            return "setToArray";
         case Builtin::aggFirstNNeedsMoreInput:
             return "aggFirstNNeedsMoreInput";
         case Builtin::aggFirstN:

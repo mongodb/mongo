@@ -796,6 +796,7 @@ enum class Builtin : uint16_t {
     isoDayOfWeek,
     isoWeek,
     objectToArray,
+    setToArray,
     arrayToObject,
 
     aggFirstNNeedsMoreInput,
@@ -1822,7 +1823,7 @@ private:
                                                                       CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
-
+    FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     // The template parameter is false for a regular DoubleDouble summation and true if merging
     // partially computed DoubleDouble sums.

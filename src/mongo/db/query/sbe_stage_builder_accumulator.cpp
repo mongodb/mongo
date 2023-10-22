@@ -782,7 +782,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorTopBottomN(
 
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     aggs.push_back(makeFunction(isAccumulatorTopN(expr) ? "aggTopN" : "aggBottomN",
-                                std::move(key),
+                                makeFunction("setToArray", std::move(key)),
                                 std::move(value),
                                 std::move(sortSpec)));
     return aggs;
@@ -906,11 +906,13 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorMinMaxN(
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     auto aggExprName = expr.name == AccumulatorMaxN::kName ? "aggMaxN" : "aggMinN";
     if (collatorSlot) {
-        aggs.push_back(
-            makeFunction(std::move(aggExprName), std::move(arg), makeVariable(*collatorSlot)));
+        aggs.push_back(makeFunction(std::move(aggExprName),
+                                    makeFunction("setToArray", std::move(arg)),
+                                    makeVariable(*collatorSlot)));
 
     } else {
-        aggs.push_back(makeFunction(std::move(aggExprName), std::move(arg)));
+        aggs.push_back(
+            makeFunction(std::move(aggExprName), makeFunction("setToArray", std::move(arg))));
     }
     return aggs;
 }
