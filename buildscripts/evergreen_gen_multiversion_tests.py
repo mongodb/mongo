@@ -7,7 +7,9 @@ import tempfile
 from collections import defaultdict
 from sys import platform
 
+from typing import Optional
 from subprocess import check_output
+from github import GithubIntegration
 
 import requests
 import click
@@ -18,7 +20,7 @@ from buildscripts.resmokelib.multiversionconstants import (
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.fileops import read_yaml_file
 import buildscripts.ciconfig.tags as _tags
-
+from buildscripts.util.read_config import read_config_file
 # pylint: disable=len-as-condition
 
 LOGGER = structlog.getLogger(__name__)
@@ -33,7 +35,7 @@ EXCLUDE_TAGS_FILE = "multiversion_exclude_tags.yml"
 # The directory in which BACKPORTS_REQUIRED_FILE resides.
 ETC_DIR = "etc"
 BACKPORTS_REQUIRED_FILE = "backports_required_for_multiversion_tests.yml"
-BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/mongodb/mongo"
+BACKPORTS_REQUIRED_BASE_URL = "https://raw.githubusercontent.com/10gen/mongo"
 
 
 def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
@@ -58,11 +60,44 @@ def get_backports_required_hash_for_shell_version(mongo_shell_path=None):
     raise ValueError("Could not find a valid commit hash from the last-lts mongo binary.")
 
 
-def get_last_lts_yaml(commit_hash):
+def get_installation_access_token(app_id: int, private_key: str,
+                                  installation_id: int) -> Optional[str]:  # noqa: D406,D407,D413
+    """
+    Obtain an installation access token using JWT.
+
+    Args:
+    - app_id: The application ID for GitHub App.
+    - private_key: The private key associated with the GitHub App.
+    - installation_id: The installation ID of the GitHub App for a particular account.
+
+    Returns:
+    - Optional[str]: The installation access token. Returns `None` if there's an error obtaining the token.
+    """
+    integration = GithubIntegration(app_id, private_key)
+    auth = integration.get_access_token(installation_id)
+    if auth:
+        return auth.token
+    else:
+        LOGGER.info("Error obtaining installation token")
+        return None
+
+
+def get_last_lts_yaml(commit_hash, expansions_file):
     """Download BACKPORTS_REQUIRED_FILE from the last LTS commit and return the yaml."""
     LOGGER.info(f"Downloading file from commit hash of last-lts branch {commit_hash}")
+
+    expansions = read_config_file(expansions_file)
+    # Obtain installation access tokens using app credentials
+    access_token_10gen_mongo = get_installation_access_token(
+        expansions["app_id_10gen_mongo"], expansions["private_key_10gen_mongo"],
+        expansions["installation_id_10gen_mongo"])
+
     response = requests.get(
-        f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}')
+        f'{BACKPORTS_REQUIRED_BASE_URL}/{commit_hash}/{ETC_DIR}/{BACKPORTS_REQUIRED_FILE}',
+        headers={
+            'Authorization': f'token {access_token_10gen_mongo}',
+        })
+
     # If the response was successful, no exception will be raised.
     response.raise_for_status()
 
@@ -84,7 +119,9 @@ def main():
 @main.command("generate-exclude-tags")
 @click.option("--output", type=str, default=os.path.join(CONFIG_DIR, EXCLUDE_TAGS_FILE),
               show_default=True, help="Where to output the generated tags.")
-def generate_exclude_yaml(output: str) -> None:
+@click.option("--expansions-file", type=str, default="../expansions.yml", show_default=True,
+              help="Location of evergreen expansions file.")
+def generate_exclude_yaml(output: str, expansions_file: str) -> None:
     # pylint: disable=too-many-locals
     """
     Create a tag file associating multiversion tests to tags for exclusion.
@@ -109,7 +146,7 @@ def generate_exclude_yaml(output: str) -> None:
         mongo_shell_path=LAST_LTS_MONGO_BINARY)
 
     # Get the yaml contents from the last-lts commit.
-    backports_required_last_lts = get_last_lts_yaml(last_lts_commit_hash)
+    backports_required_last_lts = get_last_lts_yaml(last_lts_commit_hash, expansions_file)
 
     def diff(list1, list2):
         return [elem for elem in (list1 or []) if elem not in (list2 or [])]
