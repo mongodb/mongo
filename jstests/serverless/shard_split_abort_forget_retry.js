@@ -46,7 +46,7 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
         `Attempting to run a shard split with the same tenantIds. New migrationId:
             ${operation2.migrationId}, tenantIds: ${tojson(tenantIds)}`);
 
-    operation2.commit();
+    assert.commandWorked(operation2.commit());
     assertMigrationState(donorPrimary, operation2.migrationId, "committed");
 
     operation2.forget();
@@ -90,8 +90,8 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
     jsTestLog(
         `Attempting to run a new shard split with the same tenantIds. New migrationId:
         ${operation2.migrationId}, tenantIds: ${tojson(tenantIds)}`);
-    operation2.commit();
 
+    assert.commandWorked(operation2.commit());
     assertMigrationState(donorPrimary, operation2.migrationId, "committed");
     operation2.forget();
     test.cleanupSuccesfulCommitted(operation2.migrationId, tenantIds);
