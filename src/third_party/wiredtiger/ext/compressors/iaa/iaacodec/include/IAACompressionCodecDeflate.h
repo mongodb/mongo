@@ -186,6 +186,10 @@ public:
       uint8_t *source, uint32_t source_size, uint8_t *dest, uint32_t dest_size) const;
     uint32_t doDecompressData(
       uint8_t *source, uint32_t source_size, uint8_t *dest, uint32_t uncompressed_size) const;
+
+private:
+    int pageSize;
+    void memPageSet(uint8_t *dest, uint32_t len) const;
 };
 
 class CompressionCodecDeflate {

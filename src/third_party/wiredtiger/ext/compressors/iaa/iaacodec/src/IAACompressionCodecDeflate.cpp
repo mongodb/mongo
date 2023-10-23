@@ -1,5 +1,6 @@
 #include <thread>
 #include <cstdio>
+#include <unistd.h>
 #include "IAACompressionCodecDeflate.h"
 
 namespace DB::IAA {
@@ -58,11 +59,23 @@ DeflateJobHWPool::~DeflateJobHWPool()
 HardwareCodecDeflate::HardwareCodecDeflate(WT_COMPRESSOR *compressor, WT_SESSION *session)
 {
     hwEnabled = DeflateJobHWPool::instance(compressor, session).jobPoolReady();
+    pageSize = getpagesize();
 }
 
 HardwareCodecDeflate::~HardwareCodecDeflate()
 {
     // Nothing to do.
+}
+
+inline void
+HardwareCodecDeflate::memPageSet(uint8_t *dest, uint32_t len) const
+{
+    if (dest == NULL) {
+        return;
+    }
+    // Touch dest buffer in advance to avoid page fault on it triggered by accelerator.
+    for (uint32_t p = 0; p < len; p += pageSize)
+        dest[p] = 0;
 }
 
 uint32_t
@@ -85,6 +98,8 @@ HardwareCodecDeflate::doCompressData(
     job_ptr->available_out = dest_size;
     job_ptr->flags = QPL_FLAG_FIRST | QPL_FLAG_DYNAMIC_HUFFMAN | QPL_FLAG_GZIP_MODE |
       QPL_FLAG_LAST | QPL_FLAG_OMIT_VERIFY;
+
+    memPageSet(dest, dest_size);
 
     // Compression
     status = qpl_execute_job(job_ptr);
@@ -116,6 +131,8 @@ HardwareCodecDeflate::doDecompressData(
     job_ptr->available_in = source_size;
     job_ptr->available_out = uncompressed_size;
     job_ptr->flags = QPL_FLAG_FIRST | QPL_FLAG_GZIP_MODE | QPL_FLAG_LAST;
+
+    memPageSet(dest, uncompressed_size);
 
     // Decompression
     status = qpl_execute_job(job_ptr);
