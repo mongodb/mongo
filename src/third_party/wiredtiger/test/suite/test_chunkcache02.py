@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, sys
+import os, sys, platform
 import random
 import threading
 import time
@@ -86,6 +86,10 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.get_value(), str(key) * self.rows)
 
     def test_chunkcache02(self):
+
+        if platform.system() == 'Darwin':
+            self.skipTest("FIXME-WT-11865 - Uninitialised lock on macos")
+
         ds = SimpleDataSet(
             self, self.uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()

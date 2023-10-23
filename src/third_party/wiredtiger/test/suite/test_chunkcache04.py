@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, sys
+import os, sys, platform
 import wiredtiger, wttest
 
 from wtdataset import SimpleDataSet
@@ -79,6 +79,10 @@ class test_chunkcache4(wttest.WiredTigerTestCase):
             cursor[ds.key(i)] = str(i) * 100
 
     def test_chunkcache04(self):
+
+        if platform.system() == 'Darwin':
+            self.skipTest("FIXME-WT-11865 - Uninitialised lock on macos")
+
         uris = ["table:chunkcache03", "table:chunkcache04"]
         ds = [SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format) for uri in uris]
 
