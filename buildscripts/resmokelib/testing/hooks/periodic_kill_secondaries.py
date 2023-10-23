@@ -13,6 +13,7 @@ from buildscripts.resmokelib.testing.hooks import dbhash
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import oplog
 from buildscripts.resmokelib.testing.hooks import preimages_consistency
+from buildscripts.resmokelib.testing.hooks import change_collection_consistency
 from buildscripts.resmokelib.testing.hooks import validate
 
 
@@ -146,6 +147,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         # across nodes and that there are no holes in the collection.
         self._check_pre_images_consistency(self._test_report)
 
+        # The CheckReplChangeCollectionConsistency hook checks that config.system.change_collection
+        # for each tenant is compatible across nodes and that there are no holes in the collection.
+        self._check_change_collection_consistency(self._test_report)
+
         # The CheckReplDBHash hook waits until all operations have replicated to and have been
         # applied on the secondaries, so we run the ValidateCollections hook after it to ensure
         # we're validating the entire contents of the collection.
@@ -267,6 +272,14 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         preimages_test_case.after_test(self, test_report)
         preimages_test_case.after_suite(test_report)
 
+    def _check_change_collection_consistency(self, test_report):
+        change_collection_test_case = change_collection_consistency.CheckReplChangeCollectionConsistency(
+            self._hook.logger, self.fixture)
+        change_collection_test_case.before_suite(test_report)
+        change_collection_test_case.before_test(self, test_report)
+        change_collection_test_case.after_test(self, test_report)
+        change_collection_test_case.after_suite(test_report)
+
     def _restart_and_clear_fixture(self):
         # We restart the fixture after setting 'preserve_dbpath' back to its original value in order
         # to clear the contents of the data directory if desired. The CleanEveryN hook cannot be
@@ -294,7 +307,16 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
     def _check_invariants_as_standalone(self, secondary):
         # We remove the --replSet option in order to start the node as a standalone.
-        replset_name = secondary.mongod_options.pop("replSet")
+        def try_pop_default_to_none(option):
+            try:
+                return secondary.mongod_options.pop(option)
+            except KeyError:
+                return None
+
+        # On serverless, replSet is not set, but the serverless flag still enables replication.
+        replset_name = try_pop_default_to_none("replSet")
+        serverless = try_pop_default_to_none("serverless")
+
         self.logger.info(
             "Restarting the secondary on port %d as a standalone node with"
             " its data files intact...", secondary.port)
@@ -366,7 +388,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                 " mongod on port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.
-            secondary.mongod_options["replSet"] = replset_name
+            if replset_name:
+                secondary.mongod_options["replSet"] = replset_name
+            if serverless:
+                secondary.mongod_options["serverless"] = serverless
 
     def _await_secondary_state(self, secondary):
         client = secondary.mongo_client()

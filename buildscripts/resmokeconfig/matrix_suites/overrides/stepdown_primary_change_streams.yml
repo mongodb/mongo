@@ -1,22 +1,6 @@
 # Overrides necessary for killing the primary.
 
 ###
-# Fixture options.
-###
-- name: replica_sets_fixture
-  value:
-    executor:
-      fixture:
-        mongod_options:
-          # Modify default allocation size and leaf page size so that there are more pages on disk
-          # susceptible to fast truncates.
-          wiredTigerCollectionConfigString: "allocation_size=1k,leaf_page_max=1k"
-          set_parameters:
-            preImagesCollectionTruncateMarkersMinBytes: 4096  # 4KiB
-            expiredChangeStreamPreImageRemovalJobSleepSecs: 1
-            failpoint.preImagesEnabledOnAllCollectionsByDefault: "{mode: 'alwaysOn'}"
-
-###
 # Hook options.
 ###
 - name: replica_sets_hooks
@@ -34,6 +18,7 @@
         # validating the entire contents of the collection.
         - class: CheckReplOplogs
         - class: CheckReplPreImagesConsistency
+        - class: CheckReplChangeCollectionConsistency
         - class: CheckReplDBHash
         - class: ValidateCollections
           shell_options:
@@ -42,11 +27,6 @@
                 skipEnforceFastCountOnValidate: true
         - class: CleanEveryN
           n: 20
-        - class: ClusterParameter
-          key: changeStreamOptions
-          value:
-            preAndPostImages:
-              expireAfterSeconds: 10
 
 ###
 # Archival options.
@@ -60,4 +40,5 @@
           - CheckReplDBHash
           - CheckReplOplogs
           - CheckReplPreImagesConsistency
+          - CheckReplChangeCollectionConsistency
           - ValidateCollections

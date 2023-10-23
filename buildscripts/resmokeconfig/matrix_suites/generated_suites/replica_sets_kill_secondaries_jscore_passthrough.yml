@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_kill_secondaries_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 executor:
@@ -19,18 +19,13 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        expiredChangeStreamPreImageRemovalJobSleepSecs: 1
-        failpoint.preImagesEnabledOnAllCollectionsByDefault: '{mode: ''alwaysOn''}'
-        failpoint.preImagesTruncateOnlyOnSecondaries: '{mode: ''alwaysOn''}'
         logComponentVerbosity:
           replication:
             heartbeats: 2
             rollback: 2
           storage:
             recovery: 2
-        preImagesCollectionTruncateMarkersMinBytes: 4096
       syncdelay: 5
-      wiredTigerCollectionConfigString: allocation_size=1k,leaf_page_max=1k
       wiredTigerEngineConfigString: debug_mode=(table_logging=true)
     num_nodes: 2
     replset_config_options:
@@ -39,11 +34,6 @@ executor:
     voting_secondaries: false
   hooks:
   - class: PeriodicKillSecondaries
-  - class: ClusterParameter
-    key: changeStreamOptions
-    value:
-      preAndPostImages:
-        expireAfterSeconds: 10
 matrix_suite: true
 selector:
   exclude_files:
@@ -52,7 +42,6 @@ selector:
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - requires_emptycapped
-  - incompatible_with_preimages_by_default
   roots:
   - jstests/core/*.js
   - jstests/core/txns/**/*.js

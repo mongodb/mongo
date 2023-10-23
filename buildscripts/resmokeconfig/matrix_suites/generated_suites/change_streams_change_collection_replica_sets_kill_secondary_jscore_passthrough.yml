@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 executor:
@@ -13,22 +13,38 @@ executor:
     tests: true
   config:
     shell_options:
-      eval: globalThis.testingReplication = true;
+      eval: 'globalThis.testingReplication = true;
+
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
+
+        '
+      global_vars:
+        TestData:
+          enableMajorityReadConcern: ''
+          hashTestNamesForMultitenancy: true
+          tenantId: 636d957b2646ddfaf9b5e13f
+          useResponsePrefixChecking: true
   fixture:
     class: ReplicaSetFixture
     mongod_options:
+      bind_ip_all: ''
+      noscripting: ''
+      serverless: true
       set_parameters:
+        changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
+        changeCollectionTruncateMarkersMinBytes: 4096
         enableTestCommands: 1
-        expiredChangeStreamPreImageRemovalJobSleepSecs: 1
-        failpoint.preImagesEnabledOnAllCollectionsByDefault: '{mode: ''alwaysOn''}'
-        failpoint.preImagesTruncateOnlyOnSecondaries: '{mode: ''alwaysOn''}'
+        failpoint.changeCollectionTruncateOnlyOnSecondaries: '{mode: ''alwaysOn''}'
+        featureFlagRequireTenantID: true
+        featureFlagServerlessChangeStreams: true
         logComponentVerbosity:
+          command: 2
           replication:
             heartbeats: 2
             rollback: 2
           storage:
             recovery: 2
-        preImagesCollectionTruncateMarkersMinBytes: 4096
+        multitenancySupport: true
       syncdelay: 5
       wiredTigerCollectionConfigString: allocation_size=1k,leaf_page_max=1k
       wiredTigerEngineConfigString: debug_mode=(table_logging=true)
@@ -36,23 +52,28 @@ executor:
     replset_config_options:
       settings:
         electionTimeoutMillis: 5000
+    replset_name: ChangeStreamMultitenantReplSet
     voting_secondaries: false
   hooks:
   - class: PeriodicKillSecondaries
-  - class: ClusterParameter
-    key: changeStreamOptions
-    value:
-      preAndPostImages:
-        expireAfterSeconds: 10
+  - class: EnableChangeStream
+    tenant_id: 636d957b2646ddfaf9b5e13f
 matrix_suite: true
 selector:
   exclude_files:
   - jstests/core/**/max_doc_size.js
   - jstests/core/**/exhaust.js
   exclude_with_any_tags:
+  - simulate_atlas_proxy_incompatible
+  - not_allowed_with_security_token
+  - command_not_supported_in_serverless
   - assumes_standalone_mongod
+  - requires_capped
+  - requires_scripting
+  - requires_profiling
+  - requires_auth
+  - uses_transactions
   - requires_emptycapped
-  - incompatible_with_preimages_by_default
   roots:
   - jstests/core/*.js
   - jstests/core/txns/**/*.js

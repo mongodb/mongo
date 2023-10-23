@@ -15,7 +15,7 @@ including `list-suites`, `find-suites` and `run --suites=[SUITE]`.
 
 ## Writing a matrix suite mapping file.
 Matrix suites consist of a mapping, and a set of overrides in
-their eponymous directories. When you are done writing the mapping file, you must 
+their eponymous directories. When you are done writing the mapping file, you must
 [generate the matrix suite file.](#generating-matrix-suites)
 
 The "mappings" directory contains YAML files that each contain a suite definition.
@@ -27,6 +27,7 @@ The fields of modifiers are the following:
 1. overrides
 2. excludes
 3. eval
+4. extends
 
 Each modifier field is a dot-delimited-notation representing the file and field of the modification.
 All modifier fields must be in a yaml file in the `overrides` directory
@@ -43,13 +44,18 @@ try to overwrite the same field in the base_suite.
 ### excludes
 All fields referenced in the `excludes` section of the mappings file will append to the specified
 `exclude` fields in the base suite.
-The only two valid options in the referenced modifier field are `exclude_with_any_tags` and 
+The only two valid options in the referenced modifier field are `exclude_with_any_tags` and
 `exclude_files`. They are appended in the order they are specified in the mappings file.
 
 ### eval
 All fields referenced in the `eval` section of the mappings file will append to the specified
 `config.shell_options.eval` field in the base suite.
 They are appended in the order they are specified in the mappings file.
+
+### extends
+All fields referenced in the `extends` section of the mappings file must be lists, and will be
+appended to the correspending keys on the same path. When extends is applied (after the other
+modifiers), the key being extended must already exist and also be a list.
 
 ## Generating matrix suites
 The generated matrix suites live in the `buildscripts/resmokeconfig/matrix_suites/generated_suites`
@@ -65,5 +71,5 @@ generated suite file are in sync. The `resmoke_validation_tests` task in the com
 ensures that the files are validated.
 
 ## FAQ
-For questions about the user or authorship experience, 
+For questions about the user or authorship experience,
 please reach out in #server-testing.

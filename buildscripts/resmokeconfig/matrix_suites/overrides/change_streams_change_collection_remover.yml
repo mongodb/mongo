@@ -1,0 +1,13 @@
+# Overrides for enabling pre-images.
+
+###
+# Fixture options.
+###
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          set_parameters:
+            changeCollectionTruncateMarkersMinBytes: 4096  # 4KiB
+            changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1

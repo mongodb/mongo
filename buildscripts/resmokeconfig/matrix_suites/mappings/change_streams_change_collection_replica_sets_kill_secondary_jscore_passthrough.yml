@@ -1,0 +1,20 @@
+# This suite tests that secondaries getting abrubptly killed while performing change collection
+# removal do not display consistency holes when recovering. The primary is prevented from performing
+# any removal so that a secondary containing a hole is detected as the documents when read in
+# descending order (most recent -> oldest) wouldn't match.
+
+base_suite: multitenancy_jscore_passthrough
+overrides:
+  - "serverless.enable"
+  - "replica_sets_kill_secondary.selector"
+  - "replica_sets_kill_secondary.executor"
+  - "change_streams_truncate.replica_sets_fixture"
+  - "change_streams_truncate.change_collection_truncate_only_secondaries"
+  - "change_streams_change_collection_remover.replica_sets_fixture"
+  - "replica_sets_kill_secondary.hooks"
+
+extends:
+  - "serverless.enable_change_stream_hook"
+
+excludes:
+  - "replica_sets_kill_secondary.exclusions"

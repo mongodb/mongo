@@ -1,4 +1,4 @@
-"""Test hook for verifying members of a replica set have compatible config.system.preimages."""
+"""Test hook for verifying members of a replica set have consistent config.system.preimages."""
 
 import os.path
 
@@ -6,7 +6,7 @@ from buildscripts.resmokelib.testing.hooks import jsfile
 
 
 class CheckReplPreImagesConsistency(jsfile.PerClusterDataConsistencyHook):
-    """Check that config.system.preimages is compatible between the primary and secondaries."""
+    """Check that config.system.preimages is consistent between the primary and secondaries."""
 
     IS_BACKGROUND = False
 

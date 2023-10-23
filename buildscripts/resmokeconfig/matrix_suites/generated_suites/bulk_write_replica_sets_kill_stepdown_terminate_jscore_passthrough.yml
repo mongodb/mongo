@@ -101,8 +101,6 @@ selector:
   - jstests/core/**/startup_log.js
   - jstests/core/**/shell_connection_strings.js
   - jstests/core/**/geo_s2ordering.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
   - jstests/core/timeseries/timeseries_delete_hint.js
   - jstests/core/**/set_param1.js
   - jstests/core/**/profile*.js
@@ -114,6 +112,8 @@ selector:
   - jstests/core/failcommand_failpoint.js
   - jstests/core/version_api_v1_command_coverage.js
   - jstests/core/write/write_commands_reject_unknown_fields.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - requires_getmore

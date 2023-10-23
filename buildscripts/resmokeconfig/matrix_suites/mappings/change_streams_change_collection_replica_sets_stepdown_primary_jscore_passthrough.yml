@@ -1,0 +1,21 @@
+# This suite tests that live rollbacks do not cause holes to appear in pre-image collections.
+base_suite: multitenancy_jscore_passthrough
+overrides:
+  - "serverless.enable"
+  - "kill_primary.replica_sets_shell_options"
+  - "stepdown_primary_change_streams.replica_sets_archive"
+  - "kill_primary.replica_sets_fixture"
+  - "change_streams_truncate.replica_sets_fixture"
+  - "change_streams_change_collection_remover.replica_sets_fixture"
+  - "serverless.enable_change_stream_hook"
+
+extends:
+  # The continous step down hook spawns a thread, which might cause a stepdown to happen while the
+  # EnableChangeStream hook is running, causing it to fail. Keep the hook to enable change streams
+  # first in the list.
+  - "stepdown_primary_change_streams.replica_sets_hooks"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
+
+eval:
+  - "serverless.shell_eval"

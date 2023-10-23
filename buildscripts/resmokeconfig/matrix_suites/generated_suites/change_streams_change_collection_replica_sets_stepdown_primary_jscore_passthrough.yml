@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 executor:
@@ -21,11 +21,14 @@ executor:
         globalThis.db = connect(TestData.connectionString); await import("jstests/libs/override_methods/enable_sessions.js");
         await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
         await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
-        await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+        await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");;
+        await import("jstests/libs/override_methods/simulate_atlas_proxy.js");
       global_vars:
         TestData:
           alwaysInjectTransactionNumber: true
           defaultReadConcernLevel: majority
+          enableMajorityReadConcern: ''
+          hashTestNamesForMultitenancy: true
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
@@ -36,24 +39,32 @@ executor:
             readPreference:
               mode: primary
             retryWrites: true
+          tenantId: 636d957b2646ddfaf9b5e13f
+          useResponsePrefixChecking: true
       nodb: ''
   fixture:
     all_nodes_electable: true
     class: ReplicaSetFixture
     mongod_options:
+      bind_ip_all: ''
       enableMajorityReadConcern: ''
+      noscripting: ''
+      serverless: true
       set_parameters:
+        changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
+        changeCollectionTruncateMarkersMinBytes: 4096
         enableElectionHandoff: 0
         enableTestCommands: 1
-        expiredChangeStreamPreImageRemovalJobSleepSecs: 1
-        failpoint.preImagesEnabledOnAllCollectionsByDefault: '{mode: ''alwaysOn''}'
+        featureFlagRequireTenantID: true
+        featureFlagServerlessChangeStreams: true
         logComponentVerbosity:
+          command: 2
           replication:
             heartbeats: 2
             rollback: 2
           storage:
             recovery: 2
-        preImagesCollectionTruncateMarkersMinBytes: 4096
+        multitenancySupport: true
       syncdelay: 5
       wiredTigerCollectionConfigString: allocation_size=1k,leaf_page_max=1k
       wiredTigerEngineConfigString: debug_mode=(table_logging=true)
@@ -61,12 +72,10 @@ executor:
     replset_config_options:
       settings:
         catchUpTimeoutMillis: 0
+    replset_name: ChangeStreamMultitenantReplSet
   hooks:
-  - class: ClusterParameter
-    key: changeStreamOptions
-    value:
-      preAndPostImages:
-        expireAfterSeconds: 10
+  - class: EnableChangeStream
+    tenant_id: 636d957b2646ddfaf9b5e13f
   - class: ContinuousStepdown
     kill: false
     terminate: false
@@ -84,6 +93,8 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
+  - jstests/core/query/explain/explain_agg_write_concern.js
+  - jstests/core/administrative/builtin_roles_external.js
   - jstests/core/txns/**/*.js
   - jstests/core/**/operation_latency_histogram.js
   - jstests/core/**/profile2.js
@@ -113,9 +124,16 @@ selector:
   - jstests/core/**/startup_log.js
   - jstests/core/**/shell_connection_strings.js
   - jstests/core/**/geo_s2ordering.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_with_any_tags:
+  - simulate_atlas_proxy_incompatible
+  - not_allowed_with_security_token
+  - command_not_supported_in_serverless
+  - assumes_standalone_mongod
+  - requires_capped
+  - requires_scripting
+  - requires_profiling
+  - requires_auth
+  - uses_transactions
   - assumes_standalone_mongod
   - requires_getmore
   - requires_non_retryable_writes
@@ -130,6 +148,4 @@ selector:
   - uses_parallel_shell
   roots:
   - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

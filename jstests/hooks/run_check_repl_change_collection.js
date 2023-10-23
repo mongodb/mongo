@@ -1,5 +1,5 @@
-// Runner for checkPreImageCollection() that compares the pre-images collection on all replica set
-// nodes to ensure all nodes have compatible data without any holes.
+// Runner for checkChangeCollection() that compares change_collection for all tenants on all replica
+// set nodes to ensure all nodes have compatible data without any holes.
 
 const startTime = Date.now();
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
@@ -14,7 +14,7 @@ let runCheckOnReplSet = function(db) {
            'shell is not connected to the primary or master node: ' + tojson(primaryInfo));
 
     let testFixture = new ReplSetTest(db.getMongo().host);
-    testFixture.checkPreImageCollection("Pre-image consistency");
+    testFixture.checkChangeCollection("Change collection consistency");
 };
 
 if (db.getMongo().isMongos()) {
@@ -30,4 +30,4 @@ if (db.getMongo().isMongos()) {
 }
 
 const totalTime = Date.now() - startTime;
-print('Finished pre-image consistency checks of cluster in ' + totalTime + ' ms.');
+print('Finished change collection consistency checks of cluster in ' + totalTime + ' ms.');

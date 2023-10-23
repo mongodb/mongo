@@ -1,4 +1,4 @@
-# Overrides necessary for killing the secondary.
+# Overrides for enabling pre-images.
 
 ###
 # Fixture options.
@@ -8,23 +8,15 @@
     executor:
       fixture:
         mongod_options:
-          # Modify default allocation size and leaf page size so that there are more pages on disk
-          # susceptible to fast truncates.
-          wiredTigerCollectionConfigString: "allocation_size=1k,leaf_page_max=1k"
           set_parameters:
             preImagesCollectionTruncateMarkersMinBytes: 4096  # 4KiB
             expiredChangeStreamPreImageRemovalJobSleepSecs: 1
             failpoint.preImagesEnabledOnAllCollectionsByDefault: "{mode: 'alwaysOn'}"
-            # We do not truncate on the primary in order to maintain a full record of all preimages.
-            # That way we can easily detect any pre-image holes on the secondaries.
-            failpoint.truncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"
-        num_nodes: 3
 
-- name: replica_sets_hooks
+- name: enable_pre_images_hook
   value:
     executor:
       hooks:
-      - class: PeriodicKillSecondaries
       - class: ClusterParameter
         key: changeStreamOptions
         value:

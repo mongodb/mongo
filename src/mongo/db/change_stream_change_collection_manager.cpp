@@ -99,6 +99,8 @@
 
 namespace mongo {
 namespace {
+MONGO_FAIL_POINT_DEFINE(changeCollectionTruncateOnlyOnSecondaries);
+
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
 
@@ -849,6 +851,13 @@ void ChangeStreamChangeCollectionManager::_removeExpiredMarkers(
 
 size_t ChangeStreamChangeCollectionManager::_removeExpiredChangeCollectionsDocumentsWithTruncate(
     OperationContext* opCtx, const TenantId& tenantId) {
+
+    if (MONGO_unlikely(changeCollectionTruncateOnlyOnSecondaries.shouldFail()) &&
+        repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
+            repl::MemberState::RS_PRIMARY) {
+        return 0;
+    }
+
     int64_t numRecordsDeleted = 0;
     bool shouldWarn = false;
     try {

@@ -14,7 +14,7 @@ from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib import config as _config, errors, utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
-from buildscripts.resmokelib.utils.dictionary import get_dict_value, merge_dicts, set_dict_value
+from buildscripts.resmokelib.utils.dictionary import extend_dict_lists, get_dict_value, merge_dicts, set_dict_value
 
 SuiteName = str
 
@@ -279,6 +279,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         override_names = suite.get("overrides", None)
         excludes_names = suite.get("excludes", None)
         eval_names = suite.get("eval", None)
+        extends_names = suite.get("extends", None)
         description = suite.get("description")
 
         base_suite = ExplicitSuiteConfig.get_config_obj_no_verify(base_suite_name)
@@ -335,6 +336,10 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                     set_dict_value(res, path, base_value + "; " + value)
                 else:
                     set_dict_value(res, path, value)
+
+        if extends_names:
+            for extends_name in extends_names:
+                extend_dict_lists(res, overrides[extends_name])
 
         return res
 

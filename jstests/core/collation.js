@@ -12,6 +12,7 @@
 //   requires_capped,
 //   requires_non_retryable_commands,
 //   requires_non_retryable_writes,
+//   requires_scripting,
 //   # Tenant migrations don't support applyOps.
 //   tenant_migration_incompatible,
 //   # This test has statements that do not support non-local read concern.
