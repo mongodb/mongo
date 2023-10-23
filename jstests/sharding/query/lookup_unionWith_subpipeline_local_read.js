@@ -23,6 +23,10 @@ const st = new ShardingTest({
         nodes: 2,
         setParameter: {logComponentVerbosity: tojson({sharding: 2, command: 1})},
     },
+    // Disable checking for index consistency to ensure that the config server doesn't issue an
+    // aggregate command which triggers the shards to refresh their sharding metadata as this test
+    // relies on shards to have specific metadata as specific times.
+    other: {configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}},
 });
 
 // In this test we perform writes which we expect to read on a secondary, so we need to enable
