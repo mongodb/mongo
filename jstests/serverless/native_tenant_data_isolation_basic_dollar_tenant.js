@@ -472,7 +472,17 @@ const testColl = testDb.getCollection(kCollName);
         return (healthlog.find({"operation": "dbCheckStop"}).itcount() == 1)
     });
     const tenantNss = kTenant + "_" + kDbName + "." + kCollName;
-    assert.eq(1, healthlog.find({"namespace": tenantNss}).count());
+    if (FeatureFlagUtil.isPresentAndEnabled(rst.getPrimary(), "SecondaryIndexChecksInDbCheck")) {
+        // dbCheckStart and dbCheckStop have tenantId as well
+        assert.soon(function() {
+            return (healthlog.find({"namespace": tenantNss}).itcount() == 3)
+        });
+    } else {
+        // only dbCheckBatch has tenantId
+        assert.soon(function() {
+            return (healthlog.find({"namespace": tenantNss}).itcount() == 1)
+        });
+    }
 }
 
 // fail server-side javascript commands/stages, all unsupported in serverless

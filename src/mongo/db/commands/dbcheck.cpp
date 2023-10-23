@@ -120,14 +120,18 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
 
+// The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
+// the namespace is still the admin command namespace but the tenantId will be set using the
+// namespace that dbcheck is running for.
 repl::OpTime _logOp(OperationContext* opCtx,
                     const NamespaceString& nss,
+                    const boost::optional<TenantId>& tenantIdForStartStop,
                     const boost::optional<UUID>& uuid,
                     const BSONObj& obj) {
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(nss);
-    oplogEntry.setTid(nss.tenantId());
+    oplogEntry.setTid(nss.tenantId() ? nss.tenantId() : tenantIdForStartStop);
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(obj);
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
@@ -189,15 +193,29 @@ public:
                                                         ScopeEnum::Cluster,
                                                         OplogEntriesEnum::Start,
                                                         boost::none /*data*/);
+            // The namespace logged in the oplog entry is the admin command namespace, but the
+            // namespace this dbcheck invocation is run on will be stored in the `o.dbCheck` field
+            // and in the health log.
+            boost::optional<TenantId> tenantId;
             if (_info && _info.value().secondaryIndexCheckParameters) {
                 oplogEntry.setSecondaryIndexCheckParameters(
                     _info.value().secondaryIndexCheckParameters.value());
                 healthLogEntry->setData(
                     _info.value().secondaryIndexCheckParameters.value().toBSON());
+
+                oplogEntry.setNss(_info.value().nss);
+                healthLogEntry->setNss(_info.value().nss);
+
+                oplogEntry.setUuid(_info.value().uuid);
+                healthLogEntry->setCollectionUUID(_info.value().uuid);
+
+                if (_info && _info.value().nss.tenantId()) {
+                    tenantId = _info.value().nss.tenantId();
+                }
             }
 
             HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
-            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
+            _logOp(_opCtx, nss, tenantId, boost::none /*uuid*/, oplogEntry.toBSON());
         } catch (const DBException&) {
             LOGV2(6202200, "Could not log start event");
         }
@@ -217,14 +235,28 @@ public:
                                                         ScopeEnum::Cluster,
                                                         OplogEntriesEnum::Stop,
                                                         boost::none /*data*/);
+            // The namespace logged in the oplog entry is the admin command namespace, but the
+            // namespace this dbcheck invocation is run on will be stored in the `o.dbCheck` field
+            // and in the health log.
+            boost::optional<TenantId> tenantId;
             if (_info && _info.value().secondaryIndexCheckParameters) {
                 oplogEntry.setSecondaryIndexCheckParameters(
                     _info.value().secondaryIndexCheckParameters.value());
                 healthLogEntry->setData(
                     _info.value().secondaryIndexCheckParameters.value().toBSON());
+
+                oplogEntry.setNss(_info.value().nss);
+                healthLogEntry->setNss(_info.value().nss);
+
+                oplogEntry.setUuid(_info.value().uuid);
+                healthLogEntry->setCollectionUUID(_info.value().uuid);
+
+                if (_info && _info.value().nss.tenantId()) {
+                    tenantId = _info.value().nss.tenantId();
+                }
             }
 
-            _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
+            _logOp(_opCtx, nss, tenantId, boost::none /*uuid*/, oplogEntry.toBSON());
             HealthLogInterface::get(_opCtx->getServiceContext())->log(*healthLogEntry);
         } catch (const DBException&) {
             LOGV2(6202201, "Could not log stop event");
@@ -939,7 +971,11 @@ private:
         if (info.secondaryIndexCheckParameters) {
             oplogBatch.setSecondaryIndexCheckParameters(info.secondaryIndexCheckParameters);
         }
-        batchStats->time = _logOp(opCtx, info.nss, collection->uuid(), oplogBatch.toBSON());
+        batchStats->time = _logOp(opCtx,
+                                  info.nss,
+                                  boost::none /*tenantIdForStartStop*/,
+                                  collection->uuid(),
+                                  oplogBatch.toBSON());
         LOGV2_DEBUG(7844900,
                     3,
                     "hashed one batch on primary",
@@ -1688,7 +1724,11 @@ private:
         DbCheckCollectionBatchStats result;
         result.logToHealthLog = _shouldLogBatch(batch);
         result.batchId = batch.getBatchId();
-        result.time = _logOp(opCtx, info.nss, collectionPtr->uuid(), batch.toBSON());
+        result.time = _logOp(opCtx,
+                             info.nss,
+                             boost::none /*tenantIdForStartStop*/,
+                             collectionPtr->uuid(),
+                             batch.toBSON());
         result.readTimestamp = readTimestamp;
         result.nDocs = hasher->docsSeen();
         result.nBytes = hasher->bytesSeen();

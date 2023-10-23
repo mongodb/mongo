@@ -322,3 +322,7 @@ structs:
         type: SecondaryIndexCheckParameters
         cpp_name: secondaryIndexCheckParameters
         optional: true
+      uuid:
+        type: uuid 
+        cpp_name: uuid 
+        optional: true
