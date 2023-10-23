@@ -63,8 +63,8 @@ public:
             "aggRemovablePushAdd", sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovablePushAdd = compileAggExpression(*aggRemovablePushAdd, &aggAccessor);
 
-        auto aggRemovablePushRemove =
-            sbe::makeE<sbe::EFunction>("aggRemovablePushRemove", sbe::makeEs());
+        auto aggRemovablePushRemove = sbe::makeE<sbe::EFunction>(
+            "aggRemovablePushRemove", sbe::makeEs(makeE<EVariable>(inputSlot)));
         auto compiledRemovablePushRemove =
             compileAggExpression(*aggRemovablePushRemove, &aggAccessor);
 
@@ -132,6 +132,32 @@ TEST_F(SBERemovablePushTest, BasicTest) {
         value::makeValue(Value(BSON_ARRAY(3 << 4 << 5))),
         value::makeValue(Value(BSON_ARRAY(4 << 5))),
         value::makeValue(Value(BSON_ARRAY(5))),
+        value::makeNewArray(),
+    };
+
+    runAndAssertExpression(inputValues, removablePushOps, expValues);
+}
+
+TEST_F(SBERemovablePushTest, TestWithEmptyFields) {
+    std::vector<std::pair<value::TypeTags, value::Value>> inputValues = {
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1)},
+        {value::TypeTags::Nothing, 0},
+        {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2)},
+    };
+
+    std::vector<RemovablePushOp> removablePushOps = {RemovablePushOp::kAdd,
+                                                     RemovablePushOp::kAdd,
+                                                     RemovablePushOp::kAdd,
+                                                     RemovablePushOp::kRemove,
+                                                     RemovablePushOp::kRemove,
+                                                     RemovablePushOp::kRemove};
+
+    std::vector<std::pair<value::TypeTags, value::Value>> expValues = {
+        value::makeValue(Value(BSON_ARRAY(1))),
+        value::makeValue(Value(BSON_ARRAY(1))),
+        value::makeValue(Value(BSON_ARRAY(1 << 2))),
+        value::makeValue(Value(BSON_ARRAY(2))),
+        value::makeValue(Value(BSON_ARRAY(2))),
         value::makeNewArray(),
     };
 

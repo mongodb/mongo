@@ -162,7 +162,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemovePush(
     std::unique_ptr<sbe::EExpression> arg,
     boost::optional<sbe::value::SlotId> collatorSlot) {
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.push_back(makeFunction("aggRemovablePushRemove"));
+    exprs.push_back(makeFunction("aggRemovablePushRemove", std::move(arg)));
     return exprs;
 }
 

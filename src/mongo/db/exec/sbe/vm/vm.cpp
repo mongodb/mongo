@@ -8012,6 +8012,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
     }
     value::ValueGuard stateGuard{stateTag, stateVal};
     auto [inputTag, inputVal] = moveOwnedFromStack(1);
+    if (inputTag == value::TypeTags::Nothing) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
     value::ValueGuard inputGuard{inputTag, inputVal};
 
     uassert(7993100, "State should be of array type", stateTag == value::TypeTags::Array);
@@ -8026,6 +8030,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovablePush
     ArityType arity) {
     auto [stateTag, stateVal] = moveOwnedFromStack(0);
     value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [inputTag, inputVal] = moveOwnedFromStack(1);
+    if (inputTag == value::TypeTags::Nothing) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+    value::ValueGuard inputGuard{inputTag, inputVal};
 
     uassert(7993101, "State should be of array type", stateTag == value::TypeTags::Array);
     auto state = value::getArrayView(stateVal);
