@@ -31,6 +31,7 @@
 #
 
 from suite_subprocess import suite_subprocess
+import json
 import wttest
 from wtscenario import make_scenarios
 
@@ -72,6 +73,9 @@ class test_txn08(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['printlog', '-u'], outfilename='printlog.out')
         self.check_file_contains('printlog.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')
+        # Verify that the file is a valid JSON
+        with open('printlog.out') as f:
+            log_records = json.load(f)
         self.runWt(['printlog', '-u','-x'], outfilename='printlog-hex.out')
         self.check_file_contains('printlog-hex.out',
             '\\u0001\\u0002abcd\\u0003\\u0004')

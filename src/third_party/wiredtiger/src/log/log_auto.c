@@ -163,8 +163,8 @@ __wt_logop_col_modify_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"col_modify\",\n"));
-    WT_ERR(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"recno\": %" PRIu64 ",\n", recno));
     WT_ERR(__logrec_make_json_str(session, &escaped, &value));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"value\": \"%s\"", (char *)escaped->mem));
@@ -245,8 +245,8 @@ __wt_logop_col_put_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"col_put\",\n"));
-    WT_ERR(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"recno\": %" PRIu64 ",\n", recno));
     WT_ERR(__logrec_make_json_str(session, &escaped, &value));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"value\": \"%s\"", (char *)escaped->mem));
@@ -324,8 +324,8 @@ __wt_logop_col_remove_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"col_remove\",\n"));
-    WT_RET(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_RET(__wt_fprintf(session, args->fs, "        \"recno\": %" PRIu64 "", recno));
     return (0);
 }
@@ -394,8 +394,8 @@ __wt_logop_col_truncate_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"col_truncate\",\n"));
-    WT_RET(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_RET(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_RET(__wt_fprintf(session, args->fs, "        \"start\": %" PRIu64 ",\n", start));
     WT_RET(__wt_fprintf(session, args->fs, "        \"stop\": %" PRIu64 "", stop));
     return (0);
@@ -467,8 +467,8 @@ __wt_logop_row_modify_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"row_modify\",\n"));
-    WT_ERR(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_ERR(__logrec_make_json_str(session, &escaped, &key));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"key\": \"%s\",\n", (char *)escaped->mem));
     if (FLD_ISSET(args->flags, WT_TXN_PRINTLOG_HEX)) {
@@ -555,8 +555,8 @@ __wt_logop_row_put_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"row_put\",\n"));
-    WT_ERR(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_ERR(__logrec_make_json_str(session, &escaped, &key));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"key\": \"%s\",\n", (char *)escaped->mem));
     if (FLD_ISSET(args->flags, WT_TXN_PRINTLOG_HEX)) {
@@ -641,8 +641,8 @@ __wt_logop_row_remove_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"row_remove\",\n"));
-    WT_ERR(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_ERR(__logrec_make_json_str(session, &escaped, &key));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"key\": \"%s\"", (char *)escaped->mem));
     if (FLD_ISSET(args->flags, WT_TXN_PRINTLOG_HEX)) {
@@ -723,8 +723,8 @@ __wt_logop_row_truncate_print(
         return (__wt_fprintf(session, args->fs, " REDACTED"));
 
     WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"row_truncate\",\n"));
-    WT_ERR(__wt_fprintf(
-      session, args->fs, "        \"fileid\": %" PRIu32 " 0x%" PRIx32 ",\n", fileid, fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid\": %" PRIu32 ",\n", fileid));
+    WT_ERR(__wt_fprintf(session, args->fs, "        \"fileid-hex\": \"0x%" PRIx32 "\",\n", fileid));
     WT_ERR(__logrec_make_json_str(session, &escaped, &start));
     WT_ERR(__wt_fprintf(session, args->fs, "        \"start\": \"%s\",\n", (char *)escaped->mem));
     if (FLD_ISSET(args->flags, WT_TXN_PRINTLOG_HEX)) {
@@ -800,7 +800,7 @@ __wt_logop_checkpoint_start_print(
 
     WT_RET(__wt_logop_checkpoint_start_unpack(session, pp, end));
 
-    WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"checkpoint_start\",\n"));
+    WT_RET(__wt_fprintf(session, args->fs, " \"optype\": \"checkpoint_start\"\n"));
 
     return (0);
 }
