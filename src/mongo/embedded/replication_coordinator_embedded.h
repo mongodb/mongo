@@ -330,7 +330,7 @@ public:
 
     void waitUntilSnapshotCommitted(OperationContext*, const Timestamp&) override;
 
-    void appendDiagnosticBSON(BSONObjBuilder*) override;
+    void appendDiagnosticBSON(BSONObjBuilder*, StringData) override;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
