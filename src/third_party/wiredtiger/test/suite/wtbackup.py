@@ -188,6 +188,7 @@ class backup_base(wttest.WiredTigerTestCase, suite_subprocess):
     #    holds responsibility of closing the cursor.
     #
     def take_full_backup(self, backup_dir, backup_cur=None):
+        assert os.path.exists(backup_dir), f"The directory '{backup_dir}' does not exist"
         self.pr('Full backup to ' + backup_dir + ': ')
         bkup_c = backup_cur
         if backup_cur == None:

@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger
+import os, wiredtiger
 from wtscenario import make_scenarios
 from wtbackup import backup_base
 
@@ -86,6 +86,7 @@ class test_import10(backup_base):
             self.assertEqual(cursor[i], i)
         cursor.close()
 
+        os.mkdir(self.dir)
         all_files = self.take_full_backup(self.dir, bkup_c)
         self.assertTrue(self.uri + ".wt" not in all_files)
         bkup_c.close()
