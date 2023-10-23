@@ -87,7 +87,7 @@ ret = read_workload.run(conn)
 assert ret == 0, ret
 
 # Check relevant stats
-assert get_stat(s, wiredtiger.stat.conn.chunk_cache_chunks_inuse) > 0
+assert get_stat(s, wiredtiger.stat.conn.chunkcache_chunks_inuse) > 0
 
 # Close the connection.
 conn.close()
