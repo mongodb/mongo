@@ -642,7 +642,9 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
     // timestamp. Use a short timeout: another thread might have the global lock e.g. to shut down
     // the server, and it both blocks this thread from querying config.transactions and waits for
     // this thread to terminate.
-    auto client = getGlobalServiceContext()->getService()->makeClient("OldestActiveTxnTimestamp");
+    auto client = getGlobalServiceContext()
+                      ->getService(ClusterRole::ShardServer)
+                      ->makeClient("OldestActiveTxnTimestamp");
 
     AlternativeClientRegion acr(client);
 
@@ -2114,8 +2116,9 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
             hangInCommitSplitPreparedTxnOnPrimary.pauseWhileSet();
         }
 
-        auto splitClientOwned =
-            userOpCtx->getServiceContext()->getService()->makeClient("tempSplitClient");
+        auto splitClientOwned = userOpCtx->getServiceContext()
+                                    ->getService(ClusterRole::ShardServer)
+                                    ->makeClient("tempSplitClient");
         auto splitOpCtx = splitClientOwned->makeOperationContext();
 
         AlternativeClientRegion acr(splitClientOwned);
@@ -2344,8 +2347,9 @@ void TransactionParticipant::Participant::_abortSplitPreparedTxnOnPrimary(
     for (const repl::SplitSessionInfo& sessionInfo :
          splitPrepareManager->getSplitSessions(userSessionId, userTxnNumber).get()) {
 
-        auto splitClientOwned =
-            userOpCtx->getServiceContext()->getService()->makeClient("tempSplitClient");
+        auto splitClientOwned = userOpCtx->getServiceContext()
+                                    ->getService(ClusterRole::ShardServer)
+                                    ->makeClient("tempSplitClient");
         auto splitOpCtx = splitClientOwned->makeOperationContext();
 
         AlternativeClientRegion acr(splitClientOwned);

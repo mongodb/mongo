@@ -2687,7 +2687,8 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_startKillOpThrea
 }
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn() {
-    Client::initThread("RstlKillOpThread", getGlobalServiceContext()->getService());
+    Client::initThread("RstlKillOpThread",
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     invariant(!cc().isFromUserConnection());
 

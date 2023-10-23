@@ -271,7 +271,7 @@ public:
     }
 
     virtual void run() {
-        ThreadClient tc(name(), getGlobalServiceContext()->getService());
+        ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
         // TODO(SERVER-74657): Please revisit if this thread could be made killable.
         {

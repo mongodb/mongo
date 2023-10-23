@@ -512,7 +512,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
     return ExecutorFuture<void>(_executor)
         .then([=, this]() {
             ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
-                            getGlobalServiceContext()->getService());
+                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
             auto context = _contexts.makeOperationContext(*tc);
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
@@ -555,7 +555,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(const Databa
     return ExecutorFuture<void>(_executor)
         .then([this, dbName, isPrimary = std::move(isPrimary), term = std::move(term)]() {
             ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
-                            getGlobalServiceContext()->getService());
+                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
             auto context = _contexts.makeOperationContext(*tc);
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
@@ -1087,7 +1087,7 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(
 
 void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString& nss) {
     ThreadClient tc("ShardServerCatalogCacheLoader::runCollAndChunksTasks",
-                    getGlobalServiceContext()->getService());
+                    getGlobalServiceContext()->getService(ClusterRole::ShardServer));
     auto context = _contexts.makeOperationContext(*tc);
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
@@ -1168,7 +1168,7 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
 
 void ShardServerCatalogCacheLoader::_runDbTasks(const DatabaseName& dbName) {
     ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks",
-                    getGlobalServiceContext()->getService());
+                    getGlobalServiceContext()->getService(ClusterRole::ShardServer));
     auto context = _contexts.makeOperationContext(*tc);
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.

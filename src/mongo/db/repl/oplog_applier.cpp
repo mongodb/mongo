@@ -177,7 +177,8 @@ std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
         replWriterMinThreadCount < threadCount ? replWriterMinThreadCount : threadCount;
     options.maxThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [isKillableByStepdown](const std::string&) {
-        Client::initThread(getThreadName(), getGlobalServiceContext()->getService());
+        Client::initThread(getThreadName(),
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
         auto client = Client::getCurrent();
         AuthorizationSession::get(*client)->grantInternalAuthorization(client);
 

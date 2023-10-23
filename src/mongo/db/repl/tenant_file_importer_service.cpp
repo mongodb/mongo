@@ -319,7 +319,8 @@ void TenantFileImporterService::startMigration(const UUID& migrationId,
         return;
 
     _mh->workerThread = std::make_unique<stdx::thread>([this, migrationId, startMigrationOpTime] {
-        Client::initThread("TenantFileImporterService", getGlobalServiceContext()->getService());
+        Client::initThread("TenantFileImporterService",
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
         LOGV2_INFO(6378904,
                    "TenantFileImporterService worker thread started",
                    "migrationId"_attr = migrationId,

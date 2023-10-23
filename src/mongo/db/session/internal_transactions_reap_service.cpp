@@ -130,7 +130,7 @@ void InternalTransactionsReapService::onShutdown() {
 }
 
 void InternalTransactionsReapService::_reapInternalTransactions(ServiceContext* service) try {
-    ThreadClient tc("reap-internal-transactions", service->getService());
+    ThreadClient tc("reap-internal-transactions", service->getService(ClusterRole::ShardServer));
     auto uniqueOpCtx = tc->makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

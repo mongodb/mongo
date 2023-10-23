@@ -102,7 +102,7 @@ public:
 
     void run() {
         LOGV2(7080100, "Starting Change Stream Expired Pre-images Remover thread");
-        ThreadClient tc(name(), getGlobalServiceContext()->getService());
+        ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 

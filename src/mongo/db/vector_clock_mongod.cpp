@@ -415,7 +415,8 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                 return !_durableTime;
             }();
 
-            ThreadClient tc("VectorClockStateOperation", service->getService());
+            ThreadClient tc("VectorClockStateOperation",
+                            service->getService(ClusterRole::ShardServer));
             const auto opCtxHolder = tc->makeOperationContext();
             auto* const opCtx = opCtxHolder.get();
 

@@ -213,7 +213,8 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
 
 void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* sessionCache,
                                                         WiredTigerRecordStore* oplogRecordStore) {
-    Client::initThread("OplogVisibilityThread", getGlobalServiceContext()->getService());
+    Client::initThread("OplogVisibilityThread",
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     // TODO(SERVER-74657): Please revisit if this thread could be made killable.
     {

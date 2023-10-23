@@ -116,7 +116,7 @@ void BalancerStatsRegistry::initializeAsync(OperationContext* opCtx) {
     ExecutorFuture<void>(_threadPool)
         .then([this] {
             ThreadClient tc("BalancerStatsRegistry::asynchronousInitialization",
-                            getGlobalServiceContext()->getService());
+                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
             // TODO(SERVER-74658): Please revisit if this thread could be made killable.
             {

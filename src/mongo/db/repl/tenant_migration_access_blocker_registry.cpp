@@ -93,7 +93,8 @@ TenantMigrationAccessBlockerRegistry::TenantMigrationAccessBlockerRegistry() {
     threadPoolOptions.threadNamePrefix = "TenantMigrationBlockerAsync-";
     threadPoolOptions.poolName = "TenantMigrationBlockerAsyncThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
-        Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
+        Client::initThread(threadName.c_str(),
+                           getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);

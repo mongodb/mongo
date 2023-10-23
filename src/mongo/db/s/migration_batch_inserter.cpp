@@ -123,7 +123,7 @@ void runWithoutSession(OperationContext* opCtx, Callable callable) {
 
 
 void MigrationBatchInserter::onCreateThread(const std::string& threadName) {
-    Client::initThread(threadName, getGlobalServiceContext()->getService());
+    Client::initThread(threadName, getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 }
 
 void MigrationBatchInserter::run(Status status) const try {

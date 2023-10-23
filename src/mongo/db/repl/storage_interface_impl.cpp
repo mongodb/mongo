@@ -242,9 +242,12 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     private:
         ServiceContext::UniqueClient _stashedClient;
     } stash;
-    Client::setCurrent(getGlobalServiceContext()->getService()->makeClient(
-        str::stream() << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-                      << " loader"));
+    Client::setCurrent(getGlobalServiceContext()
+                           ->getService(ClusterRole::ShardServer)
+                           ->makeClient(str::stream()
+                                        << NamespaceStringUtil::serialize(
+                                               nss, SerializationContext::stateDefault())
+                                        << " loader"));
     auto opCtx = cc().makeOperationContext();
     opCtx->setEnforceConstraints(false);
 

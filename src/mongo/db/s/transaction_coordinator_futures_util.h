@@ -120,7 +120,8 @@ public:
                             uassertStatusOK(args.status);
                         }
 
-                        ThreadClient tc("TransactionCoordinator", _serviceContext->getService());
+                        ThreadClient tc("TransactionCoordinator",
+                                        _serviceContext->getService(ClusterRole::ShardServer));
 
                         // TODO(SERVER-74658): Please revisit if this thread could be made killable.
                         {

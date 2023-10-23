@@ -383,7 +383,8 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         _stateUpdatedCV.notify_all();
     });
 
-    Client::initThread("BalancerCommandsScheduler", getGlobalServiceContext()->getService());
+    Client::initThread("BalancerCommandsScheduler",
+                       getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     bool stopWorkerRequested = false;
     LOGV2(5847205, "Balancer scheduler thread started");

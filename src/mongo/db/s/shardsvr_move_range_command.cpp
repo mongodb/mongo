@@ -146,7 +146,8 @@ public:
                             // Note that captured objects of the lambda are destroyed by the
                             // executor thread after setting the shared state as ready.
                             auto scopedMigrationLocal(std::move(scopedMigration));
-                            ThreadClient tc("MoveChunk", serviceContext->getService());
+                            ThreadClient tc("MoveChunk",
+                                            serviceContext->getService(ClusterRole::ShardServer));
                             auto uniqueOpCtx = Client::getCurrent()->makeOperationContext();
                             auto executorOpCtx = uniqueOpCtx.get();
                             Status status = {ErrorCodes::InternalError, "Uninitialized value"};
