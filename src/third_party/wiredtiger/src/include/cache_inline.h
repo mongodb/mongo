@@ -468,7 +468,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
      */
     txn_global = &S2C(session)->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
-    busy = busy || txn_shared->id != WT_TXN_NONE || session->nhazard > 0 ||
+    busy = busy || txn_shared->id != WT_TXN_NONE || session->hazards.num_active > 0 ||
       (txn_shared->pinned_id != WT_TXN_NONE && txn_global->current != txn_global->oldest_id);
 
     /*

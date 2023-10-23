@@ -235,8 +235,8 @@ __session_clear(WT_SESSION_IMPL *session)
      */
     memset(session, 0, WT_SESSION_CLEAR_SIZE);
 
-    session->hazard_inuse = 0;
-    session->nhazard = 0;
+    session->hazards.inuse = 0;
+    session->hazards.num_active = 0;
 }
 
 /*
@@ -2579,10 +2579,11 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * access to it isn't serialized. Allocate the first time we open this session.
      */
     if (WT_SESSION_FIRST_USE(session_ret)) {
-        WT_ERR(__wt_calloc_def(session, WT_SESSION_INITIAL_HAZARD_SLOTS, &session_ret->hazard));
-        session_ret->hazard_size = WT_SESSION_INITIAL_HAZARD_SLOTS;
-        session_ret->hazard_inuse = 0;
-        session_ret->nhazard = 0;
+        WT_ERR(
+          __wt_calloc_def(session, WT_SESSION_INITIAL_HAZARD_SLOTS, &session_ret->hazards.arr));
+        session_ret->hazards.size = WT_SESSION_INITIAL_HAZARD_SLOTS;
+        session_ret->hazards.inuse = 0;
+        session_ret->hazards.num_active = 0;
     }
 
     /*

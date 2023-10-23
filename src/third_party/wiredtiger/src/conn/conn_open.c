@@ -182,7 +182,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
                 __wt_free(session, s->cursor_cache);
                 __wt_free(session, s->dhhash);
                 __wt_stash_discard_all(session, s);
-                __wt_free(session, s->hazard);
+                __wt_free(session, s->hazards.arr);
             }
 
     /* Destroy the file-system configuration. */

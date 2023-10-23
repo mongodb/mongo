@@ -31,6 +31,23 @@ struct __wt_hazard {
 };
 
 /*
+ * WT_HAZARD_ARRAY --
+ *   An array of all hazard pointers held by the session.
+ *   New hazard pointers are added on a first-fit basis, and on removal their entry
+ *   in the array is set to null. As such this array may contain holes.
+ */
+struct __wt_hazard_array {
+/* The hazard pointer array grows as necessary, initialize with 250 slots. */
+#define WT_SESSION_INITIAL_HAZARD_SLOTS 250
+
+    wt_shared WT_HAZARD *arr; /* The hazard pointer array */
+    wt_shared uint32_t inuse; /* Number of array slots potentially in-use. We only need to iterate
+                                 this many slots to find all active pointers */
+    wt_shared uint32_t num_active; /* Number of array slots containing an active hazard pointer */
+    uint32_t size;                 /* Allocated size of the array */
+};
+
+/*
  * WT_PREFETCH --
  *	Pre-fetch structure containing useful information for pre-fetch.
  */
@@ -335,19 +352,11 @@ struct __wt_session_impl {
  * Hazard information persists past session close because it's accessed by threads of control other
  * than the thread owning the session.
  *
- * Use the non-NULL state of the hazard field to know if the session has previously been
+ * Use the non-NULL state of the hazard array to know if the session has previously been
  * initialized.
  */
-#define WT_SESSION_FIRST_USE(s) ((s)->hazard == NULL)
-
-/*
- * The hazard pointer array grows as necessary, initialize with 250 slots.
- */
-#define WT_SESSION_INITIAL_HAZARD_SLOTS 250
-    wt_shared uint32_t hazard_size;  /* Allocated size of the Hazard pointer array */
-    wt_shared uint32_t hazard_inuse; /* Number of hazard pointer array slots potentially in-use */
-    wt_shared uint32_t nhazard;      /* Number of hazard pointer array slots actively in-use */
-    wt_shared WT_HAZARD *hazard;     /* Hazard pointer array */
+#define WT_SESSION_FIRST_USE(s) ((s)->hazards.arr == NULL)
+    WT_HAZARD_ARRAY hazards;
 
     /*
      * Operation tracking.

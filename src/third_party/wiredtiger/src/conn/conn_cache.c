@@ -343,7 +343,8 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
      * reading without locking.
      */
     if (conn->evict_server_running)
-        WT_STAT_SET(session, stats, cache_eviction_walks_active, cache->walk_session->nhazard);
+        WT_STAT_SET(
+          session, stats, cache_eviction_walks_active, cache->walk_session->hazards.num_active);
 
     WT_STAT_SET(
       session, stats, rec_maximum_hs_wrapup_milliseconds, conn->rec_maximum_hs_wrapup_milliseconds);

@@ -1527,7 +1527,7 @@ retry:
          * Even though that ceiling has been removed, we need to test eviction with huge numbers of
          * active trees before allowing larger numbers of hazard pointers in the walk session.
          */
-        if (btree->evict_ref == NULL && session->nhazard > WT_EVICT_MAX_TREES)
+        if (btree->evict_ref == NULL && session->hazards.num_active > WT_EVICT_MAX_TREES)
             continue;
 
         /*

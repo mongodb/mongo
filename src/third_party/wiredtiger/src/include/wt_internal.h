@@ -237,6 +237,8 @@ struct __wt_fstream;
 typedef struct __wt_fstream WT_FSTREAM;
 struct __wt_hazard;
 typedef struct __wt_hazard WT_HAZARD;
+struct __wt_hazard_array;
+typedef struct __wt_hazard_array WT_HAZARD_ARRAY;
 struct __wt_ikey;
 typedef struct __wt_ikey WT_IKEY;
 struct __wt_import_entry;
