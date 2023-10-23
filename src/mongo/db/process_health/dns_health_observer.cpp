@@ -95,7 +95,8 @@ Future<HealthCheckStatus> DnsHealthObserver::periodicCheckImpl(
     }
 
     if (!isFailPointActive) {
-        auto client = _svcCtx->getService()->makeClient("DNSHealthObserver");
+        auto client =
+            _svcCtx->getService(ClusterRole::RouterServer)->makeClient("DNSHealthObserver");
 
         // TODO(SERVER-74659): Please revisit if this thread could be made killable.
         {

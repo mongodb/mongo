@@ -53,6 +53,10 @@ public:
             FaultFacetType::kMock1, _svcCtx->getFastClockSource(), callback);
     }
 
+    void tearDown() {
+        serverGlobalParams.clusterRole = _saved;
+    }
+
     HealthCheckStatus getStatus() const {
         return _facetMock->getStatus();
     }
@@ -60,6 +64,7 @@ public:
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
     std::unique_ptr<FaultFacetMock> _facetMock;
+    ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, ClusterRole::RouterServer)};
 };
 
 TEST_F(FaultFacetTestWithMock, FacetWithFailure) {
@@ -78,6 +83,10 @@ public:
     void setUp() {
         _svcCtx = ServiceContext::make();
         _svcCtx->setFastClockSource(std::make_unique<ClockSourceMock>());
+    }
+
+    void tearDown() {
+        serverGlobalParams.clusterRole = _saved;
     }
 
     void createWithStatus(HealthCheckStatus status) {
@@ -105,6 +114,7 @@ public:
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
     std::unique_ptr<FaultFacetImpl> _facet;
+    ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, ClusterRole::RouterServer)};
 };
 
 TEST_F(FaultFacetImplTest, Simple) {

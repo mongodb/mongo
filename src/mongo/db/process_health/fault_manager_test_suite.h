@@ -158,6 +158,7 @@ public:
     void tearDown() override {
         LOGV2(6007905, "Clean up test resources");
         // Shutdown the executor before the context is deleted.
+        serverGlobalParams.clusterRole = _saved;
         resetManager();
     }
 
@@ -286,6 +287,7 @@ public:
 
 private:
     ServiceContext::UniqueServiceContext _svcCtx;
+    ClusterRole _saved{std::exchange(serverGlobalParams.clusterRole, ClusterRole::RouterServer)};
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 };
 

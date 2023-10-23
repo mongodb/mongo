@@ -436,8 +436,9 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
                             session.kill(ErrorCodes::InterruptedAtShutdown));
     });
 
-    auto newClient =
-        opCtx->getServiceContext()->getService()->makeClient("ImplicitlyAbortTxnAtShutdown");
+    auto newClient = opCtx->getServiceContext()
+                         ->getService(ClusterRole::RouterServer)
+                         ->makeClient("ImplicitlyAbortTxnAtShutdown");
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {
         stdx::lock_guard<mongo::Client> lk(*newClient.get());
@@ -745,7 +746,7 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 }
 
 ExitCode runMongosServer(ServiceContext* serviceContext) {
-    ThreadClient tc("mongosMain", serviceContext->getService());
+    ThreadClient tc("mongosMain", serviceContext->getService(ClusterRole::RouterServer));
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {
@@ -768,7 +769,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     serviceContext->setSessionManager(std::make_unique<transport::SessionManagerCommon>(
         serviceContext, std::make_unique<ClientTransportObserverMongos>()));
-    serviceContext->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
+    serviceContext->getService(ClusterRole::RouterServer)
+        ->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>());
 
     const auto loadBalancerPort = load_balancer_support::getLoadBalancerPort();
     if (loadBalancerPort && *loadBalancerPort == serverGlobalParams.port) {

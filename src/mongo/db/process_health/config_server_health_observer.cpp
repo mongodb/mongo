@@ -212,7 +212,8 @@ Future<ConfigServerHealthObserver::CheckResult> ConfigServerHealthObserver::_che
     auto checkCtx =
         std::make_shared<CheckContext>(std::move(periodicCheckContext.cancellationToken));
     checkCtx->taskExecutor = periodicCheckContext.taskExecutor;
-    checkCtx->client = _svcCtx->getService()->makeClient("ConfigServerHealthObserver");
+    checkCtx->client =
+        _svcCtx->getService(ClusterRole::RouterServer)->makeClient("ConfigServerHealthObserver");
     checkCtx->opCtx = checkCtx->client->makeOperationContext();
     checkCtx->opCtx->setDeadlineAfterNowBy(kObserverTimeout, ErrorCodes::ExceededTimeLimit);
 
