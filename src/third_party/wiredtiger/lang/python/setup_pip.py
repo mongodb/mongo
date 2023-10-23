@@ -273,7 +273,7 @@ if pip_command == 'sdist':
     os.chdir(stage_dir)
     sys.argv.append('--dist-dir=' + os.path.join('..', 'dist'))
 else:
-    sources = [ os.path.join(conf_make_dir, python_rel_dir, 'CMakeFiles', '__wiredtiger.dir', 'wiredtigerPYTHON_wrap.c') ]
+    sources = [ os.path.join(conf_make_dir, python_rel_dir, 'CMakeFiles', 'wiredtiger_python.dir', 'wiredtigerPYTHON_wrap.c') ]
 
 wt_ext = Extension('_wiredtiger',
     sources = sources,
