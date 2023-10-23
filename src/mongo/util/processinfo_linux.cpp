@@ -347,17 +347,82 @@ struct MountRecord {
     std::string superOpt;    //  (11) per-superblock options (see mount(2))
 };
 
+struct DiskStats {
+    int major;
+    int minor;
+    // See https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
+    const std::vector<std::string> statsLabels = {"deviceName",
+                                                  "reads",
+                                                  "readsMerged",
+                                                  "readsSectors",
+                                                  "readsMs",
+                                                  "writes",
+                                                  "writesMerged",
+                                                  "writesSectors",
+                                                  "writesMs",
+                                                  "ioInProgress",
+                                                  "ioMs",
+                                                  "ioMsWeighted",
+                                                  "discards",
+                                                  "discardsMerged",
+                                                  "discardsSectors",
+                                                  "discardsMs",
+                                                  "flushes",
+                                                  "flushesMs"};
+    std::vector<std::string> statsValues;
+
+    void appendBSON(BSONObjBuilder& bob) const {
+        int iterations = std::min(statsLabels.size(), statsValues.size());
+        for (int i = 0; i < iterations; ++i) {
+            bob.append(statsLabels[i], statsValues[i]);
+        }
+    }
+
+    bool readLine(const std::string& line) {
+        std::istringstream iss(line);
+
+        iss >> major;
+        iss >> minor;
+        if (iss.fail()) {
+            LOGV2(5963301, "Malformed diskstats line", "line"_attr = line);
+            return false;
+        }
+
+        std::string val;
+        while (iss >> val) {
+            statsValues.push_back(val);
+        }
+        return true;
+    }
+};
+
 void appendMountInfo(BSONObjBuilder& bob) {
-    std::ifstream ifs("/proc/self/mountinfo");
+    std::ifstream ifs("/proc/diskstats");
+    std::string line;
+    std::map<std::pair<int, int>, DiskStats> diskStatsMap;
+    if (ifs) {
+        while (ifs && getline(ifs, line)) {
+            DiskStats ds;
+            if (ds.readLine(line)) {
+                diskStatsMap.insert({std::make_pair(ds.major, ds.minor), ds});
+            }
+        }
+    }
+    ifs.close();
+
+    ifs.open("/proc/self/mountinfo");
     if (!ifs)
         return;
     BSONArrayBuilder arr = bob.subarrayStart("mountInfo");
-    std::string line;
     MountRecord rec;
     while (ifs && getline(ifs, line)) {
         if (rec.parseLine(line)) {
             auto bob = BSONObjBuilder(arr.subobjStart());
             rec.appendBSON(bob);
+            auto majorMinor = std::make_pair(rec.major, rec.minor);
+            if (diskStatsMap.find(majorMinor) != diskStatsMap.end()) {
+                diskStatsMap[majorMinor].appendBSON(bob);
+            }
         }
     }
 }

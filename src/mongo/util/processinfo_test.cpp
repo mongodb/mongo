@@ -66,7 +66,7 @@ TEST(ProcessInfo, SysInfoIsInitialized) {
     }
 }
 
-TEST(FTDCProcSysInfo, TestSysInfo) {
+TEST(ProcessInfo, TestSysInfo) {
     auto sysInfo = ProcessInfo();
     BSONObjBuilder builder;
     sysInfo.appendSystemDetails(builder);
@@ -74,6 +74,24 @@ TEST(FTDCProcSysInfo, TestSysInfo) {
 
     auto stringMap = toStringMap(obj);
     ASSERT_KEY("cpuString");
+
+#if defined(__linux__)
+    ASSERT_KEY("mountInfo");
+
+    BSONElement mountInfoArray = obj.getField("mountInfo");
+    ASSERT_TRUE(mountInfoArray.type() == Array);
+    int count = 0;
+    BSONObjIterator it(mountInfoArray.Obj());
+    while (it.more()) {
+        BSONObj subobj = it.next().Obj();
+        // Check for the last* field of /proc/diskstats
+        //  *see linux kernel admin-guide/iostats.rst
+        if (subobj.hasField("ioMsWeighted")) {
+            count++;
+        }
+    }
+    ASSERT_GREATER_THAN(count, 0);
+#endif
 }
 
 TEST(ProcessInfo, GetNumAvailableCores) {
