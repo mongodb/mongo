@@ -101,7 +101,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_
   WT_INSERT *new_ins, uint64_t *recnop, u_int skipdepth)
 {
     WT_BTREE *btree;
-    uint64_t recno, last_recno;
+    uint64_t recno;
     u_int i;
 
     btree = S2BT(session);
@@ -127,10 +127,14 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_
      * number.
      */
     *recnop = recno;
-    do {
-        /* Ensure we only read the value once. */
-        last_recno = *((volatile uint64_t *)(&btree->last_recno));
-    } while ((recno > last_recno) && !__wt_atomic_cas64(&btree->last_recno, last_recno, recno));
+
+    /*
+     * This line is thread-safe. We can only enter this function by holding a lock on the page, and
+     * any append that increases last_recno must be appending to the rightmost page in the btree.
+     * Ergo, all changes to last_recno are protected by a lock on the rightmost page in the tree.
+     */
+    if (recno > btree->last_recno)
+        btree->last_recno = recno;
 
     return (0);
 }
