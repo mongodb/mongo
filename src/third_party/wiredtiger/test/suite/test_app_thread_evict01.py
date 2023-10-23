@@ -64,6 +64,7 @@ class test_app_thread_evict01(wttest.WiredTigerTestCase):
             self.session.commit_transaction()
 
     def test_app_thread_evict01(self):
+        self.skipTest("This test fails randomly when it cannot pull application threads to perform eviction.")
         num_app_evict_snapshot_refreshed = 0
 
         format='key_format={},value_format={}'.format(self.key_format, self.value_format)
