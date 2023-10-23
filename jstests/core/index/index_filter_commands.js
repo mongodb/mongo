@@ -56,8 +56,10 @@ import {
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
-const coll = db.jstests_index_filter_commands;
+// Flag indicating if index filter commands are running through the query settings interface.
+var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
 
+const coll = db.jstests_index_filter_commands;
 coll.drop();
 
 // Setup the data so that plans will not tie given the indices and query
@@ -329,11 +331,16 @@ assert.commandWorked(
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
+// The code below tests specifics of index filter implementation and therefore are not run in
+// 'index_filters_to_query_settings' suite.
+if (isIndexFiltersToQuerySettings) {
+    quit();
+}
+
 //
 // Test that planCacheSetFilter and planCacheClearFilters do not allow queries containing $expr with
 // unbound variables.
 //
-
 assert(coll.drop());
 assert.commandWorked(coll.insert({a: "a"}));
 assert.commandWorked(coll.createIndex(indexA1, {name: "a_1"}));

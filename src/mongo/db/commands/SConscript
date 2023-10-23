@@ -138,6 +138,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/query/canonical_query',
+        '$BUILD_DIR/mongo/db/query/query_plan_cache',
         '$BUILD_DIR/mongo/db/query/query_settings_manager',
         '$BUILD_DIR/mongo/db/query/query_settings_utils',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',

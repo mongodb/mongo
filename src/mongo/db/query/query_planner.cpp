@@ -1185,7 +1185,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // were used to override the allowed indices for planning, we should not use the hinted index
     // requested in the query.
     boost::optional<BSONObj> hintedIndexBson = boost::none;
-    if (!params.indexFiltersApplied) {
+    if (!params.indexFiltersApplied && !params.querySettingsApplied) {
         if (auto hintObj = query.getFindCommandRequest().getHint(); !hintObj.isEmpty()) {
             hintedIndexBson = hintObj;
         }

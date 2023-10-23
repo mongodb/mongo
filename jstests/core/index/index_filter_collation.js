@@ -19,6 +19,9 @@ import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 const collName = "index_filter_collation";
 const coll = db[collName];
 
+// Flag indicating if index filter commands are running through the query settings interface.
+var isIndexFiltersToQuerySettings = TestData.isIndexFiltersToQuerySettings || false;
+
 const caseInsensitive = {
     locale: "fr",
     strength: 2
@@ -107,6 +110,11 @@ assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 explain = coll.find({x: 3}).collation(caseInsensitive).explain();
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
+
+// TODO: SERVER-79230 Apply QuerySettings for distinct commands.
+if (isIndexFiltersToQuerySettings) {
+    quit();
+}
 
 // Ensure distinct commands behave correctly and consistently with the find commands.
 explain = coll.explain().distinct("_id", {x: 3});

@@ -61,6 +61,20 @@ for (let settings of [querySettingsA, querySettingsB, querySettingsAB]) {
     }
 }
 
+// Ensure that the hint gets ignored when query settings for the particular query are specified.
+{
+    const explain = coll.find({a: 1, b: 5}).hint({a: 1}).explain();
+    jsTestLog(explain);
+    const ixscanStages = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
+    assert.gte(ixscanStages.length, 1, explain);
+
+    // 'querySettingsAB' are expected settings, as they are the last settings that are set.
+    const expectedIndexName = querySettingsAB.indexHints.allowedIndexes[0];
+    for (let ixscanStage of ixscanStages) {
+        assert.docEq(ixscanStage.indexName, expectedIndexName, explain);
+    }
+}
+
 qsutils.removeAllQuerySettings();
 
 // Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.

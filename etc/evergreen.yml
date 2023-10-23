@@ -1153,6 +1153,7 @@ buildvariants:
   - name: .encrypt
   - name: feature_flag_multiversion_gen
   - name: idl_tests
+  - name: index_filters_to_query_settings
   - name: initial_sync_fuzzer_gen
   - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen

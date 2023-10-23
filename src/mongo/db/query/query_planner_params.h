@@ -83,6 +83,7 @@ struct QueryPlannerParams {
     QueryPlannerParams(size_t options = DEFAULT)
         : options(options),
           indexFiltersApplied(false),
+          querySettingsApplied(false),
           maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
           clusteredCollectionCollator(nullptr),
           availableMemoryBytes(0) {}
@@ -177,6 +178,9 @@ struct QueryPlannerParams {
 
     // Were index filters applied to indices?
     bool indexFiltersApplied;
+
+    // Were query settings applied?
+    bool querySettingsApplied;
 
     // What's the max number of indexed solutions we want to output?  It's expensive to compare
     // plans via the MultiPlanStage, and the set of possible plans is very large for certain

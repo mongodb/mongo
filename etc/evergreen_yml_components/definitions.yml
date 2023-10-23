@@ -6562,6 +6562,13 @@ tasks:
       use_large_distro: "true"
 
 - <<: *task_template
+  name: index_filters_to_query_settings
+  tags: ["sbe_only"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: query_stats_passthrough
   tags: []
   commands:

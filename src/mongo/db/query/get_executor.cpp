@@ -434,6 +434,7 @@ bool applyQuerySettings(const CollectionPtr& collection,
                                                 notInAllowedIndexes),
                                  plannerParams->indices.end());
 
+    plannerParams->querySettingsApplied = true;
     return true;
 }
 
@@ -2947,7 +2948,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     // If there exists an index filter, we ignore all hints. Else, we only keep the index specified
     // by the hint. Since we cannot have an index with name $natural, that case will clear the
     // plannerParams.indices.
-    if (!plannerParams.indexFiltersApplied && !hint.isEmpty()) {
+    if (!plannerParams.indexFiltersApplied && !plannerParams.querySettingsApplied &&
+        !hint.isEmpty()) {
         std::vector<IndexEntry> temp =
             QueryPlannerIXSelect::findIndexesByHint(hint, plannerParams.indices);
         temp.swap(plannerParams.indices);

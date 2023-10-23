@@ -41,6 +41,7 @@
 #include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/query/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/platform/basic.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
@@ -49,6 +50,10 @@ namespace mongo {
 namespace {
 
 using namespace query_settings;
+
+MONGO_FAIL_POINT_DEFINE(querySettingsPlanCacheInvalidation);
+
+static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
 
 SetClusterParameter makeSetClusterParameterRequest(
     const std::vector<QueryShapeConfiguration>& settingsArray, const mongo::DatabaseName& dbName) {
@@ -61,9 +66,6 @@ SetClusterParameter makeSetClusterParameterRequest(
     arrayBuilder.done();
     SetClusterParameter setClusterParameterRequest(
         BSON(QuerySettingsManager::kQuerySettingsClusterParameterName << bob.done()));
-
-    // NOTE: Forward the 'dbName' for the SetClusterParameter::toBSON() not to fail on
-    // the invariant.
     setClusterParameterRequest.setDbName(dbName);
     return setClusterParameterRequest;
 }
@@ -96,6 +98,17 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
     }
 
     return querySettings;
+}
+
+/**
+ * Clears the SBE plan cache if 'querySettingsPlanCacheInvalidation' failpoint is set.
+ * Used when setting index filters via query settings interface. See query_settings_passthrough
+ * suite.
+ */
+void testOnlyClearPlanCache(OperationContext* opCtx) {
+    if (MONGO_unlikely(querySettingsPlanCacheInvalidation.shouldFail())) {
+        sbe::getPlanCache(opCtx).clear();
+    }
 }
 
 class SetQuerySettingsCommand final : public TypedCommand<SetQuerySettingsCommand> {
@@ -244,16 +257,18 @@ public:
                     "setQuerySettings command is unknown",
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
                         serverGlobalParams.featureCompatibility));
-            return stdx::visit(OverloadedVisitor{
-                                   [&](const query_shape::QueryShapeHash& queryShapeHash) {
-                                       return setQuerySettingsByQueryShapeHash(opCtx,
-                                                                               queryShapeHash);
-                                   },
-                                   [&](const QueryInstance& queryInstance) {
-                                       return setQuerySettingsByQueryInstance(opCtx, queryInstance);
-                                   },
-                               },
-                               request().getCommandParameter());
+            auto response =
+                stdx::visit(OverloadedVisitor{
+                                [&](const query_shape::QueryShapeHash& queryShapeHash) {
+                                    return setQuerySettingsByQueryShapeHash(opCtx, queryShapeHash);
+                                },
+                                [&](const QueryInstance& queryInstance) {
+                                    return setQuerySettingsByQueryInstance(opCtx, queryInstance);
+                                },
+                            },
+                            request().getCommandParameter());
+            testOnlyClearPlanCache(opCtx);
+            return response;
         }
 
     private:
@@ -348,6 +363,8 @@ public:
                 boost::none,
                 querySettingsManager.getClusterParameterTime(opCtx,
                                                              request().getDbName().tenantId()));
+
+            testOnlyClearPlanCache(opCtx);
         }
 
     private:
