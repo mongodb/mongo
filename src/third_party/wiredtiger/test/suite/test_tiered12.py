@@ -58,18 +58,9 @@ class test_tiered12(wttest.WiredTigerTestCase, TieredConfigMixin):
         get_check(self, tc, base, n)
 
     def test_tiered(self):
-        # Default cache location is cache-<bucket-name>
-        cache = "cache-" + self.bucket
-        # The bucket format for the S3 store is the name and the region separataed by a semi-colon.
-        # Strip off the region to get the cache folder.
-        if self.ss_name == 's3_store':
-            cache = cache[:cache.find(';')]  
-
         # Create a table. Add some data. Checkpoint and flush tier.
         # We have configured the timing stress for tiered caching which delays
         # the internal thread calling flush_finish for 1 second.
-        # So after flush tier completes, check that the cached object does not
-        # exist. Then sleep and check that it does exist.
         #
         # The idea is to make sure flush_tier is not waiting for unnecessary work
         # to be done, but returns as soon as the copying to shared storage completes.
@@ -91,13 +82,6 @@ class test_tiered12(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         # Sleep more than the one second stress timing amount and give the thread time to run.
         time.sleep(2)
-        # After sleeping, the internal thread should have created the cached object.
-        if self.has_cache:
-            cache_obj_basename = self.bucket_prefix + self.obj1file
-            if self.ss_name == 's3_store':
-                cache_obj_basename = cache_obj_basename.replace('/', '-')
-            cache_obj = os.path.join(cache, cache_obj_basename)
-            self.assertTrue(os.path.exists(cache_obj))
 
 if __name__ == '__main__':
     wttest.run()

@@ -65,6 +65,7 @@ public:
 private:
     AwsManager()
     {
+        options.httpOptions.installSigPipeHandler = true;
         refCount = 0;
     }
 

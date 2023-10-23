@@ -30,9 +30,8 @@
 #include <wiredtiger_ext.h>
 #include <fstream>
 #include <list>
-#include <errno.h>
-#include <filesystem>
 #include <mutex>
+#include <atomic>
 
 #include "s3_connection.h"
 #include "s3_log_system.h"
@@ -51,14 +50,15 @@ struct S3FileSystem;
 // Statistics to be collected for the S3 storage.
 struct S3Statistics {
     // Operations using AWS SDK.
-    uint64_t listObjectsCount;  // Number of S3 list objects requests
-    uint64_t putObjectCount;    // Number of S3 put object requests
-    uint64_t getObjectCount;    // Number of S3 get object requests
-    uint64_t objectExistsCount; // Number of S3 object exists requests
+    std::atomic<int64_t> listObjectsCount;  // Number of S3 list objects requests
+    std::atomic<int64_t> putObjectCount;    // Number of S3 put object requests
+    std::atomic<int64_t> objectExistsCount; // Number of S3 object exists requests
 
     // Operations using WiredTiger's native file handle operations.
-    uint64_t fhOps;     // Number of non read/write file handle operations
-    uint64_t fhReadOps; // Number of file handle read operations
+    std::atomic<int64_t> fhCloseOps; // Number of close file handle operations
+    std::atomic<int64_t> fhOpenOps;  // Number of open file handle operations
+    std::atomic<int64_t> fhReadOps;  // Number of file handle read operations
+    std::atomic<int64_t> fhReadSize; // Number of file handle read bytes read
 };
 
 // S3 storage source structure.
@@ -72,7 +72,7 @@ struct S3Storage {
     std::mutex fhMutex;               // Protect the file handle list
     std::list<S3FileHandle *> fhList; // List of open file handles
 
-    uint32_t referenceCount; // Number of references to this storage source
+    std::atomic<uint32_t> referenceCount; // Number of references to this storage source
     int32_t verbose;
 
     S3Statistics statistics;
@@ -82,28 +82,17 @@ struct S3FileSystem {
     // Must come first - this is the interface for the file system we are implementing.
     WT_FILE_SYSTEM fileSystem;
     S3Storage *storage;
-    /*
-     * The S3_FILE_SYSTEM is built on top of the WT_FILE_SYSTEM. We require an instance of the
-     * WT_FILE_SYSTEM in order to access the native WiredTiger filesystem functionality, such as the
-     * native WT file handle open.
-     */
-    WT_FILE_SYSTEM *wtFileSystem;
     S3Connection *connection;
-    std::string cacheDir; // Directory for cached objects
-    std::string homeDir;  // Owned by the connection
+    std::string homeDir; // Owned by the connection
 };
 
 struct S3FileHandle {
     WT_FILE_HANDLE iface; // Must come first
     S3Storage *storage;   // Enclosing storage source
-
-    /*
-     * Similarly, The S3FileHandle is built on top of the WT_FILE_HANDLE. We require an instance of
-     * the WT_FILE_HANDLE in order to access the native WiredTiger filehandle functionality, such as
-     * the native WT file handle read and close.
-     */
-
-    WT_FILE_HANDLE *wtFileHandle;
+    S3FileSystem *fs;
+    wt_off_t objSize;
+    std::string objName;
+    std::atomic<uint32_t> referenceCount;
 };
 
 // Configuration variables for connecting to S3CrtClient.
@@ -114,10 +103,6 @@ const uint64_t partSize = 8 * 1024 * 1024; // 8 MB.
 std::mutex AwsManager::InitGuard;
 AwsManager AwsManager::aws_instance;
 
-static int S3GetDirectory(
-  const S3Storage &, const std::string &, const std::string &, bool, std::string &);
-static bool S3CacheExists(WT_FILE_SYSTEM *, const std::string &);
-static std::string S3CachePath(const std::string &, const std::string &);
 static std::string S3SourcePath(const std::string &, const std::string &);
 static int S3FileExists(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int S3CustomizeFileSystem(
@@ -128,7 +113,6 @@ static int S3FileOpen(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, WT_FS_OPEN_FILE_TYPE, uint32_t, WT_FILE_HANDLE **);
 static int S3Remove(WT_FILE_SYSTEM *, WT_SESSION *, const char *, uint32_t);
 static int S3Rename(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t);
-static bool LocalFileExists(const std::string &);
 static int S3FileRead(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, void *);
 static int S3ObjectList(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
@@ -143,20 +127,6 @@ static int S3FileClose(WT_FILE_HANDLE *, WT_SESSION *);
 static int S3FileSize(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t *);
 static int S3FileLock(WT_FILE_HANDLE *, WT_SESSION *, bool);
 static int S3ObjectSize(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *);
-
-// Construct a pathname from the cache directory and the object name. This takes care of translating
-// illegal characters in the object name (e.g., '/') into legal characters.
-static std::string
-S3CachePath(const std::string &dir, const std::string &name)
-{
-    int i;
-    std::string cacheFileName = name;
-    for (i = 0; i < cacheFileName.length(); i++)
-        if (cacheFileName[i] == '/')
-            cacheFileName[i] = '-';
-
-    return (dir + "/" + cacheFileName);
-}
 
 // Construct a pathname from the source directory and the base file name.
 static std::string
@@ -175,91 +145,47 @@ S3SourcePath(const std::string &dir, const std::string &name)
     return (dir + "/" + strippedName);
 }
 
-// Return if the file exists. First checks the cache, and then the S3 Bucket.
+// Return if the file exists, via looking into the S3 Bucket. Also, if the file exists, fetch the
+// file size.
+static int
+S3FileSizeHelper(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, wt_off_t *size)
+{
+    int ret = 0;
+    S3FileSystem *fs = (S3FileSystem *)fileSystem;
+    S3Storage *s3 = FS2S3(fileSystem);
+    size_t objectSize;
+    bool fileExists;
+
+    if ((ret = fs->connection->ObjectExists(name, fileExists, objectSize)) != 0)
+        s3->log->LogErrorMessage("S3FileSizeHelper: ObjectExists request to S3 failed.");
+
+    if (fileExists)
+        *size = objectSize;
+    else {
+        s3->log->LogDebugMessage("S3FileSizeHelper: File not found in S3.");
+        return (ENOENT);
+    }
+    return (ret);
+}
+
 static int
 S3FileExists(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, bool *fileExists)
 {
     int ret = 0;
     S3FileSystem *fs = (S3FileSystem *)fileSystem;
     S3Storage *s3 = FS2S3(fileSystem);
-
-    // Check if file exists in the cache.
-    *fileExists = S3CacheExists(fileSystem, name);
-    if (*fileExists) {
-        s3->log->LogDebugMessage("S3FileExists: Found file in cache.");
-        return (ret);
-    }
-
-    // It's not in the cache, try the S3 bucket.
     size_t objectSize;
+
+    *fileExists = false;
+
     s3->statistics.objectExistsCount++;
     if ((ret = fs->connection->ObjectExists(name, *fileExists, objectSize)) != 0)
         s3->log->LogErrorMessage("S3FileExists: ObjectExists request to S3 failed.");
-    else
+
+    if (fileExists)
         s3->log->LogDebugMessage("S3FileExists: Found file in S3.");
-
-    return (ret);
-}
-
-// Checks whether the given file exists in the cache.
-static bool
-S3CacheExists(WT_FILE_SYSTEM *fileSystem, const std::string &name)
-{
-    const std::string path = S3CachePath(((S3FileSystem *)fileSystem)->cacheDir, name);
-    return (LocalFileExists(path));
-}
-
-// Checks whether a file corresponding to the provided path exists locally.
-static bool
-LocalFileExists(const std::string &path)
-{
-    std::ifstream f(path);
-    return (f.good());
-}
-
-// Return a copy of a directory name after verifying that it is a directory.
-static int
-S3GetDirectory(const S3Storage &s3, const std::string &home, const std::string &name, bool create,
-  std::string &copy)
-{
-    // copy must be initialised before the function returns.
-    copy = "";
-
-    int ret;
-    std::string dirName;
-
-    // For relative pathnames, the path is considered to be relative to the home directory.
-    if (name[0] == '/')
-        dirName = name;
     else
-        dirName = home + "/" + name;
-
-    // Use filesystem status to find if directory exists.
-    std::error_code ec;
-    std::filesystem::file_status status = std::filesystem::status(dirName.c_str(), ec);
-
-    if (!std::filesystem::exists(status) && create) {
-        try {
-            std::filesystem::create_directory(dirName.c_str());
-            std::filesystem::permissions(dirName.c_str(), std::filesystem::perms::all);
-        } catch (std::filesystem::filesystem_error const &e) {
-            s3.log->LogErrorMessage(std::string("S3GetDirectory: ") + e.what());
-        }
-
-        s3.log->LogDebugMessage("S3GetDirectory: Successfully created directory.");
-    }
-
-    status = std::filesystem::status(dirName.c_str(), ec);
-    ret = ec.value();
-
-    if (ret != 0) {
-        s3.log->LogErrorMessage("S3GetDirectory: No such file or directory");
-    } else if (!std::filesystem::is_directory(status)) {
-        s3.log->LogErrorMessage("S3GetDirectory: invalid directory name");
-        ret = EINVAL;
-    }
-
-    copy = dirName;
+        s3->log->LogDebugMessage("S3FileExists: File not found in S3.");
     return (ret);
 }
 
@@ -267,10 +193,12 @@ S3GetDirectory(const S3Storage &s3, const std::string &home, const std::string &
 static int
 S3FileClose(WT_FILE_HANDLE *fileHandle, WT_SESSION *session)
 {
-    int ret = 0;
     S3FileHandle *s3FileHandle = (S3FileHandle *)fileHandle;
     S3Storage *s3 = s3FileHandle->storage;
-    WT_FILE_HANDLE *wtFileHandle = s3FileHandle->wtFileHandle;
+
+    // If there are other active instances of the file being open, do not close file handle.
+    if (--s3FileHandle->referenceCount != 0)
+        return 0;
 
     // We require exclusive access to the list of file handles when removing file handles. The
     // lock_guard will be unlocked automatically once the scope is exited.
@@ -278,17 +206,10 @@ S3FileClose(WT_FILE_HANDLE *fileHandle, WT_SESSION *session)
         std::lock_guard<std::mutex> lock(s3->fhMutex);
         s3->fhList.remove(s3FileHandle);
     }
-    if (wtFileHandle != nullptr) {
-        s3->statistics.fhOps++;
-        if ((ret = wtFileHandle->close(wtFileHandle, session)) != 0)
-            s3->log->LogErrorMessage("S3FileClose: close file handle failed.");
-        else
-            s3->log->LogDebugMessage("S3FileClose: Successfully closed file handle.");
-    }
 
     free(s3FileHandle->iface.name);
     free(s3FileHandle);
-    return (ret);
+    return (0);
 }
 
 // File open for the s3 storage source.
@@ -315,35 +236,41 @@ S3FileOpen(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
         return (EINVAL);
     }
 
+    // Check if the file exists and get the size
+    bool objExists;
+    size_t objSize;
+    if ((ret = fs->connection->ObjectExists(std::string(name), objExists, objSize)) != 0) {
+        s3->log->LogErrorMessage(
+          "S3FileOpen: error checking if the file exists: " + std::string(std::strerror(ret)));
+        return (ret);
+    }
+    if (!objExists) {
+        s3->log->LogErrorMessage(
+          "S3FileOpen: object named " + std::string(name) + " does not exist in the bucket.");
+        return (ENOENT);
+    }
+
+    // Check if there is already an existing file handle open.
+    auto fh_iterator = std::find_if(s3->fhList.begin(), s3->fhList.end(),
+      [name](S3FileHandle *fh) { return fh->objName.compare(name) == 0; });
+
+    // Active file handle for file exists, increment reference count.
+    if (fh_iterator != s3->fhList.end()) {
+        (*fh_iterator)->referenceCount++;
+        *fileHandlePtr = reinterpret_cast<WT_FILE_HANDLE *>(*fh_iterator);
+        return 0;
+    }
+
     S3FileHandle *s3FileHandle;
     if ((s3FileHandle = (S3FileHandle *)calloc(1, sizeof(S3FileHandle))) == nullptr) {
         s3->log->LogErrorMessage("S3FileOpen: unable to allocate memory for file handle.");
         return (ENOMEM);
     }
-
-    // Make a copy from S3 if the file is not in the cache.
-    const std::string cachePath = S3CachePath(fs->cacheDir, name);
-    if (!LocalFileExists(cachePath)) {
-        s3->statistics.getObjectCount++;
-        if ((ret = fs->connection->GetObject(name, cachePath)) != 0) {
-            s3->log->LogErrorMessage("S3FileOpen: GetObject request to S3 failed.");
-            return (ret);
-        }
-    }
-
-    // Use WiredTiger's native file handle open.
-    WT_FILE_SYSTEM *wtFileSystem = fs->wtFileSystem;
-    WT_FILE_HANDLE *wtFileHandle;
-    ret = wtFileSystem->fs_open_file(
-      wtFileSystem, session, cachePath.c_str(), fileType, flags, &wtFileHandle);
-    if (ret != 0) {
-        s3->log->LogErrorMessage("S3FileOpen: fs_open_file failed.");
-        return (ret);
-    } else
-        s3->log->LogDebugMessage("S3FileOpen: fs_open_file succeeded.");
-
-    s3FileHandle->wtFileHandle = wtFileHandle;
+    s3FileHandle->objName = name;
+    s3FileHandle->objSize = objSize;
     s3FileHandle->storage = s3;
+    s3FileHandle->fs = fs;
+    s3FileHandle->referenceCount = 1;
 
     // We only define the functions we need since S3 is read-only.
     WT_FILE_HANDLE *fileHandle = (WT_FILE_HANDLE *)s3FileHandle;
@@ -366,6 +293,7 @@ S3FileOpen(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
     fileHandle->name = strdup(name);
     if (fileHandle->name == nullptr) {
         s3->log->LogErrorMessage("S3FileOpen: unable to allocate memory for object name.");
+        free(s3FileHandle);
         return (ENOMEM);
     }
 
@@ -375,6 +303,8 @@ S3FileOpen(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name,
         std::lock_guard<std::mutex> lock(s3->fhMutex);
         s3FileHandle->storage->fhList.push_back(s3FileHandle);
     }
+
+    s3->statistics.fhOpenOps++;
 
     *fileHandlePtr = fileHandle;
     return (0);
@@ -407,27 +337,10 @@ S3Remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, uin
 }
 
 // Get the size of a file in bytes, by file name.
-
 static int
 S3ObjectSize(WT_FILE_SYSTEM *fileSystem, WT_SESSION *session, const char *name, wt_off_t *sizep)
 {
-    // sizep must be initialised before the function returns.
-    *sizep = 0;
-
-    S3Storage *s3 = FS2S3(fileSystem);
-    S3FileSystem *fs = (S3FileSystem *)fileSystem;
-    size_t objectSize;
-    bool exists;
-    int ret;
-
-    s3->statistics.objectExistsCount++;
-    if ((ret = fs->connection->ObjectExists(name, exists, objectSize)) != 0)
-        return (ret);
-
-    s3->log->LogDebugMessage(
-      "S3ObjectSize: Found S3 object size to be " + std::to_string(objectSize) + " bytes.");
-    *sizep = objectSize;
-    return (ret);
+    return (S3FileSizeHelper(fileSystem, session, name, sizep));
 }
 
 // Lock/unlock a file.
@@ -441,21 +354,24 @@ S3FileLock(WT_FILE_HANDLE *fileHandle, WT_SESSION *session, bool lock)
     return (0);
 }
 
-// Read a file using WiredTiger's native file handle read.
-
+// Read a file from the S3 buckets, and store the contents into an user provided buffer.
 static int
 S3FileRead(WT_FILE_HANDLE *fileHandle, WT_SESSION *session, wt_off_t offset, size_t len, void *buf)
 {
     S3FileHandle *s3FileHandle = (S3FileHandle *)fileHandle;
     S3Storage *s3 = s3FileHandle->storage;
-    WT_FILE_HANDLE *wtFileHandle = s3FileHandle->wtFileHandle;
-    int ret;
+    S3FileSystem *fs = s3FileHandle->fs;
+    int ret = 0;
+
     s3->statistics.fhReadOps++;
-    if ((ret = wtFileHandle->fh_read(wtFileHandle, session, offset, len, buf)) != 0)
+    if ((ret = fs->connection->ReadObjectWithRange(s3FileHandle->objName, offset, len, buf)) != 0)
         s3->log->LogErrorMessage("S3FileRead: fh_read failed.");
-    else
+    else {
         s3->log->LogDebugMessage(
           "S3FileRead: fh_read succeeded in reading " + std::to_string(len) + " bytes.");
+        s3->statistics.fhReadSize += len;
+    }
+
     return (ret);
 }
 
@@ -464,10 +380,9 @@ static int
 S3FileSize(WT_FILE_HANDLE *fileHandle, WT_SESSION *session, wt_off_t *sizep)
 {
     S3FileHandle *s3FileHandle = (S3FileHandle *)fileHandle;
-    S3Storage *s3 = s3FileHandle->storage;
-    WT_FILE_HANDLE *wtFileHandle = s3FileHandle->wtFileHandle;
-    s3->statistics.fhOps++;
-    return (wtFileHandle->fh_size(wtFileHandle, session, sizep));
+    WT_FILE_SYSTEM *fs = (WT_FILE_SYSTEM *)s3FileHandle->fs;
+
+    return (S3FileSizeHelper(fs, session, s3FileHandle->objName.c_str(), sizep));
 }
 
 // Return a customized file system to access the s3 storage source objects. The authToken
@@ -477,7 +392,7 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
   const char *authToken, const char *config, WT_FILE_SYSTEM **fileSystem)
 {
     S3Storage *s3;
-    int ret;
+    int ret = 0;
 
     s3 = (S3Storage *)storageSource;
 
@@ -538,7 +453,8 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
     else if (ret != WT_NOTFOUND) {
         s3->log->LogErrorMessage("S3CustomizeFileSystem: error parsing config for object prefix.");
         return (ret);
-    }
+    } else
+        ret = 0;
 
     // Configure the AWS Client configuration.
     Aws::S3Crt::ClientConfiguration awsConfig;
@@ -546,35 +462,8 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
     awsConfig.region = region;
     awsConfig.throughputTargetGbps = throughputTargetGbps;
 
-    /*
-     * Get the directory to setup the cache, or use the default one. The default cache directory is
-     * named "cache-<name>", where name is the last component of the bucket name's path. We'll
-     * create it if it doesn't exist.
-     */
-    WT_CONFIG_ITEM cacheDirConf;
-    std::string cacheDir;
-    std::string cacheStr;
-    if ((ret = s3->wtApi->config_get_string(
-           s3->wtApi, session, config, "cache_directory", &cacheDirConf)) == 0)
-        cacheStr = std::string(cacheDirConf.str, cacheDirConf.len);
-    else if (ret == WT_NOTFOUND) {
-        cacheStr = "cache-" + bucketName;
-        ret = 0;
-    } else {
-        s3->log->LogErrorMessage(
-          "S3CustomizeFileSystem: error parsing config for cache directory.");
-        return (ret);
-    }
-
-    // Fetch the native WT file system.
-    WT_FILE_SYSTEM *wtFileSystem;
-    if ((ret = s3->wtApi->file_system_get(s3->wtApi, session, &wtFileSystem)) != 0)
-        return (ret);
-
-    // Get a copy of the home and cache directory.
+    // Get a copy of the home directory.
     const std::string homeDir = session->connection->get_home(session->connection);
-    if ((ret = S3GetDirectory(*s3, homeDir, cacheStr, true, cacheDir)) != 0)
-        return (ret);
 
     // Create the file system.
     S3FileSystem *fs;
@@ -584,9 +473,7 @@ S3CustomizeFileSystem(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, con
         return (ENOMEM);
     }
     fs->storage = s3;
-    fs->wtFileSystem = wtFileSystem;
     fs->homeDir = homeDir;
-    fs->cacheDir = cacheDir;
 
     try {
         fs->connection = new S3Connection(credentials, awsConfig, bucketName, objPrefix);
@@ -794,13 +681,21 @@ S3Flush(WT_STORAGE_SOURCE *storageSource, WT_SESSION *session, WT_FILE_SYSTEM *f
 {
     S3Storage *s3 = (S3Storage *)storageSource;
     S3FileSystem *fs = (S3FileSystem *)fileSystem;
-    WT_FILE_SYSTEM *wtFileSystem = fs->wtFileSystem;
+
+    /* Get the native filesystem to check if the file exists. */
+    WT_FILE_SYSTEM *wtFileSystem;
+    int ret = 0;
+    if ((ret = s3->wtApi->file_system_get(s3->wtApi, session, &wtFileSystem)) != 0) {
+        s3->log->LogErrorMessage("S3Flush: Failed to get access to the native filesystem.");
+        return (ret);
+    }
+
     FS2S3(fileSystem)->statistics.putObjectCount++;
 
     // Confirm that the file exists on the native filesystem.
     std::string srcPath = S3SourcePath(fs->homeDir, source);
     bool nativeExist = false;
-    int ret = wtFileSystem->fs_exist(wtFileSystem, session, srcPath.c_str(), &nativeExist);
+    ret = wtFileSystem->fs_exist(wtFileSystem, session, srcPath.c_str(), &nativeExist);
     if (ret != 0) {
         s3->log->LogErrorMessage("S3Flush: Failed to check for the existence of " +
           std::string(source) + " on the native filesystem.");
@@ -828,38 +723,7 @@ static int
 S3FlushFinish(WT_STORAGE_SOURCE *storage, WT_SESSION *session, WT_FILE_SYSTEM *fileSystem,
   const char *source, const char *object, const char *config)
 {
-    S3Storage *s3 = (S3Storage *)storage;
-    S3FileSystem *fs = (S3FileSystem *)fileSystem;
-    // Constructing the pathname for source and cache from file system and local.
-    std::string srcPath = S3SourcePath(fs->homeDir, source);
-    std::string destPath = S3CachePath(fs->cacheDir, object);
-
-    // Converting S3 object name to cache directory structure to link the cache file with local
-    // file.
-    std::filesystem::create_directories(std::filesystem::path(destPath).parent_path());
-
-    // Linking file with the local file.
-    std::error_code ec;
-    std::filesystem::create_hard_link(srcPath.c_str(), destPath.c_str(), ec);
-    int ret = ec.value();
-    if (ret != 0) {
-        ret = errno;
-        s3->log->LogErrorMessage(
-          "S3FlushFinish: link " + std::string(source) + " to " + destPath + " failed");
-        return (ret);
-    }
-
-    // The file should be read-only.
-    std::filesystem::permissions(destPath.c_str(),
-      std::filesystem::perms::owner_read | std::filesystem::perms::group_read |
-        std::filesystem::perms::others_read,
-      std::filesystem::perm_options::add, ec);
-    ret = ec.value();
-    if (ret != 0) {
-        ret = errno;
-        s3->log->LogErrorMessage("S3FlushFinish: read permissions of " + destPath + " failed");
-    }
-    return (ret);
+    return (0);
 }
 
 // Log collected statistics.
@@ -869,14 +733,16 @@ S3LogStatistics(const S3Storage &s3)
     s3.log->LogDebugMessage(
       "S3 list objects count: " + std::to_string(s3.statistics.listObjectsCount));
     s3.log->LogDebugMessage("S3 put object count: " + std::to_string(s3.statistics.putObjectCount));
-    s3.log->LogDebugMessage("S3 get object count: " + std::to_string(s3.statistics.getObjectCount));
-    s3.log->LogDebugMessage(
-      "S3 object exists count: " + std::to_string(s3.statistics.objectExistsCount));
+    s3.log->LogDebugMessage("S3 object exists and size request count: " +
+      std::to_string(s3.statistics.objectExistsCount));
 
     s3.log->LogDebugMessage(
-      "Non read/write file handle operations: " + std::to_string(s3.statistics.fhOps));
+      "File handle close operations: " + std::to_string(s3.statistics.fhCloseOps));
+    s3.log->LogDebugMessage(
+      "File handle open operations: " + std::to_string(s3.statistics.fhOpenOps));
     s3.log->LogDebugMessage(
       "File handle read operations: " + std::to_string(s3.statistics.fhReadOps));
+    s3.log->LogDebugMessage("File handle size read: " + std::to_string(s3.statistics.fhReadSize));
 }
 
 // A S3 storage source library.
@@ -904,9 +770,6 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
         delete (s3);
         return (ret != 0 ? ret : EINVAL);
     }
-
-    // Set up statistics.
-    s3->statistics = {};
 
     // Initialize the AWS SDK and logging.
     AwsManager::Init();

@@ -381,7 +381,7 @@ gcp_file_open(WT_FILE_SYSTEM *file_system, [[maybe_unused]] WT_SESSION *session,
     if (!exists) {
         gcp->log->log_error_message(
           "gcp_file_open: object named " + std::string(name) + " does not exist in the bucket.");
-        return EINVAL;
+        return ENOENT;
     }
 
     // Check if there is already an existing file handle open.

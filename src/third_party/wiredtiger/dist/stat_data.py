@@ -125,7 +125,7 @@ class SessionOpStat(Stat):
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
 class StorageStat(Stat):
-    prefix = 'session'
+    prefix = 'tiered-storage'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, SessionOpStat.prefix, desc, flags)
 class ThreadStat(Stat):

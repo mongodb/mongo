@@ -5215,7 +5215,7 @@ struct __wt_storage_source {
 
     /*!
      * After a flush, rename the source file from the default file system to be cached in
-         * the shared object storage.
+     * the shared object storage.
      *
      * @errors
      *

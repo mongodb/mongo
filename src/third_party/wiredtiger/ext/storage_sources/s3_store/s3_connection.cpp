@@ -33,6 +33,7 @@
 #include <aws/s3-crt/model/GetObjectRequest.h>
 #include <aws/s3-crt/model/HeadObjectRequest.h>
 #include <aws/s3-crt/model/HeadBucketRequest.h>
+#include <aws/core/utils/stream/PreallocatedStreamBuf.h>
 
 #include <fstream>
 #include <iostream>
@@ -161,20 +162,27 @@ S3Connection::DeleteObject(const std::string &objectKey) const
     return (-1);
 }
 
-// Retrieves an object from S3. The object is downloaded to disk at the specified location.
+// Read a given range of bytes from an object in the S3 bucket. The bytes are copied into a
+// user provided buffer.
 int
-S3Connection::GetObject(const std::string &objectKey, const std::string &path) const
+S3Connection::ReadObjectWithRange(
+  const std::string &objectKey, size_t offset, size_t len, void *buf) const
 {
     Aws::S3Crt::Model::GetObjectRequest request;
     request.SetBucket(_bucketName);
     request.SetKey(_objectPrefix + objectKey);
+    std::string range = "bytes=" + std::to_string(offset) + "-" + std::to_string(offset + len - 1);
+    request.SetRange(range);
 
-    // The S3 Object should be downloaded to disk rather than into an in-memory buffer. Use a custom
-    // response stream factory to specify how the response should be downloaded.
-    request.SetResponseStreamFactory([=]() {
-        return (Aws::New<Aws::FStream>(
-          s3AllocationTag, path, std::ios_base::out | std::ios_base::binary));
-    });
+    /*
+     * The requested S3 object's range should be extracted into the given buffer. We create an
+     * IOstream using the given buffer, so that the object can be downloaded directly into the
+     * buffer without making unnecessary intermediate copies.
+     */
+    Aws::Utils::Stream::PreallocatedStreamBuf streambuf(
+      reinterpret_cast<unsigned char *>(buf), len);
+    request.SetResponseStreamFactory(
+      [&streambuf]() { return (Aws::New<Aws::IOStream>("", &streambuf)); });
 
     Aws::S3Crt::Model::GetObjectOutcome outcome = _s3CrtClient.GetObject(request);
 

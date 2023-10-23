@@ -541,8 +541,9 @@ azure_file_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *na
         return ret;
     }
     if (!exists) {
-        log->log_err_msg("azure_file_open: no such file named " + std::string(name) + ".");
-        return EINVAL;
+        log->log_err_msg(
+          "azure_file_open: object named " + std::string(name) + " does not exist in the bucket.");
+        return ENOENT;
     }
 
     // Check if there is already an existing file handle open.

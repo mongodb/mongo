@@ -128,18 +128,15 @@ TEST_CASE("Testing class S3Connection", "s3-connection")
         REQUIRE(conn.DeleteObject(objectName) == 0);
     }
 
-    SECTION("Gets an object from an S3 Bucket", "[s3-connection]")
+    SECTION("Read an object from an S3 Bucket", "[s3-connection]")
     {
         REQUIRE(conn.PutObject(objectName, fileName) == 0);
-        REQUIRE(std::remove(path.c_str()) == 0);        // Delete the local copy of the file.
-        REQUIRE(conn.GetObject(objectName, path) == 0); // Download the file from S3
 
-        // The file should now be in the current directory.
-        std::ifstream f(path);
-        REQUIRE(f.good());
+        char tmp[8];
+        REQUIRE(conn.ReadObjectWithRange(objectName, 2, 8, tmp) == 0);
+        REQUIRE(strncmp(tmp, payload.substr(2, 8).c_str(), 8) == 0);
 
         // Clean up test artifacts.
-        REQUIRE(std::remove(path.c_str()) == 0);
         REQUIRE(conn.DeleteObject(objectName) == 0);
     }
 
@@ -219,6 +216,7 @@ main(int argc, char **argv)
 {
     // Set the SDK options
     Aws::SDKOptions options;
+    options.httpOptions.installSigPipeHandler = true;
     Aws::InitAPI(options);
 
     int ret = Catch::Session().run(argc, argv);
