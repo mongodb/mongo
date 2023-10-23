@@ -414,11 +414,18 @@ extern int __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_chunkcache_create_from_metadata(WT_SESSION_IMPL *session, const char *name,
+  uint32_t id, wt_off_t file_offset, uint64_t cache_offset, size_t chunk_size)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid,
   wt_off_t offset, uint32_t size, void *dst, bool *cache_hit)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_ingest(WT_SESSION_IMPL *session, const char *local_name,
   const char *sp_obj_name, uint32_t objectid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_chunkcache_metadata_create(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_chunkcache_metadata_destroy(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_reconfig(WT_SESSION_IMPL *session, const char **cfg)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_salvage(WT_SESSION_IMPL *session)

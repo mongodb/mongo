@@ -19,17 +19,18 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
     session = conn->default_session;
 
-    TAILQ_INIT(&conn->dhqh);         /* Data handle list */
-    TAILQ_INIT(&conn->dlhqh);        /* Library list */
-    TAILQ_INIT(&conn->dsrcqh);       /* Data source list */
-    TAILQ_INIT(&conn->fhqh);         /* File list */
-    TAILQ_INIT(&conn->collqh);       /* Collator list */
-    TAILQ_INIT(&conn->compqh);       /* Compressor list */
-    TAILQ_INIT(&conn->encryptqh);    /* Encryptor list */
-    TAILQ_INIT(&conn->extractorqh);  /* Extractor list */
-    TAILQ_INIT(&conn->storagesrcqh); /* Storage source list */
-    TAILQ_INIT(&conn->tieredqh);     /* Tiered work unit list */
-    TAILQ_INIT(&conn->pfqh);         /* Pre-fetch reference list */
+    TAILQ_INIT(&conn->chunkcache_metadataqh); /* Chunkcache metadata work unit list */
+    TAILQ_INIT(&conn->dhqh);                  /* Data handle list */
+    TAILQ_INIT(&conn->dlhqh);                 /* Library list */
+    TAILQ_INIT(&conn->dsrcqh);                /* Data source list */
+    TAILQ_INIT(&conn->fhqh);                  /* File list */
+    TAILQ_INIT(&conn->collqh);                /* Collator list */
+    TAILQ_INIT(&conn->compqh);                /* Compressor list */
+    TAILQ_INIT(&conn->encryptqh);             /* Encryptor list */
+    TAILQ_INIT(&conn->extractorqh);           /* Extractor list */
+    TAILQ_INIT(&conn->storagesrcqh);          /* Storage source list */
+    TAILQ_INIT(&conn->tieredqh);              /* Tiered work unit list */
+    TAILQ_INIT(&conn->pfqh);                  /* Pre-fetch reference list */
 
     TAILQ_INIT(&conn->lsmqh); /* WT_LSM_TREE list */
 

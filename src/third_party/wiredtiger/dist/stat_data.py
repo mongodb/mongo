@@ -409,19 +409,22 @@ conn_stats = [
     ##########################################
     # Chunk cache statistics
     ##########################################
-    ChunkCacheStat('chunk_cache_bytes_inuse', 'total bytes used by the cache'),
-    ChunkCacheStat('chunk_cache_bytes_inuse_pinned', 'total bytes used by the cache for pinned chunks'),
-    ChunkCacheStat('chunk_cache_chunks_evicted', 'chunks evicted'),
-    ChunkCacheStat('chunk_cache_chunks_inuse', 'total chunks held by the chunk cache'),
-    ChunkCacheStat('chunk_cache_chunks_pinned', 'total pinned chunks held by the chunk cache'),
-    ChunkCacheStat('chunk_cache_exceeded_capacity', 'could not allocate due to exceeding capacity'),
-    ChunkCacheStat('chunk_cache_io_failed', 'number of times a read from storage failed'),
-    ChunkCacheStat('chunk_cache_lookups', 'lookups'),
-    ChunkCacheStat('chunk_cache_misses', 'number of misses'),
-    ChunkCacheStat('chunk_cache_chunks_loaded_from_flushed_tables', 'number of chunks loaded from flushed tables in chunk cache'),
-    ChunkCacheStat('chunk_cache_retries', 'retried accessing a chunk while I/O was in progress'),
-    ChunkCacheStat('chunk_cache_spans_chunks_read', 'aggregate number of spanned chunks on read'),
-    ChunkCacheStat('chunk_cache_toomany_retries', 'timed out due to too many retries'),
+    ChunkCacheStat('chunkcache_bytes_inuse', 'total bytes used by the cache'),
+    ChunkCacheStat('chunkcache_bytes_inuse_pinned', 'total bytes used by the cache for pinned chunks'),
+    ChunkCacheStat('chunkcache_chunks_evicted', 'chunks evicted'),
+    ChunkCacheStat('chunkcache_chunks_inuse', 'total chunks held by the chunk cache'),
+    ChunkCacheStat('chunkcache_chunks_loaded_from_flushed_tables', 'number of chunks loaded from flushed tables in chunk cache'),
+    ChunkCacheStat('chunkcache_chunks_pinned', 'total pinned chunks held by the chunk cache'),
+    ChunkCacheStat('chunkcache_created_from_metadata', 'total number of chunks inserted on startup from persisted metadata.'),
+    ChunkCacheStat('chunkcache_exceeded_capacity', 'could not allocate due to exceeding capacity'),
+    ChunkCacheStat('chunkcache_io_failed', 'number of times a read from storage failed'),
+    ChunkCacheStat('chunkcache_lookups', 'lookups'),
+    ChunkCacheStat('chunkcache_metadata_work_units_created', 'number of metadata inserts/deletes pushed to the worker thread'),
+    ChunkCacheStat('chunkcache_metadata_work_units_dequeued', 'number of metadata inserts/deletes read by the worker thread'),
+    ChunkCacheStat('chunkcache_misses', 'number of misses'),
+    ChunkCacheStat('chunkcache_retries', 'retried accessing a chunk while I/O was in progress'),
+    ChunkCacheStat('chunkcache_spans_chunks_read', 'aggregate number of spanned chunks on read'),
+    ChunkCacheStat('chunkcache_toomany_retries', 'timed out due to too many retries'),
 
     ##########################################
     # Cursor operations

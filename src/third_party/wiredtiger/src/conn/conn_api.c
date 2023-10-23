@@ -1206,6 +1206,7 @@ err:
     WT_TRET(__wt_config_gets(session, cfg, "final_flush", &cval));
     WT_TRET(__wt_tiered_storage_destroy(session, cval.val));
     WT_TRET(__wt_chunkcache_teardown(session));
+    WT_TRET(__wt_chunkcache_metadata_destroy(session));
 
     if (ret != 0) {
         __wt_err(session, ret, "failure during close, disabling further writes");

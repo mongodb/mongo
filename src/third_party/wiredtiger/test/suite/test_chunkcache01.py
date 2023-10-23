@@ -75,9 +75,9 @@ class test_chunkcache01(wttest.WiredTigerTestCase):
         ds.check()
 
         # Assert the new chunks are ingested. 
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_loaded_from_flushed_tables), 0)
+        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
 
         self.close_conn()
         self.reopen_conn()
         ds.check()
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunk_cache_bytes_inuse), 0)
+        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_bytes_inuse), 0)

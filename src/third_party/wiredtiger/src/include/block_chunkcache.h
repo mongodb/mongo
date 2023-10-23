@@ -12,6 +12,24 @@
 #define WT_CC_VALUE_FORMAT WT_UNCHECKED_STRING(QQ)
 #define WT_CC_APP_META_FORMAT \
     "app_metadata=\"version=1,capacity=%" PRIu64 ",buckets=%u,chunk_size=%" WT_SIZET_FMT "\""
+#define WT_CC_META_CONFIG "key_format=" WT_CC_KEY_FORMAT ",value_format=" WT_CC_VALUE_FORMAT
+
+/* The maximum number of metadata entries to write out per server wakeup. */
+#define WT_CHUNKCACHE_METADATA_MAX_WORK 1000
+
+/* Different types of chunkcache metadata operations. */
+#define WT_CHUNKCACHE_METADATA_WORK_DEL 1
+#define WT_CHUNKCACHE_METADATA_WORK_INS 2
+
+struct __wt_chunkcache_metadata_work_unit {
+    TAILQ_ENTRY(__wt_chunkcache_metadata_work_unit) q;
+    uint8_t type;
+    const char *name;
+    uint32_t id;
+    wt_off_t file_offset;
+    uint64_t cache_offset;
+    size_t data_sz;
+};
 
 struct __wt_chunkcache_hashid {
     const char *objectname;

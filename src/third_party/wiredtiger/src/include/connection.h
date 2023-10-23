@@ -313,18 +313,19 @@ struct __wt_connection_impl {
 
     const char *cfg; /* Connection configuration */
 
-    WT_SPINLOCK api_lock;               /* Connection API spinlock */
-    WT_SPINLOCK checkpoint_lock;        /* Checkpoint spinlock */
-    WT_RWLOCK debug_log_retention_lock; /* Log retention reconfiguration lock */
-    WT_SPINLOCK fh_lock;                /* File handle queue spinlock */
-    WT_SPINLOCK flush_tier_lock;        /* Flush tier spinlock */
-    WT_SPINLOCK metadata_lock;          /* Metadata update spinlock */
-    WT_SPINLOCK reconfig_lock;          /* Single thread reconfigure */
-    WT_SPINLOCK schema_lock;            /* Schema operation spinlock */
-    WT_RWLOCK table_lock;               /* Table list lock */
-    WT_SPINLOCK tiered_lock;            /* Tiered work queue spinlock */
-    WT_SPINLOCK turtle_lock;            /* Turtle file spinlock */
-    WT_RWLOCK dhandle_lock;             /* Data handle list lock */
+    WT_SPINLOCK api_lock;                 /* Connection API spinlock */
+    WT_SPINLOCK checkpoint_lock;          /* Checkpoint spinlock */
+    WT_SPINLOCK chunkcache_metadata_lock; /* Chunkcache metadata spinlock */
+    WT_RWLOCK debug_log_retention_lock;   /* Log retention reconfiguration lock */
+    WT_SPINLOCK fh_lock;                  /* File handle queue spinlock */
+    WT_SPINLOCK flush_tier_lock;          /* Flush tier spinlock */
+    WT_SPINLOCK metadata_lock;            /* Metadata update spinlock */
+    WT_SPINLOCK reconfig_lock;            /* Single thread reconfigure */
+    WT_SPINLOCK schema_lock;              /* Schema operation spinlock */
+    WT_RWLOCK table_lock;                 /* Table list lock */
+    WT_SPINLOCK tiered_lock;              /* Tiered work queue spinlock */
+    WT_SPINLOCK turtle_lock;              /* Turtle file spinlock */
+    WT_RWLOCK dhandle_lock;               /* Data handle list lock */
 
     /* Connection queue */
     TAILQ_ENTRY(__wt_connection_impl) q;
@@ -371,6 +372,11 @@ struct __wt_connection_impl {
     size_t foc_size; /* Array size */
 
     WT_FH *lock_fh; /* Lock file handle */
+
+    /* Locked: chunkcache metadata work queue (and length counter). */
+    TAILQ_HEAD(__wt_chunkcache_metadata_qh, __wt_chunkcache_metadata_work_unit)
+    chunkcache_metadataqh;
+    int chunkcache_queue_len;
 
     /*
      * The connection keeps a cache of data handles. The set of handles can grow quite large so we
@@ -563,6 +569,11 @@ struct __wt_connection_impl {
     uint64_t flush_most_recent;      /* Clock value of last flush_tier */
     uint32_t flush_state;            /* State of last flush tier */
     wt_timestamp_t flush_ts;         /* Timestamp of most recent flush_tier */
+
+    WT_SESSION_IMPL *chunkcache_metadata_session; /* Chunkcache metadata server thread session */
+    wt_thread_t chunkcache_metadata_tid;          /* Chunkcache metadata thread */
+    bool chunkcache_metadata_tid_set;             /* Chunkcache metadata thread set */
+    WT_CONDVAR *chunkcache_metadata_cond;         /* Chunkcache metadata wait mutex */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_LOG_CONFIG_ENABLED 0x001u  /* Logging is configured */
@@ -761,14 +772,15 @@ struct __wt_connection_impl {
  * Server subsystem flags.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_SERVER_CAPACITY 0x01u
-#define WT_CONN_SERVER_CHECKPOINT 0x02u
-#define WT_CONN_SERVER_COMPACT 0x04u
-#define WT_CONN_SERVER_LOG 0x08u
-#define WT_CONN_SERVER_LSM 0x10u
-#define WT_CONN_SERVER_STATISTICS 0x20u
-#define WT_CONN_SERVER_SWEEP 0x40u
-#define WT_CONN_SERVER_TIERED 0x80u
+#define WT_CONN_SERVER_CAPACITY 0x001u
+#define WT_CONN_SERVER_CHECKPOINT 0x002u
+#define WT_CONN_SERVER_CHUNKCACHE_METADATA 0x004u
+#define WT_CONN_SERVER_COMPACT 0x008u
+#define WT_CONN_SERVER_LOG 0x010u
+#define WT_CONN_SERVER_LSM 0x020u
+#define WT_CONN_SERVER_STATISTICS 0x040u
+#define WT_CONN_SERVER_SWEEP 0x080u
+#define WT_CONN_SERVER_TIERED 0x100u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 

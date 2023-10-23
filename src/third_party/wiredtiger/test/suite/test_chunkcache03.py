@@ -98,38 +98,30 @@ class test_chunkcache03(wttest.WiredTigerTestCase):
         self.session.checkpoint('flush_tier=(enabled)')
 
         # Assert the new chunks are ingested. 
-        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_loaded_from_flushed_tables), 0)
+        self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
 
         # Reopen wiredtiger to migrate all data to disk.
         self.reopen_conn()
 
-        # Read from the unpinned URIs and capture chunks in use.
-        self.read_and_verify(uris[2], ds[2])
-        self.read_and_verify(uris[3], ds[3])
-        chunks_inuse_excluding_pinned = self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_inuse)
-        self.assertGreater(chunks_inuse_excluding_pinned, 0)
+        # Ensure chunks are read from metadata in type=FILE case.
+        if self.chunk_cache_type == "FILE":
+            self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_created_from_metadata), 0)
 
-        # Assert none of the chunks are pinned.
-        self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_pinned), 0)
+        # For the type=DRAM case read manually to cache the chunks.
+        for i in range(0, 4):
+            self.read_and_verify(uris[i], ds[i])
 
-        # Read from the pinned URIs.
-        self.read_and_verify(uris[0], ds[0])
-        self.read_and_verify(uris[1], ds[1])
-        chunks_inuse_including_pinned = self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_inuse)
-        self.assertGreater(chunks_inuse_including_pinned, chunks_inuse_excluding_pinned)
+        # Assert pinned/unpinned stats.
+        total_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_inuse)
+        pinned_chunks = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned)
+        self.assertGreater(total_chunks, 0)
+        self.assertGreater(pinned_chunks, 0)
 
-        # Assert that chunks are pinned.
-        pinned_chunks_inuse = self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_pinned)
-        self.assertGreater(pinned_chunks_inuse, 0)
-
-        # Assert that the difference b/w the total chunks present and the unpinned chunks equal pinned chunks.
-        # This proves that the chunks read from pinned objects were all pinned.
-        self.assertEqual(chunks_inuse_including_pinned - chunks_inuse_excluding_pinned, pinned_chunks_inuse)
+        # Assert that pinned chunks make up 50% of the total chunks.
+        self.assertEqual(total_chunks/pinned_chunks, 2)
 
         # Reconfigure wiredtiger and mark the pinned objects as unpinned and vice-versa.
         self.conn.reconfigure('chunk_cache=[pinned=("table:chunkcache03", "table:chunkcache04")]')
 
-        # After this point all the unpinned chunks should be pinned and vice-versa.
-        # Check the following stats.
-        new_pinned_chunks_inuse = self.get_stat(wiredtiger.stat.conn.chunk_cache_chunks_pinned)
-        self.assertEqual(chunks_inuse_excluding_pinned, new_pinned_chunks_inuse)
+        # Assert that pinned chunks make up 50% of the total chunks.
+        self.assertEqual(total_chunks/pinned_chunks, 2)

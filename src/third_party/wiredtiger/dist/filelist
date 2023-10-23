@@ -75,6 +75,7 @@ src/conn/conn_api.c
 src/conn/conn_cache.c
 src/conn/conn_cache_pool.c
 src/conn/conn_capacity.c
+src/conn/conn_chunkcache.c
 src/conn/conn_ckpt.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
