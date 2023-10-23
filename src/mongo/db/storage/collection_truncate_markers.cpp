@@ -513,8 +513,8 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
         return;
     }
 
-    stdx::unique_lock<Latch> markerLk(_lastHighestRecordMutex, stdx::try_to_lock);
-    if (!markerLk) {
+    stdx::unique_lock<Latch> highestRecordLock(_lastHighestRecordMutex, stdx::try_to_lock);
+    if (!highestRecordLock) {
         logFailedLockAcquisition("_lastHighestRecordMutex");
         return;
     }
@@ -524,7 +524,7 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
         return;
     }
 
-    if (_hasPartialMarkerExpired(opCtx)) {
+    if (_hasPartialMarkerExpired(opCtx, _lastHighestRecordId, _lastHighestWallTime)) {
         auto& marker = createNewMarker(_lastHighestRecordId, _lastHighestWallTime);
 
         LOGV2_DEBUG(7393201,

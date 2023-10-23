@@ -163,7 +163,9 @@ private:
         return !getMarkers().empty();
     }
 
-    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx) const override {
+    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx,
+                                          const RecordId& highestSeenRecordId,
+                                          const Date_t& highestSeenWallTime) const override {
         return _expirePartialMarker;
     }
 };

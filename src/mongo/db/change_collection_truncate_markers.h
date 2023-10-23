@@ -71,7 +71,9 @@ public:
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
 
-    bool _hasPartialMarkerExpired(OperationContext* opCtx) const override;
+    bool _hasPartialMarkerExpired(OperationContext* opCtx,
+                                  const RecordId& highestSeenRecordId,
+                                  const Date_t& highestSeenWallTime) const override;
 
     TenantId _tenantId;
 };

@@ -125,7 +125,9 @@ private:
 
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
 
-    bool _hasPartialMarkerExpired(OperationContext* opCtx) const override;
+    bool _hasPartialMarkerExpired(OperationContext* opCtx,
+                                  const RecordId& highestSeenRecordId,
+                                  const Date_t& highestSeenWallTime) const override;
 
     /**
      * When initialized, indicates this is a serverless environment.

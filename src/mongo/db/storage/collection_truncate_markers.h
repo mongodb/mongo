@@ -380,7 +380,9 @@ private:
     Date_t _lastHighestWallTime;
 
     // Used to decide if the current partially built marker has expired.
-    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx) const {
+    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx,
+                                          const RecordId& highestSeenRecordId,
+                                          const Date_t& highestSeenWallTime) const {
         return false;
     }
 
@@ -388,8 +390,12 @@ private:
     void _updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
 
 protected:
-    std::pair<const RecordId&, const Date_t&> getPartialMarker() const {
-        return {_lastHighestRecordId, _lastHighestWallTime};
+    template <typename F>
+    auto checkPartialMarkerWith(F&& fn) const {
+        static_assert(std::is_invocable_v<F, const RecordId&, const Date_t&>,
+                      "fn must be a callable of type T(const RecordId&, const Date_t&)");
+        stdx::unique_lock lk(_lastHighestRecordMutex);
+        return fn(_lastHighestRecordId, _lastHighestWallTime);
     }
 
     void updateCurrentMarker(OperationContext* opCtx,
