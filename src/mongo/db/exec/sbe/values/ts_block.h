@@ -45,6 +45,7 @@
 #include "mongo/util/bufreader.h"
 
 namespace mongo::sbe::value {
+class TsBlock;
 /**
  * Evaluates paths on a time series bucket. The constructor input is a set of paths using the
  * Get/Traverse/Id primitives. When given a TS bucket, it evaluates each path on the block of
@@ -63,7 +64,8 @@ public:
      * Returns one CellBlock per path given in the constructor. A CellBlock represents all of the
      * values at a path, along with information on their position.
      */
-    std::vector<std::unique_ptr<CellBlock>> extractCellBlocks(const BSONObj& bucket);
+    std::pair<std::vector<std::unique_ptr<TsBlock>>, std::vector<std::unique_ptr<CellBlock>>>
+    extractCellBlocks(const BSONObj& bucket);
 
 private:
     std::vector<CellBlock::PathRequest> _pathReqs;
@@ -93,7 +95,13 @@ public:
     // Note: This constructor is special and is only used by the TsCellBlockForTopLevelField to
     // create a TsBlock for a top-level field, where the 'ncells` is actually same as the number of
     // values in this block.
-    TsBlock(size_t ncells, bool owned, TypeTags blockTag, Value blockVal);
+    TsBlock(size_t ncells,
+            bool owned,
+            TypeTags blockTag,
+            Value blockVal,
+            bool isDense = false,
+            std::pair<TypeTags, Value> controlMin = {TypeTags::Nothing, Value{0u}},
+            std::pair<TypeTags, Value> controlMax = {TypeTags::Nothing, Value{0u}});
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable
     // them until we have one.
@@ -107,8 +115,33 @@ public:
 
     DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const override;
 
+    // Return whether or not any values of the field are arrays, otherwise return boost::none.
+    boost::optional<bool> tryHasNoArrays() {
+        if (isArray(_controlMin.first) || isArray(_controlMax.first)) {
+            return false;
+        } else if (_controlMin.first == _controlMax.first && !isArray(_controlMin.first) &&
+                   !isObject(_controlMin.first) && _controlMin.first != TypeTags::Nothing) {
+            // Checking !isArray after the initial if statement is redundant but this is the
+            // explicit condition we are using to see if a field cannot contain any array values.
+            return true;
+        }
+        return boost::none;
+    }
+
     boost::optional<size_t> tryCount() const override {
         return _count;
+    }
+
+    std::pair<TypeTags, Value> tryMin() const override {
+        return _controlMin;
+    }
+
+    std::pair<TypeTags, Value> tryMax() const override {
+        return _controlMax;
+    }
+
+    boost::optional<bool> tryDense() const override {
+        return _isDense;
     }
 
 private:
@@ -140,6 +173,13 @@ private:
 
     // The number of values in this block.
     size_t _count;
+
+    // true if all values in the block are non-nothing. Currently only true for timeField
+    bool _isDense;
+
+    // Store the min and max found in the control field of a bucket
+    std::pair<TypeTags, Value> _controlMin;
+    std::pair<TypeTags, Value> _controlMax;
 };
 
 /**
@@ -163,7 +203,15 @@ public:
      * top-level), not for the value of paths "foo.a" or "foo.b". The top-level path does not
      * require path navigation.
      */
-    TsCellBlockForTopLevelField(size_t count, bool owned, TypeTags topLevelTag, Value topLevelVal);
+    TsCellBlockForTopLevelField(size_t count,
+                                bool owned,
+                                TypeTags topLevelTag,
+                                Value topLevelVal,
+                                bool isDense,
+                                std::pair<TypeTags, Value> controlMin,
+                                std::pair<TypeTags, Value> controlMax);
+
+    TsCellBlockForTopLevelField(TsBlock* block);
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable
     // them until we have one.
@@ -185,8 +233,9 @@ public:
 private:
     TsCellBlockForTopLevelField(size_t count, std::unique_ptr<TsBlock> tsBlock);
 
-    // Non-null.
-    std::unique_ptr<TsBlock> _tsBlock;
+    std::unique_ptr<TsBlock> _ownedTsBlock;
+    // If _ownedTsBlock is non-null, this points to _ownedTsBlock.
+    TsBlock* _unownedTsBlock;
 
     // For now this is always empty since only top-level fields are supported.
     std::vector<char> _positionInfo;

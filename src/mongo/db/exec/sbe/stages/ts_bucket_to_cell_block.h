@@ -85,5 +85,7 @@ private:
     value::SlotAccessor* _bucketAccessor = nullptr;
     std::vector<value::OwnedValueAccessor> _blocksOutAccessor;
     value::OwnedValueAccessor _metaOutAccessor;
+
+    std::vector<std::unique_ptr<value::TsBlock>> _tsBlockStorage;
 };
 }  // namespace mongo::sbe

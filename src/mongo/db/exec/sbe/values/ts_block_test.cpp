@@ -58,7 +58,10 @@ TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
         1,     /* count */
         false, /* owned */
         value::TypeTags::bsonObject,
-        value::bitcastFrom<const char*>(kSampleBucket["data"]["_id"].embeddedObject().objdata()));
+        value::bitcastFrom<const char*>(kSampleBucket["data"]["_id"].embeddedObject().objdata()),
+        true, /* isDense */
+        std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u}),
+        std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u}));
 
     auto& valBlock = cellBlock->getValueBlock();
 

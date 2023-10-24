@@ -68,12 +68,11 @@ TsBucketPathExtractor::TsBucketPathExtractor(std::vector<CellBlock::PathRequest>
     }
 }
 
-std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks(
-    const BSONObj& bucketObj) {
+std::pair<std::vector<std::unique_ptr<TsBlock>>, std::vector<std::unique_ptr<CellBlock>>>
+TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
 
     BSONElement bucketControl = bucketObj[timeseries::kBucketControlFieldName];
     invariant(!bucketControl.eoo());
-
 
     const int noOfMeasurements = [&]() {
         if (auto ct = bucketControl.Obj()[timeseries::kBucketControlCountFieldName]) {
@@ -101,7 +100,8 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
         }
     }
 
-    std::vector<std::unique_ptr<CellBlock>> out(_pathReqs.size());
+    std::vector<std::unique_ptr<TsBlock>> outBlocks;
+    std::vector<std::unique_ptr<CellBlock>> outCells(_pathReqs.size());
 
     // The time series decoding API gives us the top level fields only, and our CellBlock
     // extraction code expects full BSON objects. For now we resolve this mismatch by converting
@@ -120,18 +120,39 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
     bsonOffsets.reserve(noOfMeasurements);
     bsons.reserve(noOfMeasurements);
 
+    auto bucketControlMin = bucketControl.Obj()[timeseries::kBucketControlMinFieldName];
+    auto bucketControlMax = bucketControl.Obj()[timeseries::kBucketControlMaxFieldName];
+
     for (auto& [topLevelField, columnElt] : topLevelFieldToBsonElt) {
         // The set of indexes in _pathReqs which begin with this top level field.
         const auto& pathIndexesForCurrentField = _topLevelFieldToIdxes[topLevelField];
-        auto [columnTag, columnVal] = bson::convertFrom<true>(columnElt);
+        auto [columnTag, columnVal] = bson::convertFrom<true /*View*/>(columnElt);
 
-        // Initialize a TsCellBlockForTopLevelField for the top level field. For paths of the form
-        // [Get <field> Id], or equivalent, we will simply hand them this CellBlock. For nested
-        // paths, we will call extract() on this CellBlock, and then pull the values out from the
+        std::pair<TypeTags, Value> controlMin = {TypeTags::Nothing, Value{0u}};
+        std::pair<TypeTags, Value> controlMax = {TypeTags::Nothing, Value{0u}};
+        if (!bucketControlMin.eoo() && !bucketControlMax.eoo()) {
+            auto fieldMin = bucketControlMin[topLevelField];
+            controlMin = bson::convertFrom<true /*View*/>(fieldMin);
+
+            auto fieldMax = bucketControlMax[topLevelField];
+            controlMax = bson::convertFrom<true /*View*/>(fieldMax);
+        }
+
+        // The time field cannot be nothing.
+        bool isDense = _timeField == topLevelField;
+
+        // Initialize a TsBlock for the top level field. For paths of the form [Get <field> Id], or
+        // equivalent, we will create a CellBlock. For nested paths that aren't eligible for the
+        // fast path, we will call extract() on this TsBlock, and then pull the values out from the
         // nested bson.
-        auto topLevelCellBlockUniquePtr = std::make_unique<value::TsCellBlockForTopLevelField>(
-            noOfMeasurements, /*owned*/ false, columnTag, columnVal);
-        auto* topLevelCellBlock = topLevelCellBlockUniquePtr.get();
+        outBlocks.push_back(std::make_unique<TsBlock>(noOfMeasurements,
+                                                      false /*owned*/,
+                                                      columnTag,
+                                                      columnVal,
+                                                      isDense,
+                                                      controlMin,
+                                                      controlMax));
+        auto tsBlock = outBlocks.back().get();
 
         // Build a list of values 'pathIndexesForCurrentField' which are not top-level Gets.
         std::vector<size_t> nonTopLevelIdxesForCurrentField;
@@ -142,8 +163,7 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
                 // output the top level cellblock. Note that we keep the raw pointer to this
                 // CellBlock in 'topLevelCellBlock' so that if we end up decoding this CellBlock,
                 // we do so once, and via same TsCellBlockForTopLevelField instance.
-                invariant(topLevelCellBlockUniquePtr);
-                out[idx] = std::move(topLevelCellBlockUniquePtr);
+                outCells[idx] = std::make_unique<TsCellBlockForTopLevelField>(tsBlock);
             } else {
                 // Remember this PathReq index for later.
                 nonTopLevelIdxesForCurrentField.push_back(idx);
@@ -155,9 +175,6 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
             continue;
         }
 
-        auto extracted = topLevelCellBlock->getValueBlock().extract();
-        invariant(extracted.count == static_cast<size_t>(noOfMeasurements));
-
         // First check if we are traversing a top level field AND there are no arrays. The path
         // must look like: [Get <field> Traverse Id]. If this is the case, we take a fast path and
         // skip the work of shredding the whole thing.
@@ -168,14 +185,11 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
                 std::holds_alternative<CellBlock::Get>(_pathReqs[pathIdx].path[0]) &&
                 std::holds_alternative<CellBlock::Traverse>(_pathReqs[pathIdx].path[1]) &&
                 std::holds_alternative<CellBlock::Id>(_pathReqs[pathIdx].path[2]) &&
-                // TODO: In the future could use the bucket metadata to speed up this check and
-                // prove that no elements are arrays. Then we wouldn't actually have to call
-                // extract() yet.
-                std::none_of(extracted.tags, extracted.tags + extracted.count, isArray)) {
+                (tsBlock->tryHasNoArrays().get_value_or(false))) {
                 // In this case the top level TsCellBlockForTopLevelField (representing the [Get
-                // <field> Id]) is identical to the path [Get <field> Traverse Id]. We simply copy
-                // the cell block for the [Get <field> Id] path.
-                out[pathIdx] = topLevelCellBlock->clone();
+                // <field> Id]) is identical to the path [Get <field> Traverse Id]. We make a top
+                // level cell block with an unowned pointer.
+                outCells[pathIdx] = std::make_unique<TsCellBlockForTopLevelField>(tsBlock);
             } else {
                 allUsedFastPath = false;
             }
@@ -186,6 +200,9 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
             // was a top level get or eligible for the fast path.
             continue;
         }
+
+        auto extracted = tsBlock->extract();
+        invariant(extracted.count == static_cast<size_t>(noOfMeasurements));
 
         for (size_t i = 0; i < extracted.count; ++i) {
             bsonOffsets.push_back(bsonBuffer.len());
@@ -209,7 +226,7 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
         invariant(reqs.size() == extractedCellBlocks.size());
 
         for (size_t i = 0; i < extractedCellBlocks.size(); ++i) {
-            out[nonTopLevelIdxesForCurrentField[i]] = std::move(extractedCellBlocks[i]);
+            outCells[nonTopLevelIdxesForCurrentField[i]] = std::move(extractedCellBlocks[i]);
         }
 
         bsonBuilders.clear();
@@ -219,18 +236,30 @@ std::vector<std::unique_ptr<CellBlock>> TsBucketPathExtractor::extractCellBlocks
     }
 
     // Fill in any empty spots in the output with a block of [Nothing, Nothing...].
-    for (auto& cellBlock : out) {
+    for (auto& cellBlock : outCells) {
         if (!cellBlock) {
             auto emptyBlock = std::make_unique<value::ScalarMonoCellBlock>(
                 noOfMeasurements, value::TypeTags::Nothing, value::Value(0));
             cellBlock = std::move(emptyBlock);
         }
     }
-    return out;
+    return std::pair(std::move(outBlocks), std::move(outCells));
 }
 
-TsBlock::TsBlock(size_t ncells, bool owned, TypeTags blockTag, Value blockVal)
-    : _blockOwned(owned), _blockTag(blockTag), _blockVal(blockVal), _count(ncells) {
+TsBlock::TsBlock(size_t ncells,
+                 bool owned,
+                 TypeTags blockTag,
+                 Value blockVal,
+                 bool isDense,
+                 std::pair<TypeTags, Value> controlMin,
+                 std::pair<TypeTags, Value> controlMax)
+    : _blockOwned(owned),
+      _blockTag(blockTag),
+      _blockVal(blockVal),
+      _count(ncells),
+      _isDense(isDense),
+      _controlMin(copyValue(controlMin.first, controlMin.second)),
+      _controlMax(copyValue(controlMax.first, controlMax.second)) {
     invariant(_blockTag == TypeTags::bsonObject || _blockTag == TypeTags::bsonBinData);
 }
 
@@ -239,6 +268,9 @@ TsBlock::~TsBlock() {
         // The underlying buffer is owned by this TsBlock and so this releases it.
         releaseValue(_blockTag, _blockVal);
     }
+    // controlMin and controlMax are always owned so we always need to release them.
+    releaseValue(_controlMin.first, _controlMin.second);
+    releaseValue(_controlMax.first, _controlMax.second);
 }
 
 void TsBlock::deblockFromBsonObj(std::vector<TypeTags>& deblockedTags,
@@ -336,16 +368,15 @@ void TsBlock::ensureDeblocked(boost::optional<DeblockedTagValStorage>& storage) 
     }
 }
 
-
 ValueBlock& TsCellBlockForTopLevelField::getValueBlock() {
-    return *_tsBlock;
+    return *_unownedTsBlock;
 }
 
 std::unique_ptr<CellBlock> TsCellBlockForTopLevelField::clone() const {
-    auto precomputedCount = _tsBlock->tryCount();
+    auto precomputedCount = _unownedTsBlock->tryCount();
     tassert(
         7943900, "Assumes count() is available in O(1) time on TS Block type", precomputedCount);
-    auto tsBlockClone = _tsBlock->cloneStrongTyped();
+    auto tsBlockClone = _unownedTsBlock->cloneStrongTyped();
 
     // Using raw new to access private constructor.
     return std::unique_ptr<TsCellBlockForTopLevelField>(
@@ -355,7 +386,10 @@ std::unique_ptr<CellBlock> TsCellBlockForTopLevelField::clone() const {
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
                                                          bool owned,
                                                          TypeTags topLevelTag,
-                                                         Value topLevelVal)
+                                                         Value topLevelVal,
+                                                         bool isDense,
+                                                         std::pair<TypeTags, Value> controlMin,
+                                                         std::pair<TypeTags, Value> controlMax)
     : TsCellBlockForTopLevelField(
           count,
           // The 'count' means the number of cells in this TsCellBlockForTopLevelField and as of
@@ -363,11 +397,18 @@ TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
           // and the number of cells in this TsCellBlockForTopLevelField is always the same as the
           // number of values in '_tsBlock'. So, we pass 'count' to '_tsBlock' as the number of
           // values in it.
-          std::make_unique<TsBlock>(count, owned, topLevelTag, topLevelVal)) {}
+          std::make_unique<TsBlock>(
+              count, owned, topLevelTag, topLevelVal, isDense, controlMin, controlMax)) {}
+
+TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(TsBlock* block) : _unownedTsBlock(block) {
+    auto count = block->tryCount();
+    tassert(8182400, "Assumes count() is available in O(1) time on TS Block type", count);
+    _positionInfo.resize(*count, char(1));
+}
 
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
                                                          std::unique_ptr<TsBlock> tsBlock)
-    : _tsBlock(std::move(tsBlock)) {
+    : _ownedTsBlock(std::move(tsBlock)), _unownedTsBlock(_ownedTsBlock.get()) {
     _positionInfo.resize(count, char(1));
 }
 }  // namespace mongo::sbe::value

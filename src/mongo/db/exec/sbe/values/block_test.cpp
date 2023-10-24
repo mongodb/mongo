@@ -92,9 +92,10 @@ public:
         base->run();
     }
 
-    std::vector<std::unique_ptr<value::CellBlock>> extractCellBlocks(
-        const std::vector<value::CellBlock::PathRequest>& paths,
-        const std::vector<BSONObj>& bsons) {
+    std::pair<std::vector<std::unique_ptr<value::TsBlock>>,
+              std::vector<std::unique_ptr<value::CellBlock>>>
+    extractCellBlocks(const std::vector<value::CellBlock::PathRequest>& paths,
+                      const std::vector<BSONObj>& bsons) {
 
         if (useTsImpl) {
             // Shred the bsons here, produce a time series "bucket"-like thing, and pass it to the
@@ -147,7 +148,8 @@ public:
             value::TsBucketPathExtractor extractor(paths, "time");
             return extractor.extractCellBlocks(_bucketStorage);
         } else {
-            return value::extractCellBlocksFromBsons(paths, bsons);
+            return std::pair(std::vector<std::unique_ptr<value::TsBlock>>(),
+                             value::extractCellBlocksFromBsons(paths, bsons));
         }
     }
 
@@ -198,7 +200,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSimple) {
     value::CellBlock::PathRequest aReq{{value::CellBlock::Get{"a"}, value::CellBlock::Id{}}};
     value::CellBlock::PathRequest bReq{{value::CellBlock::Get{"b"}, value::CellBlock::Id{}}};
 
-    auto cellBlocks = extractCellBlocks({aReq, bReq}, bsons);
+    auto [tsBlocks, cellBlocks] = extractCellBlocks({aReq, bReq}, bsons);
 
     ASSERT_EQ(cellBlocks.size(), 2);
 
@@ -214,6 +216,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSimple) {
         auto& valsOut = cellBlocks[1]->getValueBlock();
         auto numObj = blockToBsonArr(valsOut);
         ASSERT_BSONOBJ_EQ(numObj, fromjson("{result: [1,2,3,null,null]}"));
+
         ASSERT_EQ(posInfoToString(cellBlocks[0]->filterPositionInfo()), "11111");
     }
 }
@@ -233,7 +236,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockMissings) {
 
     value::CellBlock::PathRequest aReq{{value::CellBlock::Get{"a"}, value::CellBlock::Id{}}};
 
-    auto cellBlocks = extractCellBlocks({aReq}, bsons);
+    auto [tsBlocks, cellBlocks] = extractCellBlocks({aReq}, bsons);
 
     ASSERT_EQ(cellBlocks.size(), 1);
 
@@ -257,7 +260,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockGetTraverse) {
     value::CellBlock::PathRequest req{
         {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}}};
 
-    auto cellBlocks = extractCellBlocks({req}, bsons);
+    auto [tsBlocks, cellBlocks] = extractCellBlocks({req}, bsons);
 
     ASSERT_EQ(cellBlocks.size(), 1);
 
@@ -282,7 +285,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSubfield) {
         // Get A Id.
         value::CellBlock::PathRequest req{{value::CellBlock::Get{"a"}, value::CellBlock::Id{}}};
 
-        auto cellBlocks = extractCellBlocks({req}, bsons);
+        auto [tsBlocks, cellBlocks] = extractCellBlocks({req}, bsons);
         ASSERT_EQ(cellBlocks.size(), 1);
 
         auto& valsOut = cellBlocks[0]->getValueBlock();
@@ -298,15 +301,14 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSubfield) {
         value::CellBlock::PathRequest req{
             {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}}};
 
-        auto cellBlocks = extractCellBlocks({req}, bsons);
+        auto [tsBlocks, cellBlocks] = extractCellBlocks({req}, bsons);
         ASSERT_EQ(cellBlocks.size(), 1);
 
         auto& valsOut = cellBlocks[0]->getValueBlock();
         auto numObj = blockToBsonArr(valsOut);
-        ASSERT_BSONOBJ_EQ(
-            numObj,
-            fromjson(
-                "{result: [{b: 1}, {b: [999, 999]}, {b: [2,3]}, {b: [4,5]}, null, {b: [[999]]}]}"));
+        ASSERT_BSONOBJ_EQ(numObj,
+                          fromjson("{result: [{b: 1}, {b: [999, 999]}, {b: [2,3]}, {b: [4,5]}, "
+                                   "null, {b: [[999]]}]}"));
         ASSERT_EQ(posInfoToString(cellBlocks[0]->filterPositionInfo()), "111011");
     }
 
@@ -317,7 +319,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSubfield) {
                                            value::CellBlock::Get{"b"},
                                            value::CellBlock::Id{}}};
 
-        auto cellBlocks = extractCellBlocks({req}, bsons);
+        auto [tsBlocks, cellBlocks] = extractCellBlocks({req}, bsons);
         ASSERT_EQ(cellBlocks.size(), 1);
 
         auto& valsOut = cellBlocks[0]->getValueBlock();
@@ -335,7 +337,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSubfield) {
                                            value::CellBlock::Traverse{},
                                            value::CellBlock::Id{}}};
 
-        auto cellBlocks = extractCellBlocks({req}, bsons);
+        auto [tsBlocks, cellBlocks] = extractCellBlocks({req}, bsons);
         ASSERT_EQ(cellBlocks.size(), 1);
 
         auto& valsOut = cellBlocks[0]->getValueBlock();
@@ -352,8 +354,8 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockFieldDoesNotExist) {
         // These documents have no values at a.b, however MQL semantics demand
         // they must know about the array in 'a' for "$a.b" but not for $match.
         //
-        // This tests that the information kept in Get A Traverse Get B Traverse projection position
-        // info is enough to recover the fact that 'a' had an array.
+        // This tests that the information kept in Get A Traverse Get B Traverse projection
+        // position info is enough to recover the fact that 'a' had an array.
         fromjson("{a: [{OtherField: 123}]}"),
         fromjson("{a: [1, 2, 3]}"),
 
@@ -369,7 +371,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockFieldDoesNotExist) {
                                            value::CellBlock::Traverse{},
                                            value::CellBlock::Id{}}};
 
-        auto cellBlocks = extractCellBlocks({req}, bsons);
+        auto [tsBlocks, cellBlocks] = extractCellBlocks({req}, bsons);
         ASSERT_EQ(cellBlocks.size(), 1);
 
         auto& valsOut = cellBlocks[0]->getValueBlock();
@@ -591,6 +593,15 @@ public:
     }
     boost::optional<size_t> tryCount() const override {
         return _vals.size();
+    }
+    std::pair<TypeTags, Value> tryMin() const override {
+        return {TypeTags::Nothing, Value{0u}};
+    }
+    std::pair<TypeTags, Value> tryMax() const override {
+        return {TypeTags::Nothing, Value{0u}};
+    }
+    boost::optional<bool> tryDense() const override {
+        return boost::none;
     }
     value::DeblockedTagVals deblock(
         boost::optional<value::DeblockedTagValStorage>& storage) const override {

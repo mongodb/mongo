@@ -173,6 +173,28 @@ struct ValueBlock {
      */
     virtual boost::optional<size_t> tryCount() const = 0;
 
+    /**
+     * Returns the minimum value in the block in O(1) time, otherwise returns Nothing value.
+     */
+    virtual std::pair<TypeTags, Value> tryMin() const {
+        return std::pair(TypeTags::Nothing, Value{0u});
+    }
+
+    /**
+     * Returns the maximum value in the block in O(1) time, otherwise returns Nothing value.
+     */
+    virtual std::pair<TypeTags, Value> tryMax() const {
+        return std::pair(TypeTags::Nothing, Value{0u});
+    }
+
+    /**
+     * Returns true if every value in the block is guaranteed to be non-nothing, false otherwise. If
+     * this can't be determined in O(1) time, return boost::none.
+     */
+    virtual boost::optional<bool> tryDense() const {
+        return boost::none;
+    }
+
     virtual std::unique_ptr<ValueBlock> map(const ColumnOp& op);
 
     virtual TokenizedBlock tokenize();
@@ -232,6 +254,18 @@ public:
         return _count;
     }
 
+    std::pair<TypeTags, Value> tryMin() const override {
+        return std::pair{_tag, _val};
+    }
+
+    std::pair<TypeTags, Value> tryMax() const override {
+        return std::pair{_tag, _val};
+    }
+
+    boost::optional<bool> tryDense() const override {
+        return _tag != TypeTags::Nothing;
+    }
+
     std::unique_ptr<ValueBlock> map(const ColumnOp& op) override {
         auto [tag, val] = op.processSingle(_tag, _val);
         return std::make_unique<MonoBlock>(_count, tag, val);
@@ -253,7 +287,7 @@ class HeterogeneousBlock : public ValueBlock {
 public:
     HeterogeneousBlock() = default;
 
-    HeterogeneousBlock(const HeterogeneousBlock& o) : ValueBlock(o) {
+    HeterogeneousBlock(const HeterogeneousBlock& o) : ValueBlock(o), _isDense(o._isDense) {
         _vals.resize(o._vals.size(), Value{0u});
         _tags.resize(o._tags.size(), TypeTags::Nothing);
 
@@ -265,13 +299,16 @@ public:
     }
 
     HeterogeneousBlock(HeterogeneousBlock&& o)
-        : ValueBlock(std::move(o)), _vals(std::move(o._vals)), _tags(std::move(o._tags)) {
+        : ValueBlock(std::move(o)),
+          _vals(std::move(o._vals)),
+          _tags(std::move(o._tags)),
+          _isDense(o._isDense) {
         o._vals = {};
         o._tags = {};
     }
 
-    HeterogeneousBlock(std::vector<TypeTags> tags, std::vector<Value> vals)
-        : _vals(std::move(vals)), _tags(std::move(tags)) {}
+    HeterogeneousBlock(std::vector<TypeTags> tags, std::vector<Value> vals, bool isDense = false)
+        : _vals(std::move(vals)), _tags(std::move(tags)), _isDense(isDense) {}
 
     ~HeterogeneousBlock() {
         release();
@@ -302,6 +339,18 @@ public:
         return _vals.size();
     }
 
+    std::pair<TypeTags, Value> tryMin() const override {
+        return {TypeTags::Nothing, Value{0u}};
+    }
+
+    std::pair<TypeTags, Value> tryMax() const override {
+        return {TypeTags::Nothing, Value{0u}};
+    }
+
+    boost::optional<bool> tryDense() const override {
+        return _isDense;
+    }
+
     DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const override {
         return {_vals.size(), _tags.data(), _vals.data()};
     }
@@ -323,5 +372,8 @@ private:
     // All values are owned.
     std::vector<Value> _vals;
     std::vector<TypeTags> _tags;
+
+    // True if all values are non-nothing.
+    bool _isDense = false;
 };
 }  // namespace mongo::sbe::value

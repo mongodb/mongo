@@ -210,7 +210,8 @@ void TsBucketToCellBlockStage::initCellBlocks() {
         _metaOutAccessor.reset(false, metaTag, metaVal);
     }
 
-    auto cellBlocks = _pathExtractor.extractCellBlocks(bucketObj);
+    auto [tsBlocks, cellBlocks] = _pathExtractor.extractCellBlocks(bucketObj);
+    _tsBlockStorage = std::move(tsBlocks);
     invariant(cellBlocks.size() == _blocksOutAccessor.size());
     for (size_t i = 0; i < cellBlocks.size(); ++i) {
         _blocksOutAccessor[i].reset(true,
