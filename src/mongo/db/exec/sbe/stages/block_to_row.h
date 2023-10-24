@@ -61,8 +61,6 @@ public:
                     bool participateInTrialRunTracking = true);
     ~BlockToRowStage();
 
-    void freeDeblockedValueRuns();
-
     std::unique_ptr<PlanStage> clone() const final;
 
     void prepare(CompileCtx& ctx) final;
@@ -76,8 +74,12 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void doSaveState(bool relinquishCursor) override;
+
 private:
     PlanState getNextFromDeblockedValues();
+    void freeDeblockedValueRuns();
 
     PlanState advanceChild();
 
@@ -90,6 +92,7 @@ private:
     // Values extracted from the blocks. The memory for these values are owned by the blocks in the
     // '_blocks' member.
     std::vector<std::vector<std::pair<value::TypeTags, value::Value>>> _deblockedValueRuns;
+    bool _deblockedOwned = false;
 
     std::vector<value::SlotAccessor*> _blockAccessors;
     value::SlotAccessor* _bitmapAccessor = nullptr;

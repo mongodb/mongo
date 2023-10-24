@@ -54,11 +54,15 @@ BlockToRowStage::BlockToRowStage(std::unique_ptr<PlanStage> input,
 }
 
 void BlockToRowStage::freeDeblockedValueRuns() {
-    for (auto& run : _deblockedValueRuns) {
-        for (auto [t, v] : run) {
-            value::releaseValue(t, v);
+    if (_deblockedOwned) {
+        for (auto& run : _deblockedValueRuns) {
+            for (auto [t, v] : run) {
+                value::releaseValue(t, v);
+            }
         }
+        _deblockedOwned = false;
     }
+    _deblockedValueRuns.clear();
 }
 
 BlockToRowStage::~BlockToRowStage() {
@@ -124,7 +128,6 @@ PlanState BlockToRowStage::getNextFromDeblockedValues() {
 // prepare deblocking the new blocks.
 void BlockToRowStage::prepareDeblock() {
     freeDeblockedValueRuns();
-    _deblockedValueRuns.clear();
 
     // Extract the value in the bitmap slot into a selectivity vector, to determine which indexes
     // should get passed along and which should be filtered out.
@@ -162,12 +165,14 @@ void BlockToRowStage::prepareDeblock() {
 
         // Apply the selectivity vector here, only taking the values which are included.
         std::vector<std::pair<value::TypeTags, value::Value>> tvVec;
-        tvVec.reserve(onesInBitset.get_value_or(deblocked.count));
-        for (size_t i = 0; i < deblocked.count; ++i) {
-            if (selectivityVector.empty() || selectivityVector[i]) {
-                // TODO SERVER-79629: We can avoid the copy here and do it only when a yield
-                // actually happens.
-                tvVec.push_back(value::copyValue(deblocked[i].first, deblocked[i].second));
+        tvVec.resize(onesInBitset.get_value_or(deblocked.count));
+
+        {
+            size_t idxInTvVec = 0;
+            for (size_t i = 0; i < deblocked.count; ++i) {
+                if (selectivityVector.empty() || selectivityVector[i]) {
+                    tvVec[idxInTvVec++] = std::pair(deblocked[i].first, deblocked[i].second);
+                }
             }
         }
 
@@ -199,6 +204,10 @@ PlanState BlockToRowStage::getNext() {
     // Returns once we find a non empty block with a value to return. Otherwise we need to get new
     // blocks from our child.
     while (true) {
+        // We're about to call getNext() on our child and replace any state we hold in
+        // _deblockedValueRuns. If we happen to yield during this call, don't bother copying our
+        // current state since we're going to replace it in prepareDeblock() anyway.
+        disableSlotAccess();
         auto state = _children[0]->getNext();
         if (state == PlanState::IS_EOF) {
             return trackPlanState(state);
@@ -223,6 +232,21 @@ void BlockToRowStage::close() {
 
     trackClose();
     _children[0]->close();
+}
+
+void BlockToRowStage::doSaveState(bool relinquishCursor) {
+    if (slotsAccessible() && !_deblockedOwned) {
+        for (auto& run : _deblockedValueRuns) {
+            // Copy the values which have not yet been returned, starting at _curIdx.
+            for (size_t i = _curIdx; i < run.size(); ++i) {
+                auto [t, v] = run[i];
+                run[i - _curIdx] = value::copyValue(t, v);
+            }
+            run.resize(run.size() - _curIdx);
+        }
+        _deblockedOwned = true;
+        _curIdx = 0;
+    }
 }
 
 std::unique_ptr<PlanStageStats> BlockToRowStage::getStats(bool includeDebugInfo) const {
