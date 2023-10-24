@@ -173,13 +173,13 @@ public:
         }
 
         // --- counters
-        MetricTree& metricTree = getGlobalMetricTree();
+        MetricTree* metricTree = globalMetricTree(/* create */ false);
         auto metricsEl = cmdObj["metrics"_sd];
-        if (metricsEl.eoo() || metricsEl.trueValue()) {
+        if (metricTree && (metricsEl.eoo() || metricsEl.trueValue())) {
             if (metricsEl.type() == BSONType::Object) {
-                metricTree.appendTo(result, BSON("metrics" << metricsEl.embeddedObject()));
+                metricTree->appendTo(BSON("metrics" << metricsEl.embeddedObject()), result);
             } else {
-                metricTree.appendTo(result);
+                metricTree->appendTo(result);
             }
         }
 
@@ -264,14 +264,17 @@ public:
 
 class MemBase : public ServerStatusMetric {
 public:
-    void appendTo(BSONObjBuilder& bob, StringData leafName) const override {
-        BSONObjBuilder b{bob.subobjStart(leafName)};
+    MemBase() : ServerStatusMetric(".mem.bits") {}
+
+    void appendAtLeaf(BSONObjBuilder& b) const override {
         b.append("bits", sizeof(int*) == 4 ? 32 : 64);
 
         ProcessInfo p;
+        int v = 0;
         if (p.supported()) {
             b.appendNumber("resident", p.getResidentSize());
-            b.appendNumber("virtual", p.getVirtualMemorySize());
+            v = p.getVirtualMemorySize();
+            b.appendNumber("virtual", v);
             b.appendBool("supported", true);
         } else {
             b.append("note", "not all mem info support on this platform");
@@ -280,7 +283,7 @@ public:
     }
 };
 
-MemBase& memBase = addMetricToTree(".mem", std::make_unique<MemBase>());
+MemBase& memBase = addMetricToTree(std::make_unique<MemBase>());
 
 class HttpClientServerStatus : public ServerStatusSection {
 public:

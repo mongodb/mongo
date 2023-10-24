@@ -150,7 +150,7 @@ OpTime ReplicationCoordinatorNoOp::getCurrentCommittedSnapshotOpTime() const {
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*, StringData) {
+void ReplicationCoordinatorNoOp::appendDiagnosticBSON(mongo::BSONObjBuilder*) {
     MONGO_UNREACHABLE;
 }
 

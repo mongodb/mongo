@@ -109,18 +109,20 @@
 namespace mongo {
 namespace repl {
 
-namespace {
+using std::string;
+using std::stringstream;
+
 constexpr StringData kInternalIncludeNewlyAddedFieldName = "$_internalIncludeNewlyAdded"_sd;
-}  // namespace
 
 class ReplExecutorSSM : public ServerStatusMetric {
 public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        ReplicationCoordinator::get(getGlobalServiceContext())->appendDiagnosticBSON(&b, leafName);
+    ReplExecutorSSM() : ServerStatusMetric("repl.executor") {}
+    virtual void appendAtLeaf(BSONObjBuilder& b) const {
+        ReplicationCoordinator::get(getGlobalServiceContext())->appendDiagnosticBSON(&b);
     }
 };
 
-auto& replExecutorSSM = addMetricToTree("repl.executor", std::make_unique<ReplExecutorSSM>());
+auto& replExecutorSSM = addMetricToTree(std::make_unique<ReplExecutorSSM>());
 
 // Test-only, enabled via command-line. See docs/test_commands.md.
 class CmdReplSetTest : public ReplSetCommand {
@@ -323,7 +325,7 @@ void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
     const char* slash = strchr(p, '/');
     std::set<HostAndPort> seedSet;
     if (slash) {
-        *setname = std::string(p, slash - p);
+        *setname = string(p, slash - p);
     } else {
         *setname = p;
     }
@@ -343,7 +345,7 @@ void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
         }
         HostAndPort m;
         try {
-            m = HostAndPort(std::string(p, comma - p));
+            m = HostAndPort(string(p, comma - p));
         } catch (...) {
             uassert(13114, "bad --replSet seed hostname", false);
         }
@@ -393,7 +395,7 @@ public:
         if (configObj.isEmpty()) {
             std::string replSetString = settings.getReplSetString();
 
-            std::string noConfigMessage =
+            string noConfigMessage =
                 "no configuration specified. "
                 "Using a default configuration for the set";
             result.append("info2", noConfigMessage);

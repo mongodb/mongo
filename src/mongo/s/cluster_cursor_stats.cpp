@@ -39,32 +39,36 @@
 namespace mongo {
 namespace {
 
-long long ll(auto v) {
-    return static_cast<long long>(v);
-}
-
 //
 // ServerStatus metric cursor counts.
 //
 
 class ClusterCursorStats final : public ServerStatusMetric {
 public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
+    ClusterCursorStats() : ServerStatusMetric("cursor") {}
+
+    void appendAtLeaf(BSONObjBuilder& b) const final {
         auto grid = Grid::get(getGlobalServiceContext());
-        BSONObjBuilder cursorBob(b.subobjStart(leafName));
-        cursorBob.append("timedOut", ll(grid->getCursorManager()->cursorsTimedOut()));
-        auto stats = grid->getCursorManager()->stats();
-        BSONObjBuilder{cursorBob.subobjStart("open")}
-            .append("multiTarget", ll(stats.cursorsMultiTarget))
-            .append("singleTarget", ll(stats.cursorsSingleTarget))
-            .append("queuedData", ll(stats.cursorsQueuedData))
-            .append("pinned", ll(stats.cursorsPinned))
-            .append("total", ll(stats.cursorsMultiTarget + stats.cursorsSingleTarget));
+        BSONObjBuilder cursorBob(b.subobjStart(_leafName));
+        cursorBob.append("timedOut",
+                         static_cast<long long>(grid->getCursorManager()->cursorsTimedOut()));
+        {
+            BSONObjBuilder openBob(cursorBob.subobjStart("open"));
+            auto stats = grid->getCursorManager()->stats();
+            openBob.append("multiTarget", static_cast<long long>(stats.cursorsMultiTarget));
+            openBob.append("singleTarget", static_cast<long long>(stats.cursorsSingleTarget));
+            openBob.append("queuedData", static_cast<long long>(stats.cursorsQueuedData));
+            openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
+            openBob.append(
+                "total",
+                static_cast<long long>(stats.cursorsMultiTarget + stats.cursorsSingleTarget));
+            openBob.doneFast();
+        }
+        cursorBob.done();
     }
 };
 
-ClusterCursorStats& clusterCursorStats =
-    addMetricToTree("cursor", std::make_unique<ClusterCursorStats>());
+ClusterCursorStats& clusterCursorStats = addMetricToTree(std::make_unique<ClusterCursorStats>());
 
 }  // namespace
 }  // namespace mongo

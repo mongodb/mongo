@@ -29,290 +29,70 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 
-#include <fmt/format.h>
-
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
-#include "mongo/bson/mutable/document.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+#include "mongo/bson/bsontypes.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
 
-using namespace fmt::literals;
-
-bool falseNodesPredicate(const BSONElement& el) {
-    return el.type() == Bool && !el.boolean();
-}
-
-template <typename F>
-void forEachPermutationOf(const std::vector<std::string>& seq, const F& func) {
-    std::vector<int> order(seq.size(), 0);
-    std::iota(order.begin(), order.end(), 0);
-    do {
-        std::vector<std::string> v;
-        for (auto i : order)
-            v.push_back(seq[i]);
-        func(std::move(v));
-    } while (std::next_permutation(order.begin(), order.end()));
-}
-
 class MetricTreeTest : public unittest::Test {
 protected:
-    MetricTree& tree() const {
-        return *_tree;
+    MetricTree* tree() const {
+        return _tree.get();
     }
 
-    BSONObj serialize() {
-        return serialize(tree());
+    BSONObj metrics() {
+        BSONObjBuilder builder;
+        tree()->appendTo(builder);
+        return builder.obj();
     }
 
-    BSONObj serialize(const MetricTree& mt) {
-        return serialize(mt, BSONObj{});
-    }
-
-    BSONObj serialize(const MetricTree& mt, BSONObj excludePaths) {
-        BSONObjBuilder bob;
-        mt.appendTo(bob, excludePaths);
-        return bob.obj();
-    }
-
-    Counter64& addCounter(MetricTree& tree, StringData path) {
-        return addMetricToTree(path, std::make_unique<ServerStatusMetricField<Counter64>>(), tree)
-            .value();
-    }
-
-    std::vector<std::string> extractTreeNodes(
-        BSONObj metrics, const std::function<bool(const BSONElement&)>& pred = {}) {
-        std::vector<std::string> nodes;
-        // Extract node names from metrics tree
-        for (auto&& el : metrics) {
-            StringData key = el.fieldNameStringData();
-            switch (el.type()) {
-                case Object:
-                    for (auto&& v : extractTreeNodes(el.Obj(), pred))
-                        nodes.push_back("{}.{}"_format(key, v));
-                    break;
-                default:
-                    if (!pred || pred(el))
-                        nodes.push_back(std::string{key});
-                    break;
-            }
-        }
-        return nodes;
-    }
-
-    std::vector<StringData> dotSplit(StringData path) {
-        std::vector<StringData> parts;
-        while (true) {
-            auto dot = path.find(".");
-            if (dot == std::string::npos) {
-                parts.push_back(path);
-                return parts;
-            }
-            parts.push_back(path.substr(0, dot));
-            path = path.substr(dot + 1);
-        }
-    }
-
-    BSONObj erasePaths(BSONObj inDoc, const std::vector<std::string>& paths) {
-        mutablebson::Document doc(inDoc);
-        for (auto&& path : paths) {
-            auto elem = doc.root();
-            for (auto&& part : dotSplit(path))
-                if (elem = elem[part]; !elem.ok())
-                    break;
-            if (elem.ok())
-                invariant(elem.remove().isOK());
-        }
-        return doc.getObject();
-    }
-
-    /** Parses `json` and nests the result under the "metrics" root. */
-    static BSONObj mJson(StringData json) {
-        return BSON("metrics" << fromjson(json));
-    }
-
-    /** Adds the implicit "metrics" root to the dotted `path`. */
-    static std::string mStr(StringData path) {
-        return "metrics.{}"_format(path);
-    }
-
-    /** New vector from adding implicit "metrics" to each element. */
-    std::vector<std::string> mStrVec(std::vector<std::string> pathsVec) {
-        std::vector<std::string> out;
-        for (auto&& p : pathsVec)
-            out.push_back(mStr(p));
-        return out;
-    }
-
-    void appendJsonToTree(MetricTree& tree, StringData json) {
-        for (auto&& path : extractTreeNodes(mJson(json)["metrics"].Obj()))
-            addCounter(tree, path);
-    }
-
-    BSONObj actualMerged(const std::vector<std::string>& specs, BSONObj excludedPaths = {}) {
-        std::vector<std::unique_ptr<MetricTree>> componentTrees;
-        for (StringData json : specs) {
-            auto tree = std::make_unique<MetricTree>();
-            appendJsonToTree(*tree, json);
-            componentTrees.push_back(std::move(tree));
-        }
-        std::vector<const MetricTree*> ptrs;
-        for (auto&& t : componentTrees)
-            ptrs.push_back(t.get());
-        BSONObjBuilder b;
-        appendMergedTrees(ptrs, b, excludedPaths);
-        return b.obj();
-    };
-
-    BSONObj expectedMerged(const std::vector<std::string>& specs, BSONObj excludedPaths = {}) {
-        BSONObjBuilder b;
-        MetricTree mt;
-        for (StringData json : specs)
-            appendJsonToTree(mt, json);
-        mt.appendTo(b);
-        return erasePaths(b.obj(), extractTreeNodes(excludedPaths, falseNodesPredicate));
-    }
-
-private:
     std::unique_ptr<MetricTree> _tree = std::make_unique<MetricTree>();
 };
 
-TEST_F(MetricTreeTest, DefaultMetricsSubtree) {
-    for (StringData path : {"foo", "bar"})
-        addCounter(tree(), path);
-    ASSERT_BSONOBJ_EQ(serialize(), mJson("{bar:0,foo:0}"));
-}
-
-TEST_F(MetricTreeTest, LeadingDotMeansRoot) {
-    for (StringData path : {".foo", ".bar"})
-        addCounter(tree(), path);
-    ASSERT_BSONOBJ_EQ(serialize(), fromjson("{bar:0,foo:0}"));
-}
-
-// For each node, output order should be alphabetical metrics, then
-// alphabetical subtrees. The order in which nodes are added to the tree
-// should be irrelevant.
-TEST_F(MetricTreeTest, StableOrder) {
-    // Start with a BSON tree, get the nodes that would have produced it,
-    // and then try every ordering of those nodes and confirm that they always
-    // produce the same tree.
-    BSONObj expected = mJson("{b:0,c:0,a:{a:0},d:{a:0,b:0}}");
-    forEachPermutationOf(extractTreeNodes(expected["metrics"].Obj()), [&](auto&& in) {
-        MetricTree tree;
-        for (const auto& path : in)
-            addCounter(tree, path);
-        ASSERT_BSONOBJ_EQ(serialize(tree, {}), expected);
-    });
-}
-
 TEST_F(MetricTreeTest, ValidateCounterMetric) {
-    auto& counter = addCounter(tree(), "tree.counter");
-    for (auto&& incr : {1, 2}) {
-        counter.increment(incr);
-        ASSERT_BSONOBJ_EQ(serialize(), mJson("{{tree:{{counter:{}}}}}"_format(counter.get())));
-    }
+    auto& counter =
+        addMetricToTree(std::make_unique<ServerStatusMetricField<Counter64>>("tree.counter"),
+                        tree())
+            .value();
+
+    counter.increment();
+    const auto firstMetrics = metrics();
+    BSONElement counterElement = firstMetrics["metrics"]["tree"]["counter"];
+    ASSERT(counterElement.isNumber());
+    ASSERT_EQ(counterElement.numberInt(), counter.get());
+
+    counter.increment(2);
+
+    const auto secondMetrics = metrics();
+    BSONElement anotherCounterElement = secondMetrics["metrics"]["tree"]["counter"];
+    ASSERT(anotherCounterElement.isNumber());
+    ASSERT_EQ(anotherCounterElement.numberInt(), counter.get());
 }
 
 TEST_F(MetricTreeTest, ValidateTextMetric) {
-    auto& text = addMetricToTree(
-                     "tree.text", std::make_unique<ServerStatusMetricField<std::string>>(), tree())
-                     .value();
-    for (auto&& str : {"hello", "bye"}) {
-        text = std::string{str};
-        ASSERT_BSONOBJ_EQ(serialize(), mJson("{{tree:{{text:\"{}\"}}}}"_format(str)));
-    }
-}
+    auto& text =
+        addMetricToTree(std::make_unique<ServerStatusMetricField<std::string>>("tree.text"), tree())
+            .value();
 
-TEST_F(MetricTreeTest, ExcludePaths) {
-    // Make a full tree, and try a few different exclusion trees on it. The
-    // serialized result with excludePaths should be exactly equivalent to
-    // making a result without exclusions and performing explicit subtree
-    // removals on the result.
-    MetricTree tree;
-    const BSONObj full = mJson("{b:0,c:0,a:{a:0},d:{a:0,b:0}}");
-    for (auto&& path : extractTreeNodes(full["metrics"].Obj()))
-        addCounter(tree, path);
-    for (auto&& exclusionTreeJson : std::vector<std::string>{
-             "{b:true}",
-             "{c:false,a:false}",
-             "{a:false}",
-             "{d:{a:false}}",
-         }) {
-        auto excludePaths = mJson(exclusionTreeJson);
-        ASSERT_BSONOBJ_EQ(serialize(tree, excludePaths),
-                          erasePaths(full, extractTreeNodes(excludePaths, falseNodesPredicate)));
-    }
-}
+    text = "hello";
 
-TEST_F(MetricTreeTest, MergedTreeView) {
-    for (auto&& testCase : std::vector<std::vector<std::string>>{
-             // Empties
-             {},
-             {"{}"},
-             {"{}", "{}"},
-             {"{}", "{}", "{}"},
+    auto firstMetrics = metrics();
+    BSONElement textElement = firstMetrics["metrics"]["tree"]["text"];
+    ASSERT_EQ(textElement.type(), BSONType::String);
+    ASSERT_EQ(textElement.String(), text);
 
-             // Simple nodes
-             {"{a:0}"},
-             {"{a:0}", "{}"},
-             {"{a:0}", "{b:0}"},
+    text = "bye";
 
-             // Subtrees
-             {"{a:{aa:0}}"},
-             {"{a:{aa:0}}", "{a:{ab:0}}"},
-             {"{a:{aa:0}}", "{a:{ab:0}}", "{a:{ac:0}}"},
-
-             // Mix metric and subtree
-             {"{b:0}", "{a:{aa:0}}"},
-
-             // Big multimerge of a multilevel tree
-             {
-                 "{b:0,c:0,a:{a:0},d:{a:0,b:0}}",
-                 "{e:0,f:{a:0,b:0}}",
-                 "{f:{c:0}}",
-                 "{g:0,h:{a:0,b:{a:0}}}",
-                 "{h:{b:{b:0}}}",
-                 "{}",
-             },
-         }) {
-        // A tree constructed from all nodes of the component trees
-        // should produce the same result as `appendMergedTrees`.
-        ASSERT_BSONOBJ_EQ(actualMerged(testCase), expectedMerged(testCase));
-    }
-}
-
-TEST_F(MetricTreeTest, MergedTreeViewWithExcludePaths) {
-    for (auto&& testCase : std::vector<std::vector<std::string>>{
-             {},
-             {"{}"},
-             {"{}", "{}"},
-             {"{b:0,c:0,a:{a:0},d:{a:0,b:0}}"},
-             {"{b:0,a:{a:0},d:{a:0,b:0}}", "{c:0}"},
-             {"{b:0,c:0,d:{a:0,b:0}}", "{a:{a:0}}"},
-         }) {
-        for (auto&& exclusionTreeJson : {
-                 "{b:true}",
-                 "{c:false,a:false}",
-                 "{a:false}",
-                 "{d:{a:false}}",
-             }) {
-            BSONObj exclusionTree = mJson(exclusionTreeJson);
-            ASSERT_BSONOBJ_EQ(actualMerged(testCase, exclusionTree),
-                              expectedMerged(testCase, exclusionTree));
-        }
-    }
-}
-
-TEST_F(MetricTreeTest, MergedTreeViewWithCollision) {
-    using BadValueEx = ExceptionFor<ErrorCodes::BadValue>;
-    ASSERT_THROWS(actualMerged({"{a:0}", "{a:0}"}), BadValueEx);
-    ASSERT_THROWS(actualMerged({"{a:{aa:0}}", "{a:{aa:0}}"}), BadValueEx);
+    auto secondMetrics = metrics();
+    BSONElement anotherTextElement = secondMetrics["metrics"]["tree"]["text"];
+    ASSERT_EQ(anotherTextElement.type(), BSONType::String);
+    ASSERT_EQ(anotherTextElement.String(), text);
 }
 }  // namespace
 }  // namespace mongo

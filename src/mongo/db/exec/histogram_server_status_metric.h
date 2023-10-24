@@ -54,7 +54,7 @@ class HistogramServerStatusMetric {
 public:
     HistogramServerStatusMetric(std::string name, std::vector<uint64_t> bounds)
         : _hist{std::move(bounds)},
-          _metric{addMetricToTree(name, std::make_unique<Metric>(this))} {}
+          _metric(addMetricToTree(std::make_unique<Metric>(std::move(name), this))) {}
 
     void increment(uint64_t value) {
         _hist.increment(value);
@@ -76,20 +76,21 @@ public:
 private:
     class Metric : public ServerStatusMetric {
     public:
-        explicit Metric(const HistogramServerStatusMetric* owner) : _owner{owner} {}
+        Metric(std::string name, const HistogramServerStatusMetric* owner)
+            : ServerStatusMetric{std::move(name)}, _owner{owner} {}
 
-    private:
-        void appendTo(BSONObjBuilder& bob, StringData leafName) const override {
-            _owner->_appendTo(leafName, bob);
+        void appendAtLeaf(BSONObjBuilder& bob) const override {
+            _owner->_appendTo(_leafName, bob);
         }
 
+    private:
         const HistogramServerStatusMetric* const _owner;
     };
 
     void _appendTo(StringData leafName, BSONObjBuilder& bob) const {
         BSONArrayBuilder arr{bob.subarrayStart(leafName)};
         for (auto&& [count, lower, upper] : _hist)
-            BSONObjBuilder{arr.subobjStart()}
+            BSONObjBuilder(arr.subobjStart())
                 .append("lowerBound", static_cast<long long>(lower ? *lower : 0))
                 .append("count", count);
     }

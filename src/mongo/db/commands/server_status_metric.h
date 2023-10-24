@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -38,13 +37,10 @@
 #include <utility>
 
 #include "mongo/base/counter.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/stdx/variant.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -52,7 +48,27 @@ namespace mongo {
 class ServerStatusMetric {
 public:
     virtual ~ServerStatusMetric() = default;
-    virtual void appendTo(BSONObjBuilder& b, StringData leafName) const = 0;
+
+    const std::string& getMetricName() const {
+        return _name;
+    }
+
+    virtual void appendAtLeaf(BSONObjBuilder& b) const = 0;
+
+protected:
+    static std::string _parseLeafName(const std::string& name);
+
+    /**
+     * The parameter name is a string where periods have a special meaning.
+     * It represents the path where the metric can be found into the tree.
+     * If name starts with ".", it will be treated as a path from
+     * the serverStatus root otherwise it will live under the "counters"
+     * namespace so foo.bar would be serverStatus().counters.foo.bar
+     */
+    explicit ServerStatusMetric(std::string name);
+
+    const std::string _name;
+    const std::string _leafName;
 };
 
 /**
@@ -63,7 +79,7 @@ public:
  * Note that the metric is a reference.
  *
  * auto& metric =
- *      addMetricToTree("path.to.counter", std::make_unique<ServerStatusMetricField<Counter64>>());
+ *      addMetricToTree(std::make_unique<ServerStatusMetricField<Counter64>>("path.to.counter"));
  *      ...
  *      metric.value().increment();
  *
@@ -79,123 +95,105 @@ public:
 template <typename T>
 class ServerStatusMetricField : public ServerStatusMetric {
 public:
+    explicit ServerStatusMetricField(std::string name) : ServerStatusMetric(std::move(name)) {}
+
+    void appendAtLeaf(BSONObjBuilder& b) const override {
+        b.append(_leafName, _t);
+    }
+
     T& value() {
         return _t;
     }
 
-    /**
-     * If the predicate has been set, is is consulted when appending the metric.
-     * If it evaluates to false, the metric is not appended.
-     */
-    void setEnabledPredicate(std::function<bool()> enabled) {
-        _enabled = std::move(enabled);
-    }
-
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        if (_enabled && !_enabled())
-            return;
-        b.append(leafName, _t);
-    }
-
 private:
     T _t;
-    std::function<bool()> _enabled;
 };
 
 /**
- * Metrics are organized as a tree by dot-delimited paths.
- * If path starts with `.`, it will be stripped and the path will be treated
- * as being directly under the root.
- * Otherwise, it will appear under the "metrics" subtree.
- * Examples:
- *     tree.add(".foo.m1", m1);  // m1 appears as "foo.m1"
- *     tree.add("foo.m2", m2);   // m2 appears as "metrics.foo.m2"
+ * A ServerStatusMetricField that is only reported when a predicate is satisfied.
  *
- * The `role` is used to disambiguate collisions.
+ * It's recommended to create these same way as ServerStatusMetricField, with the
+ * makeServerStatusMetric helper, but with the predicate as an additional
+ * function argument. Example:
+ *
+ *     auto predicate = [] { return gMyCounterFeatureFlag.isEnabledAndIgnoreFCVUnsafeAtStartup(); };
+ *     auto& counter = makeServerStatusMetric<Counter64>("path.to.counter", predicate);
+ *     ...
+ *     counter.increment();
  */
-class MetricTree {
+template <typename T>
+class ConditionalServerStatusMetricField : public ServerStatusMetricField<T> {
 public:
-    /** Can hold either a subtree or a metric. */
-    struct TreeNode {
-    public:
-        explicit TreeNode(std::unique_ptr<MetricTree> v) : _v{std::move(v)} {}
-        explicit TreeNode(std::unique_ptr<ServerStatusMetric> v) : _v{std::move(v)} {}
+    ConditionalServerStatusMetricField(std::string name, std::function<bool()> predicate)
+        : ServerStatusMetricField<T>{std::move(name)}, _predicate{std::move(predicate)} {}
 
-        bool isSubtree() const {
-            return _v.index() == 0;
-        }
-
-        const std::unique_ptr<MetricTree>& getSubtree() const {
-            return std::get<0>(_v);
-        }
-
-        const std::unique_ptr<ServerStatusMetric>& getMetric() const {
-            return std::get<1>(_v);
-        }
-
-    private:
-        stdx::variant<std::unique_ptr<MetricTree>, std::unique_ptr<ServerStatusMetric>> _v;
-    };
-
-    using ChildMap = std::map<std::string, TreeNode, std::less<>>;
-
-    void add(StringData path,
-             std::unique_ptr<ServerStatusMetric> metric,
-             boost::optional<ClusterRole> role = {});
-
-    void appendTo(BSONObjBuilder& b, const BSONObj& excludePaths = {}) const;
-
-    const ChildMap& children() const {
-        return _children;
+    void appendAtLeaf(BSONObjBuilder& b) const override {
+        if (_predicate && !_predicate())
+            return;
+        ServerStatusMetricField<T>::appendAtLeaf(b);
     }
 
 private:
-    void _add(StringData path,
-              std::unique_ptr<ServerStatusMetric> metric,
-              boost::optional<ClusterRole> role);
-
-    ChildMap _children;
+    std::function<bool()> _predicate;
 };
 
-MetricTree& getGlobalMetricTree();
+class MetricTree {
+public:
+    ~MetricTree() = default;
+
+    void add(std::unique_ptr<ServerStatusMetric> metric);
+
+    /**
+     * Append the metrics tree to the given BSON builder.
+     */
+    void appendTo(BSONObjBuilder& b) const;
+
+    /**
+     * Overload of appendTo which allows tree of exclude paths. The alternative overload is
+     * preferred to avoid overhead when no excludes are present.
+     */
+    void appendTo(const BSONObj& excludePaths, BSONObjBuilder& b) const;
+
+private:
+    void _add(const std::string& path, std::unique_ptr<ServerStatusMetric> metric);
+
+    std::map<std::string, std::unique_ptr<MetricTree>> _subtrees;
+    std::map<std::string, std::unique_ptr<ServerStatusMetric>> _metrics;
+};
+
+/**
+ * globalMetricTree is responsible for creating and returning a MetricTree instance
+ * statically stored inside. The create parameter bypasses its creation returning a
+ * null pointer for when it has not been created yet.
+ */
+MetricTree* globalMetricTree(bool create = true);
 
 template <typename T>
-T& addMetricToTree(StringData name,
-                   std::unique_ptr<T> metric,
-                   MetricTree& tree = getGlobalMetricTree()) {
+T& addMetricToTree(std::unique_ptr<T> metric, MetricTree* metricTree = globalMetricTree()) {
     invariant(metric);
+    invariant(metricTree);
     T& reference = *metric;
-    tree.add(name, std::move(metric));
+    metricTree->add(std::move(metric));
     return reference;
 }
 
 template <typename T>
-T& makeServerStatusMetric(StringData path) {
-    return addMetricToTree(path, std::make_unique<ServerStatusMetricField<T>>()).value();
+T& makeServerStatusMetric(std::string path) {
+    return addMetricToTree(std::make_unique<ServerStatusMetricField<T>>(std::move(path))).value();
 }
 
 /** Make a metric that only appends itself when `predicate` is true. */
 template <typename T>
-T& makeServerStatusMetric(StringData path, std::function<bool()> predicate) {
-    auto ptr = std::make_unique<ServerStatusMetricField<T>>();
-    ptr->setEnabledPredicate(std::move(predicate));
-    return addMetricToTree(path, std::move(ptr)).value();
+T& makeServerStatusMetric(std::string path, std::function<bool()> predicate) {
+    return addMetricToTree(std::make_unique<ConditionalServerStatusMetricField<T>>(
+                               std::move(path), std::move(predicate)))
+        .value();
 }
 
-/**
- * Write a merger of the `trees` to `b`, under field `name`. `excludePaths` is a
- * BSON tree of Bool, specifying `false` for subtrees that are to be omitted
- * from the results.
- */
-void appendMergedTrees(std::vector<const MetricTree*> trees,
-                       BSONObjBuilder& b,
-                       const BSONObj& excludePaths = {});
-
-/** Replicates the public interface of Counter64. */
 class CounterMetric {
 public:
-    explicit CounterMetric(StringData name) : _counter{makeServerStatusMetric<Counter64>(name)} {}
-    CounterMetric(StringData name, std::function<bool()> predicate)
+    CounterMetric(const std::string& name) : _counter{makeServerStatusMetric<Counter64>(name)} {}
+    CounterMetric(const std::string& name, std::function<bool()>&& predicate)
         : _counter{makeServerStatusMetric<Counter64>(name, std::move(predicate))} {}
     CounterMetric(CounterMetric&) = delete;
     CounterMetric& operator=(CounterMetric&) = delete;
@@ -204,14 +202,27 @@ public:
         return _counter;
     }
 
+    /**
+     * replicates the same public interface found in Counter64.
+     */
+
+    /**
+     * Atomically increment.
+     */
     void increment(uint64_t n = 1) const {
         _counter.increment(n);
     }
 
+    /**
+     * Atomically decrement.
+     */
     void decrement(uint64_t n = 1) const {
         _counter.decrement(n);
     }
 
+    /**
+     * Return the current value.
+     */
     long long get() const {
         return _counter.get();
     }
@@ -232,8 +243,10 @@ private:
 template <typename T>
 class SynchronizedMetric : public ServerStatusMetric {
 public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        b.append(leafName, **_v);
+    explicit SynchronizedMetric(std::string name) : ServerStatusMetric{std::move(name)} {}
+
+    void appendAtLeaf(BSONObjBuilder& b) const override {
+        b.append(_leafName, **_v);
     }
 
     synchronized_value<T>& value() {
@@ -256,7 +269,7 @@ private:
  */
 template <typename T>
 synchronized_value<T>& makeSynchronizedMetric(std::string path) {
-    return addMetricToTree(path, std::make_unique<SynchronizedMetric<T>>()).value();
+    return addMetricToTree(std::make_unique<SynchronizedMetric<T>>(std::move(path))).value();
 }
 
 }  // namespace mongo

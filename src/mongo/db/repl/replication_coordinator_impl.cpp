@@ -469,9 +469,8 @@ OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime_inlock() c
     return _currentCommittedSnapshot.value_or(OpTime());
 }
 
-void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob,
-                                                      StringData leafName) {
-    BSONObjBuilder eBuilder(bob->subobjStart(leafName));
+void ReplicationCoordinatorImpl::appendDiagnosticBSON(mongo::BSONObjBuilder* bob) {
+    BSONObjBuilder eBuilder(bob->subobjStart("executor"));
     _replExecutor->appendDiagnosticBSON(&eBuilder);
 }
 
