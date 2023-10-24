@@ -177,8 +177,6 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     WT_ERR(__wt_strdup(session, filename, &block->name));
     block->objectid = objectid;
     block->ref = 1;
-    WT_CONN_BLOCK_INSERT(conn, block, bucket);
-    block->linked = true;
 
     /* If not passed an allocation size, get one from the configuration. */
     if (allocsize == 0) {
@@ -249,6 +247,12 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     if (!forced_salvage)
         WT_ERR(__desc_read(session, allocsize, block));
 
+    /*
+     * No errors are possible past this point. So it is safe to make the block visible to other
+     * sessions.
+     */
+    WT_CONN_BLOCK_INSERT(conn, block, bucket);
+    block->linked = true;
     __wt_spin_unlock(session, &conn->block_lock);
 
     *blockp = block;
