@@ -674,8 +674,7 @@ public:
 
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid db name: " << dbname.toStringForErrorMsg(),
-                    NamespaceString::validDBName(dbname,
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+                    DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
             {
                 CurOp::get(opCtx)->ensureStarted();

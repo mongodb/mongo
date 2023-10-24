@@ -45,7 +45,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
                                 const DatabaseName& dbName) {
     // Internal callers should always pass in a valid 'dbName' against which to compare the
     // 'viewDefinition'.
-    invariant(NamespaceString::validDBName(dbName));
+    invariant(DatabaseName::isValid(dbName));
 
     bool valid = true;
 
@@ -61,7 +61,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
         dbName.tenantId(), viewNameElem.str(), SerializationContext::stateDefault());
 
     bool viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
-        NamespaceString::validDBName(viewName.dbName());
+        DatabaseName::isValid(viewName.dbName());
     valid &= viewNameIsValid;
 
     // Only perform validation via NamespaceString if the collection name has been determined to

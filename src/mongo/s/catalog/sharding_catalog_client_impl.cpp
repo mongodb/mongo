@@ -469,7 +469,7 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
                                                     repl::ReadConcernLevel readConcernLevel) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << dbName.toStringForErrorMsg() << " is not a valid db name",
-            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
+            DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
 
     // The admin database is always hosted on the config server.
     if (dbName.isAdminDB()) {

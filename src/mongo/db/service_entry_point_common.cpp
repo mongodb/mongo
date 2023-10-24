@@ -1567,7 +1567,7 @@ void ExecCommandDatabase::_initiateCommand() {
     const auto dbName = request.getDbName();
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
-            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
+            DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
 
 
     // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should

@@ -165,6 +165,47 @@ public:
     }
 
     /**
+     * NOTE: DollarInDbNameBehavior::allow is deprecated.
+     *
+     * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must
+     * contain a $.
+     */
+    enum class DollarInDbNameBehavior {
+        Disallow,
+        Allow,  // Deprecated
+    };
+
+
+    /**
+     * samples:
+     *   good
+     *      foo
+     *      bar
+     *      foo-bar
+     *   bad:
+     *      foo bar
+     *      foo.bar
+     *      foo"bar
+     *
+     * @param db - a possible database name
+     * @param DollarInDbNameBehavior - please do not change the default value. DB names that must
+     *                                 contain a $ should be checked explicitly.
+     * @return if db is an allowed database name
+     */
+
+    static bool validDBName(StringData dbName,
+                            DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow);
+
+    static bool isValid(const DatabaseName& dbName,
+                        DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
+        return validDBName(dbName.db(), behavior);
+    }
+
+    static bool isValid(StringData dbName) {
+        return validDBName(dbName);
+    }
+
+    /**
      * Returns a db name string without tenant id.  Only to be used when a tenant id cannot be
      * tolerated in the serialized output, and should otherwise be avoided whenever possible.
      */
@@ -342,6 +383,42 @@ private:
 inline std::string stringifyForAssert(const DatabaseName& dbName) {
     return toStringForLogging(dbName);
 }
+
+inline bool DatabaseName::validDBName(StringData db,
+                                      DatabaseName::DollarInDbNameBehavior behavior) {
+    if (db.size() == 0 || db.size() > DatabaseName::kMaxDatabaseNameLength)
+        return false;
+
+    for (StringData::const_iterator iter = db.begin(), end = db.end(); iter != end; ++iter) {
+        switch (*iter) {
+            case '\0':
+            case '/':
+            case '\\':
+            case '.':
+            case ' ':
+            case '"':
+                return false;
+            case '$':
+                if (behavior == DatabaseName::DollarInDbNameBehavior::Disallow)
+                    return false;
+                continue;
+#ifdef _WIN32
+            // We prohibit all FAT32-disallowed characters on Windows
+            case '*':
+            case '<':
+            case '>':
+            case ':':
+            case '|':
+            case '?':
+                return false;
+#endif
+            default:
+                continue;
+        }
+    }
+    return true;
+}
+
 
 // The `constexpr` definitions for `DatabaseName::ConstantProxy` static data members are below. See
 // `constexpr` definitions for the `NamespaceString::ConstantProxy` static data members of NSS in

@@ -464,8 +464,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
     // slash ("/"), backslash ("\"), space (" "), double-quote ("""), or dollar sign ("$")
     // period (".") is also prohibited, but drivers MAY allow periods
     if (!database.empty() &&
-        !NamespaceString::validDBName(database,
-                                      NamespaceString::DollarInDbNameBehavior::Disallow)) {
+        !DatabaseName::validDBName(database, DatabaseName::DollarInDbNameBehavior::Disallow)) {
         uasserted(ErrorCodes::FailedToParse,
                   str::stream() << "Database name cannot have reserved "
                                    "characters for mongodb:// URL: "

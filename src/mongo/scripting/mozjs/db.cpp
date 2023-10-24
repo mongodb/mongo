@@ -143,7 +143,7 @@ void DBInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     std::string dbName = ValueWriter(cx, args.get(1)).toString();
 
-    if (!NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow))
+    if (!DatabaseName::validDBName(dbName, DatabaseName::DollarInDbNameBehavior::Allow))
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "[" << dbName << "] is not a valid database name");
 

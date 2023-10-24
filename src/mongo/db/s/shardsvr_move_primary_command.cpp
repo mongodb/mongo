@@ -81,10 +81,10 @@ public:
             const auto& dbNss = ns();
             const auto& toShardId = request().getTo();
 
-            uassert(ErrorCodes::InvalidNamespace,
-                    "invalid database {}"_format(dbNss.toStringForErrorMsg()),
-                    NamespaceString::validDBName(dbNss.dbName(),
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+            uassert(
+                ErrorCodes::InvalidNamespace,
+                "invalid database {}"_format(dbNss.toStringForErrorMsg()),
+                DatabaseName::isValid(dbNss.dbName(), DatabaseName::DollarInDbNameBehavior::Allow));
 
             uassert(
                 ErrorCodes::InvalidOptions,

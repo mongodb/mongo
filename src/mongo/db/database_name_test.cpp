@@ -151,6 +151,47 @@ TEST(DatabaseNameTest, VerifyCompareFunction) {
     ASSERT_TRUE(dbn3a.equalCaseInsensitive(dbn3A));
 }
 
+TEST(DatabaseNameTest, DatabaseValidNames) {
+    ASSERT(DatabaseName::validDBName("foo", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(DatabaseName::validDBName("foo$bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo/bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo.bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo\\bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo\"bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("a\0b"_sd, DatabaseName::DollarInDbNameBehavior::Allow));
+#ifdef _WIN32
+    ASSERT(!DatabaseName::validDBName("foo*bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo<bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo>bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo:bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo|bar", DatabaseName::DollarInDbNameBehavior::Allow));
+    ASSERT(!DatabaseName::validDBName("foo?bar", DatabaseName::DollarInDbNameBehavior::Allow));
+#endif
+
+    ASSERT(DatabaseName::validDBName("foo"));
+    ASSERT(!DatabaseName::validDBName("foo$bar"));
+    ASSERT(!DatabaseName::validDBName("foo/bar"));
+    ASSERT(!DatabaseName::validDBName("foo bar"));
+    ASSERT(!DatabaseName::validDBName("foo.bar"));
+    ASSERT(!DatabaseName::validDBName("foo\\bar"));
+    ASSERT(!DatabaseName::validDBName("foo\"bar"));
+    ASSERT(!DatabaseName::validDBName("a\0b"_sd));
+#ifdef _WIN32
+    ASSERT(!DatabaseName::validDBName("foo*bar"));
+    ASSERT(!DatabaseName::validDBName("foo<bar"));
+    ASSERT(!DatabaseName::validDBName("foo>bar"));
+    ASSERT(!DatabaseName::validDBName("foo:bar"));
+    ASSERT(!DatabaseName::validDBName("foo|bar"));
+    ASSERT(!DatabaseName::validDBName("foo?bar"));
+#endif
+
+    ASSERT(DatabaseName::validDBName(
+        "ThisIsADatabaseNameThatBrokeAllRecordsForValidLengthForDBName63"));
+    ASSERT(!DatabaseName::validDBName(
+        "WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"));
+}
+
 TEST(DatabaseNameTest, CheckDatabaseNameLogAttrs) {
     TenantId tenantId(OID::gen());
     DatabaseName dbWithTenant = DatabaseName::createDatabaseName_forTest(tenantId, "myLongDbName");

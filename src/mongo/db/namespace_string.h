@@ -357,16 +357,6 @@ public:
      */
     static NamespaceString makeDummyNamespace(const boost::optional<TenantId>& tenantId);
 
-    /**
-     * NOTE: DollarInDbNameBehavior::allow is deprecated.
-     *
-     * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must
-     * contain a $.
-     */
-    enum class DollarInDbNameBehavior {
-        Disallow,
-        Allow,  // Deprecated
-    };
 
     boost::optional<TenantId> tenantId() const {
         if (!_hasTenantId()) {
@@ -708,12 +698,14 @@ public:
      * Returns true if the namespace is valid. Special namespaces for internal use are considered as
      * valid.
      */
-    bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
-        return validDBName(db_deprecated(), behavior) && !coll().empty();
+    bool isValid(DatabaseName::DollarInDbNameBehavior behavior =
+                     DatabaseName::DollarInDbNameBehavior::Allow) const {
+        return DatabaseName::validDBName(db_deprecated(), behavior) && !coll().empty();
     }
 
     static bool isValid(StringData ns,
-                        DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) {
+                        DatabaseName::DollarInDbNameBehavior behavior =
+                            DatabaseName::DollarInDbNameBehavior::Allow) {
         const auto nss = NamespaceString(boost::none, ns);
         return nss.isValid(behavior);
     }
@@ -736,29 +728,6 @@ public:
         return ns.startsWith("local.oplog.");
     }
 
-    /**
-     * samples:
-     *   good
-     *      foo
-     *      bar
-     *      foo-bar
-     *   bad:
-     *      foo bar
-     *      foo.bar
-     *      foo"bar
-     *
-     * @param db - a possible database name
-     * @param DollarInDbNameBehavior - please do not change the default value. DB names that must
-     *                                 contain a $ should be checked explicitly.
-     * @return if db is an allowed database name
-     */
-    static bool validDBName(StringData dbName,
-                            DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow);
-
-    static bool validDBName(const DatabaseName& dbName,
-                            DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
-        return validDBName(dbName.db(), behavior);
-    }
 
     /**
      * Takes a fully qualified namespace (ie dbname.collectionName), and returns true if
@@ -1127,39 +1096,6 @@ inline bool nsIsFull(StringData ns) {
     return true;
 }
 
-inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior behavior) {
-    if (db.size() == 0 || db.size() > DatabaseName::kMaxDatabaseNameLength)
-        return false;
-
-    for (StringData::const_iterator iter = db.begin(), end = db.end(); iter != end; ++iter) {
-        switch (*iter) {
-            case '\0':
-            case '/':
-            case '\\':
-            case '.':
-            case ' ':
-            case '"':
-                return false;
-            case '$':
-                if (behavior == DollarInDbNameBehavior::Disallow)
-                    return false;
-                continue;
-#ifdef _WIN32
-            // We prohibit all FAT32-disallowed characters on Windows
-            case '*':
-            case '<':
-            case '>':
-            case ':':
-            case '|':
-            case '?':
-                return false;
-#endif
-            default:
-                continue;
-        }
-    }
-    return true;
-}
 
 inline bool NamespaceString::validCollectionComponent(const NamespaceString& ns) {
     const auto nsStr = ns.ns();

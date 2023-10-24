@@ -211,7 +211,7 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
         return Status::OK();
     }
 
-    if (!ns.isValid(NamespaceString::DollarInDbNameBehavior::Disallow)) {
+    if (!ns.isValid(DatabaseName::DollarInDbNameBehavior::Disallow)) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Invalid namespace: " << ns.toStringForErrorMsg());
     }

@@ -283,7 +283,7 @@ void ExecCommandClient::_prologue() {
             dbname != DatabaseName::kLocal.db());
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid database name: '{}'"_format(dbname),
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+            DatabaseName::validDBName(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
     StringMap<int> topLevelFields;
     for (auto&& element : request.body) {

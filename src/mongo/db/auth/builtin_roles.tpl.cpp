@@ -174,7 +174,7 @@ const stdx::unordered_set<RoleName> kAdminBuiltinRolesNoTenant = {
 // and other authentication mechanisms and not used for storage.
 // Therefore, granting privileges on this database does not make sense.
 bool isValidDB(const DatabaseName& dbname) {
-    return NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) &&
+    return DatabaseName::isValid(dbname, DatabaseName::DollarInDbNameBehavior::Allow) &&
         (!dbname.isExternalDB());
 }
 

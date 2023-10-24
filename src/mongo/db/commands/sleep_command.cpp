@@ -112,9 +112,7 @@ public:
         // This is not ran in multitenancy since sleep is an internal testing command.
         auto nss =
             NamespaceStringUtil::deserialize(boost::none, ns, SerializationContext::stateDefault());
-        uassert(50961,
-                "lockTarget is not a valid namespace",
-                NamespaceString::validDBName(nss.dbName()));
+        uassert(50961, "lockTarget is not a valid namespace", DatabaseName::isValid(nss.dbName()));
 
         auto dbMode = mode;
         if (!nss.isDbOnly()) {

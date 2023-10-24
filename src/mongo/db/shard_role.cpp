@@ -469,8 +469,8 @@ void validateRequests(const std::vector<CollectionOrViewAcquisitionRequest>& acq
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid db name "
                                   << ar.nssOrUUID.dbName().toStringForErrorMsg(),
-                    NamespaceString::validDBName(ar.nssOrUUID.dbName(),
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+                    DatabaseName::isValid(ar.nssOrUUID.dbName(),
+                                          DatabaseName::DollarInDbNameBehavior::Allow));
         } else {
             MONGO_UNREACHABLE;
         }
