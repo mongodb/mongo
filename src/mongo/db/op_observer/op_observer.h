@@ -477,9 +477,6 @@ public:
                                     const BSONObj& storageMetadata,
                                     bool isDryRun) = 0;
 
-    virtual void onApplyOps(OperationContext* opCtx,
-                            const DatabaseName& dbName,
-                            const BSONObj& applyOpCmd) = 0;
     virtual void onEmptyCapped(OperationContext* opCtx,
                                const NamespaceString& collectionName,
                                const UUID& uuid) = 0;

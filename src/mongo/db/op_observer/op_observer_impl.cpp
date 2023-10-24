@@ -1405,17 +1405,6 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
 }
 
-void OpObserverImpl::onApplyOps(OperationContext* opCtx,
-                                const DatabaseName& dbName,
-                                const BSONObj& applyOpCmd) {
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-
-    oplogEntry.setTid(dbName.tenantId());
-    oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
-    oplogEntry.setObject(applyOpCmd);
-    logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-}
 
 void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,

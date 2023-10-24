@@ -142,9 +142,6 @@ public:
                               const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) final;
 
-    void onApplyOps(OperationContext* opCtx,
-                    const DatabaseName& dbName,
-                    const BSONObj& applyOpCmd) final;
 
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,

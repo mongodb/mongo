@@ -481,13 +481,6 @@ public:
             o->postRenameCollection(
                 opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
-    void onApplyOps(OperationContext* const opCtx,
-                    const DatabaseName& dbName,
-                    const BSONObj& applyOpCmd) override {
-        ReservedTimes times{opCtx};
-        for (auto& o : _observers)
-            o->onApplyOps(opCtx, dbName, applyOpCmd);
-    }
 
     void onEmptyCapped(OperationContext* const opCtx,
                        const NamespaceString& collectionName,

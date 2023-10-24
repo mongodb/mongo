@@ -213,14 +213,6 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
         ->logOp(opCtx, "m", nss, catalogEntry, &storageMetadata);
 }
 
-void AuthOpObserver::onApplyOps(OperationContext* opCtx,
-                                const DatabaseName& dbName,
-                                const BSONObj& applyOpCmd) {
-    const NamespaceString cmdNss(NamespaceString::makeCommandNamespace(dbName));
-
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
-}
 
 void AuthOpObserver::onEmptyCapped(OperationContext* opCtx,
                                    const NamespaceString& collectionName,
