@@ -25,6 +25,8 @@
 //   # Query settings are atlas proxy and direct shard execution incompatible.
 //   directly_against_shardsvrs_incompatible,
 //   simulate_atlas_proxy_incompatible,
+//   # Query settings are not supported in upgrade/downgrade scenario
+//   cannot_run_during_upgrade_downgrade,
 // ]
 
 import {
@@ -208,6 +210,9 @@ if (!isSbeEnabled) {
 if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings")) {
     // Set query settings for a query to use 'settings.indexHints.allowedIndexes' indexes.
     const qsutils = new QuerySettingsUtils(db, coll.getName());
+
+    // Specify 'allowedIndexes' with more than one index, otherwise it will result in single
+    // solution plan, that won't be cached in classic.
     const settings = {indexHints: {allowedIndexes: ["a_1", "a_1_b_1"]}};
     const filter = {a: 1};
     const query = qsutils.makeFindQueryInstance(filter);
