@@ -150,9 +150,6 @@ void replyToResponse(OperationContext* opCtx,
             response->addToErrDetails(error);
         }
     }
-    if (auto& retriedStmtIds = replyBase->getRetriedStmtIds()) {
-        response->setRetriedStmtIds(*retriedStmtIds);
-    }
 
     // Update the OpTime for the reply to current OpTime
     //
@@ -177,10 +174,6 @@ void responseToReply(const BatchedCommandResponse& response,
     replyBase.setN(response.getN());
     if (response.isErrDetailsSet()) {
         replyBase.setWriteErrors(response.getErrDetails());
-    }
-
-    if (response.areRetriedStmtIdsSet()) {
-        replyBase.setRetriedStmtIds(response.getRetriedStmtIds());
     }
 }
 
@@ -453,7 +446,6 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     uint32_t iter = 0;
     uint32_t numDocs = 0;
     write_ops::WriteCommandReplyBase writeBase;
-    std::vector<StmtId> retriedStmtIds;
 
     // This is an optimization for single-document unencrypted inserts.
     if (documents.size() == 1) {
@@ -493,9 +485,6 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
                 break;
             }
         } else {
-            if (auto& stmtIds = reply->getRetriedStmtIds()) {
-                retriedStmtIds.insert(retriedStmtIds.end(), stmtIds->begin(), stmtIds->end());
-            }
             numDocs++;
         }
         iter++;
@@ -506,9 +495,6 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     writeBase.setN(numDocs);
     if (!writeErrors.empty()) {
         writeBase.setWriteErrors(writeErrors);
-    }
-    if (!retriedStmtIds.empty()) {
-        writeBase.setRetriedStmtIds(std::move(retriedStmtIds));
     }
     returnReply.setWriteCommandReplyBase(writeBase);
 
