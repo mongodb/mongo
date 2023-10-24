@@ -1783,7 +1783,12 @@ finish initial sync.
 
 Otherwise, the new node iterates through all of the buffered operations, writes them to the oplog,
 and if their timestamp is after the `beginApplyingTimestamp`, applies them to the data on disk.
-Oplog entries continue to be fetched and added to the buffer while this is occurring.
+Oplog entries continue to be fetched and added to the buffer while this is occurring. As oplog entries
+are applied, if we try to apply an update but do not have a local version of the document to update,
+we fetch that document from the sync source, and get a new "initial sync end timestamp" by fetching
+the most recent oplog entry from the sync source again. Thus there is a risk of falling off the oplog
+during initial sync, and it is recommended that you size the oplog for additional time to fetch any
+new ``oplog`` entries. This allows for changes that may occur during initial syncs.
 
 One notable exception is that the node will not apply `prepareTransaction` oplog entries. Similar
 to how we reconstruct prepared transactions in startup and rollback recovery, we will update the
