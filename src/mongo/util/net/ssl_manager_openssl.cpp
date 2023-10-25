@@ -2583,6 +2583,8 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
         }
     }
 
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
     std::string cafile = params.sslCAFile;
     if (direction == ConnectionDirection::kIncoming && !params.sslClusterCAFile.empty()) {
         cafile = params.sslClusterCAFile;

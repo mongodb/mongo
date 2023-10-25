@@ -21,12 +21,14 @@ if (HOST_TYPE == "windows") {
 function testWithCerts(prefix) {
     jsTest.log("Starting mongod blindly...");
     // allowTLS to get a non-TLS control connection.
-    const conn = MongoRunner.runMongod({
-        tlsMode: 'allowTLS',
+    var opts = {
+        tlsMode: 'preferTLS',
         tlsCertificateKeyFile: 'jstests/libs/' + prefix + 'server.pem',
         waitForConnect: false,
-        env: {"SSL_CERT_FILE": "jstests/libs/" + prefix + "ca.pem"}
-    });
+        setParameter: {tlsUseSystemCA: true},
+        env: {"SSL_CERT_FILE": "jstests/libs/" + prefix + "ca.pem"},
+    };
+    const conn = MongoRunner.runMongod(opts);
 
     jsTest.log("Waiting for mongod to be non-TLS connectable...");
     let argv = ['mongo', '--port', conn.port, '--eval', ';'];

@@ -49,34 +49,38 @@ function testRS(opts, succeed) {
 
 // ca.pem signed client.pem and server.pem
 // trusted-ca.pem signed trusted-client.pem and trusted-server.pem
-const options_explicit_systemca = {
+
+// Sanity check that ca.pem can be used to properly authenticate.
+const options_manual_systemca = {
     tlsMode: 'requireTLS',
     tlsCAFile: 'jstests/libs/ca.pem',
     tlsCertificateKeyFile: 'jstests/libs/server.pem',
 
 };
+testRS(options_manual_systemca, true);
 
-testRS(options_explicit_systemca, true);
-
-const options_implicit_systemca = {
+// Ensure that we can authenticate with system CA.
+const options_systemca = {
     tlsMode: 'requireTLS',
     tlsCertificateKeyFile: 'jstests/libs/server.pem',
+    setParameter: {tlsUseSystemCA: true},
 };
+testRS(options_systemca, true);
 
-testRS(options_implicit_systemca, true);
-
-const options_explicit_systemca_nomatch = {
+// Sanity check that ca.pem can be used to properly fail to authenticate.
+const options_manual_systemca_nomatch = {
     tlsMode: 'requireTLS',
     tlsCAFile: 'jstests/libs/ca.pem',
     tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
 };
+testRS(options_manual_systemca_nomatch, false);
 
-testRS(options_explicit_systemca_nomatch, false);
-
-const options_implicit_systemca_nomatch = {
+// Ensure that we can properly fail to authenticate with system CA.
+const options_systemca_nomatch = {
     tlsMode: 'requireTLS',
     tlsCertificateKeyFile: 'jstests/libs/trusted-server.pem',
+    setParameter: {tlsUseSystemCA: true},
 };
 
-testRS(options_implicit_systemca_nomatch, false);
+testRS(options_systemca_nomatch, false);
 }());

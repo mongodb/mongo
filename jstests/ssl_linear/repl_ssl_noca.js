@@ -23,6 +23,7 @@ try {
         nodeOptions: {
             sslMode: "requireSSL",
             sslPEMKeyFile: "jstests/libs/server.pem",
+            setParameter: {tlsUseSystemCA: true},
         },
         host: "localhost",
         useHostName: false,

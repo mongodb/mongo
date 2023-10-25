@@ -100,6 +100,7 @@ struct SSLParams {
     bool sslFIPSMode = false;                     // --sslFIPSMode
     bool sslAllowInvalidCertificates = false;     // --sslAllowInvalidCertificates
     bool sslAllowInvalidHostnames = false;        // --sslAllowInvalidHostnames
+    bool sslUseSystemCA = false;                  // --setParameter tlsUseSystemCA
     bool disableNonSSLConnectionLogging =
         false;  // --setParameter disableNonSSLConnectionLogging=true
     bool disableNonSSLConnectionLoggingSet = false;

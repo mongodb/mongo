@@ -37,4 +37,4 @@ runTest('expired', expired, validityMessage);
 
 // Test that startup fails with no certificate at all.
 const needKeyFile = 'need tlsCertificateKeyFile or certificateSelector when TLS is enabled';
-runTest('no-key-file', {tlsMode: 'requireTLS'}, needKeyFile);
+runTest('no-key-file', {tlsMode: 'requireTLS', tlsCAFile: 'jstests/libs/ca.pem'}, needKeyFile);

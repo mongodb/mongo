@@ -1258,6 +1258,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         _clientCertificates[0] = std::get<0>(_clusterPEMCertificate).get();
     }
 
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
     if (!params.sslCAFile.empty()) {
 
         auto swChain = readCertChains(params.sslCAFile, params.sslCRLFile);

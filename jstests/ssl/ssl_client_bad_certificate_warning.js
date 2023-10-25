@@ -39,6 +39,7 @@ let mongod = MongoRunner.runMongod({
     tlsMode: "requireTLS",
     tlsCertificateKeyFile: SERVER_CERT,
     tlsClusterCAFile: CA_CERT,
+    tlsCAFile: CA_CERT,
 });
 
 runTests();

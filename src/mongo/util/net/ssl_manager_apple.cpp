@@ -1369,14 +1369,15 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
         }
     }
 
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
     if (!params.sslCAFile.empty()) {
         auto ca = uassertStatusOK(loadPEM(params.sslCAFile, "", kLoadPEMStripKeys));
         _clientCA = std::move(ca);
     }
 
     if (!_clientCA) {
-        // No explicit CA was specified, use the Keychain CA explicitly on client connects,
-        // even though we're going to pretend it doesn't exist on server.
+        // No explicit CA was specified, use the Keychain CA explicitly
         ::CFArrayRef certs = nullptr;
         uassertOSStatusOK(SecTrustCopyAnchorCertificates(&certs));
         _clientCA.reset(certs);

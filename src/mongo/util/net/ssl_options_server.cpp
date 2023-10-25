@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/base/error_codes.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/net/ssl_options.h"
@@ -195,13 +196,26 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
 
     const auto clusterAuthMode = serverGlobalParams.startupClusterAuthMode;
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Specifying a tlsClusterCAFile requires a tlsCAFile also be specified. See  "
+                "https://dochub.mongodb.org/core/mongod"
+                "#std-option-mongod.--tlsClusterCAFile for details.",
+                sslGlobalParams.sslClusterCAFile.empty() || !sslGlobalParams.sslCAFile.empty());
+        uassert(ErrorCodes::InvalidOptions,
+                "The use of both a CA File and the System Certificate store is not supported.",
+                !sslGlobalParams.sslUseSystemCA || sslGlobalParams.sslCAFile.empty());
+        uassert(ErrorCodes::InvalidOptions,
+                "The use of TLS without specifying a chain of trust is no longer supported. See "
+                "https://jira.mongodb.org/browse/SERVER-72839 for details.",
+                sslGlobalParams.sslUseSystemCA || !sslGlobalParams.sslCAFile.empty());
+        if (!sslGlobalParams.sslCRLFile.empty() && sslGlobalParams.sslCAFile.empty()) {
+            uasserted(ErrorCodes::BadValue,
+                      "Specifying a tlsCRLFile requires a tlsCAFile also be specified.");
+        }
         bool usingCertifiateSelectors = params.count("net.tls.certificateSelector");
         if (sslGlobalParams.sslPEMKeyFile.size() == 0 && !usingCertifiateSelectors) {
             uasserted(ErrorCodes::BadValue,
                       "need tlsCertificateKeyFile or certificateSelector when TLS is enabled");
-        }
-        if (!sslGlobalParams.sslCRLFile.empty() && sslGlobalParams.sslCAFile.empty()) {
-            uasserted(ErrorCodes::BadValue, "need tlsCAFile with tlsCRLFile");
         }
 
         std::string sslCANotFoundError(

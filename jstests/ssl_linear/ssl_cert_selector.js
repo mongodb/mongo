@@ -20,8 +20,11 @@ requireSSLProvider('windows', function() {
     }
 
     try {
-        const conn = MongoRunner.runMongod(
-            {sslMode: 'requireSSL', sslPEMKeyFile: "jstests\\libs\\trusted-server.pem"});
+        const conn = MongoRunner.runMongod({
+            sslMode: 'requireSSL',
+            sslPEMKeyFile: "jstests\\libs\\trusted-server.pem",
+            setParameter: {tlsUseSystemCA: true},
+        });
 
         const testWithCert = function(certSelector) {
             jsTest.log(`Testing with SSL cert ${certSelector}`);

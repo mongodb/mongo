@@ -126,29 +126,6 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
     }
 #endif
 
-    /*
-     * We did not add the message to startupWarningsLog as the user can not
-     * specify a sslCAFile parameter from the shell
-     */
-    if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled &&
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
-        sslGlobalParams.sslCertificateSelector.empty() &&
-        sslGlobalParams.sslClusterCertificateSelector.empty() &&
-#endif
-        sslGlobalParams.sslCAFile.empty() && sslGlobalParams.sslClusterCAFile.empty()) {
-#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
-        LOGV2_WARNING(22132,
-                      "No client certificate validation can be performed since no CA File or "
-                      "cluster CA File has been provided and no sslCertificateSelector has "
-                      "been specified. Please specify an sslCAFile or a clusterCAFile parameter");
-#else
-        LOGV2_WARNING(
-            22133,
-            "No client certificate validation can be performed since no CA file or cluster CA File "
-            "has been provided. Please specify an sslCAFile or a clusterCAFile parameter");
-#endif
-    }
-
 #if defined(_WIN32) && !defined(_WIN64)
     // Warn user that they are running a 32-bit app on 64-bit Windows
     BOOL wow64Process;
