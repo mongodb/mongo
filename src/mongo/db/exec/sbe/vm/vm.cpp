@@ -7191,7 +7191,7 @@ size_t arrayQueueSize(value::Array* arrayQueue) {
 }
 
 // Initialize an array queue
-std::tuple<value::TypeTags, value::Value> arrayQueueInit(size_t bufferSize = 4) {
+std::tuple<value::TypeTags, value::Value> arrayQueueInit() {
     auto [arrayQueueTag, arrayQueueVal] = value::makeNewArray();
     value::ValueGuard arrayQueueGuard{arrayQueueTag, arrayQueueVal};
     auto arrayQueue = value::getArrayView(arrayQueueVal);
@@ -7199,11 +7199,10 @@ std::tuple<value::TypeTags, value::Value> arrayQueueInit(size_t bufferSize = 4) 
 
     auto [bufferTag, bufferVal] = value::makeNewArray();
     value::ValueGuard bufferGuard{bufferTag, bufferVal};
+
+    // Make the buffer has at least 1 capacity so that the start index will always be valid.
     auto buffer = value::getArrayView(bufferVal);
-    buffer->reserve(bufferSize);
-    for (size_t i = 0; i < bufferSize; ++i) {
-        buffer->push_back(value::TypeTags::Null, 0);
-    }
+    buffer->push_back(value::TypeTags::Null, 0);
 
     bufferGuard.reset();
     arrayQueue->push_back(bufferTag, bufferVal);

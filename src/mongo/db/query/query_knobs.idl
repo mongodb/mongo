@@ -1317,6 +1317,26 @@ server_parameters:
         expr: 8 * 1024 * 1024 # 8MB
     default: 0
 
+  internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast:
+    description: "The window buffer memory sampling in the window stage is performed in an exponential
+    backoff way on the processed records. This setting defines the least sampling frequency."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast"
+    cpp_vartype: AtomicWord<long long>
+    default: 1024
+    validator:
+        gt: 0
+
+  internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast:
+    description: "The window state memory sampling in the window stage is performed in an exponential
+    backoff way for different window frame size. This setting defines the least sampling frequency."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast"
+    cpp_vartype: AtomicWord<long long>
+    default: 1024
+    validator:
+        gt: 0
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

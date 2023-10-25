@@ -124,12 +124,19 @@ size_t WindowStage::getLastSpilledRowId() {
     return _lastRowId - _rows.size();
 }
 
+size_t WindowStage::getWindowFrameSize(size_t windowIdx) {
+    auto& windowIdRange = _windowIdRanges[windowIdx];
+    return (windowIdRange.second + 1) - windowIdRange.first;
+}
+
 size_t WindowStage::getMemoryEstimation() {
-    auto rowMemorySize = _rows.size() * _rowMemoryAvg;
+    size_t rowMemorySize = _windowBufferMemoryEstimator.estimate(_rows.size());
     size_t windowMemorySize = 0;
-    for (auto& windowMemories : _windowMemories) {
-        for (auto memory : windowMemories) {
-            windowMemorySize += memory;
+    for (size_t windowIdx = 0; windowIdx < _windows.size(); ++windowIdx) {
+        size_t frameSize = getWindowFrameSize(windowIdx);
+        for (size_t exprIdx = 0; exprIdx < _windowInitCodes[windowIdx].size(); ++exprIdx) {
+            windowMemorySize +=
+                _windowStateMemoryEstimators[windowIdx][exprIdx].estimate(frameSize);
         }
     }
     return rowMemorySize + windowMemorySize;
@@ -224,12 +231,10 @@ bool WindowStage::fetchNextRow() {
             }
         }
 
-        // Update memory stats for 10% of row samples.
-        if (_rowMemorySampleCount == 0 || _random.nextCanonicalDouble() < 0.1) {
-            auto rowMemorySize = size_estimator::estimate(_rows.back());
-            _rowMemoryAvg = (_rowMemoryAvg * _rowMemorySampleCount + rowMemorySize) /
-                (_rowMemorySampleCount + 1);
-            _rowMemorySampleCount++;
+        // Sample window buffer record memory if needed.
+        if (_windowBufferMemoryEstimator.shouldSample()) {
+            auto memory = size_estimator::estimate(_rows.back());
+            _windowBufferMemoryEstimator.sample(memory);
         }
 
         // Spill if the memory estimation is above threshold.
@@ -259,8 +264,7 @@ void WindowStage::freeRows() {
     _rows.clear();
     _firstRowId = 1;
     _lastRowId = 0;
-    _rowMemorySampleCount = 0;
-    _rowMemoryAvg = 0;
+    _windowBufferMemoryEstimator.reset();
     _recordStore.reset();
     _nextPartitionId = boost::none;
     _isEOF = false;
@@ -396,7 +400,7 @@ void WindowStage::prepare(CompileCtx& ctx) {
     _windowInitCodes.reserve(_windows.size());
     _windowAddCodes.reserve(_windows.size());
     _windowRemoveCodes.reserve(_windows.size());
-    _windowMemories.reserve(_windows.size());
+    _windowStateMemoryEstimators.reserve(_windows.size());
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         auto& window = _windows[windowIdx];
 
@@ -474,9 +478,9 @@ void WindowStage::prepare(CompileCtx& ctx) {
         _windowAddCodes.push_back(std::move(addCodes));
         _windowRemoveCodes.push_back(std::move(removeCodes));
 
-        std::vector<size_t> windowMemories;
-        windowMemories.resize(initExprsSize, 0);
-        _windowMemories.push_back(std::move(windowMemories));
+        std::vector<WindowStateMemoryEstimator> estimators;
+        estimators.resize(initExprsSize);
+        _windowStateMemoryEstimators.push_back(std::move(estimators));
     }
 
     // Prepare slot accessor for the collator.
@@ -508,6 +512,7 @@ void WindowStage::setPartition(int id) {
     for (size_t windowIdx = 0; windowIdx < _windows.size(); windowIdx++) {
         auto& windowAccessors = _outWindowAccessors[windowIdx];
         auto& windowInitCodes = _windowInitCodes[windowIdx];
+        auto& memoryEstimators = _windowStateMemoryEstimators[windowIdx];
 
         for (size_t exprIdx = 0; exprIdx < windowInitCodes.size(); ++exprIdx) {
             if (windowInitCodes[exprIdx]) {
@@ -516,9 +521,7 @@ void WindowStage::setPartition(int id) {
             } else {
                 windowAccessors[exprIdx]->reset();
             }
-
-            auto [tag, val] = windowAccessors[exprIdx]->getViewOfValue();
-            _windowMemories[windowIdx][exprIdx] = size_estimator::estimate(tag, val);
+            memoryEstimators[exprIdx].reset();
         }
     }
 }
@@ -568,7 +571,7 @@ PlanState WindowStage::getNext() {
         auto& windowAccessors = _outWindowAccessors[windowIdx];
         auto& windowAddCodes = _windowAddCodes[windowIdx];
         auto& windowRemoveCodes = _windowRemoveCodes[windowIdx];
-        auto& windowMemories = _windowMemories[windowIdx];
+        auto& windowMemoryEstimators = _windowStateMemoryEstimators[windowIdx];
 
         // Add documents into window.
         for (size_t id = idRange.second + 1;; id++) {
@@ -604,6 +607,17 @@ PlanState WindowStage::getNext() {
                     }
                 }
                 idRange.second = id;
+
+                // Sample window state memory if needed.
+                auto frameSize = getWindowFrameSize(windowIdx);
+                for (size_t exprIdx = 0; exprIdx < windowAddCodes.size(); ++exprIdx) {
+                    auto& memoryEstimator = windowMemoryEstimators[exprIdx];
+                    if (memoryEstimator.shouldSample(frameSize)) {
+                        auto [tag, value] = windowAccessors[exprIdx]->getViewOfValue();
+                        auto memory = size_estimator::estimate(tag, value);
+                        memoryEstimator.sample(frameSize, memory);
+                    }
+                }
             } else {
                 break;
             }
@@ -633,12 +647,6 @@ PlanState WindowStage::getNext() {
                     break;
                 }
             }
-        }
-
-        // Update memory stats for the window state.
-        for (size_t exprIdx = 0; exprIdx < windowAddCodes.size(); ++exprIdx) {
-            auto [tag, val] = windowAccessors[exprIdx]->getViewOfValue();
-            windowMemories[exprIdx] = size_estimator::estimate(tag, val);
         }
 
         // Spill if the memory estimation is above threshold, or the failpoint condition is met.

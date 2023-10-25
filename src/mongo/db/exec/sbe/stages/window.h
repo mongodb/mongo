@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <bit>
+
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -108,6 +110,11 @@ private:
      * Get the last row id either in the buffer or spilled.
      */
     inline size_t getLastRowId();
+
+    /**
+     * Get the window frame size of a particular window.
+     */
+    inline size_t getWindowFrameSize(size_t windowIdx);
 
     /**
      * Fetch the next row into the window buffer, this call may cause spilling when memory
@@ -262,16 +269,118 @@ private:
     std::vector<Record> _records;
     std::vector<SharedBuffer> _recordBuffers;
     std::vector<Timestamp> _recordTimestamps;
-    // The number of memory samples for the rows.
-    size_t _rowMemorySampleCount{0};
-    // The average of memory for the rows calculated from the samples.
-    size_t _rowMemoryAvg{0};
+
+    /**
+     * A memory estimator for the window state. Incrementally calculate the linear regression of the
+     * memory samples of different window frame size. The intervals between sample frame sizes are
+     * increased in a capped exponential backoff fashion.
+     *
+     * https://stats.stackexchange.com/questions/23481/are-there-algorithms-for-computing-running-linear-or-logistic-regression-param
+     */
+    struct WindowStateMemoryEstimator {
+        WindowStateMemoryEstimator() {
+            reset();
+        }
+
+        bool shouldSample(size_t x) {
+            if (x == sampleCheckpoint) {
+                // This checkpoing increment ensures we sample at two's power plus one (1, 2, 3, 5,
+                // 9, ...), becasue some data structures (e.g. std::vector) grows internal memory at
+                // that point.
+                size_t checkPointIncrement = x <= 2 ? static_cast<size_t>(1) : std::bit_floor(x);
+                sampleCheckpoint += std::min(checkPointIncrement, maxSampleCheckpointIncrement);
+                return true;
+            }
+            return false;
+        }
+
+        void sample(size_t x, size_t y) {
+            n += 1;
+            double m = (n - 1) / n;
+            double dx = x - meanX;
+            double dy = y - meanY;
+            varX += (m * dx * dx - varX) / n;
+            covXY += (m * dx * dy - covXY) / n;
+            meanX += dx / n;
+            meanY += dy / n;
+        }
+
+        size_t estimate(size_t x) {
+            // Variance of x will be zero when less than two samples are taken.
+            double a = n <= 1 ? 0 : covXY / varX;
+            double b = meanY - a * meanX;
+            return a * x + b;
+        }
+
+        void reset() {
+            sampleCheckpoint = 1;
+            meanX = 0;
+            meanY = 0;
+            varX = 0;
+            covXY = 0;
+            n = 0;
+        }
+
+        const size_t maxSampleCheckpointIncrement =
+            internalQuerySlotBasedExecutionWindowStateMemorySamplingAtLeast.load();
+        size_t sampleCheckpoint;
+        double meanX;
+        double meanY;
+        double varX;
+        double covXY;
+        double n;
+    };
+
+    /**
+     * A memory estimator for the window buffer. Tracks the mean of each record memory sample. The
+     * samples are taken in a capped exponential backoff fashion.
+     */
+    struct WindowBufferMemoryEstimator {
+        WindowBufferMemoryEstimator() {
+            reset();
+        }
+
+        bool shouldSample() {
+            sampleCounter++;
+            if (sampleCounter == sampleCheckpoint) {
+                sampleCounter = 0;
+                sampleCheckpoint = std::min(sampleCheckpoint * 2, maxSampleCheckpoint);
+                return true;
+            }
+            return false;
+        }
+
+        void sample(size_t y) {
+            n += 1;
+            mean += (y - mean) / n;
+        }
+
+        size_t estimate(size_t x) {
+            return x * mean;
+        }
+
+        void reset() {
+            sampleCounter = 0;
+            sampleCheckpoint = 1;
+            mean = 0;
+            n = 0;
+        }
+
+        const size_t maxSampleCheckpoint =
+            internalQuerySlotBasedExecutionWindowBufferMemorySamplingAtLeast.load();
+        size_t sampleCheckpoint;
+        size_t sampleCounter;
+        double mean;
+        double n;
+    };
+
+    // The memory estimator for the window buffer.
+    WindowBufferMemoryEstimator _windowBufferMemoryEstimator;
     // The memory size for each window accumulator state.
-    std::vector<std::vector<size_t>> _windowMemories;
-    // The random number generator for the row memory sampling.
-    PseudoRandom _random{0};
+    std::vector<std::vector<WindowStateMemoryEstimator>> _windowStateMemoryEstimators;
     // Memory threshold before spilling.
     const size_t _memoryThreshold = internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load();
+
     // The failpoint counter to force spilling, incremented for every window function update,
     // every document.
     long long _failPointSpillCounter{0};
