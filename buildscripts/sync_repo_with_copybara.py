@@ -57,8 +57,6 @@ def main():
     # Create the mongodb-bot.gitconfig file as necessary.
     create_mongodb_bot_gitconfig()
 
-    #TODO: Add bypass Copybara Syncer: 10gen-to-Mongodb
-
     # Set up the Docker command and execute it
     current_dir = os.getcwd()
 
