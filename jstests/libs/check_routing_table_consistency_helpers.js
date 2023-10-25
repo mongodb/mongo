@@ -20,23 +20,24 @@ export var RoutingTableConsistencyChecker = (function() {
             // Group docs in config.chunks by coll UUID (sorting by minKey), then join with docs in
             // config.collections.
             return mongos.getDB('config')
-                                .chunks
-                                .aggregate([
-                                    {$sort: {min: 1}},
-                                    {
-                                        $group: {
-                                            _id: '$uuid',
-                                            routingTable: {$push: '$$ROOT'},
-                                        }
-                                    },
-                                    {$lookup: {
-                                        from: 'collections',
-                                        localField: '_id',
-                                        foreignField: 'uuid',
-                                        as: 'details'
-                                    },
-                                    }
-                                ]);
+                .chunks
+                .aggregate([
+                    { $sort: { min: 1 } },
+                    {
+                        $group: {
+                            _id: '$uuid',
+                            routingTable: { $push: '$$ROOT' },
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'collections',
+                            localField: '_id',
+                            foreignField: 'uuid',
+                            as: 'details'
+                        },
+                    }
+                ]);
         };
 
     const checkCollRoutingTable = (nss, shardKeyPattern, routingTable) => {
@@ -82,132 +83,140 @@ export var RoutingTableConsistencyChecker = (function() {
     };
 
     /**
-     * Reproduces the logic implemented in ShardingCatalogManager::initializePlacementHistory()
-     * to compute the placement of each existing collection and database by reading the content of
-     * - config.collections + config.chunks
-     * - config.databases.
-     * The output format follows the same schema of config.placementHistory; results are ordered by
-     * namespace.
+     * For each existing namespace at the time of the invocation, retrieves metadata (uuid and
+     * placement at shard level) from both its routing table and the information persisted
+     * config.placementHistory, represented as in the following schema:
+     * {
+     *   nss : <string>
+     *   placement: <array of {uuid, shards, source [routing table | placement history] } objects>
+     * }
      **/
-    const buildCurrentPlacementData = (mongos) => {
+    const collectPlacementMetadataByNamespace = (mongos) => {
         const pipeline = [
+            // 1.1  Current placement metadata on existing collections
             {
                 $lookup: {
-                from: "chunks",
-                localField: "uuid",
-                foreignField: "uuid",
-                as: "timestampByShard",
-                pipeline: [
-                    {
-                     $group: {
-                        _id: "$shard",
-                        value: {
-                        $max: "$onCurrentShardSince"
+                    from: "chunks",
+                    localField: "uuid",
+                    foreignField: "uuid",
+                    as: "shardsOwningCollectionChunks",
+                    pipeline: [
+                        {
+                            $group: {
+                                _id: "$shard"
+                            }
                         }
-                    }
-                    }
-                ],
+                    ],
                 }
             },
             {
                 $project: {
-                _id: 0,
-                nss: "$_id",
-                shards: "$timestampByShard._id",
-                uuid: 1,
-                timestamp: {
-                    $max: "$timestampByShard.value"
-                },
+                    _id: 0,
+                    nss: "$_id",
+                    placement: {
+                        source: "routing table",
+                        shards: "$shardsOwningCollectionChunks._id",
+                        uuid: "$uuid",
+                    }
                 }
             },
+            // 1.2 Current placement metadata on existing databases
             {
                 $unionWith: {
-                 coll: "databases",
-                 pipeline: [
-                    {
-                    $project: {
-                        _id: 0,
-                        nss: "$_id",
-                        shards: [
-                        "$primary"
-                        ],
-                        timestamp: "$version.timestamp"
-                    }
-                    }
-                ]
+                    coll: "databases",
+                    pipeline: [
+                        {
+                            $project: {
+                                _id: 0,
+                                nss: "$_id",
+                                placement: {
+                                    source: "routing table",
+                                    shards: [
+                                        "$primary"
+                                    ]
+                                }
+                            }
+                        }
+                    ]
                 }
             },
+            // 2. Outer join with config.placementHistory to retrieve the most recent document 
+            //    for each logged namespace.
             {
-                $sort: {
-                    nss: 1
-                }
-            }
-            ];
-
-        return mongos.getDB('config').collections.aggregate(pipeline);
-    };
-
-    /**
-     * Extracts from config.placementHistory the most recent document for each collection
-     * and database. Results are ordered by namespace.
-     */
-    const getHistoricalPlacementData = (mongos, atClusterTime) => {
-        const kConfigPlacementHistoryInitializationMarker = '';
-        const pipeline = [
-            {
-                $match: {
-                    // Skip documents containing initialization metadata
-                    nss: {$ne: kConfigPlacementHistoryInitializationMarker},
-                    timestamp: {$lte: atClusterTime}
+                $unionWith: {
+                    coll: "placementHistory",
+                    pipeline: [
+                        {
+                            $match: {
+                                // 2.1 The initialization markers of config.placementHistory are skipped.
+                                nss: {
+                                    $ne: ""
+                                }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: "$nss",
+                                placement: {
+                                    $top: {
+                                        output: "$$CURRENT",
+                                        sortBy: {
+                                            "timestamp": -1
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        // 2.2 Namespaces that are recorded as "dropped" are also skipped.      
+                        { $match: { "placement.shards": { $not: { $size: 0 } } } },
+                        {
+                            $project: {
+                                _id: 0,
+                                nss: "$_id",
+                                "placement.uuid": 1,
+                                "placement.shards": 1,
+                                "placement.source": "placement history"
+                            }
+                        }
+                    ]
                 }
             },
+            // 3. Merge current and historical placement metadata on a namespace into a single doc.
             {
                 $group: {
                     _id: "$nss",
-                    placement: {$top: {output: "$$CURRENT", sortBy: {"timestamp": -1}}}
+                    placement: {
+                        $push: "$placement"
+                    }
                 }
-            },
-            // Disregard placement entries on dropped namespaces
-            {$match: {"placement.shards": {$not: {$size: 0}}}},
-            {$replaceRoot: {newRoot: "$placement"}},
-            {$sort: {nss: 1}}
+            }
         ];
-        return mongos.getDB('config').placementHistory.aggregate(pipeline);
+
+        return mongos.getDB('config').collections.aggregate(pipeline,
+                                                            {readConcern: {level: "snapshot"}});
     };
 
     const checkHistoricalPlacementMetadataConsistency = (mongos) => {
-        const placementDataFromRoutingTable = buildCurrentPlacementData(mongos);
-        const now = mongos.getDB('admin').runCommand({isMaster: 1}).operationTime;
-        const historicalPlacementData = getHistoricalPlacementData(mongos, now);
+        const metadataByNamespace = collectPlacementMetadataByNamespace(mongos);
 
-        placementDataFromRoutingTable.forEach(function(nssPlacementFromRoutingTable) {
-            assert(historicalPlacementData.hasNext(),
-                   `Historical placement data on ${nssPlacementFromRoutingTable.nss} is missing`);
-            const historicalNssPlacement = historicalPlacementData.next();
-            assert.eq(nssPlacementFromRoutingTable.nss,
-                      historicalNssPlacement.nss,
-                      'Historical placement data does not contain the expected number of entries');
-            assert.sameMembers(nssPlacementFromRoutingTable.shards,
-                               historicalNssPlacement.shards,
-                               `Inconsistent placement info detected: routing table ${
-                                   tojson(nssPlacementFromRoutingTable)} VS placement history ${
-                                   tojson(historicalNssPlacement)}`);
-
-            assert.eq(nssPlacementFromRoutingTable.uuid,
-                      historicalNssPlacement.uuid,
-                      `Inconsistent placement info detected: routing table ${
-                          tojson(nssPlacementFromRoutingTable)} VS placement history ${
-                          tojson(historicalNssPlacement)}`);
-            // Timestamps are not compared, since they are expected to diverge if a chunk
-            // migration, collection rename or a movePrimary request have been executed during
-            // the test.
+        metadataByNamespace.forEach(function(namespaceMetadata) {
+            // Invariant check.
+            assert(namespaceMetadata.placement.length === 1 ||
+                       namespaceMetadata.placement.length === 2,
+                   `Unexpected output format from collectPlacementMetadataByNamespace(): ${
+                       tojson(namespaceMetadata)}`);
+            // Information missing from either the routing table or placement history.
+            assert(namespaceMetadata.placement.length === 2,
+                   `Incomplete placement metadata for namespace ${
+                       namespaceMetadata._id}. Details: ${tojson(namespaceMetadata)}`);
+            assert.eq(namespaceMetadata.placement[0].uuid,
+                      namespaceMetadata.placement[1].uuid,
+                      `Placement inconsistency detected. Details:  ${tojson(namespaceMetadata)}`);
+            assert.sameMembers(
+                namespaceMetadata.placement[0].shards,
+                namespaceMetadata.placement[1].shards,
+                `Placement inconsistency detected. Details:  ${tojson(namespaceMetadata)}`);
         });
-
-        if (historicalPlacementData.hasNext()) {
-            assert(false,
-                   `Unexpected historical placement entries: ${
-                       tojson(historicalPlacementData.toArray())}`);
-        }
     };
 
     const run = (mongos) => {
