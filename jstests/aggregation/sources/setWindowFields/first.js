@@ -133,54 +133,49 @@ assert.sameMembers(result, [
     {x: 4, y: 5, first: 'VAL'},
 ]);
 
-// TODO SERVER-82204: Uncomment below to test with missing field
-/*
 // Assert NULL is returned if field is missing
 coll.drop();
 assert.commandWorked(coll.insert([
-    {x: 1},
-    {x: 1, y: 3},
-    {x: 2, y: 6},
-    {x: 2, y: 5},
+    {_id: 1, x: 1},
+    {_id: 2, x: 1, y: 3},
+    {_id: 3, x: 2, y: 6},
+    {_id: 4, x: 2, y: 5},
 ]));
 result = coll.aggregate([
                  {
                      $setWindowFields: {
-                         sortBy: {x: 1},
+                         sortBy: {_id: 1},
                          partitionBy: "$x",
                          output: {
                              first: {$first: "$y", window: {documents: [-1, 1]}},
                          }
                      }
                  },
-                 {$unset: "_id"},
              ])
              .toArray();
 assert.sameMembers(result, [
-    {x: 1, first: null},
-    {x: 1, y: 3, first: null},
-    {x: 2, y: 6, first: 6},
-    {x: 2, y: 5, first: 6},
+    {_id: 1, x: 1, first: null},
+    {_id: 2, x: 1, y: 3, first: null},
+    {_id: 3, x: 2, y: 6, first: 6},
+    {_id: 4, x: 2, y: 5, first: 6},
 ]);
 
 // Re-run query with unbounded window
 result = coll.aggregate([
                  {
                      $setWindowFields: {
-                         sortBy: {x: 1},
+                         sortBy: {_id: 1},
                          partitionBy: "$x",
                          output: {
                              first: {$first: "$y", window: {}},
                          }
                      }
                  },
-                 {$unset: "_id"},
              ])
              .toArray();
 assert.sameMembers(result, [
-    {x: 1, first: null},
-    {x: 1, y: 3, first: null},
-    {x: 2, y: 6, first: 6},
-    {x: 2, y: 5, first: 6},
+    {_id: 1, x: 1, first: null},
+    {_id: 2, x: 1, y: 3, first: null},
+    {_id: 3, x: 2, y: 6, first: 6},
+    {_id: 4, x: 2, y: 5, first: 6},
 ]);
-*/

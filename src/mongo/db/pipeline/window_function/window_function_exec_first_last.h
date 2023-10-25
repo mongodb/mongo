@@ -64,18 +64,28 @@ protected:
 
     Value getFirst() {
         auto endpoints = _iter.getEndpoints(_bounds);
-        if (!endpoints)
+        if (!endpoints) {
             return _default;
+        }
         const Document doc = *(_iter)[endpoints->first];
-        return _input->evaluate(doc, &_input->getExpressionContext()->variables);
+        auto result = _input->evaluate(doc, &_input->getExpressionContext()->variables);
+        if (result.missing()) {
+            result = _default;
+        }
+        return result;
     }
 
     Value getLast() {
         auto endpoints = _iter.getEndpoints(_bounds);
-        if (!endpoints)
+        if (!endpoints) {
             return _default;
+        }
         const Document doc = *(_iter)[endpoints->second];
-        return _input->evaluate(doc, &_input->getExpressionContext()->variables);
+        auto result = _input->evaluate(doc, &_input->getExpressionContext()->variables);
+        if (result.missing()) {
+            result = _default;
+        }
+        return result;
     }
 
     void reset() final {}
