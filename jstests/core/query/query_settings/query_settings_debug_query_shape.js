@@ -9,12 +9,7 @@
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
-const qsutils = new QuerySettingsUtils(db, collName);
-
-// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
-// 'querySettings' cluster parameter on mongos from the configsvr.
-const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
-
+let qsutils = new QuerySettingsUtils(db, collName);
 const settings = {
     queryEngineVersion: "v1"
 };
@@ -142,6 +137,3 @@ runTest({
 //         pipeline: [{"$queue": "[]"}],
 //     },
 // });
-
-// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
-clusterParamRefreshSecs.restore();
