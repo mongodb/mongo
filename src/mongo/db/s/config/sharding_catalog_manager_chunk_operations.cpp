@@ -314,9 +314,9 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
                               << "' no longer exists"};
     }
 
-    const CollectionType coll(findCollResponse.getValue().docs[0]);
+    CollectionType coll(findCollResponse.getValue().docs[0]);
     const auto chunksQuery = BSON(ChunkType::collectionUUID << coll.getUuid());
-    const auto version = uassertStatusOK(getMaxChunkVersionFromQueryResponse(
+    auto version = uassertStatusOK(getMaxChunkVersionFromQueryResponse(
         coll,
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -2415,7 +2415,7 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
         return false;
     }();
 
-    const auto configChunksUpdateRequest = [&migratedChunk, &splitChunks, &controlChunk] {
+    auto configChunksUpdateRequest = [&migratedChunk, &splitChunks, &controlChunk] {
         write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
         std::vector<write_ops::UpdateOpEntry> updateEntries;
         updateEntries.reserve(1 + splitChunks->size() + (controlChunk ? 1 : 0));

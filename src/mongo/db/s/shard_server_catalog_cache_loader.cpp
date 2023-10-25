@@ -553,7 +553,7 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(const Databa
     }();
 
     return ExecutorFuture<void>(_executor)
-        .then([this, dbName, isPrimary = std::move(isPrimary), term = std::move(term)]() {
+        .then([this, dbName, isPrimary = isPrimary, term = term]() {
             ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
                             getGlobalServiceContext()->getService(ClusterRole::ShardServer));
             auto context = _contexts.makeOperationContext(*tc);

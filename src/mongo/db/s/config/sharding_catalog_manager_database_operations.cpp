@@ -167,7 +167,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         auto dbObj = client.findOne(NamespaceString::kConfigDatabasesNamespace, dbMatchFilter);
         if (!dbObj.isEmpty()) {
             replClient.setLastOpToSystemLastOpTime(opCtx);
-            return DatabaseType::parse(IDLParserContext("DatabaseType"), std::move(dbObj));
+            return DatabaseType::parse(IDLParserContext("DatabaseType"), dbObj);
         }
 
         if (dbLock) {

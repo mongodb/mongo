@@ -284,7 +284,7 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
                       << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
 
     store.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
-        tasks.push_back(std::move(deletionTask));
+        tasks.push_back(deletionTask);
         return true;
     });
 

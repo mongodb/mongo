@@ -113,7 +113,7 @@ Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
         configsvrSetClusterParameter.toBSON({}),
         Shard::RetryPolicy::kIdempotent);
 
-    return Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse));
+    return Shard::CommandResponse::getEffectiveStatus(cmdResponse);
 }
 
 }  // namespace

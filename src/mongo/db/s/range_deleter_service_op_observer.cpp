@@ -169,7 +169,7 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        opCtx->recoveryUnit()->onCommit([deletedDoc = std::move(deletedDocumentDecoration(args))](
+        opCtx->recoveryUnit()->onCommit([deletedDoc = deletedDocumentDecoration(args)](
                                             OperationContext* opCtx, boost::optional<Timestamp>) {
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);

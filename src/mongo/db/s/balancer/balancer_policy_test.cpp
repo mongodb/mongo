@@ -112,7 +112,7 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
         chunkVersion.incMajor();
         chunkMap[shard.shardId].push_back(std::move(chunk));
 
-        shardStats.push_back(std::move(shard));
+        shardStats.push_back(shard);
     }
 
     return std::make_pair(std::move(shardStats), std::move(chunkMap));

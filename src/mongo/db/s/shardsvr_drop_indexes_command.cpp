@@ -102,7 +102,7 @@ void updateStateForStaleConfigRetry(OperationContext* opCtx,
                    std::inserter(okShardIds, okShardIds.begin()));
 
     retryState->shardsWithSuccessResponses = std::move(okShardIds);
-    retryState->shardSuccessResponses = std::move(response.successResponses);
+    retryState->shardSuccessResponses = response.successResponses;
 }
 
 class ShardsvrDropIndexesCommand final : public TypedCommand<ShardsvrDropIndexesCommand> {

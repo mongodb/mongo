@@ -293,9 +293,9 @@ DDLLockManager::ScopedBaseDDLLock::~ScopedBaseDDLLock() {
 
 DDLLockManager::ScopedBaseDDLLock::ScopedBaseDDLLock(ScopedBaseDDLLock&& other)
     : _resourceName(std::move(other._resourceName)),
-      _resourceId(std::move(other._resourceId)),
+      _resourceId(other._resourceId),
       _reason(std::move(other._reason)),
-      _mode(std::move(other._mode)),
+      _mode(other._mode),
       _result(std::move(other._result)),
       _locker(other._locker),
       _lockManager(other._lockManager) {

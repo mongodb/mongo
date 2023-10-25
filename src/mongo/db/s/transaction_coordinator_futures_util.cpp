@@ -182,7 +182,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                 request,
                 [this,
                  commandObj = std::move(commandObj),
-                 shardId = std::move(shardId),
+                 shardId = shardId,
                  hostTargeted = std::move(hostAndShard.hostTargeted),
                  shard = std::move(hostAndShard.shard),
                  promise = std::make_shared<Promise<ResponseStatus>>(std::move(pf.promise))](
@@ -199,7 +199,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                             getWriteConcernStatusFromCommandResult(args.response.data);
                         shard->updateReplSetMonitor(hostTargeted, writeConcernStatus);
 
-                        promise->emplaceValue(std::move(args.response));
+                        promise->emplaceValue(args.response);
                     } else {
                         promise->setError([&] {
                             if (status == ErrorCodes::CallbackCanceled) {
@@ -275,18 +275,18 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
     return scheduleWork([this, shardId, readPref, operationContextFn](OperationContext* opCtx) {
         operationContextFn(opCtx);
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+        auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
 
         if (MONGO_unlikely(hangWhileTargetingRemoteHost.shouldFail())) {
             LOGV2(22450, "Hit hangWhileTargetingRemoteHost failpoint", "shardId"_attr = shardId);
             hangWhileTargetingRemoteHost.pauseWhileSet(opCtx);
         }
 
-        return shard->getTargeter()
-            ->findHost(readPref, CancellationToken::uncancelable())
+        auto targeter = shard->getTargeter();
+        return targeter->findHost(readPref, CancellationToken::uncancelable())
             .thenRunOn(_executor)
             .unsafeToInlineFuture()
-            .then([shard = std::move(shard)](HostAndPort host) -> HostAndShard {
+            .then([shard = std::move(shard)](HostAndPort host) mutable -> HostAndShard {
                 return {std::move(host), std::move(shard)};
             });
     });

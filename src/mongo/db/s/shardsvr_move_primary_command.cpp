@@ -106,7 +106,7 @@ public:
                     shardRegistry->getShard(opCtx, toShardId),
                     "requested primary shard {} does not exist"_format(toShardId.toString()));
 
-                const auto coordinatorDoc = [&] {
+                auto coordinatorDoc = [&] {
                     MovePrimaryCoordinatorDocument doc;
                     doc.setShardingDDLCoordinatorMetadata(
                         {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});

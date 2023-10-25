@@ -318,7 +318,7 @@ void setAllowMigrations(OperationContext* opCtx,
         );
     try {
         uassertStatusOKWithContext(
-            Shard::CommandResponse::getEffectiveStatus(std::move(swSetAllowMigrationsResult)),
+            Shard::CommandResponse::getEffectiveStatus(swSetAllowMigrationsResult),
             str::stream() << "Error setting allowMigrations to " << allowMigrations
                           << " for collection " << nss.toStringForErrorMsg());
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
@@ -449,9 +449,9 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
         CommandHelpers::appendMajorityWriteConcern(configsvrRemoveTagsCmd.toBSON(osi.toBSON())),
         Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(std::move(swRemoveTagsResult)),
-        str::stream() << "Error removing tags for collection " << nss.toStringForErrorMsg());
+    uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(swRemoveTagsResult),
+                               str::stream() << "Error removing tags for collection "
+                                             << nss.toStringForErrorMsg());
 }
 
 void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONObj& filter) {
@@ -472,7 +472,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(std::move(deleteResult)),
+        Shard::CommandResponse::getEffectiveStatus(deleteResult),
         str::stream() << "Failed to remove query analyzer documents that match the filter"
                       << filter);
 }

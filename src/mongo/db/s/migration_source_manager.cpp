@@ -249,7 +249,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss());
 
-        const auto [metadata, indexInfo] = checkCollectionIdentity(
+        auto [metadata, indexInfo] = checkCollectionIdentity(
             _opCtx, nss(), _args.getEpoch(), _args.getCollectionTimestamp());
 
         UUID collectionUUID = autoColl.getCollection()->uuid();

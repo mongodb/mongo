@@ -179,7 +179,7 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
     const auto reqObj = req.toBSON({});
 
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    const auto responsesFromShards = sharding_util::sendCommandToShards(
+    auto responsesFromShards = sharding_util::sendCommandToShards(
         opCtx, DatabaseName::kAdmin, reqObj, shardIds, executor, false /* throwOnError */);
 
     for (auto&& response : responsesFromShards) {
@@ -192,8 +192,7 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
 
             const ShardsvrGetStatsForBalancingReply reply =
                 ShardsvrGetStatsForBalancingReply::parse(
-                    IDLParserContext("ShardsvrGetStatsForBalancingReply"),
-                    std::move(responseValue.data));
+                    IDLParserContext("ShardsvrGetStatsForBalancingReply"), responseValue.data);
             const auto collStatsFromShard = reply.getStats();
 
             invariant(collStatsFromShard.size() == collections.size());
@@ -267,7 +266,7 @@ public:
      */
     SplitInfoVector done() {
         SplitInfoVector splitPoints;
-        for (const auto& entry : _chunkSplitPoints) {
+        for (auto& entry : _chunkSplitPoints) {
             splitPoints.push_back(std::move(entry.second));
         }
 

@@ -193,7 +193,7 @@ repl::OpTime persistParticipantListBlocking(
             // Update with participant list.
             TransactionCoordinatorDocument doc;
             doc.setId(std::move(sessionInfo));
-            doc.setParticipants(std::move(participantList));
+            doc.setParticipants(participantList);
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(doc.toBSON()));
 
             entry.setUpsert(true);
@@ -488,8 +488,11 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
         [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
         [&scheduler, lsid, txnNumberAndRetryCounter, participants, decision, affectedNamespaces] {
             return scheduler.scheduleWork(
-                [lsid, txnNumberAndRetryCounter, participants, decision, affectedNamespaces](
-                    OperationContext* opCtx) {
+                [lsid,
+                 txnNumberAndRetryCounter,
+                 participants = participants,
+                 decision,
+                 affectedNamespaces = affectedNamespaces](OperationContext* opCtx) mutable {
                     // Do not acquire a storage ticket in order to avoid unnecessary serialization
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.

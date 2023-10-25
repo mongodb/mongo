@@ -664,8 +664,8 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
     return ExecutorFuture<void>(_executor)
         .then([this,
                cmdName,
-               sampledReadCmd =
-                   makeSampledReadCommand(sampleId, nss, filter, collation, letParameters)] {
+               sampledReadCmd = makeSampledReadCommand(
+                   sampleId, nss, filter, collation, letParameters)]() mutable {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
@@ -712,8 +712,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
 
     return ExecutorFuture<void>(_executor)
         .then([this,
-               sampledUpdateCmd =
-                   makeSampledUpdateCommandRequest(originalOpCtx, sampleId, updateCmd, opIndex)]() {
+               sampledUpdateCmd = makeSampledUpdateCommandRequest(
+                   originalOpCtx, sampleId, updateCmd, opIndex)]() mutable {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
@@ -769,8 +769,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
 
     return ExecutorFuture<void>(_executor)
         .then([this,
-               sampledDeleteCmd =
-                   makeSampledDeleteCommandRequest(originalOpCtx, sampleId, deleteCmd, opIndex)]() {
+               sampledDeleteCmd = makeSampledDeleteCommandRequest(
+                   originalOpCtx, sampleId, deleteCmd, opIndex)]() mutable {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
@@ -826,7 +826,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
     return ExecutorFuture<void>(_executor)
         .then([this,
                sampledFindAndModifyCmd = makeSampledFindAndModifyCommandRequest(
-                   originalOpCtx, sampleId, findAndModifyCmd)]() {
+                   originalOpCtx, sampleId, findAndModifyCmd)]() mutable {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 

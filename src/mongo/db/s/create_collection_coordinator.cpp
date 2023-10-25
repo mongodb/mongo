@@ -364,9 +364,8 @@ void cleanupPartialChunksFromPreviousAttempt(OperationContext* opCtx,
         CommandHelpers::appendMajorityWriteConcern(configsvrRemoveChunksCmd.toBSON(osi.toBSON())),
         Shard::RetryPolicy::kIdempotent);
 
-    uassertStatusOKWithContext(
-        Shard::CommandResponse::getEffectiveStatus(std::move(swRemoveChunksResult)),
-        str::stream() << "Error removing chunks matching uuid " << uuid);
+    uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(swRemoveChunksResult),
+                               str::stream() << "Error removing chunks matching uuid " << uuid);
 }
 
 void updateCollectionMetadataInTransaction(OperationContext* opCtx,
@@ -927,7 +926,7 @@ void createCollectionOnNonPrimaryShards(
 
         // If any shards fail to create the collection, fail the entire shardCollection command
         // (potentially leaving incomplely created sharded collection)
-        for (const auto& response : responses) {
+        for (auto&& response : responses) {
             auto shardResponse = uassertStatusOKWithContext(
                 std::move(response.swResponse),
                 str::stream() << "Unable to create collection " << nss.toStringForErrorMsg()

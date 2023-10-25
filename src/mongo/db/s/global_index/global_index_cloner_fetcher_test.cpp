@@ -158,7 +158,7 @@ TEST_F(GlobalIndexClonerFetcherTest, FetcherSortsById) {
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 2 << "sKey" << -300 << "uniq" << 30)));
@@ -202,7 +202,7 @@ TEST_F(GlobalIndexClonerFetcherTest, DocsThatDontBelongToThisShardAreFileteredOu
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 3 << "sKey" << -300 << "uniq" << 30)));
@@ -243,7 +243,7 @@ TEST_F(GlobalIndexClonerFetcherTest, CorrectlyTransformCompoundKeyPatterns) {
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 3 << "sKeyA" << -300 << "sKeyB"
@@ -299,7 +299,7 @@ TEST_F(GlobalIndexClonerFetcherTest, IdGlobalIdxPattern) {
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 3 << "sKey" << -300)));
@@ -338,7 +338,7 @@ TEST_F(GlobalIndexClonerFetcherTest, ShardKeyPatternHasID) {
 
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 3 << "uniq" << 300)));
@@ -376,7 +376,7 @@ TEST_F(GlobalIndexClonerFetcherTest, DocsWithIncompleteFieldsCanStillBeFetched) 
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 2 << "sKey" << 200 << "a" << 20)));
@@ -418,7 +418,7 @@ TEST_F(GlobalIndexClonerFetcherTest, CanFetchDocumentsWithIncompleteShardKey) {
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 1 << "sKeyA" << 1 << "uniq" << 10)));
@@ -456,7 +456,7 @@ TEST_F(GlobalIndexClonerFetcherTest, CanFetchDocumentsWithDottedShardKey) {
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << 1 << "x" << BSON("a" << -1) << "uniq" << 10)));
@@ -494,7 +494,7 @@ TEST_F(GlobalIndexClonerFetcherTest, CanFetchDocumentsWithDottedIdInShardKey) {
         ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
 
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     std::deque<DocumentSource::GetNextResult> mockResults;
     mockResults.emplace_back(Doc(BSON("_id" << BSON("a" << 1 << "b" << -1) << "uniq" << 10)));
@@ -544,7 +544,7 @@ TEST_F(GlobalIndexClonerFetcherTest, FetcherShouldSkipDocsIfResumeIdIsSet) {
 
     fetcher.setResumeId(Value(kRequiresEscapingBSON));
     auto [rawPipeline, expCtx] = fetcher.makeRawPipeline(operationContext());
-    auto pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
 
     {
         auto mockSource = DocumentSourceMock::createForTest(mockResults, pipeline->getContext());

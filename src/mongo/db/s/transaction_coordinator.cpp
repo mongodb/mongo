@@ -132,7 +132,7 @@ ExecutorFuture<void> waitForMajorityWithHangFailpoint(
                     failpoint.pauseWhileSet(opCtx.get());
                 }
 
-                return waitForWC(std::move(opTime));
+                return waitForWC(opTime);
             });
     }
 
@@ -482,10 +482,10 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
 
     _transactionCoordinatorMetricsObserver->onRecoveryFromFailover();
 
-    _participants = std::move(doc.getParticipants());
+    _participants = doc.getParticipants();
     if (doc.getDecision()) {
         _participantsDurable = true;
-        _decision = std::move(doc.getDecision());
+        _decision = doc.getDecision();
     }
     _affectedNamespaces = doc.getAffectedNamespaces().get_value_or({});
 

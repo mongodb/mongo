@@ -319,11 +319,11 @@ struct CommandSubmissionParameters {
     CommandSubmissionParameters(UUID id, const std::shared_ptr<CommandInfo>& commandInfo)
         : id(id), commandInfo(commandInfo) {}
 
-    CommandSubmissionParameters(CommandSubmissionParameters&& rhs)
+    CommandSubmissionParameters(CommandSubmissionParameters&& rhs) noexcept
         : id(rhs.id), commandInfo(std::move(rhs.commandInfo)) {}
 
     const UUID id;
-    const std::shared_ptr<CommandInfo> commandInfo;
+    std::shared_ptr<CommandInfo> commandInfo;
 };
 
 /**

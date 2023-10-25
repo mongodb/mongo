@@ -97,10 +97,10 @@ class DDLLockManager {
         static Milliseconds _getTimeout();
 
         // Attributes
-        const std::string _resourceName;
-        const ResourceId _resourceId;
-        const std::string _reason;
-        const LockMode _mode;
+        std::string _resourceName;
+        ResourceId _resourceId;
+        std::string _reason;
+        LockMode _mode;
         LockResult _result;
         Locker* _locker;
         DDLLockManager* _lockManager;

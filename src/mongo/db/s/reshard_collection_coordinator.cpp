@@ -207,7 +207,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 CommandHelpers::appendMajorityWriteConcern(configsvrReshardCollection.toBSON({}),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
+            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
         }));
 }
 

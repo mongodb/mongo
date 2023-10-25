@@ -275,7 +275,7 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
 
     boost::optional<LastTxnSession> lastTxnSession;
     while (cursor->more()) {
-        const auto txnRecord =
+        auto txnRecord =
             SessionTxnRecord::parse(IDLParserContext("Session migration cloning"), cursor->next());
 
         const auto sessionId = txnRecord.getSessionId();

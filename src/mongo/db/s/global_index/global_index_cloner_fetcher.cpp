@@ -255,7 +255,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_targetAggr
                              Grid::get(opCtx)->catalogCache(),
                              _nss,
                              "targeting donor shards for global index collection cloning"_sd,
-                             [&] { return Pipeline::makePipeline(request, std::move(expCtx)); });
+                             [&] { return Pipeline::makePipeline(request, expCtx); });
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_restartPipeline(

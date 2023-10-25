@@ -359,7 +359,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                                                ChunkRange orphanRange,
                                                Date_t deadline) {
     while (true) {
-        const StatusWith<SharedSemiFuture<void>> swOrphanCleanupFuture =
+        StatusWith<SharedSemiFuture<void>> swOrphanCleanupFuture =
             [&]() -> StatusWith<SharedSemiFuture<void>> {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             const auto self =

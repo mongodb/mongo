@@ -198,7 +198,7 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
         return;
     }
 
-    const auto status = std::move(swResponse.getStatus());
+    const auto status = swResponse.getStatus();
     if (status.code() == ErrorCodes::ConflictingOperationInProgress) {
         // Reschedule auto-merge for <shard, nss> because commit overlapped with other chunk ops
         _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);

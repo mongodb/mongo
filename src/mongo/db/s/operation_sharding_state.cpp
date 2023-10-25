@@ -181,7 +181,7 @@ Status OperationShardingState::waitForCriticalSectionToComplete(
 
 void OperationShardingState::setShardingOperationFailedStatus(const Status& status) {
     invariant(!_shardingOperationFailedStatus);
-    _shardingOperationFailedStatus = std::move(status);
+    _shardingOperationFailedStatus = status;
 }
 
 boost::optional<Status> OperationShardingState::resetShardingOperationFailedStatus() {

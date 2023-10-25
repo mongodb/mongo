@@ -513,7 +513,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinatorPre71Compatible::_runImp
                         configsvrRefineCollShardKey.toBSON({}), opCtx->getWriteConcern()),
                     Shard::RetryPolicy::kIdempotent));
 
-                uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
+                uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
             auto opCtxHolder = cc().makeOperationContext();

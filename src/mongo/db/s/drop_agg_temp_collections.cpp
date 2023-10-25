@@ -76,7 +76,7 @@ void dropAggTempCollections(OperationContext* opCtx) {
     std::vector<NamespaceString> tempCollectionsToDrop;
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
-        const NamespaceString nss = NamespaceStringUtil::deserialize(
+        NamespaceString nss = NamespaceStringUtil::deserialize(
             boost::none, doc.getField("_id").String(), SerializationContext::stateDefault());
         tempCollectionsToDrop.emplace_back(std::move(nss));
     }
