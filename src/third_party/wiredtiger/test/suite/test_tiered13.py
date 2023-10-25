@@ -145,7 +145,7 @@ class test_tiered13(test_import_base, TieredConfigMixin):
         # we cannot tell it was a tiered table until we read in the root page.
         # Only test this in diagnostic mode which has an assertion.
         #
-        # FIXME-8644 There is an error path bug in wt_bm_read preventing this from
+        # FIXME-WT-8644 There is an error path bug in wt_bm_read preventing this from
         # working correctly although the code to return an error is in the code.
         # Uncomment these lines when that bug is fixed.
 

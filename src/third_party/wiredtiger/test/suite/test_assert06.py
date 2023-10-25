@@ -63,9 +63,6 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         ds = SimpleDataSet(
             self, 'file:notused', 10, key_format=self.key_format, value_format=self.value_format)
 
-        cfg_on = 'write_timestamp_usage=ordered'
-        cfg_off = 'write_timestamp_usage=none'
-
         # Create a few items with and without timestamps.
         # Then alter the setting and verify the inconsistent usage is detected.
         uri = 'file:assert06'
@@ -105,7 +102,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         # file will fail with EBUSY.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2))
         c.close()
-        self.session.alter(uri, cfg_on)
+        self.session.alter(uri, 'write_timestamp_usage=ordered')
         c = self.session.open_cursor(uri)
 
         # Update at timestamp 5, then detect not using a timestamp.
