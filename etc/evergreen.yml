@@ -60,6 +60,7 @@ include:
 - filename: etc/evergreen_yml_components/variants/ninja.yml
 - filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
 - filename: etc/evergreen_yml_components/variants/config_shard.yml
+- filename: etc/evergreen_yml_components/perf_tasks.yml
 
 variables:
 
@@ -302,6 +303,73 @@ parameters:
 #            Buildvariants            #
 #######################################
 buildvariants:
+
+- <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: perf-1-node-replSet.arm.aws.2023-09
+  display_name: PERF 1-Node ReplSet ARM AWS 2023-09
+  # Leave off for now
+  modules:
+    - enterprise
+    - dsi
+    - genny
+    - workloads
+    - linkbench
+    - linkbench2
+    - tsbs
+    - YCSB
+    - PrivateWorkloads
+    - flamegraph
+  expansions:
+    <<: *linux_arm64_generic_expansions
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    has_packages: false
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    mongodb_setup_release: 2022-11
+    mongodb_setup: single-replica
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: single
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: dsi
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: *amazon_linux2_arm64_compile_variant_name
+  run_on:
+    - rhel70-small
+  tasks:
+  - name: industry_benchmarks
+  - name: ycsb_60GB
+  - name: ycsb_60GB.long
+  - name: crud_workloads_majority
+  - name: misc_workloads
+  - name: map_reduce_workloads
+  - name: smoke_test
+  - name: canaries_only
+  - name: non_sharded_workloads
+  # - name: bestbuy_agg
+  # - name: bestbuy_agg_merge_different_db
+  # - name: bestbuy_agg_merge_same_db
+  # - name: bestbuy_agg_merge_wordcount
+  # - name: bestbuy_query
+  - name: change_streams_latency
+  - name: change_streams_listen_throughput
+  - name: snapshot_reads
+  - name: linkbench
+  - name: linkbench2
+  - name: tsbs_load
+  # - name: tsbs_query
+  # - name: tsbs_query_finance
+  - name: tsbs_query_manual_bucketing
+  # - name: tsbs_query_fixed_bucketing
+  # - name: tpcc
+  # - name: tpcc_majority
+  # - name: tpch_1_normalized
+  # - name: tpch_1_denormalized
+  # - name: tpch_10_normalized
+  # - name: tpch_10_denormalized
 
 ###########################################
 #         Linux buildvariants             #

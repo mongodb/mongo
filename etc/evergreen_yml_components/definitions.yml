@@ -88,6 +88,18 @@ modules:
   repo: git@github.com:10gen/workloads.git
   prefix: ${workdir}/src
   branch: master
+- name: linkbench
+  repo: git@github.com:10gen/linkbench.git
+  prefix: ${workdir}/src
+  branch: master
+- name: linkbench2
+  repo: git@github.com:10gen/linkbench2.git
+  prefix: ${workdir}/src
+  branch: master
+- name: tsbs
+  repo: git@github.com:mongodb-forks/tsbs.git
+  prefix: ${workdir}/src
+  branch: main
 - name: YCSB
   repo: git@github.com:mongodb-labs/YCSB.git
   prefix: ${workdir}/src
@@ -475,9 +487,13 @@ functions:
         wtdevelop: ${wtdevelop_rev}
         dsi: ${dsi_rev}
         genny: ${genny_rev}
+        linkbench: ${linkbench_rev}
+        linkbench2: ${linkbench2_rev}
+        tsbs: ${tsbs_rev}
         workloads: ${workloads_rev}
         YCSB: ${YCSB_rev}
         flamegraph: ${flamegraph_rev}
+        PrivateWorkloads: ${PrivateWorkloads_rev}
 
   # Get get the mongo repo, no modules. Useful for inspecting the commit history with the
   # `git` Python tool.
@@ -1621,6 +1637,60 @@ functions:
       args:
       - "./src/evergreen/jepsen_docker/cleanup.sh"
 
+  "f_dsi_pre_run":
+  - command: manifest.load
+  - command: expansions.update
+    params:
+      updates: []
+
+  "f_dsi_post_run":
+  - command: shell.exec
+    params:
+      script: ./src/dsi/run-dsi post_run
+  - command: perf.send
+    params:
+      file: ./build/CedarReports/cedar_report.json
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      bucket: genny-metrics
+      region: us-east-1
+      prefix: ${task_id}_${execution}
+  - command: attach.results
+    params:
+      file_location: ./build/EvergreenResultsJson/results.json
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: ./build/Artifacts/DSIArtifacts.tgz
+      remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/x-gzip
+      display_name: DSI Artifacts - Execution ${execution}
+  # TODO: https://jira.mongodb.org/browse/EVG-21107
+  #  - command: s3.put
+  #     params:
+  #       aws_key: ${aws_key}
+  #       aws_secret: ${aws_secret}
+  #       local_file: ./build/Documentation/index.html
+  #       remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-index.html
+  #       bucket: mciuploads
+  #       permissions: public-read
+  #       content_type: text/html
+  #       display_name: Documentation
+  # TODO https://jira.mongodb.org/browse/PERF-4829
+  #   - command: s3.put
+  #     params:
+  #       aws_key: ${aws_key}
+  #       aws_secret: ${aws_secret}
+  #       local_file: bootstrap.yml
+  #       remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/bootstrap-${task_name}-${build_id}-${execution}.yml
+  #       bucket: mciuploads
+  #       permissions: public-read
+  #       content_type: text/plain
+  #       display_name: Task Bootstrap Config
+
   "run jepsen test":
   - *f_expansions_write
   - command: subprocess.exec
@@ -2660,6 +2730,7 @@ functions:
 pre:
 - func: "set task expansion macros"
 - func: "f_expansions_write"
+- func: "f_dsi_pre_run"
 
 # Post task steps
 post:
@@ -2689,6 +2760,7 @@ post:
 - func: "cleanup FUSE watchdog"
 - func: "cleanup environment"
 - func: "cleanup jepsen docker test"
+- func: "f_dsi_post_run"
 
 # Timeout steps
 timeout:

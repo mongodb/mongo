@@ -1,0 +1,538 @@
+functions:
+  f_dsi_run_workload:
+    - command: git.get_project
+      params:
+        directory: src/mongo
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
+          workloads: ${workloads_rev}
+          YCSB: ${YCSB_rev}
+          flamegraph: ${flamegraph_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi run_workload
+    - command: shell.exec
+      type: system
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m SYSTEM
+    - command: shell.exec
+      type: setup
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m SETUP
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m TEST
+
+  ## Schedule Tasks ##
+  f_schedule_tasks:
+    - command: git.get_project
+      params:
+        directory: src/mongo
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          workloads: ${workloads_rev}
+          YCSB: ${YCSB_rev}
+          py-tpcc: ${py-tpcc_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks}
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
+
+  ## DSI_SELFTEST ##
+  dsi_selftest_setup_tests:
+    - command: git.get_project
+      params:
+        directory: src/dsi
+  dsi_selftest_check_python_formatting:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/check-format-python.sh
+  dsi_selftest_lint_python_scripts:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/lint-python.sh
+  dsi_selftest_lint_yml:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/lint-yml.sh
+  dsi_selftest_pytest:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/pytest.sh
+  dsi_selftest_mypy:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/mypy.sh
+  dsi_selftest_shellcheck:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi selftest testscripts/lint-shell.sh
+  dsi_selftest_e2e:
+    - command: shell.exec
+      type: test
+      params:
+        script: ./src/dsi/run-dsi e2e_test
+
+tasks:
+  ###
+  # Same in every DSI project
+  - name: schedule_global_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: all_tasks
+  - name: schedule_variant_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: variant_tasks
+  - name: schedule_patch_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: patch_tasks
+  - name: smoke_test
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: short
+  - name: smoke_test_ssl
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: short
+          mongodb_setup: replica-ssl
+          infrastructure_provisioning: replica
+  - name: smoke_test_standalone_auth
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: short
+          mongodb_setup: standalone-auth
+          infrastructure_provisioning: single
+  - name: smoke_test_replset_auth
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: short
+          mongodb_setup: replica-auth
+          infrastructure_provisioning: replica
+  - name: smoke_test_shard_lite_auth
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: short
+          mongodb_setup: shard-lite-auth
+          infrastructure_provisioning: shard-lite
+  - name: dsi_integ_test_run_command_simple
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: run_command_simple
+
+  - name: renew_ssl_cert
+    commands:
+      - command: git.get_project
+        params:
+          directory: src/mongo
+          revisions:
+            dsi: ${dsi_rev}
+      # Run the script to generate ssl cert files
+      - command: shell.exec
+        params:
+          script: AWS_ACCESS_KEY_ID=${perf_terraform_key} AWS_SECRET_ACCESS_KEY=${terraform_secret} ./src/dsi/run-dsi generate_ssl_cert
+      # Upload files for further DSI usage
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: member.pem
+          # path to the remote file is intended to be static
+          remote_file: dsi/ssl/member.pem
+          bucket: mciuploads
+          # the visibility has to be public for consumption by DSI
+          permissions: public-read
+          content_type: text/plain
+          display_name: member.pem
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: root.crt
+          # path to the remote file is intended to be static
+          remote_file: dsi/ssl/root.crt
+          bucket: mciuploads
+          # the visibility has to be public for consumption by DSI
+          permissions: public-read
+          content_type: text/plain
+          display_name: root.crt
+
+  - name: industry_benchmarks
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb"
+
+  - name: ycsb_60GB
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-60GB"
+
+  - name: ycsb_60GB.long
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-60GB.long"
+
+  - name: linkbench
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench"
+
+  - name: linkbench_stepdowns
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench_stepdowns"
+
+  - name: linkbench_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench_rolling_restarts"
+
+  - name: linkbench_non_retryable_writes_stepdowns
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench_non_retryable_writes_stepdowns"
+
+  - name: linkbench_non_retryable_writes_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench_non_retryable_writes_rolling_restarts"
+
+  - name: linkbench2
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "linkbench2"
+          additional_tfvars: "tags: {expire-on-delta: 12}"
+
+  - name: tsbs_load
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_load"
+
+  - name: tsbs_query
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query"
+
+  - name: tsbs_query_finance
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_finance"
+
+  - name: tsbs_query_high_cardinality
+    priority: 5
+    exec_timeout_secs: 432000 # 5 days
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_high_cardinality"
+
+  - name: tsbs_query_sharded
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_sharded"
+
+  - name: tsbs_query_finance_sharded
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_finance_sharded"
+
+  - name: tsbs_query_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_sharded_balancer"
+
+  - name: tsbs_query_finance_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_finance_sharded_balancer"
+
+  - name: tsbs_query_manual_bucketing
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_manual_bucketing"
+
+  - name: tsbs_query_fixed_bucketing
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_fixed_bucketing"
+
+  - name: tpcc
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpcc"
+
+  - name: tpcc_majority
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpcc_majority"
+
+  - name: crud_workloads_w1
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "crud_workloads_w1.2023-02"
+
+  - name: crud_workloads_majority
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "crud_workloads_majority"
+
+  - name: misc_workloads
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "misc_workloads"
+
+  - name: map_reduce_workloads
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "map_reduce_workloads"
+
+  - name: canaries_only
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: canaries
+
+  - name: non_sharded_workloads
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "non_sharded"
+
+  - name: bestbuy_agg
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_agg"
+
+  - name: bestbuy_agg_merge_same_db
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_agg_merge_same_db"
+
+  - name: bestbuy_agg_merge_different_db
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_agg_merge_different_db"
+
+  - name: bestbuy_agg_merge_target_hashed
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_agg_merge_target_hashed"
+
+  - name: bestbuy_agg_merge_wordcount
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_agg_merge_wordcount"
+
+  - name: bestbuy_query
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_query"
+
+  - name: bestbuy_4_analytics
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_analytics"
+          test_control_params: |
+            {scale: 4,
+             columnstore: false}
+
+  - name: bestbuy_4_analytics_columnstore
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "bestbuy_analytics"
+          test_control_params: |
+            {scale: 4,
+             columnstore: true}
+
+  - name: change_streams_latency
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "change_streams_latency"
+
+  - name: change_streams_preimage_throughput
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "change_streams_preimage_throughput"
+
+  - name: change_streams_preimage_latency
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "change_streams_preimage_latency"
+
+  - name: change_streams_listen_throughput
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "change_streams_listen_throughput"
+
+  - name: change_streams_multi_mongos
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "change_streams_multi_mongos"
+
+  - name: snapshot_reads
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "snapshot_reads"
+
+  - name: tpch_1_normalized
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 1,
+             schema: normalized}
+
+  - name: tpch_1_denormalized
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 1,
+             schema: denormalized}
+
+  - name: tpch_10_normalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: normalized}
+
+  - name: tpch_10_denormalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized}
