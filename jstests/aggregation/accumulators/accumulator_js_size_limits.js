@@ -1,5 +1,8 @@
 // Test several different kinds of size limits on user-defined (Javascript) accumulators.
-// @tags: [resource_intensive]
+// @tags: [
+//   requires_scripting,
+//   resource_intensive,
+// ]
 const coll = db.accumulator_js_size_limits;
 
 function runExample(groupKey, accumulatorSpec, aggregateOptions = {}) {

@@ -1,5 +1,9 @@
 // Tests basic functionality of the $_internalJsReduce accumulator, which provides capability for
 // the reduce stage of MapReduce.
+//
+// @tags: [
+//   requires_scripting,
+// ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 db.js_reduce.drop();

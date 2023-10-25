@@ -3,6 +3,7 @@
  * @tags: [
  *   # Needed as $densify is a 51 feature.
  *   requires_fcv_51,
+ *   not_allowed_with_security_token,
  * ]
  */
 

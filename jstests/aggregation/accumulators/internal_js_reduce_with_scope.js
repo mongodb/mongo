@@ -2,7 +2,10 @@
 // specified in runtimeConstants.
 //
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
-// @tags: [assumes_unsharded_collection]
+// @tags: [
+//   assumes_unsharded_collection,
+//   requires_scripting,
+// ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.js_reduce_with_scope;

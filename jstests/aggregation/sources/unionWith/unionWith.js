@@ -1,5 +1,9 @@
 /**
  * Tests $unionWith with various levels of nesting and stages.
+ *
+ * @tags: [
+ *   not_allowed_with_security_token,
+ * ]
  */
 
 import "jstests/libs/sbe_assert_error_override.js";

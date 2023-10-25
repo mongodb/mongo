@@ -25,16 +25,6 @@ selector:
   # failed on: For index scan, total scannedObjects should be sum of
   # (total documents in local collection + total matched documents in foreign collection)
   - jstests/aggregation/sources/lookup/lookup_query_stats.js
-  # runs scripting engine
-  - jstests/aggregation/expressions/internal_js_emit_with_scope.js
-  - jstests/aggregation/agg_infinite_recursion.js
-  - jstests/aggregation/sources/unionWith/unionWith_maxTimeMS.js
-  - jstests/aggregation/accumulators/internal_js_reduce.js
-  - jstests/aggregation/accumulators/internal_js_reduce_with_scope.js
-  - jstests/aggregation/accumulators/accumulator_js_size_limits.js
-  - jstests/aggregation/expressions/expression_function.js
-  - jstests/aggregation/accumulators/accumulator_js.js
-  - jstests/aggregation/expressions/internal_js_emit.js
   # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
   - jstests/aggregation/view_resolution_namespace_collision.js
   # failed on: Test $merge implicitly creates a new database when the target collection's database doesn't exist.

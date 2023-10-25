@@ -11,6 +11,7 @@
 //   requires_collstats,
 //   requires_pipeline_optimization,
 //   requires_persistence,
+//   not_allowed_with_security_token,
 // ]
 import "jstests/libs/sbe_assert_error_override.js";
 

@@ -15,6 +15,7 @@
  *   # Index filter commands do not support causal consistency.
  *   does_not_support_causal_consistency,
  *   requires_fcv_63,
+ *   not_allowed_with_security_token,
  * ]
  */
 

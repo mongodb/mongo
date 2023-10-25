@@ -1,7 +1,10 @@
 // Cannot implicitly shard accessed collections because the coll.stats() output from a mongod when
 // run against a sharded collection is wrapped in a "shards" object with keys for each shard.
-// @tags: [assumes_unsharded_collection]
-
+// @tags: [
+//   assumes_unsharded_collection,
+//   not_allowed_with_security_token,
+// ]
+//
 // This test is designed to stress $sample, and any optimizations a storage engine might provide.
 //
 // A $sample stage as the first stage in a pipeline should ideally have a uniform distribution, so

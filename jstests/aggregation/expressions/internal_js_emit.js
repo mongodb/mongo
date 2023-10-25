@@ -1,5 +1,9 @@
 // Tests basic functionality of the $_internalJsEmit expression, which provides capability for the
 // map stage of MapReduce.
+//
+// @tags: [
+//   requires_scripting,
+// ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.js_emit_expr;

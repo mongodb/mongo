@@ -1,7 +1,10 @@
 /**
  * This test ensures that stages dependent on a let variable optimizing to a constant in a $lookup
  * pipeline are evaluated correctly.
- * @tags: [requires_pipeline_optimization]
+ * @tags: [
+ *   requires_pipeline_optimization,
+ *   not_allowed_with_security_token,
+ * ]
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";

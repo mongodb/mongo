@@ -13,6 +13,7 @@
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
 //   requires_profiling,
+//   not_allowed_with_security_token,
 // ]
 import {isWiredTiger} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {

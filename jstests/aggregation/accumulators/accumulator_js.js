@@ -1,4 +1,8 @@
 // Test the behavior of user-defined (Javascript) accumulators.
+//
+// @tags: [
+//   requires_scripting,
+// ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 db.accumulator_js.drop();

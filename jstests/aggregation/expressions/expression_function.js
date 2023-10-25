@@ -1,4 +1,8 @@
 // Tests basic functionality of the $function expression.
+//
+// @tags: [
+//   requires_scripting,
+// ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 const coll = db.expression_function;

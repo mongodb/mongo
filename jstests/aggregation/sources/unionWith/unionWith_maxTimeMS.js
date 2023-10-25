@@ -1,7 +1,8 @@
-/**
- * Tests that maxTimeMS is respected even in an inner $unionWith pipeline.
- */
-
+// Tests that maxTimeMS is respected even in an inner $unionWith pipeline.
+//
+// @tags: [
+//   requires_scripting,
+// ]
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
 collA.drop();

@@ -4,6 +4,7 @@
  *   requires_fcv_53,
  *   requires_pipeline_optimization,
  *   do_not_wrap_aggregations_in_facets,
+ *   not_allowed_with_security_token,
  * ]
  */
 

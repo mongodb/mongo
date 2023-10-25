@@ -4,6 +4,7 @@
 // Do not run in sharded passthroughs since 'runtimeConstants' is disallowed on mongos.
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_scripting,
 // ]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 

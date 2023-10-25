@@ -1,6 +1,10 @@
 /**
  * Test that DocumentSourceSetWindowFields errors when using more than the perscribed amount of
  * data. Memory checks are per node, so only test when the data is all in one place.
+ *
+ * @tags: [
+ *   not_allowed_with_security_token,
+ * ]
  */
 
 import "jstests/libs/sbe_assert_error_override.js";
