@@ -144,7 +144,7 @@ commands:
   moveCollection:
     description: "The public command on mongos that moves one unsharded collection from source to destination shard."
     command_name: moveCollection
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: namespacestring
@@ -157,7 +157,7 @@ commands:
   unshardCollection:
     description: "The public command on mongos to unshard a sharded collection."
     command_name: unshardCollection
-    strict: false
+    strict: true
     namespace: type
     api_version: ""
     type: namespacestring
