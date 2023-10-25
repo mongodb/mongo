@@ -8,6 +8,8 @@ import stat
 import typing
 import urllib.request
 
+import mongo.generators as mongo_generators
+
 BAZELISK_PATH = None  # Absolute path to Bazelisk executable (determined in generate(), below)
 
 
@@ -158,6 +160,13 @@ def generate(env):
             compiler_args += ["--//bazel/config:use_libunwind"]
 
         global BAZEL_RUNNER
+        if env.GetOption("release") is not None:
+            build_mode = "release"
+        elif env.GetOption("dbg") == "on":
+            build_mode = "dbg"
+        else:
+            build_mode = f"opt_{mongo_generators.get_opt_options(env)}"  # one of "on", "size", "debug"
+        compiler_args.append(f"--//bazel/config:build_mode={build_mode}")
         BAZEL_RUNNER.set_compile_args(compiler_args)
         BAZEL_RUNNER.set_link_args(
             ["--dynamic_mode=off"] if static_link else ["--dynamic_mode=fully"])

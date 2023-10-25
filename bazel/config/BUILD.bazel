@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "compiler_type", "use_libunwind")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -24,7 +24,6 @@ config_setting(
         "//bazel/config:compiler_type": "gcc",
     },
 )
-
 
 # --------------------------------------
 # Architecture + OS combinations
@@ -70,34 +69,143 @@ config_setting(
     ],
 )
 
-# --------------------------------------
-# Compilation modes
-# --------------------------------------
+# ==========
+# build_mode
+# ==========
+
+build_mode(
+    name = "build_mode",
+    build_setting_default = "dbg",
+)
 
 config_setting(
-    name = "opt",
-    values = {"compilation_mode": "opt"},
+    name = "opt_on",
+    flag_values = {"//bazel/config:build_mode": "opt_on"},
+)
+
+config_setting(
+    name = "opt_off",
+    flag_values = {"//bazel/config:build_mode": "opt_off"},
+)
+
+config_setting(
+    name = "opt_debug",
+    flag_values = {"//bazel/config:build_mode": "opt_debug"},
+)
+
+config_setting(
+    name = "opt_size",
+    flag_values = {"//bazel/config:build_mode": "opt_size"},
 )
 
 config_setting(
     name = "dbg",
-    values = {"compilation_mode": "dbg"},
+    flag_values = {"//bazel/config:build_mode": "dbg"},
+)
+
+config_setting(
+    name = "release",
+    flag_values = {"//bazel/config:build_mode": "release"},
 )
 
 config_setting(
     name = "linux_dbg",
-    values = {"compilation_mode": "dbg"},
     constraint_values = [
         "@platforms//os:linux",
     ],
+    flag_values = {"//bazel/config:build_mode": "dbg"},
+)
+
+config_setting(
+    name = "linux_opt_on",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_on"},
+)
+
+config_setting(
+    name = "linux_opt_off",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_off"},
+)
+
+# TODO(SERVER-80614): Revisit why we need "optimized + debug" in the first place.
+# Note that we have an unusual setting of "optimized + debug"
+config_setting(
+    name = "linux_opt_debug",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_debug"},
+)
+
+config_setting(
+    name = "linux_opt_size",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_size"},
+)
+
+config_setting(
+    name = "linux_release",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {"//bazel/config:build_mode": "release"},
 )
 
 config_setting(
     name = "windows_dbg",
-    values = {"compilation_mode": "dbg"},
     constraint_values = [
         "@platforms//os:windows",
     ],
+    flag_values = {"//bazel/config:build_mode": "dbg"},
+)
+
+config_setting(
+    name = "windows_opt_on",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_on"},
+)
+
+config_setting(
+    name = "windows_opt_off",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_off"},
+)
+
+# TODO(SERVER-80614): Revisit why we need "optimized + debug" in the first place.
+# Note that we have an unusual setting of "optimized + debug"
+config_setting(
+    name = "windows_opt_debug",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_debug"},
+)
+
+config_setting(
+    name = "windows_opt_size",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {"//bazel/config:build_mode": "opt_size"},
+)
+
+config_setting(
+    name = "windows_release",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {"//bazel/config:build_mode": "release"},
 )
 
 # --------------------------------------
