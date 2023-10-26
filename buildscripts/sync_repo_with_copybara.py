@@ -118,10 +118,20 @@ def main():
 
     try:
         run_command(" ".join(docker_cmd))
-    except subprocess.CalledProcessError as e:
-        # Handle the specific error case for "No new changes..." between two repos
-        if "No new changes to import for resolved ref" not in str(e.stderr):
-            raise
+    except subprocess.CalledProcessError as err:
+        error_message = str(err.stderr)
+        acceptable_error_messages = [
+            # Indicates the two repositories are identical
+            "No new changes to import for resolved ref",
+            # Indicates differences exist but no changes affect the destination, for example: exclusion rules
+            "Iterative workflow produced no changes in the destination for resolved ref",
+        ]
+
+        if any(acceptable_message in error_message
+               for acceptable_message in acceptable_error_messages):
+            return
+
+        raise
 
 
 if __name__ == "__main__":
