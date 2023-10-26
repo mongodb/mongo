@@ -133,15 +133,14 @@ public:
      * client.
      */
     static void assertMatchingDbVersion(OperationContext* opCtx, const DatabaseName& dbName);
-    static void assertMatchingDbVersion(OperationContext* opCtx,
-                                        const DatabaseName& dbName,
-                                        const DatabaseVersion& receivedVersion);
+    void assertMatchingDbVersion(OperationContext* opCtx,
+                                 const DatabaseVersion& receivedVersion) const;
 
     /**
      * Checks that the current shard server is the primary for the given database, throwing
      * `IllegalOperation` if not.
      */
-    static void assertIsPrimaryShardForDb(OperationContext* opCtx, const DatabaseName& dbName);
+    void assertIsPrimaryShardForDb(OperationContext* opCtx) const;
 
     /**
      * Returns the name of the database related to the current sharding state.

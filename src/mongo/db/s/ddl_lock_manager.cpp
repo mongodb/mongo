@@ -202,7 +202,9 @@ DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* o
           opCtx, opCtx->lockState(), db, reason, mode, true /*waitForRecovery*/) {
 
     // Check under the DDL dbLock if this is the primary shard for the database
-    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, db);
+    Lock::DBLock dbLock(opCtx, db, MODE_IS);
+    const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, db);
+    scopedDss->assertIsPrimaryShardForDb(opCtx);
 }
 
 DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContext* opCtx,
@@ -218,7 +220,12 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContex
                     true /*waitForRecovery*/);
 
     // Check under the DDL db lock if this is the primary shard for the database
-    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns.dbName());
+    {
+        Lock::DBLock dbLock(opCtx, ns.dbName(), MODE_IS);
+        const auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, ns.dbName());
+        scopedDss->assertIsPrimaryShardForDb(opCtx);
+    }
 
     // Finally, acquire the collection DDL lock
     _collLock.emplace(opCtx, opCtx->lockState(), ns, reason, mode, true /*waitForRecovery*/);
