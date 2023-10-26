@@ -9,3 +9,4 @@ flask == 1.1.1
 itsdangerous == 2.0.0
 Werkzeug == 2.0.3
 ocspbuilder == 0.10.2
+PyGithub == 1.53
