@@ -76,6 +76,17 @@ int upsertToRecordStore(OperationContext* opCtx,
                         const value::MaterializedRow& val,
                         const key_string::TypeBits& typeBits,
                         bool update);
+/**
+ * When a collator is provided, the key is encoded using the collator before being converted to a
+ * record id. In this case, it is not possible to recover the key from the record id, thus we need
+ * to store the original value of the key as well.
+ */
+int upsertToRecordStore(OperationContext* opCtx,
+                        RecordStore* rs,
+                        const RecordId& recordKey,
+                        const value::MaterializedRow& key,
+                        const value::MaterializedRow& val,
+                        bool update);
 int upsertToRecordStore(OperationContext* opCtx,
                         RecordStore* rs,
                         const RecordId& key,
