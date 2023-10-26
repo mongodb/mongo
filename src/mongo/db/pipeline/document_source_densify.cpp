@@ -432,6 +432,7 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::processFirstDocForE
         case ValComparedToRange::kRangeMin: {
             _densifyState = DensifyState::kNeedGen;
             _current = val;
+            setPartitionValue(doc);
             return doc;
         }
         case ValComparedToRange::kBelow: {

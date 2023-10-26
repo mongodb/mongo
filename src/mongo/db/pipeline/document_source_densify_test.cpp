@@ -857,6 +857,161 @@ TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeStar
     ASSERT_FALSE(next.isAdvanced());
 }
 
+TEST_F(DensifyExplicitNumericTest,
+       CorrectlyDensifiesForPartionedRangeStartingBeforeBoundsRangeWithDocMatchingBoundsStart) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        "b",
+        std::list<FieldPath>({"a"}),
+        RangeStatement(Value(1), ExplicitBounds(Value(4), Value(8)), boost::none));
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 1, b: 2}", "{a: 1, b: 4}", "{a: 1, b: 6}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(4, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(5, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(6, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(7, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
+TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForPartionedRangeAcrossTwoPartitions) {
+    auto densify = DocumentSourceInternalDensify(
+        getExpCtx(),
+        "b",
+        std::list<FieldPath>({"a"}),
+        RangeStatement(Value(1), ExplicitBounds(Value(0), Value(10)), boost::none));
+    auto source = DocumentSourceMock::createForTest(
+        {"{a: 1, b: 2}", "{a: 2, b: 5}", "{a: 1, b: 7}", "{a: 2, b: 9}"}, getExpCtx());
+    densify.setSource(source.get());
+
+    auto next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(0, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(1, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(2, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(0, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(1, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(2, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(3, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(4, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(5, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(3, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(4, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(5, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(6, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(7, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(6, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(7, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(8, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(2, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(9, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(8, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT(next.isAdvanced());
+    ASSERT_EQUALS(1, next.getDocument().getField("a").getDouble());
+    ASSERT_EQUALS(9, next.getDocument().getField("b").getDouble());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+
+    next = densify.getNext();
+    ASSERT_FALSE(next.isAdvanced());
+}
+
 TEST_F(DensifyExplicitNumericTest, CorrectlyDensifiesForNumericExplicitRangeOnlyInsideRange) {
     auto densify = DocumentSourceInternalDensify(
         getExpCtx(),
@@ -1231,7 +1386,7 @@ TEST_F(DensifyPartitionNumericTest, DensifiesOnImmediateEOFExplicitRange) {
     ASSERT_FALSE(next.isAdvanced());
 }
 
-TEST_F(DensifyCloneTest, InternalDesnifyCanBeCloned) {
+TEST_F(DensifyCloneTest, InternalDensifyCanBeCloned) {
 
     std::list<boost::intrusive_ptr<DocumentSource>> sources;
     sources.push_back(make_intrusive<DocumentSourceInternalDensify>(
