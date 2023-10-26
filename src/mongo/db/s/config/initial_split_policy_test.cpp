@@ -50,6 +50,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -263,51 +264,51 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
 
     // Wrong shard key.
     ASSERT_THROWS_CODE(
-        InitialSplitPolicy::calculateOptimizationStrategy(
+        create_collection_util::createPolicy(
             opCtx(), ShardKeyPattern(BSON("x" << 1)), 0, false, {}, 1, true, true, kShardId0),
         DBException,
         ErrorCodes::InvalidOptions);
 
     // Non existing shard.
     ASSERT_THROWS_CODE(
-        InitialSplitPolicy::calculateOptimizationStrategy(
+        create_collection_util::createPolicy(
             opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true, ShardId("shard2")),
         DBException,
         ErrorCodes::ShardNotFound);
 
     // numInitialChunks must be 0.
-    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(
+    ASSERT_THROWS_CODE(create_collection_util::createPolicy(
                            opCtx(), kCorrectShardKey, 100, false, {}, 1, true, true, kShardId0),
                        DBException,
                        ErrorCodes::InvalidOptions);
 
     // No presplit hashed zones should be passed.
-    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(
+    ASSERT_THROWS_CODE(create_collection_util::createPolicy(
                            opCtx(), kCorrectShardKey, 0, true, {}, 1, true, true, kShardId0),
                        DBException,
                        ErrorCodes::InvalidOptions);
 
     // Collection must be empty.
-    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(
+    ASSERT_THROWS_CODE(create_collection_util::createPolicy(
                            opCtx(), kCorrectShardKey, 0, false, {}, 1, false, true, kShardId0),
                        DBException,
                        ErrorCodes::InvalidOptions);
 
     // We can only specify a shard for the data with unsplittable collections.
-    ASSERT_THROWS_CODE(InitialSplitPolicy::calculateOptimizationStrategy(opCtx(),
-                                                                         kCorrectShardKey,
-                                                                         0,
-                                                                         false,
-                                                                         {},
-                                                                         1,
-                                                                         true,
-                                                                         false /* unsplittable */,
-                                                                         ShardId("shard1")),
+    ASSERT_THROWS_CODE(create_collection_util::createPolicy(opCtx(),
+                                                            kCorrectShardKey,
+                                                            0,
+                                                            false,
+                                                            {},
+                                                            1,
+                                                            true,
+                                                            false /*unsplittable*/,
+                                                            ShardId("shard1")),
                        DBException,
                        ErrorCodes::InvalidOptions);
 
-    auto singleChunksOnShardPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
-        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /* unsplittable */, kShardId0);
+    auto singleChunksOnShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /*unsplittable*/, kShardId0);
 
     auto config = singleChunksOnShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
@@ -315,8 +316,8 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
     ASSERT_EQ(config.chunks.size(), 1);
     ASSERT_EQ(config.chunks[0].getShard(), kShardId0);
 
-    auto singleChunksOnNonPrimaryShardPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
-        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /* unsplittable */, kShardId1);
+    auto singleChunksOnNonPrimaryShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, 0, false, {}, 1, true, true /*unsplittable*/, kShardId1);
 
     auto nonPrimaryConfig = singleChunksOnNonPrimaryShardPolicy->createFirstChunks(
         opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
@@ -765,13 +766,9 @@ TEST_F(SingleChunkPerTagSplitPolicyTest, ZoneNotAssociatedWithAnyShardShouldFail
         makeTag(ChunkRange(keyPattern().globalMin(), BSON(shardKey() << 0)), zone1),
         makeTag(ChunkRange(BSON(shardKey() << 0), keyPattern().globalMax()), zone2)};
 
-    SingleChunkPerTagSplitPolicy splitPolicy(operationContext(), tags);
-
-    ASSERT_THROWS_CODE(splitPolicy.createFirstChunks(operationContext(),
-                                                     shardKeyPattern(),
-                                                     {UUID::gen(), ShardId("shardId")}),
-                       AssertionException,
-                       50973);
+    ASSERT_THROWS_CODE(SingleChunkPerTagSplitPolicy(operationContext(), tags),
+                       DBException,
+                       ErrorCodes::CannotCreateChunkDistribution);
 }
 
 class PresplitHashedZonesChunksTest : public SingleChunkPerTagSplitPolicyTest {
@@ -958,7 +955,6 @@ TEST_F(PresplitHashedZonesChunksTest, WithHashedPrefix) {
     checkGeneratedInitialZoneChunks(
         tags, expectedChunkRanges, expectedShardIds, shardKeyPattern, 4 /* numInitialChunks*/);
 }
-
 
 TEST_F(PresplitHashedZonesChunksTest, SingleZone) {
     const std::vector<ShardType> kShards{
@@ -1774,7 +1770,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenNoZones) {
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenCollectionNotEmpty) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y"
                                                     << "hashed"));
@@ -1792,7 +1788,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenCollectionNotEmpty) {
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenShardKeyNotHashed) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y" << 1));
     const auto zoneRange = ChunkRange(BSON("x"
@@ -1809,7 +1805,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenShardKeyNotHashed) {
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldHasMinKeyOrMaxKey) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b" << 1 << "c"
                                                     << "hashed"
@@ -1838,7 +1834,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldHas
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundOfTheHashedFieldIsNotMinKey) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("x" << 1 << "y"
                                                     << "hashed"));
@@ -1857,7 +1853,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundOfTheHashedFieldIsNotMi
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldIsSameAsUpperBound) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b" << 1 << "c"
                                                     << "hashed"
@@ -1879,7 +1875,7 @@ TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundPrecedingHashedFieldIsS
 }
 
 TEST_F(PresplitHashedZonesChunksTest, FailsWhenLowerBoundAfterHashedFieldIsNotMinKey) {
-    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123")});
+    setupShards({ShardType(shardId("0").toString(), "rs0/shard0:123", {zoneName("1")})});
     shardRegistry()->reload(operationContext());
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b"
                                                     << "hashed"
@@ -1919,6 +1915,108 @@ TEST_F(PresplitHashedZonesChunksTest, RestrictionsDoNotApplyToUpperBound) {
                    BSON("a" << MAXKEY << "b" << MAXKEY << "c" << MAXKEY << "d" << MAXKEY));
     PresplitHashedZonesSplitPolicy(
         operationContext(), shardKeyPattern, {makeTag(zoneRange, zoneName("1"))}, 0, true);
+}
+
+// Validates that building a presplitHashedZones split policy with a set of available shards equal
+// to the total of shards works.
+TEST_F(PresplitHashedZonesChunksTest, WithAvailableShards) {
+    const std::vector<ShardId> kAllShardsIds{shardId("0"), shardId("1")};
+    const std::vector<ShardType> kAllShards{
+        ShardType(kAllShardsIds[0].toString(), "rs0/shard0:123", {zoneName("0")}),
+        ShardType(kAllShardsIds[1].toString(), "rs1/shard1:123", {})};
+    setupShards(kAllShards);
+    shardRegistry()->reload(operationContext());
+    auto shardKeyPattern = ShardKeyPattern(BSON("x"
+                                                << "hashed"));
+    const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
+    const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
+
+    PresplitHashedZonesSplitPolicy splitPolicy(operationContext(),
+                                               shardKeyPattern,
+                                               tags,
+                                               1 /* numInitialChunks */,
+                                               true /* isCollEmpty */,
+                                               kAllShardsIds);
+
+    const auto config = splitPolicy.createFirstChunks(
+        operationContext(), shardKeyPattern, {UUID::gen(), shardId("0")} /* primaryShard */);
+
+    ASSERT_EQ(1, config.chunks.size());
+    ASSERT_EQ(shardId("0"), config.chunks[0].getShard());
+}
+
+// Validates that building a presplitHashedZones split policy with a set of available shards
+// incompatible with the zone distribution throws an error.
+TEST_F(PresplitHashedZonesChunksTest, CannotCreateChunkDistribution) {
+    const std::vector<ShardId> kAllShardsIds{
+        shardId("0"), shardId("1"), shardId("2"), shardId("3")};
+    const std::vector<ShardType> kAllShards{
+        ShardType(kAllShardsIds[0].toString(), "rs0/shard0:123", {}), /* Available shard */
+        ShardType(kAllShardsIds[1].toString(), "rs1/shard1:123", {}), /* Available shard */
+        ShardType(kAllShardsIds[2].toString(), "rs2/shard2:123", {}), /* Available shard */
+        ShardType(kAllShardsIds[3].toString(),
+                  "rs3/shard3:123",
+                  {zoneName("0")}) /* Not Available shard */
+    };
+    const std::vector<ShardId> kAvailableShardIds{shardId("0"), shardId("1"), shardId("2")};
+    setupShards(kAllShards);
+    shardRegistry()->reload(operationContext());
+    auto shardKeyPattern = ShardKeyPattern(BSON("x"
+                                                << "hashed"));
+    const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
+    const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
+
+    ASSERT_THROWS_CODE(PresplitHashedZonesSplitPolicy(operationContext(),
+                                                      shardKeyPattern,
+                                                      tags,
+                                                      1 /* numInitialChunks */,
+                                                      true /* isCollEmpty */,
+                                                      kAvailableShardIds),
+                       DBException,
+                       ErrorCodes::CannotCreateChunkDistribution);
+}
+
+TEST_F(PresplitHashedZonesChunksTest, ChunkDistributionWillIgnoreShardNotInAvaiableShards) {
+    const std::vector<ShardId> kAllShardIds{shardId("0"), shardId("1"), shardId("2"), shardId("3")};
+    const std::vector<ShardType> kAllShards{
+        ShardType(kAllShardIds[0].toString(),
+                  "rs0/shard0:123",
+                  {zoneName("0")}), /* Not available shard with zone */
+        ShardType(
+            kAllShardIds[1].toString(), "rs1/shard1:123", {}), /* Available shard without zone */
+        ShardType(
+            kAllShardIds[2].toString(), "rs2/shard2:123", {}), /* Available shard without zone */
+        ShardType(kAllShardIds[3].toString(),
+                  "rs3/shard3:123",
+                  {zoneName("0")}) /* Available shard with zone */};
+    const std::vector<ShardId> kAvailableShards{shardId("1"), shardId("2"), shardId("3")};
+    setupShards(kAllShards);
+    shardRegistry()->reload(operationContext());
+    auto shardKeyPattern = ShardKeyPattern(BSON("x"
+                                                << "hashed"));
+    const auto zoneRange = ChunkRange(BSON("x" << MINKEY), BSON("x" << MAXKEY));
+    const std::vector<TagsType> tags = {makeTag(zoneRange, zoneName("0"))};
+
+    PresplitHashedZonesSplitPolicy splitPolicy{operationContext(),
+                                               shardKeyPattern,
+                                               tags,
+                                               5 /* numInitialChunks */,
+                                               true /* isCollEmpty */,
+                                               kAvailableShards};
+
+    const auto config = splitPolicy.createFirstChunks(
+        operationContext(), shardKeyPattern, {UUID::gen(), shardId("0")} /* primaryShard */);
+
+    // Validate that shard not in kAvailableShards is not contain in the final chunk distribution.
+    std::set<ShardId> involvedShards;
+    for (auto&& chunk : config.chunks) {
+        const auto shard = chunk.getShard();
+        ASSERT_NE(shardId("0"), shard);
+        involvedShards.insert(shard);
+    }
+
+    // Validate that we have less shards than total.
+    ASSERT_LT(involvedShards.size(), kAllShards.size());
 }
 
 class MockPipelineSource : public SamplingBasedSplitPolicy::SampleDocumentSource {

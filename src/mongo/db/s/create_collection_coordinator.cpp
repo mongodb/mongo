@@ -141,6 +141,78 @@ MONGO_FAIL_POINT_DEFINE(failAtCommitCreateCollectionCoordinator);
 
 
 namespace mongo {
+
+namespace create_collection_util {
+std::unique_ptr<InitialSplitPolicy> createPolicy(
+    OperationContext* opCtx,
+    const ShardKeyPattern& shardKeyPattern,
+    const std::int64_t numInitialChunks,
+    const bool presplitHashedZones,
+    std::vector<TagsType> tags,
+    size_t numShards,
+    bool collectionIsEmpty,
+    bool isUnsplittable,
+    boost::optional<ShardId> dataShard,
+    boost::optional<std::vector<ShardId>> availableShardIds) {
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "numInitialChunks is only supported when the collection is empty "
+                             "and has a hashed field in the shard key pattern",
+            !numInitialChunks || (shardKeyPattern.isHashedPattern() && collectionIsEmpty));
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream()
+                << "When the prefix of the hashed shard key is a range field, "
+                   "'numInitialChunks' can only be used when the 'presplitHashedZones' is true",
+            !numInitialChunks || shardKeyPattern.hasHashedPrefix() || presplitHashedZones);
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "dataShard can only be specified in unsplittable collections",
+            !dataShard || (dataShard && isUnsplittable));
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "When dataShard or unsplittable is specified, the collection must be "
+                             "empty and no other option must be specified",
+            !isUnsplittable ||
+                (collectionIsEmpty && !presplitHashedZones && tags.empty() && !numInitialChunks &&
+                 shardKeyPattern.getKeyPattern().toBSON().woCompare((BSON("_id" << 1))) == 0));
+
+    // if unsplittable, the collection is always equivalent to a single chunk collection
+    if (isUnsplittable) {
+        if (dataShard) {
+            return std::make_unique<SingleChunkOnShardSplitPolicy>(opCtx, *dataShard);
+        } else {
+            return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
+        }
+    }
+
+    // If 'presplitHashedZones' flag is set, we always use 'PresplitHashedZonesSplitPolicy', to make
+    // sure we throw the correct assertion if further validation fails.
+    if (presplitHashedZones) {
+        return std::make_unique<PresplitHashedZonesSplitPolicy>(opCtx,
+                                                                shardKeyPattern,
+                                                                std::move(tags),
+                                                                numInitialChunks,
+                                                                collectionIsEmpty,
+                                                                std::move(availableShardIds));
+    }
+
+    //  If the collection is empty, some optimizations for the chunk distribution may be available.
+    if (collectionIsEmpty) {
+        if (tags.empty() && shardKeyPattern.hasHashedPrefix()) {
+            // Evenly distribute chunks across shards (in combination with hashed shard keys, this
+            // should increase the probability of establishing an already balanced collection).
+            return std::make_unique<SplitPointsBasedSplitPolicy>(
+                shardKeyPattern, numShards, numInitialChunks, std::move(availableShardIds));
+        }
+        if (!tags.empty()) {
+            // Enforce zone constraints.
+            return std::make_unique<SingleChunkPerTagSplitPolicy>(
+                opCtx, std::move(tags), std::move(availableShardIds));
+        }
+    }
+
+    // Generic case.
+    return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
+}
+}  // namespace create_collection_util
+
 namespace {
 
 struct OptionsAndIndexes {
@@ -832,31 +904,6 @@ TranslatedRequestParams translateRequestParameters(OperationContext* opCtx,
 }
 
 /**
- * Creates the appropiate split policy.
- */
-std::unique_ptr<InitialSplitPolicy> createPolicy(OperationContext* opCtx,
-                                                 const ShardKeyPattern& shardKeyPattern,
-                                                 const ShardsvrCreateCollectionRequest& request,
-                                                 const NamespaceString& nss,
-                                                 const boost::optional<bool>& collectionEmpty) {
-    LOGV2_DEBUG(6042001, 2, "Create collection createPolicy", logAttrs(nss));
-
-    std::unique_ptr<InitialSplitPolicy> splitPolicy =
-        InitialSplitPolicy::calculateOptimizationStrategy(
-            opCtx,
-            shardKeyPattern,
-            request.getNumInitialChunks(),
-            request.getPresplitHashedZones(),
-            getTagsAndValidate(opCtx, nss, shardKeyPattern.toBSON()),
-            getNumShards(opCtx),
-            *collectionEmpty,
-            request.getUnsplittable(),
-            request.getDataShard());
-
-    return splitPolicy;
-}
-
-/**
  * Helper function to log the end of the shard collection event.
  */
 void logEndCreateCollection(
@@ -1350,8 +1397,16 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
 
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
                 _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
-                _splitPolicy =
-                    createPolicy(opCtx, shardKeyPattern, _request, nss(), _collectionEmpty);
+                _splitPolicy = create_collection_util::createPolicy(
+                    opCtx,
+                    shardKeyPattern,
+                    _request.getNumInitialChunks(),
+                    _request.getPresplitHashedZones(),
+                    getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
+                    getNumShards(opCtx),
+                    *_collectionEmpty,
+                    _request.getUnsplittable(),
+                    _request.getDataShard());
 
 
                 _collectionUUID = createCollectionAndIndexes(opCtx,
@@ -1558,8 +1613,16 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 ShardKeyPattern shardKeyPattern(_doc.getTranslatedRequestParams()->getKeyPattern());
                 _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
-                _splitPolicy =
-                    createPolicy(opCtx, shardKeyPattern, _request, nss(), _collectionEmpty);
+                _splitPolicy = create_collection_util::createPolicy(
+                    opCtx,
+                    shardKeyPattern,
+                    _request.getNumInitialChunks(),
+                    _request.getPresplitHashedZones(),
+                    getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
+                    getNumShards(opCtx),
+                    *_collectionEmpty,
+                    _request.getUnsplittable(),
+                    _request.getDataShard());
 
                 _collectionUUID = createCollectionAndIndexes(opCtx,
                                                              shardKeyPattern,

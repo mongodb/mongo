@@ -60,6 +60,27 @@
 
 namespace mongo {
 
+namespace create_collection_util {
+/**
+ * Returns the optimization strategy for building initial chunks based on the input parameters
+ * and the collection state.
+ *
+ * If dataShard is specified, isUnsplittable must be true, because we can only select the shard
+ * that will hold the data for unsplittable collections.
+ */
+std::unique_ptr<InitialSplitPolicy> createPolicy(
+    OperationContext* opCtx,
+    const ShardKeyPattern& shardKeyPattern,
+    std::int64_t numInitialChunks,
+    bool presplitHashedZones,
+    std::vector<TagsType> tags,
+    size_t numShards,
+    bool collectionIsEmpty,
+    bool isUnsplittable,
+    boost::optional<ShardId> dataShard,
+    boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+}  // namespace create_collection_util
+
 // This interface allows the retrieval of the outcome of a shardCollection request (which may be
 // served by different types of Coordinator)
 class CreateCollectionResponseProvider {

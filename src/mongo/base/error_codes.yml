@@ -533,6 +533,8 @@ error_codes:
 
     - {code: 404, name: LDAPRoleAcquisitionError}
 
+    - {code: 405, name: CannotCreateChunkDistribution}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

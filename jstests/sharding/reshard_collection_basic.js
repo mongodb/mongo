@@ -77,7 +77,7 @@ assert.commandFailedWithCode(mongos.adminCommand({
     zones: [{zone: nonExistingZoneName, min: {newKey: 5}, max: {newKey: 10}}],
     numInitialChunks: 2,
 }),
-                             4952607);
+                             ErrorCodes.CannotCreateChunkDistribution);
 
 jsTestLog("Fail if splitting collection into multiple chunks while it is still empty.");
 assert.commandFailedWithCode(
