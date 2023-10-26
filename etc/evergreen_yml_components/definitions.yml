@@ -1651,7 +1651,7 @@ functions:
       binary: bash
       args:
       - "src/evergreen/run_python_script.sh"
-      - "buildscripts/sync_repo_with_copybara.py"
+      - "buildscripts/sync_repo_with_copybara.py --expansion-file ../expansions.yml"
 
   # Used by generator
   "run jstestfuzz":
@@ -5375,6 +5375,7 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
+  - *f_expansions_write
   - func: "sync repo with copybara"
 
 - name: monitor_mongo_fork_10gen
