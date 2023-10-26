@@ -421,6 +421,8 @@ last-continuous:
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
     ticket: SERVER-81985
+  - test_file: jstests/sharding/query/merge_nondefault_read_concern.js
+    ticket: SERVER-69244
   suites: null
 last-lts:
   all:
@@ -888,4 +890,6 @@ last-lts:
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
     ticket: SERVER-81985
+  - test_file: jstests/sharding/query/merge_nondefault_read_concern.js
+    ticket: SERVER-69244
   suites: null
