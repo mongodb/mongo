@@ -65,8 +65,6 @@ var testOps = function(mongos) {
 
     jsTestLog("Doing ops that require metadata writes and thus should fail against: " + mongos);
     assert.writeError(mongos.getDB("newDB").foo.insert({a: 1}));
-    assert.commandFailed(
-        mongos.getDB('admin').runCommand({shardCollection: "test.foo", key: {a: 1}}));
 };
 
 testOps(mongos2);

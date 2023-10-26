@@ -1454,18 +1454,57 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 return Status::OK();
             }
 
-            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
-                !status.isA<ErrorCategory::ShutdownError>()) {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
+            if (_doc.getPhase() < Phase::kCommit) {
+                // Early exit to not trigger the clean up procedure because the coordinator has not
+                // entered to any critical section.
+                return status;
+            }
 
-                // The critical section might have been taken by a migration, we force
-                // to skip the invariant check and we do nothing in case it was taken.
-                releaseCriticalSectionsOnCoordinator(
-                    opCtx, false /* throwIfReasonDiffers */, _critSecReason, originalNss());
+            if (!_isRetriableErrorForDDLCoordinator(status)) {
+                const auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+
+                triggerCleanup(opCtx, status);
             }
 
             return status;
+        });
+}
+
+ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor = executor, status, anchor = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                opCtx, getNewSession(opCtx), **executor);
+
+            if (_doc.getTranslatedRequestParams()) {
+                // The new behaviour of committing transactionally is not feature flag protected. It
+                // could happen that the coordinator is run the first time on a primary with an
+                // older binary and, after persisting the chunk entries, a new primary with a newer
+                // binary takes over. Therefore, if the collection can be found locally but is not
+                // yet tracked on the config server, then we clean up the config.chunks collection.
+
+                auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+                auto cri = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                          nss()));
+                if (uuid && !cri.cm.hasRoutingTable()) {
+                    cleanupPartialChunksFromPreviousAttempt(opCtx, *uuid, getNewSession(opCtx));
+                }
+            }
+
+            // The critical section might have been taken by a migration, we force to skip the
+            // invariant check and we do nothing in case it was taken.
+            releaseCriticalSectionsOnCoordinator(
+                opCtx, false /* throwIfReasonDiffers */, _critSecReason, originalNss());
         });
 }
 
@@ -1672,22 +1711,51 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     opCtx, originalNss(), _result, _collectionEmpty, _initialChunks);
                 LOGV2_DEBUG(7949116, 2, "Phase 5: Release all critical sections phase");
             }))
-        .onError([this, token, executor = executor, anchor = shared_from_this()](
-                     const Status& status) {
-            if (status == ErrorCodes::RequestAlreadyFulfilled) {
-                return Status::OK();
-            }
-            if (!_isRetriableErrorForDDLCoordinator(status)) {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
-
-                if (_doc.getPhase() > Phase::kTranslateRequest) {
-                    _releaseCriticalSectionsOnParticipants(opCtx, executor, token);
+        .onError(
+            [this, token, executor = executor, anchor = shared_from_this()](const Status& status) {
+                if (status == ErrorCodes::RequestAlreadyFulfilled) {
+                    return Status::OK();
                 }
-                releaseCriticalSectionsOnCoordinator(opCtx, true, _critSecReason, originalNss());
+
+                if (_doc.getPhase() < Phase::kAcquireCSOnCoordinator) {
+                    // Early exit to not trigger the clean up procedure because the coordinator has
+                    // not entered to any critical section.
+                    return status;
+                }
+
+                if (!_isRetriableErrorForDDLCoordinator(status)) {
+                    const auto opCtxHolder = cc().makeOperationContext();
+                    auto* opCtx = opCtxHolder.get();
+                    getForwardableOpMetadata().setOn(opCtx);
+
+                    triggerCleanup(opCtx, status);
+                }
+
+                return status;
+            });
+}
+
+ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor)
+        .then([this, token, executor = executor, status, anchor = shared_from_this()] {
+            const auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            getForwardableOpMetadata().setOn(opCtx);
+
+            _performNoopRetryableWriteOnAllShardsAndConfigsvr(
+                opCtx, getNewSession(opCtx), **executor);
+
+            if (_doc.getPhase() >= Phase::kAcquireCSOnParticipants) {
+                _releaseCriticalSectionsOnParticipants(opCtx, executor, token);
             }
-            return status;
+
+            // The critical section might have been taken by a migration, we force to skip the
+            // invariant check and we do nothing in case it was taken.
+            releaseCriticalSectionsOnCoordinator(
+                opCtx, false /* throwIfReasonDiffers */, _critSecReason, originalNss());
         });
 }
 

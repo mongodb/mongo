@@ -131,6 +131,10 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
+
     mongo::ShardsvrCreateCollectionRequest _request;
 
     const BSONObj _critSecReason;
@@ -184,6 +188,10 @@ private:
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
+
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
 
     /**
      * Acquires critical sections on all shards.
