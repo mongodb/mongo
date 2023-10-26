@@ -557,7 +557,12 @@ public:
     static void getCpuInfo(int& procCount,
                            std::string& modelString,
                            std::string& freq,
-                           std::string& features) {
+                           std::string& features,
+                           std::string& cpuImplementer,
+                           std::string& cpuArchitecture,
+                           std::string& cpuVariant,
+                           std::string& cpuPart,
+                           std::string& cpuRevision) {
 
         procCount = 0;
 
@@ -591,6 +596,26 @@ public:
                                         {"flags",
                                          [&](const std::string& value) {
                                              features = value;
+                                         }},
+                                        {"CPU implementer",
+                                         [&](const std::string& value) {
+                                             cpuImplementer = value;
+                                         }},
+                                        {"CPU architecture",
+                                         [&](const std::string& value) {
+                                             cpuArchitecture = value;
+                                         }},
+                                        {"CPU variant",
+                                         [&](const std::string& value) {
+                                             cpuVariant = value;
+                                         }},
+                                        {"CPU part",
+                                         [&](const std::string& value) {
+                                             cpuPart = value;
+                                         }},
+                                        {"CPU revision",
+                                         [&](const std::string& value) {
+                                             cpuRevision = value;
                                          }},
 #endif
                                     },
@@ -861,6 +886,11 @@ unsigned long countNumaNodes() {
     return 0;
 }
 
+void appendIfExists(BSONObjBuilder* bob, std::string key, std::string value) {
+    if (!value.empty()) {
+        bob->append(key, value);
+    }
+}
 /**
  * Save a BSON obj representing the host system's details
  */
@@ -868,12 +898,21 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     utsname unameData;
     std::string distroName, distroVersion;
     std::string cpuString, cpuFreq, cpuFeatures;
+    std::string cpuImplementer, cpuArchitecture, cpuVariant, cpuPart, cpuRevision;
     int cpuCount;
     int physicalCores;
     int cpuSockets;
 
     std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
-    LinuxSysHelper::getCpuInfo(cpuCount, cpuString, cpuFreq, cpuFeatures);
+    LinuxSysHelper::getCpuInfo(cpuCount,
+                               cpuString,
+                               cpuFreq,
+                               cpuFeatures,
+                               cpuImplementer,
+                               cpuArchitecture,
+                               cpuVariant,
+                               cpuPart,
+                               cpuRevision);
     LinuxSysHelper::getNumPhysicalCores(physicalCores);
     cpuSockets = LinuxSysHelper::getNumCpuSockets();
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
@@ -923,6 +962,14 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     bExtra.append("pageSize", static_cast<long long>(pageSize));
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
+
+    // Append ARM-specific fields, if they exist.
+    // Can be mapped to model name by referencing sys-utils/lscpu-arm.c
+    appendIfExists(&bExtra, "cpuImplementer", cpuImplementer);
+    appendIfExists(&bExtra, "cpuArchitecture", cpuArchitecture);
+    appendIfExists(&bExtra, "cpuVariant", cpuVariant);
+    appendIfExists(&bExtra, "cpuPart", cpuPart);
+    appendIfExists(&bExtra, "cpuRevision", cpuRevision);
 
     appendMountInfo(bExtra);
 

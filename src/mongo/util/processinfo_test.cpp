@@ -75,6 +75,14 @@ TEST(ProcessInfo, TestSysInfo) {
     auto stringMap = toStringMap(obj);
     ASSERT_KEY("cpuString");
 
+#if defined(__aarch64__) || defined(__arm__)
+    ASSERT_KEY("cpuImplementer");
+    ASSERT_KEY("cpuArchitecture");
+    ASSERT_KEY("cpuVariant");
+    ASSERT_KEY("cpuPart");
+    ASSERT_KEY("cpuRevision");
+#endif
+
 #if defined(__linux__)
     ASSERT_KEY("mountInfo");
 
