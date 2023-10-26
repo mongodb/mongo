@@ -2,6 +2,7 @@
 // @tags: [
 //   directly_against_shardsvrs_incompatible,
 //   featureFlagQuerySettings,
+//   does_not_support_stepdowns,
 //   simulate_atlas_proxy_incompatible
 // ]
 //
@@ -9,7 +10,12 @@
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 const collName = jsTestName();
-let qsutils = new QuerySettingsUtils(db, collName);
+const qsutils = new QuerySettingsUtils(db, collName);
+
+// Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
+// 'querySettings' cluster parameter on mongos from the configsvr.
+const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
+
 const settings = {
     queryEngineVersion: "v1"
 };
@@ -137,3 +143,6 @@ runTest({
 //         pipeline: [{"$queue": "[]"}],
 //     },
 // });
+
+// Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
+clusterParamRefreshSecs.restore();

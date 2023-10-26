@@ -211,6 +211,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings")) {
     // Set query settings for a query to use 'settings.indexHints.allowedIndexes' indexes.
     const qsutils = new QuerySettingsUtils(db, coll.getName());
 
+    // Set the 'clusterServerParameterRefreshIntervalSecs' value to 1 second for faster fetching of
+    // 'querySettings' cluster parameter on mongos from the configsvr.
+    const clusterParamRefreshSecs = qsutils.setClusterParamRefreshSecs(1);
+
     // Specify 'allowedIndexes' with more than one index, otherwise it will result in single
     // solution plan, that won't be cached in classic.
     const settings = {indexHints: {allowedIndexes: ["a_1", "a_1_b_1"]}};
@@ -227,4 +231,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings")) {
     assert.eq(settings, planCacheEntry.querySettings, planCacheEntry);
 
     qsutils.removeAllQuerySettings();
+
+    // Reset the 'clusterServerParameterRefreshIntervalSecs' parameter to its initial value.
+    clusterParamRefreshSecs.restore();
 }
