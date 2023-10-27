@@ -75,6 +75,8 @@ TEST(ProcessInfo, TestSysInfo) {
     auto stringMap = toStringMap(obj);
     ASSERT_KEY("cpuString");
 
+#if defined(__linux__)
+
 #if defined(__aarch64__) || defined(__arm__)
     ASSERT_KEY("cpuImplementer");
     ASSERT_KEY("cpuArchitecture");
@@ -83,7 +85,6 @@ TEST(ProcessInfo, TestSysInfo) {
     ASSERT_KEY("cpuRevision");
 #endif
 
-#if defined(__linux__)
     ASSERT_KEY("mountInfo");
 
     BSONElement mountInfoArray = obj.getField("mountInfo");
