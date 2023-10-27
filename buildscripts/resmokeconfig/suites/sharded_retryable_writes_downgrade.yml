@@ -69,9 +69,6 @@ selector:
   # This file is testing resmoke's multiversion framework, not Server behavior
   - jstests/core/**/mixed_version_replica_set.js
 
-  # TODO SERVER-61050
-  - jstests/core/timeseries/timeseries_merge.js
-
   # Explain doesn't support read concern majority in sharding.
   - jstests/core/**/command_let_variables.js
 

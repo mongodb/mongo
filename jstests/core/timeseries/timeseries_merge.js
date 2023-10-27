@@ -8,6 +8,7 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   references_foreign_collection,
+ *   requires_getmore,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
