@@ -11,28 +11,12 @@
 
 overrides:
 
-  enterprise-macos:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours
-
-  enterprise-macos-arm64:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours
-
   enterprise-rhel80-debug-complete-tsan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
   enterprise-rhel80-debug-tsan:
   - task: aggregation_timeseries_fuzzer
-    exec_timeout: 150  # 2.5 hours
-
-  macos:
-  - task: replica_sets_jscore_passthrough
-    exec_timeout: 150  # 2.5 hours
-
-  macos-arm64:
-  - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
 
   rhel80-asan:

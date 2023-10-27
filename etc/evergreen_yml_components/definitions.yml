@@ -6105,13 +6105,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
-- <<: *task_template
-  name: replica_sets_jscore_passthrough
-  tags: ["replica_sets", "common", "san", "large", "ignore_non_generated_replica_sets_jscore_passthrough"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
 - <<: *gen_task_template
   name: replica_sets_reconfig_jscore_passthrough_gen
   tags: []
@@ -6166,7 +6159,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_jscore_passthrough_gen
-  tags: []
+  tags: ["replica_sets", "common", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -8148,7 +8141,7 @@ tasks:
   - name: package
   - name: jsCore
   - name: run_dbtest
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -8193,7 +8186,7 @@ tasks:
   - name: package
   - name: jsCore
   - name: run_dbtest
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   stepback: false
   commands:
   - command: manifest.load

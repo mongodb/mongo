@@ -989,7 +989,7 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: .stitch
@@ -1102,7 +1102,7 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: .stitch
@@ -1522,7 +1522,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: .replica_sets .multi_oplog
   - name: sasl
   - name: search
@@ -1646,7 +1646,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .ocsp
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: .replica_sets .multi_oplog
   - name: sasl
   - name: search
@@ -1771,7 +1771,7 @@ buildvariants:
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: .replica_sets .multi_oplog
   - name: sasl
   - name: search
@@ -1906,7 +1906,7 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: .stitch
@@ -1963,7 +1963,7 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: .stitch
@@ -2076,7 +2076,7 @@ buildvariants:
   - name: libunwind_tests
   # - name: multiversion_gen
   - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .txns
   - name: sharding_gen
   - name: sharding_jscore_passthrough
@@ -2132,7 +2132,7 @@ buildvariants:
   - name: libunwind_tests
   # - name: multiversion_gen
   - name: replica_sets_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .txns
   - name: sharding_gen
   - name: sharding_jscore_passthrough
@@ -2200,7 +2200,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .ocsp
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: test_packages
@@ -2265,7 +2265,7 @@ buildvariants:
   - name: libunwind_tests
   - name: .ocsp
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: sharding_auth_audit_gen
   - name: test_packages
@@ -2283,7 +2283,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - ubuntu1804-arm64-build
+  - ubuntu2004-arm64
   expansions:
     additional_package_targets: >-
       archive-mongocryptd
@@ -2312,8 +2312,11 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2004-arm64
+    large_distro_name: ubuntu2004-arm64-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - ubuntu2004-arm64-large
   - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -2344,7 +2347,7 @@ buildvariants:
   display_name: Ubuntu 20.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1804-arm64-build
+  - ubuntu2004-arm64-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -2368,10 +2371,13 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
     compile_variant: ubuntu2004-arm64
+    large_distro_name: ubuntu2004-arm64-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - ubuntu2004-arm64-large
   - name: jsCore
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
@@ -2385,7 +2391,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - ubuntu2204-arm64-large
+  - ubuntu2204-arm64-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
@@ -2406,8 +2412,11 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-ubuntu2204-arm64
+    large_distro_name: ubuntu2204-arm64-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - ubuntu2204-arm64-large
   - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -2441,7 +2450,7 @@ buildvariants:
   display_name: Ubuntu 22.04 arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu2204-arm64-large
+  - ubuntu2204-arm64-small
   expansions:
     push_path: linux
     push_bucket: downloads.mongodb.org
@@ -2460,10 +2469,13 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
     compile_variant: ubuntu2204-arm64
+    large_distro_name: ubuntu2204-arm64-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - ubuntu2204-arm64-large
   - name: jsCore
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
@@ -2750,7 +2762,7 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: push
   - name: .crypt
@@ -2791,7 +2803,7 @@ buildvariants:
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: push
   - name: .crypt
