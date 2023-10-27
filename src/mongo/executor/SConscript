@@ -343,6 +343,7 @@ env.Library(
         'task_executor_interface',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/plan_yield_policy',
         'pinned_connection_task_executor_factory',
     ],
 )
