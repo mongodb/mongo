@@ -64,12 +64,41 @@ public:
 
     std::vector<DatabaseName> getNames() override;
 
+    // This class is the owner of the Database objects opened by DatabaseHolderImpl. It contains
+    // a DatabaseName -> Database map to locate Database's by name as well as a multimap of used for
+    // efficient search of case insensitive name duplicates. The class keeps both structures
+    // synchronized, and thus, it does not allow write access to the maps individually.
+    class DBsIndex {
+    public:
+        using DBs = stdx::unordered_map<DatabaseName, std::unique_ptr<Database>>;
+
+        const DBs& viewAll() const;
+
+        Database* getOrCreate(const DatabaseName& dbName);
+
+        void erase(const DatabaseName& dbName);
+
+        boost::optional<DatabaseName> getAnyConflictingName(const DatabaseName& dbName) const;
+
+        std::pair<Database*, bool> upsert(const DatabaseName& dbName, std::unique_ptr<Database> db);
+
+    private:
+        using NormalizedDatabaseName = std::string;
+        using NormalizedDBs =
+            std::unordered_multimap<NormalizedDatabaseName, DatabaseName>;  // NOLINT
+
+        DBs _dbs;                      // Use for exact matching
+        NormalizedDBs _normalizedDBs;  // Use to locate DBs with same normalized key
+
+        static NormalizedDatabaseName normalize(const DatabaseName& dbName);
+    };
+
 private:
     boost::optional<DatabaseName> _getNameWithConflictingCasing_inlock(const DatabaseName& dbName);
 
-    typedef stdx::unordered_map<DatabaseName, Database*> DBs;
     mutable SimpleMutex _m;
-    DBs _dbs;
+
+    DatabaseHolderImpl::DBsIndex _dbs;
 };
 
 }  // namespace mongo

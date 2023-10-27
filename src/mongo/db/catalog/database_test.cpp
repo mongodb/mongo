@@ -50,6 +50,8 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder_impl.h"
+#include "mongo/db/catalog/database_impl.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/unique_collection_name.h"
@@ -521,6 +523,65 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
                                 << _nss.toStringForErrorMsg() << " because it can be replicated")
                                    .stringData());
                        });
+}
+
+
+TEST_F(DatabaseTest, DatabaseHolderImplTest) {
+    DatabaseHolderImpl::DBsIndex dbIndex;
+    ASSERT_EQUALS(dbIndex.viewAll().size(), 0);
+
+    auto insertTest = [&dbIndex](const DatabaseName& dbName, bool insertNullFirst) {
+        if (insertNullFirst) {
+            dbIndex.getOrCreate(dbName);  // <dbName> -> nullptr
+            ASSERT_EQUALS(dbIndex.viewAll().find(dbName)->second, nullptr);
+        }
+
+        auto p = dbIndex.upsert(dbName, std::make_unique<DatabaseImpl>(dbName));
+        Database* db = p.first;
+        ASSERT_EQUALS(p.second, !insertNullFirst);
+        ASSERT_NOT_EQUALS(db, nullptr);
+        ASSERT_NOT_EQUALS(dbIndex.viewAll().find(dbName)->second, nullptr);
+    };
+
+    DatabaseName dbName1 = DatabaseName::createDatabaseName_forTest(boost::none, "foo1");
+    TenantId tenant2 = TenantId(OID::gen());
+    DatabaseName dbName2 = DatabaseName::createDatabaseName_forTest(tenant2, "foo2");
+    insertTest(dbName1, true);
+    insertTest(dbName2, false);
+
+    auto conflict = dbIndex.getAnyConflictingName(
+        DatabaseName::createDatabaseName_forTest(boost::none, "foo99"));
+    ASSERT_FALSE(conflict);
+
+    conflict = dbIndex.getAnyConflictingName(
+        DatabaseName::createDatabaseName_forTest(boost::none, "foo1"));
+    ASSERT_FALSE(conflict);  // No self conflict
+    conflict =
+        dbIndex.getAnyConflictingName(DatabaseName::createDatabaseName_forTest(tenant2, "foo2"));
+    ASSERT_FALSE(conflict);  // No self conflict
+
+    conflict = dbIndex.getAnyConflictingName(
+        DatabaseName::createDatabaseName_forTest(boost::none, "fOO1"));
+    ASSERT_TRUE(conflict);
+    ASSERT_EQUALS(*conflict, dbName1);
+
+
+    conflict = dbIndex.getAnyConflictingName(
+        DatabaseName::createDatabaseName_forTest(boost::none, "foo2"));
+    ASSERT_FALSE(conflict);  // No conflict different tenant
+
+    conflict = dbIndex.getAnyConflictingName(
+        DatabaseName::createDatabaseName_forTest(boost::none, "fOO2"));
+    ASSERT_FALSE(conflict);  // No conflict different tenant
+
+    conflict =
+        dbIndex.getAnyConflictingName(DatabaseName::createDatabaseName_forTest(tenant2, "FOO2"));
+    ASSERT_TRUE(conflict);
+    ASSERT_EQUALS(*conflict, dbName2);
+
+    ASSERT_EQUALS(dbIndex.viewAll().size(), 2);
+    dbIndex.erase(dbName2);
+    ASSERT_EQUALS(dbIndex.viewAll().size(), 1);
 }
 
 }  // namespace

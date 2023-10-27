@@ -31,6 +31,7 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <boost/algorithm/string.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -80,9 +81,10 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
               (dbName.isLocalDB() && opCtx->lockState()->isLocked()));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
-    DBs::const_iterator it = _dbs.find(dbName);
-    if (it != _dbs.end()) {
-        return it->second;
+
+    auto it = _dbs.viewAll().find(dbName);
+    if (it != _dbs.viewAll().end()) {
+        return it->second.get();
     }
 
     return nullptr;
@@ -93,19 +95,15 @@ bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, const DatabaseName& d
             "invalid db name: " + dbName.toStringForErrorMsg(),
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     stdx::lock_guard<SimpleMutex> lk(_m);
-    auto it = _dbs.find(dbName);
-    return it != _dbs.end() && it->second != nullptr;
+
+    auto it = _dbs.viewAll().find(dbName);
+    return it != _dbs.viewAll().end() && it->second != nullptr;
 }
 
 boost::optional<DatabaseName> DatabaseHolderImpl::_getNameWithConflictingCasing_inlock(
     const DatabaseName& dbName) {
-    for (const auto& nameAndPointer : _dbs) {
-        // A case insensitive match indicates that 'dbName' is a duplicate of an existing database.
-        if (dbName.equalCaseInsensitive(nameAndPointer.first) && dbName != nameAndPointer.first)
-            return nameAndPointer.first;
-    }
 
-    return boost::none;
+    return _dbs.getAnyConflictingName(dbName);
 }
 
 boost::optional<DatabaseName> DatabaseHolderImpl::getNameWithConflictingCasing(
@@ -117,7 +115,7 @@ boost::optional<DatabaseName> DatabaseHolderImpl::getNameWithConflictingCasing(
 std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
     stdx::lock_guard<SimpleMutex> lk(_m);
     std::vector<DatabaseName> dbNames;
-    for (const auto& nameAndPointer : _dbs) {
+    for (const auto& nameAndPointer : _dbs.viewAll()) {
         dbNames.push_back(nameAndPointer.first);
     }
     return dbNames;
@@ -138,17 +136,18 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
 
     // The following will insert a nullptr for dbname, which will treated the same as a non-
     // existant database by the get method, yet still counts in getNameWithConflictingCasing.
-    if (auto db = _dbs[dbName])
+    if (auto db = _dbs.getOrCreate(dbName))
         return db;
 
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
     ScopeGuard removeDbGuard([this, &lk, opCtx, dbName] {
         if (!lk.owns_lock())
             lk.lock();
-        auto it = _dbs.find(dbName);
+
+        auto it = _dbs.viewAll().find(dbName);
         // If someone else hasn't either already removed it or already set it successfully, remove.
-        if (it != _dbs.end() && !it->second) {
-            _dbs.erase(it);
+        if (it != _dbs.viewAll().end() && !it->second) {
+            _dbs.erase(dbName);
         }
     });
 
@@ -176,17 +175,18 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     // Finally replace our nullptr entry with the new Database pointer.
     removeDbGuard.dismiss();
     lk.lock();
-    auto it = _dbs.find(dbName);
-    invariant(it != _dbs.end());
+
+    auto it = _dbs.viewAll().find(dbName);
+    invariant(it != _dbs.viewAll().end());
     if (it->second) {
         // Creating databases only requires a DB lock in MODE_IX, thus databases can be concurrently
         // created. If this thread lost the race, return the database object that was already
         // created.
-        return it->second;
+        return it->second.get();
     }
-    it->second = newDb.release();
 
-    return it->second;
+    auto p = _dbs.upsert(dbName, std::move(newDb));
+    return p.first;
 }
 
 void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
@@ -265,21 +265,16 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
-    DBs::const_iterator it = _dbs.find(dbName);
-    if (it == _dbs.end()) {
+    if (!_dbs.viewAll().contains(dbName)) {
         return;
     }
-    auto db = it->second;
 
     LOGV2_DEBUG(20311, 2, "DatabaseHolder::close", logAttrs(dbName));
 
     CollectionCatalog::write(
         opCtx, [&](CollectionCatalog& catalog) { catalog.onCloseDatabase(opCtx, dbName); });
 
-    delete db;
-    db = nullptr;
-
-    _dbs.erase(it);
+    _dbs.erase(dbName);
 }
 
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
@@ -289,7 +284,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
         std::vector<DatabaseName> dbs;
         {
             stdx::lock_guard<SimpleMutex> lk(_m);
-            for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
+            for (auto i = _dbs.viewAll().begin(); i != _dbs.viewAll().end(); ++i) {
                 // It is the caller's responsibility to ensure that no index builds are active in
                 // the database.
                 IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(i->first);
@@ -305,6 +300,70 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
             close(opCtx, name);
         }
     }
+}
+
+DatabaseHolderImpl::DBsIndex::NormalizedDatabaseName DatabaseHolderImpl::DBsIndex::normalize(
+    const DatabaseName& dbName) {
+    std::string str = dbName.toStringForResourceId();
+    boost::algorithm::to_lower(str);
+    return str;
+}
+
+const DatabaseHolderImpl::DBsIndex::DBs& DatabaseHolderImpl::DBsIndex::viewAll() const {
+    return _dbs;
+}
+
+// Return the Database already associated to a name. If there was no association, the class
+// associates a null pointer to the Databasename in both maps
+Database* DatabaseHolderImpl::DBsIndex::getOrCreate(const DatabaseName& dbName) {
+    Database* result;
+    auto it = _dbs.find(dbName);
+    if (it != _dbs.end()) {
+        // Existing entry. So, it was already registered in _normalizedDBs
+        result = it->second.get();
+    } else {
+        // New entry. Update both collections
+        auto insertIt = _dbs.insert(it, {dbName, nullptr});
+        result = insertIt->second.get();
+        _normalizedDBs.insert({normalize(dbName), dbName});
+    }
+    return result;
+}
+
+// Get the ownership of a Database with a given name. Update the associations for both maps
+std::pair<Database*, bool> DatabaseHolderImpl::DBsIndex::upsert(const DatabaseName& dbName,
+                                                                std::unique_ptr<Database> db) {
+    auto [dbsIt, isNew] = _dbs.insert_or_assign(dbName, std::move(db));
+    if (isNew) {  // New database name
+        _normalizedDBs.insert({normalize(dbName), dbName});
+    }
+    return {dbsIt->second.get(), isNew};
+}
+
+void DatabaseHolderImpl::DBsIndex::erase(const DatabaseName& dbName) {
+    NormalizedDatabaseName normalizedName = normalize(dbName);
+    auto [begin, end] = _normalizedDBs.equal_range(normalizedName);
+    for (auto dbsIt = begin; dbsIt != end; ++dbsIt) {
+        if (dbsIt->second == dbName) {
+            _normalizedDBs.erase(dbsIt);
+            break;
+        }
+    }
+    _dbs.erase(dbName);
+}
+
+// Check if there is any opened database with a name with the same name with a case
+// insensitive search
+boost::optional<DatabaseName> DatabaseHolderImpl::DBsIndex::getAnyConflictingName(
+    const DatabaseName& dbName) const {
+    NormalizedDatabaseName normalizedName = normalize(dbName);
+    auto [begin, end] = _normalizedDBs.equal_range(normalizedName);
+    for (auto dbsIt = begin; dbsIt != end; ++dbsIt) {
+        if (dbName.equalCaseInsensitive(dbsIt->second) && dbName != dbsIt->second) {
+            return dbsIt->second;
+        }
+    }
+    return boost::none;
 }
 
 }  // namespace mongo
