@@ -116,7 +116,8 @@ void ThrottleCursorTest::setUp() {
         wuow.commit();
     }
 
-    _dataThrottle = std::make_unique<DataThrottle>(operationContext());
+    _dataThrottle = std::make_unique<DataThrottle>(operationContext(),
+                                                   [&]() { return gMaxValidateMBperSec.load(); });
 }
 
 void ThrottleCursorTest::tearDown() {

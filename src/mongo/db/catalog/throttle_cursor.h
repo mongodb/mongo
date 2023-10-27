@@ -150,13 +150,14 @@ private:
  */
 class DataThrottle {
 public:
-    DataThrottle(OperationContext* opCtx)
+    DataThrottle(OperationContext* opCtx, std::function<int()> maxMBperSec)
         : _startMillis(
               opCtx->getServiceContext()->getFastClockSource()->now().toMillisSinceEpoch()),
           _bytesProcessed(0),
           _totalElapsedTimeSec(0),
           _totalMBProcessed(0),
-          _shouldNotThrottle(false) {}
+          _shouldNotThrottle(false),
+          _maxMBperSec(maxMBperSec) {}
 
     /**
      * If throttling is not enabled by calling turnThrottlingOff(), or if
@@ -188,6 +189,9 @@ private:
 
     // Whether the throttle should be active.
     bool _shouldNotThrottle;
+
+    // Will return the rate to throttle, 0 means turn off throttling.
+    std::function<int()> _maxMBperSec;
 };
 
 }  // namespace mongo

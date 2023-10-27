@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
@@ -370,7 +371,7 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     // Scans index for duplicates, comparing consecutive index entries.
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are
     // in the format (Key, RID), and all RecordIDs are unique.
-    DataThrottle dataThrottle(opCtx);
+    DataThrottle dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); });
     dataThrottle.turnThrottlingOff();
     SortedDataInterfaceThrottleCursor indexCursor(opCtx, accessMethod, &dataThrottle);
     boost::optional<KeyStringEntry> prevIndexEntry;

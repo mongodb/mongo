@@ -363,6 +363,7 @@ env.Library(
         'database_holder',
         'index_catalog',
         'throttle_cursor',
+        'validate_idl',
     ],
 )
 
@@ -575,6 +576,7 @@ env.Library(
         'local_oplog_info',
         'multi_index_block',
         'throttle_cursor',
+        'validate_idl',
     ],
 )
 

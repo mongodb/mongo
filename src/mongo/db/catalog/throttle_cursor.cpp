@@ -170,20 +170,20 @@ void DataThrottle::awaitIfNeeded(OperationContext* opCtx, const int64_t dataSize
         return;
     }
 
-    // No throttling should take place if 'gMaxValidateMBperSec' is zero.
-    uint64_t maxValidateBytesPerSec = gMaxValidateMBperSec.load() * 1024 * 1024;
-    if (maxValidateBytesPerSec == 0) {
+    // No throttling should take place if '_maxMBperSec()' is zero.
+    uint64_t maxBytesPerSec = _maxMBperSec() * 1024 * 1024;
+    if (maxBytesPerSec == 0) {
         return;
     }
 
-    if (_bytesProcessed < maxValidateBytesPerSec) {
+    if (_bytesProcessed < maxBytesPerSec) {
         return;
     }
 
     // Wait a period of time proportional to how much extra data we have read. For example, if we
-    // read one 5 MB document and maxValidateBytesPerSec is 1, we should not be waiting until the
+    // read one 5 MB document and maxBytesPerSec is 1, we should not be waiting until the
     // next 1 second period. We should wait 5 seconds to maintain proper throughput.
-    int64_t maxWaitMs = 1000 * std::max(1.0, double(_bytesProcessed) / maxValidateBytesPerSec);
+    int64_t maxWaitMs = 1000 * std::max(1.0, double(_bytesProcessed) / maxBytesPerSec);
 
     do {
         int64_t millisToSleep = maxWaitMs - (currentMillis - _startMillis);

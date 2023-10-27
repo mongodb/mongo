@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/index/columns_access_method.h"
@@ -81,7 +82,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
     : _nss(nss),
       _mode(mode),
       _repairMode(repairMode),
-      _dataThrottle(opCtx),
+      _dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); }),
       _logDiagnostics(logDiagnostics) {
 
     // Subsequent re-locks will use the UUID when 'background' is true.
