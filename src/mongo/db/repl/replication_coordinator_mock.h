@@ -122,7 +122,7 @@ public:
 
     virtual void shutdown(OperationContext* opCtx);
 
-    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override {}
+    void appendDiagnosticBSON(BSONObjBuilder* bob, StringData leafName) override {}
 
     virtual const ReplSettings& getSettings() const;
 

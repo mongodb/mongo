@@ -145,7 +145,7 @@ OpTime ReplicationCoordinatorEmbedded::getCurrentCommittedSnapshotOpTime() const
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::appendDiagnosticBSON(mongo::BSONObjBuilder*) {
+void ReplicationCoordinatorEmbedded::appendDiagnosticBSON(mongo::BSONObjBuilder*, StringData) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

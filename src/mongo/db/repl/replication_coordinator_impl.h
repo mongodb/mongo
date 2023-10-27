@@ -416,7 +416,7 @@ public:
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
                                             const Timestamp& untilSnapshot) override;
 
-    virtual void appendDiagnosticBSON(BSONObjBuilder*) override;
+    void appendDiagnosticBSON(BSONObjBuilder*, StringData) override;
 
     virtual void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 

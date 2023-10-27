@@ -1000,8 +1000,9 @@ public:
 
     /**
      * Appends diagnostics about the replication subsystem.
+     * Places it under a subobject called `leafName`.
      */
-    virtual void appendDiagnosticBSON(BSONObjBuilder* bob) = 0;
+    virtual void appendDiagnosticBSON(BSONObjBuilder* bob, StringData leafName) = 0;
 
     /**
      * Appends connection information to the provided BSONObjBuilder.
