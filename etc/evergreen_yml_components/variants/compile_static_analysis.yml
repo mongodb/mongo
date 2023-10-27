@@ -181,7 +181,7 @@ buildvariants:
 - name: &windows-compile-required windows-compile-required
   display_name: "! Windows Compile"
   run_on:
-  - windows-vsCurrent-xlarge
+  - windows-vsCurrent-xxlarge
   modules:
   - enterprise
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
