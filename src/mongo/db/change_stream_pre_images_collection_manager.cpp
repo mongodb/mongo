@@ -469,6 +469,17 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
     // inserts and prevent users from running out of disk space.
     ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
                                                         AdmissionContext::Priority::kImmediate);
+
+    // Truncate markers should track the highest seen RecordId and wall time across pre-images to
+    // guarantee all pre-images are eventually truncated.
+    //
+    // It's possible the tenant's truncate markers aren't initialized yet. Minimize the likelihood
+    // that pre-images inserted during initialization are unaccounted for by relaxing constraints
+    // (to view the most up to date data). This is safe even during secondary batch application
+    // because the truncate marker mechanism is designed to handle unserialized inserts of
+    // pre-images.
+    opCtx->setEnforceConstraints(false);
+
     const auto preImagesColl = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),

@@ -1631,6 +1631,32 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionIsNowAView) {
     testRestoreFailsIfCollectionIsNowAView(AcquisitionPrerequisites::kWrite);
 }
 
+// Test that collection acquisiton does not change the ReadSource on a secondary when constraints
+// are relaxed.
+TEST_F(ShardRoleTest, ReadSourceDoesNotChangeOnSecondary) {
+    const auto nss = nssUnshardedCollection1;
+    ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
+                  opCtx()->recoveryUnit()->getTimestampReadSource());
+
+    opCtx()->setEnforceConstraints(false);
+
+    const auto coll = acquireCollection(
+        opCtx(),
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx()),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
+    ASSERT_TRUE(coll.exists());
+
+    ASSERT_EQUALS(RecoveryUnit::ReadSource::kNoTimestamp,
+                  opCtx()->recoveryUnit()->getTimestampReadSource());
+}
+
 TEST_F(ShardRoleTest, RestoreChangesReadSourceAfterStepUp) {
     const auto nss = nssShardedCollection1;
 
