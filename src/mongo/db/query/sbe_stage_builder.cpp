@@ -3788,14 +3788,30 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             }
         };
         if (accName == "$covarianceSamp" || accName == "$covariancePop") {
-            auto expr = dynamic_cast<ExpressionArray*>(outputField.expr->input().get());
-            tassert(7820818,
-                    "Covariance argument should be an array of two elements",
-                    expr && expr->getChildren().size() == 2);
-            auto argX = expr->getChildren()[0].get();
-            auto argY = expr->getChildren()[1].get();
-            argExprs.emplace(AccArgs::kCovarianceX, getArgExpr(argX));
-            argExprs.emplace(AccArgs::kCovarianceY, getArgExpr(argY));
+            if (auto expr = dynamic_cast<ExpressionArray*>(outputField.expr->input().get());
+                expr && expr->getChildren().size() == 2) {
+                auto argX = expr->getChildren()[0].get();
+                auto argY = expr->getChildren()[1].get();
+                argExprs.emplace(AccArgs::kCovarianceX, getArgExpr(argX));
+                argExprs.emplace(AccArgs::kCovarianceY, getArgExpr(argY));
+            } else if (auto expr =
+                           dynamic_cast<ExpressionConstant*>(outputField.expr->input().get());
+                       expr && expr->getValue().isArray() &&
+                       expr->getValue().getArray().size() == 2) {
+                auto array = expr->getValue().getArray();
+                auto bson = BSON("x" << array[0] << "y" << array[1]);
+                auto [argXTag, argXVal] =
+                    sbe::bson::convertFrom<false /* View */>(bson.getField("x"));
+                argExprs.emplace(AccArgs::kCovarianceX, makeConstant(argXTag, argXVal));
+                auto [argYTag, argYVal] =
+                    sbe::bson::convertFrom<false /* View */>(bson.getField("y"));
+                argExprs.emplace(AccArgs::kCovarianceY, makeConstant(argYTag, argYVal));
+            } else {
+                argExprs.emplace(AccArgs::kCovarianceX,
+                                 makeConstant(sbe::value::TypeTags::Null, 0));
+                argExprs.emplace(AccArgs::kCovarianceY,
+                                 makeConstant(sbe::value::TypeTags::Null, 0));
+            }
         } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
             argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
             argExprs.emplace(AccArgs::kSortBy, makeVariable(getSortBySlot().first));

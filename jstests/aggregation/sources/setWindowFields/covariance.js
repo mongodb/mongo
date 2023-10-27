@@ -6,23 +6,22 @@ import {documentBounds} from "jstests/aggregation/extras/window_function_helpers
 const coll = db[jsTestName()];
 coll.drop();
 
-const nonRemovableCovStage = {
+const getNonRemovableCovStage = (arg) => ({
     $setWindowFields: {
         sortBy: {_id: 1},
         output: {
-            popCovariance:
-                {$covariancePop: ["$x", "$y"], window: {documents: ["unbounded", "current"]}},
-            sampCovariance:
-                {$covarianceSamp: ["$x", "$y"], window: {documents: ["unbounded", "current"]}},
+            popCovariance: {$covariancePop: arg, window: {documents: ["unbounded", "current"]}},
+            sampCovariance: {$covarianceSamp: arg, window: {documents: ["unbounded", "current"]}},
         }
     },
-};
+});
+const nonRemovableCovStage = getNonRemovableCovStage(["$x", "$y"]);
 
 // Basic tests.
 assert.commandWorked(coll.insert({_id: 1, x: 0, y: 0}));
 assert.commandWorked(coll.insert({_id: 2, x: 2, y: 2}));
 
-const result = coll.aggregate([nonRemovableCovStage]).toArray();
+let result = coll.aggregate([nonRemovableCovStage]).toArray();
 assert.eq(result.length, 2);
 assert.eq(result[0].popCovariance.toFixed(2), 0.00);
 assert.eq(result[0].sampCovariance, null);
@@ -135,3 +134,36 @@ function compareCovarianceOfflineAndOnline(bounds) {
 
 // Test various type of window.
 documentBounds.forEach(compareCovarianceOfflineAndOnline);
+
+// Test covariance with incorrect runtime input types.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, x: null, y: 0}));
+assert.commandWorked(coll.insert({_id: 2, x: 0, y: null}));
+result = coll.aggregate([nonRemovableCovStage]).toArray();
+assert.eq(result.length, 2);
+assert.eq(result[0].popCovariance, null);
+assert.eq(result[0].sampCovariance, null);
+assert.eq(result[1].popCovariance, null);
+assert.eq(result[1].sampCovariance, null);
+
+// Test covariance with correct compile time input types.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, x: 0, y: 0}));
+assert.commandWorked(coll.insert({_id: 2, x: 2, y: 2}));
+result = coll.aggregate([getNonRemovableCovStage([1, 2])]).toArray();
+assert.eq(result.length, 2);
+assert.eq(result[0].popCovariance, 0);
+assert.eq(result[0].sampCovariance, null);
+assert.eq(result[1].popCovariance, 0);
+assert.eq(result[1].sampCovariance, 0);
+
+// Test covariance with incorrect compile time input types.
+coll.drop();
+assert.commandWorked(coll.insert({_id: 1, x: 0, y: 0}));
+assert.commandWorked(coll.insert({_id: 2, x: 2, y: 2}));
+result = coll.aggregate([getNonRemovableCovStage('abc')]).toArray();
+assert.eq(result.length, 2);
+assert.eq(result[0].popCovariance, null);
+assert.eq(result[0].sampCovariance, null);
+assert.eq(result[1].popCovariance, null);
+assert.eq(result[1].sampCovariance, null);
