@@ -290,6 +290,23 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         spec.setStartAtOperationTime(DocumentSourceChangeStream::getStartTimeForNewStream(expCtx));
     }
 
+    // If the stream's default version differs from the client's token version, adopt the higher.
+    // This is the token version that will be used once the stream has passed the resume token.
+    const auto clientToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
+    expCtx->changeStreamTokenVersion =
+        std::max(expCtx->changeStreamTokenVersion, clientToken.version);
+
+    // If the user explicitly requested to resume from a high water mark token, but its version
+    // differs from the version chosen above, regenerate it with the new version. There is no need
+    // for a resumed HWM stream to adopt the old token version for events at the same clusterTime.
+    const bool tokenVersionsDiffer = (clientToken.version != expCtx->changeStreamTokenVersion);
+    const bool isHighWaterMark = ResumeToken::isHighWaterMarkToken(clientToken);
+    if (isHighWaterMark && tokenVersionsDiffer && (spec.getResumeAfter() || spec.getStartAfter())) {
+        spec.setResumeAfter(ResumeToken(ResumeToken::makeHighWaterMarkToken(
+            clientToken.clusterTime, expCtx->changeStreamTokenVersion)));
+        spec.setStartAfter(boost::none);
+    }
+
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->changeStreamSpec = spec;
 

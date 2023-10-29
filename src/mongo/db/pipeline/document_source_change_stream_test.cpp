@@ -4400,24 +4400,28 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV1HighWaterMark) {
                              spec);
 
     // The high water mark token should be order ahead of every other entry with the same
-    // clusterTime. So we should see both entries that match the resumeToken's clusterTime, and both
-    // should have inherited the token version 1 from the high water mark.
+    // clusterTime. So we should see both entries that match the resumeToken's clusterTime.
+    // Even though the high watermark token has version 1, the resulting events should have
+    // the default resume token version.
     auto lastStage = stages.back();
     auto next = lastStage->getNext();
     ASSERT(next.isAdvanced());
     const auto sameTsResumeToken1 =
         ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
     ASSERT_EQ(sameTsResumeToken1.clusterTime, resumeTs);
-    ASSERT_EQ(sameTsResumeToken1.version, 1);
-    ASSERT_VALUE_EQ(sameTsResumeToken1.eventIdentifier, Value(documentKey));
+    ASSERT_EQ(sameTsResumeToken1.version, 2);
+    ASSERT_VALUE_EQ(sameTsResumeToken1.eventIdentifier,
+                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
 
     next = lastStage->getNext();
     ASSERT(next.isAdvanced());
     const auto sameTsResumeToken2 =
         ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
     ASSERT_EQ(sameTsResumeToken2.clusterTime, resumeTs);
-    ASSERT_EQ(sameTsResumeToken2.version, 1);
-    ASSERT_VALUE_EQ(sameTsResumeToken2.eventIdentifier, Value(higherDocumentKey));
+    ASSERT_EQ(sameTsResumeToken2.version, 2);
+    ASSERT_VALUE_EQ(
+        sameTsResumeToken2.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
 
     // The resumeToken after the current clusterTime should start using the default version, and
     // corresponding 'eventIdentifier' format.
