@@ -1793,7 +1793,8 @@ ThreadRunner::op_run(Operation *op)
             }
         }
     }
-    // Retry on rollback until success.
+
+    // We may retry on rollback errors.
     while (retry_op) {
         if (op->transaction != nullptr) {
             if (_in_transaction)
@@ -1846,11 +1847,23 @@ ThreadRunner::op_run(Operation *op)
             if (ret == 0)
                 cursor->reset(cursor);
             else {
-                retry_op = true;
+                /*
+                 * We don't retry on a WT_ROLLBACK error when:
+                 * - it is a mirrored operation as Workgen will create a new transaction and
+                 * - the mirror table is the one that faced the WT_ROLLBACK error as the operation
+                 * on the base table will be lost.
+                 */
+                if (op->_random_table && _icontext->_dyn_table_runtime[tint].has_mirror() &&
+                  !_icontext->_dyn_table_runtime[tint]._is_base) {
+                    VERBOSE(*this,
+                      "The table "
+                        << table_uri
+                        << " faced a WT_ROLLBACK error, giving up on the mirrored operation");
+                } else
+                    retry_op = true;
                 track->rollbacks++;
-                WT_ERR(_session->rollback_transaction(_session, nullptr));
                 _in_transaction = false;
-                ret = 0;
+                WT_ERR(_session->rollback_transaction(_session, nullptr));
             }
         } else {
             // Never retry on an internal op.
@@ -1875,7 +1888,7 @@ ThreadRunner::op_run(Operation *op)
             endtime = _op_time_us + secs_us(op->_timed);
 
         VERBOSE(
-          *this, "GROUP operation " << op->_timed << " secs, " << op->_repeatgroup << "times");
+          *this, "GROUP operation " << op->_timed << " secs, " << op->_repeatgroup << " times");
 
         do {
             // Wait for transactions to complete before stopping.
