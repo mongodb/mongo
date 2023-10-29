@@ -2777,6 +2777,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     const char *enc_cfg[] = {NULL, NULL}, *merge_cfg;
     char version[64];
 
+    WT_VERIFY_OPAQUE_POINTER(WT_CONNECTION_IMPL);
+
     /* Leave lots of space for optional additional configuration. */
     const char *cfg[] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
@@ -3245,7 +3247,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      */
     F_SET(session, WT_SESSION_NO_DATA_HANDLES);
 
-    WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
     F_SET(conn, WT_CONN_READY);
     F_CLR(conn, WT_CONN_MINIMAL);
     *connectionp = &conn->iface;

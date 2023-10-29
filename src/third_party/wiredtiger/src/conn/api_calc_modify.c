@@ -99,7 +99,7 @@ __cm_fingerprint(const uint8_t *p)
 {
     uint64_t h;
 
-    WT_STATIC_ASSERT(sizeof(h) <= WT_CM_BLOCKSIZE);
+    static_assert(sizeof(h) <= WT_CM_BLOCKSIZE, "calc modify block size exceeded");
     memcpy(&h, p, WT_CM_BLOCKSIZE);
     return (h);
 }

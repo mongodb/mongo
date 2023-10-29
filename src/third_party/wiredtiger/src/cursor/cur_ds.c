@@ -460,7 +460,7 @@ __wt_curds_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, con
     WT_DECL_RET;
     char *metaconf;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_DATA_SOURCE, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_DATA_SOURCE);
 
     metaconf = NULL;
 

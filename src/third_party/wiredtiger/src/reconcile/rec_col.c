@@ -1008,6 +1008,15 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
     uint32_t auxheaderoffset, bitmapsize, offset, space;
     uint8_t *endp, *p;
 
+    /*
+     * Encoding the offset should fit -- either it is less than what encodes to 1 byte or greater
+     * than or equal to the maximum header size. This works out to asserting that the latter is less
+     * than the maximum 1-byte-encoded integer. That in turn is a static condition.
+     *
+     * This in turn guarantees that the pack calls cannot fail.
+     */
+    static_assert(WT_COL_FIX_AUXHEADER_SIZE_MAX < POS_1BYTE_MAX, "col fix aux header check failed");
+
     btree = S2BT(session);
     WT_UNUSED(size); /* only used in DIAGNOSTIC */
 
@@ -1080,15 +1089,6 @@ __wt_rec_col_fix_write_auxheader(WT_SESSION_IMPL *session, uint32_t entries,
 
     /* The offset we're going to write is the distance from the header start to the data. */
     offset = aux_start_offset - auxheaderoffset;
-
-    /*
-     * Encoding the offset should fit -- either it is less than what encodes to 1 byte or greater
-     * than or equal to the maximum header size. This works out to asserting that the latter is less
-     * than the maximum 1-byte-encoded integer. That in turn is a static condition.
-     *
-     * This in turn guarantees that the pack calls cannot fail.
-     */
-    WT_STATIC_ASSERT(WT_COL_FIX_AUXHEADER_SIZE_MAX < POS_1BYTE_MAX);
 
     p = image + auxheaderoffset;
     endp = image + aux_start_offset;

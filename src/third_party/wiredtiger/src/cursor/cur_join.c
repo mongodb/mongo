@@ -1241,7 +1241,7 @@ __wt_curjoin_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
     size_t size;
     const char *tablename, *columns;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_JOIN, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_JOIN);
 
     if (owner != NULL)
         WT_RET_MSG(session, EINVAL, "unable to initialize a join cursor with existing owner");

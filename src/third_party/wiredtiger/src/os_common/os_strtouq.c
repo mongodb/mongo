@@ -19,7 +19,8 @@ __wt_strtouq(const char *nptr, char **endptr, int base)
 #if defined(HAVE_STRTOUQ)
     return (strtouq(nptr, endptr, base));
 #else
-    WT_STATIC_ASSERT(sizeof(uint64_t) == sizeof(unsigned long long));
+    static_assert(
+      sizeof(uint64_t) == sizeof(unsigned long long), "unsigned long long is not 64 bytes");
 
     return (strtoull(nptr, endptr, base));
 #endif

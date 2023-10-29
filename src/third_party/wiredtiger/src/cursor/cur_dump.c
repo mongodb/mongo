@@ -423,7 +423,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
     WT_SESSION_IMPL *session;
     const char *cfg[2];
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_DUMP, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_DUMP);
 
     session = (WT_SESSION_IMPL *)child->session;
 

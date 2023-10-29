@@ -354,7 +354,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], W
     WT_DECL_RET;
     WT_LOG *log;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_LOG);
 
     conn = S2C(session);
     log = conn->log;

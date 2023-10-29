@@ -647,7 +647,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
     WT_DECL_RET;
     size_t i;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_STAT);
 
     conn = S2C(session);
 

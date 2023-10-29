@@ -279,7 +279,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     WT_CURSOR_BACKUP *cb, *othercb;
     WT_DECL_RET;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_BACKUP);
 
     WT_RET(__wt_calloc_one(session, &cb));
     cursor = (WT_CURSOR *)cb;

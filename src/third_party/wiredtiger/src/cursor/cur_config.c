@@ -62,7 +62,7 @@ __wt_curconfig_open(
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_CONFIG);
 
     WT_RET(__wt_calloc_one(session, &cconfig));
     cursor = (WT_CURSOR *)cconfig;

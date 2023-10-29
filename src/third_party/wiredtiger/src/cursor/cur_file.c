@@ -974,7 +974,7 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
     size_t csize;
     bool cacheable;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_BTREE);
 
     btree = S2BT(session);
     WT_ASSERT(session, btree != NULL);

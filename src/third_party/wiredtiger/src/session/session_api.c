@@ -2492,6 +2492,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
     WT_SESSION_IMPL *session, *session_ret;
     uint32_t i;
 
+    WT_VERIFY_OPAQUE_POINTER(WT_SESSION_IMPL);
+
     *sessionp = NULL;
 
     session = conn->default_session;
@@ -2621,7 +2623,6 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      */
     WT_PUBLISH(session_ret->active, 1);
 
-    WT_STATIC_ASSERT(offsetof(WT_SESSION_IMPL, iface) == 0);
     *sessionp = session_ret;
 
     WT_STAT_CONN_INCR(session, session_open);

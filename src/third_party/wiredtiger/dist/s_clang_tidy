@@ -33,11 +33,6 @@ rm -rf ${t_pfx}build && mkdir ${t_pfx}build
 cp ${t_pfx}build/config/wiredtiger_config.h $t
 sed '/HAVE_X86INTRIN_H/d' < $t > ${t_pfx}build/config/wiredtiger_config.h
 
-# We need a custom verify_build.h, clang-tidy doesn't like the magic.
-f=src/include/verify_build.h
-cat $f > $f.save
-echo '#define WT_STATIC_ASSERT(a)' > $f
-
 def="-D_GNU_SOURCE"
 inc="-I${t_pfx}build/config -I${t_pfx}build/include -Isrc/include"
 
@@ -69,11 +64,6 @@ $tidy --quiet $f "-header-filter=.*,$args" -- $def $inc > $t
 
 f=`echo src/[a-np-z]*/*.c src/os_posix/*.c`
 $tidy --quiet $f "$args" -- $def $inc >> $t
-
-# Restore verify_build.h.
-f=src/include/verify_build.h
-cat $f.save > $f
-rm -f $f.save
 
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 echo 'clang-tidy output'

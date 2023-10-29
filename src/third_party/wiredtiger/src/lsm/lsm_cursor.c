@@ -1712,7 +1712,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, cons
     WT_LSM_TREE *lsm_tree;
     bool bulk;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_LSM);
 
     clsm = NULL;
     cursor = NULL;

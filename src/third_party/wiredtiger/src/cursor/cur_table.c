@@ -1081,7 +1081,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
     int cfg_cnt;
     const char *tablename, *columns;
 
-    WT_STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
+    WT_VERIFY_OPAQUE_POINTER(WT_CURSOR_TABLE);
 
     tablename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
