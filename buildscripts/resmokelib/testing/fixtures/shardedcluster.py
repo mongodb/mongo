@@ -22,10 +22,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def __init__(self, logger, job_num, fixturelib, mongos_options=None, mongod_executable=None,
                  mongod_options=None, dbpath_prefix=None, preserve_dbpath=False, num_shards=1,
-                 num_rs_nodes_per_shard=1, num_mongos=1, enable_sharding=None, enable_balancer=True,
-                 auth_options=None, configsvr_options=None, shard_options=None,
-                 cluster_logging_prefix=None, config_shard=None, use_auto_bootstrap_procedure=None,
-                 embedded_router=False):
+                 num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
+                 configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
+                 config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -59,7 +58,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.num_shards = num_shards
         self.num_rs_nodes_per_shard = num_rs_nodes_per_shard
         self.num_mongos = num_mongos
-        self.enable_sharding = self.fixturelib.default_if_none(enable_sharding, [])
         self.enable_balancer = enable_balancer
         self.auth_options = auth_options
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
@@ -185,45 +183,12 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # database.
         self.configsvr.await_last_op_committed()
 
-        # Enable sharding on each of the specified databases
-        for db_name in self.enable_sharding:
-            self.logger.info("Enabling sharding for '%s' database...", db_name)
-            client.admin.command({"enablesharding": db_name})
-
-        # Wait for mongod's to be ready.
-        self._await_mongod_sharding_initialization()
-
         # Ensure that the sessions collection gets auto-sharded by the config server
         if self.configsvr is not None:
             self.refresh_logical_session_cache(self.configsvr)
 
         for shard in self.shards:
             self.refresh_logical_session_cache(shard)
-
-    def _await_mongod_sharding_initialization(self):
-        if (self.enable_sharding) and (self.num_rs_nodes_per_shard is not None):
-            deadline = time.time(
-            ) + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
-            timeout_occurred = lambda: deadline - time.time() <= 0.0
-
-            for shard in self.shards:
-                for mongod in shard.nodes:
-
-                    client = interface.build_client(mongod, self.auth_options)
-                    port = mongod.port
-
-                    while True:
-                        # The choice of namespace (local.fooCollection) does not affect the output.
-                        get_shard_version_result = client.admin.command(
-                            "getShardVersion", "local.fooCollection", check=False)
-                        if get_shard_version_result["ok"]:
-                            break
-
-                        if timeout_occurred():
-                            raise self.fixturelib.ServerFailure(
-                                "mongod on port: {} failed waiting for getShardVersion success after {} seconds"
-                                .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
-                        time.sleep(0.1)
 
     # TODO: Remove with SERVER-80100.
     def _await_auto_bootstrapped_config_shard(self, config_shard_rs):

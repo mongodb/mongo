@@ -8,6 +8,7 @@
  */
 
 import {anyEq, desugarSingleStageAggregation} from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -237,6 +238,13 @@ function modifyObjectAtPath(orig, path) {
     }
 
     return orig;
+}
+
+// TODO SERVER-82095 remove creation of database once
+// explain behavior will be equal in both standalone and sharded cluster
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
 }
 
 for (let i = 0; i < testCases.length; i++) {

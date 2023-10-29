@@ -116,5 +116,3 @@ executor:
           replication:
             heartbeats: 2
     num_rs_nodes_per_shard: 2
-    enable_sharding:
-    - test

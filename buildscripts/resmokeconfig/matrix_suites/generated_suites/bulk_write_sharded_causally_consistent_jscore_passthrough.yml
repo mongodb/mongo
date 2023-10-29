@@ -22,8 +22,6 @@ executor:
         ; await import(''jstests/libs/override_methods/single_crud_op_as_bulk_write.js'');'
   fixture:
     class: ShardedClusterFixture
-    enable_sharding:
-    - test
     mongod_options:
       enableMajorityReadConcern: ''
       set_parameters:

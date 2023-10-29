@@ -5,6 +5,7 @@
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const kErrorCodeMergeBannedInLookup = 51047;
 const coll = db.merge_in_lookup_not_allowed;
@@ -12,6 +13,13 @@ coll.drop();
 
 const from = db.merge_in_lookup_not_allowed_from;
 from.drop();
+
+// TODO SERVER-82045 remove creation of database once
+// $lookup/$merge behavior will be equal in both standalone and sharded cluster
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+}
 
 let pipeline = [
         {

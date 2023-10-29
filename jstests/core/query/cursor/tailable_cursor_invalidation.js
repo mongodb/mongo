@@ -22,24 +22,25 @@ assert.eq(0, assert.commandWorked(db.runCommand({find: collName, tailable: true}
 assert.eq(0,
           assert.commandWorked(db.runCommand({find: collName, tailable: true, awaitData: true}))
               .cursor.id);
-const emptyBatchCursorId = assert
-                               .commandWorked(db.runCommand(
-                                   {find: collName, tailable: true, awaitData: true, batchSize: 0}))
-                               .cursor.id;
+
+// TODO SERVER-82107 stop dropping the database when testing on sharded cluster.
 if (FixtureHelpers.isMongos(db)) {
-    // Mongos will let you establish a cursor with batch size 0 and return to you before it
-    // realizes the shard's cursor is exhausted. The next getMore should return a 0 cursor id
-    // though.
-    assert.neq(emptyBatchCursorId, 0);
-    assert.eq(
-        0,
-        assert.commandWorked(db.runCommand({getMore: emptyBatchCursorId, collection: collName}))
-            .cursor.id);
-} else {
-    // A mongod should know immediately that the collection doesn't exist, and return a 0 cursor
-    // id.
-    assert.eq(0, emptyBatchCursorId);
+    // In sharded cluster, if the database exists, the mongos will let you establish a cursor with
+    // batch size 0 and return to you before it realizes the shard's cursor is exhausted. The next
+    // getMore should return a 0 cursor id though.
+    //
+    // On the other hand on non-sharded deployments, the mongod will know immediately that the
+    // collection doesn't exist, and return a 0 cursor id.
+    //
+    // Drop the database to make sure mongos will bheave the same as mongod would.
+    db.dropDatabase();
 }
+
+assert.eq(0,
+          assert
+              .commandWorked(
+                  db.runCommand({find: collName, tailable: true, awaitData: true, batchSize: 0}))
+              .cursor.id);
 
 function dropAndRecreateColl() {
     coll.drop();

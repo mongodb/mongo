@@ -27,8 +27,6 @@ executor:
             causalConsistency: true
   fixture:
     class: ShardedClusterFixture
-    enable_sharding:
-    - test
     mongod_options:
       set_parameters:
         coordinateCommitReturnImmediatelyAfterPersistingDecision: true

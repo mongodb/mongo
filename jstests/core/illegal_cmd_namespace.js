@@ -6,6 +6,16 @@
  *   assumes_unsharded_collection,
  * ]
  */
+
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO SERVER-82107 remove creation of database once
+// find behavior will be the same in both standalone/replicaset and sharded cluster
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+}
+
 function testBadNamespace(collName) {
     const coll = db[collName];
     assert.commandFailedWithCode(db.runCommand({find: collName}), ErrorCodes.InvalidNamespace);

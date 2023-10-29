@@ -21,6 +21,15 @@
 //   does_not_support_causal_consistency,
 // ]
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO SERVER-82096 remove creation of database once
+// count behavior will be the same in both standalone/replicaset and sharded cluster
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+}
+
 var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
 var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
 var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};

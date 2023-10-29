@@ -5,9 +5,18 @@
 // SERVER-8514: Test the count command returns an error to the user when given an invalid query
 // predicate, even when the collection doesn't exist.
 
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 var t = db.count11;
 
 t.drop();
+
+// TODO SERVER-82096 remove creation of database once
+// count behavior will be the same in both standalone/replicaset and sharded cluster
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+}
 
 var validQuery = {a: 1};
 var invalidQuery = {a: {$invalid: 1}};

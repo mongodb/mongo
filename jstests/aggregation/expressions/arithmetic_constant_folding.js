@@ -10,6 +10,14 @@ import {
     assertArrayEq,
     getExplainedPipelineFromAggregation
 } from "jstests/aggregation/extras/utils.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO SERVER-82095 remove creation of database once
+// explain behavior will be equal in both standalone and sharded cluster
+if (FixtureHelpers.isMongos(db)) {
+    // Create database
+    assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
+}
 
 (function() {
 const collName = jsTest.name();

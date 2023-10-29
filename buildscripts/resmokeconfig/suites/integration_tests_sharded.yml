@@ -31,5 +31,3 @@ executor:
         logComponentVerbosity:
           command: 2
         enableTestCommands: 1
-    enable_sharding:
-    - test

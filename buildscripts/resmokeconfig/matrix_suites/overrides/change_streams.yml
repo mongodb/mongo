@@ -65,8 +65,6 @@
         mongod_options:
           set_parameters:
             coordinateCommitReturnImmediatelyAfterPersistingDecision: true
-        enable_sharding:
-        - test
 
 - name: sharded_collections_passthrough_excludes
   value:
@@ -102,7 +100,6 @@
               command: 1
               query: 1
               replication: 3
-        enable_sharding: null
         num_shards: null
         # This suite requires w:"majority" writes to be applied on all shard secondaries.
         # By setting shards to two node replsets, the majority is all voting nodes.

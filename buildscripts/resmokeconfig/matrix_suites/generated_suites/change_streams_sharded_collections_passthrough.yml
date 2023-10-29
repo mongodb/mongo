@@ -22,8 +22,6 @@ executor:
           enableMajorityReadConcern: ''
   fixture:
     class: ShardedClusterFixture
-    enable_sharding:
-    - test
     mongod_options:
       bind_ip_all: ''
       set_parameters:
