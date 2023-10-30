@@ -485,6 +485,7 @@ functions:
         . test/evergreen/find_cmake.sh
         cd cmake_build/${directory}
         $CTEST ${extra_args} --output-on-failure 2>&1
+
   "make check all":
     command: shell.exec
     params:
@@ -497,7 +498,7 @@ functions:
         . test/evergreen/find_cmake.sh
         cd cmake_build
         echo "Using number of parallel processes '-j ${num_jobs}' for 'make check all'"
-        $CTEST -L check -j ${num_jobs} --output-on-failure ${check_args|} 2>&1
+        $CTEST -L check -j ${num_jobs} --output-on-failure ${extra_args|} 2>&1
 
   # The following cppsuite tasks define a greater overall task.
   "cppsuite test run": &cppsuite_test_run
@@ -2174,70 +2175,15 @@ tasks:
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
-
-  - name: csuite-incr-backup-test
+  - name: csuite-tests-pull-request
     tags: ["pull_request"]
-    depends_on:
-      - name: compile
     commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "make check directory"
         vars:
-          test_name: incr_backup
-
-  - name: csuite-random-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: random
-
-  - name: csuite-random-abort-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite smoke test"
-        vars:
-          test_args: cmake_build/test/csuite/random_abort/test_random_abort
-          test_binary: random_abort
-
-  - name: csuite-random-directio-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite smoke test"
-        vars:
-          test_args: cmake_build/test/csuite/random_directio/test_random_directio
-          test_binary: random_directio
-
-  - name: csuite-schema-abort-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite smoke test"
-        vars:
-          test_args: cmake_build/test/csuite/schema_abort/test_schema_abort
-          test_binary: schema_abort
-
-  - name: csuite-timestamp-abort-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite smoke test"
-        vars:
-          test_args: -b cmake_build/test/csuite/timestamp_abort/test_timestamp_abort
-          test_binary: timestamp_abort
+          directory: test/csuite
+          extra_args: -LE "long_running" -j ${num_jobs}
 
   - name: csuite-timestamp-abort-test-s3
     commands:
@@ -2258,368 +2204,6 @@ tasks:
 
             ./test_timestamp_abort -PT -Po s3_store
 
-  - name: csuite-timestamp-abort-stress-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite smoke test"
-        vars:
-          test_args: -s -b cmake_build/test/csuite/timestamp_abort/test_timestamp_abort
-          test_binary: timestamp_abort
-
-  - name: csuite-scope-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: scope
-
-  - name: csuite-truncated-log-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: truncated_log
-
-  - name: csuite-wt1965-col-efficiency-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt1965_col_efficiency
-
-  - name: csuite-wt2403-lsm-workload-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2403_lsm_workload
-
-  - name: csuite-wt2447-join-main-table-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2447_join_main_table
-
-  - name: csuite-wt2695-checksum-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2695_checksum
-
-  - name: csuite-wt2592-join-schema-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2592_join_schema
-
-  - name: csuite-wt2719-reconfig-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2719_reconfig
-
-  - name: csuite-wt2999-join-extractor-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2999_join_extractor
-
-  - name: csuite-wt3120-filesys-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_args: -b $(pwd)
-          test_name: wt3120_filesys
-
-  - name: csuite-wt3135-search-near-collator-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt3135_search_near_collator
-
-  - name: csuite-wt3184-dup-index-collator-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt3184_dup_index_collator
-
-  - name: csuite-wt3363-checkpoint-op-races-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt3363_checkpoint_op_races
-
-  - name: csuite-wt3874-pad-byte-collator-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt3874_pad_byte_collator
-
-  - name: csuite-wt4105-large-doc-small-upd-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4105_large_doc_small_upd
-
-  - name: csuite-wt4117-checksum-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4117_checksum
-
-  - name: csuite-wt4156-metadata-salvage-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4156_metadata_salvage
-
-  - name: csuite-wt4699-json-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4699_json
-
-  - name: csuite-wt4803-history-store-abort-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4803_history_store_abort
-
-  - name: csuite-wt4891-meta-ckptlist-get-alloc-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4891_meta_ckptlist_get_alloc
-
-  - name: csuite-wt6185-modify-ts-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt6185_modify_ts
-
-  - name: csuite-rwlock-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: rwlock
-
-  - name: csuite-wt2246-col-append-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2246_col_append
-
-  - name: csuite-wt2323-join-visibility-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2323_join_visibility
-
-  - name: csuite-wt2535-insert-race-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2535_insert_race
-
-  - name: csuite-wt2834-join-bloom-fix-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt2834_join_bloom_fix
-
-  - name: csuite-wt2909-checkpoint-integrity-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_args: -b $(pwd)
-          test_name: wt2909_checkpoint_integrity
-
-  - name: csuite-wt3338-partial-update-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt3338_partial_update
-
-  - name: csuite-wt4333-handle-locks-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt4333_handle_locks
-
-  - name: csuite-wt6616-checkpoint-oldest-ts-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt6616_checkpoint_oldest_ts
-
-  - name: csuite-wt7989-compact-checkpoint-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt7989_compact_checkpoint
-
-  - name: csuite-wt8057-compact-stress-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt8057_compact_stress
-
-  - name: csuite-wt8246-compact-rts-data-correctness-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt8246_compact_rts_data_correctness
-
-  - name: csuite-wt8659-reconstruct-database-from-logs-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt8659_reconstruct_database_from_logs
-
-  - name: csuite-wt8963-insert-stress-test
-    tags: ["stress-test-1"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "csuite test"
-        vars:
-          test_name: wt8963_insert_stress
-
   - name: csuite-wt8963-insert-stress-test-nonstandalone
     tags: ["stress-test-1-nonstandalone"]
     commands:
@@ -2631,25 +2215,6 @@ tasks:
         vars:
           test_name: wt8963_insert_stress
 
-  - name: csuite-wt9937-parse-opts-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt9937_parse_opts
-
-  - name: csuite-wt10461-skip-list-stress-test
-    tags: ["stress-test-1"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-      - func: "csuite test"
-        vars:
-          test_name: wt10461_skip_list_stress
-
   - name: csuite-wt10461-skip-list-stress-test-nonstandalone
     tags: ["stress-test-1"]
     commands:
@@ -2660,27 +2225,6 @@ tasks:
       - func: "csuite test"
         vars:
           test_name: wt10461_skip_list_stress
-
-  - name: csuite-wt10897-compact-quick-interrupt-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt10897_compact_quick_interrupt
-
-  - name: csuite-wt11440-config-check-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt11440_config_check
-
   # End of csuite test tasks
 
   # Start of Python unit test tasks
@@ -6426,7 +5970,7 @@ buildvariants:
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
-    check_args: -LE "cppsuite|long_running"
+    extra_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: clang-analyzer

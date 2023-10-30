@@ -90,8 +90,11 @@ def find_tests_missing_evg_cfg(test_type, dirs, evg_cfg_file):
     debug('\n')
     missing_tests = {}
     for d in dirs:
-        # Figure out the Evergreen task name from the directory name
+        # Skip csuite tests as we run all of them using ctest.
+        if test_type == 'csuite':
+            continue
 
+        # Figure out the Evergreen task name from the directory name
         if test_type == 'make_check':
             # The Evergreen task name for each 'make check' test is worked out from directory name
             # E.g. for 'make check' directory 'test/cursor_order', the corresponding Evergreen
@@ -100,15 +103,6 @@ def find_tests_missing_evg_cfg(test_type, dirs, evg_cfg_file):
             dir_wo_test_prefix = d[len("test/"):] if d.startswith("test/") else d
             evg_task_name = dir_wo_test_prefix.replace('/', '-').replace('_', '-') + '-test'
             debug("Evergreen task name for make check directory '%s' is: %s" % (d, evg_task_name))
-
-        elif test_type == 'csuite':
-            # The Evergreen task name for each 'csuite' test is worked out from sub directory name
-            # E.g. for 'test/csuite' sub directory 'wt3184_dup_index_collator', the corresponding
-            # Evergreen task name will be 'csuite-wt3184-dup-index-collator-test'.
-
-            evg_task_name = 'csuite-' + d.replace('_', '-') + '-test'
-            debug("Evergreen task name for csuite sub directory '%s' is: %s" % (d, evg_task_name))
-
         else:
             sys.exit("Unsupported test_type '%s'" % test_type)
 
@@ -120,7 +114,7 @@ def find_tests_missing_evg_cfg(test_type, dirs, evg_cfg_file):
             # Missing task/test found
             missing_tests.update({evg_task_name: d})
             print("Task '%s' (for directory '%s') is missing in %s!" %
-                  (evg_task_name, d, evg_cfg_file))
+                (evg_task_name, d, evg_cfg_file))
 
     return missing_tests
 
