@@ -450,19 +450,20 @@ public:
 
             invariant(!_commandObj.isEmpty());
 
-            if (const auto& shardVersion = _commandObj.getField("shardVersion");
-                !shardVersion.eoo()) {
-                bob->append(shardVersion);
-            }
-            if (const auto& databaseVersion = _commandObj.getField("databaseVersion");
-                !databaseVersion.eoo()) {
-                bob->append(databaseVersion);
-            }
-
             bob->append("find", _commandObj["update"].String());
             extractQueryDetails(_updateOpObj, bob);
             bob->append("batchSize", 1);
             bob->append("singleBatch", true);
+
+            if (const auto& shardVersion = _commandObj.getField("shardVersion");
+                !shardVersion.eoo()) {
+                bob->append(shardVersion);
+            }
+
+            if (const auto& databaseVersion = _commandObj.getField("databaseVersion");
+                !databaseVersion.eoo()) {
+                bob->append(databaseVersion);
+            }
 
             if (const auto& encryptionInfo = _commandObj.getField("encryptionInformation");
                 !encryptionInfo.eoo()) {
