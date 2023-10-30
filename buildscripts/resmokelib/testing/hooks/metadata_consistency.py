@@ -13,6 +13,13 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
 
     IS_BACKGROUND = True
 
+    # The 'CheckMetadataConsistency' hook relies on the 'isMaster' command to asses if the fixture cluster is sharded.
+    # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
+    SKIP_TESTS = [
+        "build/install/bin/executor_integration_test", "build/install/bin/rpc_integration_test",
+        "build/install/bin/transport_integration_test"
+    ]
+
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
 
@@ -67,6 +74,10 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
             test.logger, test, self, self._js_filename, shell_options)
         hook_test_case.configure(self.fixture)
 
+        if test.test_name in self.SKIP_TESTS:
+            self.logger.info("Metadata consistency check explicitely disabled for {test.test_name}")
+            return
+
         self.logger.info("Resuming background metadata consistency checker thread")
         self._background_job.resume(hook_test_case, test_report)
 
@@ -76,6 +87,9 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
         """
 
         if self._background_job is None:
+            return
+
+        if test.test_name in self.SKIP_TESTS:
             return
 
         self.logger.info("Pausing background metadata consistency checker thread")
