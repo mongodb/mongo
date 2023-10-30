@@ -195,7 +195,6 @@ void BalancerStatsRegistry::terminate() {
 }
 
 void BalancerStatsRegistry::onStepDown() {
-    // TODO SERVER-65817 inline the terminate() function
     terminate();
     _state.store(State::kSecondary);
 }
