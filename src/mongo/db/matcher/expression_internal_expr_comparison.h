@@ -64,25 +64,21 @@ namespace mongo {
  *
  * - Comparison to an array is illegal. It is invalid usage to construct a
  *   InternalExprComparisonMatchExpression node which compares to an array.
+ *
+ * These expressions are always treated as "imprecise" and are to be used as the first level in a
+ * two-level filtering scheme. They must always be accompanied by a later filter which is precise.
  */
 template <typename T>
 class InternalExprComparisonMatchExpression : public ComparisonMatchExpressionBase {
 public:
-    /**
-     * Constructor. 'mustExecute' indicates whether this match expression is forced to be evaluated.
-     * This defaults to false since InternalExpr* expressions are permitted to return false
-     * positives and are sometimes elided from execution plans.
-     */
     InternalExprComparisonMatchExpression(MatchType type,
                                           boost::optional<StringData> path,
-                                          BSONElement value,
-                                          bool mustExecute)
+                                          BSONElement value)
         : ComparisonMatchExpressionBase(type,
                                         path,
                                         Value(value),
                                         ElementPath::LeafArrayBehavior::kNoTraversal,
-                                        ElementPath::NonLeafArrayBehavior::kMatchSubpath),
-          _mustExecute(mustExecute) {
+                                        ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
         invariant(_rhs.type() != BSONType::Undefined);
         invariant(_rhs.type() != BSONType::Array);
     }
@@ -131,19 +127,6 @@ public:
     StringData name() const final {
         return T::kName;
     };
-
-    /*
-     * Return whether this node is marked as 'mustExecute'. InternalExpr* nodes without this flag
-     * set may get elided from the execution plan, since InternalExpr* expressions are permitted to
-     * return false positives. Setting the flag forces the execution system to evaluate these
-     * predicates.
-     */
-    bool mustExecute() const {
-        return _mustExecute;
-    }
-
-private:
-    bool _mustExecute;
 };
 
 
@@ -152,11 +135,9 @@ class InternalExprEqMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprEq"_sd;
 
-    InternalExprEqMatchExpression(boost::optional<StringData> path,
-                                  BSONElement value,
-                                  bool mustExecute = false)
+    InternalExprEqMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprEqMatchExpression>(
-              MatchType::INTERNAL_EXPR_EQ, path, value, mustExecute) {}
+              MatchType::INTERNAL_EXPR_EQ, path, value) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -172,11 +153,9 @@ class InternalExprGTMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprGt"_sd;
 
-    InternalExprGTMatchExpression(boost::optional<StringData> path,
-                                  BSONElement value,
-                                  bool mustExecute = false)
+    InternalExprGTMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTMatchExpression>(
-              MatchType::INTERNAL_EXPR_GT, path, value, mustExecute) {}
+              MatchType::INTERNAL_EXPR_GT, path, value) {}
 
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -193,11 +172,9 @@ class InternalExprGTEMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprGte"_sd;
 
-    InternalExprGTEMatchExpression(boost::optional<StringData> path,
-                                   BSONElement value,
-                                   bool mustExecute = false)
+    InternalExprGTEMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprGTEMatchExpression>(
-              MatchType::INTERNAL_EXPR_GTE, path, value, mustExecute) {}
+              MatchType::INTERNAL_EXPR_GTE, path, value) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -213,11 +190,9 @@ class InternalExprLTMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprLt"_sd;
 
-    InternalExprLTMatchExpression(boost::optional<StringData> path,
-                                  BSONElement value,
-                                  bool mustExecute = false)
+    InternalExprLTMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTMatchExpression>(
-              MatchType::INTERNAL_EXPR_LT, path, value, mustExecute) {}
+              MatchType::INTERNAL_EXPR_LT, path, value) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);
@@ -233,11 +208,9 @@ class InternalExprLTEMatchExpression final
 public:
     static constexpr StringData kName = "$_internalExprLte"_sd;
 
-    InternalExprLTEMatchExpression(boost::optional<StringData> path,
-                                   BSONElement value,
-                                   bool mustExecute = false)
+    InternalExprLTEMatchExpression(boost::optional<StringData> path, BSONElement value)
         : InternalExprComparisonMatchExpression<InternalExprLTEMatchExpression>(
-              MatchType::INTERNAL_EXPR_LTE, path, value, mustExecute) {}
+              MatchType::INTERNAL_EXPR_LTE, path, value) {}
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

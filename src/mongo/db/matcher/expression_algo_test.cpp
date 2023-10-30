@@ -2836,4 +2836,43 @@ TEST(SplitMatchExpressionForColumns, LeavesOriginalMatchExpressionFunctional) {
         BSON("albatross" << 45 << "blackbird" << 1 << "cowbird" << 2)));
 }
 
+TEST(RemoveImprecisePredicates, LeavesImprecisePredicatesInOrs) {
+    const auto predicateStr =
+        "{"
+        " $or: [{a: {$_internalExprEq: 123}}, {b: {gt: 5}}]"
+        "}";
+
+    ParsedMatchExpressionForTest predicate(predicateStr);
+    auto expr = predicate.release();
+
+    expression::removeImpreciseInternalExprNodes(expr.get());
+    MatchExpression::sortTree(expr.get());
+
+    auto expected = ParsedMatchExpressionForTest(predicateStr).release();
+    MatchExpression::sortTree(expected.get());
+    ASSERT(expected->equivalent(expr.get()));
+}
+
+TEST(RemoveImprecisePredicates, RemovesImprecisePredicateFromNestedAnds) {
+    const auto predicateStr =
+        "{"
+        " $or: [{$and: [{$expr: {$eq: ['$a', 123]}}, {a: {$_internalExprEq: 123}}]}, "
+        "       {$and: [{$expr: {$eq: ['$b', 456]}}, {b: {$_internalExprEq: 456}}]}] "
+        "}";
+
+    ParsedMatchExpressionForTest predicate(predicateStr);
+    auto expr = predicate.release();
+
+    expression::removeImpreciseInternalExprNodes(expr.get());
+    MatchExpression::sortTree(expr.get());
+
+    const auto expectedStr =
+        "{"
+        " $or: [{$and: [{$expr: {$eq: ['$a', {$const: 123}]}}]}, {$and: [{$expr: {$eq: ['$b', "
+        "{$const: 456}]}}]}] "
+        "}";
+    auto expected = ParsedMatchExpressionForTest(expectedStr).release();
+    MatchExpression::sortTree(expected.get());
+    ASSERT(expected->equivalent(expr.get()));
+}
 }  // namespace mongo

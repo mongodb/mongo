@@ -8,6 +8,10 @@
  *   do_not_wrap_aggregations_in_facets,
  *   # Explicitly testing optimization.
  *   requires_pipeline_optimization,
+ *   # This test checks explain output exactly. In 7.2 an optimization was added to remove certain
+ *   # imprecise predicates from the plan, so earlier versions witll have a slightly different
+ *   # explain.
+ *   requires_fcv_72
  * ]
  */
 import {getPlanStage, getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
@@ -102,7 +106,6 @@ function assertScanFilterEq({coll, pipeline, filter}) {
             $and: [
                 {c: {$gt: 500}},
                 {$expr: {$lt: ["$c", {$const: 800}]}},
-                {c: {$_internalExprLt: 800}},
             ]
         }
     });

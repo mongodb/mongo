@@ -973,18 +973,7 @@ public:
         generatePredicate(_context, *expr->fieldRef(), makePredicate, traversalMode, hasNull);
     }
 
-    void translateExprComparison(const ComparisonMatchExpressionBase* expr, bool mustExecute) {
-        /**
-         * Since InternalExpr* are permitted to return false positives, we simply compile this to an
-         * always "true" expression. In practice, most of the time when an InternalExpr is not
-         * marked with 'mustExecute' it is accompanied by a more precise check which removes the
-         * false positives.
-         */
-        if (!mustExecute) {
-            generateAlwaysBoolean(_context, true);
-            return;
-        }
-
+    void translateExprComparison(const ComparisonMatchExpressionBase* expr) {
         ExpressionCompare::CmpOp cmp = [&]() {
             switch (expr->matchType()) {
                 case MatchExpression::MatchType::INTERNAL_EXPR_EQ:
@@ -1038,19 +1027,19 @@ public:
     }
 
     void visit(const InternalExprEqMatchExpression* expr) final {
-        translateExprComparison(expr, expr->mustExecute());
+        translateExprComparison(expr);
     }
     void visit(const InternalExprGTMatchExpression* expr) final {
-        translateExprComparison(expr, expr->mustExecute());
+        translateExprComparison(expr);
     }
     void visit(const InternalExprGTEMatchExpression* expr) final {
-        translateExprComparison(expr, expr->mustExecute());
+        translateExprComparison(expr);
     }
     void visit(const InternalExprLTMatchExpression* expr) final {
-        translateExprComparison(expr, expr->mustExecute());
+        translateExprComparison(expr);
     }
     void visit(const InternalExprLTEMatchExpression* expr) final {
-        translateExprComparison(expr, expr->mustExecute());
+        translateExprComparison(expr);
     }
 
     void visit(const InternalEqHashedKey* expr) final {}

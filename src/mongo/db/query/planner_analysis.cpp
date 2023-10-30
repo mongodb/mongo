@@ -863,6 +863,35 @@ void QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(QuerySoluti
 }
 
 // static
+void QueryPlannerAnalysis::removeImpreciseInternalExprFilters(const QueryPlannerParams& params,
+                                                              QuerySolutionNode& root) {
+    if (params.collectionStats.isTimeseries) {
+        // For timeseries collections, the imprecise filters are able to get rid of an entire
+        // bucket's worth of data, and save us from unpacking potentially thousands of documents.
+        // In this case, we decide not to prune the imprecise filters.
+        return;
+    }
+
+    // In principle we could do this optimization for TEXT queries, but for simplicity we do not
+    // today.
+    const auto stageType = root.getType();
+    if (stageType == StageType::STAGE_TEXT_OR || stageType == STAGE_TEXT_MATCH) {
+        return;
+    }
+
+    // Remove the imprecise predicates on nodes after a fetch. For nodes before a fetch, the
+    // imprecise filters may be able to save us the significant work of doing a fetch. In such
+    // cases, we assume the imprecise filter is always worth applying.
+    if (root.fetched() && root.filter) {
+        expression::removeImpreciseInternalExprNodes(root.filter.get());
+    }
+
+    for (auto& child : root.children) {
+        removeImpreciseInternalExprFilters(params, *child);
+    }
+}
+
+// static
 std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
 QueryPlannerAnalysis::determineLookupStrategy(
     const NamespaceString& foreignCollName,
@@ -1396,6 +1425,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
 
     QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(*solnRoot);
+    QueryPlannerAnalysis::removeImpreciseInternalExprFilters(params, *solnRoot);
 
     soln->setRoot(std::move(solnRoot));
     return soln;

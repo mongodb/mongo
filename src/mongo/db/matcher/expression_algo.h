@@ -212,6 +212,21 @@ bool bidirectionalPathPrefixOf(StringData first, StringData second);
  */
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 
+/**
+ * Removes InternalExpr match expressions, which are imprecise and must be accompanied by a precise
+ * filter. Does not guarantee that *all* InternalExpr expressions will be removed. Rewrites the
+ * expression to behave as if InternalExpr* match expressions always return true (which they may
+ * do, since they are imprecise). A return value of 'true' indicates that the MatchExpression
+ * should be treated as always-true. 'false' indicates that the original match expression was
+ * modified to have the InternalExpr* predicates removed, and should still be used.
+ *
+ * This function assumes that the InternalExpr* predicates are accompanied by a more precise
+ * ExprMatchExpression predicate within ANDs. While it's possible to construct, by hand, an
+ * expression that does not have this property, our $expr rewrite code never does this, and this
+ * function depends on that property.
+ */
+void removeImpreciseInternalExprNodes(MatchExpression* expr);
+
 using ShouldSplitExprFunc = std::function<bool(
     MatchExpression&, const OrderedPathSet&, const StringMap<std::string>&, Renameables&)>;
 

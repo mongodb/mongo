@@ -1144,6 +1144,30 @@ void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path) {
     func(expr, path);
 }
 
+void removeImpreciseInternalExprNodes(MatchExpression* expr) {
+    auto matchType = expr->matchType();
+    // InternalExprs are only combined via AND and OR, and we assume that the ones we can remove
+    // are within AND nodes (along with the more precise ExprMatchExpression). It is possible we'll
+    // "miss" removing InternalExpr* nodes that we _could_ remove, but that is ok. InternalExprs
+    // are not combined via NOR or NOT.
+    if (matchType == MatchExpression::AND || matchType == MatchExpression::OR) {
+        auto* listOfNode = static_cast<ListOfMatchExpression*>(expr);
+
+        // In principle we can remove any imprecise expression beneath an AND, effectively assuming
+        // that it returns true, and relying on a later precise filter to remove any false
+        // positives. TODO finish this comment
+        if (matchType == MatchExpression::AND) {
+            listOfNode->removeChildrenIf([](const auto* node) {
+                return ComparisonMatchExpressionBase::isInternalExprComparison(node->matchType());
+            });
+        }
+
+        for (auto& node : *expr->getChildVector()) {
+            removeImpreciseInternalExprNodes(node.get());
+        }
+    }
+}
+
 bool isPathPrefixOf(StringData first, StringData second) {
     if (first.size() >= second.size()) {
         return false;

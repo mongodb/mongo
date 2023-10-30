@@ -103,6 +103,16 @@ public:
         return child;
     }
 
+    /*
+     * Removes the ith child, and releases ownership of the child.
+     */
+    virtual void removeChildrenIf(const std::function<bool(const MatchExpression*)>& pred) {
+        _expressions.erase(std::remove_if(_expressions.begin(),
+                                          _expressions.end(),
+                                          [&pred](auto& node) { return pred(node.get()); }),
+                           _expressions.end());
+    }
+
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return &_expressions;
     }

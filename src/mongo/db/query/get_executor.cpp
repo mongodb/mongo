@@ -515,13 +515,18 @@ void fillOutIndexEntries(OperationContext* opCtx,
 }
 }  // namespace
 
-CollectionStats fillOutCollectionStats(OperationContext* opCtx, const CollectionPtr& collection) {
-    auto recordStore = collection->getRecordStore();
-    CollectionStats stats;
-    stats.noOfRecords = recordStore->numRecords(opCtx),
-    stats.approximateDataSizeBytes = recordStore->dataSize(opCtx),
-    stats.storageSizeBytes = recordStore->storageSize(opCtx);
-    return stats;
+void fillOutPlannerCollectionInfo(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  PlannerCollectionInfo* out,
+                                  bool includeSizeStats) {
+    out->isTimeseries = static_cast<bool>(collection->getTimeseriesOptions());
+    if (includeSizeStats) {
+        // We only include these sometimes, since they are slightly expensive to compute.
+        auto recordStore = collection->getRecordStore();
+        out->noOfRecords = recordStore->numRecords(opCtx);
+        out->approximateDataSizeBytes = recordStore->dataSize(opCtx);
+        out->storageSizeBytes = recordStore->storageSize(opCtx);
+    }
 }
 
 void fillOutPlannerParams(OperationContext* opCtx,
@@ -606,10 +611,14 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
     }
 
-    if (!plannerParams->columnStoreIndexes.empty()) {
-        // Fill out statistics needed for column scan query planning.
-        plannerParams->collectionStats = fillOutCollectionStats(opCtx, collection);
 
+    fillOutPlannerCollectionInfo(opCtx,
+                                 collection,
+                                 &plannerParams->collectionStats,
+                                 // Only include the full size stats when there's a CSI.
+                                 !plannerParams->columnStoreIndexes.empty());
+    if (!plannerParams->columnStoreIndexes.empty()) {
+        // Only fill this out when a CSI is present.
         const auto kMB = 1024 * 1024;
         plannerParams->availableMemoryBytes =
             static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
@@ -633,7 +642,8 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
                                 secondaryColl,
                                 secondaryInfo.indexes,
                                 secondaryInfo.columnIndexes);
-            secondaryInfo.stats = fillOutCollectionStats(opCtx, secondaryColl);
+            fillOutPlannerCollectionInfo(
+                opCtx, secondaryColl, &secondaryInfo.stats, true /* include size stats */);
         } else {
             secondaryInfo.exists = false;
         }

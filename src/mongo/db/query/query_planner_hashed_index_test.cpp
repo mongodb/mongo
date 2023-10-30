@@ -1030,7 +1030,7 @@ TEST_F(QueryPlannerHashedTest, ExprEqCanUseIndex) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {$and: [{x: {$_internalExprEq: 1}}, {$expr: {$eq: ['$x', {$const: "
+        "{fetch: {filter: {$and: [{$expr: {$eq: ['$x', {$const: "
         "1}]}}]}, node: {ixscan: {pattern: {x: 'hashed', y: 1}, bounds: {x : [" +
         getHashedBound(1) + "], y: [['MinKey','MaxKey',true,true]] } }}}}");
 }
