@@ -5,12 +5,21 @@
  * mode, regardless of the configuration of the variant running the task. This is needed because the
  * suite definition cannot override a knob which is also defined by the variant.
  */
+
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 if (typeof db !== "undefined") {
-    assert.commandWorked(db.adminCommand({
-        setParameter: 1,
-        internalQueryFrameworkControl: "tryBonsaiExperimental",
-        internalQueryCardinalityEstimatorMode: "sampling"
-    }));
+    FixtureHelpers.mapOnEachShardNode({
+        db: db,
+        func: (db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: "tryBonsaiExperimental",
+                internalQueryCardinalityEstimatorMode: "sampling"
+            }));
+        },
+        primaryNodeOnly: false,
+    });
 }
 
 if (typeof TestData !== "undefined" && TestData.hasOwnProperty("setParameters") &&
