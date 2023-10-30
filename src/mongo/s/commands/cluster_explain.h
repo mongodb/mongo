@@ -64,6 +64,14 @@ public:
     static const char* getStageNameForReadOp(size_t numShards, const BSONObj& explainObj);
 
     /**
+     * When a database is not found, use this method to construct an EOF plan explain() response.
+     */
+    static void buildEOFExplainResult(OperationContext* opCtx,
+                                      const CanonicalQuery* cq,
+                                      const BSONObj& command,
+                                      BSONObjBuilder* out);
+
+    /**
      * Command implementations on mongos use this method to construct the sharded explain
      * output format based on the responses from the shards in 'shardResponses'.
      *
@@ -86,6 +94,8 @@ public:
     static const char* kMergeFromShards;
     static const char* kMergeSortFromShards;
     static const char* kWriteOnShards;
+
+    static constexpr int kPlannerVersion = 1;
 
 private:
     /**

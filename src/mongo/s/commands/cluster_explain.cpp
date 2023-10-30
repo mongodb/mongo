@@ -207,7 +207,7 @@ void ClusterExplain::buildPlannerInfo(OperationContext* opCtx,
                                       BSONObjBuilder* out) {
     BSONObjBuilder queryPlannerBob(out->subobjStart("queryPlanner"));
 
-    queryPlannerBob.appendNumber("mongosPlannerVersion", 1);
+    queryPlannerBob.appendNumber("mongosPlannerVersion", kPlannerVersion);
     BSONObjBuilder winningPlanBob(queryPlannerBob.subobjStart("winningPlan"));
 
     winningPlanBob.append("stage", mongosStageName);
@@ -331,6 +331,36 @@ void ClusterExplain::buildExecStats(const vector<AsyncRequestsSender::Response>&
 
     allPlansExecBob.doneFast();
     executionStatsBob.doneFast();
+}
+
+// static
+void ClusterExplain::buildEOFExplainResult(OperationContext* opCtx,
+                                           const CanonicalQuery* cq,
+                                           const BSONObj& command,
+                                           BSONObjBuilder* out) {
+
+    BSONObjBuilder queryPlannerBob(out->subobjStart("queryPlanner"));
+    queryPlannerBob.appendNumber("mongosPlannerVersion", kPlannerVersion);
+    queryPlannerBob.append(
+        "namespace",
+        NamespaceStringUtil::serialize(cq->nss(), SerializationContext::stateDefault()));
+
+    BSONObjBuilder parsedQueryBob(queryPlannerBob.subobjStart("parsedQuery"));
+    cq->getPrimaryMatchExpression()->serialize(&parsedQueryBob, {});
+    parsedQueryBob.doneFast();
+
+    BSONObjBuilder winningPlanBob(queryPlannerBob.subobjStart("winningPlan"));
+    BSONObjBuilder queryPlanBob(winningPlanBob.subobjStart("queryPlan"));
+    queryPlanBob.append("stage", "EOF");
+    queryPlanBob.appendNumber("planNodeId", 1);
+    queryPlanBob.doneFast();
+    winningPlanBob.doneFast();
+
+    queryPlannerBob.doneFast();
+
+    explain_common::generateServerInfo(out);
+    explain_common::generateServerParameters(opCtx, out);
+    appendIfRoom(out, command, "command");
 }
 
 // static
