@@ -48,9 +48,12 @@ function killopIndexBuildOnSecondaryOnFailpoint(rst, failpointName, shouldSuccee
     IndexBuildTest.resumeIndexBuilds(secondary);
     fp.wait();
     assert.commandWorked(secondaryDB.killOp(opId));
-    fp.off();
 
     if (shouldSucceed) {
+        // The failpoint only has to be disabled when we don't expect a crash. Otherwise, the test
+        // can fail due to the failpoint command failing because the node crashed.
+        fp.off();
+
         // "attempting to abort index build".
         checkLog.containsJson(primary, 4656010);
 
