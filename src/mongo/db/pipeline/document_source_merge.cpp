@@ -97,12 +97,14 @@ bool isSupportedMergeMode(WhenMatched whenMatched, WhenNotMatched whenNotMatched
 }
 
 /**
- * Parses a $merge stage specification and resolves the target database name and collection name.
- * The $merge specification can be either a string or an object. If the target database name is not
- * explicitly specified, it will be defaulted to 'defaultDb'.
+ * Parses a $merge stage specification and resolves the target database name and collection
+ * name. The $merge specification can be either a string or an object. If the target database
+ * name is not explicitly specified, it will be defaulted to 'defaultDb'.
  */
-DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElement& spec,
-                                                                const DatabaseName& defaultDb) {
+DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(
+    const BSONElement& spec,
+    const DatabaseName& defaultDb,
+    const SerializationContext& sc = SerializationContext::stateDefault()) {
     NamespaceString targetNss;
     DocumentSourceMergeSpec mergeSpec;
 
@@ -114,16 +116,17 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
         targetNss = NamespaceStringUtil::deserialize(defaultDb, spec.valueStringData());
     } else {
         mergeSpec = DocumentSourceMergeSpec::parse(
-            IDLParserContext(kStageName, false /* apiStrict */, defaultDb.tenantId()),
+            IDLParserContext(kStageName, false /* apiStrict */, defaultDb.tenantId(), sc),
             spec.embeddedObject());
         targetNss = mergeSpec.getTargetNss();
         if (targetNss.coll().empty()) {
-            // If the $merge spec is an object, the target namespace can be specified as a string
-            // on an object value of the 'into' field. In case it was a string, we want to use the
-            // same semantics as above, that is, treat it as a collection name. This is different
-            // from the NamespaceString semantics which treats it as a database name. So, if the
-            // target namespace collection is empty, we'll use the default database name as a target
-            // database, and the provided namespace value as a collection name.
+            // If the $merge spec is an object, the target namespace can be specified as a
+            // string on an object value of the 'into' field. In case it was a string, we want
+            // to use the same semantics as above, that is, treat it as a collection name. This
+            // is different from the NamespaceString semantics which treats it as a database
+            // name. So, if the target namespace collection is empty, we'll use the default
+            // database name as a target database, and the provided namespace value as a
+            // collection name.
             targetNss = NamespaceStringUtil::deserialize(
                 defaultDb, targetNss.serializeWithoutTenantPrefix_UNSAFE());
         } else if (targetNss.dbSize() == 0) {
@@ -295,7 +298,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
             "{} only supports a string or object argument, not {}"_format(kStageName, spec.type()),
             spec.type() == BSONType::String || spec.type() == BSONType::Object);
 
-    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(spec, expCtx->ns.dbName());
+    auto mergeSpec = parseMergeSpecAndResolveTargetNamespace(
+        spec, expCtx->ns.dbName(), expCtx->serializationCtxt);
     auto targetNss = mergeSpec.getTargetNss();
     auto whenMatched =
         mergeSpec.getWhenMatched() ? mergeSpec.getWhenMatched()->mode : kDefaultWhenMatched;

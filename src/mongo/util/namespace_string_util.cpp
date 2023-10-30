@@ -268,6 +268,10 @@ NamespaceString NamespaceStringUtil::deserialize(const boost::optional<TenantId>
     if (coll.empty())
         return deserialize(tenantId, db, context);
 
+    // if db is empty, we can never have a prefixed tenantId so we don't need to call deserialize
+    if (db.empty() && tenantId)
+        return NamespaceString(tenantId, db, coll);
+
     // TODO SERVER-80361: Pass both StringDatas down to nss constructor to make this more performant
     return deserialize(tenantId, str::stream() << db << "." << coll, context);
 }

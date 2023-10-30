@@ -27,13 +27,6 @@ selector:
   - jstests/aggregation/sources/lookup/lookup_query_stats.js
   # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
   - jstests/aggregation/view_resolution_namespace_collision.js
-  # failed on: Test $merge implicitly creates a new database when the target collection's database doesn't exist.
-  - jstests/aggregation/sources/merge/mode_merge_insert.js
-  - jstests/aggregation/sources/merge/mode_replace_insert.js
-  - jstests/aggregation/sources/merge/mode_fail_insert.js
-  - jstests/aggregation/sources/merge/bypass_doc_validation.js
-  - jstests/aggregation/sources/merge/mode_keep_existing_insert.js
-  - jstests/aggregation/sources/merge/mode_pipeline_insert.js
 
   exclude_with_any_tags:
   # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
