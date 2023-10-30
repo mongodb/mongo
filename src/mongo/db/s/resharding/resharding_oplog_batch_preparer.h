@@ -102,7 +102,7 @@ private:
                                         const OplogEntry* op,
                                         WriterVectors& writerVectors) const;
 
-    void _appendOpToWriterVector(std::uint32_t hash,
+    void _appendOpToWriterVector(size_t hash,
                                  const OplogEntry* op,
                                  WriterVectors& writerVectors) const;
 
