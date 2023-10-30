@@ -173,6 +173,10 @@ public:
             return _src->_byClient.size();
         }
 
+        std::size_t created() const {
+            return _src->_created.load();
+        }
+
     private:
         void _onSizeChange() {
             _src->_size.store(_src->_byClient.size());
@@ -343,8 +347,9 @@ bool SessionManagerCommon::waitForNoSessions(Milliseconds timeout) {
 }
 
 void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
-    const auto sessionCount = _sessions->size();
-    const auto sessionsCreated = _sessions->created();
+    auto sync = _sessions->sync();
+    const auto sessionCount = sync.size();
+    const auto sessionsCreated = sync.created();
 
     const auto appendInt = [&](StringData n, auto v) {
         bob->append(n, static_cast<int>(v));
@@ -380,7 +385,8 @@ void SessionManagerCommon::appendStats(BSONObjBuilder* bob) const {
 }
 
 std::size_t SessionManagerCommon::numOpenSessions() const {
-    return _sessions->size();
+    auto sync = _sessions->sync();
+    return sync.size();
 }
 
 void SessionManagerCommon::endSessionByClient(Client* client) {
