@@ -668,7 +668,9 @@ void ByteCode::aggMergeStdDevsImpl(value::Array* accumulator,
     // We've already handled the case where 'newCount' is zero above. This means that 'totalCount'
     // must be positive, and prevents us from ever dividing by zero in the subsequent calculation.
     int64_t totalCount = oldCount + newCount;
-    if (delta != 0) {
+    // If oldCount is zero, we should avoid needless calcuations, because they may damage floating
+    // point precision.
+    if (delta != 0 && oldCount != 0) {
         newMean = ((oldCount * oldMean) + (newCount * newMean)) / totalCount;
         newM2 += delta * delta *
             (static_cast<double>(oldCount) * static_cast<double>(newCount) / totalCount);
