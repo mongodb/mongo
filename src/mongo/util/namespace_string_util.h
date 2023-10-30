@@ -113,11 +113,6 @@ public:
                                        StringData ns,
                                        const SerializationContext& context);
 
-    /**
-     * Deserializes dbname and coll to a NamespaceString object.
-     * TODO SERVER-78534: If multitenancySupport is enabled, we will check the tenant id of dbName
-     * to ensure only specific global internal collections to be created without tenantId.
-     */
     static NamespaceString deserialize(const DatabaseName& dbName, StringData coll);
 
     static NamespaceString deserialize(const boost::optional<TenantId>& tenantId,

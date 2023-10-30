@@ -166,10 +166,6 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
 }
 
 NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, StringData coll) {
-    // TODO SERVER-78534: if gMultitenancySupport is false, create a NamespaceString object
-    // directly. Otherwise, check the tenant id, db name and collection name before creating a
-    // NamespaceString object, because We allow only specific global internal collections to be
-    // created without a tenantId.
     return NamespaceString{dbName, coll};
 }
 

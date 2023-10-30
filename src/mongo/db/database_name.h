@@ -160,7 +160,7 @@ public:
     bool isExternalDB() const {
         return db() == DatabaseName::kExternal.db();
     }
-    bool isInternalDb() {
+    bool isInternalDb() const {
         return isAdminDB() || isConfigDB() || isLocalDB();
     }
 
