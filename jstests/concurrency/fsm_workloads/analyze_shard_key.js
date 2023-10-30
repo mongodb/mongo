@@ -1289,6 +1289,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
         listSampledQueries: {
             analyzeShardKey: 0.2,
             enableQuerySampling: 0.1,
+            find: 0.1,
             aggregate: 0.1,
             count: 0.1,
             distinct: 0.1,
