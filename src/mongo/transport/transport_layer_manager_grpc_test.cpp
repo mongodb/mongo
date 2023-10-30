@@ -32,6 +32,7 @@
 #include <boost/filesystem.hpp>
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/asio/asio_session_impl.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
@@ -63,6 +64,9 @@ public:
 
     void setUp() override {
         ServiceContextTest::setUp();
+
+        _monitor = std::make_unique<unittest::ThreadAssertionMonitor>();
+
         auto* svcCtx = getServiceContext();
 
         svcCtx->setPeriodicRunner(makePeriodicRunner(getServiceContext()));
@@ -98,6 +102,7 @@ public:
         getServiceContext()->getSessionManager()->endAllSessions({});
         getServiceContext()->getTransportLayerManager()->shutdown();
         sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_disabled);
+        _monitor.reset();
         ServiceContextTest::tearDown();
     }
 
@@ -115,10 +120,23 @@ public:
     }
 
     /**
+     * Run the test using this test case's ThreadAssertionMonitor.
+     */
+    void runTest(std::function<void(unittest::ThreadAssertionMonitor& monitor)> test) {
+        _monitor->spawnController([&] { test(*_monitor); }).join();
+        _monitor->wait();
+    }
+
+    /**
      * This must be set before any requests to the transport layer have been received.
+     * The callback will be run in a thread spawned from a ThreadAssertionMonitor to ensure that
+     * failed assertions terminate the test. As a result, exceptions thrown from the handler will
+     * fail the test rather than be handled by the transport layer.
      */
     void setServerCallback(ServerCb cb) {
-        _serverCb = std::move(cb);
+        _serverCb = [&, cb = std::move(cb)](Session& s) {
+            _monitor->spawn([&] { ASSERT_DOES_NOT_THROW(cb(s)); }).join();
+        };
     }
 
 private:
@@ -142,6 +160,7 @@ private:
         return grpcLayer;
     }
 
+    std::unique_ptr<unittest::ThreadAssertionMonitor> _monitor;
     AsioTransportLayer* _asioTL;
     grpc::GRPCTransportLayer* _grpcTL;
     ServerCb _serverCb;
@@ -150,7 +169,7 @@ private:
 };
 
 TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
-    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+    runTest([&](auto& monitor) {
         setServerCallback([](Session& session) {
             ON_BLOCK_EXIT([&] { session.end(); });
             auto swMsg = session.sourceMessage();
@@ -197,34 +216,43 @@ TEST_F(AsioGRPCTransportLayerManagerTest, IngressAsioGRPC) {
 }
 
 TEST_F(AsioGRPCTransportLayerManagerTest, EgressAsio) {
-    setServerCallback([](auto& session) {
-        ON_BLOCK_EXIT([&] { session.end(); });
-        ASSERT_TRUE(dynamic_cast<SyncAsioSession*>(&session));
-        auto swMsg = session.sourceMessage();
-        uassertStatusOK(swMsg);
-        uassertStatusOK(session.sinkMessage(swMsg.getValue()));
-    });
+    runTest([&](auto& monitor) {
+        setServerCallback([](auto& session) {
+            ON_BLOCK_EXIT([&] { session.end(); });
+            ASSERT_TRUE(dynamic_cast<SyncAsioSession*>(&session));
+            auto swMsg = session.sourceMessage();
+            ASSERT_OK(swMsg);
+            ASSERT_OK(session.sinkMessage(swMsg.getValue()));
+        });
 
-    auto swSession = getTransportLayerManager().getEgressLayer()->connect(
-        HostAndPort("localhost", 27017),
-        ConnectSSLMode::kGlobalSSLMode,
-        grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
-        boost::none);
-    ASSERT_OK(swSession);
-    ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
-    grpc::assertEchoSucceeds(*swSession.getValue());
+        auto swSession = getTransportLayerManager().getEgressLayer()->connect(
+            HostAndPort("localhost", 27017),
+            ConnectSSLMode::kGlobalSSLMode,
+            grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+            boost::none);
+        ASSERT_OK(swSession);
+        ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
+        grpc::assertEchoSucceeds(*swSession.getValue());
+    });
 }
 
 TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
-    // When set with a value, the client side thread will disconnect the gRPC session.
-    auto killSessionPf = makePromiseFuture<void>();
+    runTest([&](auto&) {
+        stdx::condition_variable cv;
+        stdx::mutex mutex;
+        // When set to true, the client side thread will disconnect the gRPC session.
+        bool killSession = false;
+        bool serverCbComplete = false;
 
-    // Set with a value once the server's callback has completed fully.
-    auto serverCbCompletePf = makePromiseFuture<void>();
-
-    setServerCallback([&](auto& session) mutable {
-        try {
-            ON_BLOCK_EXIT([&] { session.end(); });
+        setServerCallback([&](auto& session) mutable {
+            ON_BLOCK_EXIT([&] {
+                session.end();
+                {
+                    stdx::unique_lock lk(mutex);
+                    serverCbComplete = true;
+                }
+                cv.notify_all();
+            });
             ASSERT_TRUE(dynamic_cast<grpc::IngressSession*>(&session));
 
             auto newClient = getServiceContext()->getService()->makeClient(
@@ -243,41 +271,40 @@ TEST_F(AsioGRPCTransportLayerManagerTest, MarkKillOnGRPCClientDisconnect) {
 
             auto clkSource = getServiceContext()->getFastClockSource();
             auto start = clkSource->now();
-            killSessionPf.promise.emplaceValue();
+            {
+                stdx::lock_guard lk(mutex);
+                killSession = true;
+            }
+            cv.notify_all();
             ASSERT_THROWS_CODE(
                 opCtx->sleepFor(Seconds(10)), DBException, cc().getDisconnectErrorCode());
             ASSERT_LT(clkSource->now() - start, Seconds(5)) << "sleep did not wake up early enough";
+        });
 
-            serverCbCompletePf.promise.emplaceValue();
-        } catch (...) {  // Need to catch all errors so we can wake up the main test thread if this
-                         // handler failed.
-            auto error = Status(ErrorCodes::UnknownError,
-                                "server handler failed, see logs for offending exception");
-            if (!killSessionPf.future.isReady()) {
-                killSessionPf.promise.setError(std::move(error));
-            } else {
-                serverCbCompletePf.promise.setError(std::move(error));
+        {
+            auto client = std::make_shared<grpc::GRPCClient>(
+                nullptr,
+                grpc::makeClientMetadataDocument(),
+                grpc::CommandServiceTestFixtures::makeClientOptions());
+            client->start(getServiceContext());
+            ON_BLOCK_EXIT([&] { client->shutdown(); });
+            auto session = client->connect(grpc::CommandServiceTestFixtures::defaultServerAddress(),
+                                           grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                           {});
+            ON_BLOCK_EXIT([&] { session->end(); });
+            {
+                stdx::unique_lock lk(mutex);
+                cv.wait(lk, [&]() { return killSession || serverCbComplete; });
+                ASSERT_FALSE(serverCbComplete) << "server callback terminated early";
             }
-            throw;
+            // Wait for server callback to enter sleep before ending session by hitting end of
+            // scope.
+            sleepFor(Milliseconds(100));
         }
+
+        stdx::unique_lock lk(mutex);
+        cv.wait(lk, [&]() { return serverCbComplete; });
     });
-
-    {
-        auto client = std::make_shared<grpc::GRPCClient>(
-            nullptr,
-            grpc::makeClientMetadataDocument(),
-            grpc::CommandServiceTestFixtures::makeClientOptions());
-        client->start(getServiceContext());
-        ON_BLOCK_EXIT([&] { client->shutdown(); });
-        auto session = client->connect(grpc::CommandServiceTestFixtures::defaultServerAddress(),
-                                       grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       {});
-        ON_BLOCK_EXIT([&] { session->end(); });
-        ASSERT_OK(killSessionPf.future.getNoThrow());
-        sleepFor(Milliseconds(100));
-    }
-
-    ASSERT_OK(serverCbCompletePf.future.getNoThrow());
 }
 
 class RotateCertificatesTransportLayerManagerTest : public AsioGRPCTransportLayerManagerTest {
@@ -327,81 +354,89 @@ private:
 };
 
 TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesSucceeds) {
-    // Ceritificates that we wil rotate to.
-    const std::string kEcdsaCAFile = "jstests/libs/ecdsa-ca.pem";
-    const std::string kEcdsaPEMFile = "jstests/libs/ecdsa-server.pem";
-    const std::string kEcdsaClientFile = "jstests/libs/ecdsa-client.pem";
+    runTest([&](auto&) {
+        // Ceritificates that we wil rotate to.
+        const std::string kEcdsaCAFile = "jstests/libs/ecdsa-ca.pem";
+        const std::string kEcdsaPEMFile = "jstests/libs/ecdsa-server.pem";
+        const std::string kEcdsaClientFile = "jstests/libs/ecdsa-client.pem";
 
-    auto initialGoodStub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
-        grpc::CommandServiceTestFixtures::kCAFile,
-        grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-    auto initialBadStub =
-        grpc::CommandServiceTestFixtures::makeStubWithCerts(kEcdsaCAFile, kEcdsaClientFile);
+        auto initialGoodStub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
+            grpc::CommandServiceTestFixtures::kCAFile,
+            grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
+        auto initialBadStub =
+            grpc::CommandServiceTestFixtures::makeStubWithCerts(kEcdsaCAFile, kEcdsaClientFile);
 
-    assertConnectingSucceedsASIO();
-    initialGoodStub.assertConnected();
-    initialBadStub.assertNotConnected();
+        assertConnectingSucceedsASIO();
+        initialGoodStub.assertConnected();
+        initialBadStub.assertNotConnected();
 
-    // Overwrite the tmp files to hold new certs.
-    boost::filesystem::copy_file(kEcdsaCAFile,
-                                 getFilePathCA().toString(),
-                                 boost::filesystem::copy_options::overwrite_existing);
-    boost::filesystem::copy_file(kEcdsaPEMFile,
-                                 getFilePathPEM().toString(),
-                                 boost::filesystem::copy_options::overwrite_existing);
+        // Overwrite the tmp files to hold new certs.
+        boost::filesystem::copy_file(kEcdsaCAFile,
+                                     getFilePathCA().toString(),
+                                     boost::filesystem::copy_options::overwrite_existing);
+        boost::filesystem::copy_file(kEcdsaPEMFile,
+                                     getFilePathPEM().toString(),
+                                     boost::filesystem::copy_options::overwrite_existing);
 
-    ASSERT_DOES_NOT_THROW(SSLManagerCoordinator::get()->rotate());
+        ASSERT_DOES_NOT_THROW(SSLManagerCoordinator::get()->rotate());
 
-    assertConnectingSucceedsASIO();
-    initialGoodStub.assertConnected();
-    initialBadStub.assertConnected();
+        assertConnectingSucceedsASIO();
+        initialGoodStub.assertConnected();
+        initialBadStub.assertConnected();
+    });
 }
 
 TEST_F(RotateCertificatesTransportLayerManagerTest,
        RotateCertificatesThrowsAndUsesOldCertsWhenEmpty) {
-    // Connect using the existing certs.
-    auto stub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
-        grpc::CommandServiceTestFixtures::kCAFile,
-        grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
+    runTest([&](auto&) {
+        // Connect using the existing certs.
+        auto stub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
+            grpc::CommandServiceTestFixtures::kCAFile,
+            grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
 
-    stub.assertConnected();
-    assertConnectingSucceedsASIO();
+        stub.assertConnected();
+        assertConnectingSucceedsASIO();
 
-    boost::filesystem::resize_file(getFilePathCA().toString(), 0);
+        boost::filesystem::resize_file(getFilePathCA().toString(), 0);
 
-    ASSERT_THROWS_CODE(
-        SSLManagerCoordinator::get()->rotate(), DBException, ErrorCodes::InvalidSSLConfiguration);
+        ASSERT_THROWS_CODE(SSLManagerCoordinator::get()->rotate(),
+                           DBException,
+                           ErrorCodes::InvalidSSLConfiguration);
 
-    assertConnectingSucceedsASIO();
-    auto stub2 = grpc::CommandServiceTestFixtures::makeStubWithCerts(
-        grpc::CommandServiceTestFixtures::kCAFile,
-        grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-    stub2.assertConnected();
+        assertConnectingSucceedsASIO();
+        auto stub2 = grpc::CommandServiceTestFixtures::makeStubWithCerts(
+            grpc::CommandServiceTestFixtures::kCAFile,
+            grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
+        stub2.assertConnected();
+    });
 }
 
 TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesUsesOldCertsWithNewBadCerts) {
-    const std::string kInvalidPEMFile = "jstests/libs/expired.pem";
+    runTest([&](auto&) {
+        const std::string kInvalidPEMFile = "jstests/libs/expired.pem";
 
-    // Connect using the existing certs.
-    auto stub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
-        grpc::CommandServiceTestFixtures::kCAFile,
-        grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-    stub.assertConnected();
-    assertConnectingSucceedsASIO();
+        // Connect using the existing certs.
+        auto stub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
+            grpc::CommandServiceTestFixtures::kCAFile,
+            grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
+        stub.assertConnected();
+        assertConnectingSucceedsASIO();
 
-    // Overwrite the tmp files to hold new, invalid certs.
-    boost::filesystem::copy_file(kInvalidPEMFile,
-                                 getFilePathPEM().toString(),
-                                 boost::filesystem::copy_options::overwrite_existing);
+        // Overwrite the tmp files to hold new, invalid certs.
+        boost::filesystem::copy_file(kInvalidPEMFile,
+                                     getFilePathPEM().toString(),
+                                     boost::filesystem::copy_options::overwrite_existing);
 
-    ASSERT_THROWS_CODE(
-        SSLManagerCoordinator::get()->rotate(), DBException, ErrorCodes::InvalidSSLConfiguration);
+        ASSERT_THROWS_CODE(SSLManagerCoordinator::get()->rotate(),
+                           DBException,
+                           ErrorCodes::InvalidSSLConfiguration);
 
-    auto stub2 = grpc::CommandServiceTestFixtures::makeStubWithCerts(
-        grpc::CommandServiceTestFixtures::kCAFile,
-        grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-    stub2.assertConnected();
-    assertConnectingSucceedsASIO();
+        auto stub2 = grpc::CommandServiceTestFixtures::makeStubWithCerts(
+            grpc::CommandServiceTestFixtures::kCAFile,
+            grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
+        stub2.assertConnected();
+        assertConnectingSucceedsASIO();
+    });
 }
 
 }  // namespace

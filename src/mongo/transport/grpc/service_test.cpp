@@ -438,8 +438,9 @@ TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
         }
         ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
 
-        auto response = OpMsg::parse(uassertStatusOK(session->sourceMessage()));
-        int32_t nReceived = response.body.getIntField("nReceived");
+        auto swResponse = session->sourceMessage();
+        ASSERT_OK(swResponse);
+        int32_t nReceived = OpMsg::parse(swResponse.getValue()).body.getIntField("nReceived");
         ASSERT_EQ(nReceived, kMessages);
     };
 
@@ -581,18 +582,23 @@ TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
 }
 
 TEST_F(CommandServiceTest, ServerHandlerThrows) {
-    CommandService::RPCHandler serverHandler = [](auto) {
+    CommandService::RPCHandler serverHandler = [](auto s) {
+        s->end();
         iasserted(Status{ErrorCodes::StreamTerminated, "test error"});
     };
+    auto server = CommandServiceTestFixtures::makeServer(
+        serverHandler, CommandServiceTestFixtures::makeServerOptions());
+    server->start();
+    ON_BLOCK_EXIT([&server] {
+        if (server->isRunning()) {
+            server->shutdown();
+        }
+    });
 
-    ClientCallbackType clientCallback = [](auto&, auto stub, auto streamFactory, auto&) {
-        ::grpc::ClientContext ctx;
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        auto stream = streamFactory(ctx, stub);
-        ASSERT_NE(stream->Finish().error_code(), ::grpc::StatusCode::OK);
-    };
-
-    runTestWithBothMethods(serverHandler, clientCallback);
+    auto stub = CommandServiceTestFixtures::makeStub();
+    ::grpc::ClientContext ctx;
+    CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+    ASSERT_NE(stub.connect().error_code(), ::grpc::StatusCode::OK);
 }
 
 TEST_F(CommandServiceTest, Shutdown) {

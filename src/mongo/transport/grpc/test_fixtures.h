@@ -296,6 +296,10 @@ public:
      * The addresses of the server is passed to the RPC handler in addition to the IngressSession.
      * The IngressSession passed to the provided RPC handler is automatically ended after the
      * handler is returned.
+     *
+     * The RPC handler will be run in a thread spawned by a ThreadAssertionMonitor to allow the
+     * server handler to perform test assertions. As a result, exceptions thrown by the RPC handler
+     * will terminate the test, rather than being handled by CommandService.
      */
     static void runWithServers(
         std::vector<Server::Options> serverOptions,
@@ -306,9 +310,10 @@ public:
             std::vector<std::unique_ptr<Server>> servers;
 
             for (auto& options : serverOptions) {
-                auto handler = [rpcHandler, &options](auto session) {
+                auto handler = [rpcHandler, &options, &monitor](auto session) {
                     ON_BLOCK_EXIT([&] { session->end(); });
-                    rpcHandler(options, session);
+                    monitor.spawn([&]() { ASSERT_DOES_NOT_THROW(rpcHandler(options, session)); })
+                        .join();
                 };
                 auto server = makeServer(handler, options);
                 server->start();

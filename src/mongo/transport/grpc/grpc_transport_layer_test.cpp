@@ -43,6 +43,7 @@
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
@@ -92,15 +93,25 @@ public:
      * Creates a GRPCTransportLayer using the provided RPCHandler and options, sets it up, starts
      * it, and then passes it to the provided callback, automatically shutting it down after the
      * callback completes.
+     *
+     * The server handler will be run in a thread spawned from a ThreadAssertionMonitor to ensure
+     * that test assertions fail the test. As a result, exceptions thrown by the handler will fail
+     * the test, rather than being handled by CommandService.
      */
     void runWithTL(CommandService::RPCHandler serverCb,
                    std::function<void(GRPCTransportLayer&)> cb,
                    GRPCTransportLayer::Options options) {
-        auto tl = makeTL(std::move(serverCb), std::move(options));
-        uassertStatusOK(tl->setup());
-        uassertStatusOK(tl->start());
-        ON_BLOCK_EXIT([&] { tl->shutdown(); });
-        cb(*tl);
+        unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+            auto tl = makeTL(
+                [&](auto session) {
+                    monitor.spawn([&] { ASSERT_DOES_NOT_THROW(serverCb(session)); }).join();
+                },
+                std::move(options));
+            uassertStatusOK(tl->setup());
+            uassertStatusOK(tl->start());
+            ON_BLOCK_EXIT([&] { tl->shutdown(); });
+            cb(*tl);
+        });
     }
 
     void assertConnectSucceeds(GRPCTransportLayer& tl, const HostAndPort& addr) {
