@@ -26,8 +26,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, sys, platform
+import os
 import random
+import sys
 import threading
 import time
 import wiredtiger, wttest
@@ -86,10 +87,6 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.get_value(), str(key) * self.rows)
 
     def test_chunkcache02(self):
-
-        if platform.system() == 'Darwin':
-            self.skipTest("FIXME-WT-11865 - Uninitialised lock on macos")
-
         ds = SimpleDataSet(
             self, self.uri, 0, key_format=self.key_format, value_format=self.value_format)
         ds.populate()
@@ -102,7 +99,7 @@ class test_chunkcache02(wttest.WiredTigerTestCase):
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 
-        # Assert the new chunks are ingested. 
+        # Assert the new chunks are ingested.
         self.assertGreater(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
 
         # Reopen wiredtiger to migrate all data to disk.

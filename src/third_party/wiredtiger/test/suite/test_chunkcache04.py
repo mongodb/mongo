@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, sys, platform
+import os, sys
 import wiredtiger, wttest
 
 from wtdataset import SimpleDataSet
@@ -34,7 +34,7 @@ from wtscenario import make_scenarios
 
 '''
 - Functional testing for the ingesting. Verify ingests are taking place with both pinned and unpinned chunks.
-- Verify that when ingesting new chunks with old pinned objects, we are releasing the pin on the old objects. 
+- Verify that when ingesting new chunks with old pinned objects, we are releasing the pin on the old objects.
 '''
 class test_chunkcache4(wttest.WiredTigerTestCase):
     rows = 10000
@@ -48,7 +48,7 @@ class test_chunkcache4(wttest.WiredTigerTestCase):
     if sys.byteorder == 'little':
         # WT's filesystem layer doesn't support mmap on big-endian platforms.
         cache_types.append(('on-disk', dict(chunk_cache_type='FILE')))
-    
+
     pinned_uris = ["table:chunkcache01", "table:chunkcache02"]
 
     scenarios = make_scenarios(format_values, cache_types)
@@ -79,32 +79,28 @@ class test_chunkcache4(wttest.WiredTigerTestCase):
             cursor[ds.key(i)] = str(i) * 100
 
     def test_chunkcache04(self):
-
-        if platform.system() == 'Darwin':
-            self.skipTest("FIXME-WT-11865 - Uninitialised lock on macos")
-
         uris = ["table:chunkcache03", "table:chunkcache04"]
         ds = [SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format) for uri in uris]
 
-        # Insert unpinned data into two tables. 
+        # Insert unpinned data into two tables.
         for i, dataset in enumerate(ds):
             dataset.populate()
             self.insert(uris[i], dataset)
 
-        # As we have not flushed yet, assert we have no newly inserted chunks. 
+        # As we have not flushed yet, assert we have no newly inserted chunks.
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables), 0)
-        
-        # Flush the unpinned tables into the chunkcache 
+
+        # Flush the unpinned tables into the chunkcache
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 
-        # Assert that chunks are not pinned. 
+        # Assert that chunks are not pinned.
         self.assertEqual(self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned), 0)
 
-        # Assert the new chunks are ingested. 
+        # Assert the new chunks are ingested.
         first_ingest = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables)
         self.assertGreater(first_ingest, 0)
-        
+
         ds2 = [SimpleDataSet(self, uri, 0, key_format=self.key_format, value_format=self.value_format) for uri in self.pinned_uris]
 
         # Insert pinned data into two tables.
@@ -112,7 +108,7 @@ class test_chunkcache4(wttest.WiredTigerTestCase):
             dataset.populate()
             self.insert(self.pinned_uris[i], dataset)
 
-        # Flush the pinned tables into the chunkcache 
+        # Flush the pinned tables into the chunkcache
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 
@@ -124,17 +120,17 @@ class test_chunkcache4(wttest.WiredTigerTestCase):
         old_pinned = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_pinned)
         self.assertGreater(old_pinned, 0)
 
-        # Modify the tables content so flush has work to do.  
+        # Modify the tables content so flush has work to do.
         cursor = self.session.open_cursor(self.pinned_uris[0])
         cursor[ds2[0].key(1)] = 'foo'
         cursor1 = self.session.open_cursor(self.pinned_uris[1])
         cursor1[ds2[1].key(2)] = 'bar'
 
-        # Flush the pinned tables into the chunkcache 
+        # Flush the pinned tables into the chunkcache
         self.session.checkpoint()
         self.session.checkpoint('flush_tier=(enabled)')
 
-        # Assert another set of ingests took place. 
+        # Assert another set of ingests took place.
         total_ingest = self.get_stat(wiredtiger.stat.conn.chunkcache_chunks_loaded_from_flushed_tables)
         self.assertGreater(total_ingest, second_ingest)
 
