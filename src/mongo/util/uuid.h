@@ -48,7 +48,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/murmur3.h"
 
 namespace mongo {
 

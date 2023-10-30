@@ -44,7 +44,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/murmur3.h"
 #include "mongo/util/secure_compare_memory.h"
 
 namespace mongo {

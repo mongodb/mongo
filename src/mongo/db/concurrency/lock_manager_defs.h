@@ -44,7 +44,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
