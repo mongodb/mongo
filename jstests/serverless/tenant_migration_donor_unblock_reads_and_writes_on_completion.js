@@ -111,7 +111,10 @@ const kCollName = "testColl";
     const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
-    assert.soon(() => getNumBlockedReads(laggedSecondary, tenantId) == 1);
+    assert.soon(() => getNumBlockedReads(laggedSecondary, tenantId) == 1,
+                "Tenant " + tenantId + " of " + dbName + " db in collection " + kCollName +
+                    " received " + getNumBlockedReads(laggedSecondary, tenantId) +
+                    " blocked reads. Expected 1\n");
 
     // Disable snapshotting on that secondary, and wait for the migration to abort and be garbage
     // collected. That way the secondary is guaranteed to observe the write to set expireAt before
@@ -159,7 +162,10 @@ const kCollName = "testColl";
     const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
-    assert.soon(() => getNumBlockedReads(laggedSecondary, tenantId) == 1);
+    assert.soon(() => getNumBlockedReads(laggedSecondary, tenantId) == 1,
+                "Tenant " + tenantId + " of " + dbName + " db in collection " + kCollName +
+                    " received " + getNumBlockedReads(laggedSecondary, tenantId) +
+                    " blocked reads. Expected 1\n");
 
     // Disable snapshotting on that secondary, and wait for the migration to commit and be garbage
     // collected. That way the secondary is guaranteed to observe the write to set expireAt before
@@ -205,8 +211,14 @@ const kCollName = "testColl";
     assert.neq(null, donorDoc);
     const readThread = startReadThread(donorPrimary, dbName, kCollName, donorDoc.blockTimestamp);
     const writeThread = startWriteThread(donorPrimary, dbName, kCollName);
-    assert.soon(() => getNumBlockedReads(donorPrimary, tenantId) == 1);
-    assert.soon(() => getNumBlockedWrites(donorPrimary, tenantId) == 1);
+    assert.soon(() => getNumBlockedReads(donorPrimary, tenantId) == 1,
+                "Tenant " + tenantId + " of " + dbName + " db in collection " + kCollName +
+                    " recieved " + getNumBlockedReads(donorPrimary, tenantId) +
+                    " blocked reads. Expected 1\n");
+    assert.soon(() => getNumBlockedWrites(donorPrimary, tenantId) == 1,
+                "Tenant " + tenantId + " of " + dbName + " db in collection " + kCollName +
+                    " recieved " + getNumBlockedWrites(donorPrimary, tenantId) +
+                    " blocked writes. Expected 1\n");
 
     // Cannot delete the donor state doc since it has not been marked as garbage collectable.
     assert.commandFailedWithCode(donorsColl.remove({}), ErrorCodes.IllegalOperation);
