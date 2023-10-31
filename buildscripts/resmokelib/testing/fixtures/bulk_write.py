@@ -51,8 +51,8 @@ class BulkWriteFixture(interface.MultiClusterFixture):
         normal_cluster_options["settings"]["mongod_options"]["set_parameters"][
             "enableTestCommands"] = 1
 
-        normal_cluster_options["num_nodes"] = 1
-        normal_cluster_options["use_replica_set_connection_string"] = True
+        normal_cluster_options["settings"]["num_nodes"] = 1
+        normal_cluster_options["settings"]["use_replica_set_connection_string"] = True
 
         normal_cluster_options["settings"]["replicaset_logging_prefix"] = "nc"
         normal_cluster_options["settings"]["dbpath_prefix"] = os.path.join(
