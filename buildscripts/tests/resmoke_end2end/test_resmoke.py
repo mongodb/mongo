@@ -1,5 +1,6 @@
 """Test resmoke's handling of test/task timeouts and archival."""
 
+import datetime
 import logging
 import json
 import os
@@ -149,12 +150,26 @@ class TestTimeout(_ResmokeSelftest):
             self.resmoke_process.stop()
         self.assertEqual(return_code, 0)
 
-    def execute_resmoke(self, resmoke_args, sleep_secs=30, **kwargs):
+    def execute_resmoke(self, resmoke_args, sentinel_file, **kwargs):
+        # Since this test is designed to start remoke, wait for it to be up-and-running, and then
+        # kill resmoke, we use a sentinel file to accomplish this.
+
+        # Form sentinel path, and make sure it's absent:
+        sentinel_path = f"{os.environ.get('TMPDIR') or os.environ.get('TMP_DIR') or '/tmp'}/{sentinel_file}.js.sentinel"
+        if os.path.isfile(sentinel_path):
+            os.remove(sentinel_path)
+
+        # Spawn resmoke (async):
         super(TestTimeout, self).execute_resmoke(resmoke_args, **kwargs)
 
-        time.sleep(sleep_secs
-                   )  # TODO: Change to more durable way of ensuring the fixtures have been set up.
+        # Wait for sentinel file to appear; bail if it takes too long:
+        started_polling_datetime = datetime.datetime.now()
+        while not os.path.isfile(sentinel_path):
+            time.sleep(0.1)
+            if datetime.datetime.now() - started_polling_datetime > datetime.timedelta(minutes=5):
+                self.fail("SUT is not available within 99 seconds; aborting test")
 
+        # Kill resmoke:
         self.signal_resmoke()
 
     def test_task_timeout(self):
@@ -171,7 +186,7 @@ class TestTimeout(_ResmokeSelftest):
             "--repeatTests=2",
             "--jobs=2",
         ]
-        self.execute_resmoke(resmoke_args)
+        self.execute_resmoke(resmoke_args, sentinel_file="timeout0")
 
         archival_dirs_to_expect = 4  # 2 tests * 2 mongod
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
@@ -193,7 +208,7 @@ class TestTimeout(_ResmokeSelftest):
             "--repeatTests=2",
             "--jobs=2",
         ]
-        self.execute_resmoke(resmoke_args)
+        self.execute_resmoke(resmoke_args, sentinel_file="timeout1")
 
         archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
@@ -216,7 +231,7 @@ class TestTimeout(_ResmokeSelftest):
             "jstests/resmoke_selftest/end2end/timeout/nested/top_level_timeout.js",
         ]
 
-        self.execute_resmoke(resmoke_args, sleep_secs=35)
+        self.execute_resmoke(resmoke_args, sentinel_file="inner_level_timeout")
 
         archival_dirs_to_expect = 4  # ((2 tests + 2 stacktrace files) * 2 nodes) / 2 data_file directories
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
