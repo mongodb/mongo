@@ -48,6 +48,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -375,18 +376,13 @@ void QueryPlannerTest::runQueryFull(
     findCommand->setHint(hint);
     findCommand->setMin(minObj);
     findCommand->setMax(maxObj);
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     false,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                                     ProjectionPolicies::findProjectionPolicies(),
-                                     std::move(pipeline),
-                                     isCountLike);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .pipeline = std::move(pipeline),
+        .isCountLike = isCountLike});
     cq->setSbeCompatible(markQueriesSbeCompatible);
     cq->setForceGenerateRecordId(forceRecordId);
 
@@ -456,18 +452,12 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     findCommand->setHint(hint);
     findCommand->setMin(minObj);
     findCommand->setMax(maxObj);
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     false,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                                     ProjectionPolicies::findProjectionPolicies(),
-                                     {},
-                                     isCountLike);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .isCountLike = isCountLike});
     cq->setSbeCompatible(markQueriesSbeCompatible);
     cq->setForceGenerateRecordId(forceRecordId);
 
@@ -482,25 +472,17 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
 
     invariant(nss.isValid());
 
-    const bool isExplain = false;
-
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.dbName(), cmdObj).body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     isExplain,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                                     ProjectionPolicies::findProjectionPolicies(),
-                                     {},
-                                     isCountLike);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .isCountLike = isCountLike});
     cq->setSbeCompatible(markQueriesSbeCompatible);
     cq->setForceGenerateRecordId(forceRecordId);
 
@@ -514,25 +496,17 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
 
     invariant(nss.isValid());
 
-    const bool isExplain = false;
-
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.dbName(), cmdObj).body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
-    auto statusWithCQ =
-        CanonicalQuery::canonicalize(opCtx.get(),
-                                     std::move(findCommand),
-                                     isExplain,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures,
-                                     ProjectionPolicies::findProjectionPolicies(),
-                                     {},
-                                     isCountLike);
-    ASSERT_OK(statusWithCQ.getStatus());
-    cq = std::move(statusWithCQ.getValue());
+    cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
+        .isCountLike = isCountLike});
     cq->setSbeCompatible(markQueriesSbeCompatible);
     cq->setForceGenerateRecordId(forceRecordId);
 

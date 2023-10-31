@@ -216,10 +216,10 @@ void FindCmdShape::appendLetCmdSpecificShapeComponents(
     } else {
         // Slow path: we need to re-parse from our representative shapes.
         auto request = uassertStatusOKWithContext(
-            parsed_find_command::parse(expCtx,
-                                       toFindCommandRequest(),
-                                       ExtensionsCallbackNoop(),
-                                       MatchExpressionParser::kAllowAllSpecialFeatures),
+            parsed_find_command::parse(
+                expCtx,
+                {.findCommand = toFindCommandRequest(),
+                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}),
             "Could not re-parse a representative query shape");
 
         // This constructor will shapify according to the options.

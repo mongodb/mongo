@@ -69,7 +69,7 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
     auto isIdHackEligibleQuery = isIdHackEligibleQueryWithoutCollator(*findCommandRequest);
 
     auto parsedFindCommand =
-        uassertStatusOK(parsed_find_command::parse(expCtx, std::move(findCommandRequest)));
+        uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(findCommandRequest)}));
 
     // Extract namespace from find command.
     auto& nssOrUuid = parsedFindCommand->findCommandRequest->getNamespaceOrUUID();

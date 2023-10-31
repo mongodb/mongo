@@ -199,15 +199,11 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
             static_cast<const NamespaceString&>(NamespaceString::kLogicalSessionsNamespace),
             SerializationContext::stateDefault(),
             apiStrict);
-
-        const boost::intrusive_ptr<ExpressionContext> expCtx;
-        auto cq = uassertStatusOK(
-            CanonicalQuery::canonicalize(opCtx,
-                                         std::move(findCommand),
-                                         false,
-                                         expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kBanAllSpecialFeatures));
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = makeExpressionContext(opCtx, *findCommand),
+            .parsedFind = ParsedFindCommandParams{
+                .findCommand = std::move(findCommand),
+                .allowedFeatures = MatchExpressionParser::kBanAllSpecialFeatures}});
 
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).

@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_stage_builder.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_solution.h"
@@ -85,13 +86,12 @@ public:
      */
     std::unique_ptr<PlanStage> buildPlanStage(std::unique_ptr<QuerySolution> querySolution) {
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);
-        ASSERT_OK(statusWithCQ.getStatus());
+        auto cq = std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         stage_builder::ClassicStageBuilder builder{
-            opCtx(), &CollectionPtr::null, *statusWithCQ.getValue(), *querySolution, workingSet()};
+            opCtx(), &CollectionPtr::null, *cq, *querySolution, workingSet()};
         return builder.build(querySolution->root());
     }
 

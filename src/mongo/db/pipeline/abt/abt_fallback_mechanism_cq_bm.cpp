@@ -67,15 +67,13 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(matchSpec);
         findCommand->setProjection(projectSpec);
-        auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
-        if (!cq.isOK()) {
-            state.SkipWithError("Canonical query could not be created");
-            return;
-        }
+        auto cq = std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(isEligibleForBonsai_forTesting(*cq.getValue()));
+            benchmark::DoNotOptimize(isEligibleForBonsai_forTesting(*cq));
             benchmark::ClobberMemory();
         }
     }

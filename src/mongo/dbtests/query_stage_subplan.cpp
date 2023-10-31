@@ -61,6 +61,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -131,7 +132,6 @@ protected:
     std::unique_ptr<CanonicalQuery> cqFromFindCommand(const std::string& findCmd) {
         BSONObj cmdObj = fromjson(findCmd);
 
-        bool isExplain = false;
         // If there is no '$db', append it.
         auto cmd = OpMsgRequest::fromDBAndBody(
                        DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmdObj)
@@ -139,14 +139,11 @@ protected:
         auto findCommand =
             query_request_helper::makeFromFindCommandForTests(cmd, NamespaceString());
 
-        auto cq = unittest::assertGet(
-            CanonicalQuery::canonicalize(opCtx(),
-                                         std::move(findCommand),
-                                         isExplain,
-                                         expCtx(),
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures));
-        return cq;
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = expCtx(),
+            .parsedFind = ParsedFindCommandParams{
+                .findCommand = std::move(findCommand),
+                .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
     }
 
     const ServiceContext::UniqueOperationContext _opCtx = cc().makeOperationContext();
@@ -178,9 +175,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     CollectionPtr collection = ctx.getCollection();
 
@@ -215,9 +212,9 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(test->opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(test->opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
     QueryPlannerParams plannerParams;
@@ -302,9 +299,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
     QueryPlannerParams plannerParams;
@@ -360,9 +357,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Get planner params.
     QueryPlannerParams plannerParams;
@@ -533,7 +530,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:5}}]}"));
     findCommand->setSort(BSON("d" << 1));
-    auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto cq = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     CollectionPtr collection = ctx.getCollection();
 
@@ -565,8 +564,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
@@ -599,8 +599,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
@@ -637,8 +638,9 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     boost::optional<AutoGetCollectionForReadCommand> collLock;
     collLock.emplace(opCtx(), nss);
@@ -684,8 +686,9 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     // Build a query with a rooted $or.
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
-    auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
+    auto canonicalQuery = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
+                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
     boost::optional<AutoGetCollectionForReadCommand> collLock;
     collLock.emplace(opCtx(), nss);

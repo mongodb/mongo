@@ -280,15 +280,12 @@ Status ClearFilters::clear(OperationContext* opCtx,
         findCommand->setProjection(entry.projection);
         findCommand->setCollation(entry.collation);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(opCtx,
-                                         std::move(findCommand),
-                                         false,
-                                         expCtx,
-                                         extensionsCallback,
-                                         MatchExpressionParser::kAllowAllSpecialFeatures);
-        invariant(statusWithCQ.isOK());
-        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = makeExpressionContext(opCtx, *findCommand),
+            .parsedFind = ParsedFindCommandParams{
+                .findCommand = std::move(findCommand),
+                .extensionsCallback = extensionsCallback,
+                .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
 
         planCacheCommandKeys.insert(canonical_query_encoder::computeHash(
             canonical_query_encoder::encodeForPlanCacheCommand(*cq)));

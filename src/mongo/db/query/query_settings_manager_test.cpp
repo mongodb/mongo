@@ -76,7 +76,7 @@ QueryShapeConfiguration makeQueryShapeConfiguration(
     auto findCommandRequest = std::make_unique<FindCommandRequest>(
         FindCommandRequest::parse(IDLParserContext("findCommandRequest"), query));
     auto parsedFindCommandResult =
-        parsed_find_command::parse(expCtx, std::move(findCommandRequest));
+        parsed_find_command::parse(expCtx, {std::move(findCommandRequest)});
     ASSERT_OK(parsedFindCommandResult);
     return QueryShapeConfiguration(
         std::make_unique<query_shape::FindCmdShape>(*parsedFindCommandResult.getValue(), expCtx)

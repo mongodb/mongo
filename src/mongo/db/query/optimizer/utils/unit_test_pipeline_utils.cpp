@@ -380,15 +380,14 @@ std::string ABTGoldenTestFixture::testParameterizedABTTranslation(StringData var
     if (isFindCmd) {
         auto opCtx = makeOperationContext();
         auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(findCmd));
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
+        auto cq = std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-        return formatGoldenTestExplain(translateCanonicalQueryToABT(metadata,
-                                                                    *statusWithCQ.getValue(),
-                                                                    ProjectionName{"test"},
-                                                                    make<ScanNode>("test", "test"),
-                                                                    prefixId),
-                                       stream);
+        return formatGoldenTestExplain(
+            translateCanonicalQueryToABT(
+                metadata, *cq, ProjectionName{"test"}, make<ScanNode>("test", "test"), prefixId),
+            stream);
     }
 
     // Query is aggregation pipeline.

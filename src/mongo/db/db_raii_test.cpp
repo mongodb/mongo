@@ -110,17 +110,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
         opCtx->getServiceContext()->getPreciseClockSource()->now() + Seconds(1);
     CurOp::get(opCtx)->ensureStarted();
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
-
-    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx,
-                                                     std::move(findCommand),
-                                                     false,
-                                                     expCtx,
-                                                     ExtensionsCallbackNoop(),
-                                                     MatchExpressionParser::kBanAllSpecialFeatures);
-    ASSERT_OK(statusWithCQ.getStatus());
-    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
-
+    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = makeExpressionContext(opCtx, *findCommand),
+        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                              .allowedFeatures =
+                                                  MatchExpressionParser::kBanAllSpecialFeatures}});
     bool permitYield = true;
     auto swExec = getExecutorFind(opCtx,
                                   &collection,

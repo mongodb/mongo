@@ -125,9 +125,9 @@ public:
     std::unique_ptr<CanonicalQuery> canonicalize(const BSONObj& query) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
-        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
-        ASSERT_OK(statusWithCQ.getStatus());
-        return std::move(statusWithCQ.getValue());
+        return std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
     }
 
     static size_t numObj() {
