@@ -27,10 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import glob, os, shutil, string, subprocess
+import glob, os, shutil, subprocess
 import wiredtiger
-
-from wtdataset import SimpleDataSet, SimpleIndexDataSet, ComplexDataSet
 
 # Python has a filecmp.cmp function, but different versions of python approach
 # file comparison differently.  To make sure we get byte for byte comparison,
