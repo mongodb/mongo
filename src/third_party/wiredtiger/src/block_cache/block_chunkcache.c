@@ -288,6 +288,7 @@ static int
 __chunkcache_memory_alloc(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 {
     WT_CHUNKCACHE *chunkcache;
+    WT_DECL_RET;
     size_t bit_index;
 
     chunkcache = &S2C(session)->chunkcache;
@@ -296,7 +297,15 @@ __chunkcache_memory_alloc(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
     if (chunkcache->type == WT_CHUNKCACHE_IN_VOLATILE_MEMORY)
         WT_RET(__wt_malloc(session, chunk->chunk_size, &chunk->chunk_memory));
     else {
-        WT_RET(__chunkcache_bitmap_alloc(session, &bit_index));
+        if ((ret = __chunkcache_bitmap_alloc(session, &bit_index)) == ENOSPC) {
+            WT_STAT_CONN_INCR(session, chunkcache_exceeded_bitmap_capacity);
+            __wt_verbose(session, WT_VERB_CHUNKCACHE,
+              "chunkcache bitmap exceeded capacity of %" PRIu64
+              " bytes "
+              "with %" PRIu64 " bytes in use and the chunk size of %" PRIu64 " bytes",
+              chunkcache->capacity, chunkcache->bytes_used, (uint64_t)chunk->chunk_size);
+        }
+        WT_ERR(ret);
 
         /* Allocate the free memory in the chunk cache. */
         chunk->chunk_memory = chunkcache->memory + chunkcache->chunk_size * bit_index;
@@ -304,30 +313,31 @@ __chunkcache_memory_alloc(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 
     __insert_update_stats(session, chunk);
 
-    return (0);
+err:
+    return (ret);
 }
 
 /*
- * __chunkcache_admit_size --
+ * __chunkcache_can_admit_new_chunk --
  *     Decide if we can admit the chunk given the limit on cache capacity.
  */
-static size_t
-__chunkcache_admit_size(WT_SESSION_IMPL *session)
+static bool
+__chunkcache_can_admit_new_chunk(WT_SESSION_IMPL *session, size_t chunk_size)
 {
     WT_CHUNKCACHE *chunkcache;
 
     chunkcache = &S2C(session)->chunkcache;
 
-    if ((chunkcache->bytes_used + chunkcache->chunk_size) < chunkcache->capacity)
-        return (chunkcache->chunk_size);
+    if ((chunkcache->bytes_used + chunk_size) < chunkcache->capacity)
+        return (true);
 
     WT_STAT_CONN_INCR(session, chunkcache_exceeded_capacity);
     __wt_verbose(session, WT_VERB_CHUNKCACHE,
       "chunkcache exceeded capacity of %" PRIu64
       " bytes "
       "with %" PRIu64 " bytes in use and the chunk size of %" PRIu64 " bytes",
-      chunkcache->capacity, chunkcache->bytes_used, (uint64_t)chunkcache->chunk_size);
-    return (0);
+      chunkcache->capacity, chunkcache->bytes_used, (uint64_t)chunk_size);
+    return (false);
 }
 
 /*
@@ -338,9 +348,7 @@ static int
 __create_and_populate_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK **newchunk,
   wt_off_t chunk_offset, size_t chunk_size, WT_CHUNKCACHE_HASHID *hash_id, uint64_t bucket)
 {
-    size_t admit_size;
-
-    if ((admit_size = __chunkcache_admit_size(session)) == 0)
+    if (!__chunkcache_can_admit_new_chunk(session, chunk_size))
         return (ENOSPC);
     WT_RET(__wt_calloc(session, 1, sizeof(WT_CHUNKCACHE_CHUNK), newchunk));
 

@@ -613,6 +613,7 @@ struct __wt_connection_stats {
     int64_t checkpoint_wait_reduce_dirty;
     int64_t chunkcache_spans_chunks_read;
     int64_t chunkcache_chunks_evicted;
+    int64_t chunkcache_exceeded_bitmap_capacity;
     int64_t chunkcache_exceeded_capacity;
     int64_t chunkcache_lookups;
     int64_t chunkcache_chunks_loaded_from_flushed_tables;
