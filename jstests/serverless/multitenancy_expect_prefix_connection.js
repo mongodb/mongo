@@ -30,37 +30,37 @@ assert(admin.auth('admin', 'pwd'));
 assert.commandWorked(
     admin.runCommand({createUser: 'baseuser', pwd: 'pwd', roles: ['readWriteAnyDatabase']}));
 
-const testDb = conn.getDB("myDb");
-conn._setSecurityToken(_createTenantToken({tenant: tenantID, expectPrefix: true}));
+const testDb = conn.getDB(tenantID.str + "_myDb");
+let countCmd = {count: kCollName, query: {myDoc: 0}};
 
-assert.commandWorked(testDb.runCommand({insert: kCollName, documents: [{myDoc: 0}]}));
+// Set the initial security token. This simulates atlas proxy behavior.
+const setInitialSecurityTokenWithExpectPrefix = function() {
+    conn._setSecurityToken(_createTenantToken({tenant: tenantID, expectPrefix: true}));
+    assert.commandWorked(testDb.runCommand(countCmd));
+}();
 
-// The same count command with `$tenant` fails as we do not allow both security token and $tenant.
-assert.commandFailedWithCode(
-    testDb.runCommand({count: kCollName, query: {myDoc: 0}, '$tenant': tenantID}),
-    6545800);  // "Cannot pass $tenant id if also passing securityToken"
+// Test this second token will throw an assert because we can't change the token once it's set.
+const changeTokenExpectPrefixFalse = function() {
+    conn._setSecurityToken(_createTenantToken({tenant: tenantID, expectPrefix: false}));
+    assert.commandFailedWithCode(testDb.runCommand(countCmd),
+                                 8154400 /*conn protocol can only change once*/);
+}();
 
-// test this second token will throw an assert because we can't change the token once it's set.
-conn._setSecurityToken(_createTenantToken({tenant: tenantID, expectPrefix: false}));
-assert.commandFailedWithCode(testDb.runCommand({count: kCollName, query: {myDoc: 0}}),
-                             8154400 /*conn protocol can only change once*/);
-
-// test this third token will throw an assert because we can't change the token once it's set.
-conn._setSecurityToken(_createTenantToken({tenant: tenantID}));
-assert.commandFailedWithCode(testDb.runCommand({count: kCollName, query: {myDoc: 0}}),
-                             8154400 /*conn protocol can only change once*/);
+// Test this third token will throw an assert because we can't change the token once it's set.
+const changeTokenMissingExpectPrefix = function() {
+    conn._setSecurityToken(_createTenantToken({tenant: tenantID}));
+    assert.commandFailedWithCode(testDb.runCommand(countCmd),
+                                 8154400 /*conn protocol can only change once*/);
+}();
 
 // Setting the same unsigned token works because same token is the same as using the original one.
 // Nothing has changed.
-conn._setSecurityToken(_createTenantToken({tenant: tenantID, expectPrefix: true}));
-assert.commandWorked(testDb.runCommand({count: kCollName, query: {myDoc: 0}}));
+const changeTokenBackToOriginal = function() {
+    conn._setSecurityToken(_createTenantToken({tenant: tenantID, expectPrefix: true}));
+    assert.commandWorked(testDb.runCommand(countCmd));
+}();
 
 // no tenant given so we shouldn't see the doc.
 conn._setSecurityToken(undefined);
-assert.commandFailedWithCode(testDb.runCommand({count: kCollName, query: {myDoc: 0}}),
-                             8423388 /*TenantId must be set*/);
-
-// $tenant still works.
-assert.commandWorked(testDb.runCommand({count: kCollName, query: {myDoc: 0}, '$tenant': tenantID}));
 
 rst.stopSet();

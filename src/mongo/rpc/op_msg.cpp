@@ -305,6 +305,8 @@ SerializationContext OpMsgRequest::getSerializationContext() const {
     serializationCtx.setTenantIdSource(tenantId ? true : false);
     if (auto const expectPrefix = body.getField("expectPrefix")) {
         serializationCtx.setPrefixState(expectPrefix.boolean());
+    } else if (validatedTenancyScope) {
+        serializationCtx.setPrefixState(validatedTenancyScope->isFromAtlasProxy());
     }
     return serializationCtx;
 }

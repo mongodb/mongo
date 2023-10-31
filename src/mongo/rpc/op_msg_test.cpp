@@ -1044,6 +1044,65 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
     }
 }
 
+void CheckVtsSetsPrefix(Client* client, bool simulateAtlasProxyTenantProtocol) {
+    using VTS = auth::ValidatedTenancyScope;
+    const auto kTenantId = TenantId(OID::gen());
+    const auto token = VTS(UserName("user", "admin", kTenantId),
+                           "secret"_sd,
+                           simulateAtlasProxyTenantProtocol ? VTS::TenantProtocol::kAtlasProxy
+                                                            : VTS::TenantProtocol::kDefault,
+                           VTS::TokenForTestingTag{})
+                           .getOriginalToken()
+                           .toString();
+    auto msg =
+        OpMsgBytes{
+            kNoFlags,  //
+            kBodySection,
+            fromjson("{ping: 1}"),
+
+            kDocSequenceSection,
+            Sized{
+                "docs",  //
+                fromjson("{a: 1}"),
+                fromjson("{a: 2}"),
+            },
+
+            kSecurityTokenSection,
+            token,
+        }
+            .parse(client);
+    VTS vts = msg.validatedTenancyScope.value();
+    ASSERT_TRUE(vts.isFromAtlasProxy() == simulateAtlasProxyTenantProtocol);
+
+    auto serializedMsg = msg.serialize();
+    auto request = OpMsgRequest::parse(serializedMsg, client);
+    ASSERT(request.validatedTenancyScope);
+    ASSERT_EQ(request.getValidatedTenantId().value(), vts.tenantId());
+    ASSERT_TRUE(request.validatedTenancyScope->isFromAtlasProxy() ==
+                simulateAtlasProxyTenantProtocol);
+    ASSERT_EQ(request.getSerializationContext().getPrefix(),
+              simulateAtlasProxyTenantProtocol ? SerializationContext::Prefix::IncludePrefix
+                                               : SerializationContext::Prefix::ExcludePrefix);
+}
+
+TEST_F(OpMsgWithAuth, TestVTSSetsPrefixStateFalse) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    CheckVtsSetsPrefix(client.get(), false);
+}
+
+TEST_F(OpMsgWithAuth, TestVTSSetsPrefixStateTrue) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    CheckVtsSetsPrefix(client.get(), true);
+}
+
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
@@ -1292,7 +1351,7 @@ TEST_F(OpMsgWithAuth, GetDbNameWithVTS) {
     request = OpMsgRequest(createMsg(false, true));
     ASSERT_EQ(request.getSerializationContext(),
               SerializationContext(
-                  SC::Source::Command, SC::CallerType::Request, SC::Prefix::Default, true));
+                  SC::Source::Command, SC::CallerType::Request, SC::Prefix::ExcludePrefix, true));
     ASSERT_EQ(request.getDbName(), expectedTenantDbName);
 
     // Test the request which has neither tenant prefix nor $tenant.
