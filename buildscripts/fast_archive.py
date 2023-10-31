@@ -81,7 +81,7 @@ def main(output_file: str, patterns: List[str], display_name: str, expansions_fi
     files = set()
 
     for pattern in patterns:
-        files.update(set(glob.glob(pattern)))
+        files.update({[path for path in glob.glob(pattern) if os.path.isfile(path)]})
 
     files = list(files)
 
