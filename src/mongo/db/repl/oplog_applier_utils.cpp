@@ -641,6 +641,15 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                                      "error"_attr = causedBy(redact(status)));
                 return status;
             }
+        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {
+            auto info = e.extraInfo<DuplicateKeyErrorInfo>();
+            LOGV2_FATAL_CONTINUE(5689600,
+                                 "Writer worker caught duplicate key exception",
+                                 "keyPattern"_attr = info->getKeyPattern(),
+                                 "keyValue"_attr = redact(info->getDuplicatedKeyValue()),
+                                 "error"_attr = redact(e.reason()),
+                                 "oplogEntry"_attr = redact(op->toBSONForLogging()));
+            return e.toStatus();
         } catch (const DBException& e) {
             // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
             // dropped before initial sync or recovery ends anyways and we should ignore it.

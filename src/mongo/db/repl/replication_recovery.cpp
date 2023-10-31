@@ -509,6 +509,14 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
             opCtx, _consistencyMarkers->getAppliedThrough(opCtx), topOfOplog);
     }
     return stableTimestamp;
+} catch (const ExceptionFor<ErrorCodes::DuplicateKey>& e) {
+    auto info = e.extraInfo<DuplicateKeyErrorInfo>();
+    LOGV2_FATAL_CONTINUE(5689601,
+                         "Caught duplicate key exception during replication recovery",
+                         "keyPattern"_attr = info->getKeyPattern(),
+                         "keyValue"_attr = redact(info->getDuplicatedKeyValue()),
+                         "error"_attr = redact(e.reason()));
+    std::terminate();
 } catch (...) {
     LOGV2_FATAL_CONTINUE(
         21570, "Caught exception during replication recovery", "error"_attr = exceptionToStatus());
