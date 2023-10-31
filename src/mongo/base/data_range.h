@@ -200,6 +200,11 @@ public:
         return _debug_offset;
     }
 
+    template <typename H>
+    friend H AbslHashValue(H h, const ConstDataRange& range) {
+        return H::combine_contiguous(std::move(h), range.data(), range.length());
+    }
+
 protected:
     // Shared implementation of split() logic between DataRange and ConstDataRange.
     template <typename RangeT, typename ByteLike, std::enable_if_t<isByte<ByteLike>, int> = 0>
