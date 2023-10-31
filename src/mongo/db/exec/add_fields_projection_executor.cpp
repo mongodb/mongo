@@ -149,7 +149,7 @@ void ProjectionSpecValidator::parseNestedObject(const BSONObj& thisLevelSpec,
                                                 const FieldPath& prefix) {
     for (auto&& elem : thisLevelSpec) {
         auto fieldName = elem.fieldNameStringData();
-        if (fieldName[0] == '$') {
+        if (fieldName.starts_with('$')) {
             // This object is an expression specification like {$add: [...]}. It will be parsed
             // into an Expression later, but for now, just track that the prefix has been
             // specified and skip it.

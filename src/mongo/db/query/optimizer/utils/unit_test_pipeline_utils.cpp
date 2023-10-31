@@ -308,7 +308,7 @@ void formatGoldenTestHeader(StringData variationName,
 
     stream << "==== VARIATION: " << variationName << " ====" << std::endl;
     stream << "-- INPUTS:" << std::endl;
-    if (findCmd != nullptr)
+    if (!findCmd.empty())
         stream << "find command: " << findCmd << std::endl;
     else
         stream << "pipeline: " << pipelineStr << std::endl;
@@ -339,7 +339,7 @@ std::string ABTGoldenTestFixture::testABTTranslationAndOptimization(
     auto&& stream = _ctx->outStream();
 
     formatGoldenTestHeader(
-        variationName, pipelineStr, nullptr, scanDefName, phaseSet, metadata, stream);
+        variationName, pipelineStr, StringData{}, scanDefName, phaseSet, metadata, stream);
 
     auto prefixId = PrefixId::createForTests();
     ABT translated = translatePipeline(

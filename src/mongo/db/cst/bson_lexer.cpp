@@ -382,8 +382,8 @@ void BSONLexer::tokenize(BSONElement elem, bool includeFieldName) {
                 pushToken(elem.valueStringData(), it->second);
             } else {
                 // If we don't care about the keyword, then it's treated as a generic value.
-                if (elem.valueStringData()[0] == '$') {
-                    if (elem.valueStringData()[1] == '$') {
+                if (elem.valueStringData().starts_with('$')) {
+                    if (elem.valueStringData().starts_with("$$")) {
                         pushToken(elem.valueStringData(),
                                   ParserGen::token::DOLLAR_DOLLAR_STRING,
                                   elem.String());

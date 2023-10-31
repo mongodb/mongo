@@ -47,25 +47,26 @@ void registerHTTPClientProvider(HttpClientProvider* factory) {
 }
 
 Status HttpClient::endpointIsSecure(StringData url) {
-    bool isAcceptableLocalhost = [url]() mutable {
+    return [&] {
+        if (url.starts_with("https://"))
+            return true;
+        if (!getTestCommandsEnabled())
+            return false;
         constexpr StringData localhostPrefix = "http://localhost"_sd;
-        if (!url.startsWith(localhostPrefix)) {
+        if (!url.starts_with(localhostPrefix)) {
             return false;
         }
-        url = url.substr(localhostPrefix.size());
-        if (url[0] == ':') {
-            url = url.substr(1);
+        url.remove_prefix(localhostPrefix.size());
+        if (url.starts_with(':')) {
+            url.remove_prefix(1);
             while (!url.empty() && ctype::isDigit(url[0])) {
-                url = url.substr(1);
+                url.remove_prefix(1);
             }
         }
-        return url.empty() || url[0] == '/';
-    }();
-
-    if (url.startsWith("https://") || (isAcceptableLocalhost && getTestCommandsEnabled())) {
-        return Status::OK();
-    }
-    return Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
+        return url.empty() || url.starts_with('/');
+    }()
+        ? Status::OK()
+        : Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
 }
 
 std::unique_ptr<HttpClient> HttpClient::create() {

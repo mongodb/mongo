@@ -87,8 +87,8 @@ void escape(Buffer& buffer,
     // beginning of the input that has not yet been written to 'escaped'. 'it' is pointing to the
     // beginning of the unicode code point we're currently processing in the while-loop below.
     // 'inLast' is the end of the input sequence.
-    auto inFirst = str.begin();
-    auto inLast = str.end();
+    auto inFirst = str.data();
+    auto inLast = str.data() + str.size();
     auto it = inFirst;
     size_t cap = maxLength;
     size_t total = 0;
@@ -121,7 +121,7 @@ void escape(Buffer& buffer,
         inFirst = it + numHandled;
 
         // Write escaped data
-        boundedWrite(escapeSequence.begin(), escapeSequence.end(), false);
+        boundedWrite(escapeSequence.data(), escapeSequence.data() + escapeSequence.size(), false);
     };
 
     auto isValidCodePoint = [&](auto pos, int len) {

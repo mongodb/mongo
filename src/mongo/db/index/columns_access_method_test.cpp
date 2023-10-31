@@ -62,6 +62,14 @@
 using namespace mongo;
 
 namespace {
+
+template <typename It>
+StringData stringDataFromRange(It first, It last) {
+    if (auto d = std::distance(first, last))
+        return StringData{&*first, static_cast<size_t>(d)};
+    return {};
+}
+
 /**
  * This test fixture provides methods to insert documents into a column store index and to scan a
  * column from the index via its IndexAccessMethod.
@@ -169,7 +177,8 @@ protected:
             // the flags and arrayInfo) of the cell retrieved from the column store. We compare the
             // hex-encoded bytes because they produce more helpful debug output when there is a
             // mismatch.
-            StringData observedCell(_splitCellView.firstValuePtr, _splitCellView.arrInfo.rawData());
+            StringData observedCell =
+                stringDataFromRange(_splitCellView.firstValuePtr, _splitCellView.arrInfo.rawData());
             ASSERT_EQ(hexblob::encode(encodedExpectedInts.buf(), encodedExpectedInts.len()),
                       hexblob::encode(observedCell));
         }

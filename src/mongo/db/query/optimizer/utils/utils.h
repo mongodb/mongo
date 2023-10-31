@@ -42,6 +42,7 @@
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 
 #include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
@@ -186,12 +187,15 @@ public:
 
     template <size_t N>
     ProjectionName getNextId(const char (&prefix)[N]) {
-        if (std::holds_alternative<IdType>(_ids)) {
-            return ProjectionName{StringData(str::stream() << "p" << std::get<IdType>(_ids)++)};
-        } else {
-            return ProjectionName{StringData(
-                str::stream() << prefix << "_" << std::get<PrefixMapType>(_ids)[prefix]++)};
-        }
+        return ProjectionName{visit(
+            [&]<typename T>(T& v) -> std::string {
+                using namespace fmt::literals;
+                if constexpr (std::is_same_v<T, IdType>)
+                    return "p{}"_format(v++);
+                else if constexpr (std::is_same_v<T, PrefixMapType>)
+                    return "{}_{}"_format(prefix, v[prefix]++);
+            },
+            _ids)};
     }
 
     PrefixId(const PrefixId& other) = delete;

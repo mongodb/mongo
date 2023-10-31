@@ -307,11 +307,8 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
     bExtra.append("pageSize", static_cast<long long>(pageSize));
 
-    std::string cpuString = getCpuString();
-    if (cpuString != nullptr) {
+    if (auto cpuString = getCpuString(); !cpuString.empty())
         bExtra.append("cpuString", cpuString);
-    }
-
 
     // get memory info
     mse.dwLength = sizeof(mse);

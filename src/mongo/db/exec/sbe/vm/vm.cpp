@@ -4943,7 +4943,8 @@ FastTuple<bool, value::TypeTags, value::Value> pcreNextMatch(pcre::Regex* pcre,
     auto [matchedTag, matchedVal] = value::makeNewString(m[0]);
     value::ValueGuard matchedGuard{matchedTag, matchedVal};
 
-    StringData precedesMatch(m.input().begin() + m.startPos(), m[0].begin());
+    StringData precedesMatch = m.input().substr(m.startPos());
+    precedesMatch = precedesMatch.substr(0, m[0].data() - precedesMatch.data());
     codePointPos += str::lengthInUTF8CodePoints(precedesMatch);
     startBytePos += precedesMatch.size();
 

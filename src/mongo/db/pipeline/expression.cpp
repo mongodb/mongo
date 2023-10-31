@@ -290,7 +290,7 @@ intrusive_ptr<Expression> Expression::parseOperand(ExpressionContext* const expC
                                                    const VariablesParseState& vps) {
     BSONType type = exprElement.type();
 
-    if (type == String && exprElement.valueStringData()[0] == '$') {
+    if (type == String && exprElement.valueStringData().starts_with('$')) {
         /* if we got here, this is a field path expression */
         return ExpressionFieldPath::parse(expCtx, exprElement.str(), vps);
     } else if (type == Object) {
@@ -7104,11 +7104,12 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
         // No match.
         return Value(BSONNULL);
 
-    StringData beforeMatch(m.input().begin() + m.startPos(), m[0].begin());
+    auto afterStart = m.input().substr(m.startPos());
+    auto beforeMatch = afterStart.substr(0, m[0].data() - afterStart.data());
     regexState->startCodePointPos += str::lengthInUTF8CodePoints(beforeMatch);
 
     // Set the start index for match to the new one.
-    regexState->startBytePos = m[0].begin() - m.input().begin();
+    regexState->startBytePos = m[0].data() - m.input().data();
 
     std::vector<Value> captures;
     captures.reserve(m.captureCount());
@@ -7349,6 +7350,8 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
             // the character at startByteIndex matches the regex, we cannot return it since we are
             // already returing an empty string starting at this index. So we move on to the next
             // byte index.
+            if (static_cast<size_t>(executionState.startBytePos) >= input.size())
+                continue;  // input already exhausted
             executionState.startBytePos +=
                 str::getCodePointLength(input[executionState.startBytePos]);
             ++executionState.startCodePointPos;

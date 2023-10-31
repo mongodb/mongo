@@ -29,15 +29,12 @@
 
 #include "mongo/base/string_data.h"
 
-#include <boost/utility/string_view.hpp>
 #include <ostream>
-
-#include <boost/utility/string_view_fwd.hpp>
+#include <string_view>
 
 namespace mongo {
-
 std::ostream& operator<<(std::ostream& stream, StringData value) {
-    return stream << boost::string_view(value.rawData(), value.size());
+    return stream << std::string_view{value};
 }
 
 }  // namespace mongo

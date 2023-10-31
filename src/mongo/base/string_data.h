@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <algorithm>  // for min
+#include <algorithm>
 #include <cstring>
 #include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <string_view>  // NOLINT
 #include <type_traits>
 
 #include "mongo/platform/compiler.h"
@@ -46,45 +47,59 @@
 
 namespace mongo {
 
+// Set to 1 if XCode supports `std::string_view` c++20 features.
+#define MONGO_STRING_DATA_CXX20 0
+
 /**
- * A StringData object wraps a 'const std::string&' or a 'const char*' without copying its
- * contents. The most common usage is as a function argument that takes any of the two
- * forms of strings above. Fundamentally, this class tries go around the fact that string
- * literals in C++ are char[N]'s.
+ * A StringData object refers to an array of `char` without owning it.
+ * The most common usage is as a function argument.
  *
- * Notes:
+ * Implements the API of `std::string_view`, and is implemented
+ * by forwarding member functions to the internal `string_view` member.
+ * Ultimately this class will be removed and we'll just use `std::string_view`
+ * directly, so we must restrict it to the feature set of `std::string_view`
+ * supported by all supported platforms. They are not all the same.
  *
- *  + The object StringData wraps around must be alive while the StringData is.
+ * The iterator is not always a raw pointer. On Windows, it is a class,
+ * which enables useful integrity checks in debug builds.
  *
- *  + Because std::string data can be used to pass a substring around, one should never assume a
- *    rawData() terminates with a null.
+ * XCode is basically implementing at the C++17 level. There's no `operator<=>`,
+ * no range constructors, and no `contains` member.
+ *
+ * The string data to which StringData refers must outlive it.
+ *
+ * StringData is not null-terminated.
+ *
+ * See https://en.cppreference.com/w/cpp/string/basic_string_view.
  */
 class MONGO_GSL_POINTER StringData {
-    /** Tag used to bypass the invariant of the {c,len} constructor. */
-    struct TrustedInitTag {};
-    constexpr StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}
-
 public:
-    // Iterator type
-    using const_iterator = const char*;
+    using value_type = std::string_view::value_type;
+    using const_pointer = std::string_view::const_pointer;
+    using pointer = std::string_view::pointer;
+    using const_reference = std::string_view::const_reference;
+    using reference = std::string_view::reference;
+    using const_iterator = std::string_view::const_iterator;
+    using iterator = std::string_view::iterator;
+    using const_reverse_iterator = std::string_view::const_reverse_iterator;
+    using reverse_iterator = std::string_view::reverse_iterator;
+    using size_type = std::string_view::size_type;
+    using difference_type = std::string_view::difference_type;
 
-    /** Constructs an empty StringData. */
+    static constexpr inline size_type npos = std::string_view::npos;
+
     constexpr StringData() = default;
 
-    /**
-     * Constructs a StringData, for the case where the length of the
-     * string is not known. 'c' must either be NULL, or a pointer to a
-     * null-terminated string.
-     */
-    StringData(const char* str)
-        : StringData(str, (str != nullptr && str[0] != '\0') ? std::strlen(str) : 0) {}
+    StringData(std::nullptr_t) = delete;  // C++23, but harmless
 
     /**
-     * Constructs a StringData, for the case of a std::string. We can
-     * use the trusted init path with no follow on checks because
-     * string::data is assured to never return nullptr.
+     * Used where string length is not known in advance.
+     * 'c' must be null or point to a null-terminated string.
      */
-    StringData(const std::string& s) : StringData(s.data(), s.length(), TrustedInitTag()) {}
+    StringData(const char* c)
+        : StringData{std::string_view{c, (c && c[0] != '\0') ? std::strlen(c) : 0}} {}
+
+    StringData(const std::string& s) : StringData{std::string_view{s}} {}
 
     /**
      * Constructs a StringData with an explicit length. 'c' must
@@ -93,239 +108,296 @@ public:
      * the first 'len' characters starting at 'c'. The range of
      * characters in the half-open interval `[c, c + len)` must be valid.
      */
-    constexpr StringData(const char* c, size_t len) : StringData(c, len, TrustedInitTag()) {
-        if (MONGO_unlikely(kDebugBuild && !_data && (_size != 0)))
+    constexpr StringData(const char* c, size_type len) : StringData(std::string_view{c, len}) {
+        if (MONGO_unlikely(kDebugBuild && !data() && (size() != 0)))
             invariant(0, "StringData(nullptr,len) requires len==0");
     }
 
-    explicit operator std::string() const {
-        return toString();
-    }
-
+#if MONGO_STRING_DATA_CXX20
     /**
-     * Constructs a StringData with begin and end iterators. begin points to the beginning of the
-     * string. end points to the position past the end of the string. In a null-terminated string,
-     * end points to the null-terminator.
+     * Constructs a StringData with iterator range [first, last). `first` points to the beginning of
+     * the string. `last` points to the position past the end of the string.
      *
-     * We template the second parameter to ensure if StringData is called with 0 in the second
-     * parameter, the (ptr,len) constructor is chosen instead.
+     * We template the second parameter to ensure if StringData is called with literal 0 in the
+     * second parameter, the (const char*, size_t) constructor is chosen instead.
+     *
+     * `std::string_view` already does advanced concepts checks on these arguments, so we
+     * use `std::is_constructible` to just accept whatever `std::string_view` accepts.
      */
-    template <typename T, std::enable_if_t<std::is_same_v<const char*, T>, int> = 0>
-    constexpr StringData(T begin, T end) : StringData(begin, end - begin) {}
+    template <typename It,
+              typename End,
+              std::enable_if_t<std::is_constructible_v<std::string_view, It, End> &&
+                                   !std::is_convertible_v<End, size_type>,
+                               int> = 0>
+    constexpr StringData(It first, End last) : _sv{first, last} {}
+#endif  // MONGO_STRING_DATA_CXX20
 
-    /**
-     * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
-     * lexicographical order.
-     */
-    constexpr int compare(StringData other) const;
-
-    /**
-     * note: this uses tolower, and therefore does not handle
-     *       come languages correctly.
-     *       should be use sparingly
-     */
-    bool equalCaseInsensitive(StringData other) const;
-
-    void copyTo(char* dest, bool includeEndingNull) const;
-
-    constexpr StringData substr(size_t pos, size_t n = std::numeric_limits<size_t>::max()) const;
-
-    //
-    // finders
-    //
-
-    size_t find(char c, size_t fromPos = 0) const;
-    size_t find(StringData needle, size_t fromPos = 0) const;
-    size_t rfind(char c, size_t fromPos = std::string::npos) const;
-
-    /**
-     * Returns true if 'prefix' is a substring of this instance, anchored at position 0.
-     */
-    bool startsWith(StringData prefix) const;
-
-    /**
-     * Returns true if 'suffix' is a substring of this instance, anchored at the end.
-     */
-    bool endsWith(StringData suffix) const;
-
-    //
-    // accessors
-    //
-
-    /**
-     * Get the pointer to the first byte of StringData.  This is not guaranteed to be
-     * null-terminated, so if using this without checking size(), you are likely doing
-     * something wrong.
-     */
-    constexpr const char* rawData() const noexcept {
-        return _data;
+    explicit operator std::string() const {
+        return std::string{_sv};
     }
 
-    constexpr size_t size() const noexcept {
-        return _size;
-    }
-    constexpr bool empty() const {
-        return size() == 0;
-    }
-    std::string toString() const {
-        return std::string(_data, size());
-    }
-    constexpr char operator[](unsigned pos) const {
-        return _data[pos];
+    explicit constexpr operator std::string_view() const noexcept {
+        return _sv;
     }
 
     //
     // iterators
     //
-    constexpr const_iterator begin() const {
-        return rawData();
+
+    constexpr const_iterator begin() const noexcept {
+        return _sv.begin();
     }
-    constexpr const_iterator end() const {
-        return rawData() + size();
+    constexpr const_iterator end() const noexcept {
+        return _sv.end();
+    }
+    constexpr const_iterator cbegin() const noexcept {
+        return _sv.cbegin();
+    }
+    constexpr const_iterator cend() const noexcept {
+        return _sv.cend();
+    }
+
+    constexpr const_reverse_iterator rbegin() const noexcept {
+        return _sv.rbegin();
+    }
+    constexpr const_reverse_iterator rend() const noexcept {
+        return _sv.rend();
+    }
+    constexpr const_reverse_iterator crbegin() const noexcept {
+        return _sv.crbegin();
+    }
+    constexpr const_reverse_iterator crend() const noexcept {
+        return _sv.crend();
+    }
+
+    //
+    // accessors
+    //
+
+    constexpr const_reference operator[](size_t pos) const {
+        if (kDebugBuild && !(pos < size()))
+            invariant(pos < size(), "StringData index out of range");
+        return _sv[pos];
+    }
+    constexpr const_reference at(size_t pos) const {
+        return _sv.at(pos);
+    }
+    constexpr const_reference back() const {
+        return _sv.back();
+    }
+    constexpr const_reference front() const {
+        return _sv.front();
+    }
+    constexpr const char* data() const noexcept {
+        return _sv.data();
+    }
+
+    //
+    // Capacity
+    //
+
+    constexpr bool empty() const noexcept {
+        return _sv.empty();
+    }
+    constexpr size_type size() const noexcept {
+        return _sv.size();
+    }
+    constexpr size_type length() const noexcept {
+        return _sv.length();
+    }
+    constexpr size_type max_size() const noexcept {
+        return _sv.max_size();
+    }
+
+    //
+    // Modifiers
+    //
+
+    /** Moves the front of the view forward by n characters. Requires n < size. */
+    constexpr void remove_prefix(size_type n) {
+        _sv.remove_prefix(n);
+    }
+
+    /** Moves the end of the view back by n characters. Requires n < size. */
+    constexpr void remove_suffix(size_type n) {
+        _sv.remove_suffix(n);
+    }
+
+    constexpr void swap(StringData& v) noexcept {
+        _sv.swap(v._sv);
+    }
+
+    //
+    // Operations
+    //
+
+    constexpr size_type copy(char* dest, size_type count, size_type pos = 0) const {
+        return _sv.copy(dest, count, pos);
+    }
+
+    constexpr StringData substr(size_type pos = 0, size_type n = npos) const {
+        return StringData{_sv.substr(pos, n)};
+    }
+
+    /**
+     * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'v' in
+     * lexicographical order.
+     */
+    constexpr int compare(StringData v) const noexcept {
+        return _sv.compare(v._sv);
+    }
+    constexpr int compare(size_type pos1, size_type count1, StringData v) const {
+        return _sv.compare(pos1, count1, v._sv);
+    }
+    constexpr int compare(
+        size_type pos1, size_type count1, StringData v, size_type pos2, size_type count2) const {
+        return _sv.compare(pos1, count1, v._sv, pos2, count2);
+    }
+    constexpr int compare(const char* s) const {
+        return _sv.compare(s);
+    }
+    constexpr int compare(size_type pos1, size_type count1, const char* s) const {
+        return _sv.compare(pos1, count1, s);
+    }
+    constexpr int compare(size_type pos1, size_type count1, const char* s, size_type count2) const {
+        return _sv.compare(pos1, count1, s, count2);
+    }
+
+    /** True if 'prefix' is a substring anchored at begin. */
+    constexpr bool starts_with(StringData v) const noexcept {
+        return _sv.starts_with(v._sv);
+    }
+    constexpr bool starts_with(char ch) const noexcept {
+        return _sv.starts_with(ch);
+    }
+    constexpr bool starts_with(const char* s) const {
+        return _sv.starts_with(s);
+    }
+
+    /** True if 'suffix' is a substring anchored at end. */
+    constexpr bool ends_with(StringData v) const noexcept {
+        return _sv.ends_with(v._sv);
+    }
+    constexpr bool ends_with(char ch) const noexcept {
+        return _sv.ends_with(ch);
+    }
+    constexpr bool ends_with(const char* s) const {
+        return _sv.ends_with(s);
+    }
+
+#if MONGO_STRING_DATA_CXX20
+    constexpr bool contains(StringData v) const noexcept {
+        return _sv.find(v._sv) != npos;
+    }
+    constexpr bool contains(char ch) const noexcept {
+        return _sv.find(ch) != npos;
+    }
+    constexpr bool contains(const char* s) const {
+        return _sv.find(s) != npos;
+    }
+#endif  // MONGO_STRING_DATA_CXX20
+
+/** The "find" family of functions have identical overload sets. */
+#define STRING_DATA_DEFINE_FIND_OVERLOADS_(func, posDefault)                            \
+    constexpr size_type func(StringData v, size_type pos = posDefault) const noexcept { \
+        return _sv.func(v._sv, pos);                                                    \
+    }                                                                                   \
+    constexpr size_type func(char ch, size_type pos = posDefault) const noexcept {      \
+        return _sv.func(ch, pos);                                                       \
+    }                                                                                   \
+    constexpr size_type func(const char* s, size_type pos, size_type count) const {     \
+        return _sv.func(s, pos, count);                                                 \
+    }                                                                                   \
+    constexpr size_type func(const char* s, size_type pos = posDefault) const {         \
+        return _sv.func(s, pos);                                                        \
+    }
+    STRING_DATA_DEFINE_FIND_OVERLOADS_(find, 0)
+    STRING_DATA_DEFINE_FIND_OVERLOADS_(rfind, npos)
+    STRING_DATA_DEFINE_FIND_OVERLOADS_(find_first_of, 0)
+    STRING_DATA_DEFINE_FIND_OVERLOADS_(find_last_of, npos)
+    STRING_DATA_DEFINE_FIND_OVERLOADS_(find_first_not_of, 0)
+    STRING_DATA_DEFINE_FIND_OVERLOADS_(find_last_not_of, npos)
+#undef STRING_DATA_FIND_OVERLOADS_
+
+    //
+    // MongoDB extras
+    //
+
+    constexpr bool startsWith(StringData prefix) const noexcept {
+        return starts_with(prefix);
+    }
+
+    constexpr bool endsWith(StringData suffix) const noexcept {
+        return ends_with(suffix);
+    }
+
+    std::string toString() const {
+        return std::string{_sv};
+    }
+
+    constexpr const char* rawData() const noexcept {
+        return data();
+    }
+
+    /** Uses tolower, and therefore does not handle some languages correctly. */
+    bool equalCaseInsensitive(StringData other) const {
+        return size() == other.size() &&
+            std::equal(begin(), end(), other.begin(), other.end(), [](char a, char b) {
+                   return ctype::toLower(a) == ctype::toLower(b);
+               });
+    }
+
+    void copyTo(char* dest, bool includeEndingNull) const {
+        if (!empty())
+            copy(dest, size());
+        if (includeEndingNull)
+            dest[size()] = 0;
     }
 
 private:
-    const char* _data = nullptr;  // is not guaranted to be null terminated (see "notes" above)
-    size_t _size = 0;             // 'size' does not include the null terminator
+    explicit constexpr StringData(std::string_view sv) : _sv{sv} {}
+
+    std::string_view _sv;
 };
 
-constexpr bool operator==(StringData lhs, StringData rhs) {
-    return (lhs.size() == rhs.size()) && (lhs.compare(rhs) == 0);
+#if MONGO_STRING_DATA_CXX20
+inline constexpr auto operator<=>(StringData a, StringData b) noexcept {
+    return std::string_view{a} <=> std::string_view{b};
+}
+#else   // !MONGO_STRING_DATA_CXX20
+inline constexpr bool operator==(StringData a, StringData b) noexcept {
+    return std::string_view{a} == std::string_view{b};
+}
+inline constexpr bool operator!=(StringData a, StringData b) noexcept {
+    return std::string_view{a} != std::string_view{b};
+}
+inline constexpr bool operator<(StringData a, StringData b) noexcept {
+    return std::string_view{a} < std::string_view{b};
+}
+inline constexpr bool operator>(StringData a, StringData b) noexcept {
+    return std::string_view{a} > std::string_view{b};
+}
+inline constexpr bool operator<=(StringData a, StringData b) noexcept {
+    return std::string_view{a} <= std::string_view{b};
+}
+inline constexpr bool operator>=(StringData a, StringData b) noexcept {
+    return std::string_view{a} >= std::string_view{b};
+}
+#endif  // !MONGO_STRING_DATA_CXX20
+
+std::ostream& operator<<(std::ostream& os, StringData v);
+
+inline std::string& operator+=(std::string& a, StringData b) {
+    return a += std::string_view{b};
 }
 
-constexpr bool operator!=(StringData lhs, StringData rhs) {
-    return !(lhs == rhs);
+/** Not supported by `std::string_view`. */
+inline std::string operator+(std::string a, StringData b) {
+    return a += b;
 }
-
-constexpr bool operator<(StringData lhs, StringData rhs) {
-    return lhs.compare(rhs) < 0;
-}
-
-constexpr bool operator<=(StringData lhs, StringData rhs) {
-    return lhs.compare(rhs) <= 0;
-}
-
-constexpr bool operator>(StringData lhs, StringData rhs) {
-    return lhs.compare(rhs) > 0;
-}
-
-constexpr bool operator>=(StringData lhs, StringData rhs) {
-    return lhs.compare(rhs) >= 0;
-}
-
-std::ostream& operator<<(std::ostream& stream, StringData value);
-
-constexpr int StringData::compare(StringData other) const {
-    // Note: char_traits::compare() allows nullptr arguments unlike memcmp().
-    int res = std::char_traits<char>::compare(_data, other._data, std::min(_size, other._size));
-
-    if (res != 0)
-        return res > 0 ? 1 : -1;
-
-    if (_size == other._size)
-        return 0;
-
-    return _size > other._size ? 1 : -1;
-}
-
-inline bool StringData::equalCaseInsensitive(StringData other) const {
-    return size() == other.size() &&
-        std::equal(begin(), end(), other.begin(), other.end(), [](char a, char b) {
-               return ctype::toLower(a) == ctype::toLower(b);
-           });
-}
-
-inline void StringData::copyTo(char* dest, bool includeEndingNull) const {
-    if (_data)
-        memcpy(dest, _data, size());
-    if (includeEndingNull)
-        dest[size()] = 0;
-}
-
-inline size_t StringData::find(char c, size_t fromPos) const {
-    if (fromPos >= size())
-        return std::string::npos;
-
-    const void* x = memchr(_data + fromPos, c, _size - fromPos);
-    if (x == nullptr)
-        return std::string::npos;
-    return static_cast<size_t>(static_cast<const char*>(x) - _data);
-}
-
-inline size_t StringData::find(StringData needle, size_t fromPos) const {
-    size_t mx = size();
-    if (fromPos > mx)
-        return std::string::npos;
-    size_t needleSize = needle.size();
-
-    if (needleSize == 0)
-        return fromPos;
-    else if (needleSize > mx)
-        return std::string::npos;
-
-    mx -= needleSize;
-
-    for (size_t i = fromPos; i <= mx; i++) {
-        if (memcmp(_data + i, needle._data, needleSize) == 0)
-            return i;
-    }
-    return std::string::npos;
-}
-
-inline size_t StringData::rfind(char c, size_t fromPos) const {
-    const size_t sz = size();
-    if (sz < 1)
-        return std::string::npos;
-    fromPos = std::min(fromPos, sz - 1) + 1;
-
-    for (const char* cur = _data + fromPos; cur > _data; --cur) {
-        if (*(cur - 1) == c)
-            return (cur - _data) - 1;
-    }
-    return std::string::npos;
-}
-
-constexpr StringData StringData::substr(size_t pos, size_t n) const {
-    if (pos > size())
-        throw std::out_of_range("out of range");
-
-    // truncate to end of string
-    if (n > size() - pos)
-        n = size() - pos;
-
-    return StringData(_data + pos, n);
-}
-
-inline bool StringData::startsWith(StringData prefix) const {
-    // TODO: Investigate an optimized implementation.
-    return substr(0, prefix.size()) == prefix;
-}
-
-inline bool StringData::endsWith(StringData suffix) const {
-    // TODO: Investigate an optimized implementation.
-    const size_t thisSize = size();
-    const size_t suffixSize = suffix.size();
-    if (suffixSize > thisSize)
-        return false;
-    return substr(thisSize - suffixSize) == suffix;
-}
-
-inline std::string& operator+=(std::string& lhs, StringData rhs) {
-    if (!rhs.empty())
-        lhs.append(rhs.rawData(), rhs.size());
-    return lhs;
-}
-
-inline std::string operator+(std::string lhs, StringData rhs) {
-    if (!rhs.empty())
-        lhs.append(rhs.rawData(), rhs.size());
-    return lhs;
-}
-
-inline std::string operator+(StringData lhs, std::string rhs) {
-    if (!lhs.empty())
-        rhs.insert(0, lhs.rawData(), lhs.size());
-    return rhs;
+/** Not supported by `std::string_view`. */
+inline std::string operator+(StringData a, std::string b) {
+    return b.insert(0, std::string_view{a});
 }
 
 inline namespace literals {
@@ -343,14 +415,14 @@ constexpr StringData operator"" _sd(const char* c, std::size_t len) {
 
 namespace fmt {
 template <>
-class formatter<mongo::StringData> : formatter<fmt::string_view> {
-    using Base = formatter<fmt::string_view>;
+class formatter<mongo::StringData> : formatter<std::string_view> {
+    using Base = formatter<std::string_view>;
 
 public:
     using Base::parse;
     template <typename FormatContext>
     auto format(const mongo::StringData& s, FormatContext& fc) {
-        return Base::format(fmt::string_view{s.rawData(), s.size()}, fc);
+        return Base::format(std::string_view{s}, fc);
     }
 };
 }  // namespace fmt

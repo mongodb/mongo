@@ -360,7 +360,7 @@ bool isExpressionDocument(BSONElement e, bool allowIncompleteDBRef) {
         return false;
 
     auto name = o.firstElement().fieldNameStringData();
-    if (name[0] != '$')
+    if (!name.starts_with('$'))
         return false;
 
     if (isDBRefDocument(o, allowIncompleteDBRef)) {
@@ -2330,7 +2330,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(MatchExpressionCounters,
 boost::optional<PathAcceptingKeyword> MatchExpressionParser::parsePathAcceptingKeyword(
     BSONElement typeElem, boost::optional<PathAcceptingKeyword> defaultKeyword) {
     auto fieldName = typeElem.fieldNameStringData();
-    if (fieldName[0] == '$' && fieldName[1]) {
+    if (fieldName.starts_with('$') && fieldName.size() > 1) {
         auto opName = fieldName.substr(1);
         auto queryOp = queryOperatorMap->find(opName);
 

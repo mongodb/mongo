@@ -119,8 +119,7 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
             BSONElement e = i.next();
 
             auto fieldName = e.fieldNameStringData();
-
-            if (fieldName[0] == '$' && containsDotsAndDollarsField) {
+            if (fieldName.starts_with('$') && containsDotsAndDollarsField) {
                 *containsDotsAndDollarsField = true;
                 // If the internal validation is disabled and we confirm this doc contains
                 // dots/dollars field name, we can skip other validations below.

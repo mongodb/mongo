@@ -101,15 +101,15 @@ TEST(Construction, Constexpr) {
     ASSERT_EQUALS(lit, "1234567"_sd);
     constexpr StringData sub = lit.substr(3, 2);
     ASSERT_EQUALS(sub, "45"_sd);
+#if MONGO_STRING_DATA_CXX20
     constexpr StringData range(lit.begin() + 1, lit.end() - 1);
     ASSERT_EQUALS(range, "23456"_sd);
+#endif
     constexpr char c = lit[1];
     ASSERT_EQUALS(c, '2');
     constexpr StringData nully{nullptr, 0};
     ASSERT_EQUALS(nully, ""_sd);
-#if 0
-    constexpr StringData cxNully{nullptr, 1};  // must not compile
-#endif
+    static_assert(!std::is_constructible_v<StringData, std::nullptr_t>);
     constexpr StringData ptr{lit.rawData() + 1, 3};
     ASSERT_EQUALS(ptr, "234"_sd);
 }

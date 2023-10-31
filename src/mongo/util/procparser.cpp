@@ -89,6 +89,18 @@ namespace mongo {
 
 namespace {
 
+template <typename It>
+StringData stringDataFromRange(It first, It last) {
+    if (auto d = std::distance(first, last))
+        return StringData(&*first, static_cast<size_t>(d));
+    return {};
+}
+
+template <typename Range>
+StringData stringDataFromRange(const Range& r) {
+    return stringDataFromRange(r.begin(), r.end());
+}
+
 /**
  * Get USER_HZ for the machine. See time(7) for an explanation.
  */
@@ -254,7 +266,7 @@ Status parseProcStat(const std::vector<StringData>& keys,
          lineIt != string_split_iterator();
          ++lineIt) {
 
-        StringData line((*lineIt).begin(), (*lineIt).end());
+        StringData line = stringDataFromRange(*lineIt);
 
         // Split the line by spaces since that is the only delimiter for stat files.
         // token_compress_on means the iterator skips over consecutive ' '. This is needed for the
@@ -269,7 +281,7 @@ Status parseProcStat(const std::vector<StringData>& keys,
             continue;
         }
 
-        StringData key((*partIt).begin(), (*partIt).end());
+        StringData key = stringDataFromRange(*partIt);
 
         ++partIt;
 
@@ -366,7 +378,7 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
          lineIt != string_split_iterator();
          ++lineIt) {
 
-        StringData line((*lineIt).begin(), (*lineIt).end());
+        StringData line = stringDataFromRange(*lineIt);
 
         // Split the line by spaces and colons since these are the delimiters for meminfo files.
         // token_compress_on means the iterator skips over consecutive ' '. This is needed for
@@ -382,7 +394,7 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
             continue;
         }
 
-        StringData key((*partIt).begin(), (*partIt).end());
+        StringData key = stringDataFromRange(*partIt);
 
         ++partIt;
 
@@ -396,7 +408,7 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
         if (keys.empty() || std::find(keys.begin(), keys.end(), key) != keys.end()) {
             foundKeys = true;
 
-            StringData stringValue((*partIt).begin(), (*partIt).end());
+            StringData stringValue = stringDataFromRange(*partIt);
 
             uint64_t value;
 
@@ -409,7 +421,7 @@ Status parseProcMemInfo(const std::vector<StringData>& keys,
 
             // If there is one last token, check if it is actually "kB"
             if (partIt != string_split_iterator()) {
-                StringData kb_token((*partIt).begin(), (*partIt).end());
+                StringData kb_token = stringDataFromRange(*partIt);
                 auto keyWithSuffix = key.toString();
 
                 if (kb_token == "kB") {
@@ -497,7 +509,7 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
                 if (keyNum == 0) {
 
                     // first token is a prefix to be applied to remaining keys
-                    prefix = StringData((*keysIt).begin(), (*keysIt).end());
+                    prefix = stringDataFromRange(*keysIt);
 
                     // ignore line if prefix isn't in requested list
                     if (!keys.empty() && std::find(keys.begin(), keys.end(), prefix) == keys.end())
@@ -506,8 +518,8 @@ Status parseProcNetstat(const std::vector<StringData>& keys,
                 } else {
 
                     // remaining tokens are key/value pairs
-                    StringData key((*keysIt).begin(), (*keysIt).end());
-                    StringData stringValue((*valuesIt).begin(), (*valuesIt).end());
+                    StringData key = stringDataFromRange(*keysIt);
+                    StringData stringValue = stringDataFromRange(*valuesIt);
                     uint64_t value;
                     if (NumberParser{}(stringValue, &value).isOK()) {
                         builder->appendNumber(prefix.toString() + key.toString(),
@@ -548,11 +560,11 @@ Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& lines
     for (string_split_iterator lineIt(data.begin(), data.end(), newlineFinder);
          lineIt != string_split_iterator();
          ++lineIt) {
-        StringData line(lineIt->begin(), lineIt->end());
+        StringData line = stringDataFromRange(*lineIt);
         // Split the line by spaces and colons since these are the delimeters for sockstat files.
         string_split_iterator partIt(line.begin(), line.end(), spaceAndColonFinder);
         // Check the line-key, which is the first part of the line, to see if we care about it.
-        StringData lineKey(partIt->begin(), partIt->end());
+        StringData lineKey = stringDataFromRange(*partIt);
         auto bucketIt = linesAndKeys.find(lineKey);
         if (bucketIt == linesAndKeys.end()) {
             // We don't care about this line.
@@ -565,7 +577,7 @@ Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& lines
         ++partIt;
         auto lineKeySet = bucketIt->second;
         while (partIt != string_split_iterator()) {
-            StringData key(partIt->begin(), partIt->end());
+            StringData key = stringDataFromRange(*partIt);
             if (!lineKeySet.count(key)) {
                 // Don't care about this key/value. Skip past it.
                 ++partIt;
@@ -574,7 +586,7 @@ Status parseProcSockstat(const std::map<StringData, std::set<StringData>>& lines
             }
             // We do care about this key. Get the value.
             ++partIt;
-            StringData stringValue(partIt->begin(), partIt->end());
+            StringData stringValue = stringDataFromRange(*partIt);
             long long value;
             if (!NumberParser{}(stringValue, &value).isOK()) {
                 return Status(ErrorCodes::FailedToParse,
@@ -635,7 +647,7 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
          lineIt != string_split_iterator();
          ++lineIt) {
 
-        StringData line((*lineIt).begin(), (*lineIt).end());
+        StringData line = stringDataFromRange(*lineIt);
 
         // Skip leading whitespace so that the split_iterator starts on non-whitespace otherwise we
         // get an empty first token. Device major numbers (the first number on each line) are right
@@ -670,7 +682,7 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
             continue;
         }
 
-        StringData disk((*partIt).begin(), (*partIt).end());
+        StringData disk = stringDataFromRange(*partIt);
 
         // Skip processing this line if we only have a block device name.
         if (partIt == string_split_iterator()) {
@@ -693,7 +705,7 @@ Status parseProcDiskStats(const std::vector<StringData>& disks,
             for (size_t index = 0; partIt != string_split_iterator() && index < kDiskFieldCount;
                  ++partIt, ++index) {
 
-                StringData stringValue((*partIt).begin(), (*partIt).end());
+                StringData stringValue = stringDataFromRange(*partIt);
 
                 uint64_t value;
 
@@ -898,7 +910,7 @@ Status parseProcVMStat(const std::vector<StringData>& keys,
          lineIt != string_split_iterator();
          ++lineIt) {
 
-        StringData line(lineIt->begin(), lineIt->end());
+        StringData line = stringDataFromRange(*lineIt);
 
         // Split the line by spaces since this the delimiters for vmstat files.
         // token_compress_on means the iterator skips over consecutive ' '. This is needed for
@@ -913,7 +925,7 @@ Status parseProcVMStat(const std::vector<StringData>& keys,
             continue;
         }
 
-        StringData key(partIt->begin(), partIt->end());
+        StringData key = stringDataFromRange(*partIt);
 
         ++partIt;
 
@@ -927,7 +939,7 @@ Status parseProcVMStat(const std::vector<StringData>& keys,
         if (keys.empty() || std::find(keys.begin(), keys.end(), key) != keys.end()) {
             foundKeys = true;
 
-            StringData stringValue(partIt->begin(), partIt->end());
+            StringData stringValue = stringDataFromRange(*partIt);
 
             uint64_t value;
 
@@ -968,7 +980,7 @@ Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* buil
     }
 
     if (key == FileNrKey::kFileHandlesInUse) {
-        StringData stringValue(partIt->begin(), partIt->end());
+        StringData stringValue = stringDataFromRange(*partIt);
         uint64_t value;
         if (!NumberParser{}(stringValue, &value).isOK()) {
             return Status(ErrorCodes::FailedToParse, "Couldn't parse first token to number");
@@ -991,7 +1003,7 @@ Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* buil
     }
 
     invariant(key == FileNrKey::kMaxFileHandles);
-    StringData stringValue(partIt->begin(), partIt->end());
+    StringData stringValue = stringDataFromRange(*partIt);
     uint64_t value;
     if (!NumberParser{}(stringValue, &value).isOK()) {
         return Status(ErrorCodes::FailedToParse, "Couldn't parse third token to number");
@@ -1031,7 +1043,7 @@ Status parseProcPressure(StringData data, BSONObjBuilder* builder) {
          lineIt != string_split_iterator();
          ++lineIt) {
 
-        StringData line((*lineIt).begin(), (*lineIt).end());
+        StringData line = stringDataFromRange(*lineIt);
 
         // Split the line by spaces and equal signs since these are the delimiters for pressure
         // files. token_compress_on means the iterator skips over consecutive ' '. This is needed
@@ -1047,7 +1059,7 @@ Status parseProcPressure(StringData data, BSONObjBuilder* builder) {
             continue;
         }
 
-        StringData time((*partIt).begin(), (*partIt).end());
+        StringData time = stringDataFromRange(*partIt);
 
         ++partIt;
 
@@ -1063,7 +1075,7 @@ Status parseProcPressure(StringData data, BSONObjBuilder* builder) {
 
         // Lookup for 'total' token in the parts.
         auto totalIt = std::find_if(partIt, string_split_iterator(), [](const auto& vec) {
-            return StringData(vec.begin(), vec.end()) == "total"_sd;
+            return stringDataFromRange(vec) == "total"_sd;
         });
 
         // If 'total' token is not found on the row return an error.
@@ -1071,7 +1083,7 @@ Status parseProcPressure(StringData data, BSONObjBuilder* builder) {
             return Status(ErrorCodes::NoSuchKey, "Failed to find 'total' token");
         }
 
-        StringData totalToken((*totalIt).begin(), (*totalIt).end());
+        [[maybe_unused]] StringData totalToken = stringDataFromRange(*totalIt);
 
         ++totalIt;
 
@@ -1079,7 +1091,7 @@ Status parseProcPressure(StringData data, BSONObjBuilder* builder) {
             return Status(ErrorCodes::FailedToParse, "No value found for 'total' token");
         }
 
-        StringData stringValue((*totalIt).begin(), (*totalIt).end());
+        StringData stringValue = stringDataFromRange(*totalIt);
 
         double value;
 

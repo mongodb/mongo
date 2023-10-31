@@ -213,7 +213,7 @@ public:
 
 protected:
     static void appendTo(fmt::memory_buffer& buffer, StringData data) {
-        buffer.append(data.begin(), data.end());
+        buffer.append(data.data(), data.data() + data.size());
     }
 
     static void appendTo(fmt::memory_buffer& buffer, const fmt::format_int& data) {

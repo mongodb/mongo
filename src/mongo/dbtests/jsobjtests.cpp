@@ -869,15 +869,16 @@ class EooMissing : public Base {
 };
 
 class WrongStringSize : public Base {
-    BSONObj valid() const {
+    BSONObj valid() const override {
         return fromjson("{\"a\":\"b\"}");
     }
-    BSONObj invalid() const {
+    BSONObj invalid() const override {
         BSONObj ret = valid();
-        ASSERT_TRUE(ret.firstElement().valueStringData().size() >= 1);
-        ASSERT_EQUALS(ret.firstElement().valueStringData()[0], 'b');
-        ASSERT_EQUALS(ret.firstElement().valueStringData()[1], 0);
-        ((char*)ret.firstElement().valueStringData().rawData())[1] = 1;
+        auto val = ret.firstElement().valueStringData();
+        ASSERT_EQUALS(val, "b"_sd);
+        auto d = const_cast<char*>(val.data());
+        ASSERT_EQUALS(d[1], 0);
+        d[1] = 1;
         return ret.copy();
     }
 };
