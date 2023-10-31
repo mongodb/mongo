@@ -3,60 +3,10 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "mongo_toolchain",
     build_file = "@//bazel/toolchains:mongo_toolchain.BUILD",
-    patch_cmds = [
-        # Alter each symlink to point to a canonical (rather than relative) path.
-        r"""
-        # Clear the log
-        rm -f /tmp/ln_log.txt
-
-        # For each symlink-to-a-file:
-        for link in $(find v4 -type l -xtype f)
-        do
-            # cd into the link's directory
-            export DIRNAME=$(dirname ${link})
-            pushd ${DIRNAME}
-
-            # Create a symlink to the target, with any ".XYZ" extension removed (e.g.: "/stow/gcc.ABC/" becomes "/stow/gcc/")
-            export BASENAME=$(basename ${link})
-            export ORIG_TARGET=$(readlink -f ${BASENAME})
-
-            # The regex pattern below matches "/stow/", followed by 1+ non-dot characters (e.g.: "gcc"), a dot, and then 3 non-dot characters (e.g.: "xyz"), then a slash ('/').
-            # Examples include "/stow/gcc.ABC/", "/stow/llvm.XYZ/", etc.
-            export NEW_TARGET=$(echo "${ORIG_TARGET}" | sed -E 's~/(stow/[^\./]+)\.[^\./][^\./][^\./]/~/\1/~g');
-            export LN_CMD="ln -frsv ${NEW_TARGET} ${BASENAME}"
-            ${LN_CMD}
-            echo -e "------------------------------------\ndirname is ${DIRNAME}\norig_target ${ORIG_TARGET}\nnew_target ${NEW_TARGET}\nln_cmd ${LN_CMD}\nln_cmd exit code $?" >> /tmp/ln_log.txt
-
-            # Pop back out into the original directory
-            popd
-        done
-        """,
-
-        # Remove the extension (e.g.: `.gUP`) from the top-level stow directories.
-        r"""find stow -maxdepth 1 -name "*\.*" -type d | while read NAME ; do mv "${NAME}" "${NAME%.*}" ; done""",
-
-        # For each binary and shared library in the v4 toolchain, amend its rpath (https://en.wikipedia.org/wiki/Rpath) to include openssl and v4 libraries.
-        r"""
-        rm -f /tmp/patchelf_log.txt
-        touch /tmp/patchelf_log.txt
-        for f in $(find v4)
-        do
-            export PATCHELF_CMD="v4/bin/patchelf \
-                --debug \
-                --force-rpath \
-                --set-rpath \$ORIGIN:\$ORIGIN/../../openssl/lib:\$ORIGIN/../../stow/openssl/lib:\$ORIGIN/../lib:\$ORIGIN/../../../../v4/lib \
-                ${f}"
-            echo -e "-------------------------------------\npatchelf_cmd ${PATCHELF_CMD}\n" >> /tmp/patchelf_log.txt
-            ${PATCHELF_CMD} 2>>/tmp/patchelf_log.txt >>/tmp/patchelf_log.txt
-            echo -e "patchelf_cmd exit code $?" >> /tmp/patchelf_log.txt
-        done
-        """,
-    ],
-    sha256 = "ba2856d0b18f7a9faa7b3c57876dc4f4e957b3da205f3f746e95aa450b3e4bfb",
-    strip_prefix = "636d9a714d33020bd7948e252ba1bfed2e205c16",  # The tarball has a prefix which we do not need
+    sha256 = "cea4ec44e3c62da3ad1952f1aa1bb489d0dfde18bfe0ff4af2317530be5af9a1",
     urls = [
         # v4 toolchain for ubuntu/arm64
-        "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204-arm64/636d9a714d33020bd7948e252ba1bfed2e205c16/toolchain_builder_ubuntu2204_arm64_636d9a714d33020bd7948e252ba1bfed2e205c16_23_06_29_23_09_01.tar.gz",
+        "https://mciuploads.s3.amazonaws.com/toolchain-builder/ubuntu2204-arm64/c8946f1ee23987ed32481a2f571d0ee38f86667b/bazel_v4_toolchain_builder_ubuntu2204_arm64_c8946f1ee23987ed32481a2f571d0ee38f86667b_23_10_25_04_25_33.tar.gz",
     ],
 )
 
