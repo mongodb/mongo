@@ -364,8 +364,6 @@ buildvariants:
   # - name: tsbs_query_finance
   - name: tsbs_query_manual_bucketing
   # - name: tsbs_query_fixed_bucketing
-  # - name: tsbs-query-genny
-  # - name: tsbs-query-optimizations
   # - name: tpcc
   # - name: tpcc_majority
   # - name: tpch_1_normalized
