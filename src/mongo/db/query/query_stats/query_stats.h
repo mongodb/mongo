@@ -70,10 +70,33 @@ struct QueryStatsStoreEntryBudgetor {
         return sizeof(decltype(key)) + value->size();
     }
 };
+
+/*
+ * 'QueryStatsStore insertion and eviction listener implementation. This class adjusts the
+ * 'queryStatsStoreSize' serverStatus metric when entries are inserted or evicted.
+ */
+struct QueryStatsStoreInsertionEvictionListener {
+    void onInsert(const std::size_t&,
+                  const std::shared_ptr<QueryStatsEntry>&,
+                  size_t estimatedSize) {
+        queryStatsStoreSizeEstimateBytesMetric.increment(estimatedSize);
+    }
+
+    void onEvict(const std::size_t&,
+                 const std::shared_ptr<QueryStatsEntry>&,
+                 size_t estimatedSize) {
+        queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
+    }
+
+    void onClear(size_t estimatedSize) {
+        queryStatsStoreSizeEstimateBytesMetric.decrement(estimatedSize);
+    }
+};
 using QueryStatsStore = PartitionedCache<std::size_t,
                                          std::shared_ptr<QueryStatsEntry>,
                                          QueryStatsStoreEntryBudgetor,
-                                         QueryStatsPartitioner>;
+                                         QueryStatsPartitioner,
+                                         QueryStatsStoreInsertionEvictionListener>;
 
 /**
  * A manager for the queryStats store allows a "pointer swap" on the queryStats store itself. The

@@ -45,6 +45,7 @@ template <class KeyType,
           class ValueType,
           class KeyBudgetEstimator,
           class Partitioner,
+          class InsertionEvictionListener,
           class KeyHasher = std::hash<KeyType>,
           class Eq = std::equal_to<KeyType>>
 class PartitionedCache {
@@ -53,7 +54,12 @@ private:
     PartitionedCache& operator=(const PartitionedCache&) = delete;
 
 public:
-    using Lru = LRUKeyValue<KeyType, ValueType, KeyBudgetEstimator, KeyHasher, Eq>;
+    using Lru = LRUKeyValue<KeyType,
+                            ValueType,
+                            KeyBudgetEstimator,
+                            InsertionEvictionListener,
+                            KeyHasher,
+                            Eq>;
     using Partition = typename Partitioned<Lru, Partitioner>::OnePartition;
     using PartitionId = typename Partitioned<Lru, Partitioner>::PartitionId;
 

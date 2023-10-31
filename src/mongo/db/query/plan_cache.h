@@ -354,6 +354,7 @@ class PlanCacheBase
           std::shared_ptr<const PlanCacheEntryBase<CachedPlanType, DebugInfoType>>,
           KeyBudgetEstimator,
           Partitioner,
+          NoopInsertionEvictionListener,
           KeyHasher> {
 private:
     PlanCacheBase(const PlanCacheBase&) = delete;
@@ -365,6 +366,7 @@ public:
                          std::shared_ptr<const PlanCacheEntryBase<CachedPlanType, DebugInfoType>>,
                          KeyBudgetEstimator,
                          Partitioner,
+                         NoopInsertionEvictionListener,
                          KeyHasher>;
     using Entry = PlanCacheEntryBase<CachedPlanType, DebugInfoType>;
 

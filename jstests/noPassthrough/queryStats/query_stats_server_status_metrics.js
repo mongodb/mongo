@@ -156,6 +156,47 @@ function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
 }
 
 /**
+ * Test that running the $queryStats aggregation stage correctly does or does not impact
+ * serverStatus counters (whichever is applicable).
+ */
+function queryStatsAggregationStageTest(conn, testDB, coll) {
+    // First, ensure that the query stats store is empty.
+    assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
+    assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted, 0);
+
+    // Insert some query stats data and capture "before" serverStatus metrics.
+    for (let i = 100; i < 200; i++) {
+        coll.aggregate([{$match: {["foo" + i]: "bar"}}]).itcount();
+    }
+
+    let sizeBefore = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
+    const evictedBefore = testDB.serverStatus().metrics.queryStats.numEvicted;
+
+    // Run a $queryStats pipeline. We should insert a new entry for this query.
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
+
+    assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted,
+              evictedBefore,
+              "$queryStats should not have triggered evictions");
+    assert.gt(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes,
+              sizeBefore,
+              "$queryStats pipeline should have been added to the query stats store");
+    sizeBefore = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
+
+    // Now run $queryStats again. The command should be fully read-only.
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
+
+    assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted,
+              evictedBefore,
+              "$queryStats should not have triggered evictions");
+    assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes,
+              sizeBefore,
+              "$queryStats pipeline should not have impacted query stats store size");
+}
+
+/**
  * In this configuration, we insert enough entries into the telemetry store to trigger LRU
  * eviction.
  */
@@ -212,3 +253,11 @@ runTestWithMongodOptions({
     setParameter: {internalQueryStatsCacheSize: "0.00001MB", internalQueryStatsRateLimit: -1},
 },
                          telemetryStoreWriteErrorsTest);
+
+/**
+ * Tests that $queryStats has expected effects (or no effect) on counters.
+ */
+runTestWithMongodOptions({
+    setParameter: {internalQueryStatsCacheSize: "2MB", internalQueryStatsRateLimit: -1},
+},
+                         queryStatsAggregationStageTest);
