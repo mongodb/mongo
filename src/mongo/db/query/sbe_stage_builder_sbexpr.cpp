@@ -117,12 +117,11 @@ optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));
 }
 
-TypeSignature constantFold(optimizer::ABT& abt,
+TypeSignature constantFold(optimizer::VariableEnvironment& env,
+                           optimizer::ABT& abt,
                            StageBuilderState& state,
                            const VariableTypes* slotInfo) {
     auto& runtimeEnv = *state.env;
-
-    auto env = optimizer::VariableEnvironment::build(abt);
 
     // Do not use descriptive names here.
     auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
@@ -166,14 +165,22 @@ TypeSignature constantFold(optimizer::ABT& abt,
     return signature;
 }
 
+TypeSignature constantFold(optimizer::ABT& abt,
+                           StageBuilderState& state,
+                           const VariableTypes* slotInfo) {
+    auto env = optimizer::VariableEnvironment::build(abt);
+
+    return constantFold(env, abt, state, slotInfo);
+}
+
 TypedExpression abtToExpr(optimizer::ABT& abt,
                           StageBuilderState& state,
                           const VariableTypes* slotInfo) {
-    TypeSignature signature = constantFold(abt, state, slotInfo);
+    auto env = optimizer::VariableEnvironment::build(abt);
+
+    TypeSignature signature = constantFold(env, abt, state, slotInfo);
 
     auto& runtimeEnv = *state.env;
-
-    auto env = optimizer::VariableEnvironment::build(abt);
 
     auto varResolver = optimizer::VarResolver([](const optimizer::ProjectionName& var) {
         if (auto slotId = getSbeVariableInfo(var)) {
