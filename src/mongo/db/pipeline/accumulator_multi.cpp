@@ -450,7 +450,7 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
     int sortOrder = 0;
     for (auto part : _sortPattern) {
         const auto newFieldName =
-            (StringBuilder() << AccumulatorN::kFieldNameSortFields << "." << sortOrder).str();
+            (StringBuilder() << AccumulatorN::kFieldNameSortFields << sortOrder).str();
         part.fieldPath.reset(FieldPath(newFieldName));
 
         if (part.expression) {
@@ -560,11 +560,20 @@ AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     }
 
     // Construct argument expression. If given sortBy: {field1: 1, field2: 1} it will be shaped like
-    // {output: <output expression>, sortFields: ["$field1", "$field2"]}. This projects out only the
-    // fields we need for sorting so we can use SortKeyComparator without copying the entire
-    // document. This argument expression will be evaluated and become the input to _processValue.
-    boost::intrusive_ptr<Expression> argument = Expression::parseObject(
-        expCtx, BSON(output << AccumulatorN::kFieldNameSortFields << sortFieldsExp), vps);
+    // {output: <output expression>, sortFields0: "$field1", sortFields1: "$field2"}. This projects
+    // out only the fields we need for sorting so we can use SortKeyComparator without copying the
+    // entire document. This argument expression will be evaluated and become the input to
+    // _processValue.
+    BSONObjBuilder argumentBuilder;
+    argumentBuilder.append(output);
+    int sortOrder = 0;
+    for (const auto& sortField : sortFieldsExp) {
+        argumentBuilder.appendAs(
+            sortField, (StringBuilder() << AccumulatorN::kFieldNameSortFields << sortOrder).str());
+        sortOrder++;
+    }
+    boost::intrusive_ptr<Expression> argument =
+        Expression::parseObject(expCtx, argumentBuilder.obj(), vps);
     auto factory = [expCtx, sortPattern = std::move(sortPattern)] {
         return make_intrusive<AccumulatorTopBottomN<sense, single>>(
             expCtx, sortPattern, /* isRemovable */ false);

@@ -623,8 +623,8 @@ TEST(Accumulators, TopBottomNRespectsCollation) {
     expCtx->setCollator(std::move(collator));
     const auto n = Value(2);
     auto mkdoc = [](Value a) {
-        return Value(BSON(AccumulatorN::kFieldNameOutput << a << AccumulatorN::kFieldNameSortFields
-                                                         << BSON_ARRAY(a)));
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
     };
 
     OperationsType bottomCasesAscending{
@@ -684,12 +684,12 @@ TEST(Accumulators, TopNDescendingBottomNAscending) {
     const auto n3 = Value(3);
     const auto n1 = Value(1);
     auto mkdoc = [](Value a) {
-        return Value(BSON(AccumulatorN::kFieldNameOutput << a << AccumulatorN::kFieldNameSortFields
-                                                         << BSON_ARRAY(a)));
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
     };
     auto mkdoc2 = [](int a, Value b) {
-        return Value(BSON(AccumulatorN::kFieldNameOutput << b << AccumulatorN::kFieldNameSortFields
-                                                         << BSON_ARRAY(a)));
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << b << (AccumulatorN::kFieldNameSortFields + "0") << a));
     };
     OperationsType cases{
         // Basic tests.
@@ -822,12 +822,12 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     const auto n3 = Value(3);
     const auto n1 = Value(1);
     auto mkdoc = [](Value a) {
-        return Value(BSON(AccumulatorN::kFieldNameOutput << a << AccumulatorN::kFieldNameSortFields
-                                                         << BSON_ARRAY(a)));
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
     };
     auto mkdoc2 = [](int a, Value b) {
-        return Value(BSON(AccumulatorN::kFieldNameOutput << b << AccumulatorN::kFieldNameSortFields
-                                                         << BSON_ARRAY(a)));
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << b << (AccumulatorN::kFieldNameSortFields + "0") << a));
     };
     OperationsType cases{
         // Basic tests.
@@ -963,6 +963,133 @@ TEST(Accumulators, TopNAscendingBottomNDescending) {
     }
 }
 
+TEST(Accumulators, TopBottomNMultiSortPattern) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    const auto n = Value(3);
+    auto mkdoc = [](int32_t a, int32_t b) {
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << (a * 10 + b) << (AccumulatorN::kFieldNameSortFields + "0") << a
+                          << (AccumulatorN::kFieldNameSortFields + "1") << b));
+    };
+    auto mkdoc2 = [](Value output, Value a, Value b) {
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << output << (AccumulatorN::kFieldNameSortFields + "0") << a
+                          << (AccumulatorN::kFieldNameSortFields + "1") << b));
+    };
+
+    OperationsType cases{
+        // Basic tests.
+        {{mkdoc(3, 3), mkdoc(4, 4), mkdoc(4, 5), mkdoc(100, 10)},
+         {Value(std::vector<Value>{Value(45), Value(44), Value(33)})}},
+        {{mkdoc(9, 5), mkdoc(8, 2), mkdoc(9, 1), mkdoc(8, 1), mkdoc(1, 0)},
+         {Value(std::vector<Value>{Value(82), Value(81), Value(10)})}},
+        // 3 or fewer values results in those values being returned.
+        {{mkdoc(9, 9), mkdoc(8, 8), mkdoc(9, 8)},
+         {Value(std::vector<Value>{Value(99), Value(98), Value(88)})}},
+        {{mkdoc(9, 9)}, {Value(std::vector<Value>{Value(99)})}},
+
+        // Ties are broken arbitrarily.
+        {{mkdoc(9, 9), mkdoc(9, 9), mkdoc(1, 0), mkdoc(9, 9), mkdoc(1, 0), mkdoc(9, 9)},
+         {Value(std::vector<Value>{Value(99), Value(10), Value(10)})}},
+
+        // Null/missing cases (missing and null are NOT ignored, but missing is upconverted to
+        // null).
+        {{mkdoc(9, 9),
+          mkdoc2(Value(BSONNULL), Value(BSONNULL), Value(BSONNULL)),
+          mkdoc2(Value(BSONNULL), Value(), Value(BSONNULL)),
+          mkdoc2(Value(), Value(BSONNULL), Value()),
+          mkdoc2(Value(), Value(BSONNULL), Value(BSONNULL))},
+         {Value(std::vector<Value>{Value(BSONNULL), Value(BSONNULL), Value(BSONNULL)})}}};
+
+    try {
+        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<TopBottomSense::kBottom, false>::create(
+                expCtx, BSON("a" << -1 << "b" << -1));
+            acc->startNewGroup(n);
+            return acc;
+        };
+        assertExpectedResults(expCtx.get(), cases, accInit);
+    } catch (...) {
+        LOGV2(8236800, "bottom3 a: -1, b: -1");
+        throw;
+    }
+
+    // topN ascending will return same results, but in reverse order.
+    for (auto& [input, expected] : cases) {
+        tassert(8236803, "expected should be an array", expected.isArray());
+        auto arr = expected.getArray();
+        std::reverse(std::begin(arr), std::end(arr));
+        expected = Value(arr);
+    }
+
+    try {
+        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<TopBottomSense::kTop, false>::create(
+                expCtx, BSON("a" << 1 << "b" << 1));
+            acc->startNewGroup(n);
+            return acc;
+        };
+        assertExpectedResults(expCtx.get(), cases, accInit);
+    } catch (...) {
+        LOGV2(8236801, "top3 a: 1, b: 1");
+        throw;
+    }
+}
+
+template <TopBottomSense Sense>
+void runTopBottomAccumulatorTest(ExpressionContext* const expCtx,
+                                 int32_t dir,
+                                 Value n,
+                                 OperationsType cases) {
+    try {
+        auto accInit = [&](ExpressionContext* const expCtx) -> intrusive_ptr<AccumulatorState> {
+            auto acc = AccumulatorTopBottomN<Sense, false>::create(expCtx, BSON("a" << dir));
+            acc->startNewGroup(n);
+            return acc;
+        };
+        assertExpectedResults(expCtx, cases, accInit);
+    } catch (...) {
+        LOGV2(8236802,
+              "failed top/bottom accumulator test",
+              "n"_attr = n,
+              "sort_dir"_attr = dir,
+              "sense"_attr = Sense);
+        throw;
+    }
+}
+
+TEST(Accumulators, TopBottomNSortArray) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    Value n{2};
+    Value arr1{std::vector<Value>{
+        Value(6),
+        Value(1),
+    }};
+    Value arr2{std::vector<Value>{
+        Value(5),
+        Value(2),
+    }};
+    Value arr3{std::vector<Value>{
+        Value(4),
+        Value(3),
+    }};
+
+    auto mkdoc = [](int32_t id, Value arr) {
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << id << (AccumulatorN::kFieldNameSortFields + "0") << arr));
+    };
+    OperationsType topCases{{{mkdoc(1, arr1), mkdoc(2, arr2), mkdoc(3, arr3)},
+                             {Value(std::vector<Value>{Value(1), Value(2)})}}};
+    OperationsType bottomCases{{{mkdoc(1, arr1), mkdoc(2, arr2), mkdoc(3, arr3)},
+                                {Value(std::vector<Value>{Value(2), Value(3)})}}};
+
+    runTopBottomAccumulatorTest<TopBottomSense::kTop>(expCtx.get(), 1, n, topCases);
+    runTopBottomAccumulatorTest<TopBottomSense::kTop>(expCtx.get(), -1, n, topCases);
+
+    runTopBottomAccumulatorTest<TopBottomSense::kBottom>(expCtx.get(), 1, n, bottomCases);
+    runTopBottomAccumulatorTest<TopBottomSense::kBottom>(expCtx.get(), -1, n, bottomCases);
+}
+
 // Utility to test the single counterparts of the topN/bottomN accumulators.
 template <TopBottomSense s>
 void testSingle(OperationsType cases, ExpressionContext* const expCtx, const BSONObj& sortPattern) {
@@ -992,8 +1119,8 @@ TEST(Accumulators, TopBottomSingle) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     const auto n = Value(1);
     auto mkdoc = [](Value a) {
-        return Value(BSON(AccumulatorN::kFieldNameOutput << a << AccumulatorN::kFieldNameSortFields
-                                                         << BSON_ARRAY(a)));
+        return Value(BSON(AccumulatorN::kFieldNameOutput
+                          << a << (AccumulatorN::kFieldNameSortFields + "0") << a));
     };
 
     const BSONObj ascSort = BSON("a" << 1);
@@ -1099,9 +1226,8 @@ struct TopBottomNRemoveTest : public AggregationContextFixture {
 
     template <typename SortKeyType>
     void add(SortKeyType sortKey, int output) {
-        auto v =
-            Value(BSON(AccumulatorN::kFieldNameOutput
-                       << output << AccumulatorN::kFieldNameSortFields << BSON_ARRAY(sortKey)));
+        auto v = Value(BSON(AccumulatorN::kFieldNameOutput
+                            << output << (AccumulatorN::kFieldNameSortFields + "0") << sortKey));
         _acc->process(v, false);
         _q.push(v);
     }
