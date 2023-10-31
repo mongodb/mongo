@@ -604,9 +604,19 @@ void ParseAndRunCommand::_parseCommand() {
     auto allowTransactionsOnConfigDatabase =
         !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
         client->isFromSystemConnection();
-    // TODO (SERVER-79644): Make this call also use allNamespaces() when applicable.
-    validateSessionOptions(
-        _osi, opCtx->getService(), command->getName(), {nss}, allowTransactionsOnConfigDatabase);
+
+    // If there are multiple namespaces this command operates on we need to validate them all
+    // explicitly. Otherwise we can use the nss defined above which may be the generic command
+    // namespace.
+    std::vector<NamespaceString> namespaces = {nss};
+    if (_invocation->allNamespaces().size() > 1) {
+        namespaces = _invocation->allNamespaces();
+    }
+    validateSessionOptions(_osi,
+                           opCtx->getService(),
+                           command->getName(),
+                           namespaces,
+                           allowTransactionsOnConfigDatabase);
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 

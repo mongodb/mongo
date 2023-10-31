@@ -146,9 +146,16 @@ public:
                              const repl::OpTime& lastOpBeforeRun,
                              BSONObjBuilder& commandResponseBuilder) const override {
 
-        // Prevent waiting for writeConcern if the command is changing an unreplicated namespace.
+        // Prevent waiting for writeConcern if the command is changing only unreplicated namespaces.
         invariant(invocation);
-        if (!invocation->ns().isReplicated()) {
+        bool anyReplicatedNamespace = false;
+        for (auto& ns : invocation->allNamespaces()) {
+            if (ns.isReplicated()) {
+                anyReplicatedNamespace = true;
+                break;
+            }
+        }
+        if (!anyReplicatedNamespace) {
             return;
         }
 
