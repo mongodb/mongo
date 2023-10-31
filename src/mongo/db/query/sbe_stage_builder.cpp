@@ -207,6 +207,13 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
             // inconsistency.
             cq.getExpCtx()->variables.setReservedValue(
                 Variables::kSearchMetaId, mongo::Value(varsObj), true /* isConstant */);
+            if (varsObj.type() == BSONType::Object) {
+                auto metaValObj = varsObj.embeddedObject();
+                if (metaValObj.hasField("count")) {
+                    auto& opDebug = CurOp::get(cq.getOpCtx())->debug();
+                    opDebug.mongotCountVal = metaValObj.getField("count").wrap();
+                }
+            }
         }
     }
 }

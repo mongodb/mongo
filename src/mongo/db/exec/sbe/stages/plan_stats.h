@@ -433,6 +433,9 @@ struct SearchStats : public SpecificStats {
     void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
         visitor->visit(this);
     }
+
+    long long msWaitingForMongot{0};
+    long long batchNum{0};
 };
 
 /**

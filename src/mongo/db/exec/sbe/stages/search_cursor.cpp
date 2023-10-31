@@ -149,6 +149,7 @@ void SearchCursorStage::prepare(CompileCtx& ctx) {
             "RemoteCursors must be established",
             ctx.remoteCursors && ctx.remoteCursors->count(_remoteCursorId));
     _cursor = ctx.remoteCursors->at(_remoteCursorId).get();
+    _cursorId = _cursor->getCursorId();
 }
 
 value::SlotAccessor* SearchCursorStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -249,16 +250,16 @@ PlanState SearchCursorStage::getNext() {
 
     // Get BSONObj response from Mongot
     _response = _cursor->getNext(_opCtx);
-    auto& opDebug = CurOp::get(_opCtx)->debug();
 
-    // TODO: SERVER-80114 should we move this to SearchStats?
-    if (opDebug.msWaitingForMongot) {
-        *opDebug.msWaitingForMongot += durationCount<Milliseconds>(_cursor->resetWaitingTime());
-    } else {
-        opDebug.msWaitingForMongot = durationCount<Milliseconds>(_cursor->resetWaitingTime());
-    }
-    opDebug.mongotBatchNum = _cursor->getBatchNum();
-    opDebug.mongotCursorId = _cursor->getCursorId();
+    // Update search stats.
+    _specificStats.msWaitingForMongot += durationCount<Milliseconds>(_cursor->resetWaitingTime());
+    _specificStats.batchNum = _cursor->getBatchNum();
+    // Update opDebug log as well so that these are logged in "Slow query" log for every getMore
+    // command.
+    auto& opDebug = CurOp::get(_opCtx)->debug();
+    opDebug.mongotCursorId = _cursorId;
+    opDebug.msWaitingForMongot = _specificStats.msWaitingForMongot;
+    opDebug.mongotBatchNum = _specificStats.batchNum;
 
     // If there's no response, return EOF
     if (!_response) {
@@ -382,6 +383,10 @@ std::unique_ptr<PlanStageStats> SearchCursorStage::getStats(bool includeDebugInf
         if (_collatorSlot) {
             bob.appendNumber("collatorSlot", static_cast<long long>(*_collatorSlot));
         }
+
+        // Specific stats.
+        bob.appendBool("msWaitingForMongot", _specificStats.msWaitingForMongot);
+        bob.appendNumber("batchNum", _specificStats.batchNum);
 
         ret->debugInfo = bob.obj();
     }
