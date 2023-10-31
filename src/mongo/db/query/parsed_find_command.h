@@ -51,14 +51,6 @@
 
 namespace mongo {
 
-struct ParsedFindCommandParams {
-    std::unique_ptr<FindCommandRequest> findCommand;
-    const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop();
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-        MatchExpressionParser::kDefaultSpecialFeatures;
-    const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies();
-};
-
 /**
  * Represents a find command request, but with more fully parsed ASTs for some fields which are
  * still raw BSONObj on the FindCommandRequest type.
@@ -118,8 +110,25 @@ StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
 
 /**
  * Parses each big component of the input 'findCommand.' Throws exceptions if failing to parse.
+ * Comes in one overload which will create an ExpressionContext for the caller, and one overload to
+ * be used when the caller already has an ExpressionContext.
  */
+StatusWith<std::pair<boost::intrusive_ptr<ExpressionContext>, std::unique_ptr<ParsedFindCommand>>>
+parse(OperationContext* opCtx,
+      std::unique_ptr<FindCommandRequest> findCommand,
+      const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+      MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+          MatchExpressionParser::kDefaultSpecialFeatures,
+      const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies());
+
+// Overload of the above for when the caller has an available ExpressionContext.
 StatusWith<std::unique_ptr<ParsedFindCommand>> parse(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, ParsedFindCommandParams&& params);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::unique_ptr<FindCommandRequest> findCommand,
+    const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+        MatchExpressionParser::kDefaultSpecialFeatures,
+    const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies());
+
 }  // namespace parsed_find_command
 }  // namespace mongo

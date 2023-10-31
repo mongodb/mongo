@@ -88,7 +88,7 @@ public:
         auto expCtx = make_intrusive<ExpressionContextForTest>();
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setFilter(filter.getOwned());
-        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
         return std::make_unique<FindKey>(expCtx, *parsedFind, collectionType);
     }
 
@@ -97,7 +97,7 @@ public:
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {
         auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
-        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
         FindKey findKey(expCtx, *parsedFind, collectionType);
         SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
         if (!applyHmac) {
@@ -233,8 +233,8 @@ TEST_F(QueryStatsStoreTest, EvictionTest) {
         fcr->setMax(BSON("z" << 25));
         fcr->setMin(BSON("z" << 80));
         fcr->setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-        auto expCtx = makeExpressionContext(opCtx.get(), *fcr);
-        auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
+        auto&& [expCtx, parsedFind] =
+            uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
 
         key = std::make_unique<query_stats::FindKey>(expCtx, *parsedFind, collectionType);
         auto lookupHash = absl::HashOf(key);
@@ -270,9 +270,9 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     fcr.setFilter(bob.obj());
     auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
     auto opCtx = makeOperationContext();
-    auto expCtx = makeExpressionContext(opCtx.get(), *fcrCopy);
-    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
-    RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
+    auto parsedFindPair =
+        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcrCopy)));
+    RAIIServerParameterControllerForTest queryKnobController{"internalQueryStatsRateLimit", -1};
 
     auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());
     globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
@@ -284,8 +284,9 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
         opCtx.get(),
         nss,
         [&]() {
-            return std::make_unique<query_stats::FindKey>(
-                expCtx, *parsedFind, query_shape::CollectionType::kCollection);
+            return std::make_unique<query_stats::FindKey>(parsedFindPair.first,
+                                                          *parsedFindPair.second,
+                                                          query_shape::CollectionType::kCollection);
         },
         /*requiresFullQueryStatsFeatureFlag*/ false));
     auto& opDebug = CurOp::get(*opCtx)->debug();

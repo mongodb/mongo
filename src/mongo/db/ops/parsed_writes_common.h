@@ -127,19 +127,13 @@ namespace impl {
         if (auto& letParams = request.getLet()) {
             findCommand->setLet(*letParams);
         }
-        auto expCtxForCq = [&]() {
-            if (expCtx) {
-                return boost::intrusive_ptr<ExpressionContext>(expCtx);
-            }
 
-            return makeExpressionContext(opCtx, *findCommand);
-        }();
-        return CanonicalQuery::make(
-            {.expCtx = std::move(expCtxForCq),
-             .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                                   .extensionsCallback = extensionsCallback,
-                                                   .allowedFeatures = allowedMatcherFeatures},
-             .explain = request.getIsExplain()});
+        return CanonicalQuery::canonicalize(opCtx,
+                                            std::move(findCommand),
+                                            request.getIsExplain(),
+                                            expCtx,
+                                            extensionsCallback,
+                                            allowedMatcherFeatures);
     }
 }  // namespace impl
 

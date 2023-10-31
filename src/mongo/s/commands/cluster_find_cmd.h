@@ -34,7 +34,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
@@ -210,22 +209,13 @@ public:
 
             Impl::checkCanRunHere(opCtx);
 
-            auto findRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            auto collator = [&]() -> std::unique_ptr<mongo::CollatorInterface> {
-                if (!findRequest->getCollation().isEmpty()) {
-                    return uassertStatusOKWithContext(
-                        CollatorFactoryInterface::get(opCtx->getServiceContext())
-                            ->makeFromBSON(findRequest->getCollation()),
-                        "unable to parse collation");
-                }
-                return nullptr;
-            }();
-            auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, *findRequest, std::move(collator), true /* mayDbProfile */);
-            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
-                expCtx,
-                {.findCommand = std::move(findRequest),
-                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
+            auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
+                opCtx,
+                _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body),
+                ExtensionsCallbackNoop(),
+                MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto& expCtx = parsedFindResult.first;
+            auto& parsedFind = parsedFindResult.second;
 
             if (!_didDoFLERewrite) {
                 query_stats::registerRequest(
@@ -240,10 +230,8 @@ public:
             }
 
             // TODO: SERVER-77469 Propagate QueryShapeHash/QuerySettings from mongos to the shards.
-            auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = std::move(expCtx),
-                .parsedFind = std::move(parsedFind),
-            });
+            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(
+                expCtx, std::move(parsedFind), query_settings::QuerySettings()));
 
             try {
                 // Do the work to generate the first batch of results. This blocks waiting to get

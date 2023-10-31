@@ -136,9 +136,10 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(filterObj);
         query_request_helper::setTailableMode(tailableMode, findCommand.get());
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
+        ASSERT_OK(statusWithCQ.getStatus());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        MONGO_verify(nullptr != cq.get());
 
         // Make the stage.
         unique_ptr<PlanStage> root(new CollectionScan(
@@ -182,9 +183,10 @@ public:
             std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ixscan), nullptr, coll);
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
-        auto cq = std::make_unique<CanonicalQuery>(
-            CanonicalQueryParams{.expCtx = makeExpressionContext(&_opCtx, *findCommand),
-                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+        auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));
+        MONGO_verify(statusWithCQ.isOK());
+        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        MONGO_verify(nullptr != cq.get());
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor =

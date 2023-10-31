@@ -70,11 +70,12 @@ SbeStageBuilderTestFixture::buildPlanStage(
     auto findCommand = std::make_unique<FindCommandRequest>(_nss);
     const boost::intrusive_ptr<ExpressionContext> expCtx(
         new ExpressionContextForTest(operationContext(), _nss, std::move(collator)));
-    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = expCtx, .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(operationContext(), std::move(findCommand), false, expCtx);
+    ASSERT_OK(statusWithCQ.getStatus());
     if (hasRecordId) {
         // Force the builder to generate the RecordId output even if it isn't needed by the plan.
-        cq->setForceGenerateRecordId(true);
+        statusWithCQ.getValue()->setForceGenerateRecordId(true);
     }
 
     CollectionMock coll(_nss);
@@ -86,7 +87,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
     }
 
     stage_builder::SlotBasedStageBuilder builder{
-        operationContext(), colls, *cq, *querySolution, getYieldPolicy()};
+        operationContext(), colls, *statusWithCQ.getValue(), *querySolution, getYieldPolicy()};
 
     auto [stage, data] = builder.build(querySolution->root());
 

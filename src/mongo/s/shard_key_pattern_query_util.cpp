@@ -182,11 +182,14 @@ StatusWith<BSONObj> extractShardKeyFromBasicQuery(OperationContext* opCtx,
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(basicQuery.getOwned());
 
-    auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
-         .parsedFind = ParsedFindCommandParams{
-             .findCommand = std::move(findCommand),
-             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(findCommand),
+                                     false, /* isExplain */
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -204,11 +207,13 @@ StatusWith<BSONObj> extractShardKeyFromBasicQueryWithContext(
         findCommand->setCollation(expCtx->getCollatorBSON().getOwned());
     }
 
-    auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = expCtx,
-         .parsedFind = ParsedFindCommandParams{
-             .findCommand = std::move(findCommand),
-             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(expCtx->opCtx,
+                                     std::move(findCommand),
+                                     false, /* isExplain */
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
@@ -469,11 +474,13 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
         expCtx->setIgnoreCollator();
     }
 
-    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = expCtx,
-        .parsedFind = ParsedFindCommandParams{
-            .findCommand = std::move(findCommand),
-            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    auto cq = uassertStatusOK(
+        CanonicalQuery::canonicalize(expCtx->opCtx,
+                                     std::move(findCommand),
+                                     false, /* isExplain */
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures));
 
     getShardIdsForCanonicalQuery(*cq, collation, cm, shardIds, info, bypassIsFieldHashedCheck);
 }

@@ -81,11 +81,18 @@ protected:
         const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
-        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-            .expCtx = makeExpressionContext(operationContext(), *findCommand),
-            .parsedFind = ParsedFindCommandParams{
-                .findCommand = std::move(findCommand),
-                .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(operationContext()));
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(operationContext(),
+                                         std::move(findCommand),
+                                         false,
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+        ASSERT_OK(statusWithCQ.getStatus());
+        return std::move(statusWithCQ.getValue());
     }
 
     void checkIndexBoundsWithKey(const char* keyStr,
@@ -658,15 +665,18 @@ TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
         const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
-        ASSERT_THROWS_CODE(
-            std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = makeExpressionContext(operationContext(), *findCommand),
-                .parsedFind =
-                    ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                            .allowedFeatures =
-                                                MatchExpressionParser::kAllowAllSpecialFeatures}}),
-            DBException,
-            ErrorCodes::BadValue);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(operationContext()));
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(operationContext(),
+                                         std::move(findCommand),
+                                         false,
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "Too many geoNear expressions"),
+                  statusWithCQ.getStatus());
     }
 
     // GEO_NEAR must be a top-level expression in the CanonicalQuery.
@@ -677,15 +687,18 @@ TEST_F(CMCollapseTreeTest, GeoNearLimitationsInPlace) {
         const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
-        ASSERT_THROWS_CODE(
-            std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = makeExpressionContext(operationContext(), *findCommand),
-                .parsedFind =
-                    ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                            .allowedFeatures =
-                                                MatchExpressionParser::kAllowAllSpecialFeatures}}),
-            DBException,
-            ErrorCodes::BadValue);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(
+            new ExpressionContextForTest(operationContext()));
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(operationContext(),
+                                         std::move(findCommand),
+                                         false,
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
+
+        ASSERT_EQ(Status(ErrorCodes::BadValue, "$near must be top-level expr"),
+                  statusWithCQ.getStatus());
     }
 }
 

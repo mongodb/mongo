@@ -41,7 +41,6 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/intrusive_counter.h"
@@ -56,11 +55,16 @@ const NamespaceString CanonicalQueryTest::nss =
 std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const BSONObj& queryObj) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(queryObj);
-    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
-        .parsedFind = ParsedFindCommandParams{
-            .findCommand = std::move(findCommand),
-            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx(),
+                                     std::move(findCommand),
+                                     false,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
 std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(StringData queryStr) {
@@ -77,11 +81,16 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(BSONObj query,
     findCommand->setSort(sort);
     findCommand->setProjection(proj);
     findCommand->setCollation(collation);
-    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
-        .parsedFind = ParsedFindCommandParams{
-            .findCommand = std::move(findCommand),
-            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx(),
+                                     std::move(findCommand),
+                                     false,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
 std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* queryStr,
@@ -113,11 +122,16 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* que
     findCommand->setHint(fromjson(hintStr));
     findCommand->setMin(fromjson(minStr));
     findCommand->setMax(fromjson(maxStr));
-    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
-        .parsedFind = ParsedFindCommandParams{
-            .findCommand = std::move(findCommand),
-            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx(),
+                                     std::move(findCommand),
+                                     false,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
 std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* queryStr,
@@ -142,12 +156,16 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* que
     findCommand->setHint(fromjson(hintStr));
     findCommand->setMin(fromjson(minStr));
     findCommand->setMax(fromjson(maxStr));
-    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
-        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                              .allowedFeatures =
-                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
-        .explain = explain});
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx(),
+                                     std::move(findCommand),
+                                     explain,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    ASSERT_OK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 
 }  // namespace mongo

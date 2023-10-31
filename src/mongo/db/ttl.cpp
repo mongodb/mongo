@@ -758,13 +758,12 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
     BSONObj query = BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationDate));
     auto findCommand = std::make_unique<FindCommandRequest>(collection.nss());
     findCommand->setFilter(query);
-    auto canonicalQuery = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx, *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
+    invariant(canonicalQuery.getStatus());
 
     auto params = std::make_unique<DeleteStageParams>();
     params->isMulti = true;
-    params->canonicalQuery = canonicalQuery.get();
+    params->canonicalQuery = canonicalQuery.getValue().get();
 
     // Maintain a consistent view of whether batching is enabled - batching depends on
     // parameters that can be set at runtime, and it is illegal to try to get

@@ -105,13 +105,22 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     tassert(ErrorCodes::BadValue,
             "Unsupported type UUID for namespace",
             findCommand->getNamespaceOrUUID().isNamespaceString());
+    const ExtensionsCallbackReal extensionsCallback(opCtx,
+                                                    &findCommand->getNamespaceOrUUID().nss());
 
-    return CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
-         .parsedFind = ParsedFindCommandParams{
-             .findCommand = std::move(findCommand),
-             .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
-             .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(findCommand),
+                                     false,
+                                     expCtx,
+                                     extensionsCallback,
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!statusWithCQ.isOK()) {
+        return statusWithCQ.getStatus();
+    }
+
+    return std::move(statusWithCQ.getValue());
 }
 
 void removePlanCacheEntriesByPlanCacheCommandKeys(

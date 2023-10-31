@@ -103,9 +103,9 @@ std::unique_ptr<CanonicalQuery> canonicalQueryFromFilterObj(OperationContext* op
                                                             BSONObj filter) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
-    return std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx, *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
+    uassertStatusOK(statusWithCQ.getStatus());
+    return std::move(statusWithCQ.getValue());
 }
 }  // namespace
 
@@ -231,9 +231,9 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     // Query can be answered by either index on "a" or index on "b".
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
@@ -282,9 +282,9 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     // Query can be answered by either index on "a" or index on "b".
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{a: {$gte: 8}, b: 1}"));
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     auto key = plan_cache_key_factory::make<PlanCacheKey>(*cq, collection.getCollection());
 
     // We shouldn't have anything in the plan cache for this shape yet.
@@ -513,9 +513,9 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
 
     // Query can be answered by either index on "a" or index on "b".
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();
@@ -557,9 +557,9 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
 
     // Query can be answered by either index on "a" or index on "b".
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    const std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     // We shouldn't have anything in the plan cache for this shape yet.
     PlanCache* cache = CollectionQueryInfo::get(collection).getPlanCache();

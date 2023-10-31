@@ -235,15 +235,17 @@ TEST_F(ServiceContextTest, BasicCanonicalQueryTranslation) {
     auto opCtx = makeOperationContext();
     auto findCommand = query_request_helper::makeFromFindCommandForTests(
         fromjson("{find: 'collection', '$db': 'test', filter: {a: 10, b: 20, c:30}}"));
-    auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
     auto prefixId = PrefixId::createForTests();
 
-    MatchExpression::unparameterize(cq->getPrimaryMatchExpression());
+    MatchExpression::unparameterize(statusWithCQ.getValue()->getPrimaryMatchExpression());
 
-    auto translation = translateCanonicalQueryToABT(
-        metadata, *cq, ProjectionName{"test"}, make<ScanNode>("test", "test"), prefixId);
+    auto translation = translateCanonicalQueryToABT(metadata,
+                                                    *(statusWithCQ.getValue()),
+                                                    ProjectionName{"test"},
+                                                    make<ScanNode>("test", "test"),
+                                                    prefixId);
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{test}]\n"
         "Filter []\n"

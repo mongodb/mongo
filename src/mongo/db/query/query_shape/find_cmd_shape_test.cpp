@@ -58,7 +58,7 @@ public:
         auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
         fcr->setSort(fromjson(sortJson));
         auto&& parsedRequest =
-            uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+            uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, std::move(fcr)));
         return std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
     }
 

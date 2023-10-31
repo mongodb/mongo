@@ -91,12 +91,19 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
             BSON("_id" << 0 << repl::OplogEntry::kPrevWriteOpTimeInTransactionFieldName << 1LL));
     }
 
-    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
-        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                              .allowedFeatures =
-                                                  MatchExpressionParser::kBanAllSpecialFeatures},
-    });
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx,
+                                                     std::move(findCommand),
+                                                     false,
+                                                     expCtx,
+                                                     ExtensionsCallbackNoop(),
+                                                     MatchExpressionParser::kBanAllSpecialFeatures);
+    invariant(statusWithCQ.isOK(),
+              str::stream() << "Failed to canonicalize oplog lookup"
+                            << causedBy(statusWithCQ.getStatus()));
+    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
     boost::optional<AutoGetOplog> oplogRead;
     boost::optional<AutoGetChangeCollection> changeCollectionRead;
     const CollectionPtr* collPtr;

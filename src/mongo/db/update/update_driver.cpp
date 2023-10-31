@@ -197,18 +197,22 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
     auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString::kEmpty);
     findCommand->setFilter(query);
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
     // $expr is not allowed in the query for an upsert, since it is not clear what the equality
     // extraction behavior for $expr should be.
-    auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures &
-        ~MatchExpressionParser::AllowedFeatures::kExpr;
-    auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
-         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                               .allowedFeatures = allowedFeatures}});
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(findCommand),
+                                     false,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures &
+                                         ~MatchExpressionParser::AllowedFeatures::kExpr);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
-    auto cq = std::move(statusWithCQ.getValue());
+    std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
     return populateDocumentWithQueryFields(*cq->getPrimaryMatchExpression(), immutablePaths, doc);
 }
 

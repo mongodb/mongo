@@ -69,38 +69,53 @@ namespace mongo {
 
 class OperationContext;
 
-struct CanonicalQueryParams {
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-    stdx::variant<std::unique_ptr<ParsedFindCommand>, ParsedFindCommandParams> parsedFind;
-    query_settings::QuerySettings querySettings = query_settings::QuerySettings();
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {};
-    bool explain = false;
-    bool isCountLike = false;
-    bool isSearchQuery = false;
-};
-
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
-                                                              FindCommandRequest& findCommand);
-
 class CanonicalQuery {
 public:
     // A type that encodes the notion of query shape suitable for use with the plan cache. Encodes
     // the query's match, projection, sort, etc. potentially with some constants removed or replaced
     // with parameter markers.
     typedef std::string QueryShapeString;
-
     // A second encoding of query shape similar to 'QueryShapeString' above, except designed to work
     // with index filters and the 'planCacheClear' command. A caller can encode a query into an
     // 'PlanCacheCommandKey' in order to look for for matching index filters that should apply to
     // the query, or plan cache entries to which the 'planCacheClear' command should be applied.
     typedef std::string PlanCacheCommandKey;
 
-    CanonicalQuery(CanonicalQueryParams&& params);
+    /**
+     * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
+     * query (which will never be NULL).  If parsing fails, returns an error Status.
+     *
+     * 'opCtx' must point to a valid OperationContext, but 'opCtx' does not need to outlive the
+     * returned CanonicalQuery.
+     */
+    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
+        OperationContext* opCtx,
+        std::unique_ptr<FindCommandRequest> findCommand,
+        bool explain = false,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
+        const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
+            MatchExpressionParser::kDefaultSpecialFeatures,
+        const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies(),
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline = {},
+        bool isCountLike = false,
+        bool isSearchQuery = false);
 
     /**
-     * Deprecated factory method for creating CanonicalQuery.
+     * Creates a CanonicalQuery from a ParsedFindCommand. Uses 'expCtx->opCtx', which must be valid.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> make(CanonicalQueryParams&& params);
+    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
+        boost::intrusive_ptr<ExpressionContext> expCtx,
+        std::unique_ptr<ParsedFindCommand> parsedFind,
+        query_settings::QuerySettings&& querySettings,
+        bool explain = false,
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline = {},
+        bool isCountLike = false,
+        bool isSearchQuery = false);
+
+    /**
+     * For testing or for internal clients to use.
+     */
 
     /**
      * Used for creating sub-queries from an existing CanonicalQuery.
@@ -109,16 +124,8 @@ public:
      *
      * Does not take ownership of 'root'.
      */
-    CanonicalQuery(OperationContext* opCtx,
-                   const CanonicalQuery& baseQuery,
-                   MatchExpression* matchExpr);
-
-    /**
-     * Deprecated factory method for creating CanonicalQuery.
-     */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> make(OperationContext* opCtx,
-                                                            const CanonicalQuery& baseQuery,
-                                                            MatchExpression* matchExpr);
+    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeSubQuery(
+        OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* matchExpr);
 
     /**
      * Returns true if "query" describes an exact-match query on _id.
@@ -130,6 +137,12 @@ public:
      * normalization - those should happen in parsed_find_command::isValid().
      */
     static Status isValidNormalized(const MatchExpression* root);
+
+    /**
+     * For internal use only - but public for accessibility for make_unique(). You must go through
+     * canonicalize to create a CanonicalQuery.
+     */
+    CanonicalQuery() {}
 
     NamespaceString nss() const {
         invariant(_findCommand->getNamespaceOrUUID().isNamespaceString());
@@ -352,11 +365,11 @@ public:
     }
 
 private:
-    void initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
-                std::unique_ptr<ParsedFindCommand> parsedFind,
-                std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-                bool isCountLike,
-                bool isSearchQuery);
+    Status initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
+                  std::unique_ptr<ParsedFindCommand> parsedFind,
+                  std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
+                  bool isCountLike,
+                  bool isSearchQuery);
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 

@@ -129,12 +129,19 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (!collection)
         return RecordId();
 
-    auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
-        .parsedFind = ParsedFindCommandParams{
-            .findCommand = std::move(findCommand),
-            .extensionsCallback = ExtensionsCallbackReal(opCtx, &collection->ns()),
-            .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}});
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
+
+    const boost::intrusive_ptr<ExpressionContext> expCtx;
+    auto statusWithCQ =
+        CanonicalQuery::canonicalize(opCtx,
+                                     std::move(findCommand),
+                                     false,
+                                     expCtx,
+                                     extensionsCallback,
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    massertStatusOK(statusWithCQ.getStatus());
+    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     cq->setForceGenerateRecordId(true);
 
     auto exec = uassertStatusOK(getExecutor(opCtx,

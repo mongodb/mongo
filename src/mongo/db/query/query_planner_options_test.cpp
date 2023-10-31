@@ -818,9 +818,9 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     auto findCommand = std::make_unique<FindCommandRequest>(
         NamespaceString::createNamespaceString_forTest("test.collection"));
     findCommand->setFilter(BSON("a" << 3));
-    auto scopedCq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->getPrimaryMatchExpression()->setTag(new IndexTag(1));
 
     ASSERT_NOT_OK(QueryPlanner::cacheDataFromTaggedTree(scopedCq->getPrimaryMatchExpression(),
@@ -833,9 +833,9 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("a" << 3));
-    auto scopedCq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
     std::unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
     indexTree->setIndexEntry(buildSimpleIndexEntry(BSON("a" << 1), "a_1"));
@@ -864,9 +864,9 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     // Regenerate canonical query in order to clear tags.
     auto newQR = std::make_unique<FindCommandRequest>(nss);
     newQR->setFilter(BSON("a" << 3));
-    scopedCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *newQR),
-        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(newQR)}});
+    statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(newQR));
+    ASSERT_OK(statusWithCQ.getStatus());
+    scopedCq = std::move(statusWithCQ.getValue());
 
     // Mismatched tree topology.
     auto child = std::make_unique<PlanCacheIndexTree>();

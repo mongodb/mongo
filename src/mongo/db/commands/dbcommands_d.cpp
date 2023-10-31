@@ -283,14 +283,12 @@ public:
             findCommand->setFilter(query.getOwned());
             findCommand->setSort(sort.getOwned());
 
-            auto statusWithCQ = CanonicalQuery::make(
-                {.expCtx = makeExpressionContext(opCtx, *findCommand),
-                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
+            auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
             if (!statusWithCQ.isOK()) {
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return false;
             }
-            auto cq = std::move(statusWithCQ.getValue());
+            std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated

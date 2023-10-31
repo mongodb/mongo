@@ -375,13 +375,13 @@ bool CollectionRoutingInfoTargeter::isExactIdQuery(OperationContext* opCtx,
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation);
     }
+    const auto cq = CanonicalQuery::canonicalize(opCtx,
+                                                 std::move(findCommand),
+                                                 false, /* isExplain */
+                                                 nullptr,
+                                                 ExtensionsCallbackNoop(),
+                                                 MatchExpressionParser::kAllowAllSpecialFeatures);
 
-    auto cq = CanonicalQuery::make({
-        .expCtx = makeExpressionContext(opCtx, *findCommand),
-        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                              .allowedFeatures =
-                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
-    });
     return cq.isOK() && _isExactIdQuery(*cq.getValue(), cm);
 }
 
@@ -740,12 +740,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CollectionRoutingInfoTargeter::_cano
         expCtx->setCollator(defaultCollator->clone());
     }
 
-    return CanonicalQuery::make({
-        .expCtx = expCtx,
-        .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                              .allowedFeatures =
-                                                  MatchExpressionParser::kAllowAllSpecialFeatures},
-    });
+    return CanonicalQuery::canonicalize(opCtx,
+                                        std::move(findCommand),
+                                        false, /* isExplain */
+                                        expCtx,
+                                        ExtensionsCallbackNoop(),
+                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 }
 
 StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQuery(
