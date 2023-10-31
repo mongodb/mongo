@@ -7,10 +7,13 @@ config_variables:
   password: *keyFileData
   username: __system
 
-test_kind: js_test
-# This suite starts two 3-node replica sets and uses the ContinuousShardMerge hook to run
-# background tenant migrations. It also wraps all CRUD commands in transactions and asserts that
-# the transactions are committed/aborted correctly while tenant migrations are running.
+test_kind: multi_stmt_txn_passthrough
+
+description: |
+  This passthrough runs the shard merge migration in multitenancy while testing different jstests.
+  Starts two 3-node replica sets and uses the ContinuousShardMerge hook to run background tenant
+  migrations. It also wraps all CRUD commands in transactions and asserts that the transactions are
+  committed/aborted correctly while shard merges are running.
 
 selector:
   roots:
@@ -23,8 +26,6 @@ selector:
 
   # These tests already run with transactions.
   - jstests/core/txns/**/*.js
-  # Skip any tests that run with auth explicitly.
-  - jstests/core/administrative/*[aA]uth*.js
 
   #
   # Excluded from replica_sets_multi_stmt_txn_jscore_passthrough.yml
@@ -215,11 +216,17 @@ selector:
   # Does not support tojson of command objects.
   - jstests/core/**/SERVER-23626.js
 
+  # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
+  - jstests/core/query/explain/explain_agg_write_concern.js
+
+  # `rolesInfo` is returning unprefixed database names
+  - jstests/core/administrative/builtin_roles_external.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
-  # These tests run getMore commands which are not supported in the tenant migration passthrough.
+  # These tests run getMore commands which are not supported in the shard merge passthrough.
   - requires_getmore
-  # Due to background tenant migrations, operations in the main test shell are not guaranteed to
+  # Due to background shard merges, operations in the main test shell are not guaranteed to
   # be causally consistent with operations in a parallel shell. The reason is that
   # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/
   # afterClusterTime or linearlizable read. Therefore, one of shell may not be aware that the
@@ -229,15 +236,13 @@ selector:
   - requires_profiling
   # capped collections are banned in Serverless
   - requires_capped
-  # emptycapped command is blocked during tenant migration.
+  # emptycapped command is blocked during shard merge.
   - requires_emptycapped
   - tenant_migration_incompatible
   # "Cowardly refusing to override read concern of command: ..."
   - assumes_read_concern_unchanged
   # "writeConcern is not allowed within a multi-statement transaction"
   - assumes_write_concern_unchanged
-  # Transactions are not allowed to operate on capped collections.
-  - requires_capped
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
   # $out is not supported in transactions
@@ -246,16 +251,26 @@ selector:
   # that use API parameters cannot be run with transactions.
   - uses_api_parameters
   - does_not_support_transactions
-  # Full validation can cause ongoing queries to fail. This can affect the tenant migration
+  # Full validation can cause ongoing queries to fail. This can affect the shard merge
   # process.
   - uses_full_validation
-  # Multi-updates that conflict with tenant migration are not retried by simulate_atlas_proxy.js.
+  # Multi-updates that conflict with shard merge are not retried by simulate_atlas_proxy.js.
   - requires_multi_updates
   - requires_timeseries # Transactions not supported
   - requires_fastcount
   - multiple_tenants_incompatible
   # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
   - simulate_atlas_proxy_incompatible
+  # Exclude tests which we know use commands that don't support a security token.
+  - not_allowed_with_security_token
+  # Exclude tests which use commands that aren't supported in Serverless.
+  - command_not_supported_in_serverless
+  # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+  - requires_scripting
+  # Skip any tests that run with auth explicitly.
+  - requires_auth
+  # Skip any tests that use transactions
+  - uses_transactions
 
 executor:
   archive:
@@ -280,18 +295,20 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-          networkErrorAndTxnOverrideConfig:
-            wrapCRUDinTransactions: true
-          sessionOptions:
-            # Tests in this suite only read from primaries and only one node is electable, so causal
-            # consistency is not required to read your own writes.
-            causalConsistency: false
           # TODO SERVER-63517 No longer needed when we only use shard merge protocol.
           useLocalDBForDBCheck: true
           # Shard Merge does not support fastcount. When we call CheckTenantMigrationDBHash after
           # each migration we would potentially fail when enforcing using the fast count during that
           # process.
           skipEnforceFastCountOnValidate: true
+          networkErrorAndTxnOverrideConfig:
+            wrapCRUDinTransactions: true
+          sessionOptions:
+            # Tests in this suite only read from primaries and only one node is electable, so causal
+            # consistency is not required to read your own writes.
+            causalConsistency: false
+          hashTestNamesForMultitenancy: true
+          useResponsePrefixChecking: true
   hooks:
   - class: ContinuousShardMerge
     shell_options:
@@ -333,12 +350,14 @@ executor:
         # so. Therefore, the garbage collection delay doesn't need to be large.
         tenantMigrationGarbageCollectionDelayMS: 1
         minSnapshotHistoryWindowInSeconds: 30
+        multitenancySupport: true
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
       tlsAllowInvalidHostnames: ''
       auth: ''
       keyFile: *keyFile
       syncdelay: 1
+      noscripting: ''
     per_mongod_options:
       # Each entry is for a different replica set's extra mongod options.
       - tlsCertificateKeyFile: jstests/libs/rs0.pem
