@@ -35,6 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/inline_auto_update.h"
@@ -65,6 +66,13 @@ GENERATE_BSON_CMP_FUNC(BSONObj, LTE, SimpleBSONObjComparator::kInstance, <=);
 GENERATE_BSON_CMP_FUNC(BSONObj, GT, SimpleBSONObjComparator::kInstance, >);
 GENERATE_BSON_CMP_FUNC(BSONObj, GTE, SimpleBSONObjComparator::kInstance, >=);
 GENERATE_BSON_CMP_FUNC(BSONObj, NE, SimpleBSONObjComparator::kInstance, !=);
+
+GENERATE_BSON_CMP_FUNC(BSONObj, EQ_UNORDERED, UnorderedFieldsBSONObjComparator{}, ==);
+GENERATE_BSON_CMP_FUNC(BSONObj, LT_UNORDERED, UnorderedFieldsBSONObjComparator{}, <);
+GENERATE_BSON_CMP_FUNC(BSONObj, LTE_UNORDERED, UnorderedFieldsBSONObjComparator{}, <=);
+GENERATE_BSON_CMP_FUNC(BSONObj, GT_UNORDERED, UnorderedFieldsBSONObjComparator{}, >);
+GENERATE_BSON_CMP_FUNC(BSONObj, GTE_UNORDERED, UnorderedFieldsBSONObjComparator{}, >=);
+GENERATE_BSON_CMP_FUNC(BSONObj, NE_UNORDERED, UnorderedFieldsBSONObjComparator{}, !=);
 
 // This comparator checks for binary equality. Useful when logical equality (through woCompare()) is
 // not strong enough.

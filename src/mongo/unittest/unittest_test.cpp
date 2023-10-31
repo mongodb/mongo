@@ -201,10 +201,38 @@ TEST(UnitTestSelfTest, BSONObjComparisons) {
     ASSERT_BSONOBJ_NE(a, b);
     ASSERT_BSONOBJ_LT(a, b);
     ASSERT_BSONOBJ_LTE(a, b);
-    ASSERT_BSONOBJ_LTE(a, b);
+    ASSERT_BSONOBJ_LTE(b, b);
     ASSERT_BSONOBJ_GT(b, a);
     ASSERT_BSONOBJ_GTE(b, a);
     ASSERT_BSONOBJ_GTE(a, a);
+
+    ASSERT_BSONOBJ_EQ_UNORDERED(a, a);
+    ASSERT_BSONOBJ_NE_UNORDERED(a, b);
+    ASSERT_BSONOBJ_LT_UNORDERED(a, b);
+    ASSERT_BSONOBJ_LTE_UNORDERED(a, b);
+    ASSERT_BSONOBJ_LTE_UNORDERED(b, b);
+    ASSERT_BSONOBJ_GT_UNORDERED(b, a);
+    ASSERT_BSONOBJ_GTE_UNORDERED(b, a);
+    ASSERT_BSONOBJ_GTE_UNORDERED(a, a);
+}
+
+TEST(UnitTestSelfTest, BSONObjComparisonsUnordered) {
+    auto a = mongo::BSONObjBuilder{}.append("foo", "bar").append("hello", "world").obj();
+    auto b = mongo::BSONObjBuilder{}.append("hello", "world").append("foo", "bar").obj();
+    ASSERT_BSONOBJ_NE(a, b);
+    ASSERT_BSONOBJ_EQ_UNORDERED(a, b);
+    ASSERT_BSONOBJ_LTE_UNORDERED(a, b);
+    ASSERT_BSONOBJ_LTE_UNORDERED(b, a);
+    ASSERT_BSONOBJ_GTE_UNORDERED(b, a);
+    ASSERT_BSONOBJ_GTE_UNORDERED(a, b);
+
+    auto c = mongo::BSONObjBuilder{}.append("hello", "world").append("foo", "baz").obj();
+    ASSERT_BSONOBJ_NE_UNORDERED(a, c);
+    ASSERT_BSONOBJ_NE_UNORDERED(b, c);
+    ASSERT_BSONOBJ_LT_UNORDERED(a, c);
+    ASSERT_BSONOBJ_LT_UNORDERED(b, c);
+    ASSERT_BSONOBJ_GT_UNORDERED(c, b);
+    ASSERT_BSONOBJ_GT_UNORDERED(c, a);
 }
 
 TEST(UnitTestSelfTest, BSONElementComparisons) {
