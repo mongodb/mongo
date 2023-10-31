@@ -124,18 +124,15 @@ protected:
         }
         auto pipeline = parsePipeline(expCtx, pipelineObj);
 
-        auto statusWithCQ =
-            CanonicalQuery::canonicalize(opCtx,
-                                         std::move(findCommand),
-                                         false,
-                                         expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures,
-                                         ProjectionPolicies::findProjectionPolicies(),
-                                         std::move(pipeline),
-                                         isCountLike);
-        ASSERT_OK(statusWithCQ.getStatus());
-        return std::move(statusWithCQ.getValue());
+        return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+            .expCtx = expCtx,
+            .parsedFind =
+                ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                        .allowedFeatures =
+                                            MatchExpressionParser::kAllowAllSpecialFeatures},
+
+            .pipeline = std::move(pipeline),
+            .isCountLike = isCountLike});
     }
 
     unique_ptr<CanonicalQuery> canonicalize(OperationContext* opCtx, const char* queryStr) {

@@ -99,7 +99,7 @@ void BM_ShapfiyIDHack(benchmark::State& state) {
     auto fcr = std::make_unique<FindCommandRequest>(expCtx->ns);
     fcr->setFilter(fromjson("{_id: 4}"));
     ClientMetadata::setFromMetadata(opCtx->getClient(), kMockClientMetadataElem, false);
-    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
 
     // Run the benchmark.
     for (auto keepRunning : state) {
@@ -123,7 +123,7 @@ void BM_ShapfiyMildlyComplex(benchmark::State& state) {
         yearlySpend: {$lte: 1000}
     })"));
     ClientMetadata::setFromMetadata(opCtx->getClient(), kMockClientMetadataElem, false);
-    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcr)));
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcr)}));
 
     // Run the benchmark.
     for (auto keepRunning : state) {

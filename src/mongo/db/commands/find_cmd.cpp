@@ -241,19 +241,15 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     std::unique_ptr<FindCommandRequest> findCommand) {
     // Fill out curop information.
     beginQueryOp(opCtx, nss, requestBody);
-    // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
 
     const auto& collection = collOrViewAcquisition.getCollectionPtr();
-
     auto expCtx =
         makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
-
-    auto parsedRequest = uassertStatusOK(
-        parsed_find_command::parse(expCtx,
-                                   std::move(findCommand),
-                                   extensionsCallback,
-                                   MatchExpressionParser::kAllowAllSpecialFeatures));
+    auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
+        expCtx,
+        {.findCommand = std::move(findCommand),
+         .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
+         .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
     // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
     // $$USER_ROLES for the find command.
@@ -273,8 +269,10 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     }
 
     auto querySettings = lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss);
-    return uassertStatusOK(CanonicalQuery::canonicalize(
-        std::move(expCtx), std::move(parsedRequest), std::move(querySettings)));
+    return std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = std::move(expCtx),
+                             .parsedFind = std::move(parsedRequest),
+                             .querySettings = std::move(querySettings)});
 }
 
 /**
@@ -439,9 +437,6 @@ public:
             auto respSc =
                 SerializationContext::stateCommandReply(findCommand->getSerializationContext());
 
-            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
-            const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
             const auto& collectionPtr = collectionOrView->getCollectionPtr();
@@ -451,18 +446,19 @@ public:
                     opCtx, findCommand->getResumeAfter(), isClusteredCollection));
             }
             auto expCtx = makeExpressionContext(opCtx, *findCommand, collectionPtr, verbosity);
-            auto parsedRequest = uassertStatusOK(
-                parsed_find_command::parse(expCtx,
-                                           std::move(findCommand),
-                                           extensionsCallback,
-                                           MatchExpressionParser::kAllowAllSpecialFeatures));
+            auto parsedRequest = uassertStatusOK(parsed_find_command::parse(
+                expCtx,
+                {.findCommand = std::move(findCommand),
+                 .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
+                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             auto querySettings =
                 lookupQuerySettingsForFind(expCtx, *parsedRequest, collectionPtr, nss);
-            auto cq = uassertStatusOK(CanonicalQuery::canonicalize(std::move(expCtx),
-                                                                   std::move(parsedRequest),
-                                                                   std::move(querySettings),
-                                                                   true /* explain */));
+            auto cq = std::make_unique<CanonicalQuery>(
+                CanonicalQueryParams{.expCtx = std::move(expCtx),
+                                     .parsedFind = std::move(parsedRequest),
+                                     .querySettings = std::move(querySettings),
+                                     .explain = true});
 
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
             // $$USER_ROLES for the find command.

@@ -573,37 +573,6 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
     return findCommand;
 }
 
-StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
-    const intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& nss,
-    std::unique_ptr<FindCommandRequest> findCommand,
-    const QueryMetadataBitSet& metadataRequested,
-    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    bool isCountLike,
-    bool isSearchQuery) {
-    // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially allow
-    // SBE to execute the portion of the query that's pushed down, even if the portion of the query
-    // that is not pushed down contains expressions not supported by SBE.
-    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
-
-    auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
-                                           std::move(findCommand),
-                                           static_cast<bool>(expCtx->explain),
-                                           expCtx,
-                                           ExtensionsCallbackReal(expCtx->opCtx, &nss),
-                                           matcherFeatures,
-                                           ProjectionPolicies::aggregateProjectionPolicies(),
-                                           {} /* empty pipeline */,
-                                           isCountLike,
-                                           isSearchQuery);
-
-    if (cq.isOK()) {
-        // Mark the metadata that's requested by the pipeline on the CQ.
-        cq.getValue()->requestAdditionalMetadata(metadataRequested);
-    }
-    return cq;
-}
-
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
     const intrusive_ptr<ExpressionContext>& expCtx,
     const MultipleCollectionAccessor& collections,
@@ -615,13 +584,23 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     Pipeline* pipeline,
     bool isCountLike) {
-    auto cq = createCanonicalQuery(expCtx,
-                                   nss,
-                                   std::move(findCommand),
-                                   metadataRequested,
-                                   matcherFeatures,
-                                   isCountLike,
-                                   PipelineD::isSearchPresentAndEligibleForSbe(pipeline));
+    // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
+    // allow SBE to execute the portion of the query that's pushed down, even if the portion of
+    // the query that is not pushed down contains expressions not supported by SBE.
+    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+
+    auto cq = CanonicalQuery::make(
+        {.expCtx = expCtx,
+         .parsedFind =
+             ParsedFindCommandParams{
+                 .findCommand = std::move(findCommand),
+                 .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
+                 .allowedFeatures = matcherFeatures,
+                 .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()},
+         .explain = static_cast<bool>(expCtx->explain),
+         .isCountLike = isCountLike,
+         .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
+
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of
         // sort and projection will result in a bad query, but when we try with a different
@@ -630,6 +609,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // another attempt.
         return {cq.getStatus()};
     }
+
+    // Mark the metadata that's requested by the pipeline on the CQ.
+    cq.getValue()->requestAdditionalMetadata(metadataRequested);
 
     if (groupForDistinctScan) {
         // When the pipeline includes a $group that groups by a single field

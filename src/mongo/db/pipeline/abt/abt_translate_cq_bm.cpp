@@ -78,25 +78,19 @@ public:
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(matchSpec);
         findCommand->setProjection(projectSpec);
-        auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
-        if (!cq.isOK()) {
-            state.SkipWithError("Canonical query could not be created");
-            return;
-        }
+        auto cq = std::make_unique<CanonicalQuery>(
+            CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+                                 .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
-        if (!isEligibleForBonsai_forTesting(*cq.getValue())) {
+        if (!isEligibleForBonsai_forTesting(*cq)) {
             state.SkipWithError("CanonicalQuery is not supported by CQF");
             return;
         }
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(
-                translateCanonicalQueryToABT(metadata,
-                                             *cq.getValue(),
-                                             scanProjName,
-                                             make<ScanNode>(scanProjName, "collection"),
-                                             prefixId));
+            benchmark::DoNotOptimize(translateCanonicalQueryToABT(
+                metadata, *cq, scanProjName, make<ScanNode>(scanProjName, "collection"), prefixId));
             benchmark::ClobberMemory();
         }
     }

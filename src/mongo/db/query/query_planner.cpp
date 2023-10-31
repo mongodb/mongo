@@ -2056,7 +2056,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
         auto orChild = planningResult.orExpression->getChild(i);
 
         // Turn the i-th child into its own query.
-        auto statusWithCQ = CanonicalQuery::canonicalizeSubQuery(opCtx, query, orChild);
+
+        auto statusWithCQ = CanonicalQuery::make(opCtx, query, orChild);
         if (!statusWithCQ.isOK()) {
             str::stream ss;
             ss << "Can't canonicalize subchild " << orChild->debugString() << " "

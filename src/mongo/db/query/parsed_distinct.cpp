@@ -333,22 +333,23 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         findCommand->setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
     }
 
-    const boost::intrusive_ptr<ExpressionContext> expCtx;
-    auto cq = CanonicalQuery::canonicalize(opCtx,
-                                           std::move(findCommand),
-                                           isExplain,
-                                           expCtx,
-                                           extensionsCallback,
-                                           MatchExpressionParser::kAllowAllSpecialFeatures);
-    if (!cq.isOK()) {
-        return cq.getStatus();
+    auto statusWithCQ = CanonicalQuery::make(
+        {.expCtx = makeExpressionContext(opCtx, *findCommand),
+         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
+                                               .extensionsCallback = extensionsCallback,
+                                               .allowedFeatures =
+                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
+         .explain = isExplain});
+    if (!statusWithCQ.isOK()) {
+        return statusWithCQ.getStatus();
+    }
+    auto cq = std::move(statusWithCQ.getValue());
+
+    if (cq->getFindCommandRequest().getCollation().isEmpty() && defaultCollator) {
+        cq->setCollator(defaultCollator->clone());
     }
 
-    if (cq.getValue()->getFindCommandRequest().getCollation().isEmpty() && defaultCollator) {
-        cq.getValue()->setCollator(defaultCollator->clone());
-    }
-
-    return ParsedDistinct(std::move(cq.getValue()),
+    return ParsedDistinct(std::move(cq),
                           parsedDistinct.getKey().toString(),
                           parsedDistinct.getMirrored().value_or(false),
                           parsedDistinct.getSampleId());

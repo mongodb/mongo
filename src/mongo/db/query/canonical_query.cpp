@@ -91,81 +91,62 @@ bool isBonsaiEnabled(QueryFrameworkControlEnum frameworkControl) {
 
 }  // namespace
 
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
+                                                              FindCommandRequest& findCommand) {
+    auto collator = [&]() -> std::unique_ptr<mongo::CollatorInterface> {
+        if (findCommand.getCollation().isEmpty()) {
+            return nullptr;
+        }
+        return uassertStatusOKWithContext(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(findCommand.getCollation()),
+                                          "unable to parse collation");
+    }();
+    return make_intrusive<ExpressionContext>(
+        opCtx, findCommand, std::move(collator), true /* mayDbProfile */);
+}
+
 // static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    OperationContext* opCtx,
-    std::unique_ptr<FindCommandRequest> findCommand,
-    bool explain,
-    const boost::intrusive_ptr<ExpressionContext>& givenExpCtx,
-    const ExtensionsCallback& extensionsCallback,
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
-    const ProjectionPolicies& projectionPolicies,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-    bool isCountLike,
-    bool isSearchQuery) {
-    if (givenExpCtx) {
-        // Caller provided an ExpressionContext, let's go ahead and use that.
-        auto swParsedFind = parsed_find_command::parse(givenExpCtx,
-                                                       std::move(findCommand),
-                                                       extensionsCallback,
-                                                       allowedFeatures,
-                                                       projectionPolicies);
-        if (!swParsedFind.isOK()) {
-            return swParsedFind.getStatus();
-        }
-        return canonicalize(std::move(givenExpCtx),
-                            std::move(swParsedFind.getValue()),
-                            query_settings::QuerySettings(),
-                            explain,
-                            std::move(cqPipeline),
-                            isCountLike,
-                            isSearchQuery);
-    } else {
-        // No ExpressionContext provided, let's call the override that makes one for us.
-        auto swResults = parsed_find_command::parse(
-            opCtx, std::move(findCommand), extensionsCallback, allowedFeatures, projectionPolicies);
-        if (!swResults.isOK()) {
-            return swResults.getStatus();
-        }
-        auto&& [expCtx, parsedFind] = std::move(swResults.getValue());
-        return canonicalize(std::move(expCtx),
-                            std::move(parsedFind),
-                            query_settings::QuerySettings(),
-                            explain,
-                            std::move(cqPipeline),
-                            isCountLike,
-                            isSearchQuery);
+StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::make(OperationContext* opCtx,
+                                                                 const CanonicalQuery& baseQuery,
+                                                                 MatchExpression* matchExpr) {
+    try {
+        return std::make_unique<CanonicalQuery>(opCtx, baseQuery, matchExpr);
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
 }
 
 // static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    std::unique_ptr<ParsedFindCommand> parsedFind,
-    query_settings::QuerySettings&& querySettings,
-    bool explain,
-    std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-    bool isCountLike,
-    bool isSearchQuery) {
-
-    // Make the CQ we'll hopefully return.
-    auto cq = std::make_unique<CanonicalQuery>();
-    cq->setExplain(explain);
-    cq->_querySettings = std::move(querySettings);
-    if (auto initStatus = cq->initCq(std::move(expCtx),
-                                     std::move(parsedFind),
-                                     std::move(cqPipeline),
-                                     isCountLike,
-                                     isSearchQuery);
-        !initStatus.isOK()) {
-        return initStatus;
+StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::make(CanonicalQueryParams&& params) {
+    try {
+        return std::make_unique<CanonicalQuery>(std::move(params));
+    } catch (const DBException& e) {
+        return e.toStatus();
     }
-    return {std::move(cq)};
 }
 
-// static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalizeSubQuery(
-    OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* matchExpr) {
+CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
+    setExplain(params.explain);
+    _querySettings = std::move(params.querySettings);
+    auto parsedFind = uassertStatusOK(stdx::visit(
+        OverloadedVisitor{[](std::unique_ptr<ParsedFindCommand> parsedFindRequest) {
+                              return StatusWith(std::move(parsedFindRequest));
+                          },
+                          [&](ParsedFindCommandParams p) {
+                              return parsed_find_command::parse(params.expCtx, std::move(p));
+                          }},
+        std::move(params.parsedFind)));
+
+    initCq(std::move(params.expCtx),
+           std::move(parsedFind),
+           std::move(params.pipeline),
+           params.isCountLike,
+           params.isSearchQuery);
+}
+
+CanonicalQuery::CanonicalQuery(OperationContext* opCtx,
+                               const CanonicalQuery& baseQuery,
+                               MatchExpression* matchExpr) {
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
     findCommand->setFilter(matchExpr->serialize());
     findCommand->setProjection(baseQuery.getFindCommandRequest().getProjection().getOwned());
@@ -173,35 +154,29 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalizeSubQuery
     findCommand->setCollation(baseQuery.getFindCommandRequest().getCollation().getOwned());
 
     // Make the CQ we'll hopefully return.
-    auto cq = std::make_unique<CanonicalQuery>();
-    cq->setExplain(baseQuery.getExplain());
+    setExplain(baseQuery.getExplain());
 
     // Copy query settings from the 'baseQuery'.
-    cq->_querySettings = baseQuery._querySettings;
+    _querySettings = baseQuery._querySettings;
 
-    auto swParsedFind = ParsedFindCommand::withExistingFilter(
+    auto parsedFind = uassertStatusOK(ParsedFindCommand::withExistingFilter(
         baseQuery.getExpCtx(),
         baseQuery.getCollator() ? baseQuery.getCollator()->clone() : nullptr,
         matchExpr->clone(),
-        std::move(findCommand));
-    if (!swParsedFind.isOK()) {
-        return swParsedFind.getStatus();
-    }
-    auto initStatus =
-        cq->initCq(baseQuery.getExpCtx(),
-                   std::move(swParsedFind.getValue()),
-                   {},     // cqPipeline
-                   false,  // The parent query countLike is independent from the subquery countLike.
-                   baseQuery.isSearchQuery());
-    invariant(initStatus.isOK());
-    return {std::move(cq)};
+        std::move(findCommand)));
+
+    initCq(baseQuery.getExpCtx(),
+           std::move(parsedFind),
+           {} /* an empty cqPipeline */,
+           false,  // The parent query countLike is independent from the subquery countLike.
+           baseQuery.isSearchQuery());
 }
 
-Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
-                              std::unique_ptr<ParsedFindCommand> parsedFind,
-                              std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
-                              bool isCountLike,
-                              bool isSearchQuery) {
+void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
+                            std::unique_ptr<ParsedFindCommand> parsedFind,
+                            std::vector<std::unique_ptr<InnerPipelineStageInterface>> cqPipeline,
+                            bool isCountLike,
+                            bool isSearchQuery) {
     _expCtx = expCtx;
 
     _findCommand = std::move(parsedFind->findCommandRequest);
@@ -260,16 +235,15 @@ Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     // The tree must always be valid after normalization.
     dassert(parsed_find_command::isValid(_primaryMatchExpression.get(), *_findCommand).isOK());
     if (auto status = isValidNormalized(_primaryMatchExpression.get()); !status.isOK()) {
-        return status;
+        uasserted(status.code(), status.reason());
     }
 
     if (_proj) {
         _metadataDeps = _proj->metadataDeps();
-
-        if (_proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
-            _findCommand->getSort().isEmpty()) {
-            return {ErrorCodes::BadValue, "cannot use sortKey $meta projection without a sort"};
-        }
+        uassert(ErrorCodes::BadValue,
+                "cannot use sortKey $meta projection without a sort",
+                !(_proj->metadataDeps()[DocumentMetadataFields::kSortKey] &&
+                  _findCommand->getSort().isEmpty()));
     }
 
     if (_sortPattern) {
@@ -287,7 +261,6 @@ Status CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (_findCommand->getReturnKey()) {
         _metadataDeps.set(DocumentMetadataFields::kIndexKey);
     }
-    return Status::OK();
 }
 
 void CanonicalQuery::setCollator(std::unique_ptr<CollatorInterface> collator) {
