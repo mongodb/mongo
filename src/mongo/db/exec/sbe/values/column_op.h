@@ -54,6 +54,12 @@ struct ColumnOpType {
 
         // ColumnOp always returns a non-Nothing value if the input matches the expected input type.
         kOutputNonNothingOnExpectedInput = 1u << 2u,
+
+        // ColumnOp always returns a non-Nothing value if the input is non-Nothing
+        kOutputNonNothingOnExistingInput = 1u << 3u,
+
+        // ColumnOp is a monotonic function
+        kMonotonic = 1u << 4u,
     };
 
     // Indicates ColumnOp always returns a non-Nothing value if the input is Nothing.

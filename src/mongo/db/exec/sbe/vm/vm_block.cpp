@@ -44,10 +44,12 @@
 namespace mongo::sbe::vm {
 using ColumnOpType = value::ColumnOpType;
 
-static constexpr auto existsOpType = ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput,
-                                                  value::TypeTags::Nothing,
-                                                  value::TypeTags::Boolean,
-                                                  ColumnOpType::ReturnBoolOnMissing{}};
+static constexpr auto existsOpType = ColumnOpType{
+    // TODO SERVER-82852 kOutputNonNothingOnMissingInput is already set by ReturnBoolOnMissing{}.
+    ColumnOpType::kOutputNonNothingOnMissingInput | ColumnOpType::kOutputNonNothingOnExistingInput,
+    value::TypeTags::Nothing,
+    value::TypeTags::Boolean,
+    ColumnOpType::ReturnBoolOnMissing{}};
 
 static const auto existsOp =
     value::makeColumnOp<existsOpType>([](value::TypeTags tag, value::Value val) {
@@ -65,6 +67,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists
 
     invariant(inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    // Avoid extracting the block if we know every value is non-Nothing.
+    if (valueBlockIn->tryDense().get_value_or(false) && valueBlockIn->tryCount()) {
+        // Block was dense and we could determine the number of the values in the block without
+        // extracting so we can just return a MonoBlock of true.
+        auto out = std::make_unique<value::MonoBlock>(
+            *valueBlockIn->tryCount(), value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(out.release())};
+    }
 
     auto out = valueBlockIn->map(existsOp);
 
@@ -101,12 +114,14 @@ struct FillEmptyFunctor {
 
 // Currently have an invariant that prevents the fill value being Nothing, need to change this flag
 // if that invariant gets removed.
-static constexpr auto fillEmptyOpType = ColumnOpType{ColumnOpType::kOutputNonNothingOnMissingInput,
-                                                     value::TypeTags::Nothing,
-                                                     value::TypeTags::Nothing,
-                                                     ColumnOpType::ReturnNonNothingOnMissing{}};
+static constexpr auto fillEmptyNonNothingOpType = ColumnOpType{
+    ColumnOpType::kOutputNonNothingOnMissingInput | ColumnOpType::kOutputNonNothingOnExistingInput,
+    value::TypeTags::Nothing,
+    value::TypeTags::Nothing,
+    ColumnOpType::ReturnNonNothingOnMissing{}};
 
-static const auto fillEmptyOp = value::makeColumnOpWithParams<fillEmptyOpType, FillEmptyFunctor>();
+static const auto fillEmptyOp =
+    value::makeColumnOpWithParams<fillEmptyNonNothingOpType, FillEmptyFunctor>();
 }  // namespace
 
 /**
@@ -125,6 +140,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
     auto [blockOwned, blockTag, blockVal] = getFromStack(0);
     invariant(blockTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
+
+    if (valueBlockIn->tryDense().get_value_or(false) && valueBlockIn->tryCount()) {
+        // Block was dense and we could determine the number of the values in the block without
+        // extracting so we can just return the input block.
+        return moveFromStack(0);
+    }
+
     auto out = valueBlockIn->map(fillEmptyOp.bindParams(fillTag, fillVal));
 
     return {
@@ -251,15 +273,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCount(
 }
 
 namespace {
-template <class Cmp>
+template <class Cmp, ColumnOpType::Flags AddFlags = ColumnOpType::kNoFlags>
 FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueBlock* blockView,
                                                                    value::TypeTags rhsTag,
                                                                    value::Value rhsVal) {
-
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
+    static constexpr auto cmpOpType =
+        ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput | AddFlags,
+                     value::TypeTags::Nothing,
+                     value::TypeTags::Nothing,
+                     ColumnOpType::ReturnNothingOnMissing{}};
 
     const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
         return genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
@@ -273,7 +295,7 @@ FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueB
 
 }  // namespace
 
-template <class Cmp>
+template <class Cmp, ColumnOpType::Flags AddFlags>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmpScalar(
     ArityType arity) {
     invariant(arity == 2);
@@ -282,7 +304,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmpSca
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
 
     auto blockView = value::getValueBlock(blockVal);
-    return blockCompareGeneric<Cmp>(blockView, valueTag, valueVal);
+    return blockCompareGeneric<Cmp, AddFlags>(blockView, valueTag, valueVal);
 }
 
 /*
@@ -290,16 +312,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmpSca
  */
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockGtScalar(
     ArityType arity) {
-    return builtinValueBlockCmpScalar<std::greater<>>(arity);
+    return builtinValueBlockCmpScalar<std::greater<>, ColumnOpType::kMonotonic>(arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockGteScalar(
     ArityType arity) {
-    return builtinValueBlockCmpScalar<std::greater_equal<>>(arity);
+    return builtinValueBlockCmpScalar<std::greater_equal<>, ColumnOpType::kMonotonic>(arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockEqScalar(
     ArityType arity) {
+    // This is not monotonic, because the min and max not being equal to the target value does not
+    // imply that no values in the block will be equal to the target value.
     return builtinValueBlockCmpScalar<std::equal_to<>>(arity);
 }
 
@@ -327,12 +351,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNeqSca
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLtScalar(
     ArityType arity) {
-    return builtinValueBlockCmpScalar<std::less<>>(arity);
+    return builtinValueBlockCmpScalar<std::less<>, ColumnOpType::kMonotonic>(arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLteScalar(
     ArityType arity) {
-    return builtinValueBlockCmpScalar<std::less_equal<>>(arity);
+    return builtinValueBlockCmpScalar<std::less_equal<>, ColumnOpType::kMonotonic>(arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmp3wScalar(

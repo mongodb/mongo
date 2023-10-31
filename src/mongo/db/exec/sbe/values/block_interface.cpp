@@ -79,6 +79,25 @@ std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) {
 }
 
 std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
+    // If the ColumnOp function is monotonic and the block is dense, we can try to map the whole
+    // bucket to a MonoBlock instead of mapping each value iteratively.
+    if (tryDense().get_value_or(false) && tryCount() &&
+        (op.opType.flags & ColumnOpType::kMonotonic)) {
+        auto [minTag, minVal] = tryMin();
+        auto [maxTag, maxVal] = tryMax();
+
+        if (minTag == maxTag && minTag != value::TypeTags::Nothing) {
+            auto [minResTag, minResVal] = op.processSingle(minTag, minVal);
+            auto [maxResTag, maxResVal] = op.processSingle(maxTag, maxVal);
+            if (minResTag == maxResTag && minResVal == maxResVal) {
+                auto [cpyTag, cpyVal] = copyValue(minResTag, minResVal);
+                return std::make_unique<MonoBlock>(*tryCount(), cpyTag, cpyVal);
+            }
+        }
+        // The min and max didn't exist or didn't map to the same value so we need to process the
+        // whole block.
+    }
+
     auto extracted = extract();
 
     if (extracted.count == 0) {
@@ -88,9 +107,15 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
     std::vector<TypeTags> tags(extracted.count, TypeTags::Nothing);
     std::vector<Value> vals(extracted.count, Value{0u});
 
+    // TODO SERVER-82615 Determine at runtime if the output block is dense if this can't be
+    // determined from flags alone.
     op.processBatch(extracted.tags, extracted.vals, tags.data(), vals.data(), extracted.count);
 
-    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
+    bool isDense = (op.opType.flags & ColumnOpType::kOutputNonNothingOnExistingInput) &&
+        (tryDense().get_value_or(false) ||
+         op.opType.flags & ColumnOpType::kOutputNonNothingOnMissingInput);
+
+    return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals), isDense);
 }
 
 

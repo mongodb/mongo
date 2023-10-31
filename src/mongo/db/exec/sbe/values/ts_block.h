@@ -133,11 +133,19 @@ public:
     }
 
     std::pair<TypeTags, Value> tryMin() const override {
-        return _controlMin;
+        // Timeseries computes min and max for arrays/objects differently. As a result, the min/max
+        // value is not guaranteed to a member of the block so we choose not to expose it.
+        if (!isObject(_controlMin.first) && !isArray(_controlMin.first)) {
+            return _controlMin;
+        }
+        return std::pair{TypeTags::Nothing, Value{0u}};
     }
 
     std::pair<TypeTags, Value> tryMax() const override {
-        return _controlMax;
+        if (!isObject(_controlMax.first) && !isArray(_controlMax.first)) {
+            return _controlMax;
+        }
+        return std::pair{TypeTags::Nothing, Value{0u}};
     }
 
     boost::optional<bool> tryDense() const override {

@@ -80,4 +80,16 @@ TimeseriesTest.run((insert) => {
     testMatch({"arrOfObj.x": {$lte: 101}}, [{_id: 0}, {_id: 1}]);
     testMatch({"arrOfObj.x": {$eq: 102}}, [{_id: 1}]);
     testMatch({"arrOfObj.x": {$ne: 102}}, [{_id: 0}, {_id: 2}]);
+
+    testMatch({"time": {$gt: new Date(datePrefix + 100)}}, [{_id: 1}, {_id: 2}]);
+    testMatch({"time": {$gte: new Date(datePrefix + 100)}}, [{_id: 0}, {_id: 1}, {_id: 2}]);
+    testMatch({"time": {$lt: new Date(datePrefix + 200)}}, [{_id: 0}]);
+    testMatch({"time": {$lte: new Date(datePrefix + 200)}}, [{_id: 0}, {_id: 1}]);
+    testMatch({"time": {$eq: new Date(datePrefix + 300)}}, [{_id: 2}]);
+    testMatch({"time": {$ne: new Date(datePrefix + 200)}}, [{_id: 0}, {_id: 2}]);
+
+    testMatch({"time": {$gt: new Date(datePrefix + 100), $lt: new Date(datePrefix + 300)}},
+              [{_id: 1}]);
+
+    testMatch({"time": {"obj": new Date(datePrefix + 100)}}, []);
 });

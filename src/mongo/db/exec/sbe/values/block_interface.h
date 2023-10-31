@@ -255,11 +255,11 @@ public:
     }
 
     std::pair<TypeTags, Value> tryMin() const override {
-        return std::pair{_tag, _val};
+        return std::pair(_tag, _val);
     }
 
     std::pair<TypeTags, Value> tryMax() const override {
-        return std::pair{_tag, _val};
+        return std::pair(_tag, _val);
     }
 
     boost::optional<bool> tryDense() const override {
