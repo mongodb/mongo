@@ -187,22 +187,14 @@ public:
             checkChunkMatchesRange(opCtx, nss, metadata, indexInfo, chunkRange);
         }
 
-        auto topChunk = uassertStatusOK(splitChunk(opCtx,
-                                                   nss,
-                                                   keyPatternObj,
-                                                   chunkRange,
-                                                   std::move(splitKeys),
-                                                   shardName,
-                                                   expectedCollectionEpoch,
-                                                   expectedCollectionTimestamp));
-
-        // Otherwise, we want to check whether or not top-chunk optimization should be performed. If
-        // yes, then we should have a ChunkRange that was returned. Regardless of whether it should
-        // be performed, we will return true.
-        if (topChunk) {
-            result.append("shouldMigrate",
-                          BSON("min" << topChunk->getMin() << "max" << topChunk->getMax()));
-        }
+        uassertStatusOK(splitChunk(opCtx,
+                                   nss,
+                                   keyPatternObj,
+                                   chunkRange,
+                                   std::move(splitKeys),
+                                   shardName,
+                                   expectedCollectionEpoch,
+                                   expectedCollectionTimestamp));
 
         return true;
     }

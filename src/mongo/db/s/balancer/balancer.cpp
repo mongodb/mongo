@@ -1078,7 +1078,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
             LOGV2_WARNING(21879,
                           "Failed to split chunk",
                           "splitInfo"_attr = redact(splitInfo.toString()),
-                          "error"_attr = redact(splitStatus.getStatus()));
+                          "error"_attr = redact(splitStatus));
         }
     }
 

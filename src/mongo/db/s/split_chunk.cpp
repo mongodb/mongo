@@ -193,15 +193,14 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
 
 }  // namespace
 
-StatusWith<boost::optional<ChunkRange>> splitChunk(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const BSONObj& keyPatternObj,
-    const ChunkRange& chunkRange,
-    std::vector<BSONObj>&& splitPoints,
-    const std::string& shardName,
-    const OID& expectedCollectionEpoch,
-    const boost::optional<Timestamp>& expectedCollectionTimestamp) {
+Status splitChunk(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  const BSONObj& keyPatternObj,
+                  const ChunkRange& chunkRange,
+                  std::vector<BSONObj>&& splitPoints,
+                  const std::string& shardName,
+                  const OID& expectedCollectionEpoch,
+                  const boost::optional<Timestamp>& expectedCollectionTimestamp) {
     auto scopedSplitOrMergeChunk(uassertStatusOK(
         ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(opCtx, nss, chunkRange)));
 
@@ -228,46 +227,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
                                      expectedCollectionTimestamp,
                                      chunkRange,
                                      std::move(splitPoints));
-
-    // Get the chunk containing a single document (if any) to perform the top-chunk optimization.
-    auto topChunkRange = [&] {
-        AutoGetCollection collection(opCtx, nss, MODE_IS);
-        if (!collection) {
-            LOGV2_WARNING(23778,
-                          "will not perform top-chunk checking since {namespace} does not "
-                          "exist after splitting",
-                          logAttrs(nss));
-            return boost::optional<ChunkRange>(boost::none);
-        }
-
-        // Allow multiKey based on the invariant that shard keys must be single-valued.
-        // Therefore, any multi-key index prefixed by shard key cannot be multikey over the
-        // shard key fields.
-        const auto shardKeyIdx = findShardKeyPrefixedIndex(
-            opCtx, *collection, keyPatternObj, false /* requireSingleKey */);
-        if (!shardKeyIdx) {
-            return boost::optional<ChunkRange>(boost::none);
-        }
-
-        auto backChunk = ChunkType();
-        backChunk.setMin(request.getSplitPoints().back());
-        backChunk.setMax(chunkRange.getMax());
-
-        auto frontChunk = ChunkType();
-        frontChunk.setMin(chunkRange.getMin());
-        frontChunk.setMax(request.getSplitPoints().front());
-
-        KeyPattern shardKeyPattern(keyPatternObj);
-        if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
-            checkIfSingleDoc(opCtx, collection.getCollection(), *shardKeyIdx, &backChunk)) {
-            return boost::optional<ChunkRange>(ChunkRange(backChunk.getMin(), backChunk.getMax()));
-        } else if (shardKeyPattern.globalMin().woCompare(frontChunk.getMin()) == 0 &&
-                   checkIfSingleDoc(opCtx, collection.getCollection(), *shardKeyIdx, &frontChunk)) {
-            return boost::optional<ChunkRange>(
-                ChunkRange(frontChunk.getMin(), frontChunk.getMax()));
-        }
-        return boost::optional<ChunkRange>(boost::none);
-    }();
 
     auto configCmdObj =
         request.toConfigCommandBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
@@ -325,7 +284,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
         }
     }
 
-    return topChunkRange;
+    return Status::OK();
 }
 
 }  // namespace mongo

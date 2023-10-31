@@ -75,7 +75,6 @@ namespace {
 
 const char kMinKey[] = "min";
 const char kMaxKey[] = "max";
-const char kShouldMigrate[] = "shouldMigrate";
 
 }  // namespace
 
@@ -185,15 +184,14 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
     return response.getSplitKeys();
 }
 
-StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
-    OperationContext* opCtx,
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const ShardKeyPattern& shardKeyPattern,
-    const OID& epoch,
-    const Timestamp& timestamp,
-    const ChunkRange& chunkRange,
-    const std::vector<BSONObj>& splitPoints) {
+Status splitChunkAtMultiplePoints(OperationContext* opCtx,
+                                  const ShardId& shardId,
+                                  const NamespaceString& nss,
+                                  const ShardKeyPattern& shardKeyPattern,
+                                  const OID& epoch,
+                                  const Timestamp& timestamp,
+                                  const ChunkRange& chunkRange,
+                                  const std::vector<BSONObj>& splitPoints) {
     invariant(!splitPoints.empty());
 
     auto splitPointsBeginIt = splitPoints.begin();
@@ -269,26 +267,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
         return status.withContext("split failed");
     }
 
-    BSONElement shouldMigrateElement;
-    status = bsonExtractTypedField(cmdResponse, kShouldMigrate, Object, &shouldMigrateElement);
-    if (status.isOK()) {
-        auto chunkRangeStatus = ChunkRange::fromBSON(shouldMigrateElement.embeddedObject());
-        if (!chunkRangeStatus.isOK()) {
-            return chunkRangeStatus.getStatus();
-        }
-
-        return boost::optional<ChunkRange>(std::move(chunkRangeStatus.getValue()));
-    } else if (status != ErrorCodes::NoSuchKey) {
-        LOGV2_WARNING(
-            22879,
-            "Chunk migration will be skipped because extracting field from splitChunk response "
-            "failed",
-            "response"_attr = redact(cmdResponse),
-            "field"_attr = kShouldMigrate,
-            "error"_attr = redact(status));
-    }
-
-    return boost::optional<ChunkRange>();
+    return Status::OK();
 }
 
 ShardId selectLeastLoadedShard(OperationContext* opCtx) {

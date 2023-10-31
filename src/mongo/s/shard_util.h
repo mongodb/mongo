@@ -106,8 +106,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
 
 /**
  * Asks the specified shard to split the chunk described by min/maxKey into the respective split
- * points. If split was successful and the shard indicated that one of the resulting chunks should
- * be moved off the currently owning shard, the return value will contain the bounds of this chunk.
+ * points.
  *
  * shardId The shard, which currently owns the chunk.
  * nss Namespace, which owns the chunk.
@@ -117,15 +116,14 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
  * chunkRange Bounds of the chunk to be split.
  * splitPoints The set of points at which the chunk should be split.
  */
-StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
-    OperationContext* opCtx,
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const ShardKeyPattern& shardKeyPattern,
-    const OID& epoch,
-    const Timestamp& timestamp,
-    const ChunkRange& chunkRange,
-    const std::vector<BSONObj>& splitPoints);
+Status splitChunkAtMultiplePoints(OperationContext* opCtx,
+                                  const ShardId& shardId,
+                                  const NamespaceString& nss,
+                                  const ShardKeyPattern& shardKeyPattern,
+                                  const OID& epoch,
+                                  const Timestamp& timestamp,
+                                  const ChunkRange& chunkRange,
+                                  const std::vector<BSONObj>& splitPoints);
 
 /**
  * Selects the shard with the least amount of data by checking the total size of each shard in the
