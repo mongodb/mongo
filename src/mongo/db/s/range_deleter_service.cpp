@@ -161,7 +161,9 @@ bool RangeDeleterService::ReadyRangeDeletionsProcessor::_stopRequested() const {
 void RangeDeleterService::ReadyRangeDeletionsProcessor::emplaceRangeDeletion(
     const RangeDeletionTask& rdt) {
     stdx::unique_lock<Latch> lock(_mutex);
-    invariant(_state == kRunning);
+    if (_state != kRunning) {
+        return;
+    }
     _queue.push(rdt);
     _condVar.notify_all();
 }
