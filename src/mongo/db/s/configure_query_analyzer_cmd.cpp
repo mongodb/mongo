@@ -75,7 +75,12 @@ public:
                 opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
             // Check under the db lock if this is still the primary shard for the database.
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
+            {
+                Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
+                const auto scopedDss =
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+                scopedDss->assertIsPrimaryShardForDb(opCtx);
+            }
 
             _collDDLLock.emplace(ddlLockManager->lock(
                 opCtx, nss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout));

@@ -79,7 +79,12 @@ public:
             }
 
             // Check if the receiving shard is still the primary for the database
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, fromNss.dbName());
+            {
+                Lock::DBLock dbLock(opCtx, fromNss.dbName(), MODE_IS);
+                const auto scopedDss =
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, fromNss.dbName());
+                scopedDss->assertIsPrimaryShardForDb(opCtx);
+            }
 
             /**
              * Acquiring the local part of the distributed locks for involved namespaces allows:

@@ -160,7 +160,12 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     auto dbDDLLock = ddlLockManager->lock(opCtx, ns().db(), lockReason, lockTimeout);
 
     // Check under the dbLock if this is still the primary shard for the database
-    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns().dbName());
+    {
+        Lock::DBLock dbLock(opCtx, ns().dbName(), MODE_IS);
+        const auto scopedDss =
+            DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, ns().dbName());
+        scopedDss->assertIsPrimaryShardForDb(opCtx);
+    }
 
     auto resolvedNs = ns();
     auto dropIdxBSON = dropIdxCmd.toBSON({});

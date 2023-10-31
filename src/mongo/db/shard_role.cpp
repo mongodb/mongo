@@ -174,7 +174,8 @@ void checkPlacementVersion(OperationContext* opCtx,
                            const PlacementConcern& placementConcern) {
     const auto& receivedDbVersion = placementConcern.dbVersion;
     if (receivedDbVersion) {
-        DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.dbName(), *receivedDbVersion);
+        const auto scopedDss = DatabaseShardingState::acquireShared(opCtx, nss.dbName());
+        scopedDss->assertMatchingDbVersion(opCtx, *receivedDbVersion);
     }
 
     const auto& receivedShardVersion = placementConcern.shardVersion;
