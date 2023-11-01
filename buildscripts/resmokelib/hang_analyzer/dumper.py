@@ -680,8 +680,19 @@ class GDBDumper(Dumper):
 
         cmds = self._prefix() + cmds + self._postfix()
 
-        call([dbg, "--nx"] + list(itertools.chain.from_iterable([['-ex', b] for b in cmds])),
-             logger)
+        args = [dbg, "--nx"] + list(itertools.chain.from_iterable([['-ex', b] for b in cmds]))
+        exit_code = call(args, logger, check=False)
+
+        # We do not fail when GDB has internal issues that are not our fault.
+        if exit_code == -11:
+            logger.warn(
+                "GDB returned exit code -11. This is often because of fatal errors internal to gdb."
+            )
+            logger.warn("Skipping core dump.")
+            return 0, "skip"
+
+        if exit_code != 0:
+            raise Exception("Bad exit code %d from %s" % (exit_code, " ".join(args)))
 
         return 0, "pass"
 

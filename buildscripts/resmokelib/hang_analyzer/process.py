@@ -22,7 +22,7 @@ if _IS_WINDOWS:
 PROCS_TIMEOUT_SECS = 60
 
 
-def call(args, logger, timeout_seconds=None, pinfo=None):
+def call(args, logger, timeout_seconds=None, pinfo=None, check=True) -> int:
     """Call subprocess on args list."""
     logger.info(str(args))
 
@@ -39,13 +39,15 @@ def call(args, logger, timeout_seconds=None, pinfo=None):
         process.kill()
         process.wait()
         logger_pipe.wait_until_finished()
-        return
+        return -1
 
     logger_pipe.wait_until_finished()
 
-    if ret != 0:
+    if check and ret:
         logger.error("Bad exit code %d", ret)
         raise Exception("Bad exit code %d from %s" % (ret, " ".join(args)))
+
+    return ret
 
 
 def find_program(prog, paths):
