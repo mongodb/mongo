@@ -404,6 +404,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
                                            nss,
                                            CollectionValidation::ValidateMode::kForegroundFull,
                                            CollectionValidation::RepairMode::kNone,
+                                           /*additionalOptions=*/{},
                                            &validateResults,
                                            &bob,
                                            /*logDiagnostics=*/false));

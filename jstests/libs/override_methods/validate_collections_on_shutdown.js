@@ -125,7 +125,11 @@ MongoRunner.validateCollectionsCallback = function(port) {
     for (let i = 0; i < dbNames.length; ++i) {
         const dbName = dbNames[i];
         cmds.then("validating " + dbName, function(conn) {
-            const validateOptions = {full: true, enforceFastCount: true};
+            const validateOptions = {
+                full: true,
+                enforceFastCount: true,
+                warnOnSchemaValidation: true
+            };
             // TODO (SERVER-24266): Once fast counts are tolerant to unclean shutdowns, remove the
             // check for TestData.allowUncleanShutdowns.
             if (TestData.skipEnforceFastCountOnValidate || TestData.allowUncleanShutdowns) {

@@ -59,6 +59,7 @@ public:
                   const NamespaceString& nss,
                   ValidateMode mode,
                   RepairMode repairMode,
+                  const AdditionalOptions& additionalOptions,
                   bool logDiagnostics);
 
     const NamespaceString& nss() const {
@@ -167,6 +168,10 @@ public:
         return _logDiagnostics;
     }
 
+    bool warnOnSchemaValidation() const {
+        return _warnOnSchemaValidation;
+    }
+
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
@@ -209,6 +214,7 @@ private:
     ValidateMode _mode;
     RepairMode _repairMode;
     bool _collectionSchemaViolated = false;
+    bool _warnOnSchemaValidation = false;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;

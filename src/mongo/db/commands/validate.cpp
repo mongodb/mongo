@@ -330,9 +330,18 @@ public:
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         }
 
+        CollectionValidation::AdditionalOptions additionalOptions;
+        additionalOptions.warnOnSchemaValidation = cmdObj["warnOnSchemaValidation"].trueValue();
+
         ValidateResults validateResults;
-        Status status = CollectionValidation::validate(
-            opCtx, nss, mode, repairMode, &validateResults, &result, logDiagnostics);
+        Status status = CollectionValidation::validate(opCtx,
+                                                       nss,
+                                                       mode,
+                                                       repairMode,
+                                                       additionalOptions,
+                                                       &validateResults,
+                                                       &result,
+                                                       logDiagnostics);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         }

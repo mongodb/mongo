@@ -87,6 +87,13 @@ enum class RepairMode {
 };
 
 /**
+ * Additional validation options that can run in any mode.
+ */
+struct AdditionalOptions {
+    bool warnOnSchemaValidation = false;  // only warn on schema validation failure
+};
+
+/**
  * Expects the caller to hold no locks.
  *
  * Background validation does not support any type of full validation above.
@@ -101,6 +108,7 @@ Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
                 ValidateMode mode,
                 RepairMode repairMode,
+                const AdditionalOptions& additionalOptions,
                 ValidateResults* results,
                 BSONObjBuilder* output,
                 bool logDiagnostics);

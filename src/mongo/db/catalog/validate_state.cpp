@@ -54,6 +54,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
                              ValidateMode mode,
                              RepairMode repairMode,
+                             const AdditionalOptions& additionalOptions,
                              bool logDiagnostics)
     : _nss(nss),
       _mode(mode),
@@ -87,6 +88,9 @@ ValidateState::ValidateState(OperationContext* opCtx,
         uasserted(ErrorCodes::NamespaceNotFound,
                   str::stream() << "Collection '" << _nss << "' does not exist to validate.");
     }
+
+    // Return warnings instead of errors on schema validation failures.
+    _warnOnSchemaValidation = additionalOptions.warnOnSchemaValidation;
 
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFastCount.

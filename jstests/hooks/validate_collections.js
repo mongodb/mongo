@@ -124,6 +124,7 @@ function CollectionValidator() {
                     // accurate.
                     enforceFastCount:
                         !TestData.skipEnforceFastCountOnValidate && !TestData.allowUncleanShutdowns,
+                    warnOnSchemaValidation: true
                 });
                 if (validateRes.ok !== 1) {
                     return {ok: 0, host: host, validateRes: validateRes};
