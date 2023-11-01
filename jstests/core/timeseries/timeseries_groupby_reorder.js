@@ -18,12 +18,12 @@ coll.drop();
 // is better done in document_source_internal_unpack_bucket_test/group_reorder_test.cpp. For the
 // cases when the re-write isn't applicable, the used datasets should yield wrong result if the
 // re-write is applied.
-function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
+export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
     coll.drop();
     if (excludeMeta) {
         db.createCollection(coll.getName(), {timeseries: {timeField: "time"}});
     } else {
-        db.createCollection(coll.getName(), {timeseries: {metaField: "meta", timeField: "time"}});
+        db.createCollection(coll.getName(), {timeseries: {metaField: "myMeta", timeField: "time"}});
     }
     coll.insertMany(docs);
     assert.sameMembers(expectedResults, coll.aggregate(pipeline).toArray(), () => {
@@ -36,10 +36,10 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testNonMetaGroupKey() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, key: 2, val: 1},  // global min
-        {time: t, meta: 1, key: 1, val: 3},  // min for key = 1
-        {time: t, meta: 1, key: 1, val: 5},  // max for key = 1
-        {time: t, meta: 1, key: 2, val: 7},  // global max
+        {time: t, myMeta: 1, key: 2, val: 1},  // global min
+        {time: t, myMeta: 1, key: 1, val: 3},  // min for key = 1
+        {time: t, myMeta: 1, key: 1, val: 5},  // max for key = 1
+        {time: t, myMeta: 1, key: 2, val: 7},  // global max
     ];
     runGroupRewriteTest(docs,
                         [{$group: {_id: "$key", min: {$min: "$val"}}}, {$match: {_id: 1}}],
@@ -53,9 +53,9 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testConstGroupKey_NoFilter() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 0},
-        {time: t, meta: 1, val: 1},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 0},
+        {time: t, myMeta: 1, val: 1},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
         docs, [{$group: {_id: null, min: {$min: "$val"}}}], [{"_id": null, "min": 0}]);
@@ -67,9 +67,9 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testConstExprGroupKey_WithMinMaxAccumulator() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
         docs,
@@ -81,9 +81,9 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testNullGroupKey_WithMinMaxAccumulator_NoMetaField() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(docs,
                         [{$group: {_id: null, min: {$min: "$val"}, max: {$max: "$val"}}}],
@@ -95,16 +95,16 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testConstGroupKey_WithFilterOnMeta() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 0},
-        {time: t, meta: 2, val: 1},
-        {time: t, meta: 2, val: 3},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 0},
+        {time: t, myMeta: 2, val: 1},
+        {time: t, myMeta: 2, val: 3},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(docs,
-                        [{$match: {meta: 2}}, {$group: {_id: null, min: {$min: "$val"}}}],
+                        [{$match: {myMeta: 2}}, {$group: {_id: null, min: {$min: "$val"}}}],
                         [{"_id": null, "min": 1}]);
     runGroupRewriteTest(docs,
-                        [{$match: {meta: 2}}, {$group: {_id: null, max: {$max: "$val"}}}],
+                        [{$match: {myMeta: 2}}, {$group: {_id: null, max: {$max: "$val"}}}],
                         [{"_id": null, "max": 3}]);
 })();
 
@@ -112,9 +112,9 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testConstGroupKey_WithFilterOnMeasurement() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 0, include: false},
-        {time: t, meta: 1, val: 1, include: true},
-        {time: t, meta: 1, val: 5, include: false},
+        {time: t, myMeta: 1, val: 0, include: false},
+        {time: t, myMeta: 1, val: 1, include: true},
+        {time: t, myMeta: 1, val: 5, include: false},
     ];
     runGroupRewriteTest(docs,
                         [{$match: {include: true}}, {$group: {_id: null, min: {$min: "$val"}}}],
@@ -128,16 +128,16 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_NoFilter() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 5},
-        {time: t, meta: 2, val: 4},
-        {time: t, meta: 2, val: 3},
-        {time: t, meta: 1, val: 1},
+        {time: t, myMeta: 1, val: 5},
+        {time: t, myMeta: 2, val: 4},
+        {time: t, myMeta: 2, val: 3},
+        {time: t, myMeta: 1, val: 1},
     ];
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", min: {$min: "$val"}}}, {$match: {_id: 2}}],
+                        [{$group: {_id: "$myMeta", min: {$min: "$val"}}}, {$match: {_id: 2}}],
                         [{"_id": 2, "min": 3}]);
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", max: {$max: "$val"}}}, {$match: {_id: 2}}],
+                        [{$group: {_id: "$myMeta", max: {$max: "$val"}}}, {$match: {_id: 2}}],
                         [{"_id": 2, "max": 4}]);
 })();
 
@@ -145,16 +145,16 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithFilterOnMeta() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 5},
-        {time: t, meta: 2, val: 4},
-        {time: t, meta: 2, val: 3},
-        {time: t, meta: 1, val: 1},
+        {time: t, myMeta: 1, val: 5},
+        {time: t, myMeta: 2, val: 4},
+        {time: t, myMeta: 2, val: 3},
+        {time: t, myMeta: 1, val: 1},
     ];
     runGroupRewriteTest(docs,
-                        [{$match: {meta: 2}}, {$group: {_id: "$meta", min: {$min: "$val"}}}],
+                        [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", min: {$min: "$val"}}}],
                         [{"_id": 2, "min": 3}]);
     runGroupRewriteTest(docs,
-                        [{$match: {meta: 2}}, {$group: {_id: "$meta", max: {$max: "$val"}}}],
+                        [{$match: {myMeta: 2}}, {$group: {_id: "$myMeta", max: {$max: "$val"}}}],
                         [{"_id": 2, "max": 4}]);
 })();
 
@@ -162,16 +162,18 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithFilterOnMeasurement() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3, include: false},
-        {time: t, meta: 1, val: 4, include: true},
-        {time: t, meta: 1, val: 5, include: false},
+        {time: t, myMeta: 1, val: 3, include: false},
+        {time: t, myMeta: 1, val: 4, include: true},
+        {time: t, myMeta: 1, val: 5, include: false},
     ];
-    runGroupRewriteTest(docs,
-                        [{$match: {include: true}}, {$group: {_id: "$meta", min: {$min: "$val"}}}],
-                        [{"_id": 1, "min": 4}]);
-    runGroupRewriteTest(docs,
-                        [{$match: {include: true}}, {$group: {_id: "$meta", max: {$max: "$val"}}}],
-                        [{"_id": 1, "max": 4}]);
+    runGroupRewriteTest(
+        docs,
+        [{$match: {include: true}}, {$group: {_id: "$myMeta", min: {$min: "$val"}}}],
+        [{"_id": 1, "min": 4}]);
+    runGroupRewriteTest(
+        docs,
+        [{$match: {include: true}}, {$group: {_id: "$myMeta", max: {$max: "$val"}}}],
+        [{"_id": 1, "max": 4}]);
 })();
 
 // Test SERVER-73822 fix: complex $min and $max (i.e. not just straight field refs) work correctly.
@@ -179,15 +181,15 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
     const t = new Date();
     // min(a+b) != min(a) + min(b) and max(a+b) != max(a) + max(b)
     const docs = [
-        {time: t, meta: 1, a: 1, b: 20},  // max(a + b)
-        {time: t, meta: 1, a: 2, b: 10},
-        {time: t, meta: 1, a: 3, b: 1},  // min(a + b)
+        {time: t, myMeta: 1, a: 1, b: 20},  // max(a + b)
+        {time: t, myMeta: 1, a: 2, b: 10},
+        {time: t, myMeta: 1, a: 3, b: 1},  // min(a + b)
     ];
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", min: {$min: {$add: ["$a", "$b"]}}}}],
+                        [{$group: {_id: "$myMeta", min: {$min: {$add: ["$a", "$b"]}}}}],
                         [{"_id": 1, "min": 4}]);
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", max: {$max: {$add: ["$a", "$b"]}}}}],
+                        [{$group: {_id: "$myMeta", max: {$max: {$add: ["$a", "$b"]}}}}],
                         [{"_id": 1, "max": 21}]);
 })();
 
@@ -197,12 +199,12 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithNonMinMaxAccumulatorOnMeta() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", x: {$sum: "$meta"}}}, {$match: {_id: 1}}],
+                        [{$group: {_id: "$myMeta", x: {$sum: "$myMeta"}}}, {$match: {_id: 1}}],
                         [{"_id": 1, "x": 2}]);
 })();
 
@@ -211,20 +213,20 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithAccumulatorOnMeta_WithFilterOnMeasurement() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, include: false},
+        {time: t, myMeta: 1, include: false},
     ];
     runGroupRewriteTest(
-        docs, [{$match: {include: true}}, {$group: {_id: "$meta", x: {$min: "$meta"}}}], []);
+        docs, [{$match: {include: true}}, {$group: {_id: "$myMeta", x: {$min: "$myMeta"}}}], []);
 })();
 
 // Test min on the time field (cannot rewrite $min because the control.time.min is rounded
 // down).
 (function testMetaGroupKey_WithMinOnTime() {
     const docs = [
-        {time: ISODate("2023-07-20T23:16:47.683Z"), meta: 1},
+        {time: ISODate("2023-07-20T23:16:47.683Z"), myMeta: 1},
     ];
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", min: {$min: "$time"}}}],
+                        [{$group: {_id: "$myMeta", min: {$min: "$time"}}}],
                         [{_id: 1, min: ISODate("2023-07-20T23:16:47.683Z")}]);
 })();
 
@@ -232,10 +234,10 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 // down).
 (function testMetaGroupKey_WithMaxOnTime() {
     const docs = [
-        {time: ISODate("2023-07-20T23:16:47.683Z"), meta: 1},
+        {time: ISODate("2023-07-20T23:16:47.683Z"), myMeta: 1},
     ];
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", max: {$max: "$time"}}}],
+                        [{$group: {_id: "$myMeta", max: {$max: "$time"}}}],
                         [{_id: 1, max: ISODate("2023-07-20T23:16:47.683Z")}]);
 })();
 
@@ -244,13 +246,16 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testListMetaFields_WithMinMaxAccumulator() {
     const t = new Date();
     const docs = [
-        {time: t, meta: {a: 2, b: 10}, val: 3},
-        {time: t, meta: {a: 3, b: 10}, val: 4},
-        {time: t, meta: {a: 2, b: 10}, val: 5},
+        {time: t, myMeta: {a: 2, b: 10}, val: 3},
+        {time: t, myMeta: {a: 3, b: 10}, val: 4},
+        {time: t, myMeta: {a: 2, b: 10}, val: 5},
     ];
     runGroupRewriteTest(
         docs,
-        [{$group: {_id: {a: "$meta.a", b: "$meta.b"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [{
+            $group:
+                {_id: {a: "$myMeta.a", b: "$myMeta.b"}, min: {$min: "$val"}, max: {$max: "$val"}}
+        }],
         [{_id: {a: 3, b: 10}, min: 4, max: 4}, {_id: {a: 2, b: 10}, min: 3, max: 5}]);
 })();
 
@@ -259,14 +264,14 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testListMetaAndOtherFields_WithMinMaxAccumulator() {
     const t = new Date();
     const docs = [
-        {time: t, meta: {a: 2, b: 10}, val: 3, string: "apple"},
-        {time: t, meta: {a: 3, b: 10}, val: 4, string: "pear"},
-        {time: t, meta: {a: 3, b: 10}, val: 6, string: "apple"},
-        {time: t, meta: {a: 2, b: 10}, val: 5, string: "apple"}
+        {time: t, myMeta: {a: 2, b: 10}, val: 3, string: "apple"},
+        {time: t, myMeta: {a: 3, b: 10}, val: 4, string: "pear"},
+        {time: t, myMeta: {a: 3, b: 10}, val: 6, string: "apple"},
+        {time: t, myMeta: {a: 2, b: 10}, val: 5, string: "apple"}
     ];
     runGroupRewriteTest(
         docs,
-        [{$group: {_id: {a: "$meta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [{$group: {_id: {a: "$myMeta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
         [
             {_id: {a: 2, b: "apple"}, min: 3, max: 5},
             {_id: {a: 3, b: "apple"}, min: 6, max: 6},
@@ -279,14 +284,14 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testListOfOtherFields_NoMetaField() {
     const t = new Date();
     const docs = [
-        {time: t, meta: {a: 2, b: 10}, val: 3, string: "apple"},
-        {time: t, meta: {a: 3, b: 10}, val: 4, string: "pear"},
-        {time: t, meta: {a: 3, b: 10}, val: 6, string: "apple"},
-        {time: t, meta: {a: 2, b: 10}, val: 5, string: "apple"}
+        {time: t, myMeta: {a: 2, b: 10}, val: 3, string: "apple"},
+        {time: t, myMeta: {a: 3, b: 10}, val: 4, string: "pear"},
+        {time: t, myMeta: {a: 3, b: 10}, val: 6, string: "apple"},
+        {time: t, myMeta: {a: 2, b: 10}, val: 5, string: "apple"}
     ];
     runGroupRewriteTest(
         docs,
-        [{$group: {_id: {a: "$meta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
+        [{$group: {_id: {a: "$myMeta.a", b: "$string"}, min: {$min: "$val"}, max: {$max: "$val"}}}],
         [
             {_id: {a: 2, b: "apple"}, min: 3, max: 5},
             {_id: {a: 3, b: "apple"}, min: 6, max: 6},
@@ -303,14 +308,14 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithCountMinMaxAccumulator() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
         docs,
         [
-            {$group: {_id: "$meta", x: {$count: {}}, y: {$min: "$val"}, z: {$max: "$val"}}},
+            {$group: {_id: "$myMeta", x: {$count: {}}, y: {$min: "$val"}, z: {$max: "$val"}}},
             {$match: {_id: 1}}
         ],
         [{"_id": 1, "x": 2, "y": 3, "z": 5}]);
@@ -321,12 +326,12 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithSum1Accumulator() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(
-        docs, [{$group: {_id: "$meta", x: {$sum: 1}}}, {$match: {_id: 1}}], [{"_id": 1, "x": 2}]);
+        docs, [{$group: {_id: "$myMeta", x: {$sum: 1}}}, {$match: {_id: 1}}], [{"_id": 1, "x": 2}]);
 })();
 
 // Test with a constant group key with the $count accumulator when there is no metaField. The
@@ -334,9 +339,9 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testConstGroupKey_WithCountAccumulator_NoMetaField() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(docs,
                         [{$group: {_id: null, x: {$sum: 1}}}],
@@ -350,12 +355,12 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithSumFieldPath() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(docs,
-                        [{$group: {_id: "$meta", x: {$sum: "$val"}}}],
+                        [{$group: {_id: "$myMeta", x: {$sum: "$val"}}}],
                         [{"_id": 1, "x": 8}, {"_id": 3, "x": 4}]);
 })();
 
@@ -364,9 +369,9 @@ function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta) {
 (function testMetaGroupKey_WithCountStage() {
     const t = new Date();
     const docs = [
-        {time: t, meta: 1, val: 3},
-        {time: t, meta: 3, val: 4},
-        {time: t, meta: 1, val: 5},
+        {time: t, myMeta: 1, val: 3},
+        {time: t, myMeta: 3, val: 4},
+        {time: t, myMeta: 1, val: 5},
     ];
     runGroupRewriteTest(docs,
                         [{$group: {_id: null, min: {$min: "$val"}}}, {$count: "groupCount"}],

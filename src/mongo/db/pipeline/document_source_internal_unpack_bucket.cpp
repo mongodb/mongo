@@ -373,6 +373,62 @@ boost::intrusive_ptr<Expression> handleDateTruncRewrite(
                                                dateExprChildren[4 /* _kStartOfWeek */].get());
 }
 
+// Returns true if all the field paths contained in the expression only reference the metaField or
+// some subfield(s) of the metaField.
+bool fieldPathsAccessOnlyMetaField(boost::intrusive_ptr<Expression> expr,
+                                   const boost::optional<std::string>& metaField) {
+    auto deps = expression::getDependencies(expr.get());
+    if (deps.needWholeDocument) {
+        return false;
+    }
+
+    if (!deps.fields.empty() && !metaField) {
+        return false;
+    }
+
+    for (auto&& path : deps.fields) {
+        FieldPath idPath(path);
+        if (idPath.getPathLength() < 1 || idPath.getFieldName(0) != metaField.value()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Rewrites all the fields paths in the given expression that contain the metafield to use
+// kBucketMetaFieldName instead.
+boost::intrusive_ptr<Expression> rewriteMetaFieldPaths(
+    boost::intrusive_ptr<ExpressionContext> pExpCtx,
+    const boost::optional<std::string>& metaField,
+    boost::intrusive_ptr<Expression> expr) {
+    if (!metaField) {
+        return expr;
+    }
+
+    // We need to clone here to avoid corrupting the original expression if the optimization cannot
+    // be made. E.g., if a subsequent group by element contains a field path that references a time
+    // series field.
+    //
+    // Clone by serializing and reparsing. There does not seem to be a more idiomatic way to do this
+    // at the moment.
+    auto serialized = expr->serialize(SerializationOptions{});
+    auto obj = BSON("f" << serialized);
+    auto clonedExpr =
+        Expression::parseOperand(pExpCtx.get(), obj.firstElement(), pExpCtx->variablesParseState);
+
+    auto renameMap =
+        StringMap<std::string>{{metaField.value(), timeseries::kBucketMetaFieldName.toString()}};
+    SubstituteFieldPathWalker walker{renameMap};
+    auto mutatedExpr = expression_walker::walk<Expression>(clonedExpr.get(), &walker);
+    if (!mutatedExpr) {
+        // mutatedExpr may be null if the root of the expression tree was not updated, but
+        // clonedExpr will still have been updated in-place.
+        return clonedExpr;
+    }
+
+    return mutatedExpr.release();
+}
+
 boost::intrusive_ptr<Expression> rewriteGroupByElement(
     boost::intrusive_ptr<ExpressionContext> pExpCtx,
     boost::intrusive_ptr<Expression> expr,
@@ -383,7 +439,7 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     bool usesExtendedRange) {
     // We allow the $group stage to be rewritten if the _id field only consists of these 3 options:
     // 1. If the _id field is constant.
-    // 2. If the _id field is a fieldPath on the meta field.
+    // 2. If the _id field is an expression whose fieldPaths are at or under the metaField.
     // 3. For fixed buckets collection, if the _id field is a $dateTrunc expressions on the
     // timeField.
     if (ExpressionConstant::isConstant(expr)) {
@@ -391,27 +447,12 @@ boost::intrusive_ptr<Expression> rewriteGroupByElement(
     }
 
     // Option 2: The only field path supported is at or under the metaField.
-    const auto* exprIdPath = dynamic_cast<const ExpressionFieldPath*>(expr.get());
-    if (exprIdPath) {
-        // {The path must be at or under the metaField for this re-write to be correct (and
-        // the zero component is always CURRENT).}
-        const auto& idPath = exprIdPath->getFieldPath();
-        if (!metaField || idPath.getPathLength() < 2 ||
-            idPath.getFieldName(1) != metaField.value()) {
-            return {};
-        }
-
-        std::ostringstream os;
-        os << timeseries::kBucketMetaFieldName;
-        for (size_t index = 2; index < idPath.getPathLength(); index++) {
-            os << "." << idPath.getFieldName(index);
-        }
-        return ExpressionFieldPath::createPathFromString(
-            pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
+    if (fieldPathsAccessOnlyMetaField(expr, metaField)) {
+        return rewriteMetaFieldPaths(pExpCtx, metaField, expr);
     }
 
-    // Option 3: The only expression currently allowed is $dateTrunc on the timeField if the buckets
-    // are fixed and do not use an extended range.
+    // Option 3: Currently the only allowed field path not on the metaField is $dateTrunc on the
+    // timeField if the buckets are fixed and do not use an extended range.
     if (fixedBuckets && !usesExtendedRange) {
         return handleDateTruncRewrite(pExpCtx, expr, timeField, bucketMaxSpanSeconds);
     }
