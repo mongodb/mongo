@@ -2488,7 +2488,9 @@ buildvariants:
 
   - name: linux-standalone-sbe.2022-11
     display_name: Linux Standalone (SBE) 2022-11
-    cron: *cron_query_perf_schedule
+    # TODO SERVER-82669: Reduce frequency back to baseline.
+    # cron: *cron_query_perf_schedule
+    cron: *linux-standalone-cron
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -4303,7 +4305,9 @@ buildvariants:
   - <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-sbe-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory (SBE).2023-01
-    cron: *cron_query_perf_schedule
+    # TODO SERVER-82669: Reduce frequency back to baseline.
+    # cron: *cron_query_perf_schedule
+    cron: *linux-microbench-cron
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
