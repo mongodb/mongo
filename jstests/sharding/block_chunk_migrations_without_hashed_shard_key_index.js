@@ -55,10 +55,18 @@ assert.commandFailedWithCode(
     st.s.adminCommand(
         {moveChunk: nss, bounds: [chunks[0].min, chunks[0].max], to: st.shard1.shardName}),
     ErrorCodes.IndexNotFound);
-assert.commandFailedWithCode(
-    st.s.adminCommand(
-        {moveRange: nss, toShard: st.shard1.shardName, min: chunks[0].min, max: chunks[0].max}),
-    ErrorCodes.IndexNotFound);
+
+// moveRange is not present in 5.0 so skip this assertion if FCV is lesser than 6.0 in multi-version
+// test suite.
+if (st.rs0.getPrimary().getDB('admin').system.version.findOne(
+        {_id: 'featureCompatibilityVersion'}) == getFCVConstants().latest &&
+    st.rs1.getPrimary().getDB('admin').system.version.findOne(
+        {_id: 'featureCompatibilityVersion'}) == getFCVConstants().latest) {
+    assert.commandFailedWithCode(
+        st.s.adminCommand(
+            {moveRange: nss, toShard: st.shard1.shardName, min: chunks[0].min, max: chunks[0].max}),
+        ErrorCodes.IndexNotFound);
+}
 
 // Recreate the index and verify that we can re-enable balancing.
 assert.commandWorked(coll.createIndex({"_id": "hashed"}));
