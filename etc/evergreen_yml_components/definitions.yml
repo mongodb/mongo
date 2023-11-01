@@ -2692,6 +2692,19 @@ functions:
       content_type: application/gzip
       display_name: Docker Compose
 
+  "attach task errors":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/task_errors.txt
+      remote_file: ${project}/${build_variant}/${revision}/task-errors-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Task Errors
+
   "attach local resmoke invocation":
     command: s3.put
     params:
@@ -2739,6 +2752,7 @@ post:
 - func: "attach local resmoke invocation"
 - func: "attach multiversion exclude tags"
 - func: "attach report"
+- func: "attach task errors"
 - func: "attach artifacts"
 - func: "save ec2 task artifacts"
 - func: "attach wiki page"
@@ -3797,6 +3811,26 @@ tasks:
       binary: bash
       args:
       - "src/evergreen/crypt_run_tests.sh"
+
+- name: daily_task_scanner
+  tags: []
+  commands:
+  - *f_expansions_write
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - *f_expansions_write
+  - *kill_processes
+  - *cleanup_environment
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/daily_task_scan.py"
+        - "-f=task_errors.txt"
 
 ## lint ##
 - name: lint_pylinters
