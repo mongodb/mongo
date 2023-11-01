@@ -2186,7 +2186,7 @@ buildvariants:
   - name: compile_test_serial_TG
   - name: compile_integration_and_test_parallel_stream_TG
   - name: check_feature_flag_tags
-  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggfuzzer !.feature_flag_guarded !.timeseries
   - name: .aggregation !.feature_flag_guarded
   - name: audit
   # - name: .auth  # Not passing

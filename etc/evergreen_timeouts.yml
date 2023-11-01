@@ -11,14 +11,6 @@
 
 overrides:
 
-  enterprise-rhel80-debug-complete-tsan:
-  - task: aggregation_timeseries_fuzzer
-    exec_timeout: 150  # 2.5 hours
-
-  enterprise-rhel80-debug-tsan:
-  - task: aggregation_timeseries_fuzzer
-    exec_timeout: 150  # 2.5 hours
-
   rhel80-asan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
