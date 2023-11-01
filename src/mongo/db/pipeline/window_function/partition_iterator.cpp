@@ -483,7 +483,7 @@ void PartitionIterator::getNextDocument() {
 
     // Greedily populate the internal document cache to enable easier memory tracking versus
     // detecting the changing document size during execution of each function.
-    doc.fillCache();
+    doc = doc.shred();
 
     if (_partitionExpr) {
         if (!_partitionComparator) {

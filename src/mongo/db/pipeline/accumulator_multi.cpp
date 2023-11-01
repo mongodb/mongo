@@ -671,8 +671,7 @@ void AccumulatorTopBottomN<sense, single>::_processValue(const Value& val) {
         }
     }
 
-    keyOutPair.first.fillCache();
-    const auto memUsage = keyOutPair.first.getApproximateSize() +
+    const auto memUsage = keyOutPair.first.shred().getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
     updateAndCheckMemUsage(memUsage);
     _map->emplace(keyOutPair);
@@ -692,7 +691,7 @@ void AccumulatorTopBottomN<sense, single>::remove(const Value& val) {
     auto it = _map->lower_bound(keyOutPair.first);
     _map->erase(it);
 
-    _memUsageBytes -= keyOutPair.first.getApproximateSize() +
+    _memUsageBytes -= keyOutPair.first.shred().getApproximateSize() +
         keyOutPair.second.getApproximateSize() + sizeof(KeyOutPair);
 }
 

@@ -501,20 +501,18 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForDocumentIteratorCache) {
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
     size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
-    // Pull in the first document, and verify the reported size of the iterator is roughly double
-    // the size of the document. The size of the iterator is double the size of the document because
-    // we greedily fill the cache, so each internal document in memory stores two copies of
-    // largeStr.
+    // Pull in the first document, and verify the reported size of the iterator is roughly the size
+    // of the document.
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 500);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize + 500);
 
     // Pull in the second document. Both docs remain in the cache so the reported memory should
     // include both.
     advance();
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2 * 2);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 * 2 + 500);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 500);
 }
 
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForArraysInDocumentIteratorCache) {
@@ -527,19 +525,19 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForArraysInDocumentIteratorCach
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
     size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
-    // Pull in the first document, and verify the reported size of the iterator is roughly
-    // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
-    // for the 'arr' element and once for the nested 'subObj' element.
+    // Pull in the first document, and verify the reported size of the iterator is roughly the size
+    // of the document. The reason we can't use EQ is that for memory tracking we call shred() so
+    // that the document cache will not increase when fields are accessed
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 3 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize + 1024);
 
     // Pull in the second document. Both docs remain in the cache so the reported memory should
     // include both.
     advance();
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 3) * 2);
-    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 3) * 2 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
 }
 
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedArraysInDocumentIteratorCache) {
@@ -552,19 +550,19 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedArraysInDocumentIterat
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
     size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
-    // Pull in the first document, and verify the reported size of the iterator is roughly
-    // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
-    // for the 'arr' element and once for the nested 'subObj' element.
+    // Pull in the first document, and verify the reported size of the iterator is roughly the size
+    // of the document. The reason we can't use EQ is that for memory tracking we call shred() so
+    // that the document cache will not increase when fields are accessed
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 3 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize + 1024);
 
     // Pull in the second document. Both docs remain in the cache so the reported memory should
     // include both.
     advance();
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 3) * 2);
-    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 3) * 2 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
 }
 
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedObjInDocumentIteratorCache) {
@@ -577,11 +575,10 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedObjInDocumentIteratorC
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
     size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
-    // Pull in the first document, and verify the reported size. TODO SERVER-57011: The approximate
-    // size should not double count the nested strings.
+    // Pull in the first document, and verify the reported size.
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 4);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2);
 }
 
 TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
@@ -594,18 +591,25 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
     auto accessor = makeDefaultAccessor(mock, boost::none);
     size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
-    // Pull in the first document, and verify the reported size of the iterator is roughly double
-    // the size of the document.
+    // Pull in the first document, and verify the reported size of the iterator is roughly the size
+    // of the document.
     ASSERT_DOCUMENT_EQ(*accessor[0], docs[0].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize + 1024);
+
+    // Read the field so that it is coppied into the cache. This will make the document bigger but
+    // shouldn't affect memory tracking.
+    auto iterSizeBeforeAccess = _iter->getApproximateSize();
+    docs[0].getDocument()["a"];
+    ASSERT_GT(docs[0].getDocument().getCurrentApproximateSize(), initialDocSize);
+    ASSERT_EQ(_iter->getApproximateSize(), iterSizeBeforeAccess);
 
     // The accessor will have marked the first document as expired, and thus freed on the next call
     // to advance().
     advance();
     ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
-    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
-    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize + 1024);
 }
 
 TEST_F(PartitionIteratorTest, ManualPolicy) {
