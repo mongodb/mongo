@@ -2079,7 +2079,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -2135,7 +2135,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_gen
   - name: .ssl
   - name: .stitch
   - name: test_packages
@@ -2332,7 +2332,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_gen
   - name: .ssl
   - name: .stitch
   - name: .crypt
@@ -2432,7 +2432,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: .sharding .txns
   - name: sharding_gen
-  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_gen
   - name: .ssl
   - name: .stitch
   - name: .crypt

@@ -6378,12 +6378,11 @@ tasks:
       suite: sharded_collections_jscore_passthrough
       run_no_feature_flag_tests: "true"
 
-- <<: *task_template
-  name: sharding_jscore_passthrough
+- <<: *gen_task_template
+  name: sharding_jscore_passthrough_gen
   tags: ["sharding", "jscore", "common"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: sharding_jscore_passthrough_with_auto_bootstrap_gen
