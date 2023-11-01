@@ -82,7 +82,7 @@ exit_status = 0   # final exit status, assume success by default
 this_build_status = 0   # "exit status" of an individual build
 num_jobs = None
 delayed_warnings = []
-
+jobs = None
 
 def fetch_win32_parallel_msg():
     # A subsidiary function that exists solely to isolate this import
@@ -1275,7 +1275,7 @@ def _build_targets(fs, options, targets, target_top):
     is_37_or_later = sys.version_info >= (3, 7)
     python_has_threads = sysconfig.get_config_var('WITH_THREAD') or is_pypy or is_37_or_later
     # to check if python configured with threads.
-    global num_jobs
+    global num_jobs, jobs
     num_jobs = options.num_jobs
     jobs = SCons.Job.Jobs(num_jobs, taskmaster)
     if num_jobs > 1:

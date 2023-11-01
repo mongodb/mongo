@@ -2808,6 +2808,7 @@ tasks:
       # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
         BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast
@@ -2856,10 +2857,11 @@ tasks:
   - func: "scons compile"
     vars:
       targets: >-
-        build/fast/mongo/db/commands/libfsync_locked.a
+        build/fast/third_party/unwind/libunwind.a
       # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
         BAZEL_FLAGS=--config=local
         ICECC=
         --build-profile=fast

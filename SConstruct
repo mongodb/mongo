@@ -15,6 +15,8 @@ import stat
 import subprocess
 import sys
 import textwrap
+import threading
+import time
 import uuid
 from datetime import datetime
 from glob import glob
@@ -1067,6 +1069,13 @@ env_vars.Add(
     'BAZEL_FLAGS',
     help='Flags specific to bazel to pass through to the underlying bazel build command.',
     default="",
+)
+
+env_vars.Add(
+    'BAZEL_INTEGRATION_DEBUG',
+    help='Enable SCons/Bazel integration debug output',
+    converter=functools.partial(bool_var_converter, var='BAZEL_INTEGRATION_DEBUG'),
+    default="0",
 )
 
 env_vars.Add(
@@ -2165,6 +2174,7 @@ elif use_libunwind == "auto":
     use_libunwind = can_use_libunwind
 
 use_vendored_libunwind = use_libunwind and not use_system_libunwind
+env['USE_VENDORED_LIBUNWIND'] = use_vendored_libunwind
 if use_system_libunwind and not use_libunwind:
     print("Error: --use-system-libunwind requires --use-libunwind")
     Exit(1)
@@ -2366,8 +2376,6 @@ if link_model.startswith("dynamic"):
                     return []
 
                 env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
-
-env.Tool('integrate_bazel')
 
 if optBuild != "off":
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
@@ -6472,6 +6480,11 @@ if has_option("cache"):
         addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
         addNoCacheEmitter(env['BUILDERS']['SharedArchive'])
         addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
+
+# load the tool late to make sure we can copy over any new
+# emitters/scanners we may have created in the SConstruct when
+# we go to make stand in bazel builders for the various scons builders
+env.Tool('integrate_bazel')
 
 env.SConscript(
     dirs=[
