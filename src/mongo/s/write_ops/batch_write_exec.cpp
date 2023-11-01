@@ -540,12 +540,30 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
                                       TargetedBatchMap& childBatches,
                                       BatchWriteExecStats* stats,
                                       const BatchedCommandRequest& clientRequest,
-                                      bool& abortBatch,
-                                      size_t& nextOpIndex) {
+                                      bool& abortBatch) {
+    auto getIndex = [](const TargetedWriteBatch& batch) {
+        const auto& writes = batch.getWrites();
+        invariant(writes.size() == 1, std::to_string(writes.size()));
+        return writes.front()->writeOpRef.first;
+    };
+
+    invariant(!childBatches.empty());
+    auto index = getIndex(*childBatches.begin()->second);
+
+    if constexpr (kDebugBuild) {
+        if (childBatches.size() > 1) {
+            // All child batches should be from the same update statement, which means they should
+            // have the same index.
+            for (auto&& [shardId, batch] : childBatches) {
+                invariant(getIndex(*batch) == index);
+            }
+        }
+    }
+
     auto wholeOp = clientRequest.getUpdateRequest();
-    auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, nextOpIndex);
+    auto singleUpdateOp = timeseries::buildSingleUpdateOp(wholeOp, index);
     BatchedCommandRequest singleUpdateRequest(singleUpdateOp);
-    const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, nextOpIndex++);
+    const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, index);
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
@@ -678,7 +696,6 @@ void executeNonOrdinaryWriteChildBatches(OperationContext* opCtx,
                                          BatchWriteExecStats* stats,
                                          const BatchedCommandRequest& clientRequest,
                                          bool& abortBatch,
-                                         size_t& nextOpIndex,
                                          WriteType writeType) {
     switch (writeType) {
         case WriteType::WithoutShardKeyOrId: {
@@ -723,14 +740,8 @@ void executeNonOrdinaryWriteChildBatches(OperationContext* opCtx,
             // If the WriteType is 'TimeseriesRetryableUpdate', then we have detected
             // a retryable time-series update request. We will run it in the internal
             // transaction api and collect the response.
-            executeRetryableTimeseriesUpdate(opCtx,
-                                             targeter,
-                                             batchOp,
-                                             childBatches,
-                                             stats,
-                                             clientRequest,
-                                             abortBatch,
-                                             nextOpIndex);
+            executeRetryableTimeseriesUpdate(
+                opCtx, targeter, batchOp, childBatches, stats, clientRequest, abortBatch);
             break;
         default:
             MONGO_UNREACHABLE
@@ -759,7 +770,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     int numCompletedOps = 0;
     int numRoundsWithoutProgress = 0;
     bool abortBatch = false;
-    size_t nextOpIndex = 0;
 
     while (!batchOp.isFinished() && !abortBatch) {
         //
@@ -833,7 +843,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                                     stats,
                                                     clientRequest,
                                                     abortBatch,
-                                                    nextOpIndex,
                                                     statusWithWriteType.getValue());
             }
         }
