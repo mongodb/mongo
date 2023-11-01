@@ -15,3 +15,8 @@ leak:mongo::getThreadName
 leak:__cxa_thread_atexit_impl
 
 leak:glob64
+
+# Cleanup on io_context may not run due to race with shutdown.
+leak:mongo::transport::AsioReactor::run()
+leak:mongo::transport::AsioReactor::drain()
+leak:UnitTest_SuiteNameTaskExecutorCursorFixtureTestNamePinnedExecutorDestroyedOnUnderlying
