@@ -32,7 +32,6 @@
 #include <cstdint>
 #include <memory>
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/defs.h"
@@ -45,12 +44,30 @@ namespace mongo::optimizer::ce {
 
 class SamplingTransport;
 
+/**
+ * Abstract sampling executor. It receives a physical plan defined in the 'planAndProps' argument of
+ * its method estimateSelectivity(), and using the provided operation context and metadata, answers
+ * the question what selectivity of the predicate which this plan encodes is.
+ */
+class SamplingExecutor {
+public:
+    virtual ~SamplingExecutor() = default;
+    virtual boost::optional<optimizer::SelectivityType> estimateSelectivity(
+        const Metadata& metadata, int64_t sampleSize, const PlanAndProps& planAndProps) = 0;
+};
+
+/**
+ * Cardinality estimator based on sampling. We recieve from the optimizer a node, a memo, and
+ * logical properties, and we estimate the cardinality of the node's new group. Internally
+ * potentially many sampling queries are issued for estimation, and those are handled by the
+ * provided executor.
+ */
 class SamplingEstimator : public cascades::CardinalityEstimator {
 public:
-    SamplingEstimator(OperationContext* opCtx,
-                      OptPhaseManager phaseManager,
+    SamplingEstimator(OptPhaseManager phaseManager,
                       int64_t numRecords,
-                      std::unique_ptr<cascades::CardinalityEstimator> fallbackCE);
+                      std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
+                      std::unique_ptr<SamplingExecutor> executor);
     ~SamplingEstimator();
 
     CEType deriveCE(const Metadata& metadata,

@@ -83,9 +83,19 @@ env.Library(
         'sampling_estimator.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
         'ce_utils',
+    ],
+)
+
+env.Library(
+    target="query_ce_sampling_executor",
+    source=[
+        'sampling_executor.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
+        'query_ce_sampling',
     ],
 )
 
@@ -102,6 +112,7 @@ env.Library(
         'query_ce_heuristic',
         'query_ce_histogram',
         'query_ce_sampling',
+        'query_ce_sampling_executor',
     ],
 )
 

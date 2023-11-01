@@ -296,6 +296,7 @@ env.CppUnitTest(
         'abt/sbe_abt_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/ce/query_ce_sampling',
         'sbe_abt_test_util',
     ],
 )

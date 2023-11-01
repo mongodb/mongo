@@ -41,13 +41,6 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
-#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/sel_tree_utils.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
@@ -65,7 +58,6 @@
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -233,14 +225,14 @@ class SamplingTransport {
     static constexpr size_t kMaxSampleSize = 1000;
 
 public:
-    SamplingTransport(OperationContext* opCtx,
-                      OptPhaseManager phaseManager,
+    SamplingTransport(OptPhaseManager phaseManager,
                       const int64_t numRecords,
-                      std::unique_ptr<cascades::CardinalityEstimator> fallbackCE)
+                      std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
+                      std::unique_ptr<SamplingExecutor> executor)
         : _phaseManager(std::move(phaseManager)),
-          _opCtx(opCtx),
           _sampleSize(std::min<int64_t>(numRecords, kMaxSampleSize)),
-          _fallbackCE(std::move(fallbackCE)) {}
+          _fallbackCE(std::move(fallbackCE)),
+          _executor(std::move(executor)) {}
 
     CEType transport(const ABT::reference_type n,
                      const FilterNode& node,
@@ -386,52 +378,8 @@ private:
                                 "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
         }
 
-        auto env = VariableEnvironment::build(planAndProps._node);
-        SlotVarMap slotMap;
-        auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO Use factory
-        boost::optional<sbe::value::SlotId> ridSlot;
-        sbe::value::SlotIdGenerator ids;
-        sbe::InputParamToSlotMap inputParamToSlotMap;
-
-        SBENodeLowering g{env,
-                          *runtimeEnvironment,
-                          ids,
-                          inputParamToSlotMap,
-                          _phaseManager.getMetadata(),
-                          planAndProps._map,
-                          internalCascadesOptimizerSamplingCEScanStartOfColl.load()
-                              ? ScanOrder::Forward
-                              : ScanOrder::Random};
-        auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
-        tassert(6624261, "Unexpected rid slot", !ridSlot);
-
-        // TODO: return errors instead of exceptions?
-        uassert(6624244, "Lowering failed", sbePlan != nullptr);
-        uassert(6624245, "Invalid slot map size", slotMap.size() == 1);
-
-        sbePlan->attachToOperationContext(_opCtx);
-        sbe::CompileCtx ctx(std::move(runtimeEnvironment));
-        sbePlan->prepare(ctx);
-
-        std::vector<sbe::value::SlotAccessor*> accessors;
-        for (auto& [name, slot] : slotMap) {
-            accessors.emplace_back(sbePlan->getAccessor(ctx, slot));
-        }
-
-        sbePlan->open(false);
-        ON_BLOCK_EXIT([&] { sbePlan->close(); });
-
-        while (sbePlan->getNext() != sbe::PlanState::IS_EOF) {
-            const auto [tag, value] = accessors.at(0)->getViewOfValue();
-            if (tag == sbe::value::TypeTags::NumberInt64) {
-                // TODO: check if we get exactly one result from the groupby?
-                return {{static_cast<double>(value) / _sampleSize}};
-            }
-            return boost::none;
-        };
-
-        // If nothing passes the filter, estimate 0.0 selectivity. HashGroup will return 0 results.
-        return {{0.0}};
+        return _executor->estimateSelectivity(
+            _phaseManager.getMetadata(), _sampleSize, planAndProps);
     }
 
     struct NodeRefHash {
@@ -451,19 +399,17 @@ private:
 
     OptPhaseManager _phaseManager;
 
-    // We don't own this.
-    OperationContext* _opCtx;
-
     const int64_t _sampleSize;
     std::unique_ptr<cascades::CardinalityEstimator> _fallbackCE;
+    std::unique_ptr<SamplingExecutor> _executor;
 };
 
-SamplingEstimator::SamplingEstimator(OperationContext* opCtx,
-                                     OptPhaseManager phaseManager,
+SamplingEstimator::SamplingEstimator(OptPhaseManager phaseManager,
                                      const int64_t numRecords,
-                                     std::unique_ptr<cascades::CardinalityEstimator> fallbackCE)
+                                     std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
+                                     std::unique_ptr<SamplingExecutor> executor)
     : _transport(std::make_unique<SamplingTransport>(
-          opCtx, std::move(phaseManager), numRecords, std::move(fallbackCE))) {}
+          std::move(phaseManager), numRecords, std::move(fallbackCE), std::move(executor))) {}
 
 SamplingEstimator::~SamplingEstimator() {}
 

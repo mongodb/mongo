@@ -53,6 +53,8 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
+#include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
@@ -712,6 +714,106 @@ TEST_F(NodeSBE, RequireRID) {
     sbePlan->close();
 
     ASSERT_EQ(1, resultSize);
+}
+
+class ABTRecorder : public ce::SamplingExecutor {
+public:
+    ABTRecorder(ABTVector& nodes) : _nodes(nodes) {}
+    ~ABTRecorder() = default;
+
+    boost::optional<optimizer::SelectivityType> estimateSelectivity(
+        const Metadata& /*metadata*/,
+        const int64_t /*sampleSize*/,
+        const PlanAndProps& planAndProps) final {
+        _nodes.push_back(planAndProps._node);
+        return SelectivityType{0.0};
+    }
+
+private:
+    // We don't own this.
+    ABTVector& _nodes;
+};
+
+TEST_F(NodeSBE, SamplingTest) {
+    auto prefixId = PrefixId::createForTests();
+    const std::string scanDefName = "test";
+    Metadata metadata{{{scanDefName, {}}}};
+
+    auto opCtx = makeOperationContext();
+    auto pipeline = parsePipeline(
+        "[{$match: {a: 2}}]", NamespaceString::createNamespaceString_forTest("test"), opCtx.get());
+
+    const ProjectionName scanProjName = prefixId.getNextId("scan");
+
+    ABT tree = translatePipelineToABT(metadata,
+                                      *pipeline.get(),
+                                      scanProjName,
+                                      make<ScanNode>(scanProjName, scanDefName),
+                                      prefixId);
+
+    // We are not lowering the paths.
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._numSamplingChunks = 5}};
+
+    // Used to record the sampling plans.
+    ABTVector nodes;
+
+    // Not optimizing fully.
+    OptPhaseManager phaseManager{
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        metadata,
+        std::make_unique<ce::SamplingEstimator>(std::move(phaseManagerForSampling),
+                                                1000 /*collectionSize*/,
+                                                makeHeuristicCE(),
+                                                std::make_unique<ABTRecorder>(nodes)),
+        makeHeuristicCE(),
+        makeCostEstimator(getTestCostModel()),
+        defaultConvertPathToInterval,
+        ConstEval::constFold,
+        DebugInfo::kDefaultForTests,
+        {} /*queryHints*/};
+
+    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
+
+    ASSERT_EQ(1, nodes.size());
+
+    // We have a single plan to sample the predicate
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{sum}]\n"
+        "GroupBy []\n"
+        "|   aggregations: \n"
+        "|       [sum]\n"
+        "|           FunctionCall [$sum]\n"
+        "|           Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [2]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
+        "LimitSkip [limit: 5, skip: 0]\n"
+        "PhysicalScan [{'<rid>': rid_0}, test]\n",
+        nodes.front());
 }
 
 /**
