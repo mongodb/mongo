@@ -133,19 +133,9 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
 
             HealthLogInterface::get(opCtx)->log(entry);
 
-            auto options = [&] {
-                if (opCtx->recoveryUnit()->getDataCorruptionDetectionMode() ==
-                    DataCorruptionDetectionMode::kThrow) {
-                    return logv2::LogOptions{
-                        logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
-                } else {
-                    return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
-                }
-            }();
-
             LOGV2_ERROR_OPTIONS(
                 4615603,
-                options,
+                {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
                 "Erroneous index key found with reference to non-existent record id. Consider "
                 "dropping and then re-creating the index and then running the validate command "
                 "on the collection.",
