@@ -95,6 +95,7 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
                                                  nss,
                                                  mode,
                                                  repairMode,
+                                                 /*additionalOptions=*/{},
                                                  &validateResults,
                                                  &output,
                                                  /*logDiagnostics=*/false));
@@ -167,6 +168,7 @@ std::vector<std::pair<BSONObj, ValidateResults>> backgroundValidate(const Namesp
                                              nss,
                                              CollectionValidation::ValidateMode::kBackground,
                                              CollectionValidation::RepairMode::kNone,
+                                             /*additionalOptions=*/{},
                                              &validateResults,
                                              &output,
                                              /*logDiagnostics=*/false));

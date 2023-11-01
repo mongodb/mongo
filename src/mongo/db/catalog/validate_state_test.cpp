@@ -169,6 +169,7 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
                                             kNss,
                                             CollectionValidation::ValidateMode::kForeground,
                                             CollectionValidation::RepairMode::kNone,
+                                            /*additionalOptions=*/{},
                                             /*logDiagnostics=*/false),
         AssertionException,
         ErrorCodes::NamespaceNotFound);
@@ -178,6 +179,7 @@ TEST_F(ValidateStateTest, NonExistentCollectionShouldThrowNamespaceNotFoundError
                                             kNss,
                                             CollectionValidation::ValidateMode::kBackground,
                                             CollectionValidation::RepairMode::kNone,
+                                            /*additionalOptions=*/{},
                                             /*logDiagnostics=*/false),
         AssertionException,
         ErrorCodes::NamespaceNotFound);
@@ -201,6 +203,7 @@ TEST_F(ValidateStateDiskTest, UncheckpointedCollectionShouldThrowCursorNotFoundE
         kNss,
         CollectionValidation::ValidateMode::kBackground,
         CollectionValidation::RepairMode::kNone,
+        /*additionalOptions=*/{},
         /*logDiagnostics=*/false);
     ASSERT_THROWS_CODE(
         validateState.initializeCursors(opCtx), AssertionException, ErrorCodes::CursorNotFound);
@@ -227,6 +230,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
             kNss,
             CollectionValidation::ValidateMode::kForeground,
             CollectionValidation::RepairMode::kNone,
+            /*additionalOptions=*/{},
             /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
 
@@ -246,6 +250,7 @@ TEST_F(ValidateStateTest, OpenCursorsOnAllIndexes) {
         kNss,
         CollectionValidation::ValidateMode::kForeground,
         CollectionValidation::RepairMode::kNone,
+        /*additionalOptions=*/{},
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexIdents().size(), 5);
@@ -274,6 +279,7 @@ TEST_F(ValidateStateDiskTest, OpenCursorsOnCheckpointedIndexes) {
         kNss,
         CollectionValidation::ValidateMode::kBackground,
         CollectionValidation::RepairMode::kNone,
+        /*additionalOptions=*/{},
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
 
@@ -312,6 +318,7 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
             kNss,
             CollectionValidation::ValidateMode::kBackground,
             CollectionValidation::RepairMode::kNone,
+            /*additionalOptions=*/{},
             /*logDiagnostics=*/false);
         validateState.initializeCursors(opCtx);
         ASSERT_EQ(validateState.getIndexIdents().size(), 3);
@@ -326,6 +333,7 @@ TEST_F(ValidateStateDiskTest, CursorsAreNotOpenedAgainstCheckpointedIndexesThatW
         kNss,
         CollectionValidation::ValidateMode::kBackground,
         CollectionValidation::RepairMode::kNone,
+        /*additionalOptions=*/{},
         /*logDiagnostics=*/false);
     validateState.initializeCursors(opCtx);
     ASSERT_EQ(validateState.getIndexIdents().size(), 3);

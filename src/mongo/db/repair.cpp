@@ -239,6 +239,7 @@ Status repairCollection(OperationContext* opCtx,
                                        nss,
                                        CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
                                        CollectionValidation::RepairMode::kFixErrors,
+                                       /*additionalOptions=*/{},
                                        &validateResults,
                                        &output,
                                        /*logDiagnostics=*/false);

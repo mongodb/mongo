@@ -150,8 +150,14 @@ protected:
         BSONObjBuilder output;
 
         forceCheckpoint(_background);
-        ASSERT_OK(CollectionValidation::validate(
-            &_opCtx, _nss, mode, repairMode, &results, &output, kLogDiagnostics));
+        ASSERT_OK(CollectionValidation::validate(&_opCtx,
+                                                 _nss,
+                                                 mode,
+                                                 repairMode,
+                                                 /*additionalOptions=*/{},
+                                                 &results,
+                                                 &output,
+                                                 kLogDiagnostics));
 
         //  Check if errors are reported if and only if valid is set to false.
         ASSERT_EQ(results.valid, results.errors.empty());
@@ -1267,6 +1273,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1387,6 +1394,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1478,6 +1486,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1593,6 +1602,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1622,6 +1632,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1658,6 +1669,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1777,6 +1789,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1808,6 +1821,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1840,6 +1854,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1930,6 +1945,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1961,6 +1977,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -1992,6 +2009,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2145,6 +2163,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2175,6 +2194,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2228,6 +2248,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2401,6 +2422,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2434,6 +2456,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2488,6 +2511,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2755,6 +2779,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2785,6 +2810,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2839,6 +2865,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2968,6 +2995,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -2999,6 +3027,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3031,6 +3060,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3448,6 +3478,7 @@ public:
                                                      _nss,
                                                      mode,
                                                      CollectionValidation::RepairMode::kNone,
+                                                     /*additionalOptions=*/{},
                                                      &results,
                                                      &output,
                                                      kLogDiagnostics));
@@ -3516,6 +3547,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3547,6 +3579,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3582,6 +3615,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3613,6 +3647,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3786,6 +3821,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3815,6 +3851,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -3845,6 +3882,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -4004,6 +4042,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -4033,6 +4072,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kFixErrors,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -4062,6 +4102,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -4171,6 +4212,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kAdjustMultikey,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -4204,6 +4246,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForeground,
                                                CollectionValidation::RepairMode::kAdjustMultikey,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
@@ -4277,6 +4320,7 @@ public:
                                                      _nss,
                                                      mode,
                                                      CollectionValidation::RepairMode::kNone,
+                                                     /*additionalOptions=*/{},
                                                      &results,
                                                      &output,
                                                      kLogDiagnostics));
@@ -4391,6 +4435,7 @@ public:
                                                      _nss,
                                                      mode,
                                                      CollectionValidation::RepairMode::kNone,
+                                                     /*additionalOptions=*/{},
                                                      &results,
                                                      &output,
                                                      kLogDiagnostics));
@@ -4502,6 +4547,7 @@ public:
                                                      _nss,
                                                      mode,
                                                      CollectionValidation::RepairMode::kNone,
+                                                     /*additionalOptions=*/{},
                                                      &results,
                                                      &output,
                                                      kLogDiagnostics));
@@ -4542,6 +4588,7 @@ public:
                                                      _nss,
                                                      mode,
                                                      CollectionValidation::RepairMode::kFixErrors,
+                                                     /*additionalOptions=*/{},
                                                      &results,
                                                      &output,
                                                      kLogDiagnostics));
@@ -4669,6 +4716,7 @@ public:
                                                _nss,
                                                CollectionValidation::ValidateMode::kForegroundFull,
                                                CollectionValidation::RepairMode::kNone,
+                                               /*additionalOptions=*/{},
                                                &results,
                                                &output,
                                                kLogDiagnostics));
