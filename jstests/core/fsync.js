@@ -21,7 +21,7 @@ function waitUntilOpCountIs(opFilter, num) {
     assert.soon(() => {
         let ops = db.getSiblingDB('admin')
                       .aggregate([
-                          {$currentOp: {}},
+                          {$currentOp: {allUsers: true, idleConnections: true}},
                           {$match: opFilter},
                       ])
                       .toArray();
