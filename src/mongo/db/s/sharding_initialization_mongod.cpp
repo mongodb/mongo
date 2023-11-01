@@ -60,6 +60,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/keys_collection_client.h"
@@ -75,6 +76,8 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/replica_set_endpoint_sharding_state.h"
+#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_local.h"
@@ -714,6 +717,18 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         // executors aren't used for user queries in mongod.
         1,
         initKeysClient));
+
+    if (replica_set_endpoint::isFeatureFlagEnabled() &&
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        DBDirectClient client(opCtx);
+        FindCommandRequest request(NamespaceString::kConfigsvrShardsNamespace);
+        request.setFilter(BSON("_id" << ShardId::kConfigServerId));
+        auto cursor = client.find(request);
+        if (cursor->more()) {
+            replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(
+                true);
+        }
+    }
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&

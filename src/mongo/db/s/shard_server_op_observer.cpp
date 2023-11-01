@@ -47,6 +47,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/replica_set_endpoint_sharding_state.h"
+#include "mongo/db/replica_set_endpoint_util.h"
 #include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -219,6 +221,18 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         }
                     });
                 }
+            }
+        }
+
+        if (replica_set_endpoint::isFeatureFlagEnabled() &&
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+            nss == NamespaceString::kConfigsvrShardsNamespace) {
+            if (auto shardId = insertedDoc["_id"].str(); shardId == ShardId::kConfigServerId) {
+                opCtx->recoveryUnit()->onCommit(
+                    [](OperationContext* opCtx, boost::optional<Timestamp>) {
+                        replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)
+                            ->setIsConfigShard(true);
+                    });
             }
         }
 
@@ -615,6 +629,18 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     ShardIdentityRollbackNotifier::get(opCtx)->recordThatRollbackHappened();
                 }
             }
+        }
+    }
+
+    if (replica_set_endpoint::isFeatureFlagEnabled() &&
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+        nss == NamespaceString::kConfigsvrShardsNamespace) {
+        if (auto shardId = documentId["_id"].str(); shardId == ShardId::kConfigServerId) {
+            opCtx->recoveryUnit()->onCommit([](OperationContext* opCtx,
+                                               boost::optional<Timestamp>) {
+                replica_set_endpoint::ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(
+                    false);
+            });
         }
     }
 

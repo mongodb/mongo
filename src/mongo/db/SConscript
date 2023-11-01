@@ -915,6 +915,8 @@ env.Library(
     target='shard_role_api',
     source=[
         'catalog/collection_operation_source.cpp',
+        'replica_set_endpoint_sharding_state.cpp',
+        'replica_set_endpoint_util.cpp',
         's/collection_metadata.cpp',
         's/collection_sharding_state.cpp',
         's/collection_sharding_state_factory_standalone.cpp',
@@ -934,6 +936,7 @@ env.Library(
         'transaction_resources.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         '$BUILD_DIR/mongo/s/grid',
         'concurrency/lock_manager',
         'index/index_access_method',
@@ -971,6 +974,18 @@ env.Library(
         'server_base',
         'storage/capped_snapshots',
         'storage/snapshot_helper',
+    ],
+)
+
+env.CppUnitTest(
+    target='replica_set_endpoint_test',
+    source=[
+        'replica_set_endpoint_sharding_state_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'shard_role_api',
     ],
 )
 
