@@ -107,13 +107,10 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
     std::vector<TypeTags> tags(extracted.count, TypeTags::Nothing);
     std::vector<Value> vals(extracted.count, Value{0u});
 
-    // TODO SERVER-82615 Determine at runtime if the output block is dense if this can't be
-    // determined from flags alone.
     op.processBatch(extracted.tags, extracted.vals, tags.data(), vals.data(), extracted.count);
 
-    bool isDense = (op.opType.flags & ColumnOpType::kOutputNonNothingOnExistingInput) &&
-        (tryDense().get_value_or(false) ||
-         op.opType.flags & ColumnOpType::kOutputNonNothingOnMissingInput);
+    bool isDense = std::all_of(
+        tags.begin(), tags.end(), [](TypeTags tag) { return tag != TypeTags::Nothing; });
 
     return std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals), isDense);
 }
