@@ -27,6 +27,7 @@ a notice will be included in
 | [benchmark]                | Apache-2.0        | 1.5.2             |                      |                                 |
 | [Boost]                    | BSL-1.0           | 1.79.0            |                      |                ✗                |
 | [c-ares]                   | MIT               | 1.19.1            |                      |                ✗                |
+| [double-conversion]        | ???               | ???               |                      |               ???               |
 | [fmt]                      | BSD-2-Clause      | 7.1.3             |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause      | 2.9.1             |                      |                ✗                |
 | [gRPC]                     | Apache-2.0        | 1.46.6            |                      |                ✗                |
@@ -65,6 +66,7 @@ a notice will be included in
 [ASIO]: https://github.com/chriskohlhoff/asio
 [benchmark]: https://github.com/google/benchmark
 [Boost]: http://www.boost.org/
+[double-conversion]: https://github.com/google/double-conversion (transitive dependency of MozJS)
 [fmt]: http://fmtlib.net/
 [GPerfTools]: https://github.com/gperftools/gperftools
 [ICU4]: http://site.icu-project.org/download/
