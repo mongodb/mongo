@@ -7,7 +7,7 @@ config_variables:
   password: *keyFileData
   username: __system
 
-test_kind: js_test
+test_kind: multi_stmt_txn_passthrough
 # This suite starts two 3-node replica sets and uses the ContinuousShardMerge hook to run
 # background tenant migrations. It also wraps all CRUD commands in transactions and asserts that
 # the transactions are committed/aborted correctly while tenant migrations are running.
