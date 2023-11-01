@@ -2254,13 +2254,13 @@ start_all_runs(WTPERF *wtperf)
         len = strlen(wtperf->home) + 5;
         next_wtperf->home = dmalloc(len);
         testutil_snprintf(next_wtperf->home, len, "%s/D%02d", wtperf->home, (int)i);
-        if (opts->create)
+        if (opts->create != 0)
             testutil_recreate_dir(next_wtperf->home);
 
         len = strlen(wtperf->monitor_dir) + 5;
         next_wtperf->monitor_dir = dmalloc(len);
         testutil_snprintf(next_wtperf->monitor_dir, len, "%s/D%02d", wtperf->monitor_dir, (int)i);
-        if (opts->create && strcmp(next_wtperf->home, next_wtperf->monitor_dir) != 0)
+        if (opts->create != 0 && strcmp(next_wtperf->home, next_wtperf->monitor_dir) != 0)
             testutil_recreate_dir(next_wtperf->monitor_dir);
 
         testutil_check(__wt_thread_create(NULL, &threads[i], thread_run_wtperf, next_wtperf));
@@ -2318,7 +2318,7 @@ start_run(WTPERF *wtperf)
     create_uris(wtperf);
 
     /* If creating, create the tables. */
-    if (opts->create && (ret = create_tables(wtperf)) != 0)
+    if (opts->create != 0 && (ret = create_tables(wtperf)) != 0)
         goto err;
 
     /* Start the monitor thread. */
@@ -2328,7 +2328,7 @@ start_run(WTPERF *wtperf)
     }
 
     /* If creating, populate the table. */
-    if (opts->create && execute_populate(wtperf) != 0)
+    if (opts->create != 0 && execute_populate(wtperf) != 0)
         goto err;
 
     /* Optional workload. */
@@ -2341,7 +2341,7 @@ start_run(WTPERF *wtperf)
             goto err;
 
         /* Didn't create, set insert count. */
-        if (opts->create && opts->random_range == 0 && find_table_count(wtperf) != 0)
+        if (opts->create == 0 && opts->random_range == 0 && find_table_count(wtperf) != 0)
             goto err;
         /* Start the backup thread. */
         if (opts->backup_interval != 0) {
@@ -2689,7 +2689,7 @@ main(int argc, char *argv[])
         goto err;
 
     /* If creating, remove and re-create the home and tiered bucket directories. */
-    if (opts->create) {
+    if (opts->create != 0) {
         testutil_recreate_dir(wtperf->home);
         testutil_check(create_tiered_bucket(wtperf));
     }
