@@ -87,7 +87,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingWriteWithoutShardkeyWithId);
+MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingWriteWithoutShardKeyWithId);
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
@@ -680,13 +680,16 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
         for (auto& targetedWriteBatchMap : pendingBatches) {
             auto& targetedWrite = targetedWriteBatchMap.second->getWrites().front();
             auto& writeOp = batchOp.getWriteOp(targetedWrite->writeOpRef.first);
-            writeOp.resetWriteToReady();
+            // If we are here due to a stale shard/db and n=1 response, we don't need to retry.
+            if (writeOp.getWriteState() != WriteOpState_Completed) {
+                writeOp.resetWriteToReady();
+            }
             // Since all targeted writes belong to one writeOp we can break the loop.
             break;
         }
     }
 
-    hangBeforeCompletingWriteWithoutShardkeyWithId.pauseWhileSet();
+    hangBeforeCompletingWriteWithoutShardKeyWithId.pauseWhileSet();
 }
 
 void executeNonOrdinaryWriteChildBatches(OperationContext* opCtx,

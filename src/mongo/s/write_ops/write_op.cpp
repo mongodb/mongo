@@ -49,6 +49,8 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 namespace mongo {
 namespace {
 
@@ -322,23 +324,34 @@ void WriteOp::noteWriteError(const TargetedWrite& targetedWrite,
 
 void WriteOp::noteWriteWithoutShardKeyWithIdResponse(const TargetedWrite& targetedWrite, int n) {
     dassert(n == 0 || n == 1);
+    const WriteOpRef& ref = targetedWrite.writeOpRef;
+    auto& currentChildOp = _childOps[ref.second];
     if (n == 0) {
         // Defer the completion of this child WriteOp until later when we are sure that we do not
         // need to retry them due to StaleConfig or StaleDBVersion.
-        const WriteOpRef& ref = targetedWrite.writeOpRef;
-        auto& childOp = _childOps[ref.second];
-        childOp.state = WriteOpState_Deferred;
+        currentChildOp.state = WriteOpState_Deferred;
+        _updateOpState();
     } else {
-        noteWriteComplete(targetedWrite);
         for (auto& childOp : _childOps) {
             dassert(childOp.parentOp->_writeType == WriteType::WithoutShardKeyWithId);
-            if (childOp.state == WriteOpState_Pending) {
+            if (childOp.state == WriteOpState_Pending &&
+                childOp.pendingWrite->writeOpRef != targetedWrite.writeOpRef) {
                 childOp.state = WriteOpState_NoOp;
+            } else if (childOp.state == WriteOpState_Error) {
+                // When n equals 1, the write operation without a shard key with _id
+                // equality has successfully occurred on the intended shard. In this case, any
+                // errors from other shards can be safely disregarded. These errors will not
+                // impact the parent write operation for us or the user.
+                LOGV2_DEBUG(8083900,
+                            4,
+                            "Ignoring write without shard key with id child op error.",
+                            "error"_attr = childOp.error->serialize());
+                childOp.state = WriteOpState_Completed;
+                childOp.error = boost::none;
             }
         }
+        noteWriteComplete(targetedWrite);
     }
-    // TODO: SERVER-80839 handle write errors here.
-    _updateOpState();
 }
 
 void WriteOp::setOpComplete(boost::optional<BulkWriteReplyItem> bulkWriteReplyItem) {

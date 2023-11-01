@@ -61,7 +61,7 @@ enum WriteOpState {
     WriteOpState_Pending,
 
     // This is used for WriteType::WriteWithoutShardKeyWithId to defer responses for child write ops
-    // only until we are sure that there won't be a retry of broadcast.
+    // with n = 0 from shards only until we are sure that there won't be a retry of broadcast.
     WriteOpState_Deferred,
 
     // Op was successful, write completed
@@ -105,7 +105,7 @@ struct ChildWriteOp {
     // filled when state > _Pending
     std::unique_ptr<ShardEndpoint> endpoint;
 
-    // filled when state == _Error or (optionally) when state == _Cancelled
+    // filled when state == _Error
     boost::optional<write_ops::WriteError> error;
 
     // filled when state == _Complete and this is an op from a bulkWrite command.
