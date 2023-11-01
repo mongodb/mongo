@@ -509,6 +509,14 @@ public:
                        ErrorCodes::Error killCode = ErrorCodes::Interrupted);
 
     /**
+     * Delists the operation by removing it from "_clientByOperationId" and its client. Both
+     * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of
+     * ServiceContext. Also, "opCtx" should never be deleted before this method returns. Finally,
+     * the thread invoking this method must not hold the client and the service context locks.
+     */
+    void delistOperation(OperationContext* opCtx) noexcept;
+
+    /**
      * Kills the operation "opCtx" with the code "killCode", if opCtx has not already been killed,
      * and delists the operation by removing it from "_clientByOperationId" and its client. Both
      * "opCtx->getClient()->getServiceContext()" and "this" must point to the same instance of

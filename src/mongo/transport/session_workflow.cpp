@@ -728,14 +728,15 @@ Future<DbResponse> SessionWorkflow::Impl::_dispatchWork() {
 
 void SessionWorkflow::Impl::_acceptResponse(DbResponse response) {
     auto&& work = *_work;
-    // opCtx must be killed and delisted here so that the operation cannot show up in
-    // currentOp results after the response reaches the client. Destruction of the already
-    // killed opCtx is postponed for later (i.e., after completion of the future-chain) to
+    // opCtx must be delisted here so that the operation cannot show up in currentOp results after
+    // the response reaches the client. We are assuming that the operation has already been killed
+    // once we are accepting the response here, so delisting is sufficient. Destruction of the
+    // already killed opCtx is postponed for later (i.e., after completion of the future-chain) to
     // mitigate its performance impact on the critical path of execution.
     // Note that destroying futures after execution, rather that postponing the destruction
     // until completion of the future-chain, would expose the cost of destroying opCtx to
     // the critical path and result in serious performance implications.
-    _serviceContext->killAndDelistOperation(work.opCtx(), ErrorCodes::OperationIsKilledAndDelisted);
+    _serviceContext->delistOperation(work.opCtx());
     // Format our response, if we have one
     Message& toSink = response.response;
     if (toSink.empty())

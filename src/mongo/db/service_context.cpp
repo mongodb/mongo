@@ -478,6 +478,16 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
     opCtx->releaseOperationKey();
 }
 
+void ServiceContext::delistOperation(OperationContext* opCtx) noexcept {
+    auto client = opCtx->getClient();
+    invariant(client);
+
+    auto service = client->getServiceContext();
+    invariant(service == this);
+
+    _delistOperation(opCtx);
+}
+
 void ServiceContext::killAndDelistOperation(OperationContext* opCtx,
                                             ErrorCodes::Error killCode) noexcept {
 
