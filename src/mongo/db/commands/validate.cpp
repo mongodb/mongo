@@ -400,6 +400,7 @@ public:
         CollectionValidation::AdditionalOptions additionalOptions;
         additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed =
             cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue();
+        additionalOptions.warnOnSchemaValidation = cmdObj["warnOnSchemaValidation"].trueValue();
 
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(
