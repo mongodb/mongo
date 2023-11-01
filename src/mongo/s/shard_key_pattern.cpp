@@ -97,14 +97,23 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
 
         // Numeric and ascending (1.0), or "hashed" with exactly hashed field.
         auto isHashedPattern = ShardKeyPattern::isHashedPatternEl(patternEl);
-        numHashedFields += isHashedPattern ? 1 : 0;
-        uassert(ErrorCodes::BadValue,
+        if (isHashedPattern) {
+            numHashedFields += 1;
+            uassert(
+                ErrorCodes::BadValue,
                 str::stream() << "Shard key " << keyPattern.toString()
-                              << " can contain at most one 'hashed' field, and/or multiple "
-                                 "numerical fields set to a value of 1. Failed to parse field "
+                              << " can contain at most one 'hashed' field. Failed to parse field "
                               << patternEl.fieldNameStringData(),
-                (patternEl.isNumber() && patternEl.safeNumberInt() == 1) ||
-                    (isHashedPattern && numHashedFields == 1));
+                numHashedFields == 1);
+        } else {
+            uassert(
+                ErrorCodes::BadValue,
+                str::stream() << "Shard key " << keyPattern.toString()
+                              << "numerical fields must be set to a value of 1 (ascending). Failed "
+                                 "to parse field "
+                              << patternEl.fieldNameStringData(),
+                (patternEl.isNumber() && patternEl.safeNumberInt() == 1));
+        }
         parsedPaths.emplace_back(std::move(newFieldRef));
     }
 
