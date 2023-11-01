@@ -52,6 +52,7 @@
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -68,6 +69,7 @@ const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>()
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
+MONGO_FAIL_POINT_DEFINE(runPostCommitDebugChecks);
 
 /**
  * Prepares the batch for commit. Sets min/max appropriately, records the number of
@@ -251,6 +253,17 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
     auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
+    if (MONGO_unlikely(runPostCommitDebugChecks.shouldFail() && opCtx)) {
+        Bucket* bucket = internal::useBucket(catalog.bucketStateRegistry,
+                                             stripe,
+                                             stripeLock,
+                                             batch->bucketHandle.bucketId,
+                                             internal::IgnoreBucketState::kYes);
+        if (bucket) {
+            internal::runPostCommitDebugChecks(opCtx, *bucket, *batch);
+        }
+    }
+
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
@@ -295,10 +308,6 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
     stats.incNumMeasurementsCommitted(batch->measurements.size());
     if (bucket) {
         bucket->numCommittedMeasurements += batch->measurements.size();
-        /* TODO (SERVER-82126): reenable or remove
-        if (kDebugBuild && opCtx) {
-            internal::runPostCommitDebugChecks(opCtx, *bucket, *batch);
-        }*/
     }
 
     if (!bucket) {
