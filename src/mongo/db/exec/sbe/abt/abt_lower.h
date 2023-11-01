@@ -329,8 +329,8 @@ private:
      * Even when 'projectionNames' is free of duplicates, the output may have duplicates because two
      * projections can map to the same slot.
      */
-    sbe::value::SlotVector convertProjectionsToSlots(const SlotVarMap& slotMap,
-                                                     const ProjectionNameVector& projectionNames);
+    sbe::value::SlotVector convertProjectionsToSlots(
+        const SlotVarMap& slotMap, const ProjectionNameVector& projectionNames) const;
 
     /**
      * During Cascades, projections that a node is required to propagate up the tree are added to
@@ -345,7 +345,13 @@ private:
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
         const SlotVarMap& slotMap,
         const NodeProps& props,
-        const sbe::value::SlotVector& toExclude = {});
+        const sbe::value::SlotVector& toExclude = {}) const;
+
+    /**
+     * If the node pointer exists in _nodeToGroupPropsMap, then return _planNode from the
+     * corresponding entry, otherwise return 0.
+     */
+    PlanNodeId getPlanNodeId(const Node& node) const;
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(SlotVarMap& slotMap,
                                                           bool isLower,

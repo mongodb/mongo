@@ -144,17 +144,18 @@ private:
 };
 
 class SamplingChunksTransport {
-
 public:
-    SamplingChunksTransport(NodeToGroupPropsMap& propsMap, const OptPhaseManager& phaseManager)
-        : _propsMap(propsMap), _phaseManager(phaseManager) {}
+    SamplingChunksTransport(NodeToGroupPropsMap& propsMap,
+                            const int64_t numChunks,
+                            const RIDProjectionsMap& ridProjections)
+        : _propsMap(propsMap), _numChunks(numChunks), _ridProjections(ridProjections) {}
 
     void transport(ABT& n, const LimitSkipNode& limit, ABT& child) {
         if (limit.getProperty().getSkip() != 0) {
             return;
         }
         const PhysicalScanNode& physicalScan = *child.cast<PhysicalScanNode>();
-        const auto& ridProj = _phaseManager.getRIDProjections().at(physicalScan.getScanDefName());
+        const auto& ridProj = _ridProjections.at(physicalScan.getScanDefName());
 
         ABT newPhysicalScan =
             make<PhysicalScanNode>(FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
@@ -170,9 +171,9 @@ public:
             ridProj, physicalScan.getFieldProjectionMap(), physicalScan.getScanDefName());
         _propsMap.emplace(seekNode.cast<Node>(), props);
 
-        const int32_t limitSize = limit.getProperty().getLimit();
-        const int32_t numChunks = std::min(_phaseManager.getHints()._numSamplingChunks, limitSize);
-        const int32_t chunkSize = limitSize / numChunks;
+        const int64_t limitSize = limit.getProperty().getLimit();
+        const int64_t numChunks = std::min(_numChunks, limitSize);
+        const int64_t chunkSize = limitSize / numChunks;
 
         ABT outerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(numChunks, 0),
                                             std::move(newPhysicalScan));
@@ -218,7 +219,8 @@ public:
 
 private:
     NodeToGroupPropsMap& _propsMap;
-    const OptPhaseManager& _phaseManager;
+    const int64_t _numChunks;
+    const RIDProjectionsMap& _ridProjections;
 };
 
 class SamplingTransport {
@@ -367,9 +369,10 @@ private:
         PlanAndProps planAndProps = _phaseManager.optimizeAndReturnProps(std::move(abt));
 
         // If internalCascadesOptimizerSampleChunks is a positive integer, sample by chunks using
-        // that value as the number of chunks. Otherwise perform fully randomized sample.
-        if (_phaseManager.getHints()._numSamplingChunks > 0) {
-            SamplingChunksTransport instance{planAndProps._map, _phaseManager};
+        // that value as the number of chunks. Otherwise, perform fully randomized sample.
+        if (const int64_t numChunks = _phaseManager.getHints()._numSamplingChunks; numChunks > 0) {
+            SamplingChunksTransport instance{
+                planAndProps._map, numChunks, _phaseManager.getRIDProjections()};
             algebra::transport<true>(planAndProps._node, instance);
 
             OPTIMIZER_DEBUG_LOG(6264807,
