@@ -162,6 +162,7 @@ __chunkcache_metadata_queue_internal(WT_SESSION_IMPL *session, uint8_t type, con
 {
     WT_CHUNKCACHE_METADATA_WORK_UNIT *entry;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
 
     conn = S2C(session);
 
@@ -169,7 +170,7 @@ __chunkcache_metadata_queue_internal(WT_SESSION_IMPL *session, uint8_t type, con
 
     WT_RET(__wt_calloc_one(session, &entry));
     entry->type = type;
-    WT_RET(__wt_strdup(session, name, &entry->name));
+    WT_ERR(__wt_strdup(session, name, &entry->name));
     entry->id = objectid;
     entry->file_offset = file_offset;
     entry->cache_offset = cache_offset;
@@ -188,7 +189,12 @@ __chunkcache_metadata_queue_internal(WT_SESSION_IMPL *session, uint8_t type, con
 
     WT_STAT_CONN_INCR(session, chunkcache_metadata_work_units_created);
 
-    return (0);
+    if (0) {
+err:
+        __wt_free(session, entry);
+    }
+
+    return (ret);
 }
 
 /*
