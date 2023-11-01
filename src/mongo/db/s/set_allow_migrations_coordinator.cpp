@@ -132,10 +132,11 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
 
         updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-        auto response = configShard->runBatchWriteCommand(opCtx,
-                                                          Shard::kDefaultConfigCommandTimeout,
-                                                          updateRequest,
-                                                          Shard::RetryPolicy::kIdempotent);
+        auto response =
+            configShard->runBatchWriteCommand(opCtx,
+                                              Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                              updateRequest,
+                                              Shard::RetryPolicy::kIdempotent);
 
         uassertStatusOK(response.toStatus());
 

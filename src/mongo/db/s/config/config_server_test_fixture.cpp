@@ -197,7 +197,7 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx
             insertOp.setDocuments({doc});
             return insertOp.toBSON({});
         }(),
-        Shard::kDefaultConfigCommandTimeout,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kNoRetry);
 
     BatchedCommandResponse batchResponse;
@@ -225,7 +225,7 @@ Status ConfigServerTestFixture::updateToConfigCollection(OperationContext* opCtx
             }()});
             return updateOp.toBSON({});
         }(),
-        Shard::kDefaultConfigCommandTimeout,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kNoRetry);
 
 
@@ -252,7 +252,7 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
             }()});
             return deleteOp.toBSON({});
         }(),
-        Shard::kDefaultConfigCommandTimeout,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kNoRetry);
 
 
@@ -411,7 +411,7 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             ns.dbName(),
                                             BSON("listIndexes" << ns.coll().toString()),
-                                            Shard::kDefaultConfigCommandTimeout,
+                                            Milliseconds(defaultConfigCommandTimeoutMS.load()),
                                             Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {
         return response.getStatus();

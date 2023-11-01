@@ -206,8 +206,13 @@ StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(
     const BSONObj& update,
     bool upsert,
     const WriteConcernOptions& writeConcern) {
-    return {updateConfigDocument(
-        opCtx, nss, query, update, upsert, writeConcern, Shard::kDefaultConfigCommandTimeout)};
+    return {updateConfigDocument(opCtx,
+                                 nss,
+                                 query,
+                                 update,
+                                 upsert,
+                                 writeConcern,
+                                 Milliseconds(defaultConfigCommandTimeoutMS.load()))};
 }
 
 StatusWith<bool> ShardingCatalogClientMock::updateConfigDocument(

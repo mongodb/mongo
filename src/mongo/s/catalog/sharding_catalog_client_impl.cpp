@@ -560,7 +560,7 @@ HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kAdmin,
         request.toBSON(BSONObj()),
-        Shard::kDefaultConfigCommandTimeout,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kIdempotentOrCursorInvalidated));
 
     uassertStatusOK(remoteResponse.commandStatus);
@@ -1238,7 +1238,7 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         dbname,
         cmdToRun,
-        Shard::kDefaultConfigCommandTimeout,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kNotIdempotent);
 
     if (!swResponse.isOK()) {
@@ -1268,7 +1268,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
         kConfigPrimaryPreferredSelector,
         dbname,
         cmdObj,
-        Shard::kDefaultConfigCommandTimeout,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
         Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
         CommandHelpers::filterCommandReplyForPassthrough(resultStatus.getValue().response, result);
@@ -1295,8 +1295,11 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
     const auto configShard = _getConfigShard(opCtx);
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        auto response = configShard->runBatchWriteCommand(
-            opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kNoRetry);
+        auto response =
+            configShard->runBatchWriteCommand(opCtx,
+                                              Milliseconds(defaultConfigCommandTimeoutMS.load()),
+                                              request,
+                                              Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1360,8 +1363,13 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
     const BSONObj& update,
     bool upsert,
     const WriteConcernOptions& writeConcern) {
-    return _updateConfigDocument(
-        opCtx, nss, query, update, upsert, writeConcern, Shard::kDefaultConfigCommandTimeout);
+    return _updateConfigDocument(opCtx,
+                                 nss,
+                                 query,
+                                 update,
+                                 upsert,
+                                 writeConcern,
+                                 Milliseconds(defaultConfigCommandTimeoutMS.load()));
 }
 
 StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
@@ -1435,7 +1443,10 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     request.setWriteConcern(writeConcern.toBSON());
 
     auto response = _getConfigShard(opCtx)->runBatchWriteCommand(
-        opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
+        opCtx,
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        request,
+        Shard::RetryPolicy::kIdempotent);
     return response.toStatus();
 }
 

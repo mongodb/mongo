@@ -1391,13 +1391,13 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     countBuilder.append("count", nss.coll());
     countBuilder.append("query", query);
 
-    auto resultStatus =
-        _localConfigShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                            kConfigReadSelector,
-                                                            nss.dbName(),
-                                                            countBuilder.done(),
-                                                            Shard::kDefaultConfigCommandTimeout,
-                                                            Shard::RetryPolicy::kIdempotent);
+    auto resultStatus = _localConfigShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        kConfigReadSelector,
+        nss.dbName(),
+        countBuilder.done(),
+        Milliseconds(defaultConfigCommandTimeoutMS.load()),
+        Shard::RetryPolicy::kIdempotent);
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }

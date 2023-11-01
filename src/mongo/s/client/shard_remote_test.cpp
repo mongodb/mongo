@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/duration.h"
 #include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
@@ -42,6 +43,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
@@ -124,6 +126,37 @@ TEST_F(ShardRemoteTest, TargeterMarksHostAsDownWhenConfigShuttingDown) {
 
     ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::InterruptedAtShutdown);
     ASSERT_EQ(1UL, configTargeter()->getAndClearMarkedDownHosts().size());
+}
+
+TEST_F(ShardRemoteTest, FindOnConfigRespectsDefaultConfigCommandTimeout) {
+    // Set the timeout for config commands to 1 second.
+    auto timeoutMs = 1000;
+    RAIIServerParameterControllerForTest configCommandTimeout{"defaultConfigCommandTimeoutMS",
+                                                              timeoutMs};
+
+    auto configShard = ShardId("config");
+    auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), configShard));
+    auto future = launchAsync([&] {
+        uassertStatusOK(shard->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            NamespaceString::createNamespaceString_forTest("admin.bar"),
+            {},
+            {},
+            {}));
+    });
+
+    // Assert that maxTimeMS is set to defaultConfigCommandTimeoutMS. We don't actually care about
+    // the response here, so use a dummy error.
+    auto error = Status(ErrorCodes::CommandFailed, "Dummy error");
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT(request.cmdObj.hasField("maxTimeMS")) << request;
+        ASSERT_EQ(request.cmdObj["maxTimeMS"].Long(), timeoutMs);
+        return error;
+    });
+
+    ASSERT_THROWS_CODE(future.default_timed_get(), DBException, ErrorCodes::CommandFailed);
 }
 
 }  // namespace

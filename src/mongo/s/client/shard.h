@@ -271,10 +271,6 @@ public:
         boost::optional<long long> limit,
         const boost::optional<BSONObj>& hint = boost::none);
 
-    // This timeout will be used by default in operations against the config server, unless
-    // explicitly overridden
-    static const Milliseconds kDefaultConfigCommandTimeout;
-
     /**
      * Returns false if the error is a retriable error and/or causes a replset monitor update. These
      * errors, if from a remote call, should not be further propagated back to another server

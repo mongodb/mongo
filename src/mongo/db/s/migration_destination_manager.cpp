@@ -723,8 +723,8 @@ void MigrationDestinationManager::abortWithoutSessionIdCheck() {
 Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId) {
     stdx::unique_lock<Latch> lock(_mutex);
 
-    const auto convergenceTimeout =
-        Shard::kDefaultConfigCommandTimeout + Shard::kDefaultConfigCommandTimeout / 4;
+    const auto convergenceTimeout = Milliseconds(defaultConfigCommandTimeoutMS.load()) +
+        Milliseconds(defaultConfigCommandTimeoutMS.load()) / 4;
 
     // The donor may have started the commit while the recipient is still busy processing
     // the last batch of mods sent in the catch up phase. Allow some time for synching up.

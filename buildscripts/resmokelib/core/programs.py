@@ -105,6 +105,8 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
         suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0")
     remove_set_parameter_if_before_version(suite_set_parameters, "queryAnalysisWriterIntervalSecs",
                                            bin_version, "7.0.0")
+    remove_set_parameter_if_before_version(suite_set_parameters, "defaultConfigCommandTimeoutMS",
+                                           bin_version, "7.3.0")
     _apply_set_parameters(args, suite_set_parameters)
     final_mongod_options = mongod_options.copy()
     mongod_options.pop("set_parameters")
@@ -141,6 +143,8 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     suite_set_parameters = mongos_options.get("set_parameters", {})
     remove_set_parameter_if_before_version(
         suite_set_parameters, "queryAnalysisSamplerConfigurationRefreshSecs", bin_version, "7.0.0")
+    remove_set_parameter_if_before_version(suite_set_parameters, "defaultConfigCommandTimeoutMS",
+                                           bin_version, "7.3.0")
     _apply_set_parameters(args, suite_set_parameters)
     final_mongos_options = mongos_options.copy()
     mongos_options.pop("set_parameters")

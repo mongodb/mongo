@@ -96,8 +96,6 @@ Status Shard::CommandResponse::processBatchWriteResponse(
     return status;
 }
 
-const Milliseconds Shard::kDefaultConfigCommandTimeout = Seconds{30};
-
 bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return !isMongosRetriableError(code) && (code != ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }

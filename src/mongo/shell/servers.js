@@ -751,6 +751,7 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts, "internalQueryDisableExclusionProjectionFastPath", "6.2.0");
     _removeSetParameterIfBeforeVersion(
         opts, "disableTransitionFromLatestToLastContinuous", "7.0.0");
+    _removeSetParameterIfBeforeVersion(opts, "defaultConfigCommandTimeoutMS", "7.3.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";
@@ -896,6 +897,7 @@ MongoRunner.mongosOptions = function(opts) {
         opts, "mongosShutdownTimeoutMillisForSignaledShutdown", "4.5.0", true);
     _removeSetParameterIfBeforeVersion(
         opts, "failpoint.skipClusterParameterRefresh", "7.1.0", true);
+    _removeSetParameterIfBeforeVersion(opts, "defaultConfigCommandTimeoutMS", "7.3.0", true);
 
     return opts;
 };

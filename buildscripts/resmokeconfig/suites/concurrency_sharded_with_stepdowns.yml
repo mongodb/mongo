@@ -205,6 +205,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         queryAnalysisSamplerConfigurationRefreshSecs: 1
+        defaultConfigCommandTimeoutMS: 90000
     configsvr_options:
       num_nodes: 3
       all_nodes_electable: true
@@ -227,6 +228,7 @@ executor:
         enableElectionHandoff: 0
         roleGraphInvalidationIsFatal: 1
         queryAnalysisWriterIntervalSecs: 1
+        defaultConfigCommandTimeoutMS: 90000
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

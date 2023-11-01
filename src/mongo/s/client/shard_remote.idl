@@ -44,3 +44,13 @@ server_parameters:
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gFindChunksOnConfigTimeoutMS
         default: 900000
+
+    defaultConfigCommandTimeoutMS:
+        description: Default timeout used for operations run against the config server.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: defaultConfigCommandTimeoutMS
+        # Default to 30 seconds
+        default: 30000
+        validator:
+          gte: 0

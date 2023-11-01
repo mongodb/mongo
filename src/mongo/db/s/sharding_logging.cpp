@@ -220,7 +220,7 @@ Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kConfig,
             createCmd,
-            Shard::kDefaultConfigCommandTimeout,
+            Milliseconds(defaultConfigCommandTimeoutMS.load()),
             Shard::RetryPolicy::kIdempotent);
 
         if (!result.isOK()) {

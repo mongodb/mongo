@@ -74,7 +74,7 @@ assert.soon(
     },
     'Did not see any log entries containing the following message: ' + msgAA + ' ... ' + msgAB +
         ' or ' + msgB,
-    60000,
+    180000,
     300);
 
 // Can't do clean shutdown with this failpoint on.
