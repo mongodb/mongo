@@ -13,7 +13,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db.getCollection("coll");
 coll.drop();
@@ -36,13 +36,13 @@ let res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
+cursorSizeValidator(res, 4);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
-assert(!res.cursor.firstBatch[4]);
 
 assert.sameMembers(
     coll.find().toArray(),
@@ -69,13 +69,13 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
+cursorSizeValidator(res, 4);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1, nModified: 1});
-assert(!res.cursor.firstBatch[4]);
 
 const updatedDoc = coll.findOne({_id: 2});
 assert.eq(updatedDoc["skey"], "MongoDB4");

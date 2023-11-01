@@ -3,11 +3,21 @@
  * Helper function to check a BulkWrite cursorEntry.
  */
 export const cursorEntryValidator = function(entry, expectedEntry) {
-    assert.eq(entry.ok, expectedEntry.ok);
-    assert.eq(entry.idx, expectedEntry.idx);
-    assert.eq(entry.n, expectedEntry.n);
-    assert.eq(entry.nModified, expectedEntry.nModified);
-    assert.eq(entry.code, expectedEntry.code);
+    const assertMsg =
+        " value did not match for bulkWrite reply item. actual reply: " + tojson(entry);
+    assert.eq(entry.ok, expectedEntry.ok, "'ok'" + assertMsg);
+    assert.eq(entry.idx, expectedEntry.idx, "'idx'" + assertMsg);
+    assert.eq(entry.n, expectedEntry.n, "'n'" + assertMsg);
+    assert.eq(entry.nModified, expectedEntry.nModified, "'nModified' " + assertMsg);
+    assert.eq(entry.code, expectedEntry.code, "'code'" + assertMsg);
+    assert.docEq(entry.upserted, expectedEntry.upserted, "'upserted' " + assertMsg);
+};
+
+export const cursorSizeValidator = function(response, expectedSize) {
+    assert.eq(
+        response.cursor.firstBatch.length,
+        expectedSize,
+        "Expected cursor size did not match response cursor size. Response: " + tojson(response));
 };
 
 // Helper class for the bulkwrite_metrics tests.

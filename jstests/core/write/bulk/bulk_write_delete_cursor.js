@@ -9,7 +9,7 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
 
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
@@ -27,12 +27,11 @@ var res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 
+cursorSizeValidator(res, 2);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
-assert(!res.cursor.firstBatch[1].value);
-assert(!res.cursor.firstBatch[2]);
 
 assert(!coll.findOne());
 
@@ -50,12 +49,11 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
-
+cursorSizeValidator(res, 3);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
-assert(!res.cursor.firstBatch[3]);
 assert.eq(coll.find().itcount(), 1);
 
 coll.drop();
@@ -72,11 +70,9 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
-
+cursorSizeValidator(res, 1);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
-assert(!res.cursor.firstBatch[1]);
-
 assert(!coll.findOne());
 
 coll.drop();
@@ -93,11 +89,9 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
-
+cursorSizeValidator(res, 1);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 0});
-assert(!res.cursor.firstBatch[1]);
-
 assert.eq("MongoDB", coll1.findOne().skey);
 
 coll.drop();
@@ -117,13 +111,13 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
+cursorSizeValidator(res, 4);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, n: 1});
-assert(!res.cursor.firstBatch[4]);
 
 assert.sameMembers(coll.find().toArray(), [{_id: 1, skey: "MongoDB2"}, {_id: 2, skey: "MongoDB3"}]);
 

@@ -14,7 +14,7 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
 
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
@@ -159,14 +159,13 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 2);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
-cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 0});
-
-assert.docEq(res.cursor.firstBatch[1].upserted, {_id: 1});
-assert(!res.cursor.firstBatch[2]);
+cursorEntryValidator(res.cursor.firstBatch[1],
+                     {ok: 1, idx: 1, n: 1, nModified: 0, upserted: {_id: 1}});
 coll.drop();
 coll2.drop();
 
@@ -184,11 +183,11 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
-assert(!res.cursor.firstBatch[1]);
 coll.drop();
 coll2.drop();
 
@@ -217,7 +216,8 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 3);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -233,7 +233,6 @@ try {
                          {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
 }
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, n: 1, idx: 2});
-assert(!res.cursor.firstBatch[3]);
 
 coll.drop();
 
@@ -250,7 +249,8 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 2);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -265,7 +265,6 @@ try {
     cursorEntryValidator(res.cursor.firstBatch[1],
                          {ok: 0, n: 0, idx: 1, code: ErrorCodes.Interrupted});
 }
-assert(!res.cursor.firstBatch[2]);
 
 coll.drop();
 
@@ -281,7 +280,8 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 2);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -289,7 +289,6 @@ cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: 11000
 // Make sure that error extra info was correctly added
 assert.docEq(res.cursor.firstBatch[1].keyPattern, {_id: 1});
 assert.docEq(res.cursor.firstBatch[1].keyValue, {_id: 1});
-assert(!res.cursor.firstBatch[2]);
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 0);
@@ -309,13 +308,13 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 3);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, n: 0, idx: 1, code: 11000});
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, n: 1, idx: 2});
-assert(!res.cursor.firstBatch[3]);
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 1);
@@ -333,7 +332,7 @@ res = db.adminCommand({
     bypassDocumentValidation: false,
 });
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 assert.eq(0, coll.count({_id: 3}));
 coll.drop();
@@ -350,13 +349,13 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 3);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
 cursorEntryValidator(res.cursor.firstBatch[2],
                      {ok: 0, idx: 2, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
-assert(!res.cursor.firstBatch[3]);
 coll.drop();
 
 coll.insert({skey: "MongoDB"});
@@ -375,12 +374,12 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
 assert.eq(res.cursor.firstBatch[0].errmsg,
           "Constant values may only be specified for pipeline updates");
-assert(!res.cursor.firstBatch[1]);
 
 coll.drop();
 
@@ -401,11 +400,11 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+cursorSizeValidator(res, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 9});
 assert.eq(res.cursor.firstBatch[0].errmsg,
           "the parameter 'upsertSupplied' is set to 'true', but no document was supplied");
-assert(!res.cursor.firstBatch[1]);
 
 coll.drop();

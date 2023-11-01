@@ -12,7 +12,7 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-import {cursorEntryValidator} from "jstests/libs/bulk_write_utils.js";
+import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
 
 const coll = db.getCollection("t");
 const nonTSColl = db.getCollection("c");
@@ -37,7 +37,7 @@ let res = db.adminCommand({
     ordered: true,
 });
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0);
+assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
 res.cursor.firstBatch.forEach((entry, idx) => cursorEntryValidator(entry, {ok: 1, idx: idx, n: 1}));
 assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
 
@@ -53,9 +53,9 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}],
     ordered: true,
 });
-assert.eq(res.numErrors, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0})
-assert.eq(res.cursor.firstBatch.length, 1);
+cursorSizeValidator(res, 1);
 assert.eq(coll.countDocuments({}), 3);
 
 // Test unordered timeseries inserts with failed operations.
@@ -70,7 +70,7 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}],
     ordered: false,
 });
-assert.eq(res.numErrors, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0})
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1})
 cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1})
@@ -91,7 +91,7 @@ res = db.adminCommand({
     nsInfo: [{ns: coll.getFullName()}, {ns: nonTSColl.getFullName()}],
     ordered: false,
 });
-assert.eq(res.numErrors, 2);
+assert.eq(res.numErrors, 2, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: 2, n: 0})
 cursorEntryValidator(res.cursor.firstBatch[4], {ok: 0, idx: 4, code: 11000, n: 0})
 assert.eq(coll.countDocuments({}), 8);
@@ -110,8 +110,8 @@ res = db.adminCommand({
     ordered: true,
 });
 jsTestLog(tojson(res));
-assert.eq(res.numErrors, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: 2, n: 0})
-assert.eq(res.cursor.firstBatch.length, 2);
+cursorSizeValidator(res, 2);
 assert.eq(coll.countDocuments({}), 8);
 assert.eq(nonTSColl.countDocuments({}), 2);
