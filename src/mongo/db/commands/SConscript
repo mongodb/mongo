@@ -143,6 +143,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_settings_utils',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'set_cluster_parameter_impl',
+    ])
+
+env.Library(
+    target='set_cluster_parameter_impl', source=[
+        'set_cluster_parameter_command_impl.cpp',
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/s/grid',
+        'cluster_server_parameter_commands_invocation',
+        'mongod_fcv',
     ])
 
 # Commands available in all mongodb server processes (mongod, mongos, etc.)
@@ -743,6 +754,7 @@ env.Library(
         'profile_common',
         'rwc_defaults_commands',
         'servers',
+        'set_cluster_parameter_impl',
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
         'set_user_write_block_mode_idl',

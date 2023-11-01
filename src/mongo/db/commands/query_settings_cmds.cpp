@@ -34,6 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/query_settings_cmds_gen.h"
+#include "mongo/db/commands/set_cluster_parameter_command_impl.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
@@ -72,13 +73,13 @@ SetClusterParameter makeSetClusterParameterRequest(
 
 /**
  * Invokes the setClusterParameter() weak function, which is an abstraction over the corresponding
- * command implementation in sharded clusters (mongos) vs. replica set deployments (mongod).
+ * command implementation in the router-role vs. the shard-role/the replica-set or standalone impl.
  */
 void setClusterParameter(OperationContext* opCtx,
                          const SetClusterParameter& request,
                          boost::optional<Timestamp> clusterParameterTime,
                          boost::optional<LogicalTime> previousTime) {
-    static auto w = MONGO_WEAK_FUNCTION_DEFINITION(setClusterParameter);
+    auto w = getSetClusterParameterImpl(opCtx);
     w(opCtx, request, clusterParameterTime, previousTime);
 }
 

@@ -139,6 +139,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/rename_collection_idl',
         '$BUILD_DIR/mongo/db/commands/rwc_defaults_commands',
         '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/db/commands/set_cluster_parameter_impl',
         '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
         '$BUILD_DIR/mongo/db/commands/set_index_commit_quorum_idl',
         '$BUILD_DIR/mongo/db/commands/set_user_write_block_mode_idl',
