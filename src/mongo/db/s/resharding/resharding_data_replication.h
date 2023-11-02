@@ -153,6 +153,7 @@ private:
     struct TrustedInitTag {};
 
 public:
+    virtual ~ReshardingDataReplication();
     static std::unique_ptr<ReshardingDataReplicationInterface> make(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,

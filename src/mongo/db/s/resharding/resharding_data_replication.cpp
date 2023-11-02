@@ -546,4 +546,9 @@ ReshardingDonorOplogId ReshardingDataReplication::getOplogApplierResumeId(
                            : ReshardingDonorOplogId{minFetchTimestamp, minFetchTimestamp};
 }
 
+ReshardingDataReplication::~ReshardingDataReplication() {
+    shutdown();
+    join();
+}
+
 }  // namespace mongo
