@@ -1496,8 +1496,8 @@ WriteResult performUpdates(OperationContext* opCtx,
     auto ns = wholeOp.getNamespace();
     NamespaceString originalNs;
     if (source == OperationSource::kTimeseriesUpdate) {
+        originalNs = ns;
         if (!ns.isTimeseriesBucketsCollection()) {
-            originalNs = ns;
             ns = ns.makeTimeseriesBucketsNamespace();
         }
 
