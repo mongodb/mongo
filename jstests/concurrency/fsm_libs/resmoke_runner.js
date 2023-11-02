@@ -42,7 +42,7 @@ async function runWorkloads(workloads,
     // this before constructing a ThreadManager instance to make its dependency on the
     // 'clusterOptions' being filled in explicit.
     const cluster = new Cluster(clusterOptions);
-    const threadMgr = new ThreadManager(clusterOptions, executionMode);
+    const threadMgr = new ThreadManager(clusterOptions);
 
     Random.setRandomSeed(clusterOptions.seed);
 

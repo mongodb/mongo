@@ -5,11 +5,9 @@ import {Thread} from "jstests/libs/parallelTester.js";
  * Helper for spawning and joining worker threads.
  */
 
-export const ThreadManager = function(clusterOptions, executionMode = {
-    composed: false
-}) {
+export const ThreadManager = function(clusterOptions) {
     if (!(this instanceof ThreadManager)) {
-        return new ThreadManager(clusterOptions, executionMode);
+        return new ThreadManager(clusterOptions);
     }
 
     function makeThread(workloads, args, options) {
@@ -26,10 +24,6 @@ export const ThreadManager = function(clusterOptions, executionMode = {
                 }
             }
         };
-
-        if (executionMode.composed) {
-            return new Thread(guardedThreadFn, workerThread.composed, workloads, args, options);
-        }
 
         return new Thread(guardedThreadFn, workerThread.fsm, workloads, args, options);
     }
@@ -101,9 +95,6 @@ export const ThreadManager = function(clusterOptions, executionMode = {
             var config = _context[workload].config;
             workloadData[workload] = config.data;
             var workloads = [workload];  // worker thread only needs to load 'workload'
-            if (executionMode.composed) {
-                workloads = _workloads;  // worker thread needs to load all workloads
-            }
 
             for (var i = 0; i < config.threadCount; ++i) {
                 var args = {
@@ -203,14 +194,5 @@ workerThread.fsm = async function(workloads, args, options) {
         var workloads = Object.keys(configs);
         assert.eq(1, workloads.length);
         await fsm.run(configs[workloads[0]]);
-    });
-};
-
-workerThread.composed = async function(workloads, args, options) {
-    const {workerThread} = await import("jstests/concurrency/fsm_libs/worker_thread.js");
-    const {composer} = await import("jstests/concurrency/fsm_libs/composer.js");
-
-    return workerThread.main(workloads, args, function(configs) {
-        composer.run(workloads, configs, options);
     });
 };

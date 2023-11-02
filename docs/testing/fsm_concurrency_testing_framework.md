@@ -348,23 +348,6 @@ all complete, all threads have their teardown function run.
 
 ![fsm_simultaneous_example.png](../images/testing/fsm_simultaneous_example.png)
 
-#### Composed
-
-Composed is the most complicated of runner modes. It is similar to parallel in
-that all setups and teardowns are run in sequence, but the execution that goes
-on between them is a little different. In composed mode, each thread spawned
-after setup has a two step transition between states. The first step is to
-decide whether or not to switch which FSM it is executing within. The
-probability of switching is defined by the option composeProb. If no switching
-between FSMs will be performed, then the next step is just to choose which state
-to move to within the existing FSM using the workload's defined transition
-probabilities. If switching between FSMs is the outcome of the first step, then
-the second step becomes choosing a state from all the other workloads with equal
-probability. For a walkthrough of this process, see the slides under "Other
-Resources".
-
-![fsm_composed_example.png](../images/testing/fsm_composed_example.png)
-
 
 ### Existing runners
 
@@ -382,8 +365,6 @@ runWorkloads functions, the third argument, can contain the following options
   workloads to execute in parallel or composed mode
 * `subsetSize` - Not available in serial mode, determines how large each subset of
   workloads executed is
-* `composeProb` - Only available in composed mode, determines the probability of
-  leaving the current FSM to enter a new FSM in composed mode
 * `iterations` - Only available in composed mode, determines how many transitions
   to perform between states in a single thread of composition.
 
@@ -393,19 +374,6 @@ Runs all workloads serially. For each workload, `$config.threadCount` threads
 are spawned and each thread runs for exactly `$config.iterations` steps starting
 at `$config.startState` and transitioning to other states based on the
 transition probabilities defined in $config.transitions.
-
-#### fsm_all_composed.js
-
-options: numSubsets, subsetSize, composeProb, iterations (=100 by default)
-
-Runs numSubsets subsets (each subset has size subsetSize) of all workloads in
-composition. During composition, the probability of transitioning from some
-state in a workload to another state in the same workload is equal to
-1-composeProb. Each thread spawned during composition goes for exactly
-iterations steps. The same database and collection are used throughout a
-composition of workloads. By default, each workload in each subset is run
-between 2 and 3 times. The number of threads used during composition equals the
-sum of the `$config.threadCount` values for each workload in each subset.
 
 #### fsm_all_simultaneous.js
 
