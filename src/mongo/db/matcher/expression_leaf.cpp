@@ -319,25 +319,15 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
 void RegexMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
                                                          const SerializationOptions& opts,
                                                          bool includePath) const {
-    // Sadly we cannot use the fast/short syntax to append this, we need to be careful to generate a
-    // valid regex, and the default string "?" is not valid.
-    if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
-        bob->append("$regex", "\\?");
-    } else {
-        // May generate {$regex: "?string"} - invalid regex but we don't care since it's not
-        // parseable it's just saying "there was a string here."
-        opts.appendLiteral(bob, "$regex", _regex);
-    }
+    // We need to be careful to generate a valid regex representative value, and the default string
+    // "?" is not valid.
+    opts.appendLiteral(bob, "$regex", _regex, Value("\\?"_sd));
 
     if (!_flags.empty()) {
-        if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
-            // We need to make sure the $options value can be re-parsed as legal regex options, so
-            // we'll set the representative value in this case to be the empty string rather than
-            // "?", which is the standard representative for string values.
-            bob->append("$options", "");
-        } else {
-            opts.appendLiteral(bob, "$options", _flags);
-        }
+        // We need to make sure the $options value can be re-parsed as legal regex options, so
+        // we'll set the representative value in this case to be the empty string rather than
+        // "?", which is the standard representative for string values.
+        opts.appendLiteral(bob, "$options", _flags, Value(""_sd));
     }
 }
 

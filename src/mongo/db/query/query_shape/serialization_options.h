@@ -189,7 +189,10 @@ struct SerializationOptions {
      * Helper method to call 'serializeLiteral()' on 'v' and append the result to 'bob' using field
      * name 'fieldName'.
      */
-    void appendLiteral(BSONObjBuilder* bob, StringData fieldName, const ImplicitValue& v) const;
+    void appendLiteral(BSONObjBuilder* bob,
+                       StringData fieldName,
+                       const ImplicitValue& v,
+                       const boost::optional<Value>& representativeValue = boost::none) const;
 
     /**
      * Depending on the configured 'literalPolicy', serializeLiteral will return the appropriate
@@ -198,11 +201,14 @@ struct SerializationOptions {
      * - If it is 'kToDebugTypeString', computes and returns the type string as a string Value.
      * - If it is 'kToRepresentativeValue', it returns an arbitrary value of the same type as the
      *   one given. For any number, this will be the number 1. For any boolean this will be true.
+     *   If the 'representativeValue' parameter if it is not none, returns it (regardless of type).
      *
      * Example usage: BSON("myArg" << options.serializeLiteral(_myArg));
      */
-    Value serializeLiteral(const BSONElement& e) const;
-    Value serializeLiteral(const ImplicitValue& v) const;
+    Value serializeLiteral(const BSONElement& e,
+                           const boost::optional<Value>& representativeValue = boost::none) const;
+    Value serializeLiteral(const ImplicitValue& v,
+                           const boost::optional<Value>& representativeValue = boost::none) const;
 
     // 'literalPolicy' is an independent option to serialize in a general format with the aim of
     // similar "shaped" queries serializing to the same object. For example, if set to

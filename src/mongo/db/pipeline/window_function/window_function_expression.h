@@ -572,7 +572,9 @@ public:
         if (_N) {
             subObj[kNArg] = opts.serializeLiteral(_N.get());
         } else {
-            subObj[kAlphaArg] = opts.serializeLiteral(_alpha.get());
+            // Alpha must be between zero and one (exclusive), so choose a legal representative
+            // value if applicable.
+            subObj[kAlphaArg] = opts.serializeLiteral(_alpha.get(), Value(0.1));
         }
         subObj[kInputArg] = _input->serialize(opts);
         MutableDocument outerObj;

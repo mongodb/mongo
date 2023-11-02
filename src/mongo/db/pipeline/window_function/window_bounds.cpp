@@ -87,14 +87,18 @@ WindowBounds::Bound<T> parseBound(ExpressionContext* expCtx,
 }
 
 template <class T>
-Value serializeBound(const WindowBounds::Bound<T>& bound, const SerializationOptions& opts) {
+Value serializeBound(const WindowBounds::Bound<T>& bound,
+                     const SerializationOptions& opts,
+                     const Value& representativeValue) {
     return stdx::visit(
         OverloadedVisitor{
             [&](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
             [&](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
             [&](const T& n) {
                 // If not "unbounded" or "current", n must be a literal constant
-                return opts.serializeLiteral(n);
+                // The upper bound must be greater than the lower bound. We override the
+                // representative value to meet this constraint.
+                return opts.serializeLiteral(n, representativeValue);
             },
         },
         bound);
@@ -250,24 +254,28 @@ WindowBounds WindowBounds::parse(BSONElement args,
     }
 }
 void WindowBounds::serialize(MutableDocument& args, const SerializationOptions& opts) const {
-    stdx::visit(OverloadedVisitor{
-                    [&](const DocumentBased& docBounds) {
-                        args[kArgDocuments] = Value{std::vector<Value>{
-                            serializeBound(docBounds.lower, opts),
-                            serializeBound(docBounds.upper, opts),
-                        }};
-                    },
-                    [&](const RangeBased& rangeBounds) {
-                        args[kArgRange] = Value{std::vector<Value>{
-                            serializeBound(rangeBounds.lower, opts),
-                            serializeBound(rangeBounds.upper, opts),
-                        }};
-                        if (rangeBounds.unit) {
-                            args[kArgUnit] =
-                                opts.serializeLiteral(serializeTimeUnit(*rangeBounds.unit));
-                        }
-                    },
-                },
-                bounds);
+    stdx::visit(
+        OverloadedVisitor{
+            [&](const DocumentBased& docBounds) {
+                args[kArgDocuments] = Value{std::vector<Value>{
+                    serializeBound(
+                        docBounds.lower, opts, /* representative value, if needed */ Value(0LL)),
+                    serializeBound(
+                        docBounds.upper, opts, /* representative value, if needed */ Value(1LL)),
+                }};
+            },
+            [&](const RangeBased& rangeBounds) {
+                args[kArgRange] = Value{std::vector<Value>{
+                    serializeBound(
+                        rangeBounds.lower, opts, /* representative value, if needed */ Value(0LL)),
+                    serializeBound(
+                        rangeBounds.upper, opts, /* representative value, if needed */ Value(1LL)),
+                }};
+                if (rangeBounds.unit) {
+                    args[kArgUnit] = Value(serializeTimeUnit(*rangeBounds.unit));
+                }
+            },
+        },
+        bounds);
 }
 }  // namespace mongo

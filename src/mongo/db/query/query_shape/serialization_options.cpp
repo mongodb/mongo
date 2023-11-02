@@ -472,31 +472,34 @@ void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
 
 void SerializationOptions::appendLiteral(BSONObjBuilder* bob,
                                          StringData fieldName,
-                                         const ImplicitValue& v) const {
-    serializeLiteral(v).addToBsonObj(bob, fieldName);
+                                         const ImplicitValue& v,
+                                         const boost::optional<Value>& representativeValue) const {
+    serializeLiteral(v, representativeValue).addToBsonObj(bob, fieldName);
 }
 
-Value SerializationOptions::serializeLiteral(const BSONElement& e) const {
+Value SerializationOptions::serializeLiteral(
+    const BSONElement& e, const boost::optional<Value>& representativeValue) const {
     switch (literalPolicy) {
         case LiteralSerializationPolicy::kUnchanged:
             return Value(e);
         case LiteralSerializationPolicy::kToDebugTypeString:
             return Value(debugTypeString(e));
         case LiteralSerializationPolicy::kToRepresentativeParseableValue:
-            return defaultLiteralOfType(e);
+            return representativeValue.value_or(defaultLiteralOfType(e));
         default:
             MONGO_UNREACHABLE_TASSERT(7539802);
     }
 }
 
-Value SerializationOptions::serializeLiteral(const ImplicitValue& v) const {
+Value SerializationOptions::serializeLiteral(
+    const ImplicitValue& v, const boost::optional<Value>& representativeValue) const {
     switch (literalPolicy) {
         case LiteralSerializationPolicy::kUnchanged:
             return v;
         case LiteralSerializationPolicy::kToDebugTypeString:
             return Value(debugTypeString(v));
         case LiteralSerializationPolicy::kToRepresentativeParseableValue:
-            return defaultLiteralOfType(v);
+            return representativeValue.value_or(defaultLiteralOfType(v));
         default:
             MONGO_UNREACHABLE_TASSERT(7539804);
     }
