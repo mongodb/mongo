@@ -51,7 +51,7 @@ public:
         using TypeTags = sbe::value::TypeTags;
         using Value = sbe::value::Value;
         using TagValuePair = std::pair<TypeTags, Value>;
-        using Cmp = StringData::ComparatorInterface;
+        using Cmp = StringDataComparator;
 
         explicit InListElemLessThan(const Cmp* cmp) : _cmp(cmp) {}
 
@@ -89,7 +89,7 @@ public:
 
     class InListElemEqualTo {
     public:
-        using Cmp = StringData::ComparatorInterface;
+        using Cmp = StringDataComparator;
 
         explicit InListElemEqualTo(const Cmp* cmp) : _cmp(cmp) {}
 

@@ -44,7 +44,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -247,7 +247,7 @@ public:
      *  as strings are compared, but comparing one field at a time instead
      *  of one character at a time.
      *
-     *  Pass a non-null StringData::ComparatorInterface if special string comparison semantics are
+     *  Pass a non-null StringDataComparator if special string comparison semantics are
      *  required. If the comparator is null, then a simple binary compare is used for strings. This
      *  comparator is only used for string *values*; field names are always compared using simple
      *  binary compare.
@@ -260,7 +260,7 @@ public:
      */
     static int compare(const Document& lhs,
                        const Document& rhs,
-                       const StringData::ComparatorInterface* stringComparator);
+                       const StringDataComparator* stringComparator);
 
     std::string toString() const;
 
@@ -280,7 +280,7 @@ public:
      * Meant to be used to create composite hashes suitable for
      * hashed container classes such as unordered_map.
      */
-    void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
+    void hash_combine(size_t& seed, const StringDataComparator* stringComparator) const;
 
     /**
      * Returns true, if this document is trivially convertible to BSON, meaning the underlying

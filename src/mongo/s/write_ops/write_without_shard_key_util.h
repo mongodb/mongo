@@ -59,7 +59,7 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
     OperationContext* opCtx,
     const UpdateRequest& updateRequest,
     boost::optional<TimeseriesOptions> timeseriesOptions,
-    const StringData::ComparatorInterface* comparator);
+    const StringDataComparator* comparator);
 
 /**
  * Returns true if we can use the two phase protocol to complete a single write without shard

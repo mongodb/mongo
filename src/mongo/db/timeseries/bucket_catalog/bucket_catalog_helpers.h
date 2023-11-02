@@ -37,7 +37,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -61,7 +61,7 @@ namespace mongo::timeseries::bucket_catalog {
  * Returns a bad status if the bucket document is malformed.
  */
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
-                                               const StringData::ComparatorInterface* comparator);
+                                               const StringDataComparator* comparator);
 
 /**
  * Generates and returns a Schema object from an existing bucket document. Avoids unpacking the
@@ -70,7 +70,7 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
  * Returns a bad status if the bucket document is malformed or contains mixed schema measurements.
  */
 StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
-                                               const StringData::ComparatorInterface* comparator);
+                                               const StringDataComparator* comparator);
 
 /**
  * Extracts the time field of a measurement document.

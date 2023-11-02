@@ -149,7 +149,7 @@ bool DocID::operator<(const DocID& other) const {
     if (comp > 0)
         return false;
 
-    const StringData::ComparatorInterface* stringComparator = nullptr;
+    const StringDataComparator* stringComparator = nullptr;
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
     return eltCmp.evaluate(_id < other._id);
 }

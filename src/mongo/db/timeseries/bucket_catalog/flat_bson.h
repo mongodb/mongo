@@ -297,7 +297,7 @@ public:
      */
     UpdateStatus update(const BSONObj& doc,
                         boost::optional<StringData> metaField,
-                        const StringData::ComparatorInterface* stringComparator);
+                        const StringDataComparator* stringComparator);
 
     int64_t calculateMemUsage();
 
@@ -310,13 +310,13 @@ protected:
     _update(typename FlatBSONStore<Element, Value>::Obj obj,
             BSONElement elem,
             typename Element::UpdateContext updateContext,
-            const StringData::ComparatorInterface* stringComparator);
+            const StringDataComparator* stringComparator);
 
     // Helper to search and compare field names between FlatBSONStore::Obj and BSONObj.
     UpdateStatus _updateObj(typename FlatBSONStore<Element, Value>::Obj& obj,
                             const BSONObj& doc,
                             typename Element::UpdateContext updateContext,
-                            const StringData::ComparatorInterface* stringComparator,
+                            const StringDataComparator* stringComparator,
                             std::function<bool(StringData)> skipFieldFn);
 
     /**
@@ -454,7 +454,7 @@ public:
      */
     static MinMax parseFromBSON(const BSONObj& min,
                                 const BSONObj& max,
-                                const StringData::ComparatorInterface* stringComparator);
+                                const StringDataComparator* stringComparator);
 
 protected:
     static std::pair<UpdateStatus, MinMaxElement::UpdateContext> _shouldUpdateObj(
@@ -466,7 +466,7 @@ protected:
     static UpdateStatus _maybeUpdateValue(MinMaxStore::Obj& obj,
                                           const BSONElement& elem,
                                           MinMaxElement::UpdateContext updateContext,
-                                          const StringData::ComparatorInterface* stringComparator);
+                                          const StringDataComparator* stringComparator);
 
 private:
     /**
@@ -543,7 +543,7 @@ public:
      */
     static Schema parseFromBSON(const BSONObj& min,
                                 const BSONObj& max,
-                                const StringData::ComparatorInterface* stringComparator);
+                                const StringDataComparator* stringComparator);
 
 protected:
     static std::pair<UpdateStatus, typename SchemaElement::UpdateContext> _shouldUpdateObj(
@@ -555,7 +555,7 @@ protected:
     static UpdateStatus _maybeUpdateValue(SchemaStore::Obj& obj,
                                           const BSONElement& elem,
                                           SchemaElement::UpdateContext updateContext,
-                                          const StringData::ComparatorInterface* stringComparator);
+                                          const StringDataComparator* stringComparator);
 
 private:
     /**

@@ -46,7 +46,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <s2cellid.h>
 
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -1194,7 +1194,9 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQue
 }
 
 uint32_t computeHash(StringData key) {
-    return SimpleStringDataComparator::kInstance.hash(key);
+    size_t seed = 0;
+    simpleStringDataComparator.hash_combine(seed, key);
+    return seed;
 }
 }  // namespace canonical_query_encoder
 }  // namespace mongo

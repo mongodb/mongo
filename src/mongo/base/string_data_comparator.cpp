@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,29 +27,16 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/base/string_data_comparator.h"
 
-#include <cstddef>
+#include <cstdlib>
 
-#include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
-/**
- * Compares and hashes strings using simple binary comparisons.
- */
-class SimpleStringDataComparator final : public StringData::ComparatorInterface {
-public:
-    // Global comparator for performing simple binary string comparisons. String comparisons that
-    // require database logic, such as collations, must instantiate their own comparator.
-    static const SimpleStringDataComparator kInstance;
-
-    SimpleStringDataComparator() = default;
-
-    int compare(StringData left, StringData right) const override;
-
-    void hash_combine(size_t& seed, StringData stringToHash) const override;
-};
+void SimpleStringDataComparator::hash_combine(size_t& seed, StringData stringToHash) const {
+    seed = murmur3<sizeof(seed)>(stringToHash, seed);
+}
 
 }  // namespace mongo

@@ -1225,7 +1225,7 @@ std::pair<value::TypeTags, value::Value> ByteCode::compare3way(
     value::Value lhsValue,
     value::TypeTags rhsTag,
     value::Value rhsValue,
-    const StringData::ComparatorInterface* comparator) {
+    const StringDataComparator* comparator) {
     if (lhsTag == value::TypeTags::Nothing || rhsTag == value::TypeTags::Nothing) {
         return {value::TypeTags::Nothing, 0};
     }
@@ -1243,7 +1243,7 @@ std::pair<value::TypeTags, value::Value> ByteCode::compare3way(value::TypeTags l
         return {value::TypeTags::Nothing, 0};
     }
 
-    auto comparator = static_cast<StringData::ComparatorInterface*>(getCollatorView(collValue));
+    auto comparator = static_cast<StringDataComparator*>(getCollatorView(collValue));
 
     return value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue, comparator);
 }

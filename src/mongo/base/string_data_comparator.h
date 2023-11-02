@@ -27,19 +27,50 @@
  *    it in the license file.
  */
 
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/util/murmur3.h"
+#pragma once
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
-const SimpleStringDataComparator SimpleStringDataComparator::kInstance{};
+/**
+ * Abstraction providing consistent `compare` and `hash_combine` operations for
+ * use with polymorphic configurable sorting or to configure unordered
+ * associative containers. These closely related operations are bundled into
+ * this one interface.
+ */
+class StringDataComparator {
+public:
+    virtual ~StringDataComparator() = default;
 
-int SimpleStringDataComparator::compare(StringData left, StringData right) const {
-    return left.compare(right);
-}
+    /**
+     * Compares two string values, applying a weak order (i.e. allowing ties).
+     * Returns:
+     *   -1 if `left < right`
+     *    0 if `left == right`
+     *   +1 if `left > right`
+     */
+    virtual int compare(StringData left, StringData right) const = 0;
 
-void SimpleStringDataComparator::hash_combine(size_t& seed, StringData stringToHash) const {
-    seed = murmur3<sizeof(size_t)>(stringToHash, seed);
-}
+    /**
+     * Hash `str` in a way consistent with this comparator, storing the
+     * result in the `seed` in-out parameter. Strings which `compare` equal
+     * must have the same effect on all `seed` values.
+     */
+    virtual void hash_combine(size_t& seed, StringData str) const = 0;
+};
+
+/** Uses `StringData::compare` and Murmur3 hashing. */
+class SimpleStringDataComparator final : public StringDataComparator {
+public:
+    constexpr int compare(StringData left, StringData right) const override {
+        return left.compare(right);
+    }
+
+    void hash_combine(size_t& seed, StringData stringToHash) const override;
+};
+
+/** Singleton instance for use in basic string comparisons. */
+inline const SimpleStringDataComparator simpleStringDataComparator{};
 
 }  // namespace mongo

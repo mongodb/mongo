@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <cstdlib>
 #include <iterator>
@@ -43,7 +42,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -53,6 +51,7 @@
 #include "mongo/db/update/push_node.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -79,11 +78,13 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
     invariant(modExpr.ok());
 
     if (modExpr.type() == BSONType::Object && modExpr[kEachClauseName]) {
-        std::set<StringData> validClauseNames{
-            kEachClauseName, kSliceClauseName, kSortClauseName, kPositionClauseName};
-        auto clausesFound =
-            SimpleStringDataComparator::kInstance.makeStringDataUnorderedMap<const BSONElement>();
-
+        const StringDataSet validClauseNames{
+            kEachClauseName,
+            kSliceClauseName,
+            kSortClauseName,
+            kPositionClauseName,
+        };
+        StringDataMap<BSONElement> clausesFound;
         for (auto&& modifier : modExpr.embeddedObject()) {
             auto clauseName = modifier.fieldNameStringData();
 
@@ -94,12 +95,11 @@ Status PushNode::init(BSONElement modExpr, const boost::intrusive_ptr<Expression
                                             << modifier.fieldNameStringData());
             }
 
-            if (clausesFound.find(*foundClauseName) != clausesFound.end()) {
+            auto [insIter, insOk] = clausesFound.insert({*foundClauseName, modifier});
+            if (!insOk) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Only one " << clauseName << " is supported.");
             }
-
-            clausesFound.insert(std::make_pair(*foundClauseName, modifier));
         }
 
         // Parse $each.

@@ -40,7 +40,7 @@
 namespace mongo::timeseries::bucket_catalog {
 
 BucketMetadata::BucketMetadata(BSONElement elem,
-                               const StringData::ComparatorInterface* comparator,
+                               const StringDataComparator* comparator,
                                boost::optional<StringData> trueMetaFieldName)
     : _metadataElement(elem), _comparator(comparator) {
     if (_metadataElement) {
@@ -70,7 +70,7 @@ StringData BucketMetadata::getMetaField() const {
     return StringData(_metadataElement.fieldName());
 }
 
-const StringData::ComparatorInterface* BucketMetadata::getComparator() const {
+const StringDataComparator* BucketMetadata::getComparator() const {
     return _comparator;
 }
 

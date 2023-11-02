@@ -378,12 +378,11 @@ std::string printTagAndVal(const std::pair<TypeTags, Value>& value);  // debuggi
 /**
  * Three ways value comparison (aka spaceship operator).
  */
-std::pair<TypeTags, Value> compareValue(
-    TypeTags lhsTag,
-    Value lhsValue,
-    TypeTags rhsTag,
-    Value rhsValue,
-    const StringData::ComparatorInterface* comparator = nullptr);
+std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
+                                        Value lhsValue,
+                                        TypeTags rhsTag,
+                                        Value rhsValue,
+                                        const StringDataComparator* comparator = nullptr);
 
 bool isNaN(TypeTags tag, Value val) noexcept;
 

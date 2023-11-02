@@ -33,7 +33,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/util/str.h"
@@ -169,7 +169,7 @@ void deduplicateChildren(Element parent, EqualityComparator equal) {
 class woLess {
     // TODO: This should possibly derive from std::binary_function.
 public:
-    woLess(const StringData::ComparatorInterface* comparator, bool considerFieldName = true)
+    woLess(const StringDataComparator* comparator, bool considerFieldName = true)
         : _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& left, const ConstElement& right) const {
@@ -177,7 +177,7 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _comp = nullptr;
+    const StringDataComparator* _comp = nullptr;
     const bool _considerFieldName;
 };
 
@@ -185,7 +185,7 @@ private:
 class woGreater {
     // TODO: This should possibly derive from std::binary_function.
 public:
-    woGreater(const StringData::ComparatorInterface* comparator, bool considerFieldName = true)
+    woGreater(const StringDataComparator* comparator, bool considerFieldName = true)
         : _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& left, const ConstElement& right) const {
@@ -193,7 +193,7 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _comp = nullptr;
+    const StringDataComparator* _comp = nullptr;
     const bool _considerFieldName;
 };
 
@@ -201,7 +201,7 @@ private:
 class woEqual {
     // TODO: This should possibly derive from std::binary_function.
 public:
-    woEqual(const StringData::ComparatorInterface* comparator, bool considerFieldName = true)
+    woEqual(const StringDataComparator* comparator, bool considerFieldName = true)
         : _comp(comparator), _considerFieldName(considerFieldName) {}
 
     inline bool operator()(const ConstElement& left, const ConstElement& right) const {
@@ -209,7 +209,7 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _comp = nullptr;
+    const StringDataComparator* _comp = nullptr;
     const bool _considerFieldName;
 };
 
@@ -218,7 +218,7 @@ class woEqualTo {
     // TODO: This should possibly derive from std::binary_function.
 public:
     woEqualTo(const ConstElement& value,
-              const StringData::ComparatorInterface* comparator,
+              const StringDataComparator* comparator,
               bool considerFieldName = true)
         : _value(value), _comp(comparator), _considerFieldName(considerFieldName) {}
 
@@ -228,7 +228,7 @@ public:
 
 private:
     const ConstElement _value;
-    const StringData::ComparatorInterface* _comp = nullptr;
+    const StringDataComparator* _comp = nullptr;
     const bool _considerFieldName;
 };
 

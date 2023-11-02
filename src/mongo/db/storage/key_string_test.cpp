@@ -40,8 +40,8 @@
 #include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonmisc.h"
@@ -1245,7 +1245,7 @@ void testPermutation(key_string::Version version,
                 std::vector<BSONObj> elements = elementsOrig;
                 BSONObjComparator bsonCmp(orderObj,
                                           BSONObjComparator::FieldNamesMode::kConsider,
-                                          &SimpleStringDataComparator::kInstance);
+                                          &simpleStringDataComparator);
                 std::stable_sort(elements.begin(), elements.end(), bsonCmp.makeLessThan());
 
                 for (size_t i = 0; i < elements.size(); i++) {

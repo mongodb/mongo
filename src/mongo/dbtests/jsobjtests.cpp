@@ -1466,7 +1466,7 @@ public:
     }
 
     void test(BSONObj order, BSONObj l, BSONObj r, bool wanted) {
-        const StringData::ComparatorInterface* stringComparator = nullptr;
+        const StringDataComparator* stringComparator = nullptr;
         BSONObjComparator bsonCmp(
             order, BSONObjComparator::FieldNamesMode::kConsider, stringComparator);
         bool got = bsonCmp.makeLessThan()(l, r);

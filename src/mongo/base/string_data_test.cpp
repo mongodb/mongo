@@ -38,8 +38,8 @@
 
 #include <fmt/format.h>
 
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -48,7 +48,7 @@
 namespace mongo {
 namespace {
 
-using std::string;
+using namespace fmt::literals;
 
 TEST(Construction, Empty) {
     StringData strData;
@@ -80,19 +80,19 @@ TEST(Construction, FromNullCString) {
 TEST(Construction, FromUserDefinedLiteral) {
     const auto strData = "cc\0c"_sd;
     ASSERT_EQUALS(strData.size(), 4U);
-    ASSERT_EQUALS(strData.toString(), string("cc\0c", 4));
+    ASSERT_EQUALS(strData.toString(), std::string("cc\0c", 4));
 }
 
 TEST(Construction, FromUserDefinedRawLiteral) {
     const auto strData = R"("")"_sd;
     ASSERT_EQUALS(strData.size(), 2U);
-    ASSERT_EQUALS(strData.toString(), string("\"\"", 2));
+    ASSERT_EQUALS(strData.toString(), std::string("\"\"", 2));
 }
 
 TEST(Construction, FromEmptyUserDefinedLiteral) {
     const auto strData = ""_sd;
     ASSERT_EQUALS(strData.size(), 0U);
-    ASSERT_EQUALS(strData.toString(), string(""));
+    ASSERT_EQUALS(strData.toString(), std::string(""));
 }
 
 // Try some constexpr initializations
@@ -178,7 +178,7 @@ TEST(Comparison, MixedEmptyAndNot) {
 }
 
 TEST(Find, Char1) {
-    ASSERT_EQUALS(string::npos, StringData("foo").find('a'));
+    ASSERT_EQUALS(std::string::npos, StringData("foo").find('a'));
     ASSERT_EQUALS(0U, StringData("foo").find('f'));
     ASSERT_EQUALS(1U, StringData("foo").find('o'));
 
@@ -200,10 +200,10 @@ TEST(Find, Char1) {
 }
 
 TEST(Find, Str1) {
-    ASSERT_EQUALS(string::npos, StringData("foo").find("asdsadasda"));
-    ASSERT_EQUALS(string::npos, StringData("foo").find("a"));
-    ASSERT_EQUALS(string::npos, StringData("foo").find("food"));
-    ASSERT_EQUALS(string::npos, StringData("foo").find("ooo"));
+    ASSERT_EQUALS(std::string::npos, StringData("foo").find("asdsadasda"));
+    ASSERT_EQUALS(std::string::npos, StringData("foo").find("a"));
+    ASSERT_EQUALS(std::string::npos, StringData("foo").find("food"));
+    ASSERT_EQUALS(std::string::npos, StringData("foo").find("ooo"));
 
     ASSERT_EQUALS(0U, StringData("foo").find("f"));
     ASSERT_EQUALS(0U, StringData("foo").find("fo"));
@@ -211,7 +211,7 @@ TEST(Find, Str1) {
     ASSERT_EQUALS(1U, StringData("foo").find("o"));
     ASSERT_EQUALS(1U, StringData("foo").find("oo"));
 
-    ASSERT_EQUALS(string("foo").find(""), StringData("foo").find(""));
+    ASSERT_EQUALS(std::string("foo").find(""), StringData("foo").find(""));
 
     using namespace std::literals;
     const std::string haystacks[]{"", "x", "foo", "fffoo", "\0"s};
@@ -231,48 +231,50 @@ TEST(Find, Str1) {
     }
 }
 
-// Helper function for Test(Hasher, Str1)
-template <int SizeofSizeT>
-void SDHasher_check(void);
-
-template <>
-void SDHasher_check<4>(void) {
-    const auto& strCmp = SimpleStringDataComparator::kInstance;
-    ASSERT_EQUALS(strCmp.hash(""), static_cast<size_t>(0));
-    ASSERT_EQUALS(strCmp.hash("foo"), static_cast<size_t>(4138058784ULL));
-    ASSERT_EQUALS(strCmp.hash("pizza"), static_cast<size_t>(3587803311ULL));
-    ASSERT_EQUALS(strCmp.hash("mongo"), static_cast<size_t>(3724335885ULL));
-    ASSERT_EQUALS(strCmp.hash("murmur"), static_cast<size_t>(1945310157ULL));
-}
-
-template <>
-void SDHasher_check<8>(void) {
-    const auto& strCmp = SimpleStringDataComparator::kInstance;
-    ASSERT_EQUALS(strCmp.hash(""), static_cast<size_t>(0));
-    ASSERT_EQUALS(strCmp.hash("foo"), static_cast<size_t>(16316970633193145697ULL));
-    ASSERT_EQUALS(strCmp.hash("pizza"), static_cast<size_t>(12165495155477134356ULL));
-    ASSERT_EQUALS(strCmp.hash("mongo"), static_cast<size_t>(2861051452199491487ULL));
-    ASSERT_EQUALS(strCmp.hash("murmur"), static_cast<size_t>(18237957392784716687ULL));
-}
-
 TEST(Hasher, Str1) {
-    SDHasher_check<sizeof(size_t)>();
+    static constexpr size_t sizeofSizeT = sizeof(size_t);
+    struct Spec {
+        StringData str;
+        uint32_t h4;
+        uint64_t h8;
+    };
+    static constexpr auto specs = std::to_array<Spec>({
+        {""_sd, 0, 0},
+        {"foo"_sd, 0xf6a5c420, 0xe271865701f54561},
+        {"pizza"_sd, 0xd5d988af, 0xa8d485636af33c14},
+        {"mongo"_sd, 0xddfcdb0d, 0x27b47f232477579f},
+        {"murmur"_sd, 0x73f313cd, 0xfd1a3d9eb1a4738f},
+    });
+    auto tryHash = [](StringData str) {
+        size_t h = 0;
+        simpleStringDataComparator.hash_combine(h, str);
+        return h;
+    };
+    if constexpr (sizeofSizeT == 4) {
+        for (auto&& s : specs)
+            ASSERT_EQUALS(tryHash(s.str), s.h4) << "str={}"_format(s.str);
+    } else if constexpr (sizeofSizeT == 8) {
+        for (auto&& s : specs)
+            ASSERT_EQUALS(tryHash(s.str), s.h8) << "str={}"_format(s.str);
+    } else {
+        FAIL("sizeT weird size") << " sizeof(size_t) == {}"_format(sizeofSizeT);
+    }
 }
 
 TEST(Rfind, Char1) {
-    ASSERT_EQUALS(string::npos, StringData("foo").rfind('a'));
+    ASSERT_EQUALS(std::string::npos, StringData("foo").rfind('a'));
 
     ASSERT_EQUALS(0U, StringData("foo").rfind('f'));
     ASSERT_EQUALS(0U, StringData("foo").rfind('f', 3));
     ASSERT_EQUALS(0U, StringData("foo").rfind('f', 2));
     ASSERT_EQUALS(0U, StringData("foo").rfind('f', 1));
-    ASSERT_EQUALS(string::npos, StringData("foo", 0).rfind('f'));
+    ASSERT_EQUALS(std::string::npos, StringData("foo", 0).rfind('f'));
 
     ASSERT_EQUALS(2U, StringData("foo").rfind('o'));
     ASSERT_EQUALS(2U, StringData("foo", 3).rfind('o'));
     ASSERT_EQUALS(1U, StringData("foo", 2).rfind('o'));
-    ASSERT_EQUALS(string::npos, StringData("foo", 1).rfind('o'));
-    ASSERT_EQUALS(string::npos, StringData("foo", 0).rfind('o'));
+    ASSERT_EQUALS(std::string::npos, StringData("foo", 1).rfind('o'));
+    ASSERT_EQUALS(std::string::npos, StringData("foo", 0).rfind('o'));
 
     using namespace std::literals;
     const std::string haystacks[]{"", "x", "foo", "fffoo", "oof", "\0"s};

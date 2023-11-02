@@ -101,7 +101,7 @@ public:
     /**
      * Constructs a value comparator with special string comparison semantics.
      */
-    ValueComparator(const StringData::ComparatorInterface* stringComparator)
+    ValueComparator(const StringDataComparator* stringComparator)
         : _stringComparator(stringComparator) {}
 
     /**
@@ -204,7 +204,7 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _stringComparator = nullptr;
+    const StringDataComparator* _stringComparator = nullptr;
 };
 
 //

@@ -40,7 +40,7 @@
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
@@ -287,7 +287,7 @@ int compareElementStringValues(const BSONElement& leftStr, const BSONElement& ri
 int BSONElement::compareElements(const BSONElement& l,
                                  const BSONElement& r,
                                  ComparisonRulesSet rules,
-                                 const StringData::ComparatorInterface* comparator) {
+                                 const StringDataComparator* comparator) {
     switch (l.type()) {
         case BSONType::EOO:
         case BSONType::Undefined:  // EOO and Undefined are same canonicalType
@@ -466,7 +466,7 @@ std::vector<BSONElement> BSONElement::Array() const {
 
 int BSONElement::woCompare(const BSONElement& elem,
                            ComparisonRulesSet rules,
-                           const StringData::ComparatorInterface* comparator) const {
+                           const StringDataComparator* comparator) const {
     if (type() != elem.type()) {
         int lt = (int)canonicalType();
         int rt = (int)elem.canonicalType();

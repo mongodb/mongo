@@ -29,13 +29,13 @@
 
 #include "mongo/db/query/collation/collator_interface.h"
 
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data_comparator.h"
 
 namespace mongo {
 
 void CollatorInterface::hash_combine(size_t& seed, StringData stringToHash) const {
     auto comparisonKey = getComparisonKey(stringToHash);
-    SimpleStringDataComparator::kInstance.hash_combine(seed, comparisonKey.getKeyData());
+    simpleStringDataComparator.hash_combine(seed, comparisonKey.getKeyData());
 }
 
 std::string CollatorInterface::getComparisonString(StringData stringData) const {

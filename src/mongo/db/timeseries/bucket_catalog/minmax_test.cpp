@@ -35,8 +35,8 @@
 
 #include <boost/move/utility_core.hpp>
 
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -120,7 +120,7 @@ TEST(MinMax, Insert) {
 
 TEST(MinMax, MinMaxNoUpdatesAfterFullMinMax) {
     MinMax minMaxObj;
-    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+    const auto* strCmp = &simpleStringDataComparator;
     minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.min(), BSON("a" << 2 << "b" << 3));
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj());
@@ -133,7 +133,7 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMax) {
 
 TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
     MinMax minMaxObj;
-    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+    const auto* strCmp = &simpleStringDataComparator;
 
     auto obj = BSON("a" << BSON("z" << 1) << "b" << BSON_ARRAY(BSON("z" << 1) << BSON("z" << 2)));
     minMaxObj.update(obj, "_meta"_sd, strCmp);
@@ -155,7 +155,7 @@ TEST(MinMax, MinMaxNoUpdatesAfterFullMinMaxNested) {
 
 TEST(MinMax, MinMaxInitialUpdates) {
     MinMax minMaxObj;
-    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+    const auto* strCmp = &simpleStringDataComparator;
     minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSON("u" << BSON("a" << 2 << "b" << 3)));
 
@@ -165,7 +165,7 @@ TEST(MinMax, MinMaxInitialUpdates) {
 
 TEST(MinMax, MinMaxMixedUpdates) {
     MinMax minMaxObj;
-    const auto* strCmp = &SimpleStringDataComparator::kInstance;
+    const auto* strCmp = &simpleStringDataComparator;
     minMaxObj.update(BSON("a" << 2 << "b" << 3 << "meta" << 4), "meta"_sd, strCmp);
     ASSERT_BSONOBJ_EQ(minMaxObj.min(), BSON("a" << 2 << "b" << 3));
     ASSERT_BSONOBJ_EQ(minMaxObj.minUpdates(), BSONObj());

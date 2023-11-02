@@ -98,7 +98,7 @@ public:
     /**
      * Constructs a document comparator with special string comparison semantics.
      */
-    DocumentComparator(const StringData::ComparatorInterface* stringComparator)
+    DocumentComparator(const StringDataComparator* stringComparator)
         : _stringComparator(stringComparator) {}
 
     /**
@@ -184,7 +184,7 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _stringComparator = nullptr;
+    const StringDataComparator* _stringComparator = nullptr;
 };
 
 //

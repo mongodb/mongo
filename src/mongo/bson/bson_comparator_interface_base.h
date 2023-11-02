@@ -40,7 +40,7 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -290,7 +290,7 @@ protected:
     static void hashCombineBSONObj(size_t& seed,
                                    const BSONObj& objToHash,
                                    ComparisonRulesSet rules,
-                                   const StringData::ComparatorInterface* stringComparator);
+                                   const StringDataComparator* stringComparator);
 
     /**
      * Hashes 'elemToHash', respecting the equivalence classes given by 'stringComparator'.
@@ -300,7 +300,7 @@ protected:
     static void hashCombineBSONElement(size_t& seed,
                                        BSONElement elemToHash,
                                        ComparisonRulesSet rules,
-                                       const StringData::ComparatorInterface* stringComparator);
+                                       const StringDataComparator* stringComparator);
 };
 
 }  // namespace mongo

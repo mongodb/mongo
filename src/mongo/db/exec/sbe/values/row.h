@@ -38,7 +38,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/values/slot_util.h"
@@ -360,7 +360,7 @@ private:
 
 template <typename RowType>
 struct RowEq {
-    using ComparatorType = StringData::ComparatorInterface;
+    using ComparatorType = StringDataComparator;
 
     explicit RowEq(const ComparatorType* comparator = nullptr) : _comparator(comparator) {}
 

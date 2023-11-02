@@ -54,7 +54,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
@@ -556,12 +556,12 @@ public:
     int woCompare(const BSONObj& r,
                   const Ordering& o,
                   ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
-                  const StringData::ComparatorInterface* comparator = nullptr) const;
+                  const StringDataComparator* comparator = nullptr) const;
 
     int woCompare(const BSONObj& r,
                   const BSONObj& ordering = BSONObj(),
                   ComparisonRulesSet rules = ComparisonRules::kConsiderFieldName,
-                  const StringData::ComparatorInterface* comparator = nullptr) const;
+                  const StringDataComparator* comparator = nullptr) const;
 
     DeferredComparison operator<(const BSONObj& other) const {
         return DeferredComparison(DeferredComparison::Type::kLT, *this, other);

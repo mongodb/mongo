@@ -33,9 +33,8 @@
 #include <mutex>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"

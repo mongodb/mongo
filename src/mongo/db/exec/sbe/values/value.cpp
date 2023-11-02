@@ -37,7 +37,7 @@
 #include <cmath>
 
 #include "mongo/base/compare_numbers.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -550,7 +550,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                                         Value lhsValue,
                                         TypeTags rhsTag,
                                         Value rhsValue,
-                                        const StringData::ComparatorInterface* comparator) {
+                                        const StringDataComparator* comparator) {
     if (isNumber(lhsTag) && isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
             case TypeTags::NumberInt32: {

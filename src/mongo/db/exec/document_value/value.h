@@ -328,7 +328,7 @@ public:
      * Compare two Values. Most Values should prefer to use ValueComparator instead. See
      * value_comparator.h for details.
      *
-     *  Pass a non-null StringData::ComparatorInterface if special string comparison semantics are
+     *  Pass a non-null StringDataComparator if special string comparison semantics are
      *  required. If the comparator is null, then a simple binary compare is used for strings. This
      *  comparator is only used for string *values*; field names are always compared using simple
      *  binary compare.
@@ -339,7 +339,7 @@ public:
      */
     static int compare(const Value& lhs,
                        const Value& rhs,
-                       const StringData::ComparatorInterface* stringComparator);
+                       const StringDataComparator* stringComparator);
 
     friend DeferredComparison operator==(const Value& lhs, const Value& rhs) {
         return DeferredComparison(DeferredComparison::Type::kEQ, lhs, rhs);
@@ -397,7 +397,7 @@ public:
      * Most callers should prefer the utilities in ValueComparator for hashing and creating function
      * objects for computing the hash. See value_comparator.h.
      */
-    void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
+    void hash_combine(size_t& seed, const StringDataComparator* stringComparator) const;
 
     /// Call this after memcpying to update ref counts if needed
     void memcpyed() const {

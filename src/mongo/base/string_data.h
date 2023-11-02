@@ -65,9 +65,6 @@ class MONGO_GSL_POINTER StringData {
     constexpr StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}
 
 public:
-    // Declared in string_data_comparator_interface.h.
-    class ComparatorInterface;
-
     // Iterator type
     using const_iterator = const char*;
 

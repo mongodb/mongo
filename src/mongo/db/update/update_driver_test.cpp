@@ -41,8 +41,8 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -262,7 +262,7 @@ static void assertSameFields(const BSONObj& docA, const BSONObj& docB);
  */
 static void assertSameElements(const BSONElement& elA, const BSONElement& elB) {
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                 &SimpleStringDataComparator::kInstance);
+                                 &simpleStringDataComparator);
     if (elA.type() != elB.type() || (!elA.isABSONObj() && eltCmp.evaluate(elA != elB))) {
         FAIL(stream() << "element " << elA << " not equal to " << elB);
     } else if (elA.type() == mongo::Array) {

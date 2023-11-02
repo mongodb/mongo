@@ -54,7 +54,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
@@ -71,14 +70,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_component_settings.h"
-#include "mongo/logv2/log_manager.h"
-#include "mongo/logv2/log_options.h"
-#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/pcre.h"
@@ -86,6 +78,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
@@ -374,7 +367,7 @@ Status WiredTigerUtil::getApplicationMetadata(OperationContext* opCtx,
     WT_CONFIG_ITEM keyItem;
     WT_CONFIG_ITEM valueItem;
     int ret;
-    auto keysSeen = SimpleStringDataComparator::kInstance.makeStringDataUnorderedSet();
+    StringDataSet keysSeen;
     while ((ret = parser.next(&keyItem, &valueItem)) == 0) {
         const StringData key(keyItem.str, keyItem.len);
         if (keysSeen.count(key)) {

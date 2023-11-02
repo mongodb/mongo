@@ -110,7 +110,7 @@ boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
     const BSONObj& metadata,
     StringDataMap<BSONObjBuilder>& dataBuilders,
     const boost::optional<TimeseriesOptions>& options = boost::none,
-    const boost::optional<const StringData::ComparatorInterface*>& comparator = boost::none) {
+    const boost::optional<const StringDataComparator*>& comparator = boost::none) {
     bucket_catalog::MinMax minmax;
     bool computeMinmax = options && comparator;
 
@@ -386,7 +386,7 @@ BucketDocument makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const TimeseriesOptions& options,
-    const boost::optional<const StringData::ComparatorInterface*>& comparator) {
+    const boost::optional<const StringDataComparator*>& comparator) {
     StringDataMap<BSONObjBuilder> dataBuilders;
     auto minmax =
         processTimeseriesMeasurements(measurements, metadata, dataBuilders, options, comparator);
@@ -405,7 +405,7 @@ BucketDocument makeNewDocumentForWrite(
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const NamespaceString& nss,
                            const TimeseriesOptions& options,
-                           const StringData::ComparatorInterface* comparator) {
+                           const StringDataComparator* comparator) {
     std::vector<write_ops::InsertCommandRequest> insertOps;
     auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
         nss, comparator, options, measurements[0]));

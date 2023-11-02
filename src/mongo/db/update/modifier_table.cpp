@@ -29,16 +29,12 @@
 
 #include "mongo/db/update/modifier_table.h"
 
+#include <algorithm>
+#include <array>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
-#include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/db/update/arithmetic_node.h"
 #include "mongo/db/update/bit_node.h"
@@ -54,87 +50,47 @@
 #include "mongo/db/update/unset_node.h"
 #include "mongo/db/update/update_node.h"
 
-namespace mongo {
-
-using std::make_pair;
-using std::string;
-
-namespace modifiertable {
-
+namespace mongo::modifiertable {
 namespace {
+struct OrderByName {
+    constexpr StringData lens(StringData x) const {
+        return x;
+    }
+    template <typename... T>
+    constexpr StringData lens(const std::pair<T...>& x) const {
+        return lens(x.first);
+    }
 
-struct ModifierEntry {
-    string name;
-    ModifierType type;
-
-    ModifierEntry(StringData name, ModifierType type) : name(name.toString()), type(type) {}
+    template <typename A, typename B>
+    constexpr bool operator()(const A& a, const B& b) const {
+        return std::less<>{}(lens(a), lens(b));
+    }
 };
 
-typedef StringDataUnorderedMap<ModifierEntry*> NameMap;
+constexpr auto names = std::to_array<std::pair<StringData, ModifierType>>({
+    {"$addToSet"_sd, MOD_ADD_TO_SET},
+    {"$bit"_sd, MOD_BIT},
+    {"$currentDate"_sd, MOD_CURRENTDATE},
+    {"$inc"_sd, MOD_INC},
+    {"$max"_sd, MOD_MAX},
+    {"$min"_sd, MOD_MIN},
+    {"$mul"_sd, MOD_MUL},
+    {"$pop"_sd, MOD_POP},
+    {"$pull"_sd, MOD_PULL},
+    {"$pullAll"_sd, MOD_PULL_ALL},
+    {"$push"_sd, MOD_PUSH},
+    {"$rename"_sd, MOD_RENAME},
+    {"$set"_sd, MOD_SET},
+    {"$setOnInsert"_sd, MOD_SET_ON_INSERT},
+    {"$unset"_sd, MOD_UNSET},
+});
+static_assert(std::is_sorted(names.begin(), names.end(), OrderByName{}), "Must be sorted by name");
 
-NameMap* MODIFIER_NAME_MAP;
-
-void init(NameMap* nameMap) {
-    ModifierEntry* entryAddToSet = new ModifierEntry("$addToSet", MOD_ADD_TO_SET);
-    nameMap->insert(make_pair(StringData(entryAddToSet->name), entryAddToSet));
-
-    ModifierEntry* entryBit = new ModifierEntry("$bit", MOD_BIT);
-    nameMap->insert(make_pair(StringData(entryBit->name), entryBit));
-
-    ModifierEntry* entryCurrentDate = new ModifierEntry("$currentDate", MOD_CURRENTDATE);
-    nameMap->insert(make_pair(StringData(entryCurrentDate->name), entryCurrentDate));
-
-    ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
-    nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
-
-    ModifierEntry* entryMax = new ModifierEntry("$max", MOD_MAX);
-    nameMap->insert(make_pair(StringData(entryMax->name), entryMax));
-
-    ModifierEntry* entryMin = new ModifierEntry("$min", MOD_MIN);
-    nameMap->insert(make_pair(StringData(entryMin->name), entryMin));
-
-    ModifierEntry* entryMul = new ModifierEntry("$mul", MOD_MUL);
-    nameMap->insert(make_pair(StringData(entryMul->name), entryMul));
-
-    ModifierEntry* entryPop = new ModifierEntry("$pop", MOD_POP);
-    nameMap->insert(make_pair(StringData(entryPop->name), entryPop));
-
-    ModifierEntry* entryPull = new ModifierEntry("$pull", MOD_PULL);
-    nameMap->insert(make_pair(StringData(entryPull->name), entryPull));
-
-    ModifierEntry* entryPullAll = new ModifierEntry("$pullAll", MOD_PULL_ALL);
-    nameMap->insert(make_pair(StringData(entryPullAll->name), entryPullAll));
-
-    ModifierEntry* entryPush = new ModifierEntry("$push", MOD_PUSH);
-    nameMap->insert(make_pair(StringData(entryPush->name), entryPush));
-
-    ModifierEntry* entrySet = new ModifierEntry("$set", MOD_SET);
-    nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
-
-    ModifierEntry* entrySetOnInsert = new ModifierEntry("$setOnInsert", MOD_SET_ON_INSERT);
-    nameMap->insert(make_pair(StringData(entrySetOnInsert->name), entrySetOnInsert));
-
-    ModifierEntry* entryRename = new ModifierEntry("$rename", MOD_RENAME);
-    nameMap->insert(make_pair(StringData(entryRename->name), entryRename));
-
-    ModifierEntry* entryUnset = new ModifierEntry("$unset", MOD_UNSET);
-    nameMap->insert(make_pair(StringData(entryUnset->name), entryUnset));
-}
-
-}  // unnamed namespace
-
-MONGO_INITIALIZER(ModifierTable)(InitializerContext* context) {
-    MODIFIER_NAME_MAP = new NameMap(
-        SimpleStringDataComparator::kInstance.makeStringDataUnorderedMap<ModifierEntry*>());
-    init(MODIFIER_NAME_MAP);
-}
+}  // namespace
 
 ModifierType getType(StringData typeStr) {
-    NameMap::const_iterator it = MODIFIER_NAME_MAP->find(typeStr);
-    if (it == MODIFIER_NAME_MAP->end()) {
-        return MOD_UNKNOWN;
-    }
-    return it->second->type;
+    auto [it1, it2] = std::equal_range(names.begin(), names.end(), typeStr, OrderByName{});
+    return it1 == it2 ? MOD_UNKNOWN : it1->second;
 }
 
 std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
@@ -176,5 +132,4 @@ std::unique_ptr<UpdateLeafNode> makeUpdateLeafNode(ModifierType modType) {
     }
 }
 
-}  // namespace modifiertable
-}  // namespace mongo
+}  // namespace mongo::modifiertable

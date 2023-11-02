@@ -724,7 +724,7 @@ boost::optional<const projection_ast::Projection*> attemptToGetProjectionFromQue
  * Returns true if 'setL' is a non-strict subset of 'setR'.
  *
  * The types of the sets are permitted to be different to allow checking something with compatible
- * but different types e.g. std::set<std::string> and StringDataUnorderedMap.
+ * but different types e.g. std::set<std::string>, StringMap.
  */
 template <typename SetL, typename SetR>
 bool isSubset(const SetL& setL, const SetR& setR) {

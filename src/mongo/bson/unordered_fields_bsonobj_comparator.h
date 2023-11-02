@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 
 namespace mongo {
@@ -39,8 +39,7 @@ namespace mongo {
  */
 class UnorderedFieldsBSONObjComparator final : public BSONObj::ComparatorInterface {
 public:
-    UnorderedFieldsBSONObjComparator(
-        const StringData::ComparatorInterface* stringComparator = nullptr)
+    UnorderedFieldsBSONObjComparator(const StringDataComparator* stringComparator = nullptr)
         : _stringComparator(stringComparator) {}
 
     int compare(const BSONObj& lhs, const BSONObj& rhs) const final {
@@ -59,6 +58,6 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _stringComparator;
+    const StringDataComparator* _stringComparator;
 };
 }  // namespace mongo

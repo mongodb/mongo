@@ -334,7 +334,7 @@ private:
 
         // Please, keep BSONElementComparator consistent with
         // `ComparisonMatchExpressionBase::equivalent()`.
-        const StringData::ComparatorInterface* stringComparator = nullptr;
+        const StringDataComparator* stringComparator = nullptr;
         BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                      stringComparator);
         hashCombineTypeAndPath(expr);

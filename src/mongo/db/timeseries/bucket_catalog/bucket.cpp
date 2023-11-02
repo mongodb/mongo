@@ -75,7 +75,7 @@ bool allCommitted(const Bucket& bucket) {
 bool schemaIncompatible(Bucket& bucket,
                         const BSONObj& input,
                         boost::optional<StringData> metaField,
-                        const StringData::ComparatorInterface* comparator) {
+                        const StringDataComparator* comparator) {
     auto result = bucket.schema.update(input, metaField, comparator);
     return (result == Schema::UpdateStatus::Failed);
 }

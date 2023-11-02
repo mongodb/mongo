@@ -751,8 +751,7 @@ size_t Document::memUsageForSorter() const {
         storage().nonCachedBsonObjSize();
 }
 
-void Document::hash_combine(size_t& seed,
-                            const StringData::ComparatorInterface* stringComparator) const {
+void Document::hash_combine(size_t& seed, const StringDataComparator* stringComparator) const {
     for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
         StringData name = it->nameSD();
         boost::hash_range(seed, name.rawData(), name.rawData() + name.size());
@@ -762,7 +761,7 @@ void Document::hash_combine(size_t& seed,
 
 int Document::compare(const Document& rL,
                       const Document& rR,
-                      const StringData::ComparatorInterface* stringComparator) {
+                      const StringDataComparator* stringComparator) {
 
     if (&rL.storage() == &rR.storage()) {
         // If the storage is the same (shared between the documents) then the documents must be

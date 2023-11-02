@@ -79,7 +79,7 @@ int compareObjects(const BSONObj& firstObj,
                    const BSONObj& secondObj,
                    const BSONObj& idxKey,
                    BSONObj::ComparisonRulesSet rules,
-                   const StringData::ComparatorInterface* comparator) {
+                   const StringDataComparator* comparator) {
     if (firstObj.isEmpty())
         return secondObj.isEmpty() ? 0 : -1;
     if (secondObj.isEmpty())
@@ -366,7 +366,7 @@ BSONObj BSONObj::jsonStringBuffer(JsonStringFormat format,
 int BSONObj::woCompare(const BSONObj& r,
                        const Ordering& o,
                        ComparisonRulesSet rules,
-                       const StringData::ComparatorInterface* comparator) const {
+                       const StringDataComparator* comparator) const {
     if (isEmpty())
         return r.isEmpty() ? 0 : -1;
     if (r.isEmpty())
@@ -402,7 +402,7 @@ int BSONObj::woCompare(const BSONObj& r,
 int BSONObj::woCompare(const BSONObj& r,
                        const BSONObj& idxKey,
                        ComparisonRulesSet rules,
-                       const StringData::ComparatorInterface* comparator) const {
+                       const StringDataComparator* comparator) const {
     return (rules & ComparisonRules::kIgnoreFieldOrder)
         ? compareObjects<BSONObjIteratorSorted>(*this, r, idxKey, rules, comparator)
         : compareObjects<BSONObjIterator>(*this, r, idxKey, rules, comparator);

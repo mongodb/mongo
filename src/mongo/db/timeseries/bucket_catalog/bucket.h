@@ -168,7 +168,7 @@ bool allCommitted(const Bucket&);
 bool schemaIncompatible(Bucket& bucket,
                         const BSONObj& input,
                         boost::optional<StringData> metaField,
-                        const StringData::ComparatorInterface* comparator);
+                        const StringDataComparator* comparator);
 
 /**
  * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket

@@ -44,9 +44,8 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/field_ref.h"
@@ -65,10 +64,9 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -1078,7 +1076,7 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToWildcardIndexes(
  */
 static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
                                                size_t idx,
-                                               const StringDataUnorderedSet& prefixPaths) {
+                                               const StringDataSet& prefixPaths) {
     // If we're here, there are prefixPaths and node is either:
     // 1. a text pred which we can't use as we have nothing over its prefix, or
     // 2. a non-text pred which we can't use as we don't have a text pred AND-related.
@@ -1113,7 +1111,7 @@ static void stripInvalidAssignmentsToTextIndex(MatchExpression* node,
     // The AND must have an EQ predicate for each prefix path.  When we encounter a child with a
     // tag we remove it from childrenPrefixPaths.  All children exist if this set is empty at
     // the end.
-    StringDataUnorderedSet childrenPrefixPaths = prefixPaths;
+    auto childrenPrefixPaths = prefixPaths;
 
     for (size_t i = 0; i < node->numChildren(); ++i) {
         MatchExpression* child = node->getChild(i);
@@ -1171,8 +1169,7 @@ void QueryPlannerIXSelect::stripInvalidAssignmentsToTextIndexes(MatchExpression*
         // Gather the set of paths that comprise the index prefix for this text index.
         // Each of those paths must have an equality assignment, otherwise we can't assign
         // *anything* to this index.
-        auto textIndexPrefixPaths =
-            SimpleStringDataComparator::kInstance.makeStringDataUnorderedSet();
+        StringDataSet textIndexPrefixPaths;
         BSONObjIterator it(index.keyPattern);
 
         // We stop when we see the first string in the key pattern.  We know that

@@ -101,7 +101,7 @@ BucketDocument makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const TimeseriesOptions& options,
-    const boost::optional<const StringData::ComparatorInterface*>& comparator);
+    const boost::optional<const StringDataComparator*>& comparator);
 
 /**
  * Returns the document for writing a new bucket with 'measurements'. Generates the id and
@@ -112,7 +112,7 @@ BucketDocument makeNewDocumentForWrite(
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const NamespaceString& nss,
                            const TimeseriesOptions& options,
-                           const StringData::ComparatorInterface* comparator);
+                           const StringDataComparator* comparator);
 
 /**
  * Returns an update request to the bucket when the 'measurements' is non-empty. Otherwise, returns

@@ -37,7 +37,7 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator.h"
@@ -140,7 +140,7 @@ void assertBSONElementSetsAreEqual(const std::vector<BSONObj>& expectedObjs,
 
 
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                 &SimpleStringDataComparator::kInstance);
+                                 &simpleStringDataComparator);
     for (size_t i = 0; i < expectedElements.size(); ++i) {
         if (eltCmp.evaluate(*expectedIt != *actualIt)) {
             StringBuilder sb;

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 
 namespace mongo {
@@ -40,7 +40,7 @@ namespace mongo {
  */
 class UnorderedFieldsBSONElementComparator final : public BSONElement::ComparatorInterface {
 public:
-    static constexpr StringData::ComparatorInterface* kStringComparator = nullptr;
+    static constexpr StringDataComparator* kStringComparator = nullptr;
 
     UnorderedFieldsBSONElementComparator() = default;
 

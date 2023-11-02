@@ -179,7 +179,7 @@ std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
 }
 
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
-                                               const StringData::ComparatorInterface* comparator) {
+                                               const StringDataComparator* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
     if (!swDocs.isOK()) {
         return swDocs.getStatus();
@@ -195,7 +195,7 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
 }
 
 StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
-                                               const StringData::ComparatorInterface* comparator) {
+                                               const StringDataComparator* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
     if (!swDocs.isOK()) {
         return swDocs.getStatus();

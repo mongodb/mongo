@@ -44,7 +44,7 @@ struct BucketMetadata {
 public:
     BucketMetadata() = default;
     BucketMetadata(BSONElement elem,
-                   const StringData::ComparatorInterface* comparator,
+                   const StringDataComparator* comparator,
                    boost::optional<StringData> trueMetaFieldName);
 
     bool operator==(const BucketMetadata& other) const;
@@ -55,7 +55,7 @@ public:
 
     StringData getMetaField() const;
 
-    const StringData::ComparatorInterface* getComparator() const;
+    const StringDataComparator* getComparator() const;
 
     template <typename H>
     friend H AbslHashValue(H h, const BucketMetadata& metadata) {
@@ -72,7 +72,7 @@ private:
     // Empty if metadata field isn't present, owns a copy otherwise.
     BSONObj _metadata;
 
-    const StringData::ComparatorInterface* _comparator = nullptr;
+    const StringDataComparator* _comparator = nullptr;
 };
 
 }  // namespace mongo::timeseries::bucket_catalog

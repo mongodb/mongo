@@ -38,9 +38,9 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -647,7 +647,7 @@ static void assertContains(const EqualityMatches& equalities, const BSONObj& wra
     }
 
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                 &SimpleStringDataComparator::kInstance);
+                                 &simpleStringDataComparator);
     if (eltCmp.evaluate(it->second->getData() != value)) {
         FAIL(stream() << "Equality match at path \"" << path << "\" contains value "
                       << it->second->getData() << ", not value " << value);
@@ -944,7 +944,7 @@ static void assertParent(const EqualityMatches& equalities,
     }
 
     BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                 &SimpleStringDataComparator::kInstance);
+                                 &simpleStringDataComparator);
     if (eltCmp.evaluate(parentEl != value)) {
         FAIL(stream() << "Equality match parent for \"" << pathStr << "\" at path \"" << parentPath
                       << "\" contains value " << parentEl << ", not value " << value);

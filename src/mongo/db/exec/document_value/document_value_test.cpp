@@ -624,7 +624,7 @@ public:
     }
     size_t hash(const BSONObj& obj) {
         size_t seed = 0x106e1e1;
-        const StringData::ComparatorInterface* stringComparator = nullptr;
+        const StringDataComparator* stringComparator = nullptr;
         Document(obj).hash_combine(seed, stringComparator);
         return seed;
     }
@@ -2436,7 +2436,7 @@ private:
     }
     size_t hash(const Value& v) {
         size_t seed = 0xf00ba6;
-        const StringData::ComparatorInterface* stringComparator = nullptr;
+        const StringDataComparator* stringComparator = nullptr;
         v.hash_combine(seed, stringComparator);
         return seed;
     }

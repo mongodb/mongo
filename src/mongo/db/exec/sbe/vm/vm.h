@@ -48,7 +48,7 @@
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/string_data.h"
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
@@ -82,7 +82,7 @@ std::pair<value::TypeTags, value::Value> genericCompare(
     value::Value lhsValue,
     value::TypeTags rhsTag,
     value::Value rhsValue,
-    const StringData::ComparatorInterface* comparator = nullptr,
+    const StringDataComparator* comparator = nullptr,
     Op op = {}) {
     if (value::isNumber(lhsTag) && value::isNumber(rhsTag)) {
         switch (getWidestNumericalType(lhsTag, rhsTag)) {
@@ -260,8 +260,7 @@ std::pair<value::TypeTags, value::Value> genericCompare(value::TypeTags lhsTag,
         return {value::TypeTags::Nothing, 0};
     }
 
-    auto comparator =
-        static_cast<StringData::ComparatorInterface*>(value::getCollatorView(collValue));
+    auto comparator = static_cast<StringDataComparator*>(value::getCollatorView(collValue));
 
     return genericCompare(lhsTag, lhsValue, rhsTag, rhsValue, comparator, op);
 }
@@ -1480,7 +1479,7 @@ private:
         value::Value lhsValue,
         value::TypeTags rhsTag,
         value::Value rhsValue,
-        const StringData::ComparatorInterface* comparator = nullptr);
+        const StringDataComparator* comparator = nullptr);
 
     std::pair<value::TypeTags, value::Value> compare3way(value::TypeTags lhsTag,
                                                          value::Value lhsValue,

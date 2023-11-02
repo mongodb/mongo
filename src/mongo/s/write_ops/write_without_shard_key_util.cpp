@@ -110,7 +110,7 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
     OperationContext* opCtx,
     const UpdateRequest& updateRequest,
     boost::optional<TimeseriesOptions> timeseriesOptions,
-    const StringData::ComparatorInterface* comparator) {
+    const StringDataComparator* comparator) {
     // We are only using this to parse the query for producing the upsert document.
     ParsedUpdateForMongos parsedUpdate(opCtx, &updateRequest);
     uassertStatusOK(parsedUpdate.parseRequest());

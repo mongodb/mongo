@@ -118,7 +118,7 @@ StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes);
  */
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     const NamespaceString& ns,
-    const StringData::ComparatorInterface* comparator,
+    const StringDataComparator* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc);
 
@@ -170,15 +170,14 @@ Bucket* useAlternateBucket(Stripe& stripe, WithLock stripeLock, const CreationIn
  * validate that the bucket is expected (i.e. to help resolve hash collisions for archived buckets).
  * Does *not* hand ownership of the bucket to the catalog.
  */
-StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(
-    OperationContext* opCtx,
-    BucketStateRegistry& registry,
-    const NamespaceString& ns,
-    const StringData::ComparatorInterface* comparator,
-    const TimeseriesOptions& options,
-    const BucketToReopen& bucketToReopen,
-    uint64_t catalogEra,
-    const BucketKey* expectedKey);
+StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
+                                                    BucketStateRegistry& registry,
+                                                    const NamespaceString& ns,
+                                                    const StringDataComparator* comparator,
+                                                    const TimeseriesOptions& options,
+                                                    const BucketToReopen& bucketToReopen,
+                                                    uint64_t catalogEra,
+                                                    const BucketKey* expectedKey);
 
 /**
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket
@@ -231,7 +230,7 @@ stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
 StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 BucketCatalog& catalog,
                                 const NamespaceString& ns,
-                                const StringData::ComparatorInterface* comparator,
+                                const StringDataComparator* comparator,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
                                 CombineWithInsertsFromOtherClients combine,

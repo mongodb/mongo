@@ -367,7 +367,7 @@ public:
      *   Returns 1 if this > other according to BSONElement::woCompare
      */
     int compareWithElement(const ConstElement& other,
-                           const StringData::ComparatorInterface* comparator,
+                           const StringDataComparator* comparator,
                            bool considerFieldName = true) const;
 
     /** Compare this Element with BSONElement 'other'. You should not call this on the root
@@ -379,7 +379,7 @@ public:
      *   Returns 1 if this > other according to BSONElement::woCompare
      */
     int compareWithBSONElement(const BSONElement& other,
-                               const StringData::ComparatorInterface* comparator,
+                               const StringDataComparator* comparator,
                                bool considerFieldName = true) const;
 
     /** Compare this Element, which must be an Object or an Array, with 'other'.
@@ -389,7 +389,7 @@ public:
      *   Returns 1 if this object > other according to BSONElement::woCompare
      */
     int compareWithBSONObj(const BSONObj& other,
-                           const StringData::ComparatorInterface* comparator,
+                           const StringDataComparator* comparator,
                            bool considerFieldName = true) const;
 
 

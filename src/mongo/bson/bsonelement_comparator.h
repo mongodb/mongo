@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/base/string_data_comparator.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 
 namespace mongo {
@@ -55,7 +55,7 @@ public:
      * 'stringComparator' is used for all string comparisons.
      */
     BSONElementComparator(FieldNamesMode fieldNamesMode,
-                          const StringData::ComparatorInterface* stringComparator)
+                          const StringDataComparator* stringComparator)
         : _stringComparator(stringComparator),
           _rules((fieldNamesMode == FieldNamesMode::kConsider) ? ComparisonRules::kConsiderFieldName
                                                                : 0) {}
@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    const StringData::ComparatorInterface* _stringComparator;
+    const StringDataComparator* _stringComparator;
     ComparisonRulesSet _rules;
 };
 
