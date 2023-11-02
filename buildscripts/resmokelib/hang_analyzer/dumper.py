@@ -16,12 +16,17 @@ from collections import namedtuple
 from distutils import spawn
 from typing import List, Tuple
 
+from opentelemetry import trace
+from opentelemetry.trace.status import StatusCode
+
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo
 from buildscripts.resmokelib import config as resmoke_config
+from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 from buildscripts.simple_report import Report, Result
 
 Dumpers = namedtuple('Dumpers', ['dbg', 'jstack'])
+TRACER = trace.get_tracer("resmoke")
 
 
 def get_dumpers(root_logger: logging.Logger, dbg_output: str):
@@ -576,9 +581,14 @@ class GDBDumper(Dumper):
         self._root_logger.info("Done analyzing %s processes with PIDs %s", pinfo.name,
                                str(pinfo.pidv))
 
+    @TRACER.start_as_current_span("core_analyzer.analyze_cores")
     def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str) -> Report:
         core_files = find_files(f"*.{self.get_dump_ext()}", core_file_dir)
+        analyze_cores_span = get_default_current_span()
         if not core_files:
+            analyze_cores_span.set_status(StatusCode.ERROR, "No core dumps found")
+            analyze_cores_span.set_attribute("analyze_cores_error",
+                                             f"No core dumps found in {core_file_dir}")
             raise RuntimeError(f"No core dumps found in {core_file_dir}")
 
         tmp_dir = os.path.join(analysis_dir, "tmp")
@@ -593,14 +603,24 @@ class GDBDumper(Dumper):
             handler = logging.StreamHandler(log_stream)
             handler.setFormatter(logging.Formatter(fmt="%(message)s"))
             logger.addHandler(handler)
-            try:
-                exit_code, status = self.analyze_core(
-                    core_file_path=core_file_path, install_dir=install_dir,
-                    analysis_dir=analysis_dir, tmp_dir=tmp_dir, logger=logger)
-            except Exception:
-                logger.exception("Exception occured while analyzing core")
-                exit_code = 1
-                status = "fail"
+            with TRACER.start_as_current_span("core_analyzer.analyze_core") as analyze_core_span:
+                analyze_core_span.set_status(StatusCode.OK)
+                try:
+                    exit_code, status = self.analyze_core(
+                        core_file_path=core_file_path, install_dir=install_dir,
+                        analysis_dir=analysis_dir, tmp_dir=tmp_dir, logger=logger)
+                except Exception:
+                    logger.exception("Exception occured while analyzing core")
+                    exit_code = 1
+                    status = "fail"
+
+                analyze_core_span.set_attributes({
+                    "analyze_core_status": status,
+                    "core_file": core_file_path,
+                })
+                if status == "fail":
+                    analyze_core_span.set_status(StatusCode.ERROR,
+                                                 description="Failed to analyze core dump.")
             output = log_stream.getvalue()
             result = Result(
                 Result({
@@ -611,6 +631,8 @@ class GDBDumper(Dumper):
                 report["failures"] += 1
             report["results"].append(result)
             self._root_logger.info("Analysis of %s ended with status %s", basename, status)
+        analyze_cores_span.set_attributes(
+            {"failures": report["failures"], "core_dump_count": len(core_files)})
         shutil.rmtree(tmp_dir)
         return report
 
@@ -681,6 +703,9 @@ class GDBDumper(Dumper):
 
         args = [dbg, "--nx"] + list(itertools.chain.from_iterable([['-ex', b] for b in cmds]))
         exit_code = call(args, logger, check=False)
+
+        current_span = trace.get_current_span()
+        current_span.set_attribute("gdb_exit_code", exit_code)
 
         # We do not fail when GDB has internal issues that are not our fault.
         if exit_code == -11:

@@ -48,15 +48,20 @@ def get_core_analyzer_commands(task_id: str, execution: str,
         FunctionCall("configure evergreen api credentials"),
         BuiltInCommand(
             "subprocess.exec", {
-                "binary":
-                    "bash", "args": [
-                        "src/evergreen/run_python_script.sh",
-                        "buildscripts/resmoke.py",
-                        "core-analyzer",
-                        f"--task-id={task_id}",
-                        f"--execution={execution}",
-                        "--generate-report",
-                    ]
+                "binary": "bash",
+                "args": [
+                    "src/evergreen/run_python_script.sh",
+                    "buildscripts/resmoke.py",
+                    "core-analyzer",
+                    f"--task-id={task_id}",
+                    f"--execution={execution}",
+                    "--generate-report",
+                ],
+                "env": {
+                    "OTEL_TRACE_ID": "${otel_trace_id}",
+                    "OTEL_PARENT_ID": "${otel_parent_id}",
+                    "OTEL_COLLECTOR_DIR": "../build/OTelTraces/",
+                },
             }),
         BuiltInCommand(
             "archive.targz_pack", {

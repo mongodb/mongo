@@ -1,5 +1,6 @@
 """Configure the command line input for the resmoke 'run' subcommand."""
 
+import argparse
 import collections
 import configparser
 import datetime
@@ -30,6 +31,7 @@ from buildscripts.idl import gen_all_feature_flag_list
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongo_fuzzer_configs
+from buildscripts.util.read_config import read_config_file
 
 BASE_16_TO_INT = 16
 
@@ -160,8 +162,7 @@ def _find_resmoke_wrappers():
 
 
 def _set_up_tracing(
-        otel_collector_endpoint: Optional[str],
-        otel_collector_file: Optional[str],
+        otel_collector_dir: Optional[str],
         trace_id: Optional[str],
         parent_span_id: Optional[str],
         extra_context: Optional[Dict[str, object]],
@@ -180,25 +181,14 @@ def _set_up_tracing(
     resource = Resource(attributes={SERVICE_NAME: "resmoke"})
 
     provider = TracerProvider(resource=resource)
-    if otel_collector_endpoint:
-        # TODO: EVG-20576
-        # We can remove this and export to a file when EVG-20576 is merged
-        # This will remove our dependency on grpc
-        # TODO: SERVER-80336 grpc has problems on macosx, ppc, and s390x.
-        # Rather than hardcode the environments where grpc fails to install we just try to use it and bail out if it fails
+    if otel_collector_dir:
         try:
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+            otel_collector_dir = Path(otel_collector_dir)
+            otel_collector_dir.mkdir(parents=True, exist_ok=True)
+            # Make the file easy to read when ran locally.
+            pretty_print = _config.EVERGREEN_TASK_ID is None
             processor = BatchedBaggageSpanProcessor(
-                OTLPSpanExporter(endpoint=otel_collector_endpoint))
-            provider.add_span_processor(processor)
-        except ModuleNotFoundError:
-            print("Failed to set up a remote grpc otel endpoint. Continuing.")
-
-    if otel_collector_file:
-        try:
-            otel_collector_file_path = Path(otel_collector_file)
-            otel_collector_file_path.parent.mkdir(parents=True, exist_ok=True)
-            processor = BatchedBaggageSpanProcessor(FileSpanExporter(otel_collector_file_path))
+                FileSpanExporter(otel_collector_dir, pretty_print))
             provider.add_span_processor(processor)
         except OSError:
             traceback.print_exc()
@@ -472,13 +462,11 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     # otel info
     _config.OTEL_TRACE_ID = config.pop("otel_trace_id")
     _config.OTEL_PARENT_ID = config.pop("otel_parent_id")
-    _config.OTEL_COLLECTOR_ENDPOINT = config.pop("otel_collector_endpoint")
-    _config.OTEL_COLLECTOR_FILE = config.pop("otel_collector_file")
+    _config.OTEL_COLLECTOR_DIR = config.pop("otel_collector_dir")
 
     try:
         setup_success = _set_up_tracing(
-            _config.OTEL_COLLECTOR_ENDPOINT,
-            _config.OTEL_COLLECTOR_FILE,
+            _config.OTEL_COLLECTOR_DIR,
             _config.OTEL_TRACE_ID,
             _config.OTEL_PARENT_ID,
             extra_context={
@@ -670,3 +658,49 @@ def _update_symbolizer_secrets():
     yml_data = utils.load_yaml_file(_config.EXPANSIONS_FILE)
     _config.SYMBOLIZER_CLIENT_SECRET = yml_data.get("symbolizer_client_secret")
     _config.SYMBOLIZER_CLIENT_ID = yml_data.get("symbolizer_client_id")
+
+
+def add_otel_args(parser: argparse.ArgumentParser):
+    parser.add_argument(
+        "--otelTraceId",
+        dest="otel_trace_id",
+        type=str,
+        default=os.environ.get("OTEL_TRACE_ID", None),
+        help="Open Telemetry Trace ID",
+    )
+
+    parser.add_argument(
+        "--otelParentId",
+        dest="otel_parent_id",
+        type=str,
+        default=os.environ.get("OTEL_PARENT_ID", None),
+        help="Open Telemetry Parent ID",
+    )
+
+    parser.add_argument(
+        "--otelCollectorDir",
+        dest="otel_collector_dir",
+        type=str,
+        default=os.environ.get("OTEL_COLLECTOR_DIR", "build/metrics/"),
+        help="Open Collector Files",
+    )
+
+
+def detect_evergreen_config(parsed_args: argparse.Namespace,
+                            expansions_file: str = "../expansions.yml"):
+    if not os.path.exists(expansions_file):
+        return
+
+    expansions = read_config_file(expansions_file)
+
+    parsed_args.build_id = expansions.get("build_id", None)
+    parsed_args.distro_id = expansions.get("distro_id", None)
+    parsed_args.execution_number = expansions.get("execution", None)
+    parsed_args.project_name = expansions.get("project", None)
+    parsed_args.git_revision = expansions.get("revision", None)
+    parsed_args.revision_order_id = expansions.get("revision_order_id", None)
+    parsed_args.task_id = expansions.get("task_id", None)
+    parsed_args.task_name = expansions.get("task_name", None)
+    parsed_args.variant_name = expansions.get("build_variant", None)
+    parsed_args.version_id = expansions.get("version_id", None)
+    parsed_args.evg_project_config_path = expansions.get("evergreen_config_file_path", None)

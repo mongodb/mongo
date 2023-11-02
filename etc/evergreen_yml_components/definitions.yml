@@ -1094,7 +1094,7 @@ functions:
       env:
         OTEL_TRACE_ID: ${otel_trace_id}
         OTEL_PARENT_ID: ${otel_parent_id}
-        OTEL_COLLECTOR_ENDPOINT: ${otel_collector_endpoint}
+        OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
 
   "retrieve generated test configuration": &retrieve_generated_test_configuration
     command: s3.get
@@ -1489,7 +1489,7 @@ functions:
       env:
         OTEL_TRACE_ID: ${otel_trace_id}
         OTEL_PARENT_ID: ${otel_parent_id}
-        OTEL_COLLECTOR_ENDPOINT: ${otel_collector_endpoint}
+        OTEL_COLLECTOR_DIR: "../build/OTelTraces/"
 
   "archive resmoke constants": &archive_resmoke_constants
     command: archive.targz_pack

@@ -1066,38 +1066,7 @@ class RunPlugin(PluginInterface):
         parser.add_argument("--tagFile", action="append", dest="tag_files", metavar="TAG_FILES",
                             help="One or more YAML files that associate tests and tags.")
 
-        parser.add_argument(
-            "--otelTraceId",
-            dest="otel_trace_id",
-            type=str,
-            default=os.environ.get("OTEL_TRACE_ID", None),
-            help="Open Telemetry Trace ID",
-        )
-
-        parser.add_argument(
-            "--otelParentId",
-            dest="otel_parent_id",
-            type=str,
-            default=os.environ.get("OTEL_PARENT_ID", None),
-            help="Open Telemetry Parent ID",
-        )
-
-        otel_collector_endpoint = os.environ.get("OTEL_COLLECTOR_ENDPOINT", None)
-        parser.add_argument(
-            "--otelCollectorEndpoint",
-            dest="otel_collector_endpoint",
-            type=str,
-            default=otel_collector_endpoint,
-            help="Open Collector Endpoint",
-        )
-
-        parser.add_argument(
-            "--otelCollectorFile",
-            dest="otel_collector_file",
-            type=str,
-            default="" if otel_collector_endpoint else "build/metrics.json",
-            help="Open Collector Files",
-        )
+        configure_resmoke.add_otel_args(parser)
 
         mongodb_server_options = parser.add_argument_group(
             title=_MONGODB_SERVER_OPTIONS_TITLE,

@@ -1,7 +1,12 @@
+import base64
+import json
+import os
 from typing import Optional, Callable, Sequence
 from os import linesep
 from logging import getLogger
 
+from google.protobuf.json_format import MessageToDict
+from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace import ReadableSpan
 
@@ -18,19 +23,40 @@ class FileSpanExporter(SpanExporter):
 
     def __init__(
             self,
-            file_name: str,
+            directory: str,
+            pretty_print=False,
             service_name: Optional[str] = None,
             formatter: Callable[[ReadableSpan], str] = lambda span: span.to_json() + linesep,
     ):
         self.formatter = formatter
         self.service_name = service_name
-        self.out = open(file_name, mode='w')
+        self.file_count = 0
+        self.pretty_print = pretty_print
+        self.directory = directory
+
+    def convert_span(self, span: dict) -> None:
+        for key in ["traceId", "spanId", "parentSpanId"]:
+            if key not in span:
+                continue
+
+            span[key] = base64.b64decode(span[key]).hex()
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         try:
-            for span in spans:
-                self.out.write(self.formatter(span))
-            self.out.flush()
+            encoded_spans = encode_spans(spans)
+            message = MessageToDict(encoded_spans)
+            self.file_count += 1
+            # Evergreen expects the ids in hex but the python otel library exportes them in base64
+            for resourceSpan in message["resourceSpans"]:
+                for scopeSpan in resourceSpan["scopeSpans"]:
+                    for span in scopeSpan["spans"]:
+                        self.convert_span(span)
+
+            with open(os.path.join(self.directory, f"metrics{self.file_count}.json"), "w") as file:
+                if self.pretty_print:
+                    json.dump(message, file, indent=2)
+                else:
+                    json.dump(message, file, indent=None, separators=(',', ':'))
         except:
             logger.exception("Failed to write OTEL metrics to file %s", self.out.name)
             return SpanExportResult.FAILURE
@@ -38,7 +64,7 @@ class FileSpanExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
     def shutdown(self) -> None:
-        self.out.close()
+        pass
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return True

@@ -170,8 +170,7 @@ DEFAULTS = {
     # otel info
     "otel_trace_id": None,
     "otel_parent_id": None,
-    "otel_collector_endpoint": None,
-    "otel_collector_file": None,
+    "otel_collector_dir": None,
 
     # The images to build for an External System Under Test
     "docker_compose_build_images": None,
@@ -556,8 +555,7 @@ TEST_FILES = None
 # Metrics for open telemetry
 OTEL_TRACE_ID = None
 OTEL_PARENT_ID = None
-OTEL_COLLECTOR_ENDPOINT = None
-OTEL_COLLECTOR_FILE = None
+OTEL_COLLECTOR_DIR = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # WiredTiger collection configuration settings.
