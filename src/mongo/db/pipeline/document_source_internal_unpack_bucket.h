@@ -312,6 +312,10 @@ private:
 
     bool haveComputedMetaField() const;
 
+    // Parses given 'eventFilterBson' to set '_eventFilter' and determines its dependencies
+    // and SBE compatibility.
+    void setEventFilter(BSONObj eventFilterBson, bool shouldOptimize);
+
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.
     bool _assumeNoMixedSchemaData = false;
@@ -330,7 +334,7 @@ private:
     int _bucketMaxCount = 0;
     boost::optional<long long> _sampleSize;
 
-    // It's benefitial to do as much filtering at the bucket level as possible to avoid unpacking
+    // It's beneficial to do as much filtering at the bucket level as possible to avoid unpacking
     // buckets that wouldn't contribute to the results anyway. There is a generic mechanism that
     // allows to swap $match stages with this one (see 'getModifiedPaths()'). It lets us split out
     // and push down a filter on the metaField "as is". The remaining filters might cause creation
@@ -356,5 +360,6 @@ private:
 
     // Caches the SBE-compatibility status result of this stage.
     boost::optional<bool> _isSbeCompatible = boost::none;
+    boost::optional<SbeCompatibility> _isEventFilterSbeCompatible = boost::none;
 };
 }  // namespace mongo

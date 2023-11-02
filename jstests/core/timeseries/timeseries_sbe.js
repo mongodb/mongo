@@ -82,3 +82,23 @@ runTest({
     ],
     expectedEngine: "sbe",
 })
+
+// Bucket unpacking should not be lowered when there is an eventFilter with a full match
+// expression that is not supported in SBE. This entire pipeline should run in classic.
+runTest({
+    pipeline: [
+        {
+            $match: {
+                a: {
+                    // $geoWithin is not supported in SBE.
+                    $geoWithin: {
+                        $geometry:
+                            {type: "Polygon", coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}
+                    }
+                }
+            }
+        },
+        {$project: {t: 1}}
+    ],
+    expectedEngine: "classic",
+});

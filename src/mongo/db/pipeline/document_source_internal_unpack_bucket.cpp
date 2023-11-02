@@ -635,14 +635,9 @@ DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
                                          assumeNoMixedSchemaData,
                                          fixedBuckets) {
     if (eventFilterBson) {
-        _eventFilterBson = eventFilterBson->getOwned();
-        _eventFilter =
-            uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
-                                                         pExpCtx,
-                                                         ExtensionsCallbackNoop(),
-                                                         Pipeline::kAllowedMatcherFeatures));
-        _eventFilterDeps = {};
-        match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+        // Optimizing '_eventFilter' here duplicates predicates in $expr expressions.
+        // TODO SERVER-79692 remove the 'shouldOptimize' boolean.
+        setEventFilter(eventFilterBson.get(), false /* shouldOptimize */);
     }
     if (wholeBucketFilterBson) {
         _wholeBucketFilterBson = wholeBucketFilterBson->getOwned();
@@ -1052,6 +1047,33 @@ bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
         }
     }
     return nextStageWasRemoved;
+}
+
+void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
+                                                        bool shouldOptimize) {
+    _eventFilterBson = eventFilterBson.getOwned();
+
+    // Having an '_eventFilter' might make the unpack stage incompatible with SBE. Rather
+    // than tracking the specific exprs, we temporarily reset the context to be fully SBE
+    // compatible and check after parsing if the '_eventFilter' made the unpack stage
+    // incompatible.
+    auto originalSbeCompatibility = pExpCtx->sbeCompatibility;
+    pExpCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+
+    _eventFilter = uassertStatusOK(MatchExpressionParser::parse(
+        _eventFilterBson, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
+    if (shouldOptimize) {
+        _eventFilter =
+            MatchExpression::optimize(std::move(_eventFilter), /* enableSimplification */ false);
+    }
+    _isEventFilterSbeCompatible.emplace(pExpCtx->sbeCompatibility);
+
+    // Reset the sbeCompatibility taking _eventFilter into account.
+    pExpCtx->sbeCompatibility =
+        std::min(originalSbeCompatibility, _isEventFilterSbeCompatible.get());
+
+    _eventFilterDeps = {};
+    match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
 }
 
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
@@ -1779,16 +1801,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
 
         if (!predicates.rewriteProvidesExactMatchPredicate) {
             // Push the original event predicate into the unpacking stage.
-            _eventFilterBson = nextMatch->getQuery().getOwned();
-            _eventFilter =
-                uassertStatusOK(MatchExpressionParser::parse(_eventFilterBson,
-                                                             pExpCtx,
-                                                             ExtensionsCallbackNoop(),
-                                                             Pipeline::kAllowedMatcherFeatures));
-            _eventFilter = MatchExpression::optimize(std::move(_eventFilter),
-                                                     /* enableSimplification */ false);
-            _eventFilterDeps = {};
-            match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
+            setEventFilter(nextMatch->getQuery(), true /* shouldOptimize */);
         }
 
         container->erase(std::next(itr));
@@ -1861,19 +1874,17 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
     if (!_isSbeCompatible) {
         _isSbeCompatible.emplace([&] {
             // Just in case that the event filter or the whole bucket filter is incompatible with
-            // SBE. Here's what may happen:
-            //
-            // While optimizing pipeline, we may end up with pushing SBE-incompatible filters down
-            // to the '$_internalUnpackBucket' stage. But before trying to pushing down stages to
-            // SBE, we set the expCtx->sbeCompatibility to 'fullyCompatible' and we forget the the
-            // whole SBE compatibility status for pipeline. And we examine each stage one by one
-            // while pushding down them. So, we need to remember the SBE compatibility at this
-            // point.
-            //
-            // This is overly conservative but we don't have a way to check which stage or
-            // expression is individually incompatible with SBE.
-            if (pExpCtx->sbeCompatibility < SbeCompatibility::fullyCompatible) {
-                return false;
+            // SBE. While optimizing pipeline, we may end up with pushing SBE-incompatible filters
+            // down to the '$_internalUnpackBucket' stage. We've stored the sbeCompatibility of
+            // '_eventFilter' in '_isEventFilterSbeCompatible'.
+            if (_eventFilter) {
+                tassert(8062700,
+                        "If _eventFilter is set, we must have determined if it is compatible with "
+                        "SBE or not.",
+                        _isEventFilterSbeCompatible);
+                if (_isEventFilterSbeCompatible.get() < SbeCompatibility::fullyCompatible) {
+                    return false;
+                }
             }
 
             // Currently we only support in SBE unpacking with a statically known set of fields.
