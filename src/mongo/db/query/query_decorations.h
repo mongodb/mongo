@@ -41,6 +41,7 @@ public:
     QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp();
     bool getSbeDisableGroupPushdownForOp();
     bool getSbeDisableLookupPushdownForOp();
+    bool getSbeDisableTimeSeriesForOp();
 
 private:
     void _tryToSetAllValues();
@@ -48,6 +49,7 @@ private:
     bool _isSet = false;
     bool _sbeDisableGroupPushdownValue;
     bool _sbeDisableLookupPushdownValue;
+    bool _sbeDisableTimeSeriesValue;
     QueryFrameworkControlEnum _queryFrameworkControlValue;
 };
 }  // namespace mongo

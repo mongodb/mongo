@@ -45,6 +45,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
@@ -109,8 +110,10 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
 
     const auto& nss = cq->nss();
 
-    if (!feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+    auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
+    if ((!feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
+             serverGlobalParams.featureCompatibility) ||
+         queryKnob.getSbeDisableTimeSeriesForOp()) &&
         nss.isTimeseriesBucketsCollection()) {
         return false;
     }

@@ -1336,6 +1336,14 @@ server_parameters:
     default: 1024
     validator:
         gt: 0
+  
+  internalQuerySlotBasedExecutionDisableTimeSeriesPushdown:
+    description: "If true, the system will not push down time-series queries to the SBE execution engine."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQuerySlotBasedExecutionDisableTimeSeriesPushdown"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
 # Note for adding additional query knobs:
 #

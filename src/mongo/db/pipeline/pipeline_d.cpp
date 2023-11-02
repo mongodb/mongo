@@ -422,6 +422,7 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * $_internalUnpackBucket stages ('DocumentSourceInternalUnpackBucket') are extracted when all of:
  *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
  *    - When 'featureFlagTimeSeriesInSbe' is true.
+ *    - When 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown' query knob if 'false'.
  *    - When ExpressionContext::sbePipelineCompatibility is set to
  *      'SbeCompatibility::fullyCompatible'.
  */
@@ -503,6 +504,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
                             serverGlobalParams.featureCompatibility) &&
+            !queryKnob.getSbeDisableTimeSeriesForOp() &&
             cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::fullyCompatible,
     };
 
