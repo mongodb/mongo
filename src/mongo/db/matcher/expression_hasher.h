@@ -35,9 +35,10 @@ namespace mongo {
 /**
  * MatchExpression's hash function designed to be consistent with `MatchExpression::equivalent()`.
  * The function does not support $jsonSchema and will tassert() if provided an input that contains
- * any $jsonSchema-related nodes.
+ * any $jsonSchema-related nodes. 'maxNumberOfInElementsToHash' is the maximum number of equalities
+ * or regexes to hash to avoid performance issues related to hashing of large '$in's.
  */
-size_t calculateHash(const MatchExpression& expr);
+size_t calculateHash(const MatchExpression& expr, size_t maxNumberOfInElementsToHash);
 
 /**
  * MatchExpression's hash functor implementation compatible with unordered containers. Designed to
@@ -45,9 +46,19 @@ size_t calculateHash(const MatchExpression& expr);
  * will tassert() if provided an input that contains any $jsonSchema-related nodes.
  */
 struct MatchExpressionHasher {
+    /**
+     * 'maxNumberOfInElementsToHash' is the maximum number of equalities or regexes to hash to avoid
+     * performance issues related to hashing of large '$in's.
+     */
+    explicit MatchExpressionHasher(size_t maxNumberOfInElementsToHash = 20)
+        : _maxNumberOfInElementsToHash(maxNumberOfInElementsToHash) {}
+
     size_t operator()(const MatchExpression* expr) const {
-        return calculateHash(*expr);
+        return calculateHash(*expr, _maxNumberOfInElementsToHash);
     }
+
+private:
+    const size_t _maxNumberOfInElementsToHash;
 };
 
 /**

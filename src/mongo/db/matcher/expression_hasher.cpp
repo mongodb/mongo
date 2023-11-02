@@ -84,7 +84,9 @@ H AbslHashValue(H h, const Collation& collation) {
 template <typename H>
 class MatchExpressionHashVisitor final : public MatchExpressionConstVisitor {
 public:
-    explicit MatchExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
+    MatchExpressionHashVisitor(H hashState, size_t maxNumberOfInElementsToHash)
+        : _hashState(std::move(hashState)),
+          _maxNumberOfInElementsToHash(maxNumberOfInElementsToHash) {}
 
     void visit(const BitsAllClearMatchExpression* expr) final {
         visitBitTest(expr);
@@ -123,14 +125,27 @@ public:
         _hashState = H::combine(std::move(_hashState), expr->hasNull());
         hashCombineCollator(expr->getCollator());
 
+        // Hash the size of equalities's list and up to a maximum of 'maxNumberOfHashedElements'
+        // evenly chosen equalities.
         BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
                                      expr->getCollator());
-        for (const auto& eq : expr->getEqualities()) {
-            _hashState = H::combine(std::move(_hashState), eltCmp.hash(eq));
+        const auto& equalities = expr->getEqualities();
+        const size_t eqStep =
+            std::max(static_cast<size_t>(1), equalities.size() / _maxNumberOfInElementsToHash);
+        _hashState = H::combine(std::move(_hashState), equalities.size());
+        for (size_t i = 0; i < equalities.size(); i += eqStep) {
+            _hashState = H::combine(std::move(_hashState), eltCmp.hash(equalities[i]));
         }
 
-        for (const auto& reg : expr->getRegexes()) {
-            _hashState = H::combine(std::move(_hashState), calculateHash(*reg.get()));
+        // Hash the size of regexes's list and up to a maximum of 'maxNumberOfHashedElements'
+        // evenly chosen regexes.
+        const auto& regexes = expr->getRegexes();
+        const size_t regStep =
+            std::max(static_cast<size_t>(1), regexes.size() / _maxNumberOfInElementsToHash);
+        _hashState = H::combine(std::move(_hashState), regexes.size());
+        for (size_t i = 0; i < regexes.size(); i += regStep) {
+            _hashState = H::combine(std::move(_hashState),
+                                    calculateHash(*regexes[i].get(), _maxNumberOfInElementsToHash));
         }
     }
 
@@ -353,17 +368,27 @@ private:
     }
 
     H _hashState;
+
+    const size_t _maxNumberOfInElementsToHash;
+};
+
+/**
+ * A utility struct used to pass additional parameters to the MatchExpression's hasher.
+ */
+struct MatchExpressionHashParams {
+    const MatchExpression& exprToHash;
+    size_t maxNumberOfInElementsToHash;
 };
 
 template <typename H>
-H AbslHashValue(H h, const MatchExpression& expr) {
-    MatchExpressionHashVisitor<H> visitor{std::move(h)};
+H AbslHashValue(H h, const MatchExpressionHashParams& toHash) {
+    MatchExpressionHashVisitor<H> visitor{std::move(h), toHash.maxNumberOfInElementsToHash};
     MatchExpressionWalker walker{&visitor, nullptr, nullptr};
-    tree_walker::walk<true, MatchExpression>(&expr, &walker);
+    tree_walker::walk<true, MatchExpression>(&toHash.exprToHash, &walker);
     return std::move(visitor.extractHashState());
 }
 
-size_t calculateHash(const MatchExpression& expr) {
-    return absl::Hash<MatchExpression>{}(expr);
+size_t calculateHash(const MatchExpression& expr, size_t maxNumberOfInElementsToHash) {
+    return absl::Hash<MatchExpressionHashParams>{}({expr, maxNumberOfInElementsToHash});
 }
 }  // namespace mongo

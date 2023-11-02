@@ -82,16 +82,11 @@ struct Context {
      * Stores the given MatchExpression and assign a bit index to it. Returns the bit index.
      */
     size_t getOrAssignBitIndex(const MatchExpression* expr) {
-        auto it = _map.find(expr);
-        if (it != _map.end()) {
-            return it->second;
+        auto [it, inserted] = _map.try_emplace(expr, expressions.size());
+        if (inserted) {
+            expressions.emplace_back(expr);
         }
-
-        const size_t bitIndex = expressions.size();
-        expressions.emplace_back(expr);
-        _map[expressions.back().expression] = bitIndex;
-
-        return bitIndex;
+        return it->second;
     }
 
     size_t getMaxtermSize() const {
