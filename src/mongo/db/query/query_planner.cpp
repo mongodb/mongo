@@ -143,15 +143,13 @@ void logNumberOfSolutions(size_t numSolutions) {
 
 namespace {
 /**
- * On success, applies the index tags from 'branchCacheData' (which represent the winning
- * plan for 'orChild') to 'compositeCacheData'.
+ * Attempts to apply the index tags from 'branchCacheData' to 'orChild'. If the index assignments
+ * cannot be applied, return the error from the process. Otherwise the tags are applied and success
+ * is returned.
  */
-Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
-                                  SolutionCacheData* branchCacheData,
+Status tagOrChildAccordingToCache(const SolutionCacheData* branchCacheData,
                                   MatchExpression* orChild,
                                   const std::map<IndexEntry::Identifier, size_t>& indexMap) {
-    invariant(compositeCacheData);
-
     // We want a well-formed *indexed* solution.
     if (nullptr == branchCacheData) {
         // For example, we don't cache things for 2d indices.
@@ -175,9 +173,6 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
         ss << "Failed to extract indices from subchild " << orChild->debugString();
         return tagStatus.withContext(ss);
     }
-
-    // Add the child's cache data to the cache data we're creating for the main query.
-    compositeCacheData->children.push_back(branchCacheData->tree->clone());
 
     return Status::OK();
 }
@@ -1416,7 +1411,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> out;
 
     // If we have any relevant indices, we try to create indexed plans.
-    if (0 < relevantIndices.size()) {
+    if (!relevantIndices.empty()) {
         // The enumerator spits out trees tagged with IndexTag(s).
         PlanEnumeratorParams enumParams;
         enumParams.intersect = params.options & QueryPlannerParams::INDEX_INTERSECTION;
@@ -1439,9 +1434,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             // Store the plan cache index tree before calling prepareForAccessingPlanning(), so
             // that the PlanCacheIndexTree has the same sort as the MatchExpression used to
             // generate the plan cache key.
-            std::unique_ptr<MatchExpression> clone(nextTaggedTree->clone());
             std::unique_ptr<PlanCacheIndexTree> cacheData;
-            auto statusWithCacheData = cacheDataFromTaggedTree(clone.get(), relevantIndices);
+            auto statusWithCacheData =
+                cacheDataFromTaggedTree(nextTaggedTree.get(), relevantIndices);
             if (!statusWithCacheData.isOK()) {
                 LOGV2_DEBUG(20977,
                             5,
@@ -1920,9 +1915,6 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
     QueryPlanner::SubqueriesPlanningResult planningResult,
     std::function<StatusWith<std::unique_ptr<QuerySolution>>(
         CanonicalQuery* cq, std::vector<unique_ptr<QuerySolution>>)> multiplanCallback) {
-    // This is the skeleton of index selections that is inserted into the cache.
-    std::unique_ptr<PlanCacheIndexTree> cacheData(new PlanCacheIndexTree());
-
     for (size_t i = 0; i < planningResult.orExpression->numChildren(); ++i) {
         auto orChild = planningResult.orExpression->getChild(i);
         auto branchResult = planningResult.branches[i].get();
@@ -1930,14 +1922,14 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
         if (branchResult->cachedData.get()) {
             // We can get the index tags we need out of the cache.
             Status tagStatus = tagOrChildAccordingToCache(
-                cacheData.get(), branchResult->cachedData.get(), orChild, planningResult.indexMap);
+                branchResult->cachedData.get(), orChild, planningResult.indexMap);
             if (!tagStatus.isOK()) {
                 return tagStatus;
             }
         } else if (1 == branchResult->solutions.size()) {
             QuerySolution* soln = branchResult->solutions.front().get();
-            Status tagStatus = tagOrChildAccordingToCache(
-                cacheData.get(), soln->cacheData.get(), orChild, planningResult.indexMap);
+            Status tagStatus =
+                tagOrChildAccordingToCache(soln->cacheData.get(), orChild, planningResult.indexMap);
 
             // Check if 'soln' is a CLUSTERED_IXSCAN. This branch won't be tagged, and 'tagStatus'
             // will return 'NoQueryExecutionPlans'. However, this plan can be executed by the OR
@@ -1997,7 +1989,6 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::choosePlanForSubqueries
                     ss << "Failed to extract indices from subchild " << orChild->debugString();
                     return tagStatus.withContext(ss);
                 }
-                cacheData->children.push_back(bestSoln->cacheData->tree->clone());
             }
         }
     }
