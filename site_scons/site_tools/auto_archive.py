@@ -201,15 +201,28 @@ def archive_builder(source, target, env, for_signature):
 
     archive_type = env["__AUTO_ARCHIVE_TYPE"]
     make_archive_script = source[0]
+    compression_flags = ""
+
     tar_cmd = env.WhereIs("tar")
     if archive_type == "tar" and tar_cmd:
-        command_prefix = "{tar} -C {common_ancestor} -T {file_list} -czf {archive_name}"
+
+        pigz_cmd = env.WhereIs("pigz")
+        if pigz_cmd:
+            # pigz is the parallel implementation of gizp,
+            # it uses all available cores on the machine.
+            # if available we use it to speedup compression.
+            compression_flags = "--use-compress-program='{pigz_cmd}'".format(pigz_cmd=pigz_cmd)
+        else:
+            compression_flags = "-z"
+
+        command_prefix = "{tar} -c {compression_flags} -C {common_ancestor} -T {file_list} -f {archive_name}"
     else:
         command_prefix = "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor} {file_list}"
 
     archive_name = env.File(target[0])
     command_sig = command_prefix.format(
         tar=tar_cmd,
+        compression_flags=compression_flags,
         python=sys.executable,
         archive_type=archive_type,
         archive_name=archive_name,
@@ -265,6 +278,7 @@ def archive_builder(source, target, env, for_signature):
 
     cmd = command_prefix.format(
         tar=tar_cmd,
+        compression_flags=compression_flags,
         python=sys.executable,
         archive_type=archive_type,
         archive_name=archive_name,
