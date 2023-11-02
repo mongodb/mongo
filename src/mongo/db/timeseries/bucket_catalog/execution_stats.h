@@ -51,6 +51,7 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketsArchivedDueToMemoryThreshold;
     AtomicWord<long long> numBucketsArchivedDueToTimeBackward;
     AtomicWord<long long> numCommits;
+    AtomicWord<long long> numMeasurementsGroupCommitted;
     AtomicWord<long long> numWaits;
     AtomicWord<long long> numMeasurementsCommitted;
     AtomicWord<long long> numBucketsReopened;
@@ -85,6 +86,7 @@ public:
     void incNumBucketsArchivedDueToMemoryThreshold(long long increment = 1);
     void incNumBucketsArchivedDueToTimeBackward(long long increment = 1);
     void incNumCommits(long long increment = 1);
+    void incNumMeasurementsGroupCommitted(long long increment = 1);
     void incNumWaits(long long increment = 1);
     void incNumMeasurementsCommitted(long long increment = 1);
     void incNumBucketsReopened(long long increment = 1);

@@ -345,4 +345,14 @@ void appendExecutionStats(const BucketCatalog& catalog,
                           const NamespaceString& ns,
                           BSONObjBuilder& builder);
 
+/**
+ * Reports a number of measurements inserted that were committed by a different thread than the one
+ * that initially staged them. These measurements are considered to have benefitted from "group
+ * commit".
+ */
+void reportMeasurementsGroupCommitted(BucketCatalog& catalog,
+                                      const NamespaceString& ns,
+                                      int64_t count);
+
+
 }  // namespace mongo::timeseries::bucket_catalog

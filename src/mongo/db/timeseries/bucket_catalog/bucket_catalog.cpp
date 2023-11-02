@@ -413,4 +413,11 @@ void appendExecutionStats(const BucketCatalog& catalog,
     appendExecutionStatsToBuilder(*stats, builder);
 }
 
+void reportMeasurementsGroupCommitted(BucketCatalog& catalog,
+                                      const NamespaceString& ns,
+                                      int64_t count) {
+    auto stats = internal::getOrInitializeExecutionStats(catalog, ns);
+    stats.incNumMeasurementsGroupCommitted(count);
+}
+
 }  // namespace mongo::timeseries::bucket_catalog
