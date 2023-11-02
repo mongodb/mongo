@@ -1169,53 +1169,10 @@ BSONObj toBSON(const CommandConstructionPlan::Entry& e) {
     return bob.obj();
 }
 
-namespace {
-/**
- * All command registrations should be specifying at least one role,
- * and at least one of the roles owned by the active service context.
- */
-template <typename Entries>
-void warnOnUnexpectedRoles(Service* service, const Entries& entries) {
-    auto scRoles = [&] {
-        std::vector<ClusterRole> vec;
-        if (auto sc = service ? service->getServiceContext() : nullptr) {
-            for (ClusterRole r : {ClusterRole::ShardServer, ClusterRole::RouterServer})
-                if (sc->getService(r))
-                    vec.push_back(r);
-        }
-        return vec;
-    }();
-
-    // Flag an entry if it has no roles, or has roles that don't match any server roles.
-    std::vector<BSONObj> noRole;
-    std::vector<BSONObj> noRelevantRole;
-    std::vector<BSONObj> okEntries;
-    for (auto&& entry : entries) {
-        if (!entry->roles) {
-            noRole.push_back(toBSON(*entry));
-        } else if (!std::any_of(scRoles.begin(), scRoles.end(), [&](auto r) {
-                       return entry->roles->has(r);
-                   })) {
-            noRelevantRole.push_back(toBSON(*entry));
-        } else {
-            okEntries.push_back(toBSON(*entry));
-        }
-    }
-    if (!noRole.empty() || !noRelevantRole.empty())
-        LOGV2_WARNING_OPTIONS(8097100,
-                              {logv2::LogTruncation::Disabled},
-                              "Commands with unexpected role",
-                              "scRoles"_attr = scRoles,
-                              "noRole"_attr = noRole,
-                              "noRelevantRole"_attr = noRelevantRole);
-}
-}  // namespace
-
 void CommandConstructionPlan::execute(CommandRegistry* registry,
                                       Service* service,
                                       const std::function<bool(const Entry&)>& pred) const {
     LOGV2_DEBUG(8043400, 3, "Constructing Command objects from specs");
-    warnOnUnexpectedRoles(service, entries());
     for (auto&& entry : entries()) {
         if (entry->testOnly && !getTestCommandsEnabled()) {
             LOGV2_DEBUG(8043401, 3, "Skipping test-only command", "entry"_attr = *entry);
@@ -1245,7 +1202,8 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
 
 void CommandConstructionPlan::execute(CommandRegistry* registry, Service* service) const {
     execute(registry, service, [r = service->role()](const auto& e) {
-        return !e.roles || e.roles->has(r);
+        invariant(e.roles, "All commands must have a role.");
+        return e.roles->has(r);
     });
 }
 

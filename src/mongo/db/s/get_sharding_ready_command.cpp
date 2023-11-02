@@ -67,5 +67,5 @@ public:
         return Status::OK();
     }
 };
-MONGO_REGISTER_COMMAND(GetShardingReadyCmd).testOnly();
+MONGO_REGISTER_COMMAND(GetShardingReadyCmd).forShard().testOnly();
 }  // namespace mongo
