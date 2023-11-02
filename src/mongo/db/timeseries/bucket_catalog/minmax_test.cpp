@@ -271,6 +271,5 @@ TEST(MinMax, SearchLookupMap) {
     ASSERT_EQ(obj.search(obj.begin(), "50")->fieldName(), "50");
 }
 
-
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

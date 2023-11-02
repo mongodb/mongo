@@ -326,12 +326,26 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
     return std::make_pair(Iterator(inserted), end());
 }
 
+size_t stringHeapUsage(const std::string& s) {
+    static const std::string emptyString;
+    return s.capacity() > emptyString.capacity() ? s.capacity() : 0;
+}
+
 template <class Element, class Value>
 int64_t FlatBSONStore<Element, Value>::calculateMemUsage() const {
     auto memUsage = entries.capacity() * sizeof(Entry);
     for (auto&& entry : entries) {
-        // TODO SERVER-81405: Actually account for the memory allocated in _fieldNameToIndex
-        memUsage += entry._element.calculateMemUsage();
+        int64_t approxFieldNameToIndexMemUsage = 0;
+        if (entry._fieldNameToIndex) {
+            approxFieldNameToIndexMemUsage =
+                (sizeof(StringMap<uint32_t>::slot_type)) * entry._fieldNameToIndex->capacity();
+            auto it = entry._fieldNameToIndex->begin();
+            auto itEnd = entry._fieldNameToIndex->end();
+            for (; it != itEnd; ++it) {
+                approxFieldNameToIndexMemUsage += stringHeapUsage(it->first);
+            }
+        }
+        memUsage += entry._element.calculateMemUsage() + approxFieldNameToIndexMemUsage;
     }
     return memUsage;
 }
