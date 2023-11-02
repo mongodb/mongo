@@ -117,7 +117,7 @@ class CoreAnalyzerPlugin(PluginInterface):
 
         parser.add_argument(
             "--working-dir", '-w', action="store", type=str, default="core-analyzer",
-            help="Directory that downloaded artifacts will be stores and output will be written to."
+            help="Directory that downloaded artifacts will be stored and output will be written to."
         )
 
         parser.add_argument(
