@@ -125,8 +125,8 @@ sh.help = function() {
         "\tsh.startAutoMerger()                      globally enable auto-merger (active only if balancer is up)");
     print("\tsh.stopAutoMerger()                     globally disable auto-merger");
     print("\tsh.shouldAutoMerge()                    returns whether the auto-merger is enabled");
-    print("\tsh.disableAutoMerge(coll)               disable auto-merging on one collection");
-    print("\tsh.enableAutoMerge(coll)                re-enable auto-merge on one collection");
+    print("\tsh.disableAutoMerger(coll)              disable auto-merging on one collection");
+    print("\tsh.enableAutoMerger(coll)               re-enable auto-merge on one collection");
     print(
         "\tsh.balancerCollectionStatus(fullName)       " +
         "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
@@ -267,7 +267,7 @@ sh.shouldAutoMerge = function(configDB) {
     return automerge.enabled;
 };
 
-sh.disableAutoMerge = function(coll) {
+sh.disableAutoMerger = function(coll) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
@@ -286,7 +286,7 @@ sh.disableAutoMerge = function(coll) {
     }, 'Timed out waiting for disabling auto-merge');
 };
 
-sh.enableAutoMerge = function(coll) {
+sh.enableAutoMerger = function(coll) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
