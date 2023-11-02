@@ -1345,6 +1345,16 @@ server_parameters:
     default: false
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+  internalQuerySpillingMaxWaitTimeout:
+    description: "Timeout in MS that the storage engine will block a spilling operation when the
+      cache is under pressure."
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: internalQuerySpillingMaxWaitTimeout
+    default: 1000
+    validator:
+      gte: 0
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

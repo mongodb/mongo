@@ -827,6 +827,13 @@ public:
         return false;
     }
 
+    /**
+     * Sets a maximum timeout that the storage engine will block an operation when the cache is
+     * under pressure.
+     * If not set (default 0) then the storage engine will block indefinitely.
+     */
+    virtual void setCacheMaxWaitTimeout(Milliseconds) {}
+
 protected:
     RecoveryUnit();
 

@@ -107,6 +107,13 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc,
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork(), toString(_getState()));
     _abort();
+
+    // If the session has non zero timeout then reset it back to 0 before returning the session back
+    // to the cache.
+    if (durationCount<Milliseconds>(_cacheMaxWaitTimeout)) {
+        auto wtSession = getSessionNoTxn()->getSession();
+        invariantWTOK(wtSession->reconfigure(wtSession, "cache_max_wait_ms=0"), wtSession);
+    }
 }
 
 void WiredTigerRecoveryUnit::_commit() {
@@ -927,4 +934,15 @@ void WiredTigerRecoveryUnit::storeWriteContextForDebugging(const BSONObj& info) 
     _writeContextForDebugging.push_back(info);
 }
 
+void WiredTigerRecoveryUnit::setCacheMaxWaitTimeout(Milliseconds timeout) {
+    _cacheMaxWaitTimeout = timeout;
+
+    auto wtSession = getSessionNoTxn()->getSession();
+    invariantWTOK(
+        wtSession->reconfigure(
+            wtSession,
+            fmt::format("cache_max_wait_ms={}", durationCount<Milliseconds>(_cacheMaxWaitTimeout))
+                .c_str()),
+        wtSession);
+}
 }  // namespace mongo

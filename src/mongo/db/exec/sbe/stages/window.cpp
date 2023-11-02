@@ -116,6 +116,17 @@ std::unique_ptr<PlanStage> WindowStage::clone() const {
                                          _participateInTrialRunTracking);
 }
 
+void WindowStage::doSaveState(bool relinquishCursor) {
+    if (_recordStore) {
+        _recordStore->saveState();
+    }
+}
+void WindowStage::doRestoreState(bool relinquishCursor) {
+    if (_recordStore) {
+        _recordStore->restoreState();
+    }
+}
+
 size_t WindowStage::getLastRowId() {
     return _lastRowId;
 }
@@ -151,17 +162,14 @@ void WindowStage::spill() {
 
     // Create spilled record storage if not created.
     if (!_recordStore) {
-        _recordStore = _opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
-            _opCtx, KeyFormat::Long);
+        _recordStore = std::make_unique<SpillingStore>(_opCtx, KeyFormat::Long);
         _specificStats.usedDisk = true;
     }
     _specificStats.spills++;
 
     auto writeBatch = [&]() {
-        WriteUnitOfWork wuow(_opCtx);
-        auto status = _recordStore->rs()->insertRecords(_opCtx, &_records, _recordTimestamps);
+        auto status = _recordStore->insertRecords(_opCtx, &_records, _recordTimestamps);
         tassert(7870901, "Failed to spill records in the window stage", status.isOK());
-        wuow.commit();
         _records.clear();
         _recordBuffers.clear();
     };
@@ -274,7 +282,7 @@ void WindowStage::readSpilledRow(size_t id, value::MaterializedRow& row) {
     invariant(_recordStore);
     auto recordId = RecordId(id);
     RecordData record;
-    auto result = _recordStore->rs()->findRecord(_opCtx, recordId, &record);
+    auto result = _recordStore->findRecord(_opCtx, recordId, &record);
     tassert(7870902, "Failed to find a spilled record in the window stage", result);
     auto buf = BufReader(record.data(), record.size());
     CollatorInterface* collator = nullptr;

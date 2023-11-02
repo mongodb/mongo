@@ -45,6 +45,7 @@
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -306,7 +307,7 @@ private:
         internalQuerySBEAggApproxMemoryUseInBytesBeforeSpill.load();
 
     // A record store which is instantiated and written to in the case of spilling.
-    std::unique_ptr<TemporaryRecordStore> _recordStore;
+    std::unique_ptr<SpillingStore> _recordStore;
     std::unique_ptr<SeekableRecordCursor> _rsCursor;
 
     // A monotically increasing counter used to ensure uniqueness of 'RecordId' values. When

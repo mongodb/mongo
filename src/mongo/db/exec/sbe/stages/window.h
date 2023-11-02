@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
@@ -104,6 +105,10 @@ public:
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     size_t estimateCompileTimeSize() const final;
+
+protected:
+    void doSaveState(bool relinquishCursor) override;
+    void doRestoreState(bool relinquishCursor) override;
 
 private:
     /**
@@ -263,7 +268,7 @@ private:
     // Whether to allow spilling.
     bool _allowDiskUse;
     // The spilled record storage.
-    std::unique_ptr<TemporaryRecordStore> _recordStore{nullptr};
+    std::unique_ptr<SpillingStore> _recordStore{nullptr};
     // The temporary data structure to hold record batch before they're spilled.
     static const long _batchSize = 1000;
     std::vector<Record> _records;

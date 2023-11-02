@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -73,32 +74,76 @@ key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits type
     return kb.getValueCopy();
 }
 
-boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* opCtx,
-                                                            RecordStore* rs,
-                                                            const RecordId& rid) {
-    RecordData record;
-    if (rs->findRecord(opCtx, rid, &record)) {
-        auto valueReader = BufReader(record.data(), record.size());
-        return value::MaterializedRow::deserializeForSorter(valueReader, {});
-    }
-    return boost::none;
+SpillingStore::SpillingStore(OperationContext* opCtx, KeyFormat format) {
+    _recordStore =
+        opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx, format);
+
+    _spillingUnit = std::unique_ptr<RecoveryUnit>(
+        opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit());
+    _spillingUnit->setCacheMaxWaitTimeout(Milliseconds(internalQuerySpillingMaxWaitTimeout.load()));
+    _spillingState = WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 }
 
-static int upsertToRecordStore(
-    OperationContext* opCtx, RecordStore* rs, const RecordId& key, BufBuilder& buf, bool update) {
+SpillingStore::~SpillingStore() {}
 
+int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
+                                       const RecordId& recordKey,
+                                       const value::MaterializedRow& key,
+                                       const value::MaterializedRow& val,
+                                       bool update) {
+    BufBuilder buf;
+    key.serializeForSorter(buf);
+    val.serializeForSorter(buf);
+    return upsertToRecordStore(opCtx, recordKey, buf, update);
+}
+
+int SpillingStore::upsertToRecordStore(
+    OperationContext* opCtx,
+    const RecordId& key,
+    const value::MaterializedRow& val,
+    const key_string::TypeBits& typeBits,  // recover type of value.
+    bool update) {
+    BufBuilder bufValue;
+    val.serializeForSorter(bufValue);
+    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
+    // draining HashAgg.
+    bufValue.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+
+    return upsertToRecordStore(opCtx, key, bufValue, update);
+}
+
+int SpillingStore::upsertToRecordStore(
+    OperationContext* opCtx,
+    const RecordId& key,
+    BufBuilder& buf,
+    const key_string::TypeBits& typeBits,  // recover type of value.
+    bool update) {
+    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
+    // draining HashAgg.
+    buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
+
+    return upsertToRecordStore(opCtx, key, buf, update);
+}
+
+int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
+                                       const RecordId& key,
+                                       BufBuilder& buf,
+                                       bool update) {
     assertIgnorePrepareConflictsBehavior(opCtx);
 
+    switchToSpilling(opCtx);
+    ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
     WriteUnitOfWork wuow(opCtx);
 
     auto result = mongo::Status::OK();
     if (update) {
-        result = rs->updateRecord(opCtx, key, buf.buf(), buf.len());
+        result = rs()->updateRecord(opCtx, key, buf.buf(), buf.len());
     } else {
-        auto status = rs->insertRecord(opCtx, key, buf.buf(), buf.len(), Timestamp{});
+        auto status = rs()->insertRecord(opCtx, key, buf.buf(), buf.len(), Timestamp{});
         result = status.getStatus();
     }
     wuow.commit();
+
     if (!result.isOK()) {
         tasserted(5843600, str::stream() << "Failed to write to disk because " << result.reason());
         return 0;
@@ -106,42 +151,59 @@ static int upsertToRecordStore(
     return buf.len();
 }
 
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& key,
-                        const value::MaterializedRow& val,
-                        const key_string::TypeBits& typeBits,  // recover type of value.
-                        bool update) {
-    BufBuilder buf;
-    val.serializeForSorter(buf);
-    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
-    // draining HashAgg.
-    buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
-    return upsertToRecordStore(opCtx, rs, key, buf, update);
+Status SpillingStore::insertRecords(OperationContext* opCtx,
+                                    std::vector<Record>* inOutRecords,
+                                    const std::vector<Timestamp>& timestamps) {
+    assertIgnorePrepareConflictsBehavior(opCtx);
+
+    switchToSpilling(opCtx);
+    ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+    WriteUnitOfWork wuow(opCtx);
+    auto status = rs()->insertRecords(opCtx, inOutRecords, timestamps);
+    wuow.commit();
+
+    return status;
 }
 
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& recordKey,
-                        const value::MaterializedRow& key,
-                        const value::MaterializedRow& val,
-                        bool update) {
-    BufBuilder buf;
-    key.serializeForSorter(buf);
-    val.serializeForSorter(buf);
-    return upsertToRecordStore(opCtx, rs, recordKey, buf, update);
+boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(OperationContext* opCtx,
+                                                                           const RecordId& rid) {
+    switchToSpilling(opCtx);
+    ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+
+    RecordData record;
+    if (rs()->findRecord(opCtx, rid, &record)) {
+        auto valueReader = BufReader(record.data(), record.size());
+        return value::MaterializedRow::deserializeForSorter(valueReader, {});
+    }
+    return boost::none;
 }
 
-int upsertToRecordStore(OperationContext* opCtx,
-                        RecordStore* rs,
-                        const RecordId& key,
-                        BufBuilder& buf,
-                        const key_string::TypeBits& typeBits,  // recover type of value.
-                        bool update) {
-    // Append the 'typeBits' to the end of the val's buffer so the 'key' can be reconstructed when
-    // draining HashAgg.
-    buf.appendBuf(typeBits.getBuffer(), typeBits.getSize());
-    return upsertToRecordStore(opCtx, rs, key, buf, update);
+bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out) {
+    switchToSpilling(opCtx);
+    ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
+
+    return rs()->findRecord(opCtx, loc, out);
 }
+
+void SpillingStore::switchToSpilling(OperationContext* opCtx) {
+    invariant(!_originalUnit);
+    _originalUnit = opCtx->releaseRecoveryUnit();
+    _originalState = opCtx->setRecoveryUnit(std::move(_spillingUnit), _spillingState);
+}
+void SpillingStore::switchToOriginal(OperationContext* opCtx) {
+    invariant(!_spillingUnit);
+    _spillingUnit = opCtx->releaseRecoveryUnit();
+    _spillingState = opCtx->setRecoveryUnit(std::move(_originalUnit), _originalState);
+    invariant(!(_spillingUnit->getState() == RecoveryUnit::State::kInactiveInUnitOfWork ||
+                _spillingUnit->getState() == RecoveryUnit::State::kActive));
+}
+
+void SpillingStore::saveState() {
+    _spillingUnit->abandonSnapshot();
+}
+void SpillingStore::restoreState() {
+    // We do not have to do anything.
+}
+
 }  // namespace sbe
 }  // namespace mongo
