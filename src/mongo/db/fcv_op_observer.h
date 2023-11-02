@@ -203,6 +203,7 @@ private:
      */
     static void _setVersion(OperationContext* opCtx,
                             ServerGlobalParams::FeatureCompatibility::Version newVersion,
+                            bool withinRecoveryUnit,
                             boost::optional<Timestamp> commitTs = boost::none);
 
     /**
