@@ -4613,6 +4613,12 @@ tasks:
         vars:
           stats_dir: mongo-tests/largescale/many-collection-artifacts/results
           test-name: many-collection-test
+      - func: "upload artifact"
+        vars:
+          upload_filename: many-collection-test.tgz
+          upload_source_dir: mongo-tests/largescale/many-collection-artifacts
+      # Call cleanup function to avoid duplicated artifact upload in the post-task stage.
+      - func: "cleanup"
 
   - name: cyclomatic-complexity
     commands:
