@@ -37,6 +37,8 @@ namespace mongo {
 extern AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes;
 uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes();
 
+extern AtomicWord<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes;
+uint64_t getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes();
 /**
  * Checks the time or the meta field doesn't contain embedded null bytes.
  */

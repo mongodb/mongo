@@ -466,7 +466,8 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
 }
 
 TEST_F(BucketCatalogTest, InsertThroughDifferentCatalogsIntoDifferentBuckets) {
-    BucketCatalog temporaryBucketCatalog(/*numberOfStripes=*/1);
+    BucketCatalog temporaryBucketCatalog(/*numberOfStripes=*/1,
+                                         getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes);
     auto result1 = insert(_opCtx,
                           *_bucketCatalog,
                           _ns1,
@@ -2159,6 +2160,95 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithReopening) {
     result1 = boost::none;
 }
 
+TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressure) {
+    // Initialize the side bucket catalog.
+    auto sideBucketCatalog = std::make_unique<timeseries::bucket_catalog::BucketCatalog>(
+        1, getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes);
+    ClosedBuckets closedBuckets;
+
+    // Create dummy bucket and populate bucket state registry.
+    auto dummyBucketId = BucketId(NamespaceString(), OID());
+    auto dummyBucketKey = BucketKey(NamespaceString(), BucketMetadata());
+    sideBucketCatalog->bucketStateRegistry.bucketStates.emplace(dummyBucketId,
+                                                                BucketState::kNormal);
+    auto dummyBucket = std::make_unique<Bucket>(
+        dummyBucketId, dummyBucketKey, "time", Date_t(), sideBucketCatalog->bucketStateRegistry);
+
+    // Create and populate stripe.
+    auto& stripe = sideBucketCatalog->stripes[0];
+    stripe.openBucketsById.try_emplace(
+        dummyBucketId,
+        std::make_unique<Bucket>(dummyBucketId,
+                                 dummyBucketKey,
+                                 "time",
+                                 Date_t(),
+                                 sideBucketCatalog->bucketStateRegistry));
+    stripe.openBucketsByKey[dummyBucketKey].emplace(dummyBucket.get());
+    stripe.idleBuckets.push_front(dummyBucket.get());
+    stdx::lock_guard stripeLock{stripe.mutex};
+
+    // Create execution stats controller.
+    auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
+    auto statsController =
+        ExecutionStatsController(collectionStats, sideBucketCatalog->globalExecutionStats);
+
+    // Ensure we start out with no buckets archived or closed due to memory pressure.
+    ASSERT_EQ(0, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
+    ASSERT_EQ(0, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
+    ASSERT_EQ(
+        0, sideBucketCatalog->globalExecutionStats.numBucketsArchivedDueToMemoryThreshold.load());
+    ASSERT_EQ(0,
+              sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
+
+
+    // Set the catalog memory usage to be above the memory usage threshold by the amount of memory
+    // used by the idle bucket.
+    sideBucketCatalog->memoryUsage.store(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() +
+                                         (dummyBucket->memoryUsage) / 2);
+
+    // When we exceed the memory usage threshold we will first try to archive idle buckets to try
+    // to get below the threshold. If this does not get us beneath the threshold, we will then try
+    // to close archived buckets, until we hit the global expiry max count limit (or if we run out
+    // of idle buckets in this stripe). Then, we try to close any archived buckets. In this
+    // particular execution we should expect not to close any buckets, but we should archive one.
+    internal::expireIdleBuckets(_makeOperationContext().second.get(),
+                                *sideBucketCatalog,
+                                stripe,
+                                stripeLock,
+                                statsController,
+                                closedBuckets);
+
+    ASSERT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
+    ASSERT_EQ(
+        1, sideBucketCatalog->globalExecutionStats.numBucketsArchivedDueToMemoryThreshold.load());
+    ASSERT_EQ(0, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
+    ASSERT_EQ(0,
+              sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
+
+    // Clears the list of idle buckets - usually this is done within the expire idle buckets
+    // function, but that requires setting up more state with the bucket's idleListEntry. This gets
+    // around that for testing purposes.
+    stripe.idleBuckets.clear();
+
+    // Set the memory usage to be back at the threshold. Now, when we run expire idle buckets again,
+    // because there are no idle buckets left to archive, we will close the bucket that we
+    // previously archived.
+    sideBucketCatalog->memoryUsage.store(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() +
+                                         1);
+    internal::expireIdleBuckets(_makeOperationContext().second.get(),
+                                *sideBucketCatalog,
+                                stripe,
+                                stripeLock,
+                                statsController,
+                                closedBuckets);
+
+    ASSERT_EQ(1, collectionStats->numBucketsArchivedDueToMemoryThreshold.load());
+    ASSERT_EQ(
+        1, sideBucketCatalog->globalExecutionStats.numBucketsArchivedDueToMemoryThreshold.load());
+    ASSERT_EQ(1, collectionStats->numBucketsClosedDueToMemoryThreshold.load());
+    ASSERT_EQ(1,
+              sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
+}
 
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

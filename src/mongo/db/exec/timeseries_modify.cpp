@@ -135,7 +135,8 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
           _params.updateDriver->type() == UpdateDriver::UpdateType::kDelta || _params.fromMigrate);
 
     if (_params.isUpdate) {
-        _sideBucketCatalog = std::make_unique<timeseries::bucket_catalog::BucketCatalog>(1);
+        _sideBucketCatalog = std::make_unique<timeseries::bucket_catalog::BucketCatalog>(
+            1, getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes);
     }
 }
 

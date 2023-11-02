@@ -35,6 +35,7 @@
 namespace mongo {
 
 AtomicWord<long long> gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes{-1};
+AtomicWord<long long> gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes{104857600};  // 100MB
 
 uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() {
     long long userValue = gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes.load();
@@ -52,6 +53,10 @@ uint64_t getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes() {
     }
 
     return systemBasedValue;
+}
+
+uint64_t getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() {
+    return static_cast<uint64_t>(gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes.load());
 }
 
 }  // namespace mongo

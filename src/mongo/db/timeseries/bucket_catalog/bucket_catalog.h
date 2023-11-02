@@ -170,9 +170,13 @@ public:
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
 
-    BucketCatalog() : stripes(numberOfStripes) {}
-    BucketCatalog(size_t numberOfStripes)
-        : numberOfStripes(numberOfStripes), stripes(numberOfStripes){};
+    BucketCatalog()
+        : stripes(numberOfStripes),
+          memoryUsageThreshold(getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
+    BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
+        : numberOfStripes(numberOfStripes),
+          stripes(numberOfStripes),
+          memoryUsageThreshold(memoryUsageThreshold) {}
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;
 
@@ -196,6 +200,9 @@ public:
 
     // Approximate memory usage of the bucket catalog across all stripes.
     AtomicWord<uint64_t> memoryUsage;
+
+    // Memory usage threshold in bytes after which idle buckets will be expired.
+    std::function<uint64_t()> memoryUsageThreshold;
 
     // Cardinality of opened and archived buckets managed across all stripes.
     AtomicWord<uint32_t> numberOfActiveBuckets;

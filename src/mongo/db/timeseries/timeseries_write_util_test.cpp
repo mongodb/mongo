@@ -892,7 +892,8 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicWritesForUserUpdate) {
         std::vector<BSONObj> unchangedMeasurements{
             ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":2,"b":2})")};
         std::set<OID> bucketIds{};
-        bucket_catalog::BucketCatalog sideBucketCatalog{1};
+        bucket_catalog::BucketCatalog sideBucketCatalog{
+            1, getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes};
         ASSERT_DOES_NOT_THROW(performAtomicWritesForUpdate(
             opCtx,
             bucketsColl.getCollection(),
@@ -959,7 +960,8 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
     }
 
     std::set<OID> bucketIds{};
-    bucket_catalog::BucketCatalog sideBucketCatalog{1};
+    bucket_catalog::BucketCatalog sideBucketCatalog{
+        1, getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes};
 
     // Updates one measurement. One new bucket is created.
     {

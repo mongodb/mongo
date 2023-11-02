@@ -55,6 +55,12 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_varname: "gTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes"
         default: 0
+    "timeseriesSideBucketCatalogMemoryUsageThreshold":
+        description: "The threshold in bytes for side bucket catalog memory usage above which idle
+                      buckets will be expired."
+        set_at: [ startup, runtime ]
+        cpp_varname: "gTimeseriesSideBucketCatalogMemoryUsageThresholdBytes"
+        default: 104857600 # 100 MB
     "timeseriesIdleBucketExpiryMaxCountPerAttempt":
         description: "The maximum number of buckets that may be closed due to expiry at each attempt"
         set_at: [ startup ]
