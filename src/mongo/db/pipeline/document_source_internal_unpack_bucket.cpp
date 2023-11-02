@@ -1892,26 +1892,6 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
                 return false;
             }
 
-            auto fieldSet = _bucketUnpacker.bucketSpec().fieldSet();
-            tassert(7969801,
-                    "All fields must be top-level ones",
-                    std::all_of(fieldSet.begin(), fieldSet.end(), [](auto&& field) {
-                        return FieldPath(field).getPathLength() == 1;
-                    }));
-
-            for (auto&& computedMeta : _bucketUnpacker.bucketSpec().computedMetaProjFields()) {
-                fieldSet.erase(computedMeta);
-            }
-            if (fieldSet.empty()) {
-                // If the bucket spec has no measurement fields, then the stage cannot be pushed
-                // down because if the 'block_to_row' / 'ts_bucket_to_cell_block' stages in the SBE
-                // do not have any fields to unpack, then they can't know how many rows to produce
-                // according to the current implementation.
-                //
-                // TODO SERVER-80323: Remove this restriction.
-                return false;
-            }
-
             return true;
         }());
     }

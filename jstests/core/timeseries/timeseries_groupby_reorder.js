@@ -334,6 +334,20 @@ export function runGroupRewriteTest(docs, pipeline, expectedResults, excludeMeta
         docs, [{$group: {_id: "$myMeta", x: {$sum: 1}}}, {$match: {_id: 1}}], [{"_id": 1, "x": 2}]);
 })();
 
+// Test with a meta group key, and {$sum: 7}. The group rewrite doesn't apply in this case but we
+// do a different optimization that takes into account that no fields should be unpacked.
+(function testMetaGroupKey_WithSum7Accumulator() {
+    const t = new Date();
+    const docs = [
+        {time: t, meta: 1, val: 3},
+        {time: t, meta: 3, val: 4},
+        {time: t, meta: 1, val: 5},
+    ];
+    runGroupRewriteTest(docs,
+                        [{$group: {_id: "$meta", x: {$sum: 7}}}, {$match: {_id: 1}}],
+                        [{"_id": 1, "x": 2 * 7}]);
+})();
+
 // Test with a constant group key with the $count accumulator when there is no metaField. The
 // rewrite should apply.
 (function testConstGroupKey_WithCountAccumulator_NoMetaField() {
