@@ -397,34 +397,52 @@ constexpr size_t kSbeMaxPipelineStages = 100;
 
 /**
  * Finds a prefix of stages from the given pipeline to prepare for pushdown into the inner query
- * layer so that it can be executed using SBE.
+ * layer so that it can be executed using SBE. Unless pushdown is completely disabled by
+ * {'internalQueryFrameworkControl': 'forceClassicEngine'}, a stage can be extracted from the
+ * pipeline if and only if all the stages before it are extracted and it meets the criteria for its
+ * stage type:
+ * $group via 'DocumentSourceGroup':
+ *   - The 'internalQuerySlotBasedExecutionDisableGroupPushdown' knob is false and
+ *   - the $group is not a mering operation that aggregates partial groups
+ *     (DocumentSourceGroupBase::doingMerge()).
  *
- * $group stages ('DocumentSourceGroup') are extracted from the pipeline when all of:
- *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
- *    - DocumentSourceGroup has 'doingMerge=false'.
+ * $lookup via 'DocumentSourceLookUp':
+ *   - The 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is false,
+ *   - the $lookup uses only the 'localField'/'foreignField' syntax (no pipelines), and
+ *   - the foreign collection is neither sharded nor a view.
  *
- * $lookup stages ('DocumentSourceLookUp') are extracted when all of:
- *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
- *    - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
- *    - The foreign collection is neither sharded nor a view.
+ * $project via 'DocumentSourceInternalProjection':
+ *   - No additional criteria.
  *
- * $project and $addFields stages (collectively 'DocumentSourceInternalProjection') are extracted
- * when all of:
- *    - 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - featureFlagSbeFull is enabled (TODO SERVER-72549 remove this comment line: SBE Pushdown)
+ * $addFields via 'DocumentSourceInternalProjection':
+ *   - The stage that _follows_ the $addFields is also pushed down _or_
+ *   - the 'featureFlagSbeFull' flag is enabled.
  *
- * Search is extracted from the pipeline when the following conditions are met:
- *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - When 'featureFlagSearchInSbe' is true.
+ * $replaceRoot/$replaceWith via 'DocumentSourceSingleDocumentTransformation':
+ *   - No additional criteria.
  *
- * $_internalUnpackBucket stages ('DocumentSourceInternalUnpackBucket') are extracted when all of:
- *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
- *    - When 'featureFlagTimeSeriesInSbe' is true.
- *    - When 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown' query knob if 'false'.
- *    - When ExpressionContext::sbePipelineCompatibility is set to
- *      'SbeCompatibility::fullyCompatible'.
+ * $sort via 'DocumentSourceSort':
+ *   - The sort operation does not produce sort key "meta" fields need by a later merging operation
+ *     (i.e., 'needsMerge' is false).
+ *
+ * $match via 'DocumentSourceMatch':
+ *   - No additional criteria.
+ *
+ * $limit via 'DocumentSourceLimit':
+ *   - No additional criteria.
+ *
+ * $skip via 'DocumentSourceSkip':
+ *   - No additional criteria.
+ *
+ * 'DocumentSourceUnpackBucket':
+ *   - The 'featureFlagSbeFull' flag is enabled.
+ *
+ * 'DocumentSourceSearch':
+ *   - The 'featureFlagSearchInSbe' flag is enabled.
+ *
+ * $_internalUnpackBucket via 'DocumentSourceInternalUnpackBucket':
+ *   - The 'featureFlagTimeSeriesInSbe' flag is enabled and
+ *   - the 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown', is _not_ enabled,
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
@@ -476,10 +494,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         .lookup = !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
             !collections.isAnySecondaryNamespaceAViewOrSharded(),
 
-        // TODO (SERVER-72549): SBE execution of "transform stages" ($project and $addFields),
-        // $match, $sort, $limit, and $skip requires 'featureFlagSbeFull' to be enabled.
-        .transform = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
-        .match = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+        .transform = SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .match = SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 
         // TODO (SERVER-80226): SBE execution of 'unwind' stages requires 'featureFlagSbeFull' to be
         // enabled.
@@ -489,9 +505,9 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
         // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
         // do not yet support metadata fields.
-        .sort = (SbeCompatibility::flagGuarded >= minRequiredCompatibility) && !needsMerge,
+        .sort = (SbeCompatibility::fullyCompatible >= minRequiredCompatibility) && !needsMerge,
 
-        .limitSkip = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+        .limitSkip = SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
@@ -526,10 +542,14 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         }
     }
 
-    // TODO (SERVER-72549): Once $addFields stages can be pushed down without 'featureFlagSbeFull'
-    // being enabled, enabling 'featureFlagFull` will disable this step so that $addFields will
-    // _always_ be pushed down when possible.
-    reconsiderStagesForPushdown(stagesForPushdown);
+    if (SbeCompatibility::flagGuarded >= minRequiredCompatibility) {
+        // When 'minRequiredCompatibility' is permissive enough (because featureFlagSbeFull is
+        // enabled), return 'stagesForPushdown' as is, pushing down as many stages as possible.
+    } else {
+        // Otherwise, "reconsider" stages that we don't expect to improve performance when they
+        // execute in SBE.
+        reconsiderStagesForPushdown(stagesForPushdown);
+    }
 
     return stagesForPushdown;
 }

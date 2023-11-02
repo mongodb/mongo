@@ -20,7 +20,7 @@ assert.commandWorked(coll.insert({_id: {a: 1, b: 1}, a: 1, c: {d: 1}, e: ['elem1
 
 let indexSpec = {a: 1, 'c.d': 1, 'e.0': 1};
 
-const groupPushdownEnabled = checkSBEEnabled(db);
+const sbeEnabled = checkSBEEnabled(db);
 
 /**
  * Helper to test that for a given pipeline, the same results are returned whether or not an
@@ -90,7 +90,7 @@ assertResultsMatch({
     pipeline: [{$project: {_id: 0, a: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}],
     expectProjectToCoalesce: true,
     removedProjectStage: {_id: 0, a: 1},
-    pipelineOptimizedAway: groupPushdownEnabled
+    pipelineOptimizedAway: sbeEnabled
 });
 assertResultsMatch({
     pipeline: [{$sort: {a: -1}}, {$project: {_id: 0, a: 1}}],
@@ -105,7 +105,7 @@ assertResultsMatch({
     ],
     expectProjectToCoalesce: true,
     removedProjectStage: {_id: 0, a: 1},
-    pipelineOptimizedAway: groupPushdownEnabled
+    pipelineOptimizedAway: sbeEnabled
 });
 assertResultsMatch({
     pipeline: [{$project: {_id: 0, c: {d: 1}}}],
@@ -131,20 +131,11 @@ assertResultsMatch({
     expectProjectToCoalesce: true,
     pipelineOptimizedAway: true
 });
-// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    assertResultsMatch({
-        pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
-        expectProjectToCoalesce: true,
-        pipelineOptimizedAway: true
-    });
-} else {
-    assertResultsMatch({
-        pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
-        expectProjectToCoalesce:
-            !groupPushdownEnabled,  // lowering $group into SBE prevents coalesing of projects
-    });
-}
+assertResultsMatch({
+    pipeline: [{$sort: {a: 1}}, {$group: {_id: "$_id", a: {$sum: "$a"}}}, {$project: {arr: 1}}],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: sbeEnabled
+});
 
 // Test that projections with computed fields are removed from the pipeline.
 assertResultsMatch({
@@ -164,29 +155,15 @@ assertResultsMatch({
     pipelineOptimizedAway: true
 });
 
-// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    assertResultsMatch({
-        pipeline: [
-            {$project: {_id: 0, a: 1}},
-            {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
-            {$project: {_id: 0}}
-        ],
-        expectProjectToCoalesce: true,
-        pipelineOptimizedAway: true
-    });
-} else {
-    // Test that only the first projection is removed from the pipeline.
-    assertResultsMatch({
-        pipeline: [
-            {$project: {_id: 0, a: 1}},
-            {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
-            {$project: {_id: 0}}
-        ],
-        expectProjectToCoalesce: true,
-        removedProjectStage: {_id: 0, a: 1},
-    });
-}
+assertResultsMatch({
+    pipeline: [
+        {$project: {_id: 0, a: 1}},
+        {$group: {_id: "$a", c: {$sum: "$c"}, a: {$sum: "$a"}}},
+        {$project: {_id: 0}}
+    ],
+    expectProjectToCoalesce: true,
+    pipelineOptimizedAway: sbeEnabled
+});
 
 // Test that projections on _id with nested fields are removed from pipeline.
 indexSpec = {

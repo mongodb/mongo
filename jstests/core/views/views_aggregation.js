@@ -12,6 +12,9 @@
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   references_foreign_collection,
+ *   # Some of the SBE statistics we check have different values pre-7.1, and this test only checks
+ *   # the values that we expect from the 7.2-and-later SBE.
+ *   requires_fcv_72,
  * ]
  */
 import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
@@ -22,8 +25,7 @@ import {
 } from "jstests/libs/fixture_helpers.js";  // For arrayEq, assertErrorCode, and
 import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
-// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
-const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+const sbeEnabled = checkSBEEnabled(db);
 
 let viewsDB = db.getSiblingDB("views_aggregation");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -216,7 +218,7 @@ assert.commandWorked(viewsDB.runCommand({
     }
     assert.eq(explainPlan.queryPlanner.namespace, "views_aggregation.coll", explainPlan);
     assert(explainPlan.hasOwnProperty("executionStats"), explainPlan);
-    if (featureFlagSbeFull) {
+    if (sbeEnabled) {
         assert.eq(explainPlan.executionStats.nReturned, 0, explainPlan);
     } else {
         assert.eq(explainPlan.executionStats.nReturned, 1, explainPlan);

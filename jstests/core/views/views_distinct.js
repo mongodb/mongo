@@ -13,10 +13,6 @@
 // care about order in the distinct response.
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getPlanStage, getSingleNodeExplain, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
-const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 var viewsDB = db.getSiblingDB("views_distinct");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -78,7 +74,7 @@ assert.commandWorked(largePopView.explain().distinct("pop", {state: "CA"}));
 let explainPlan = largePopView.explain().count({foo: "bar"});
 assert.commandWorked(explainPlan);
 explainPlan = getSingleNodeExplain(explainPlan);
-if (!featureFlagSbeFull) {
+if (explainPlan.hasOwnProperty("stages") && explainPlan.stages[0].hasOwnProperty('$cursor')) {
     explainPlan = explainPlan.stages[0].$cursor;
 }
 assert.eq(explainPlan.queryPlanner.namespace, "views_distinct.coll");

@@ -87,16 +87,8 @@ const multiLookupPipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
-
-// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    checkUnshardedResults(multiLookupPipeline,
-                          ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"],
-                          []);
-} else {
-    checkUnshardedResults(
-        multiLookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"], ["$addFields", "$lookup"]);
-}
+checkUnshardedResults(
+    multiLookupPipeline, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"], []);
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.

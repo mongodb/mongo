@@ -13,12 +13,6 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
-import {getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
-const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-
 const coll = db.double_optimize;
 coll.drop();
 

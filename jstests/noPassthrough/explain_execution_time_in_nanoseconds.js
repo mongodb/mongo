@@ -2,7 +2,6 @@
 // includes "executionTimeMicros"/"executionTimeNanos" only if requested.
 // "executionTimeMillisEstimate" will always be present in the explain output.
 import {getAllPlanStages} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 let conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start up");
@@ -39,13 +38,9 @@ verifyStages(executionStages, false);
 const pipeline = [{$match: {x: {$gt: 500}}}, {$addFields: {xx: {$add: ["$x", "$y"]}}}];
 // Run an explain command when the "executionTimeMicros"/"executionTimeNanos" should be omitted.
 explainResult = coll.explain("executionStats").aggregate(pipeline);
-// TODO SERVER-72549: Remove use of featureFlagSbeFull by SBE Pushdown feature.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    // SBE optimizes away the entire aggregation pipeline.
-    executionStages = [explainResult.executionStats.executionStages];
-} else {
-    executionStages = explainResult.stages;
-}
+executionStages = explainResult.hasOwnProperty("stages")
+    ? explainResult.stages
+    : [explainResult.executionStats.executionStages];
 assert.neq(executionStages.length, 0, executionStages);
 
 for (let executionStage of executionStages) {

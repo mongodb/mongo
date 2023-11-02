@@ -6,10 +6,6 @@
  * Tests that the explain output for $match reflects any optimizations.
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
-
-// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
-const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.match_explain;
 coll.drop();
@@ -25,8 +21,16 @@ let explain = coll.explain().aggregate(
     [{$sort: {b: -1}}, {$addFields: {c: {$mod: ["$a", 4]}}}, {$match: {$and: [{c: 1}]}}]);
 
 assert.commandWorked(explain);
-if (featureFlagSbeFull) {
-    assert.eq(getAggPlanStage(explain, "$match"), null);
+
+// Depending on whether the $match can be "pushed down" for SBE, the $match filter may appear in the
+// explain plan as a $match pipeline stage or as a MATCH plan stage.
+const documentSourceStage = getAggPlanStage(explain, "$match");
+const pushedDownFilterStage = getAggPlanStage(explain, "MATCH");
+assert(documentSourceStage || pushedDownFilterStage, explain);
+if (documentSourceStage) {
+    assert(documentSourceStage.hasOwnProperty("$match"), documentSourceStage);
+    assert.eq(documentSourceStage["$match"], {c: {$eq: 1}});
 } else {
-    assert.eq(getAggPlanStage(explain, "$match"), {$match: {c: {$eq: 1}}});
+    assert(pushedDownFilterStage.hasOwnProperty("filter"), pushedDownFilterStage);
+    assert.eq(pushedDownFilterStage.filter, {c: {$eq: 1}});
 }

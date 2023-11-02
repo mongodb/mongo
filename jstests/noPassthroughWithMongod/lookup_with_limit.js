@@ -9,7 +9,7 @@ if (!checkSBEEnabled(db)) {
     quit();
 }
 
-// TODO SERVER-72549, SERVER-80226: Remove 'featureFlagSbeFull' used by SBE Pushdown, SBE $unwind.
+// SERVER-80226: Remove 'featureFlagSbeFull' used by SBE Pushdown, SBE $unwind.
 const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.lookup_with_limit;
@@ -53,11 +53,7 @@ var pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
-if (featureFlagSbeFull) {
-    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "LIMIT"]);
-} else {
-    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$limit"]);
-}
+checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "LIMIT"]);
 checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP"]);
 
 // Check that lookup->addFields->lookup->limit is reordered to limit->lookup->addFields->lookup,
@@ -68,16 +64,9 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
-// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature.
-if (featureFlagSbeFull) {
-    checkResults(
-        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
-    checkResults(
-        pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
-} else {
-    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$addFields", "$lookup", "$limit"]);
-    checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "$addFields", "$lookup"]);
-}
+checkResults(
+    pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
+checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP"]);
 
 // Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it.
