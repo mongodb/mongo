@@ -48,14 +48,15 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SetUnSetGetIsConfigShard) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(false);
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(false);
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShardMultipleTimes) {
@@ -63,14 +64,15 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShardMultipleTimes) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShardMultipleTimes) {
@@ -78,16 +80,17 @@ TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShardMultipleTimes) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(false);
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(false);
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(false);
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(false);
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 DEATH_TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShard_NotConfigServer, "invariant") {
@@ -95,7 +98,8 @@ DEATH_TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShard_NotConfigServ
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
+    shardingState->setIsConfigShard(true);
 }
 
 DEATH_TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShard_NotConfigServer, "invariant") {
@@ -103,7 +107,8 @@ DEATH_TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShard_NotConfigSe
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(false);
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
+    shardingState->setIsConfigShard(false);
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, GetIsConfigShard_NotConfigServer) {
@@ -111,7 +116,8 @@ TEST_F(ReplicaSetEndpointShardingStateTest, GetIsConfigShard_NotConfigServer) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 }  // namespace

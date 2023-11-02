@@ -215,10 +215,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest, ConfigShardsOnInserts_NotCon
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     insertToConfigShards(opCtx, {UUID::gen().toString()});
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -227,10 +228,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     insertToConfigShards(opCtx, {ShardId::kConfigServerId.toString()});
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -241,10 +243,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     insertToConfigShards(opCtx, {ShardId::kConfigServerId.toString()});
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -255,10 +258,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     insertToConfigShards(opCtx, {ShardId::kConfigServerId.toString()});
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -267,11 +271,12 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
     deleteFromConfigShards(opCtx, ShardId::kConfigServerId.toString());
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -282,11 +287,12 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
     deleteFromConfigShards(opCtx, ShardId::kConfigServerId.toString());
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -295,11 +301,12 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
     deleteFromConfigShards(opCtx, UUID::gen().toString());
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -308,11 +315,12 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
     updateConfigShards(opCtx, {ShardId::kConfigServerId.toString()});
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -321,10 +329,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     updateConfigShards(opCtx, {ShardId::kConfigServerId.toString()});
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -333,10 +342,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     insertToConfigShards(opCtx, {BSON("_id" << UUID::gen())});  // Not ShardType.
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -345,11 +355,12 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ReplicaSetEndpointShardingState::get(opCtx)->setIsConfigShard(true);
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    shardingState->setIsConfigShard(true);
+    ASSERT(shardingState->isConfigShardForTest());
     deleteFromConfigShards(opCtx, BSON("_id" << UUID::gen()));  // Not ShardType.
-    ASSERT(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT(shardingState->isConfigShardForTest());
 }
 
 TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
@@ -358,10 +369,11 @@ TEST_F(ShardServerOpObserverReplicaSetEndpointTest,
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
+    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
 
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
     updateConfigShards(opCtx, BSON("_id" << UUID::gen()));  // Not ShardType.
-    ASSERT_FALSE(ReplicaSetEndpointShardingState::get(opCtx)->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
 }
 
 }  // namespace
