@@ -139,7 +139,7 @@ struct TypedSlot {
  */
 class PlanStageSlots {
 public:
-    // The _slots map is capable of holding different "classes" of slots:
+    // The _slotNameToIdMap map is capable of holding different "types" of slots:
     // 1) kMeta slots are used to hold the current document (kResult), record ID (kRecordId), and
     //    various pieces of metadata.
     // 2) kField slots represent the values of top-level fields, or in some cases of dotted field
@@ -156,7 +156,7 @@ public:
     //    field path across multiple accumulators).
     // 5) kFilterCellField slots represent the value obtained from evaluating a dotted path on top
     //    of a timeseries bucket, expanding arrays as they are encountered during the traversal.
-    enum class Type {
+    enum class SlotType {
         kMeta,
         kField,
         kSortKey,
@@ -164,80 +164,108 @@ public:
         kFilterCellField,
     };
 
-    using Name = std::pair<Type, StringData>;
-    using OwnedName = std::pair<Type, std::string>;
+    // Slot "names" in this file are really type-and-name pairs.
+    using UnownedSlotName = std::pair<SlotType, StringData>;
+    using OwnedSlotName = std::pair<SlotType, std::string>;
 
-    static constexpr auto kMeta = Type::kMeta;
-    static constexpr auto kField = Type::kField;
-    static constexpr auto kSortKey = Type::kSortKey;
-    static constexpr auto kPathExpr = Type::kPathExpr;
-    static constexpr auto kFilterCellField = Type::kFilterCellField;
+    struct NameHasher {
+        using is_transparent = void;
+        size_t operator()(const UnownedSlotName& p) const noexcept {
+            auto h{std::pair{p.first, absl::string_view{p.second.rawData(), p.second.size()}}};
+            return absl::Hash<decltype(h)>{}(h);
+        }
+    };
 
-    static constexpr Name kResult = {kMeta, "result"_sd};
-    static constexpr Name kRecordId = {kMeta, "recordId"_sd};
-    static constexpr Name kReturnKey = {kMeta, "returnKey"_sd};
-    static constexpr Name kSnapshotId = {kMeta, "snapshotId"_sd};
-    static constexpr Name kIndexIdent = {kMeta, "indexIdent"_sd};
-    static constexpr Name kIndexKey = {kMeta, "indexKey"_sd};
-    static constexpr Name kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
-    static constexpr Name kMetadataSearchScore = {kMeta, "metadataSearchScore"_sd};
-    static constexpr Name kMetadataSearchHighlights = {kMeta, "metadataSearchHighlights"_sd};
-    static constexpr Name kMetadataSearchDetails = {kMeta, "metadataSearchDetails"_sd};
-    static constexpr Name kMetadataSearchSortValues = {kMeta, "metadataSearchSortValues"_sd};
-    static constexpr Name kMetadataSearchSequenceToken = {kMeta, "metadataSearchSequenceToken"_sd};
+    struct NameEq : std::equal_to<UnownedSlotName> {
+        using is_transparent = void;
+    };
+
+    using SlotNameMap = absl::flat_hash_map<OwnedSlotName, TypedSlot, NameHasher, NameEq>;
+    using SlotNameSet = absl::flat_hash_set<OwnedSlotName, NameHasher, NameEq>;
+
+    static constexpr SlotType kMeta = SlotType::kMeta;
+    static constexpr SlotType kField = SlotType::kField;
+    static constexpr SlotType kSortKey = SlotType::kSortKey;
+    static constexpr SlotType kPathExpr = SlotType::kPathExpr;
+    static constexpr SlotType kFilterCellField = SlotType::kFilterCellField;
+
+    static constexpr UnownedSlotName kResult = {kMeta, "result"_sd};
+    static constexpr UnownedSlotName kRecordId = {kMeta, "recordId"_sd};
+    static constexpr UnownedSlotName kReturnKey = {kMeta, "returnKey"_sd};
+    static constexpr UnownedSlotName kSnapshotId = {kMeta, "snapshotId"_sd};
+    static constexpr UnownedSlotName kIndexIdent = {kMeta, "indexIdent"_sd};
+    static constexpr UnownedSlotName kIndexKey = {kMeta, "indexKey"_sd};
+    static constexpr UnownedSlotName kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
+    static constexpr UnownedSlotName kMetadataSearchScore = {kMeta, "metadataSearchScore"_sd};
+    static constexpr UnownedSlotName kMetadataSearchHighlights = {kMeta,
+                                                                  "metadataSearchHighlights"_sd};
+    static constexpr UnownedSlotName kMetadataSearchDetails = {kMeta, "metadataSearchDetails"_sd};
+    static constexpr UnownedSlotName kMetadataSearchSortValues = {kMeta,
+                                                                  "metadataSearchSortValues"_sd};
+    static constexpr UnownedSlotName kMetadataSearchSequenceToken = {
+        kMeta, "metadataSearchSequenceToken"_sd};
 
     PlanStageSlots() = default;
 
     PlanStageSlots(const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator);
 
-    bool has(const Name& str) const {
-        return _slots.count(str);
+    bool has(const UnownedSlotName& str) const {
+        return _slotNameToIdMap.count(str);
     }
 
-    TypedSlot get(const Name& str) const {
-        auto it = _slots.find(str);
-        invariant(it != _slots.end());
+    TypedSlot get(const UnownedSlotName& str) const {
+        auto it = _slotNameToIdMap.find(str);
+        invariant(it != _slotNameToIdMap.end());
         return it->second;
     }
 
-    boost::optional<TypedSlot> getIfExists(const Name& str) const {
-        if (auto it = _slots.find(str); it != _slots.end()) {
+    boost::optional<TypedSlot> getIfExists(const UnownedSlotName& str) const {
+        if (auto it = _slotNameToIdMap.find(str); it != _slotNameToIdMap.end()) {
             return it->second;
         }
         return boost::none;
     }
 
-    boost::optional<sbe::value::SlotId> getSlotIfExists(const Name& str) const {
-        if (auto it = _slots.find(str); it != _slots.end()) {
+    boost::optional<sbe::value::SlotId> getSlotIfExists(const UnownedSlotName& str) const {
+        if (auto it = _slotNameToIdMap.find(str); it != _slotNameToIdMap.end()) {
             return it->second.slotId;
         }
         return boost::none;
     }
 
-    void set(const Name& str, sbe::value::SlotId slot) {
+    void set(const UnownedSlotName& str, sbe::value::SlotId slot) {
         set(str, TypedSlot{slot, TypeSignature::kAnyScalarType});
     }
 
-    void set(OwnedName str, sbe::value::SlotId slot) {
+    void set(OwnedSlotName str, sbe::value::SlotId slot) {
         set(std::move(str), TypedSlot{slot, TypeSignature::kAnyScalarType});
     }
 
-    void set(const Name& str, TypedSlot slot) {
-        _slots.insert_or_assign(str, slot);
+    void set(const UnownedSlotName& str, TypedSlot slot) {
+        _slotNameToIdMap.insert_or_assign(str, slot);
     }
 
-    void set(OwnedName str, TypedSlot slot) {
-        _slots.insert_or_assign(std::move(str), slot);
+    void set(OwnedSlotName str, TypedSlot slot) {
+        _slotNameToIdMap.insert_or_assign(std::move(str), slot);
     }
 
-    void clear(const Name& str) {
-        _slots.erase(str);
+    void clear(const UnownedSlotName& str) {
+        _slotNameToIdMap.erase(str);
     }
 
+    // Clear a single field (SlotType::kField) in '_slotNameToIdMap' by its string name.
+    void clearField(StringData fieldName) {
+        auto it = _slotNameToIdMap.find(UnownedSlotName{kField, fieldName});
+        if (it != _slotNameToIdMap.end()) {
+            _slotNameToIdMap.erase(it);
+        }
+    }
+
+    // Clear all fields (SlotType::kField) in '_slotNameToIdMap'.
     void clearAllFields() {
-        for (auto it = _slots.begin(); it != _slots.end();) {
+        for (auto it = _slotNameToIdMap.begin(); it != _slotNameToIdMap.end();) {
             if (it->first.first == kField) {
-                _slots.erase(it++);
+                _slotNameToIdMap.erase(it++);
                 continue;
             }
             ++it;
@@ -265,97 +293,86 @@ public:
     inline void forEachSlot(const PlanStageReqs& reqs,
                             const std::function<void(const TypedSlot&)>& fn) const;
 
-    inline void forEachSlot(const PlanStageReqs& reqs,
-                            const std::function<void(const TypedSlot&, const Name&)>& fn) const;
+    inline void forEachSlot(
+        const PlanStageReqs& reqs,
+        const std::function<void(const TypedSlot&, const UnownedSlotName&)>& fn) const;
     inline void forEachSlot(const std::function<void(const TypedSlot&)>& fn) const;
-    inline void forEachSlot(const std::function<void(const Name&, const TypedSlot&)>& fn) const;
+    inline void forEachSlot(
+        const std::function<void(const UnownedSlotName&, const TypedSlot&)>& fn) const;
     inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
 
-    struct NameHasher {
-        using is_transparent = void;
-        size_t operator()(const Name& p) const noexcept {
-            auto h{std::pair{p.first, absl::string_view{p.second.rawData(), p.second.size()}}};
-            return absl::Hash<decltype(h)>{}(h);
-        }
-    };
-
-    struct NameEq : std::equal_to<Name> {
-        using is_transparent = void;
-    };
-
-    template <typename V>
-    using NameMap = absl::flat_hash_map<OwnedName, V, NameHasher, NameEq>;
-    using NameSet = absl::flat_hash_set<OwnedName, NameHasher, NameEq>;
-
 private:
-    NameMap<TypedSlot> _slots;
-};
+    // Slot type-and-name to SlotId map for the output slots produced by this plan stage.
+    SlotNameMap _slotNameToIdMap;
+};  // class PlanStageSlots
 
 /**
- * The PlanStageReqs class is used by SlotBasedStageBuilder to represent the incoming requirements
- * and context when building a stage.
+ * The PlanStageReqs class is used by SlotBasedStageBuilder to represent the context and parent's
+ * required inputs ('reqs'), which thus double as the current stage's required outputs, when
+ * building a stage.
  */
 class PlanStageReqs {
 public:
-    using Type = PlanStageSlots::Type;
-    using Name = PlanStageSlots::Name;
-    using OwnedName = PlanStageSlots::OwnedName;
+    using SlotType = PlanStageSlots::SlotType;
+    using UnownedSlotName = PlanStageSlots::UnownedSlotName;
+    using OwnedSlotName = PlanStageSlots::OwnedSlotName;
 
-    static constexpr auto kMeta = PlanStageSlots::Type::kMeta;
-    static constexpr auto kField = PlanStageSlots::Type::kField;
-    static constexpr auto kSortKey = PlanStageSlots::Type::kSortKey;
+    static constexpr SlotType kMeta = SlotType::kMeta;
+    static constexpr SlotType kField = SlotType::kField;
+    static constexpr SlotType kSortKey = SlotType::kSortKey;
 
     PlanStageReqs copy() const {
         return *this;
     }
 
-    bool has(const Name& str) const {
-        return _slots.contains(str);
+    bool has(const UnownedSlotName& str) const {
+        return _slotNameSet.contains(str);
     }
 
-    PlanStageReqs& set(const Name& str) {
-        _slots.emplace(str);
+    PlanStageReqs& set(const UnownedSlotName& str) {
+        _slotNameSet.emplace(str);
         return *this;
     }
 
-    PlanStageReqs& set(OwnedName str) {
-        _slots.emplace(std::move(str));
+    PlanStageReqs& set(OwnedSlotName str) {
+        _slotNameSet.emplace(std::move(str));
         return *this;
     }
 
-    PlanStageReqs& set(const std::vector<Name>& strs) {
-        _slots.insert(strs.begin(), strs.end());
+    PlanStageReqs& set(const std::vector<UnownedSlotName>& strs) {
+        _slotNameSet.insert(strs.begin(), strs.end());
         return *this;
     }
 
-    PlanStageReqs& set(std::vector<OwnedName> strs) {
-        _slots.insert(std::make_move_iterator(strs.begin()), std::make_move_iterator(strs.end()));
+    PlanStageReqs& set(std::vector<OwnedSlotName> strs) {
+        _slotNameSet.insert(std::make_move_iterator(strs.begin()),
+                            std::make_move_iterator(strs.end()));
         return *this;
     }
 
-    PlanStageReqs& setIf(const Name& str, bool condition) {
+    PlanStageReqs& setIf(const UnownedSlotName& str, bool condition) {
         if (condition) {
-            _slots.emplace(str);
+            _slotNameSet.emplace(str);
         }
         return *this;
     }
 
     PlanStageReqs& setFields(std::vector<std::string> strs) {
         for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.emplace(kField, std::move(strs[i]));
+            _slotNameSet.emplace(kField, std::move(strs[i]));
         }
         return *this;
     }
 
     PlanStageReqs& setSortKeys(std::vector<std::string> strs) {
         for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.emplace(kSortKey, std::move(strs[i]));
+            _slotNameSet.emplace(kSortKey, std::move(strs[i]));
         }
         return *this;
     }
 
-    PlanStageReqs& clear(const Name& str) {
-        _slots.erase(str);
+    PlanStageReqs& clear(const UnownedSlotName& str) {
+        _slotNameSet.erase(str);
         return *this;
     }
 
@@ -383,9 +400,9 @@ public:
         return _targetNamespace;
     }
 
-    bool hasType(Type t) const {
+    bool hasType(SlotType t) const {
         return std::any_of(
-            _slots.begin(), _slots.end(), [t](auto& item) { return item.first == t; });
+            _slotNameSet.begin(), _slotNameSet.end(), [t](auto& item) { return item.first == t; });
     }
     bool hasFields() const {
         return hasType(kField);
@@ -394,9 +411,9 @@ public:
         return hasType(kSortKey);
     }
 
-    std::vector<std::string> getOfType(Type t) const {
+    std::vector<std::string> getOfType(SlotType t) const {
         std::vector<std::string> res;
-        for (const auto& [type, str] : _slots) {
+        for (const auto& [type, str] : _slotNameSet) {
             if (type == t) {
                 res.push_back(str);
             }
@@ -411,8 +428,8 @@ public:
         return getOfType(kSortKey);
     }
 
-    PlanStageReqs& clearAllOfType(Type t) {
-        absl::erase_if(_slots, [t](auto& item) { return item.first == t; });
+    PlanStageReqs& clearAllOfType(SlotType t) {
+        absl::erase_if(_slotNameSet, [t](auto& item) { return item.first == t; });
         return *this;
     }
     PlanStageReqs& clearAllFields() {
@@ -440,21 +457,25 @@ public:
     friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                           sbe::value::SlotIdGenerator* slotIdGenerator);
 
-    inline void forEachReq(const std::function<void(const Name&)>& fn) const {
-        for (const auto& name : _slots) {
+    inline void forEachReq(const std::function<void(const UnownedSlotName&)>& fn) const {
+        for (const auto& name : _slotNameSet) {
             fn(name);
         }
     }
+
+    friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
+                                          sbe::value::SlotIdGenerator* slotIdGenerator);
 
     friend void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
                                             const std::function<void(const TypedSlot&)>& fn) const;
 
     friend void PlanStageSlots::forEachSlot(
         const PlanStageReqs& reqs,
-        const std::function<void(const TypedSlot&, const Name&)>& fn) const;
+        const std::function<void(const TypedSlot&, const UnownedSlotName&)>& fn) const;
 
 private:
-    PlanStageSlots::NameSet _slots;
+    // The set of the type-and-names of the slots required as inputs by this plan stage.
+    PlanStageSlots::SlotNameSet _slotNameSet;
 
     // When we're in the middle of building a special union sub-tree implementing a tailable cursor
     // collection scan, this flag will be set to true. Otherwise this flag will be false.
@@ -470,55 +491,56 @@ private:
     // different from its parent node can set this value to notify any child nodes of the correct
     // namespace.
     NamespaceString _targetNamespace;
-};
+};  // class PlanStageReqs
 
 void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
                                  const std::function<void(const TypedSlot&)>& fn) const {
-    for (const auto& name : reqs._slots) {
-        auto it = _slots.find(name);
+    for (const auto& name : reqs._slotNameSet) {
+        auto it = _slotNameToIdMap.find(name);
         tassert(7050900,
                 str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
                               << name.second << "' in the slot map, expected slot to exist",
-                it != _slots.end());
+                it != _slotNameToIdMap.end());
 
         fn(it->second);
     }
 }
 
 void PlanStageSlots::forEachSlot(
-    const PlanStageReqs& reqs, const std::function<void(const TypedSlot&, const Name&)>& fn) const {
-    for (const auto& name : reqs._slots) {
-        auto it = _slots.find(name);
+    const PlanStageReqs& reqs,
+    const std::function<void(const TypedSlot&, const UnownedSlotName&)>& fn) const {
+    for (const auto& name : reqs._slotNameSet) {
+        auto it = _slotNameToIdMap.find(name);
         tassert(7050901,
                 str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
                               << name.second << "' in the slot map, expected slot to exist",
-                it != _slots.end());
+                it != _slotNameToIdMap.end());
         fn(it->second, name);
     }
 }
 
 void PlanStageSlots::forEachSlot(const std::function<void(const TypedSlot&)>& fn) const {
-    for (const auto& entry : _slots) {
+    for (const auto& entry : _slotNameToIdMap) {
         fn(entry.second);
     }
 }
 
 void PlanStageSlots::forEachSlot(
-    const std::function<void(const Name&, const TypedSlot&)>& fn) const {
-    for (const auto& entry : _slots) {
+    const std::function<void(const UnownedSlotName&, const TypedSlot&)>& fn) const {
+    for (const auto& entry : _slotNameToIdMap) {
         fn(entry.first, entry.second);
     }
 }
 
 void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs) {
-    auto it = _slots.begin();
-    while (it != _slots.end()) {
+    auto it = _slotNameToIdMap.begin();
+    while (it != _slotNameToIdMap.end()) {
         auto& name = it->first;
         // We never clear kResult, regardless of whether it is required by 'reqs'.
-        if (_slots.key_eq()(name, kResult) || reqs.has(name)) {
+        if (_slotNameToIdMap.key_eq()(name, kResult) || reqs.has(name)) {
             ++it;
         } else {
-            _slots.erase(it++);
+            _slotNameToIdMap.erase(it++);
         }
     }
 }
@@ -611,6 +633,9 @@ private:
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildMatch(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildUnwind(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildReplaceRoot(
@@ -713,5 +738,5 @@ private:
 
     // Common parameters to SBE stage builder functions.
     StageBuilderState _state;
-};
+};  // class SlotBasedStageBuilder
 }  // namespace mongo::stage_builder

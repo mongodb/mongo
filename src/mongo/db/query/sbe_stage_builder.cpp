@@ -83,6 +83,7 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -157,7 +158,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
     PlanNodeId nodeId, const PlanStageReqs& reqs, StageBuilderState& state) {
     PlanStageSlots outputs;
 
-    reqs.forEachReq([&](const std::pair<PlanStageReqs::Type, StringData>& name) {
+    reqs.forEachReq([&](const std::pair<PlanStageReqs::SlotType, StringData>& name) {
         auto slot =
             state.env->registerSlot(sbe::value::TypeTags::Nothing, 0, false, state.slotIdGenerator);
         outputs.set(name, slot);
@@ -221,9 +222,9 @@ void prepareSearchQueryParameters(PlanStageData* data, const CanonicalQuery& cq)
 
 sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
                                              const PlanStageSlots& outputs) {
-    std::vector<std::pair<PlanStageSlots::Name, sbe::value::SlotId>> pairs;
+    std::vector<std::pair<PlanStageSlots::UnownedSlotName, sbe::value::SlotId>> pairs;
 
-    outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+    outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::UnownedSlotName& name) {
         pairs.emplace_back(name, slot.slotId);
     });
 
@@ -244,13 +245,13 @@ sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
     auto slots = sbe::makeSV();
 
     if (exclude.empty()) {
-        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::UnownedSlotName& name) {
             slots.emplace_back(slot.slotId);
         });
     } else {
         auto excludeSet = sbe::value::SlotSet{exclude.begin(), exclude.end()};
 
-        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::Name& name) {
+        outputs.forEachSlot(reqs, [&](auto&& slot, const PlanStageSlots::UnownedSlotName& name) {
             if (!excludeSet.count(slot.slotId)) {
                 slots.emplace_back(slot.slotId);
             }
@@ -401,8 +402,9 @@ buildSearchMetadataExecutorSBE(OperationContext* opCtx,
 
 PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
                                sbe::value::SlotIdGenerator* slotIdGenerator) {
-    for (const auto& slotName : reqs._slots) {
-        _slots[slotName] = TypedSlot{slotIdGenerator->generate(), TypeSignature::kAnyScalarType};
+    for (const PlanStageSlots::OwnedSlotName& slotName : reqs._slotNameSet) {
+        _slotNameToIdMap[slotName] =
+            TypedSlot{slotIdGenerator->generate(), TypeSignature::kAnyScalarType};
     }
 }
 
@@ -1923,6 +1925,168 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 /**
+ * This builds the execution stage for an $unwind aggregation stage that has been pushed down to
+ * SBE. This also builds a child project stage to get the field to be unwound, and ancestor project
+ * stage(s) to add the $unwind outputs (value and optionally array index) to the result document.
+ */
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    const UnwindNode* un = static_cast<const UnwindNode*>(root);
+    const FieldPath& fp = un->fieldPath;
+
+    //
+    // Build the execution subtree for the child plan subtree.
+    //
+
+    // The child must produce all of the slots required by the parent of this UnwindNode, plus this
+    // node needs to produce the result slot.
+    PlanStageReqs childReqs = reqs.copy().set(kResult);
+    auto [stage, outputs] = build(un->children[0].get(), childReqs);
+    // Clear the root of the original field being unwound so later plan stages do not reference it.
+    outputs.clearField(fp.getSubpath(0));
+    const TypedSlot childResultSlot = outputs.get(kResult);
+
+    //
+    // Build a project execution child node to get the field to be unwound. This gets the value of
+    // the field at the end of the full FieldPath out of the doc produced by the child and puts it
+    // into 'getFieldSlot'. projectFieldsToSlots() is used instead of makeProjectStage() because
+    // only the former supports dotted paths.
+    //
+    std::vector<std::string> fields;
+    fields.emplace_back(fp.fullPath());
+    auto [outStage, outSlots] = projectFieldsToSlots(std::move(stage),
+                                                     fields,
+                                                     childResultSlot.slotId,
+                                                     root->nodeId(),
+                                                     &_slotIdGenerator,
+                                                     _state,
+                                                     &outputs);
+    stage = std::move(outStage);
+    sbe::value::SlotId getFieldSlot = outSlots[0];
+
+    //
+    // Build the unwind execution node itself. This will unwind the value in 'getFieldSlot' into
+    // 'unwindSlot' and place the array index value into 'arrayIndexSlot'.
+    //
+    sbe::value::SlotId unwindSlot = _slotIdGenerator.generate();
+    sbe::value::SlotId arrayIndexSlot = _slotIdGenerator.generate();
+    stage = sbe::makeS<sbe::UnwindStage>(std::move(stage),
+                                         getFieldSlot /* inField */,
+                                         unwindSlot /* outField */,
+                                         arrayIndexSlot /* outIndex */,
+                                         un->preserveNullAndEmptyArrays,
+                                         un->nodeId(),
+                                         nullptr /* yieldPolicy */,
+                                         true /* participateInTrialRunTracking */);
+
+    //
+    // If needed, build project parent node to add the unwind output array index to the result doc.
+    //
+
+    // Variables whose values are to be projected into the result document (as wrapped SlotIds).
+    std::vector<ProjectNode> projectionNodes;
+
+    TypedSlot resultSlot1;
+    if (un->indexPath) {
+        projectionNodes.emplace_back(SbExpr{arrayIndexSlot});
+
+        // If our parent wants the array index field, set our outputs to point it to that slot.
+        // Otherwise clearNonRequiredSlots() will have cleared this field, so we don't need to.
+        if (reqs.has({PlanStageSlots::SlotType::kField, un->indexPath->fullPath()})) {
+            outputs.set(PlanStageSlots::OwnedSlotName{PlanStageSlots::SlotType::kField,
+                                                      un->indexPath->fullPath()},
+                        arrayIndexSlot);
+        }
+
+        // Create a projection expression to project the array index to the result document.
+        SbExpr indexProjectExpr = generateProjection(
+            _state,
+            projection_ast::ProjectType::kAddition,
+            {un->indexPath->fullPath()},
+            std::move(projectionNodes),
+            SbExpr{childResultSlot.slotId},  // current result doc: updated by the projection
+            childResultSlot);  // rootSlot: holds the current doc defining the root of paths
+
+        // Create a projection expression to force project a Null array index to the result doc.
+        projectionNodes.clear();
+        projectionNodes.emplace_back(SbExpr{makeConstant(sbe::value::TypeTags::Null, 0)});
+        SbExpr indexNullProjectExpr = generateProjection(
+            _state,
+            projection_ast::ProjectType::kAddition,
+            {un->indexPath->fullPath()},
+            std::move(projectionNodes),
+            SbExpr{childResultSlot.slotId},  // current result doc: updated by the projection
+            childResultSlot);  // rootSlot: holds the current doc defining the root of paths
+
+        // Wrap 'indexProjectExpr' and 'indexNullProjectExpr' in a conditional to handle quirky MQL
+        // edge cases.
+        SbExprBuilder ifIndexBuilder{_state};
+        TypedExpression ifIndexProjectExpr =
+            ifIndexBuilder
+                .makeIf(
+                    /* if */ ifIndexBuilder.makeBinaryOp(
+                        sbe::EPrimBinary::logicOr,
+                        ifIndexBuilder.makeFunction("isNull",
+                                                    ifIndexBuilder.makeVariable(arrayIndexSlot)),
+                        ifIndexBuilder.makeBinaryOp(
+                            sbe::EPrimBinary::greaterEq,
+                            ifIndexBuilder.makeVariable(arrayIndexSlot),
+                            makeConstant(sbe::value::TypeTags::NumberInt64, 0))),
+                    /* then project index */ std::move(indexProjectExpr),
+                    /* else project Null */ std::move(indexNullProjectExpr))
+                .extractExpr(_state);
+
+        resultSlot1 = TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
+        stage = makeProjectStage(std::move(stage),
+                                 un->nodeId(),
+                                 resultSlot1.slotId,  // output result document
+                                 std::move(ifIndexProjectExpr.expr));
+    } else {
+        // The "includeArrayIndex" option was not specified, so we do not wire the stage to project
+        // it, and 'resultSlot1' is just an alias of the prior 'childResultSlot'.
+        resultSlot1 = childResultSlot;
+    }
+
+    //
+    // Build project (grand)parent node to add the unwound value to the result doc.
+    //
+
+    // Create a projection expression to project the unwind value to the result document.
+    projectionNodes.clear();
+    projectionNodes.emplace_back(SbExpr{unwindSlot});
+    SbExpr unwindProjectExpr = generateProjection(
+        _state,
+        projection_ast::ProjectType::kAddition,
+        {fp.fullPath()},
+        std::move(projectionNodes),
+        SbExpr{resultSlot1.slotId},  // current result document: updated by the projection
+        resultSlot1);                // rootSlot: holds current doc defining the root of paths
+
+    // Wrap 'unwindProjectExpr' in a conditional that correctly handles the quirky MQL edge cases.
+    // If the unwind field was not an array, we avoid projecting the Nothing value to the result as
+    // this would incorrectly create the dotted path above that value in the result document.
+    SbExprBuilder ifUnwindBuilder{_state};
+    TypedExpression ifUnwindProjectExpr =
+        ifUnwindBuilder
+            .makeIf(
+                /* if */ ifUnwindBuilder.makeFunction("isNull",
+                                                      ifUnwindBuilder.makeVariable(arrayIndexSlot)),
+                /* then no-op */ ifUnwindBuilder.makeVariable(resultSlot1.slotId),
+                /* else project */ std::move(unwindProjectExpr))
+            .extractExpr(_state);
+
+    TypedSlot resultSlot2 = TypedSlot{_slotIdGenerator.generate(), TypeSignature::kObjectType};
+    stage = makeProjectStage(std::move(stage),
+                             un->nodeId(),
+                             resultSlot2.slotId,  // output result document
+                             std::move(ifUnwindProjectExpr.expr));
+
+    outputs.set(kResult, resultSlot2);
+    outputs.clearNonRequiredSlots(reqs);
+    return {std::move(stage), std::move(outputs)};
+}  // buildUnwind
+
+/**
  * Create a ProjectStage that evalutes the "newRoot" expression from a $replaceRoot pipeline stage
  * and append it to the root of the SBE plan.
  */
@@ -1978,7 +2142,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     outputs.clearAllFields();
     outputs.clearNonRequiredSlots(reqs);
     return {std::move(stage), std::move(outputs)};
-}
+}  // buildReplaceRoot
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
@@ -2119,8 +2283,8 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
                                               const PlanStageReqs& reqs) {
     tassert(6023407, "buildProjectionDefault() does not support kSortKey", !reqs.hasSortKeys());
 
-    auto pn = static_cast<const ProjectionNodeDefault*>(root);
-    const auto& projection = pn->proj;
+    const ProjectionNodeDefault* pn = static_cast<const ProjectionNodeDefault*>(root);
+    const projection_ast::Projection& projection = pn->proj;
 
     if (const auto [ixn, ct] = getFirstNodeByType(root, STAGE_IXSCAN);
         !pn->fetched() && projection.isInclusionOnly() && ixn && ct >= 1) {
@@ -2145,16 +2309,16 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     // The child must produce all of the slots required by the parent of this ProjectionNodeDefault.
     // In addition to that, the child must always produce 'kResult' because it's needed by the
     // projection logic below.
-    auto childReqs = reqs.copy().set(kResult).clearAllFields().setFields(fields);
+    PlanStageReqs childReqs = reqs.copy().set(kResult).clearAllFields().setFields(fields);
 
     auto [stage, outputs] = build(pn->children[0].get(), childReqs);
 
-    auto inputSlot = outputs.get(kResult);
+    TypedSlot inputSlot = outputs.get(kResult);
     auto projectionExpr =
         generateProjection(_state, &projection, inputSlot.slotId, inputSlot, &outputs)
             .extractExpr(_state);
 
-    auto resultSlot = _state.slotId();
+    sbe::value::SlotId resultSlot = _state.slotId();
     auto resultStage =
         makeProject(std::move(stage), root->nodeId(), resultSlot, std::move(projectionExpr.expr));
 
@@ -2165,7 +2329,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
-}
+}  // buildProjectionDefault
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionDefaultCovered(const QuerySolutionNode* root,
@@ -4311,7 +4475,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             nodes.emplace_back(SbExpr{windowFinalSlots[i]});
         }
 
-        auto resultSlot = outputs.get(kResult);
+        TypedSlot resultSlot = outputs.get(kResult);
         auto projType = projection_ast::ProjectType::kAddition;
         auto projectionExpr = generateProjection(_state,
                                                  projType,
@@ -4321,7 +4485,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                  resultSlot)
                                   .extractExpr(_state);
 
-        auto outResultSlot = _state.slotId();
+        sbe::value::SlotId outResultSlot = _state.slotId();
         auto outStage = makeProject(
             std::move(stage), windowNode->nodeId(), outResultSlot, std::move(projectionExpr.expr));
 
@@ -4332,7 +4496,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     outputs.clearNonRequiredSlots(reqs);
 
     return {std::move(stage), std::move(outputs)};
-}
+}  // buildWindow
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
     const SearchNode* root,
@@ -4574,6 +4738,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         {STAGE_FETCH, &SlotBasedStageBuilder::buildFetch},
         {STAGE_LIMIT, &SlotBasedStageBuilder::buildLimit},
         {STAGE_MATCH, &SlotBasedStageBuilder::buildMatch},
+        {STAGE_UNWIND, &SlotBasedStageBuilder::buildUnwind},
         {STAGE_REPLACE_ROOT, &SlotBasedStageBuilder::buildReplaceRoot},
         {STAGE_SKIP, &SlotBasedStageBuilder::buildSkip},
         {STAGE_SORT_SIMPLE, &SlotBasedStageBuilder::buildSort},

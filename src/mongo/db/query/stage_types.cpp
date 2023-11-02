@@ -85,6 +85,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_UNKNOWN, "UNKNOWN"_sd},
         {STAGE_UNPACK_SAMPLED_TS_BUCKET, "UNPACK_SAMPLED_TS_BUCKET"_sd},
         {STAGE_UNPACK_TS_BUCKET, "UNPACK_TS_BUCKET"_sd},
+        {STAGE_UNWIND, "UNWIND"_sd},
         {STAGE_UPDATE, "UPDATE"_sd},
         {STAGE_WINDOW, "WINDOW"_sd},
     };

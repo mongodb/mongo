@@ -85,7 +85,7 @@ class RecordId;
 
 namespace KeyString {
 class Value;
-}
+}  // namespace KeyString
 
 class InListData;
 
@@ -367,7 +367,13 @@ std::ostream& operator<<(std::ostream& os, TypeTags tag);
 str::stream& operator<<(str::stream& str, TypeTags tag);
 std::ostream& operator<<(std::ostream& os, const std::pair<TypeTags, Value>& value);
 str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& value);
-std::string print(const std::pair<TypeTags, Value>& value);
+
+/**
+ * Functions for writing values and tags to a std::string.
+ */
+std::string print(const std::pair<TypeTags, Value>& value);           // production function
+std::string printTagAndVal(TypeTags tag, Value value);                // debugging function
+std::string printTagAndVal(const std::pair<TypeTags, Value>& value);  // debugging function
 
 /**
  * Three ways value comparison (aka spaceship operator).

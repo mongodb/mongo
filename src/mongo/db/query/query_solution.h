@@ -963,6 +963,55 @@ struct MatchNode : public QuerySolutionNode {
 };
 
 /**
+ * UnwindNode is used for $unwind aggregation stages that are pushed down to SBE.
+ */
+struct UnwindNode : public QuerySolutionNode {
+    UnwindNode(std::unique_ptr<QuerySolutionNode> child,
+               const FieldPath& fieldPath,
+               bool preserveNullAndEmptyArrays,
+               const boost::optional<FieldPath>& indexPath)
+        : QuerySolutionNode(std::move(child)),
+          fieldPath{fieldPath},
+          preserveNullAndEmptyArrays{preserveNullAndEmptyArrays},
+          indexPath(indexPath) {}
+
+    virtual StageType getType() const {
+        return STAGE_UNWIND;
+    }
+
+    /**
+     * Data from the unwind node is considered fetched iff the child provides fetched data.
+     */
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return children[0]->getFieldAvailability(field);
+    }
+
+    bool sortedByDiskLoc() const {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    const ProvidedSortSet& providedSorts() const {
+        return children[0]->providedSorts();
+    }
+
+    void appendToString(str::stream* ss, int indent) const final;
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    // Path in the document to the field to unwind.
+    FieldPath fieldPath;
+
+    // Iff true, then if the path is null, missing, or an empty array, unwind outputs the document.
+    bool preserveNullAndEmptyArrays;
+
+    // Optional output path in which to return the array index unwound to this output doc.
+    const boost::optional<FieldPath>& indexPath;
+};  // struct UnwindNode
+
+/**
  * ReplaceRootNode is used for $replaceRoot aggregation stages that are pushed down to SBE.
  */
 struct ReplaceRootNode : public QuerySolutionNode {

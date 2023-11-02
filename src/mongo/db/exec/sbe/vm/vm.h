@@ -284,6 +284,12 @@ size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
 }
 }  // namespace
 
+/**
+ * Enumeration of built-in VM instructions. These are implemented in vm.cpp ByteCode::runInternal.
+ *
+ * See also enum class Builtin for built-in functions, like 'addToArray', that are implemented as
+ * C++ rather than VM instructions.
+ */
 struct Instruction {
     enum Tags {
         pushConstVal,
@@ -343,7 +349,7 @@ struct Instruction {
         // Iterates the column index cell and returns values representing the types of cell's
         // content, including arrays and nested objects. Skips contents of nested arrays.
         traverseCsiCellTypes,
-        setField,
+        setField,      // add or overwrite a field in a document
         getArraySize,  // number of elements
 
         aggSum,
@@ -629,13 +635,21 @@ struct Instruction {
 };
 static_assert(sizeof(Instruction) == sizeof(uint8_t));
 
-// Builtins which can fit into one byte and have small arity are encoded using a special instruction
-// tag, functionSmall.
+/**
+ * Enumeration of SBE VM built-in functions. These are dispatched by ByteCode::dispatchBuiltin() in
+ * vm.cpp. An enum value 'foo' refers to a C++ implementing function named builtinFoo().
+ *
+ * See also struct Instruction for "functions" like 'setField' that are implemented as single VM
+ * instructions.
+ *
+ * Builtins which can fit into one byte and have small arity are encoded using a special instruction
+ * tag, functionSmall.
+ */
 using SmallBuiltinType = uint8_t;
 enum class Builtin : uint16_t {
     split,
     regexMatch,
-    replaceOne,
+    replaceOne,  // replace first occurrence of a specified substring with a diffferent substring
     dateDiff,
     dateParts,
     dateToParts,
@@ -648,10 +662,10 @@ enum class Builtin : uint16_t {
     dateFromString,
     dateFromStringNoThrow,
     dropFields,
-    newArray,
+    newArray,  // create a new array from the top 'arity' values on the stack
     keepFields,
     newArrayFromRange,
-    newObj,
+    newObj,      // create a new object from 'arity' alternating field names and values on the stack
     ksToString,  // KeyString to string
     newKs,       // new KeyString
     collNewKs,   // new KeyString (with collation)
@@ -1412,9 +1426,13 @@ private:
 
     MONGO_COMPILER_NORETURN void runFailInstruction();
 
+    /**
+     * Run a usually Boolean check against the tag of the item on top of the stack and add its
+     * result to the stack as a TypeTags::Boolean value. However, if the stack item to be checked
+     * itself has a tag of TagTypes::Nothing, this instead pushes a result of TagTypes::Nothing.
+     */
     template <typename T>
     void runTagCheck(const uint8_t*& pcPointer, T&& predicate);
-
     void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
 
     MONGO_COMPILER_ALWAYS_INLINE
@@ -2075,6 +2093,9 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(
         ArityType arity);
 
+    /**
+     * Dispatcher for calls to VM built-in C++ functions enumerated by enum class Builtin.
+     */
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f,
                                                                    ArityType arity,
                                                                    const CodeFragment* code);

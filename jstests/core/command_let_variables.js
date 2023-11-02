@@ -5,8 +5,9 @@
 //   requires_fcv_72,
 // ]
 //
-import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";  // TODO SERVER-80226: Remove this import
 
 const testDB = db.getSiblingDB("command_let_variables");
 const coll = testDB.command_let_variables;
@@ -90,10 +91,16 @@ let explain = assert.commandWorked(testDB.runCommand({
     verbosity: "executionStats"
 }));
 if (!isMongos) {
-    assert(explain.hasOwnProperty("stages"), explain);
-    assert.neq(explain.stages.length, 0, explain);
-    let lastStage = explain.stages[explain.stages.length - 1];
-    assert.eq(lastStage.nReturned, 2, explain);
+    // TODO SERVER-80226: Remove 'featureFlagSbeFull' used by $unwind Pushdown feature.
+    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+        // $unwind should be pushed down to SBE.
+        assert(planHasStage(db, explain, "UNWIND"), explain);
+    } else {
+        assert(explain.hasOwnProperty("stages"), explain);
+        assert.neq(explain.stages.length, 0, explain);
+        let lastStage = explain.stages[explain.stages.length - 1];
+        assert.eq(lastStage.nReturned, 2, explain);
+    }
 }
 
 if (!isMongos) {

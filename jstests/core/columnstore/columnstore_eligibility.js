@@ -20,6 +20,7 @@
 import {aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";  // TODO SERVER-80226: Remove this import
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     quit();
@@ -168,7 +169,16 @@ explain = coll.explain().aggregate([
     {$unwind: "$comments"},
     {$group: {_id: "$comments.author", total_views: {$sum: "$comments.views"}}}
 ]);
-assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// TODO SERVER-80226: Remove 'featureFlagSbeFull' used by $unwind Pushdown feature.
+if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    // The entire pipeline should be pushed down to SBE.
+    assert(planHasStage(db, explain, "GROUP"), explain);
+    assert(planHasStage(db, explain, "UNWIND"), explain);
+    assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+} else {
+    assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+}
 
 // SBE is not supported for update operations. Also this update would require the whole document.
 // Be sure to update by _id to preseve the sharded collection passthrough coverage. Targeting by

@@ -985,7 +985,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         tassert(6335204, "bounds slot for index scan is undefined", optimizedBoundsSlot);
         auto optimizedOutputs = std::move(optimizedOutSlots);
 
-        auto mergeThenElseBranches = [&](const PlanStageSlots::Name name) {
+        auto mergeThenElseBranches = [&](const PlanStageSlots::UnownedSlotName name) {
             genericIndexScanSlots.push_back(genericOutputs.get(name).slotId);
             optimizedIndexScanSlots.push_back(optimizedOutputs.get(name).slotId);
 

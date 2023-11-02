@@ -1313,6 +1313,31 @@ std::unique_ptr<QuerySolutionNode> MatchNode::clone() const {
 }
 
 //
+// UnwindNode
+//
+
+void UnwindNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "UNWIND\n";
+    addIndent(ss, indent + 1);
+    *ss << "preserveNullAndEmptyArrays = " << preserveNullAndEmptyArrays << "\n";
+    if (indexPath) {
+        addIndent(ss, indent + 1);
+        *ss << "indexPath = " << indexPath->fullPath() << "\n";
+    }
+
+    addCommon(ss, indent);
+    addIndent(ss, indent + 1);
+    *ss << "Child:" << '\n';
+    children[0]->appendToString(ss, indent + 2);
+}
+
+std::unique_ptr<QuerySolutionNode> UnwindNode::clone() const {
+    return std::make_unique<UnwindNode>(
+        children[0]->clone(), fieldPath, preserveNullAndEmptyArrays, indexPath);
+}
+
+//
 // ReplaceRootNode
 //
 

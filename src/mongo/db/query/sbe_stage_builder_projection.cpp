@@ -369,13 +369,14 @@ void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
     }
 }
 
-SbExpr evaluateProjection(StageBuilderState& state,
-                          projection_ast::ProjectType type,
-                          std::vector<std::string> paths,
-                          std::vector<ProjectNode> nodes,
-                          SbExpr inputExpr,
-                          boost::optional<TypedSlot> rootSlot,
-                          const PlanStageSlots* slots) {
+SbExpr evaluateProjection(
+    StageBuilderState& state,
+    projection_ast::ProjectType type,
+    std::vector<std::string> paths,       // (possibly dotted) paths to project to
+    std::vector<ProjectNode> nodes,       // SlotIds w/ values for 'paths'
+    SbExpr inputExpr,                     // SlotId of result doc to project into
+    boost::optional<TypedSlot> rootSlot,  // TypedSlot holding doc defined as root of 'paths'
+    const PlanStageSlots* slots) {
     using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
     auto tree = buildPathTree<boost::optional<ProjectNode>>(

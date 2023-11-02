@@ -384,7 +384,7 @@ testDB.p11.save({
     favorites: ['pickles', 'ice cream', 'kettle chips']
 });
 
-let p11 = testDB.runCommand({
+const p11a = testDB.runCommand({
     aggregate: "p11",
     pipeline: [
         {$unwind: "$items.authors"},
@@ -395,13 +395,108 @@ let p11 = testDB.runCommand({
     cursor: {}
 });
 
-let p11result = [
+const p11a_result = [
     {"_id": 5, "name": "MongoDB", "author": "bjornar"},
     {"_id": 5, "name": "MongoDB", "author": "jay"},
     {"_id": 5, "name": "MongoDB", "author": "vivek"},
 ];
 
-assert.docEq(p11result, p11.cursor.firstBatch, 'p11 failed');
+assert.docEq(p11a_result, p11a.cursor.firstBatch, 'p11a failed');
+
+// Same as prior test but also return the array index in new field "idx".
+const p11b = testDB.runCommand({
+    aggregate: "p11",
+    pipeline: [
+        {$unwind: {path: "$items.authors", includeArrayIndex: "idx"}},
+        {$project: {name: 1, idx: 1, author: "$items.authors"}},
+        {$sort: {author: 1}}
+
+    ],
+    cursor: {}
+});
+
+const p11b_result = [
+    {"_id": 5, "name": "MongoDB", "idx": NumberLong(2), "author": "bjornar"},
+    {"_id": 5, "name": "MongoDB", "idx": NumberLong(0), "author": "jay"},
+    {"_id": 5, "name": "MongoDB", "idx": NumberLong(1), "author": "vivek"},
+];
+
+assert.docEq(p11b_result, p11b.cursor.firstBatch, 'p11b failed');
+
+// Same as prior test but return the array index in a field that overwrites existing "dbg" field.
+const p11c = testDB.runCommand({
+    aggregate: "p11",
+    pipeline: [
+        {$unwind: {path: "$items.authors", includeArrayIndex: "dbg"}},
+        {$project: {name: 1, dbg: 1, author: "$items.authors"}},
+        {$sort: {author: 1}}
+
+    ],
+    cursor: {}
+});
+
+const p11c_result = [
+    {"_id": 5, "name": "MongoDB", "dbg": NumberLong(2), "author": "bjornar"},
+    {"_id": 5, "name": "MongoDB", "dbg": NumberLong(0), "author": "jay"},
+    {"_id": 5, "name": "MongoDB", "dbg": NumberLong(1), "author": "vivek"},
+];
+
+assert.docEq(p11c_result, p11c.cursor.firstBatch, 'p11c failed');
+
+// Same as prior test but $project also depends on "dbg" field to compute "dbgInc".
+const p11d = testDB.runCommand({
+    aggregate: "p11",
+    pipeline: [
+        {$unwind: {path: "$items.authors", includeArrayIndex: "dbg"}},
+        {$project: {name: 1, dbg: 1, dbgInc: {$add: ["$dbg", 1]}, author: "$items.authors"}},
+        {$sort: {author: 1}}
+
+    ],
+    cursor: {}
+});
+
+const p11d_result = [
+    {"_id": 5, "name": "MongoDB", "dbg": NumberLong(2), "dbgInc": 3, "author": "bjornar"},
+    {"_id": 5, "name": "MongoDB", "dbg": NumberLong(0), "dbgInc": 1, "author": "jay"},
+    {"_id": 5, "name": "MongoDB", "dbg": NumberLong(1), "dbgInc": 2, "author": "vivek"},
+];
+
+assert.docEq(p11d_result, p11d.cursor.firstBatch, 'p11d failed');
+
+// Verify unwinding a nonexistent field "x.y.z" does not create the dotted path "x.y" above that
+// field in the output object when "preserveNullAndEmptyArrays" is true.
+const p11e = testDB.runCommand({
+    aggregate: "p11",
+    pipeline: [{$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true}}],
+    cursor: {}
+});
+
+const p11e_result = [{
+    "_id": 5,
+    "name": 'MongoDB',
+    "items": {"authors": ['jay', 'vivek', 'bjornar'], "dbg": [17, 42]},
+    "favorites": ['pickles', 'ice cream', 'kettle chips']
+}];
+
+assert.docEq(p11e_result, p11e.cursor.firstBatch, 'p11e failed');
+
+// Same as prior test but also set "includeArrayIndex" to true.
+const p11f = testDB.runCommand({
+    aggregate: "p11",
+    pipeline:
+        [{$unwind: {path: "$x.y.z", preserveNullAndEmptyArrays: true, includeArrayIndex: "idx"}}],
+    cursor: {}
+});
+
+const p11f_result = [{
+    "_id": 5,
+    "name": 'MongoDB',
+    "items": {"authors": ['jay', 'vivek', 'bjornar'], "dbg": [17, 42]},
+    "favorites": ['pickles', 'ice cream', 'kettle chips'],
+    "idx": null
+}];
+
+assert.docEq(p11f_result, p11f.cursor.firstBatch, 'p11f failed');
 
 // multiply test
 let p12 = testDB.runCommand({

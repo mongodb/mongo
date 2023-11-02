@@ -300,9 +300,20 @@ str::stream& operator<<(str::stream& str, const std::pair<TypeTags, Value>& valu
     ValuePrinters::make(str, PrintOptions()).writeValueToStream(value.first, value.second);
     return str;
 }
+
 std::string print(const std::pair<TypeTags, Value>& value) {
-    auto stream = str::stream();
+    str::stream stream = str::stream();
     stream << value;
+    return stream;
+}
+
+std::string printTagAndVal(const TypeTags tag, const Value value) {
+    return printTagAndVal(std::pair<TypeTags, Value>{tag, value});
+}
+
+std::string printTagAndVal(const std::pair<TypeTags, Value>& value) {
+    str::stream stream = str::stream();
+    stream << "tag: " << value.first << ", val: " << value;
     return stream;
 }
 
@@ -773,7 +784,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto result = canonicalizeBSONType(lhsType) - canonicalizeBSONType(rhsType);
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     }
-}
+}  // compareValue
 
 bool isNaN(TypeTags tag, Value val) noexcept {
     return (tag == TypeTags::NumberDouble && std::isnan(bitcastTo<double>(val))) ||

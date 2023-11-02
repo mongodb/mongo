@@ -394,12 +394,13 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     if (reqs.has(PlanStageSlots::kResult)) {
         std::vector<std::string> fieldNames;
         sbe::value::SlotVector fieldSlots;
-        outputs.forEachSlot([&](const PlanStageSlots::Name& name, const TypedSlot& slot) {
-            if (name.first == PlanStageSlots::kField) {
-                fieldNames.push_back(std::string{name.second});
-                fieldSlots.push_back(slot.slotId);
-            }
-        });
+        outputs.forEachSlot(
+            [&](const PlanStageSlots::UnownedSlotName& name, const TypedSlot& slot) {
+                if (name.first == PlanStageSlots::kField) {
+                    fieldNames.push_back(std::string{name.second});
+                    fieldSlots.push_back(slot.slotId);
+                }
+            });
 
         auto resultSlot = _slotIdGenerator.generate();
         outputs.set(kResult, resultSlot);
@@ -418,7 +419,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         // As we are not producing a result record, we must fulfill all reqs in a way that would be
         // equivalent to fetching the same fields from 'kResult', that is, we'll map the fields to
         // the environtment's 'Nothing' slot.
-        reqs.forEachReq([&](const std::pair<PlanStageReqs::Type, StringData>& name) {
+        reqs.forEachReq([&](const std::pair<PlanStageReqs::SlotType, StringData>& name) {
             if (!outputs.has(name)) {
                 outputs.set(name, _state.env->getSlot(kNothingEnvSlotName));
             }

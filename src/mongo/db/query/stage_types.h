@@ -136,6 +136,7 @@ enum StageType {
     // collection.
     STAGE_UNPACK_SAMPLED_TS_BUCKET,
 
+    STAGE_UNWIND,
     STAGE_UPDATE,
 
     // Stages for DocumentSources.

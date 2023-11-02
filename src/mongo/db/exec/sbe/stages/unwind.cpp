@@ -122,48 +122,46 @@ PlanState UnwindStage::getNext() {
             !_inArray || _children[0]->slotsAccessible());
 #endif
 
-    if (!_inArray) {
-        do {
-            // We are about to call getNext() on our child so do not bother saving our internal
-            // state in case it yields as the state will be completely overwritten after the
-            // getNext() call.
-            disableSlotAccess();
-            auto state = _children[0]->getNext();
-            if (state != PlanState::ADVANCED) {
-                return trackPlanState(state);
-            }
+    while (!_inArray) {
+        // We are about to call getNext() on our child so do not bother saving our internal
+        // state in case it yields as the state will be completely overwritten after the
+        // getNext() call.
+        disableSlotAccess();
+        auto state = _children[0]->getNext();
+        if (state != PlanState::ADVANCED) {
+            return trackPlanState(state);
+        }
 
-            // Get the value.
-            auto [tag, val] = _inFieldAccessor->getViewOfValue();
+        // Get the value.
+        auto [tag, val] = _inFieldAccessor->getViewOfValue();
 
-            if (value::isArray(tag)) {
-                _inArrayAccessor.reset(_inFieldAccessor);
-                _index = 0;
-                _inArray = true;
+        if (value::isArray(tag)) {
+            _inArrayAccessor.reset(_inFieldAccessor);
+            _index = 0;
+            _inArray = true;
 
-                // Empty input array.
-                if (_inArrayAccessor.atEnd()) {
-                    _inArray = false;
-                    if (_preserveNullAndEmptyArrays) {
-                        _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
-                        _outIndexOutputAccessor->reset(false,
-                                                       value::TypeTags::NumberInt64,
-                                                       value::bitcastFrom<int64_t>(_index));
-                        return trackPlanState(PlanState::ADVANCED);
-                    }
-                }
-            } else {
-                bool nullOrNothing =
-                    tag == value::TypeTags::Null || tag == value::TypeTags::Nothing;
-
-                if (!nullOrNothing || _preserveNullAndEmptyArrays) {
-                    _outFieldOutputAccessor->reset(false, tag, val);
-                    _outIndexOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
+            // Empty input array.
+            if (_inArrayAccessor.atEnd()) {
+                _inArray = false;
+                if (_preserveNullAndEmptyArrays) {
+                    _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
+                    // -1 array index indicates the unwind field was an array, but it was empty.
+                    _outIndexOutputAccessor->reset(
+                        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(-1));
                     return trackPlanState(PlanState::ADVANCED);
                 }
             }
-        } while (!_inArray);
-    }
+        } else {
+            bool nullOrNothing = tag == value::TypeTags::Null || tag == value::TypeTags::Nothing;
+
+            if (!nullOrNothing || _preserveNullAndEmptyArrays) {
+                _outFieldOutputAccessor->reset(false, tag, val);
+                // Null array index indicates the unwind field was not an array.
+                _outIndexOutputAccessor->reset(false, value::TypeTags::Null, 0);
+                return trackPlanState(PlanState::ADVANCED);
+            }
+        }
+    }  // while (!_inArray)
 
     // We are inside the array so pull out the current element and advance.
     auto [tagElem, valElem] = _inArrayAccessor.getViewOfValue();

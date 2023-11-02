@@ -241,10 +241,10 @@ struct CompatiblePipelineStages {
     bool transform : 1;
 
     bool match : 1;
+    bool unwind : 1;
     bool sort : 1;
     bool limitSkip : 1;
     bool search : 1;
-
     bool window : 1;
     bool unpackBucket : 1;
 };
@@ -345,6 +345,14 @@ bool pushDownPipelineStageIfCompatible(
 
         stagesForPushdown.emplace_back(
             std::make_unique<InnerPipelineStageImpl>(unpackBucketStage, isLastSource));
+        return true;
+    } else if (auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(stage.get())) {
+        if (!allowedStages.unwind || unwindStage->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+
+        stagesForPushdown.emplace_back(
+            std::make_unique<InnerPipelineStageImpl>(unwindStage, isLastSource));
         return true;
     }
 
@@ -471,6 +479,10 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
         // $match, $sort, $limit, and $skip requires 'featureFlagSbeFull' to be enabled.
         .transform = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
         .match = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+
+        // TODO (SERVER-80226): SBE execution of 'unwind' stages requires 'featureFlagSbeFull' to be
+        // enabled.
+        .unwind = SbeCompatibility::flagGuarded >= minRequiredCompatibility,
 
         // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is

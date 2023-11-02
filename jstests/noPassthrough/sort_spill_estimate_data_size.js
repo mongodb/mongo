@@ -56,12 +56,37 @@ function createPipeline(collection) {
 }
 
 const explain = createPipeline(coll.explain("executionStats"));
+
+// Returns the (first) value of the field named 'key' in the object 'obj' if it exists nested at any
+// depth, else returns "undefined".
+function findKey(key, obj) {
+    if ((typeof obj === "undefined") || (obj === null)) {
+        return;
+    }
+    if (obj.hasOwnProperty(key)) {
+        return obj[key];
+    }
+    for (let prop in obj) {
+        if (typeof obj[prop] === "object") {
+            let result = findKey(key, obj[prop]);
+            if (typeof result !== "undefined") {
+                return result;
+            }
+        }
+    }
+}  // function findKey
+
+let dataBytesSorted;
 const sortStages = getAggPlanStages(explain, "$sort");
-
-assert.eq(sortStages.length, 1, explain);
-const sort = sortStages[0];
-const dataBytesSorted = sort["totalDataSizeSortedBytesEstimate"];
-
+if (sortStages.length == 0) {
+    // SBE executed sbe::SortStage.
+    dataBytesSorted = findKey("totalDataSizeSorted", explain);
+} else {
+    // Classic engine executed DocumentSourceSort.
+    assert.eq(sortStages.length, 1, explain);
+    const sortStage = sortStages[0];
+    dataBytesSorted = sortStage["totalDataSizeSortedBytesEstimate"];
+}
 // The total data size sorted is no greater than 3x the total size of all documents sorted.
 assert.lt(dataBytesSorted, 3 * totalSize, explain);
 

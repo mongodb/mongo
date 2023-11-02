@@ -124,6 +124,10 @@ public:
         return _unwindProcessor->getIndexPath();
     }
 
+    SbeCompatibility sbeCompatibility() const {
+        return _sbeCompatibility;
+    }
+
 protected:
     /**
      * Attempts to swap with a subsequent $sort stage if the $sort is on a different field.
@@ -146,12 +150,16 @@ private:
     // Checks if a limit is eligible to be moved before the unwind.
     bool canPushLimitBack(const DocumentSourceLimit* limit) const;
 
+    // Helper class instance to execute unwind logic.
     boost::optional<UnwindProcessor> _unwindProcessor;
 
     // If preserveNullAndEmptyArrays is true and unwind is followed by a limit, we can duplicate
     // the limit before the unwind. We only want to do this if we've found a limit smaller than the
     // one we already pushed down. boost::none means no push down has occurred yet.
     boost::optional<long long> _smallestLimitPushedDown;
+
+    // TODO SERVER-80226: Change to SbeCompatibility::fullyCompatible when $unwind pushdown enabled.
+    SbeCompatibility _sbeCompatibility{SbeCompatibility::flagGuarded};
 };
 
 }  // namespace mongo

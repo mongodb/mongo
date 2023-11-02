@@ -9,7 +9,7 @@ if (!checkSBEEnabled(db)) {
     quit();
 }
 
-// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature here and below.
+// TODO SERVER-72549, SERVER-80226: Remove 'featureFlagSbeFull' used by SBE Pushdown, SBE $unwind.
 const featureFlagSbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 const coll = db.lookup_with_limit;
@@ -68,6 +68,7 @@ pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "additional"}},
     {$limit: 5}
 ];
+// TODO SERVER-72549: Remove 'featureFlagSbeFull' used by SBE Pushdown feature.
 if (featureFlagSbeFull) {
     checkResults(
         pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "EQ_LOOKUP", "LIMIT"]);
@@ -85,7 +86,12 @@ pipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
+// TODO SERVER-80226: Remove 'featureFlagSbeFull' used by SBE $unwind feature.
+if (featureFlagSbeFull) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "LIMIT"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
+}
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 
 // Check that lookup->unwind->sort->limit is reordered to lookup->sort, with the unwind stage being
@@ -97,5 +103,10 @@ pipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+// TODO SERVER-80226: Remove 'featureFlagSbeFull' used by SBE $unwind feature.
+if (featureFlagSbeFull) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "SORT", "LIMIT"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+}
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);

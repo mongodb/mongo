@@ -1737,8 +1737,8 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
 /**
  * If 'query.cqPipeline()' is non-empty, it contains a prefix of the aggregation pipeline that can
- * be pushed down to SBE. For now, we plan this separately here and later attach the agg portion of
- * the plan to the solution(s).
+ * be pushed down to SBE. For now, we plan this separately here and attach the agg portion of the
+ * plan to the solution(s) via the extendWith() call near the end.
  */
 std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     CanonicalQuery& query,
@@ -1792,6 +1792,15 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         if (projectionStage) {
             solnForAgg = std::make_unique<ProjectionNodeDefault>(
                 std::move(solnForAgg), nullptr, projectionStage->projection());
+            continue;
+        }
+
+        auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(innerStage->documentSource());
+        if (unwindStage) {
+            solnForAgg = std::make_unique<UnwindNode>(std::move(solnForAgg) /* child */,
+                                                      unwindStage->getUnwindPath() /* fieldPath */,
+                                                      unwindStage->preserveNullAndEmptyArrays(),
+                                                      unwindStage->indexPath());
             continue;
         }
 
@@ -1899,9 +1908,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
     }
 
     solution->extendWith(std::move(solnForAgg));
-
     solution = QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
-
     QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(*solution->root());
 
     return std::move(solution);

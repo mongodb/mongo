@@ -70,8 +70,12 @@ namespace po = ::boost::program_options;
 using namespace fmt::literals;
 
 std::string readFile(const fs::path& path) {
-    uassert(6741506, "path must not be a directory", !is_directory(path));
-    uassert(6741505, "path must be a regular file", is_regular_file(path));
+    uassert(6741506,
+            str::stream() << "path '" << path.string() << "' must not be a directory",
+            !is_directory(path));
+    uassert(6741505,
+            str::stream() << "path '" << path.string() << "' must be a regular file",
+            is_regular_file(path));
 
     std::ostringstream os;
     os << fs::ifstream(path).rdbuf();
