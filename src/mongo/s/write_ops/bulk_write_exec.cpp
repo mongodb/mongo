@@ -629,7 +629,7 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
     }
 
     LOGV2_DEBUG(7263701, 4, "Finished execution of bulkWrite");
-    return bulkWriteOp.generateReplyInfo();
+    return bulkWriteOp.generateReplyInfo(clientRequest.getErrorsOnly());
 }
 
 BulkWriteOp::BulkWriteOp(OperationContext* opCtx, const BulkWriteCommandRequest& clientRequest)
@@ -1101,7 +1101,7 @@ void BulkWriteOp::noteWriteOpFinalResponse(
     }
 }
 
-BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
+BulkWriteReplyInfo BulkWriteOp::generateReplyInfo(bool errorsOnly) {
     dassert(isFinished());
     std::vector<BulkWriteReplyItem> replyItems;
     int numErrors = 0;
@@ -1113,7 +1113,9 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
         // responses to all outstanding requests.
         dassert(writeOp.getWriteState() != WriteOpState_Pending || _aborted);
         if (writeOp.getWriteState() == WriteOpState_Completed) {
-            replyItems.push_back(writeOp.takeBulkWriteReplyItem());
+            if (!errorsOnly) {
+                replyItems.push_back(writeOp.takeBulkWriteReplyItem());
+            }
         } else if (writeOp.getWriteState() == WriteOpState_Error) {
             replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(),
                                     writeOp.getOpError().getStatus());

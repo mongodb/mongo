@@ -301,11 +301,6 @@ commands:
                 type: SimpleCursorOptions
                 optional: true
                 stability: unstable
-            singleBatch:
-                description: "Determines whether to close the cursor after the first batch."
-                type: bool
-                default: false
-                stability: unstable
             bypassDocumentValidation:
                 description: "Enables the operation to bypass document validation. This lets you
                               write documents that do not meet the validation requirements."
@@ -334,5 +329,10 @@ commands:
                 description: "Specifies constant values."
                 type: object
                 optional: true
+                stability: unstable
+            errorsOnly:
+                description: "Only return error responses and not all detailed results."
+                type: bool
+                default: false
                 stability: unstable
 

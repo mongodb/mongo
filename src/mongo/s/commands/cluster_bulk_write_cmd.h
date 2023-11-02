@@ -255,6 +255,7 @@ public:
                 responseSizeTracker.add(nextObj);
             }
             if (numRepliesInFirstBatch == replyItems.size()) {
+                replyItems.resize(numRepliesInFirstBatch);
                 reply.setCursor(BulkWriteCommandResponseCursor(
                     0, std::vector<BulkWriteReplyItem>(std::move(replyItems)), cursorNss));
                 return reply;

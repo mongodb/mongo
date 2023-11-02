@@ -408,3 +408,22 @@ assert.eq(res.cursor.firstBatch[0].errmsg,
           "the parameter 'upsertSupplied' is set to 'true', but no document was supplied");
 
 coll.drop();
+
+// Test errorsOnly.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [{insert: 0, document: {_id: 1}}, {insert: 0, document: {_id: 1}}],
+    nsInfo: [{ns: "test.coll"}],
+    errorsOnly: true
+});
+
+assert.commandWorked(res, "bulkWrite command response: " + tojson(res));
+cursorSizeValidator(res, 1);
+assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+
+assert(res.cursor.id == 0, "bulkWrite command response: " + tojson(res));
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, n: 0, idx: 1, code: 11000});
+assert(!res.cursor.firstBatch[1], "bulkWrite command response: " + tojson(res));
+assert.eq(res.cursor.ns, "admin.$cmd.bulkWrite", "bulkWrite command response: " + tojson(res));
+
+coll.drop();

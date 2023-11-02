@@ -327,21 +327,23 @@ private:
 
     // Helper to keep _approximateSize up to date when appending to _replies.
     void _addReply(const BulkWriteReplyItem& replyItem) {
-        if (_req.getSingleBatch() && _req.getCursor() && _req.getCursor()->getBatchSize() &&
-            int64_t(_replies.size()) >= *_req.getCursor()->getBatchSize()) {
+        bool isError = replyItem.getOk() == 0;
+
+        // if the response is not an error and we want to only return errors
+        // then we should not store this reply.
+        if (!isError && _req.getErrorsOnly()) {
             return;
         }
+
         _approximateSize += replyItem.getApproximateSize();
         _replies.emplace_back(replyItem);
     }
 };
 
 bool aboveBulkWriteRepliesMaxSize(OperationContext* opCtx,
-                                  bool singleBatch,
                                   size_t idx,
                                   BulkWriteReplies& responses) {
-    auto bulkWriteRepliesMaxSize =
-        singleBatch ? BSONObjMaxUserSize : gBulkWriteMaxRepliesSize.loadRelaxed();
+    auto bulkWriteRepliesMaxSize = gBulkWriteMaxRepliesSize.loadRelaxed();
     if (responses.getApproximateSize() >= bulkWriteRepliesMaxSize) {
         Status status{ErrorCodes::ExceededMemoryLimit,
                       fmt::format("BulkWrite response size exceeded limit ({} bytes)",
@@ -854,7 +856,7 @@ bool handleInsertOp(OperationContext* opCtx,
                     std::vector<int>& validatedNamespaces,
                     BulkWriteReplies& responses,
                     InsertGrouper& insertGrouper) {
-    if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
         return false;
     }
     const auto& nsInfo = req.getNsInfo();
@@ -966,7 +968,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     std::vector<int>& validatedNamespaces,
                     BulkWriteReplies& responses) {
-    if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
         return false;
     }
 
@@ -1338,8 +1340,7 @@ public:
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
 
-            if (req.getSingleBatch() && req.getCursor() && req.getCursor()->getBatchSize() &&
-                *req.getCursor()->getBatchSize() == 0) {
+            if (replies.size() == 0) {
                 return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
                                                  0 /* cursorId */, {} /* firstBatch */, cursorNss),
                                              numErrors);
@@ -1477,7 +1478,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                     write_ops_exec::LastOpFixer& lastOpFixer,
                     std::vector<int>& validatedNamespaces,
                     BulkWriteReplies& responses) {
-    if (aboveBulkWriteRepliesMaxSize(opCtx, req.getSingleBatch(), currentOpIdx, responses)) {
+    if (aboveBulkWriteRepliesMaxSize(opCtx, currentOpIdx, responses)) {
         return false;
     }
 
