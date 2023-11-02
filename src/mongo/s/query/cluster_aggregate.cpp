@@ -297,24 +297,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     AggregateCommandRequest& request,
     boost::optional<CollectionRoutingInfo> cri,
     bool hasChangeStream,
-    bool shouldDoFLERewrite) {
-    // Populate the collection UUID and the appropriate collation to use.
-    auto [collationObj, uuid] = [&]() -> std::pair<BSONObj, boost::optional<UUID>> {
-        // If this is a change stream, take the user-defined collation if one exists, or an
-        // empty BSONObj otherwise. Change streams never inherit the collection's default
-        // collation, and since collectionless aggregations generally run on the 'admin'
-        // database, the standard logic would attempt to resolve its non-existent UUID and
-        // collation by sending a specious 'listCollections' command to the config servers.
-        if (hasChangeStream) {
-            return {request.getCollation().value_or(BSONObj()), boost::none};
-        }
-
-        return cluster_aggregation_planner::getCollationAndUUID(
-            opCtx,
-            cri ? boost::make_optional(cri->cm) : boost::none,
-            executionNss,
-            request.getCollation().value_or(BSONObj()));
-    }();
+    bool shouldDoFLERewrite,
+    bool requiresCollationForParsingUnshardedAggregate) {
+    // Populate the collation. If this is a change stream, take the user-defined collation if one
+    // exists, or an empty BSONObj otherwise. Change streams never inherit the collection's default
+    // collation, and since collectionless aggregations generally run on the 'admin'
+    // database, the standard logic would attempt to resolve its non-existent UUID and
+    // collation by sending a specious 'listCollections' command to the config servers.
+    auto collationObj = hasChangeStream ? request.getCollation().value_or(BSONObj())
+                                        : cluster_aggregation_planner::getCollation(
+                                              opCtx,
+                                              cri ? boost::make_optional(cri->cm) : boost::none,
+                                              executionNss,
+                                              request.getCollation().value_or(BSONObj()),
+                                              requiresCollationForParsingUnshardedAggregate);
 
     // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
     // includes all involved namespaces, and creates a shared MongoProcessInterface for use by
@@ -324,7 +320,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
                               request,
                               cri,
                               collationObj,
-                              uuid,
+                              boost::none /* uuid */,
                               resolveInvolvedNamespaces(involvedNamespaces),
                               hasChangeStream);
 
@@ -396,6 +392,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
     auto startsWithQueue = liteParsedPipeline.startsWithQueue();
+    auto requiresCollationForParsingUnshardedAggregate =
+        liteParsedPipeline.requiresCollationForParsingUnshardedAggregate();
     auto pipelineDataSource = hasChangeStream ? PipelineDataSource::kChangeStream
         : startsWithQueue                     ? PipelineDataSource::kQueue
                                               : PipelineDataSource::kNormal;
@@ -434,13 +432,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // To achieve parity with mongod-style responses, parse and validate the query
             // even though the namespace is not found.
             try {
-                auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
-                                                                   involvedNamespaces,
-                                                                   namespaces.executionNss,
-                                                                   request,
-                                                                   cri,
-                                                                   hasChangeStream,
-                                                                   shouldDoFLERewrite);
+                auto pipeline = parsePipelineAndRegisterQueryStats(
+                    opCtx,
+                    involvedNamespaces,
+                    namespaces.executionNss,
+                    request,
+                    cri,
+                    hasChangeStream,
+                    shouldDoFLERewrite,
+                    requiresCollationForParsingUnshardedAggregate);
                 pipeline->validateCommon(false);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // ignore redundant NamespaceNotFound errors.
@@ -455,13 +455,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const auto pipelineBuilder = [&]() {
-        auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
-                                                           involvedNamespaces,
-                                                           namespaces.executionNss,
-                                                           request,
-                                                           cri,
-                                                           hasChangeStream,
-                                                           shouldDoFLERewrite);
+        auto pipeline =
+            parsePipelineAndRegisterQueryStats(opCtx,
+                                               involvedNamespaces,
+                                               namespaces.executionNss,
+                                               request,
+                                               cri,
+                                               hasChangeStream,
+                                               shouldDoFLERewrite,
+                                               requiresCollationForParsingUnshardedAggregate);
         expCtx = pipeline->getContext();
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
@@ -478,12 +480,21 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
         }
 
-        pipeline->optimizePipeline();
+        // Optimize the pipeline if:
+        // - We have a valid routing table.
+        // - We know the collection's collation.
+        // - We have a change stream or need to do a FLE rewrite.
+        // This is because the results of optimization may depend on knowing the collation.
+        // TODO SERVER-81991: Determine whether this is necessary once all unsharded collections are
+        // tracked as unsplittable collections in the sharding catalog.
+        if ((cri && cri->cm.hasRoutingTable()) || requiresCollationForParsingUnshardedAggregate ||
+            hasChangeStream || shouldDoFLERewrite) {
+            pipeline->optimizePipeline();
 
-        // Validate the pipeline post-optimization.
-        const bool alreadyOptimized = true;
-        pipeline->validateCommon(alreadyOptimized);
-
+            // Validate the pipeline post-optimization.
+            const bool alreadyOptimized = true;
+            pipeline->validateCommon(alreadyOptimized);
+        }
         return pipeline;
     };
 

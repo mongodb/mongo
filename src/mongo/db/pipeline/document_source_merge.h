@@ -130,6 +130,14 @@ public:
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final;
 
+        /**
+         * We must know the aggregation's collation when parsing a $merge in order to correctly
+         * verify that the target namespace guarantees the uniqueness of the 'mergeOnFields'.
+         */
+        bool requiresCollationForParsingUnshardedAggregate() const final {
+            return true;
+        }
+
     private:
         MergeWhenMatchedModeEnum _whenMatched;
         MergeWhenNotMatchedModeEnum _whenNotMatched;

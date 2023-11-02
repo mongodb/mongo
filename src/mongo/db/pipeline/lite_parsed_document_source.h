@@ -197,6 +197,17 @@ public:
     }
 
     /**
+     * Returns true if this stage require knowledge of the collection default collation at parse
+     * time, false otherwise. This is useful to know as it could save a network request to discern
+     * the collation.
+     * TODO SERVER-81991: Delete this function once all unsharded collections are tracked in the
+     * sharding catalog as unsplittable along with their collation.
+     */
+    virtual bool requiresCollationForParsingUnshardedAggregate() const {
+        return false;
+    }
+
+    /**
      * Returns Status::OK() if the involved namespace 'nss' is allowed to be sharded. The behavior
      * is to allow by default. Stages should opt-out if foreign collections are not allowed to be
      * sharded by returning a Status with a message explaining why.

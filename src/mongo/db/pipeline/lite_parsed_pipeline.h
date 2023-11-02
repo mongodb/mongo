@@ -147,6 +147,19 @@ public:
             return spec->isChangeStream();
         });
     }
+    /**
+     * Returns true if any of the stages in this pipeline require knowledge of the collection
+     * default collation to be successfully parsed, false otherwise. Note that this only applies to
+     * top level stages and does not account for subpipelines.
+     * TODO SERVER-81991: Delete this function once all unsharded collections are tracked in the
+     * sharding catalog as unsplittable along with their collation.
+     */
+    bool requiresCollationForParsingUnshardedAggregate() const {
+        return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {
+            return spec->requiresCollationForParsingUnshardedAggregate();
+        });
+    }
+
 
     /**
      * Returns an error Status if at least one of the stages does not allow the involved namespace

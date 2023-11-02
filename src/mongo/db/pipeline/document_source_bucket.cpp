@@ -58,7 +58,7 @@ using std::list;
 using std::vector;
 
 REGISTER_DOCUMENT_SOURCE(bucket,
-                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceBucket::LiteParsed::parse,
                          DocumentSourceBucket::createFromBson,
                          AllowedWithApiStrict::kAlways);
 

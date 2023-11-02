@@ -599,47 +599,39 @@ ClusterClientCursorGuard convertPipelineToRouterStages(
 }
 
 /**
- * Returns the output of the listCollections command filtered to the namespace 'nss'.
+ * Contacts the primary shard for the collection default collation.
  */
-BSONObj getUnshardedCollInfo(OperationContext* opCtx,
-                             const ShardId& shardId,
-                             const NamespaceString& nss) {
+BSONObj getUntrackedCollectionCollation(OperationContext* opCtx,
+                                        const ShardId& shardId,
+                                        const NamespaceString& nss) {
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
     ScopedDbConnection conn(shard->getConnString());
     std::list<BSONObj> all = conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
-    if (all.empty()) {
-        // Collection does not exist, return an empty object.
-        return BSONObj();
-    }
-    return all.front();
-}
 
-/**
- * Returns the collection default collation or the simple collator if there is no default. If the
- * collection does not exist, then returns an empty BSON Object.
- */
-BSONObj getDefaultCollationForUnshardedCollection(const BSONObj collectionInfo) {
-    if (collectionInfo.isEmpty()) {
-        // Collection does not exist, return an empty object.
+    // Collection or collection info does not exist; return an empty collation object.
+    if (all.empty() || all.front().isEmpty()) {
         return BSONObj();
     }
 
-    BSONObj defaultCollation = CollationSpec::kSimpleSpec;
+    auto collectionInfo = all.front();
+
+    // We inspect 'info' to infer the collection default collation.
+    BSONObj collationToReturn = CollationSpec::kSimpleSpec;
     if (collectionInfo["options"].type() == BSONType::Object) {
         BSONObj collectionOptions = collectionInfo["options"].Obj();
         BSONElement collationElement;
         auto status = bsonExtractTypedField(
             collectionOptions, "collation", BSONType::Object, &collationElement);
         if (status.isOK()) {
-            defaultCollation = collationElement.Obj().getOwned();
+            collationToReturn = collationElement.Obj().getOwned();
             uassert(ErrorCodes::BadValue,
                     "Default collation in collection metadata cannot be empty.",
-                    !defaultCollation.isEmpty());
+                    !collationToReturn.isEmpty());
         } else if (status != ErrorCodes::NoSuchKey) {
             uassertStatusOK(status);
         }
     }
-    return defaultCollation;
+    return collationToReturn;
 }
 
 bool isMergeSkipOrLimit(const boost::intrusive_ptr<DocumentSource>& stage) {
@@ -675,7 +667,7 @@ AggregationTargeter AggregationTargeter::make(
     PipelineDataSource pipelineDataSource,
     bool perShardCursor) {
     if (perShardCursor) {
-        return {TargetingPolicy::kSpecificShardOnly, nullptr, cri};
+        return {TargetingPolicy::kSpecificShardOnly, nullptr /* pipeline */, cri};
     }
 
     tassert(7972401,
@@ -806,58 +798,33 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                    pipelineDataSource == PipelineDataSource::kChangeStream);
 }
 
-std::pair<BSONObj, boost::optional<UUID>> getCollationAndUUID(
-    OperationContext* opCtx,
-    const boost::optional<ChunkManager>& cm,
-    const NamespaceString& nss,
-    const BSONObj& collation) {
-    const bool collectionIsSharded = (cm && cm->isSharded());
-    const bool collectionIsNotSharded = (cm && !cm->isSharded());
-
-    // If this is a collectionless aggregation, we immediately return the user-
-    // defined collation if one exists, or an empty BSONObj otherwise. Collectionless aggregations
-    // generally run on the 'admin' database, the standard logic would attempt to resolve its
-    // non-existent UUID and collation by sending a specious 'listCollections' command to the config
-    // servers.
-    if (nss.isCollectionlessAggregateNS()) {
-        return {collation, boost::none};
+BSONObj getCollation(OperationContext* opCtx,
+                     const boost::optional<ChunkManager>& cm,
+                     const NamespaceString& nss,
+                     const BSONObj& collation,
+                     bool requiresCollationForParsingUnshardedAggregate) {
+    // If this is a collectionless aggregation or if the user specified an explicit collation,
+    // we immediately return the user-defined collation if one exists, or an empty BSONObj
+    // otherwise.
+    if (nss.isCollectionlessAggregateNS() || !collation.isEmpty() || !cm) {
+        return collation;
     }
 
-    // If the collection is unsharded, obtain collInfo from the primary shard.
-    const auto unshardedCollInfo =
-        collectionIsNotSharded ? getUnshardedCollInfo(opCtx, cm->dbPrimary(), nss) : BSONObj();
+    // If the target collection is untracked, we will contact the primary shard to discover this
+    // information if it is necessary for pipeline parsing. Otherwise, we infer the collation once
+    // the command is executed on the primary shard.
+    if (!cm->hasRoutingTable()) {
+        return requiresCollationForParsingUnshardedAggregate
+            ? getUntrackedCollectionCollation(opCtx, cm->dbPrimary(), nss)
+            : BSONObj();
+    }
 
-    // Return the collection UUID if available, or boost::none otherwise.
-    const auto getUUID = [&]() -> boost::optional<UUID> {
-        if (collectionIsSharded) {
-            return cm->getUUID();
-        } else {
-            return unshardedCollInfo["info"] && unshardedCollInfo["info"]["uuid"]
-                ? boost::optional<UUID>{uassertStatusOK(
-                      UUID::parse(unshardedCollInfo["info"]["uuid"]))}
-                : boost::optional<UUID>{boost::none};
-        }
-    };
+    // Return the default collator if one exists, otherwise return the simple collation.
+    if (auto defaultCollator = cm->getDefaultCollator()) {
+        return defaultCollator->getSpec().toBSON();
+    }
 
-    // If the collection exists, return its default collation, or the simple
-    // collation if no explicit default is present. If the collection does not
-    // exist, return an empty BSONObj.
-    const auto getCollation = [&]() -> auto {
-        if (!collectionIsSharded && !collectionIsNotSharded) {
-            return BSONObj();
-        }
-        if (collectionIsNotSharded) {
-            return getDefaultCollationForUnshardedCollection(unshardedCollInfo);
-        } else {
-            return cm->getDefaultCollator() ? cm->getDefaultCollator()->getSpec().toBSON()
-                                            : CollationSpec::kSimpleSpec;
-        }
-    };
-
-    // If the user specified an explicit collation, we always adopt it. Otherwise,
-    // obtain the collection default or simple collation as appropriate, and return
-    // it along with the collection's UUID.
-    return {collation.isEmpty() ? getCollation() : collation, getUUID()};
+    return CollationSpec::kSimpleSpec;
 }
 
 Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionContext>& expCtx,

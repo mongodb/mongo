@@ -225,8 +225,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     if (!cm.hasRoutingTable()) {
         // The collection does not have a routing table. Target only the primary shard for the
         // database.
-        // TODO SERVER-80145: Consider removing this call to 'dbPrimary()', or at least allowing the
-        // generic code to target an unsharded collection.
         shardIds.emplace(cm.dbPrimary());
     } else {
         // The collection has a routing table. Target all shards that own chunks that match the

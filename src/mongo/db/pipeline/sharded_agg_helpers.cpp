@@ -1112,6 +1112,8 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
     //   is not the primary.
     // - The pipeline contains one or more stages which must always merge on mongoS.
     // - The pipeline requires the merge to be performed on a specific shard that is not targeted.
+    // TODO SERVER-79583: This reference to dbPrimary can be removed once
+    // HostTypeRequirement::kPrimaryShard is no longer used.
     const bool needsSplit =
         (shardIds.size() > 1u || needsMongosMerge || targetEveryShardServer ||
          (needsPrimaryShardMerge && cri && *(shardIds.begin()) != cri->cm.dbPrimary())) ||
@@ -1160,6 +1162,8 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     boost::optional<BSONObj> readConcern,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
     stdx::unordered_map<ShardId, BSONObj> resumeTokenMap) {
+    tassert(8014500, "Pipeline must be defined in order to target it", pipeline);
+
     const auto& [shardQuery,
                  shardTargetingCollation,
                  shardIds,
@@ -1308,6 +1312,9 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     // Record the number of shards involved in the aggregation. If we are required to merge on
     // the primary shard, but the primary shard was not in the set of targeted shards, then we
     // must increment the number of involved shards.
+    // TODO SERVER-79583: Revisit this computation. In particular, even when we are no longer
+    // merging on the primary shard specifically, we may need to account for the chase where the
+    // merging shard is not in 'shardIds'.
     CurOp::get(opCtx)->debug().nShards =
         shardCount + (needsPrimaryShardMerger && cri && !shardIds.count(cri->cm.dbPrimary()));
 

@@ -11,11 +11,9 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
-// Shard targeting for the routing table consistency check involves issuing a 'listCollections' with
-// primary read preference. As such, this check will fail given that there isn't a config server
-// primary at the end of this test.
-// TODO SERVER-80145: Try to delete this if we no longer need to issue 'listCollections' against a
-// primary to obtain collation and UUID information when performing shard targeting.
+// The routing table consistency check runs with 'snapshot' level readConcern. This readConcern
+// level cannot be satisfied without a replica set primary, which we won't have on the config server
+// because this test removes the config server primary.
 TestData.skipCheckRoutingTableConsistency = true;
 
 var st = new ShardingTest({shards: 2, config: 3});

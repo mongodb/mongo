@@ -44,6 +44,32 @@ namespace mongo {
  */
 class DocumentSourceBucket final {
 public:
+    class LiteParsed final : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec) {
+            return std::make_unique<LiteParsed>(spec.fieldName());
+        }
+        explicit LiteParsed(std::string parseTimeName)
+            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+            return {};
+        }
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
+            return {};
+        }
+
+        /**
+         * The correct collation for the aggregate is needed at parse time to determine whether the
+         * parsed bucket boundaries are valid.
+         */
+        bool requiresCollationForParsingUnshardedAggregate() const final {
+            return true;
+        }
+    };
     /**
      * Returns a $group stage followed by a $sort stage.
      */

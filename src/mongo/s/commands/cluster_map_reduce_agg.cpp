@@ -101,10 +101,18 @@ auto makeExpressionContext(OperationContext* opCtx,
     // Populate the collection UUID and the appropriate collation to use.
     auto nss = parsedMr.getNamespace();
 
-    // TODO SERVER-80145: Verify that, in the event of no user-specified collation, we get an empty
-    // collation object and boost::none UUID for unsplittable collections.
-    auto [collationObj, uuid] = cluster_aggregation_planner::getCollationAndUUID(
-        opCtx, cm, nss, parsedMr.getCollation().get_value_or(BSONObj()));
+    // An aggregation against an unsharded collection which features a $merge (i.e. a mapReduce
+    // command with an out option configured to 'reduce' or 'merge') would normally need to
+    // contact the primary shard to obtain the collection default collation. However, this is not
+    // necessary for mapReduce commands because we will always be merging on the _id field. As such,
+    // the collection default collation has no impact on the selection of fields to merge on.
+    const auto requiresCollationForParsingUnshardedAggregate = false;
+    auto collationObj =
+        cluster_aggregation_planner::getCollation(opCtx,
+                                                  cm,
+                                                  nss,
+                                                  parsedMr.getCollation().get_value_or(BSONObj()),
+                                                  requiresCollationForParsingUnshardedAggregate);
 
     std::unique_ptr<CollatorInterface> resolvedCollator;
     if (!collationObj.isEmpty()) {
@@ -135,7 +143,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         opCtx,
         verbosity,
         false,  // fromMongos
-        false,  // needsmerge
+        false,  // needsMerge
         true,   // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
         true,  // isMapReduceCommand
