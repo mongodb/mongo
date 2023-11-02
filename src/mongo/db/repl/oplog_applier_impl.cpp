@@ -433,12 +433,6 @@ protected:
         signalOplogWaiters();
     }
 
-    void _recordDurable(const OpTimeAndWallTime& newOpTimeAndWallTime) {
-        // We have to use setMyLastDurableOpTimeAndWallTimeForward since this thread races with
-        // ReplicationExternalStateImpl::onTransitionToPrimary.
-        _replCoord->setMyLastDurableOpTimeAndWallTimeForward(newOpTimeAndWallTime);
-    }
-
 private:
     // Used to update the replication system's progress.
     ReplicationCoordinator* _replCoord;
@@ -500,8 +494,6 @@ void ApplyBatchFinalizerForJournal::_run() {
     }
 
     while (true) {
-        OpTimeAndWallTime latestOpTimeAndWallTime = {OpTime(), Date_t()};
-
         {
             stdx::unique_lock<Latch> lock(_mutex);
             while (_latestOpTimeAndWallTime.opTime.isNull() && !_shutdownSignaled) {
@@ -512,13 +504,11 @@ void ApplyBatchFinalizerForJournal::_run() {
                 return;
             }
 
-            latestOpTimeAndWallTime = _latestOpTimeAndWallTime;
             _latestOpTimeAndWallTime = {OpTime(), Date_t()};
         }
 
         auto opCtx = cc().makeOperationContext();
         JournalFlusher::get(opCtx.get())->waitForJournalFlush();
-        _recordDurable(latestOpTimeAndWallTime);
     }
 }
 
