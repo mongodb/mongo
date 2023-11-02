@@ -140,7 +140,7 @@ void generatePlannerInfo(PlanExecutor* exec,
             plannerBob.append("collation", query->getCollator()->getSpec().toBSON());
         }
 
-        auto& querySettings = query->getQuerySettings();
+        auto& querySettings = query->getExpCtx()->getQuerySettings();
         if (auto querySettingsBSON = querySettings.toBSON(); !querySettingsBSON.isEmpty()) {
             plannerBob.append("querySettings", querySettingsBSON);
         }

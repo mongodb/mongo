@@ -269,10 +269,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     }
 
     auto querySettings = lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss);
-    return std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = std::move(expCtx),
-                             .parsedFind = std::move(parsedRequest),
-                             .querySettings = std::move(querySettings)});
+    expCtx->setQuerySettings(std::move(querySettings));
+    return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = std::move(expCtx),
+        .parsedFind = std::move(parsedRequest),
+    });
 }
 
 /**
@@ -454,10 +455,10 @@ public:
 
             auto querySettings =
                 lookupQuerySettingsForFind(expCtx, *parsedRequest, collectionPtr, nss);
+            expCtx->setQuerySettings(std::move(querySettings));
             auto cq = std::make_unique<CanonicalQuery>(
                 CanonicalQueryParams{.expCtx = std::move(expCtx),
                                      .parsedFind = std::move(parsedRequest),
-                                     .querySettings = std::move(querySettings),
                                      .explain = true});
 
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of

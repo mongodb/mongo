@@ -1818,6 +1818,7 @@ env.Library(
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
         'query/query_knobs',
+        'query/query_settings',
         'query/query_shape/query_shape_common',
         'sbe_values',
         'stats/counters',

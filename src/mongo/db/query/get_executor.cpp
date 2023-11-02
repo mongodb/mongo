@@ -383,7 +383,7 @@ bool applyQuerySettings(const CollectionPtr& collection,
                         QueryPlannerParams* plannerParams) {
     // If 'querySettings' has no index hints specified, then there are no settings to be applied to
     // this query.
-    auto indexHintSpecs = canonicalQuery.getQuerySettings().getIndexHints();
+    auto indexHintSpecs = canonicalQuery.getExpCtx()->getQuerySettings().getIndexHints();
     if (!indexHintSpecs) {
         return false;
     }
@@ -1695,7 +1695,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerParams) {
-    auto& querySettings = canonicalQuery->getQuerySettings();
+    auto& querySettings = canonicalQuery->getExpCtx()->getQuerySettings();
     auto exec = [&]() {
         invariant(canonicalQuery);
         const auto& mainColl = collections.getMainCollection();

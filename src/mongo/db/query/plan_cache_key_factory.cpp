@@ -155,7 +155,7 @@ PlanCacheKey make(const CanonicalQuery& query,
         plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                 query.getPrimaryMatchExpression(),
                                                 collection,
-                                                query.getQuerySettings()),
+                                                query.getExpCtx()->getQuerySettings()),
     };
 }
 
@@ -186,7 +186,7 @@ sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAcce
     return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                     query.getPrimaryMatchExpression(),
                                                     collections.getMainCollection(),
-                                                    query.getQuerySettings()),
+                                                    query.getExpCtx()->getQuerySettings()),
             std::move(mainCollectionState),
             std::move(secondaryCollectionStates)};
 }

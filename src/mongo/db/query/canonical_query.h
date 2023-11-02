@@ -72,7 +72,6 @@ class OperationContext;
 struct CanonicalQueryParams {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     stdx::variant<std::unique_ptr<ParsedFindCommand>, ParsedFindCommandParams> parsedFind;
-    query_settings::QuerySettings querySettings = query_settings::QuerySettings();
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {};
     bool explain = false;
     bool isCountLike = false;
@@ -170,10 +169,6 @@ public:
 
     std::shared_ptr<CollatorInterface> getCollatorShared() const {
         return _expCtx->getCollatorShared();
-    }
-
-    const query_settings::QuerySettings& getQuerySettings() const {
-        return _querySettings;
     }
 
     /**
@@ -425,9 +420,6 @@ private:
     bool _isUncacheableSbe = false;
 
     bool _isSearchQuery = false;
-
-    // Query settings associated with the given query.
-    query_settings::QuerySettings _querySettings = query_settings::QuerySettings();
 };
 
 }  // namespace mongo

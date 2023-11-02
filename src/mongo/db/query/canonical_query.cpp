@@ -127,7 +127,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::make(CanonicalQueryP
 
 CanonicalQuery::CanonicalQuery(CanonicalQueryParams&& params) {
     setExplain(params.explain);
-    _querySettings = std::move(params.querySettings);
     auto parsedFind = uassertStatusOK(stdx::visit(
         OverloadedVisitor{[](std::unique_ptr<ParsedFindCommand> parsedFindRequest) {
                               return StatusWith(std::move(parsedFindRequest));
@@ -155,9 +154,6 @@ CanonicalQuery::CanonicalQuery(OperationContext* opCtx,
 
     // Make the CQ we'll hopefully return.
     setExplain(baseQuery.getExplain());
-
-    // Copy query settings from the 'baseQuery'.
-    _querySettings = baseQuery._querySettings;
 
     auto parsedFind = uassertStatusOK(ParsedFindCommand::withExistingFilter(
         baseQuery.getExpCtx(),
@@ -355,9 +351,6 @@ std::string CanonicalQuery::toString(bool forErrMsg) const {
     if (!_findCommand->getCollation().isEmpty()) {
         ss << "Collation: " << _findCommand->getCollation().toString() << '\n';
     }
-    if (auto querySettingsBson = _querySettings.toBSON(); !querySettingsBson.isEmpty()) {
-        ss << "QuerySettings: " << querySettingsBson.toString() << '\n';
-    }
     return ss;
 }
 
@@ -387,10 +380,6 @@ std::string CanonicalQuery::toStringShort(bool forErrMsg) const {
 
     if (_findCommand->getSkip()) {
         ss << " skip: " << *_findCommand->getSkip();
-    }
-
-    if (auto querySettingsBson = _querySettings.toBSON(); !querySettingsBson.isEmpty()) {
-        ss << " querySettings: " << querySettingsBson.toString();
     }
 
     return ss;

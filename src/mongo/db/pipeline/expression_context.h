@@ -66,6 +66,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 #include "mongo/db/server_options.h"
@@ -641,6 +642,14 @@ public:
         return _requiresTimeseriesExtendedRangeSupport;
     }
 
+    const query_settings::QuerySettings& getQuerySettings() const {
+        return _querySettings;
+    }
+
+    void setQuerySettings(query_settings::QuerySettings&& querySettings) {
+        _querySettings = std::move(querySettings);
+    }
+
     // Forces the plan cache to be used even if there's only one solution available. Queries that
     // are ineligible will still not be cached.
     bool forcePlanCache = false;
@@ -768,6 +777,8 @@ private:
     // We use this set to indicate whether or not a system variable was referenced in the query that
     // is being executed (if the variable was referenced, it is an element of this set).
     stdx::unordered_set<Variables::Id> _varsReferencedInQuery;
+
+    query_settings::QuerySettings _querySettings = query_settings::QuerySettings();
 };
 
 }  // namespace mongo
