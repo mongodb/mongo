@@ -366,10 +366,14 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         }
     }
 
+#define DEFAULT_WIREDTIGER_MAX_SESSIONS 33000
     std::stringstream ss;
     ss << "create,";
     ss << "cache_size=" << cacheSizeMB << "M,";
-    ss << "session_max=33000,";
+    if (serverGlobalParams.maxConns <= DEFAULT_WIREDTIGER_MAX_SESSIONS)
+        ss << "session_max=DEFAULT_WIREDTIGER_MAX_SESSIONS,";
+    else
+        ss << "session_max=" << serverGlobalParams.maxConns << ",";
     ss << "eviction=(threads_min=4,threads_max=4),";
 
     if (gWiredTigerEvictionDirtyTargetGB)
