@@ -63,6 +63,7 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/repl/topology_coordinator_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -2052,7 +2053,9 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
         response->append("syncSourceId", -1);
     }
 
-    if (_rsConfig.getConfigServer()) {
+    if (_rsConfig.getConfigServer_deprecated() ||
+        (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
         response->append("configsvr", true);
     }
 
@@ -2610,7 +2613,8 @@ MemberState TopologyCoordinator::getMemberState() const {
         return MemberState::RS_STARTUP;
     }
 
-    if (_rsConfig.getConfigServer() || _options.clusterRole.has(ClusterRole::ConfigServer)) {
+    if (_rsConfig.getConfigServer_deprecated() ||
+        _options.clusterRole.has(ClusterRole::ConfigServer)) {
         if (!_options.clusterRole.has(ClusterRole::ConfigServer) &&
             !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;

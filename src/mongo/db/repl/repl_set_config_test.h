@@ -115,7 +115,7 @@ inline bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
         a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
         a.getElectionTimeoutPeriod() == b.getElectionTimeoutPeriod() &&
         a.isChainingAllowed() == b.isChainingAllowed() &&
-        a.getConfigServer() == b.getConfigServer() &&
+        a.getConfigServer_deprecated() == b.getConfigServer_deprecated() &&
         a.getDefaultWriteConcern().w == b.getDefaultWriteConcern().w &&
         a.getProtocolVersion() == b.getProtocolVersion() &&
         a.getReplicaSetId() == b.getReplicaSetId();

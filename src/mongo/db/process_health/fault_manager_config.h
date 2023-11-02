@@ -225,37 +225,6 @@ private:
 
     static Milliseconds _getDefaultObserverInterval(FaultFacetType type);
 
-    template <typename T, typename R>
-    R _getPropertyByType(FaultFacetType type, synchronized_value<T>* data, R defaultValue) const {
-        boost::optional<R> result;
-        switch (type) {
-            case FaultFacetType::kLdap:
-                result = (*data)->getLdap();
-                break;
-            case FaultFacetType::kDns:
-                result = (*data)->getDns();
-                break;
-            case FaultFacetType::kTestObserver:
-                result = (*data)->getTest();
-                break;
-            case FaultFacetType::kConfigServer:
-                result = (*data)->getConfigServer();
-                break;
-            case FaultFacetType::kSystem:
-                result = defaultValue;
-                break;
-            case FaultFacetType::kMock1:
-                result = defaultValue;
-                break;
-            case FaultFacetType::kMock2:
-                result = defaultValue;
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
-        return *result;
-    }
-
     bool _periodicChecksDisabledForTests = false;
 
     stdx::unordered_map<FaultFacetType, HealthObserverIntensityEnum> _facetToIntensityMapForTest;

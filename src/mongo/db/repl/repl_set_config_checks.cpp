@@ -51,6 +51,7 @@
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -195,10 +196,12 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
                                     << newConfig.getReplicaSetId());
     }
 
-    if (oldConfig.getConfigServer() && !newConfig.getConfigServer()) {
+    if (oldConfig.getConfigServer_deprecated() && !newConfig.getConfigServer_deprecated() &&
+        !gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                      str::stream() << "Cannot remove \"" << ReplSetConfig::kConfigServerFieldName
-                                    << "\" from replica set configuration on reconfig");
+                      str::stream()
+                          << "Cannot remove \"" << ReplSetConfig::kConfigServer_deprecatedFieldName
+                          << "\" from replica set configuration on reconfig");
     }
 
     //

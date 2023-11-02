@@ -193,8 +193,8 @@ Status ReplSetConfig::_initialize(bool forInitiate,
     // Initialize configServer
     //
     if (forInitiate && serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !getConfigServer().has_value()) {
-        setConfigServer(true);
+        !getConfigServer_deprecated().has_value()) {
+        setConfigServer_deprecated(true);
     }
 
     //
@@ -405,7 +405,9 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                       "one non-arbiter member with priority > 0");
     }
 
-    if (getConfigServer()) {
+    if (getConfigServer_deprecated() ||
+        (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
                           "Arbiters are not allowed in replica set configurations being used for "

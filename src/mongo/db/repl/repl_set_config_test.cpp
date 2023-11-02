@@ -116,7 +116,7 @@ TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(ReplSetConfig::kDefaultElectionTimeoutPeriod, config.getElectionTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
-    ASSERT_FALSE(config.getConfigServer());
+    ASSERT_FALSE(config.getConfigServer_deprecated());
     ASSERT_EQUALS(1, config.getProtocolVersion());
     ASSERT_EQUALS(
         ConnectionString::forReplicaSet("rs0", {HostAndPort{"localhost:12345"}}).toString(),
@@ -147,7 +147,7 @@ TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
     ASSERT_EQUALS(MemberId(234), config.membersBegin()->getId());
     ASSERT_FALSE(config.isChainingAllowed());
     ASSERT_TRUE(config.getWriteConcernMajorityShouldJournal());
-    ASSERT_FALSE(config.getConfigServer());
+    ASSERT_FALSE(config.getConfigServer_deprecated());
     ASSERT_EQUALS(Seconds(5), config.getHeartbeatInterval());
     ASSERT_EQUALS(Seconds(120), config.getHeartbeatTimeoutPeriod());
     ASSERT_EQUALS(Milliseconds(10), config.getElectionTimeoutPeriod());
@@ -882,7 +882,7 @@ TEST(ReplSetConfig, ConfigServerField) {
                                   << "members"
                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                            << "localhost:12345")))));
-    ASSERT_TRUE(config.getConfigServer());
+    ASSERT_TRUE(config.getConfigServer_deprecated());
     // When the field is true it should be serialized.
     BSONObj configBSON = config.toBSON();
     ASSERT_TRUE(configBSON.getField("configsvr").isBoolean());
@@ -895,7 +895,7 @@ TEST(ReplSetConfig, ConfigServerField) {
                                         << false << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "localhost:12345"))));
-    ASSERT_FALSE(config2.getConfigServer());
+    ASSERT_FALSE(config2.getConfigServer_deprecated());
     // When the field is false it should not be serialized.
     configBSON = config2.toBSON();
     ASSERT_FALSE(configBSON.hasField("configsvr"));
@@ -1093,7 +1093,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                   << "protocolVersion" << 1 << "version" << 1 << "members"
                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                            << "localhost:12345")))));
-    ASSERT_FALSE(config.getConfigServer());
+    ASSERT_FALSE(config.getConfigServer_deprecated());
     // Default false configsvr field should not be serialized.
     BSONObj configBSON = config.toBSON();
     ASSERT_FALSE(configBSON.hasField("configsvr"));
@@ -1106,7 +1106,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                       << "localhost:12345"))),
                                         OID::gen()));
-    ASSERT_FALSE(config2.getConfigServer());
+    ASSERT_FALSE(config2.getConfigServer_deprecated());
 
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
@@ -1117,7 +1117,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                         << "protocolVersion" << 1 << "version" << 1 << "members"
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "localhost:12345"))));
-    ASSERT_FALSE(config3.getConfigServer());
+    ASSERT_FALSE(config3.getConfigServer_deprecated());
 
     ReplSetConfig config4(
         ReplSetConfig::parseForInitiate(BSON("_id"
@@ -1127,7 +1127,7 @@ TEST(ReplSetConfig, ConfigServerFieldDefaults) {
                                              << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                       << "localhost:12345"))),
                                         OID::gen()));
-    ASSERT_TRUE(config4.getConfigServer());
+    ASSERT_TRUE(config4.getConfigServer_deprecated());
     // Default true configsvr field should be serialized (even though it wasn't included
     // originally).
     configBSON = config4.toBSON();

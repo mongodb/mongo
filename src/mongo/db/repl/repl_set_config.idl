@@ -158,7 +158,7 @@ structs:
                 description: "An array of member configuration documents, one for each member of
                               the replica set"
             configsvr:
-                cpp_name: configServer
+                cpp_name: configServer_deprecated
                 type: optionalBoolSerializeIfTrue
                 description: "Indicates whether the replica set is used for a sharded cluster’s
                               config servers. Set to true if the replica set is for a sharded
