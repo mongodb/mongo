@@ -54,6 +54,7 @@ MONGO_FAIL_POINT_DEFINE(finishedDropConnections);
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
                                 multiversion::FeatureCompatibilityVersion newVersion,
                                 bool onRollback,
+                                bool withinRecoveryUnit,
                                 boost::optional<Timestamp> commitTs) {
     // We set the last FCV update timestamp before setting the new FCV, to make sure we never
     // read an FCV that is not stable.  We might still read a stale one.
@@ -97,10 +98,19 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // rather than waiting for the transactions to complete. FCV changes take the global S lock when
     // in the upgrading/downgrading state.
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (newFcvSnapshot.isUpgradingOrDowngrading()) {
-        SessionKiller::Matcher matcherAllSessions(
-            KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-        killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
+    try {
+        if (newFcvSnapshot.isUpgradingOrDowngrading()) {
+            SessionKiller::Matcher matcherAllSessions(
+                KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+            killSessionsAbortUnpreparedTransactions(opCtx, matcherAllSessions);
+        }
+    } catch (const DBException&) {
+        // Swallow the error when running within a recovery unit to avoid process termination.
+        // The failure can be ignored here, assuming that the setFCV command will also be
+        // interrupted on _prepareToUpgrade/Downgrade() or earlier.
+        if (!withinRecoveryUnit) {
+            throw;
+        }
     }
 
     const auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
@@ -160,7 +170,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
 
     opCtx->recoveryUnit()->onCommit(
         [newVersion](OperationContext* opCtx, boost::optional<Timestamp> ts) {
-            _setVersion(opCtx, newVersion, false /*onRollback*/, ts);
+            _setVersion(opCtx, newVersion, false /*onRollback*/, true /*withinRecoveryUnit*/, ts);
         });
 }
 
@@ -220,7 +230,7 @@ void FcvOpObserver::_onReplicationRollback(OperationContext* opCtx,
                   "Setting featureCompatibilityVersion as part of rollback",
                   "newVersion"_attr = multiversion::toString(diskFcv),
                   "oldVersion"_attr = multiversion::toString(memoryFcv));
-            _setVersion(opCtx, diskFcv, true /*onRollback*/);
+            _setVersion(opCtx, diskFcv, true /*onRollback*/, false /*withinRecoveryUnit*/);
             // The rollback FCV is already in the stable snapshot.
             FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();
         }
