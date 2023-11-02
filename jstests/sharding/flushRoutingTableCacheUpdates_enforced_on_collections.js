@@ -1,5 +1,7 @@
 // Ensure that a call to _flushRoutingTableCacheUpdates in a sharded cluster will return error if
 // attempted on a database instead of a collection.
+// @tags: [requires_fcv_50]
+
 let st = new ShardingTest({});
 const testDBName = jsTestName();
 const collName = 'coll';
