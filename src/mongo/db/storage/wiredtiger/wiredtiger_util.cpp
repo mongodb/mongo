@@ -1297,8 +1297,10 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
         cfg << ",";
 
         int level;
-        // Deliberately skip WT_VERBOSE_DEBUG_1, as it's a bit too noisy.
         switch (severity.toInt()) {
+            case logv2::LogSeverity::Debug(1).toInt():
+                level = WT_VERBOSE_DEBUG_1;
+                break;
             case logv2::LogSeverity::Debug(2).toInt():
                 level = WT_VERBOSE_DEBUG_2;
                 break;
