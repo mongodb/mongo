@@ -46,7 +46,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/canonical_distinct.h"
+#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/assert.h"
@@ -60,48 +60,19 @@ static const NamespaceString testns =
     NamespaceString::createNamespaceString_forTest("testdb.testcoll");
 static const bool isExplain = true;
 
-class CanonicalDistinctTest : public mongo::unittest::Test {
-public:
-    CanonicalDistinctTest() {
-        uniqueTxn = serviceContext.makeOperationContext();
-        opCtx = uniqueTxn.get();
-        expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, testns);
-        expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-        expCtx->explain = boost::none;
-    }
-
-private:
+TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     QueryTestServiceContext serviceContext;
-    ServiceContext::UniqueOperationContext uniqueTxn;
-    OperationContext* opCtx;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
 
-protected:
-    boost::intrusive_ptr<ExpressionContext> expCtx;
-};
+    auto pd = ParsedDistinct::parse(opCtx,
+                                    testns,
+                                    fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}"),
+                                    ExtensionsCallbackNoop(),
+                                    !isExplain);
+    ASSERT_OK(pd.getStatus());
 
-std::unique_ptr<ParsedDistinctCommand> bsonToParsedDistinct(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& cmd) {
-
-
-    auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
-        IDLParserContext("distinctCommandRequest", false /* apiStrict */, boost::none), cmd));
-
-    auto parsedDistinct =
-        parsed_distinct_command::parse(expCtx,
-                                       cmd,
-                                       std::move(distinctCommand),
-                                       ExtensionsCallbackNoop(),
-                                       MatchExpressionParser::kAllowAllSpecialFeatures);
-
-    return parsedDistinct;
-}
-
-TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
-    auto pdc =
-        bsonToParsedDistinct(expCtx, fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}"));
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
-
-    auto agg = cd.asAggregationCommand();
+    auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
@@ -134,12 +105,19 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
-    auto pdc = bsonToParsedDistinct(
-        expCtx, fromjson("{distinct: 'testcoll', key: 'x.y.z', $db: 'testdb'}"));
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+TEST(ParsedDistinctTest, ConvertToAggregationDottedPathNoQuery) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
 
-    auto agg = cd.asAggregationCommand();
+    auto pd = ParsedDistinct::parse(opCtx,
+                                    testns,
+                                    fromjson("{distinct: 'testcoll', key: 'x.y.z', $db: 'testdb'}"),
+                                    ExtensionsCallbackNoop(),
+                                    !isExplain);
+    ASSERT_OK(pd.getStatus());
+
+    auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
@@ -172,8 +150,13 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
-    auto pdc = bsonToParsedDistinct(expCtx,
+TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+
+    auto pd = ParsedDistinct::parse(opCtx,
+                                    testns,
                                     BSON("distinct"
                                          << "testcoll"
                                          << "key"
@@ -188,9 +171,12 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
                                          << BSON("readPreference"
                                                  << "secondary")
                                          << "maxTimeMS" << 100 << "$db"
-                                         << "testdb"));
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
-    auto agg = cd.asAggregationCommand();
+                                         << "testdb"),
+                                    ExtensionsCallbackNoop(),
+                                    !isExplain);
+    ASSERT_OK(pd.getStatus());
+
+    auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
@@ -230,12 +216,20 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
-    auto pdc = bsonToParsedDistinct(
-        expCtx, fromjson("{distinct: 'testcoll', key: 'y', query: {z: 7}, $db: 'testdb'}"));
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
 
-    auto agg = cd.asAggregationCommand();
+    auto pd = ParsedDistinct::parse(
+        opCtx,
+        testns,
+        fromjson("{distinct: 'testcoll', key: 'y', query: {z: 7}, $db: 'testdb'}"),
+        ExtensionsCallbackNoop(),
+        !isExplain);
+    ASSERT_OK(pd.getStatus());
+
+    auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
     auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
@@ -269,12 +263,19 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
-    auto pdc =
-        bsonToParsedDistinct(expCtx, fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}"));
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+TEST(ParsedDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
 
-    auto agg = cd.asAggregationCommand();
+    auto pd = ParsedDistinct::parse(opCtx,
+                                    testns,
+                                    fromjson("{distinct: 'testcoll', key: 'x', $db: 'testdb'}"),
+                                    ExtensionsCallbackNoop(),
+                                    isExplain);
+    ASSERT_OK(pd.getStatus());
+
+    auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
     ASSERT_FALSE(agg.getValue().hasField("explain"));
@@ -303,7 +304,11 @@ TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationComma
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithUnknownFields) {
+TEST(ParsedDistinctTest, FailsToParseDistinctWithUnknownFields) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+
     BSONObj cmdObj = fromjson(R"({
         distinct: 'testcoll',
         key: "a",
@@ -311,30 +316,47 @@ TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithUnknownFields) {
         unknown: 1
     })");
 
-    ASSERT_THROWS_CODE(bsonToParsedDistinct(expCtx, cmdObj), DBException, 40415);
+    auto parsedDistinct =
+        ParsedDistinct::parse(opCtx, testns, cmdObj, ExtensionsCallbackNoop(), false);
+    ASSERT_EQ(parsedDistinct.getStatus().code(), 40415);
 }
 
-TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithMissingKey) {
+TEST(QueryRequestTest, FailsToParseDistinctWithMissingKey) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+
     BSONObj cmdObj = fromjson(R"({
         distinct: 'testns',
         $db: 'testdb'
     })");
 
-    ASSERT_THROWS_CODE(
-        bsonToParsedDistinct(expCtx, cmdObj), DBException, ErrorCodes::IDLFailedToParse);
+    auto parsedDistinct =
+        ParsedDistinct::parse(opCtx, testns, cmdObj, ExtensionsCallbackNoop(), false);
+    ASSERT_EQ(parsedDistinct.getStatus().code(), ErrorCodes::IDLFailedToParse);
 }
 
-TEST_F(CanonicalDistinctTest, FailsToParseDistinctWithInvalidKeyType) {
+TEST(QueryRequestTest, FailsToParseDistinctWithInvalidKeyType) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+
     BSONObj cmdObj = fromjson(R"({
         distinct: 'testns',
         key: {a: 1},
         $db: 'test'
     })");
 
-    ASSERT_THROWS_CODE(bsonToParsedDistinct(expCtx, cmdObj), DBException, ErrorCodes::TypeMismatch);
+    auto parsedDistinct =
+        ParsedDistinct::parse(opCtx, testns, cmdObj, ExtensionsCallbackNoop(), false);
+    ASSERT_EQ(parsedDistinct.getStatus().code(), ErrorCodes::TypeMismatch);
 }
 
-TEST_F(CanonicalDistinctTest, InvalidGenericCommandArgumentsAreIgnored) {
+TEST(QueryRequestTest, InvalidGenericCommandArgumentsAreIgnored) {
+    QueryTestServiceContext serviceContext;
+    auto uniqueTxn = serviceContext.makeOperationContext();
+    OperationContext* opCtx = uniqueTxn.get();
+
     BSONObj cmdObj = fromjson(R"({
         distinct: 'testns',
         key: 'a',
@@ -342,8 +364,9 @@ TEST_F(CanonicalDistinctTest, InvalidGenericCommandArgumentsAreIgnored) {
         $db: 'test'
     })");
 
-    auto pdc = bsonToParsedDistinct(expCtx, cmdObj);
-    auto cd = CanonicalDistinct::parse(expCtx, std::move(pdc), nullptr);
+    auto parsedDistinct =
+        ParsedDistinct::parse(opCtx, testns, cmdObj, ExtensionsCallbackNoop(), false);
+    ASSERT_OK(parsedDistinct.getStatus());
 }
 
 }  // namespace

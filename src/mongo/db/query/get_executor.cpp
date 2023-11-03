@@ -2872,7 +2872,7 @@ namespace {
 QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                                                    const CollectionPtr& collection,
                                                    size_t plannerOptions,
-                                                   const CanonicalDistinct& canonicalDistinct,
+                                                   const ParsedDistinct& parsedDistinct,
                                                    bool flipDistinctScanDirection) {
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
@@ -2882,7 +2882,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     const bool mayUnwindArrays = !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
     auto ii = collection->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady);
-    auto query = canonicalDistinct.getQuery()->getFindCommandRequest().getFilter();
+    auto query = parsedDistinct.getQuery()->getFindCommandRequest().getFilter();
     while (ii->more()) {
         const IndexCatalogEntry* ice = ii->next();
         const IndexDescriptor* desc = ice->descriptor();
@@ -2890,25 +2890,25 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         // Skip the addition of hidden indexes to prevent use in query planning.
         if (desc->hidden())
             continue;
-        if (desc->keyPattern().hasField(canonicalDistinct.getKey())) {
+        if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
             // This handles regular fields of Compound Wildcard Indexes as well.
             if (flipDistinctScanDirection && ice->isMultikey(opCtx, collection)) {
-                // This CanonicalDistinct was generated as a result of transforming a $group with
-                // $last accumulators using the GroupFromFirstTransformation. We cannot use a
+                // This ParsedDistinct was generated as a result of transforming a $group with $last
+                // accumulators using the GroupFromFirstTransformation. We cannot use a
                 // DISTINCT_SCAN if $last is being applied to an indexed field which is multikey,
-                // even if the 'canonicalDistinct' key does not include multikey paths. This is
-                // because changing the sort direction also changes the comparison semantics for
-                // arrays, which means that flipping the scan may not exactly flip the order that we
-                // see documents in. In the case of using DISTINCT_SCAN for $group, that would mean
-                // that $first of the flipped scan may not be the same document as $last from the
-                // user's requested sort order.
+                // even if the 'parsedDistinct' key does not include multikey paths. This is because
+                // changing the sort direction also changes the comparison semantics for arrays,
+                // which means that flipping the scan may not exactly flip the order that we see
+                // documents in. In the case of using DISTINCT_SCAN for $group, that would mean that
+                // $first of the flipped scan may not be the same document as $last from the user's
+                // requested sort order.
                 continue;
             }
             if (!mayUnwindArrays &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),
                                              ice->isMultikey(opCtx, collection),
                                              ice->getMultikeyPaths(opCtx, collection),
-                                             canonicalDistinct.getKey())) {
+                                             parsedDistinct.getKey())) {
                 // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
                 // then an index which is multikey on the distinct field may not be used. This is
                 // because when indexing an array each element gets inserted individually. Any plan
@@ -2917,16 +2917,16 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
             }
 
             plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(
-                opCtx, collection, *ice, canonicalDistinct.getQuery()));
+                opCtx, collection, *ice, parsedDistinct.getQuery()));
         } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
             // Check whether the $** projection captures the field over which we are distinct-ing.
             auto* proj = static_cast<const WildcardAccessMethod*>(ice->accessMethod())
                              ->getWildcardProjection()
                              ->exec();
             if (projection_executor_utils::applyProjectionToOneField(proj,
-                                                                     canonicalDistinct.getKey())) {
+                                                                     parsedDistinct.getKey())) {
                 plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(
-                    opCtx, collection, *ice, canonicalDistinct.getQuery()));
+                    opCtx, collection, *ice, parsedDistinct.getQuery()));
             }
 
             // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:
@@ -2939,7 +2939,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         }
     }
 
-    const CanonicalQuery* canonicalQuery = canonicalDistinct.getQuery();
+    const CanonicalQuery* canonicalQuery = parsedDistinct.getQuery();
     const BSONObj& hint = canonicalQuery->getFindCommandRequest().getHint();
 
     applyQuerySettingsOrIndexFilters(collection, *canonicalQuery, &plannerParams);
@@ -2962,28 +2962,28 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
  * that has the "distinct" field as the first component of its key pattern.
  *
  * If a suitable solution is found, this function will create and return a new executor. In order to
- * do so, it releases the CanonicalQuery from the 'canonicalDistinct' input. If no solution is
- * found, the return value is StatusOK with a nullptr value, and the 'canonicalDistinct'
- * CanonicalQuery remains valid. This function may also return a failed status code, in which case
- * the caller should assume that the 'canonicalDistinct' CanonicalQuery is no longer valid.
+ * do so, it releases the CanonicalQuery from the 'parsedDistinct' input. If no solution is found,
+ * the return value is StatusOK with a nullptr value, and the 'parsedDistinct' CanonicalQuery
+ * remains valid. This function may also return a failed status code, in which case the caller
+ * should assume that the 'parsedDistinct' CanonicalQuery is no longer valid.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForSimpleDistinct(
     OperationContext* opCtx,
     VariantCollectionPtrOrAcquisition coll,
     const QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    CanonicalDistinct* canonicalDistinct) {
+    ParsedDistinct* parsedDistinct) {
 
-    invariant(canonicalDistinct->getQuery());
-    auto collator = canonicalDistinct->getQuery()->getCollator();
+    invariant(parsedDistinct->getQuery());
+    auto collator = parsedDistinct->getQuery()->getCollator();
 
     // If there's no query, we can just distinct-scan one of the indices. Not every index in
     // plannerParams.indices may be suitable. Refer to getDistinctNodeIndex().
     size_t distinctNodeIndex = 0;
-    if (!canonicalDistinct->getQuery()->getFindCommandRequest().getFilter().isEmpty() ||
-        canonicalDistinct->getQuery()->getSortPattern() ||
+    if (!parsedDistinct->getQuery()->getFindCommandRequest().getFilter().isEmpty() ||
+        parsedDistinct->getQuery()->getSortPattern() ||
         !getDistinctNodeIndex(
-            plannerParams.indices, canonicalDistinct->getKey(), collator, &distinctNodeIndex)) {
+            plannerParams.indices, parsedDistinct->getKey(), collator, &distinctNodeIndex)) {
         // Not a "simple" DISTINCT_SCAN or no suitable index was found.
         return {nullptr};
     }
@@ -3008,14 +3008,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     QueryPlannerParams params;
 
     auto soln = QueryPlannerAnalysis::analyzeDataAccess(
-        *canonicalDistinct->getQuery(), params, std::move(solnRoot));
+        *parsedDistinct->getQuery(), params, std::move(solnRoot));
     invariant(soln);
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto&& root = stage_builder::buildClassicExecutableTree(
-        opCtx, coll, *canonicalDistinct->getQuery(), *soln, ws.get());
+        opCtx, coll, *parsedDistinct->getQuery(), *soln, ws.get());
 
-    auto exec = plan_executor_factory::make(canonicalDistinct->releaseQuery(),
+    auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                             std::move(ws),
                                             std::move(root),
                                             coll,
@@ -3036,13 +3036,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
 // Checks each solution in the 'solutions' std::vector to see if one includes an IXSCAN that can be
 // rewritten as a DISTINCT_SCAN, assuming we want distinct scan behavior on the getKey() property of
-// the 'canonicalDistinct' argument.
+// the 'parsedDistinct' argument.
 //
 // If a suitable solution is found, this function will create and return a new executor. In order to
-// do so, it releases the CanonicalQuery from the 'canonicalDistinct' input. If no solution is
-// found, the return value is StatusOK with a nullptr value, and the 'canonicalDistinct'
-// CanonicalQuery remains valid. This function may also return a failed status code, in which case
-// the caller should assume that the 'canonicalDistinct' CanonicalQuery is no longer valid.
+// do so, it releases the CanonicalQuery from the 'parsedDistinct' input. If no solution is found,
+// the return value is StatusOK with a nullptr value, and the 'parsedDistinct' CanonicalQuery
+// remains valid. This function may also return a failed status code, in which case the caller
+// should assume that the 'parsedDistinct' CanonicalQuery is no longer valid.
 //
 // See the declaration of turnIxscanIntoDistinctIxscan() for an explanation of the
 // 'strictDistinctOnly' parameter.
@@ -3051,7 +3051,7 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
                                       VariantCollectionPtrOrAcquisition coll,
                                       std::vector<std::unique_ptr<QuerySolution>> solutions,
                                       PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                      CanonicalDistinct* canonicalDistinct,
+                                      ParsedDistinct* parsedDistinct,
                                       bool flipDistinctScanDirection,
                                       size_t plannerOptions) {
     const bool strictDistinctOnly = (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
@@ -3059,16 +3059,16 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
     // We look for a solution that has an ixscan we can turn into a distinctixscan
     for (size_t i = 0; i < solutions.size(); ++i) {
         if (turnIxscanIntoDistinctIxscan(solutions[i].get(),
-                                         canonicalDistinct->getKey(),
+                                         parsedDistinct->getKey(),
                                          strictDistinctOnly,
                                          flipDistinctScanDirection)) {
             // Build and return the SSR over solutions[i].
             std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
             std::unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
             auto&& root = stage_builder::buildClassicExecutableTree(
-                opCtx, coll, *canonicalDistinct->getQuery(), *currentSolution, ws.get());
+                opCtx, coll, *parsedDistinct->getQuery(), *currentSolution, ws.get());
 
-            auto exec = plan_executor_factory::make(canonicalDistinct->releaseQuery(),
+            auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                                     std::move(ws),
                                                     std::move(root),
                                                     coll,
@@ -3128,22 +3128,22 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     VariantCollectionPtrOrAcquisition coll,
     size_t plannerOptions,
-    CanonicalDistinct* canonicalDistinct,
+    ParsedDistinct* parsedDistinct,
     bool flipDistinctScanDirection) {
     const auto& collectionPtr = coll.getCollectionPtr();
 
-    auto expCtx = canonicalDistinct->getQuery()->getExpCtx();
+    auto expCtx = parsedDistinct->getQuery()->getExpCtx();
     OperationContext* opCtx = expCtx->opCtx;
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 
     // Assert that not eligible for bonsai
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(*canonicalDistinct->getQuery(), opCtx, collectionPtr));
+            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collectionPtr));
 
     if (!collectionPtr) {
         // Treat collections that do not exist as empty collections.
-        return plan_executor_factory::make(canonicalDistinct->releaseQuery(),
+        return plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                            std::make_unique<WorkingSet>(),
                                            std::make_unique<EOFStage>(expCtx.get()),
                                            coll,
@@ -3163,7 +3163,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // a soln with the above properties.
 
     auto plannerParams = fillOutPlannerParamsForDistinct(
-        opCtx, collectionPtr, plannerOptions, *canonicalDistinct, flipDistinctScanDirection);
+        opCtx, collectionPtr, plannerOptions, *parsedDistinct, flipDistinctScanDirection);
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
@@ -3178,7 +3178,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
             // the fields in the projection. That's definitely not possible in this case, so we
             // dispense with the projection.
             return getExecutorWithoutProjection(
-                opCtx, coll, canonicalDistinct->getQuery(), yieldPolicy, plannerOptions);
+                opCtx, coll, parsedDistinct->getQuery(), yieldPolicy, plannerOptions);
         }
     }
 
@@ -3187,7 +3187,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     //
 
     auto executorWithStatus =
-        getExecutorForSimpleDistinct(opCtx, coll, plannerParams, yieldPolicy, canonicalDistinct);
+        getExecutorForSimpleDistinct(opCtx, coll, plannerParams, yieldPolicy, parsedDistinct);
     if (!executorWithStatus.isOK() || executorWithStatus.getValue()) {
         // We either got a DISTINCT plan or a fatal error.
         return executorWithStatus;
@@ -3197,15 +3197,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
 
     // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
     // fillOutPlannerParamsForDistinct() (i.e., the indexes that include the distinct field).
-    auto statusWithMultiPlanSolns =
-        QueryPlanner::plan(*canonicalDistinct->getQuery(), plannerParams);
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(*parsedDistinct->getQuery(), plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         if (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY) {
             return {nullptr};
         } else {
             return getExecutor(opCtx,
                                coll,
-                               canonicalDistinct->releaseQuery(),
+                               parsedDistinct->releaseQuery(),
                                nullptr /* extractAndAttachPipelineStages */,
                                yieldPolicy,
                                plannerOptions);
@@ -3221,7 +3220,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
                                                                coll,
                                                                std::move(solutions),
                                                                yieldPolicy,
-                                                               canonicalDistinct,
+                                                               parsedDistinct,
                                                                flipDistinctScanDirection,
                                                                plannerOptions);
     if (!executorWithStatus.isOK() || executorWithStatus.getValue()) {
@@ -3234,7 +3233,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
         // possible to cover the fields in the projection. That's definitely not possible in this
         // case, so we dispense with the projection.
         return getExecutorWithoutProjection(
-            opCtx, coll, canonicalDistinct->getQuery(), yieldPolicy, plannerOptions);
+            opCtx, coll, parsedDistinct->getQuery(), yieldPolicy, plannerOptions);
     } else {
         // We did not find a solution that we could convert to DISTINCT_SCAN, and the
         // STRICT_DISTINCT_ONLY prohibits us from using any other kind of plan, so we return

@@ -56,12 +56,12 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner.h"
@@ -274,9 +274,9 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * A $group stage on a single field behaves similarly to a distinct command. If it has no
  * accumulators or only $first accumulators, the $group command only needs to visit one document for
  * each distinct value of the grouped-by (_id) field to compute its result. When there is a sort
- * order specified in canonicalDistinct->getQuery()->getFindCommandRequest().getSort(),
- * DISTINCT_SCAN will follow that sort order, ensuring that it chooses the correct document from
- * each group to compute any $first accumulators.
+ * order specified in parsedDistinct->getQuery()->getFindCommandRequest().getSort(), DISTINCT_SCAN
+ * will follow that sort order, ensuring that it chooses the correct document from each group to
+ * compute any $first accumulators.
  *
  * Specify the QueryPlannerParams::STRICT_DISTINCT_ONLY flag in the 'params' argument to ensure that
  * any resulting plan _guarantees_ it will return exactly one document per value of the distinct
@@ -292,9 +292,9 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * STRICT_DISTINCT_ONLY), a DISTINCT_SCAN is not possible, and the caller would have to fall back
  * to a different plan.
  *
- * Note that this function uses the projection in 'canonicalDistinct' to produce a covered query
- * when possible, but when a covered query is not possible, the resulting plan may elide the
- * projection stage (instead returning entire fetched documents).
+ * Note that this function uses the projection in 'parsedDistinct' to produce a covered query when
+ * possible, but when a covered query is not possible, the resulting plan may elide the projection
+ * stage (instead returning entire fetched documents).
  *
  * For example, a distinct query on field 'b' could use a DISTINCT_SCAN over index {a: 1, b: 1}.
  * This plan will reduce the output set by filtering out documents that are equal on both the 'a'
@@ -304,7 +304,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     VariantCollectionPtrOrAcquisition coll,
     size_t plannerOptions,
-    CanonicalDistinct* canonicalDistinct,
+    ParsedDistinct* parsedDistinct,
     bool flipDistinctScanDirection = false);
 
 /*

@@ -269,9 +269,10 @@ give a summary of how each is parsed, but not get into the same level of detail.
 
 * count : Parsed by IDL and then turned into a CountStage which can be executed in a similar way to
   a find command.
-* distinct : The distinct specific arguments are parsed by IDL into DistinctCommandRequest. Generic
-  command arguments and 'query' field are parsed by custom code into ParsedDistinctCommand, then
-  being used to construct CanonicalDistinct and eventually turned into executable stage.
+* distinct : The distinct specific arguments are parsed by IDL, and the generic command arguments
+  are parsed by custom code. They are then combined into a FindCommandRequest (mentioned above),
+  canonicalized, packaged into a ParsedDistinct, which is eventually turned into an executable
+  stage.
 * mapReduce : Parsed by IDL and then turned into an equivalent aggregation command.
 * update : Parsed by IDL. An update command can contain both query (find) and pipeline syntax
   (for updates) which each get delegated to their own parsers.

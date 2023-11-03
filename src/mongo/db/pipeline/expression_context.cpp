@@ -84,7 +84,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
           std::move(collator),
           nullptr,  // mongoProcessInterface
           {},       // resolvedNamespaces
-          [&findCmd]() -> boost::optional<UUID> {
+          [findCmd]() -> boost::optional<UUID> {
               if (findCmd.getNamespaceOrUUID().isUUID()) {
                   return findCmd.getNamespaceOrUUID().uuid();
               }
@@ -93,36 +93,6 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
           findCmd.getLet(),
           mayDbProfile,
           findCmd.getSerializationContext()) {}
-
-
-ExpressionContext::ExpressionContext(OperationContext* opCtx,
-                                     const DistinctCommandRequest& distinctCmd,
-                                     const NamespaceString& nss,
-                                     std::unique_ptr<CollatorInterface> collator,
-                                     bool mayDbProfile,
-                                     boost::optional<ExplainOptions::Verbosity> verbosity)
-    : ExpressionContext(
-          opCtx,
-          verbosity,
-          false,  // fromMongos
-          false,  // needsMerge
-          false,  // allowDiskUse
-          false,  // bypassDocumentValidation
-          false,  // isMapReduceCommand
-          nss,
-          boost::none,  // legacyRuntimeConstraints
-          std::move(collator),
-          nullptr,  // mongoProcessInterface
-          {},       // resolvedNamespaces
-          [&distinctCmd]() -> boost::optional<UUID> {
-              if (distinctCmd.getNamespaceOrUUID().isUUID()) {
-                  return distinctCmd.getNamespaceOrUUID().uuid();
-              }
-              return boost::none;
-          }(),
-          boost::none,  // letParameters
-          mayDbProfile,
-          distinctCmd.getSerializationContext()) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,

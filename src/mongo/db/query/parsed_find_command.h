@@ -92,7 +92,7 @@ struct ParsedFindCommand {
 
     // All other parameters to the find command which do not have AST-like types and can be
     // appropriately tracked as raw value types like ints. The fields above like 'filter' are all
-    // still present in their raw form on this FindCommandRequest, but it is not expected that they
+    // still present in their raw form on this FidnCommandRequest, but it is not expected that they
     // will be useful other than to keep the original BSON values around in-memory to avoid copying
     // large strings and such.
     std::unique_ptr<FindCommandRequest> findCommandRequest;
