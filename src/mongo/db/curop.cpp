@@ -279,6 +279,8 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         serializeAuthenticatedUsers("effectiveUsers"_sd);
     }
 
+    infoBuilder->appendBool("isFromUserConnection", client->isFromUserConnection());
+
     if (const auto seCtx = transport::ServiceExecutorContext::get(client)) {
         infoBuilder->append("threaded"_sd, seCtx->usesDedicatedThread());
     }
@@ -936,7 +938,9 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("type", networkOpToString(networkOp));
     }
 
+    pAttrs->add("isFromUserConnection", client->isFromUserConnection());
     pAttrs->addDeepCopy("ns", toStringForLogging(curop.getNSS()));
+    pAttrs->addDeepCopy("collectionType", getCollectionType(curop.getNSS()));
 
     if (client) {
         if (auto clientMetadata = ClientMetadata::get(client)) {
@@ -1829,6 +1833,48 @@ void OpDebug::appendResolvedViewsInfo(BSONObjBuilder& builder) const {
     BSONArrayBuilder resolvedViewsArr(builder.subarrayStart("resolvedViews"));
     appendResolvedViewsInfoImpl(resolvedViewsArr, this->resolvedViews);
     resolvedViewsArr.doneFast();
+}
+
+std::string OpDebug::getCollectionType(const NamespaceString& nss) const {
+    if (nss.isEmpty()) {
+        return "none";
+    } else if (!resolvedViews.empty()) {
+        auto dependencyItr = resolvedViews.find(nss);
+        // 'resolvedViews' might be populated if any other collection as a part of the query is on a
+        // view. However, it will not have associated dependencies.
+        if (dependencyItr == resolvedViews.end()) {
+            return "normal";
+        }
+        const std::vector<NamespaceString>& dependencies = dependencyItr->second.first;
+
+        auto nssIterInDeps = std::find(dependencies.begin(), dependencies.end(), nss);
+        tassert(7589000,
+                str::stream() << "The view with ns: " << nss.toStringForErrorMsg()
+                              << ", should have a valid dependency.",
+                nssIterInDeps != (dependencies.end() - 1) && nssIterInDeps != dependencies.end());
+
+        // The underlying namespace for the view/timeseries collection is the next namespace in the
+        // dependency chain. If the view depends on a timeseries buckets collection, then it is a
+        // timeseries collection, otherwise it is a regular view.
+        const NamespaceString& underlyingNss = *std::next(nssIterInDeps);
+        if (underlyingNss.isTimeseriesBucketsCollection()) {
+            return "timeseries";
+        }
+        return "view";
+    } else if (nss.isTimeseriesBucketsCollection()) {
+        return "timeseriesBuckets";
+    } else if (nss.isSystem()) {
+        return "system";
+    } else if (nss.isConfigDB()) {
+        return "config";
+    } else if (nss.isAdminDB()) {
+        return "admin";
+    } else if (nss.isLocalDB()) {
+        return "local";
+    } else if (nss.isNormalCollection()) {
+        return "normal";
+    }
+    return "unknown";
 }
 
 namespace {

@@ -10,7 +10,7 @@ TestData.skipCollectionAndIndexValidation = true;
 
 function makePatternForValidate(dbName, collName) {
     return new RegExp(
-        `Slow query.*"ns":"${dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"validate":"${
+        `Slow query.*"ns":"${dbName}\\.\\$cmd".*"appName":"MongoDB Shell","command":{"validate":"${
             collName}"`,
         "g");
 }

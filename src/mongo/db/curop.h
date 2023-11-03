@@ -269,6 +269,11 @@ public:
     BSONObj makeMongotDebugStatsObject() const;
 
     /**
+     * Gets the type of the namespace on which the current operation operates.
+     */
+    std::string getCollectionType(const NamespaceString& nss) const;
+
+    /**
      * Accumulate resolved views.
      */
     void addResolvedViews(const std::vector<NamespaceString>& namespaces,

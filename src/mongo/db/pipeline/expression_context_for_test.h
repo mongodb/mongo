@@ -140,6 +140,33 @@ public:
     }
 
     /**
+     * Constructor which sets the given OperationContext and SerializationContext on the
+     * ExpressionContextForTest. This will also resolve the ExpressionContextForTest's
+     * ServiceContext from the OperationContext.
+     */
+    ExpressionContextForTest(OperationContext* opCtx, NamespaceString nss, SerializationContext sc)
+        : ExpressionContext(opCtx,
+                            boost::none,  // explain
+                            false,        // fromMongos,
+                            false,        // needsMerge,
+                            false,        // allowDiskUse,
+                            false,        // bypassDocumentValidation,
+                            false,        // isMapReduce
+                            nss,
+                            LegacyRuntimeConstants(Date_t::now(), Timestamp(1, 0)),
+                            {},  // collator
+                            std::make_shared<StubMongoProcessInterface>(),
+                            {},     // resolvedNamespaces
+                            {},     // collUUID
+                            {},     // let
+                            false,  // mayDbProfile
+                            sc),
+          _serviceContext(opCtx->getServiceContext()) {
+        // Resolve the TimeZoneDatabase to be used by this ExpressionContextForTest.
+        _setTimeZoneDatabase();
+    }
+
+    /**
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
      * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext.
      */

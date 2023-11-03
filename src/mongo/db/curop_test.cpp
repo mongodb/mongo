@@ -38,8 +38,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/tick_source_mock.h"
@@ -284,6 +286,46 @@ TEST(CurOpTest, ShouldNotReportFailpointMsgIfNotSet) {
 
     // bsonObj should _not_ contain 'failpointMsg' if a fail point is not set.
     ASSERT_FALSE(bsonObj.hasField("failpointMsg"));
+}
+
+TEST(CurOpTest, ShouldReportIsFromUserConnection) {
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto client = serviceContext.getClient();
+
+    // Mock a client with a user connection.
+    transport::TransportLayerMock transportLayer;
+    auto clientUserConn = serviceContext.getServiceContext()->getService()->makeClient(
+        "userconn", transportLayer.createSession());
+
+    auto curop = CurOp::get(*opCtx);
+
+    BSONObjBuilder curOpObj;
+    BSONObjBuilder curOpObjUserConn;
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
+
+        // Serialization Context on expression context should be non-empty in
+        // reportCurrentOpForClient.
+        auto sc = SerializationContext(SerializationContext::Source::Command,
+                                       SerializationContext::CallerType::Reply,
+                                       SerializationContext::Prefix::Default,
+                                       false,
+                                       true);
+        auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
+
+        curop->reportCurrentOpForClient(expCtx, client, false, false, &curOpObj);
+        curop->reportCurrentOpForClient(
+            expCtx, clientUserConn.get(), false, false, &curOpObjUserConn);
+    }
+    auto bsonObj = curOpObj.done();
+    auto bsonObjUserConn = curOpObjUserConn.done();
+
+    ASSERT_TRUE(bsonObj.hasField("isFromUserConnection"));
+    ASSERT_TRUE(bsonObjUserConn.hasField("isFromUserConnection"));
+    ASSERT_FALSE(bsonObj.getField("isFromUserConnection").Bool());
+    ASSERT_TRUE(bsonObjUserConn.getField("isFromUserConnection").Bool());
 }
 
 TEST(CurOpTest, ElapsedTimeReflectsTickSource) {

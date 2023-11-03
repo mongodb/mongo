@@ -49,7 +49,7 @@ cursor.next();  // Perform initial query and retrieve first document in batch.
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
 let logLine = [
-    '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+    '"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
     '"queryHash":'
 ];
 
@@ -73,7 +73,7 @@ function cursorIdToString(cursorId) {
 }
 
 logLine = [
-    `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+    `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${
         cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
     '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
     '"queryHash":'
@@ -88,7 +88,7 @@ cursorid = getLatestProfilerEntry(testDB).cursorid;
 assert.eq(cursor.itcount(), 10);
 
 logLine = [
-    `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+    `"msg":"Slow query","attr":{"type":"command","isFromUserConnection":true,"ns":"log_getmore.test","collectionType":"normal","appName":"MongoDB Shell","command":{"getMore":${
         cursorIdToString(cursorid)},"collection":"test"`,
     '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}'
 ];
