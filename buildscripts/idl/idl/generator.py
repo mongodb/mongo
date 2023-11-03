@@ -129,6 +129,11 @@ def _get_bson_type_check(bson_element, ctxt_name, ast_type):
         return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
 
 
+def _get_required_fields(struct):
+    # type: (ast.Struct) -> List[ast.Field]
+    return list(filter(_is_required_serializer_field, struct.fields))
+
+
 def _get_all_fields(struct):
     # type: (ast.Struct) -> List[ast.Field]
     """Get a list of all the fields, including the command field."""
@@ -179,6 +184,11 @@ def _gen_field_element_name(field):
     # type: (ast.Field) -> str
     """Get the name for a BSONElement pointer in field iteration."""
     return "BSONElement_%s" % (common.title_case(field.cpp_name))
+
+
+def _gen_mark_present(field_name):
+    # type: (str) -> str
+    return f'_hasMembers.markPresent(static_cast<size_t>(RequiredFields::{field_name}));'
 
 
 def _get_constant(name):
@@ -660,8 +670,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         body = cpp_type_info.get_setter_body(
             _get_field_member_name(field),
             _get_field_member_validator_name(field) if field.validator is not None else '')
-        set_has = f'{_get_has_field_member_name(field)} = true;' if is_serial else ''
-        self._writer.write_line(f'void {memfn}({param_type} value) {{ {body} {set_has} }}')
+        set_has = _gen_mark_present(field.cpp_name) if is_serial else ''
+
+        with self._block(f'void {memfn}({param_type} value) {{', '}'):
+            self._writer.write_line(f'{body}')
+            if (set_has):
+                self._writer.write_line(set_has)
+        self._writer.write_empty_line()
 
     def gen_constexpr_getters(self):
         # type: () -> None
@@ -733,6 +748,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     common.template_args(
                         'static constexpr auto kCommandAlias = "${command_alias}"_sd;',
                         command_alias=struct.command_alias))
+
+    def gen_required_field_enum(self, struct):
+        self._writer.write_line('enum class RequiredFields : size_t { %s };' % ', '.join(
+            [f.cpp_name for f in _get_required_fields(struct)]))
 
     def gen_authorization_contract_declaration(self, struct):
         # type: (ast.Struct) -> None
@@ -1202,6 +1221,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     self.write_unindented_line('private:')
 
+                    self.gen_required_field_enum(struct)
+                    self.write_empty_line()
+
                     if struct.generate_comparison_operators:
                         self.gen_comparison_operators_declarations(struct)
 
@@ -1223,12 +1245,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             if not (field.type and field.type.internal_only):
                                 self.gen_member(field)
 
-                    # Write serializer member variables
-                    # Note: we write these out second to ensure the bit fields can be packed by
-                    # the compiler.
-                    for field in struct.fields:
-                        if _is_required_serializer_field(field):
-                            self.gen_serializer_member(field)
+                    # Write the HasMember member variable. Note that this is a noop class in
+                    # non-debug builds, and is marked MONGO_COMPILER_NO_UNIQUE_ADDRESS so that the
+                    # compiler knows that it should be optimized to take up no space when possible.
+                    self._writer.write_line(
+                        'MONGO_COMPILER_NO_UNIQUE_ADDRESS mongo::idl::HasMembers<%s> _hasMembers;' %
+                        len(_get_required_fields(struct)))
                     # Write constexpr struct data
                     self.gen_constexpr_members(struct)
 
@@ -1534,7 +1556,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add(field, bson_element)
 
             if _is_required_serializer_field(field):
-                self._writer.write_line('%s = true;' % (_get_has_field_member_name(field)))
+                self._writer.write_line(_gen_mark_present(field.cpp_name))
 
     def gen_field_deserializer(self, field, field_type, bson_object, bson_element,
                                field_usage_check, tenant, is_command_field=False, check_type=True,
@@ -1784,25 +1806,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 initializers.append('_dbName(_nssOrUUID.dbName())')
                 initializes_db_name = True
 
-        # Serialize has fields third
-        # Add _has{FIELD} bool members to ensure fields are set before serialization.
-        for field in struct.fields:
-            if _is_required_serializer_field(field) and not (field.name == "$db"
-                                                             and initializes_db_name):
-                if default_init:
-                    initializers.append('%s(false)' % _get_has_field_member_name(field))
-                else:
-                    initializers.append('%s(true)' % _get_has_field_member_name(field))
-
-        if initializes_db_name:
-            initializers.append('_hasDbName(true)')
-
         initializers_str = ''
         if initializers:
             initializers_str = ': ' + ', '.join(initializers)
 
         with self._block('%s %s {' % (constructor.get_definition(), initializers_str), '}'):
-            self._writer.write_line('// Used for initialization only')
+            for field in _get_required_fields(struct):
+                if not (field.name == "$db" and initializes_db_name) and not default_init:
+                    self._writer.write_line(_gen_mark_present(field.cpp_name))
+            if initializes_db_name:
+                self._writer.write_line(_gen_mark_present('dbName'))
+        self._writer.write_empty_line()
 
     def gen_constructors(self, struct):
         # type: (ast.Struct) -> None
@@ -2205,8 +2219,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             field_usage_check.add(field, "sequence.name")
 
                             if _is_required_serializer_field(field):
-                                self._writer.write_line(
-                                    '%s = true;' % (_get_has_field_member_name(field)))
+                                self._writer.write_line(_gen_mark_present(field.cpp_name))
 
                             self.gen_doc_sequence_deserializer(field,
                                                                "request.getValidatedTenantId()")
@@ -2548,8 +2561,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         ]
 
         if required_fields:
-            assert_fields_set = ' && '.join(required_fields)
-            self._writer.write_line('invariant(%s);' % assert_fields_set)
+            self._writer.write_line('_hasMembers.required();')
             self._writer.write_empty_line()
 
         # Serialize the namespace as the first field

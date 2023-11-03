@@ -86,6 +86,7 @@
 #include "mongo/stdx/variant.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -1633,6 +1634,27 @@ TEST(IDLNestedStruct, TestDuplicateTypes) {
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
     }
 }
+
+void attemptToSerializeIncompleteStruct() {
+    BSONObjBuilder builder;
+    RequiredStrictField3 f1;
+    f1.setField1(1);
+    f1.setField2(2);
+
+    f1.serialize(&builder);
+}
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+DEATH_TEST(IDLSerializeTests, TestUninitializedRequiredFieldsDiesDebug, "invariant") {
+    // This should invariant because the required field3 is uninitialized.
+    attemptToSerializeIncompleteStruct();
+}
+#else   // #ifdef MONGO_CONFIG_DEBUG_BUILD
+TEST(IDLSerializeTests, TestUninitializedRequiredFieldsOk) {
+    // Uninitialized fields are only tracked in debug builds.
+    ASSERT_DOES_NOT_THROW(attemptToSerializeIncompleteStruct());
+}
+#endif  // #ifdef MONGO_CONFIG_DEBUG_BUILD
 
 // Positive: Arrays of simple types
 TEST(IDLArrayTests, TestSimpleArrays) {
