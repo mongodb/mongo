@@ -49,15 +49,15 @@ types:
                       fits in an int32, NumberLong otherwise.  Rejects decimals and doubles that
                       are not integer values."
         cpp_type: std::int64_t
-        serializer: ::smallExactInt64Append
-        deserializer: ::parseSmallExactInt64
+        serializer: ::mongo::repl::smallExactInt64Append
+        deserializer: ::mongo::repl::parseSmallExactInt64
 
     termType:
         bson_serialization_type: any
         description: "Same as smallExactInt64, only is only serialized if not -1."
         cpp_type: std::int64_t
-        serializer: ::serializeTermField
-        deserializer: ::parseSmallExactInt64
+        serializer: ::mongo::repl::serializeTermField
+        deserializer: ::mongo::repl::parseSmallExactInt64
 
     optionalBoolSerializeIfTrue:
         bson_serialization_type: any
@@ -65,7 +65,7 @@ types:
         cpp_type: "mongo::OptionalBool"
         default: "mongo::OptionalBool()"
         deserializer: "mongo::OptionalBool::parseFromBSON"
-        serializer: "::serializeOptionalBoolIfTrue"
+        serializer: "::mongo::repl::serializeOptionalBoolIfTrue"
 
     replSetWriteConcernModeMap:
         bson_serialization_type: any

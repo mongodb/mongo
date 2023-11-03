@@ -38,6 +38,7 @@ $ coverage run run_tests.py && coverage html
 
 import os
 import unittest
+from textwrap import dedent
 
 # import package so that it works regardless of whether we run as a module or file
 if __package__ is None:
@@ -138,6 +139,84 @@ class TestGenerator(testcase.IDLTestcase):
                 found = True
 
         self.assertTrue(found, "Bad Header: " + header)
+
+    def test_custom_array_type_function_serialization(self) -> None:
+        """Test the function based serialization codegen for array containing custom types."""
+        _, source = self.assert_generate("""
+        types:
+                serialization_context:
+                    bson_serialization_type: any
+                    description: foo
+                    cpp_type: foo
+                    internal_only: true
+
+                Pokemon:
+                  description: "Yet another custom type"
+                  cpp_type: "stdx::variant<Pikachu, Snorlax>"
+                  bson_serialization_type: any
+                  serializer: ::pokemon::pokedex::record
+                  deserializer: ::pokemon::pokedex::lookup
+
+        structs:
+                Pokedex:
+                  description: "Struct representing the index hint spec."
+                  fields:
+                    knownPokemons:
+                      type: array<Pokemon>
+        """)
+        expected = dedent("""
+        void Pokedex::serialize(BSONObjBuilder* builder) const {
+            invariant(_hasKnownPokemons);
+        
+            {
+                BSONArrayBuilder arrayBuilder(builder->subarrayStart(kKnownPokemonsFieldName));
+                for (const auto& item : _knownPokemons) {
+                    ::pokemon::pokedex::record(item, &arrayBuilder);
+                }
+            }
+        
+        }
+        """)
+        self.assertIn(expected, source)
+
+    def test_custom_array_type_method_serialization(self) -> None:
+        """Test the method based serialization codegen for array containing custom types."""
+        _, source = self.assert_generate("""
+        types:
+                serialization_context:
+                    bson_serialization_type: any
+                    description: foo
+                    cpp_type: foo
+                    internal_only: true
+
+                Pokemon:
+                  description: "Yet another custom type"
+                  cpp_type: "stdx::variant<Pikachu, Snorlax>"
+                  bson_serialization_type: any
+                  serializer: record
+                  deserializer: lookup
+
+        structs:
+                Pokedex:
+                  description: "Struct representing the index hint spec."
+                  fields:
+                    knownPokemons:
+                      type: array<Pokemon>
+        """)
+        expected = dedent("""
+        void Pokedex::serialize(BSONObjBuilder* builder) const {
+            invariant(_hasKnownPokemons);
+        
+            {
+                BSONArrayBuilder arrayBuilder(builder->subarrayStart(kKnownPokemonsFieldName));
+                for (const auto& item : _knownPokemons) {
+                    item.record(&arrayBuilder);
+                }
+            }
+        
+        }
+        """)
+        self.assertIn(expected, source)
 
 
 if __name__ == '__main__':
