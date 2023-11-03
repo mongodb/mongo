@@ -80,7 +80,7 @@ env.Library(
     MONGO_API_NAME="visibility_test_lib2",
 )
 
-visibility_test1 = env.Program(
+visibility_test1 = env.BazelProgram(
     target="visibility_test1",
     source=[
         "visibility_test1.cpp",

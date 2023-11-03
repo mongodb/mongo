@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_binary")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -11,5 +11,42 @@ mongo_cc_library(
     ],
     srcs=[
         "visibility_test_libcommon.cpp",
+    ],
+)
+
+mongo_cc_library(
+    name="visibility_test_lib1",
+    deps=[
+        ":visibility_test_libcommon"
+    ],
+    hdrs=[
+        "visibility_test_lib1.h",
+    ],
+    srcs=[
+        "visibility_test_lib1.cpp",
+    ],
+)
+
+mongo_cc_library(
+    name="visibility_test_lib2",
+    deps=[
+        ":visibility_test_lib1"
+    ],
+    hdrs=[
+        "visibility_test_lib2.h",
+    ],
+    srcs=[
+        "visibility_test_lib2.cpp",
+    ],
+)
+
+mongo_cc_binary(
+    name="visibility_test1",
+    deps=[
+        ":visibility_test_lib1",
+        "//src/mongo/util:exit_code",
+    ],
+    srcs=[
+        "visibility_test1.cpp",
     ],
 )

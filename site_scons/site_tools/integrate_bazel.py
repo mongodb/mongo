@@ -253,31 +253,30 @@ def bazel_batch_build_thread(log_dir: str) -> None:
         raise exc
 
 
-def create_library_builder(env: SCons.Environment.Environment) -> None:
-    # The next section of builders are hook builders. These
-    # will be standin place holders for the original scons builders, and if bazel build is enabled
-    # these simply copy out the target from the underlying bazel build
-    if env.GetOption("link-model") in ["auto", "static"]:
-        lib_prefix = ''
-        name_prefix = 'Static'
-    else:
-        lib_prefix = 'SH'
-        name_prefix = 'Shared'
-
-    builder = SCons.Builder.Builder(
+def create_bazel_builder(builder):
+    return SCons.Builder.Builder(
         action=BazelCopyOutputsAction,
-        prefix=f'${lib_prefix}LIBPREFIX',
-        suffix=f'${lib_prefix}LIBSUFFIX',
-        src_suffix=env['BUILDERS'][f'{name_prefix}Library'].src_suffix,
-        source_scanner=env['BUILDERS'][f'{name_prefix}Library'].source_scanner,
-        target_scanner=env['BUILDERS'][f'{name_prefix}Library'].target_scanner,
-        emitter=env['BUILDERS'][f'{name_prefix}Library'].emitter,
+        prefix=builder.prefix,
+        suffix=builder.suffix,
+        src_suffix=builder.src_suffix,
+        source_scanner=builder.source_scanner,
+        target_scanner=builder.target_scanner,
+        emitter=SCons.Builder.ListEmitter([builder.emitter, bazel_target_emitter]),
     )
-    env['BUILDERS']['BazelLibrary'] = builder
 
-    base_emitter = builder.emitter
-    new_emitter = SCons.Builder.ListEmitter([base_emitter, bazel_target_emitter])
-    builder.emitter = new_emitter
+
+# The next section of builders are hook builders. These
+# will be standin place holders for the original scons builders, and if bazel build is enabled
+# these simply copy out the target from the underlying bazel build
+def create_library_builder(env: SCons.Environment.Environment) -> None:
+    if env.GetOption("link-model") in ["auto", "static"]:
+        env['BUILDERS']['BazelLibrary'] = create_bazel_builder(env['BUILDERS']["StaticLibrary"])
+    else:
+        env['BUILDERS']['BazelLibrary'] = create_bazel_builder(env['BUILDERS']["SharedLibrary"])
+
+
+def create_program_builder(env: SCons.Environment.Environment) -> None:
+    env['BUILDERS']['BazelProgram'] = create_bazel_builder(env['BUILDERS']["Program"])
 
 
 # Establishes logic for BazelLibrary build rule
@@ -355,6 +354,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         # === Builders ===
         create_library_builder(env)
+        create_program_builder(env)
 
         def shutdown_bazel_builer():
             Globals.kill_bazel_thread_flag = True
@@ -367,3 +367,4 @@ def generate(env: SCons.Environment.Environment) -> None:
         bazel_build_thread.start()
     else:
         env['BUILDERS']['BazelLibrary'] = env['BUILDERS']['Library']
+        env['BUILDERS']['BazelProgram'] = env['BUILDERS']['Program']
