@@ -43,6 +43,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -75,16 +76,22 @@ using QueryShapeConfigurationsMap = stdx::unordered_map<query_shape::QueryShapeH
                                                         QueryShapeHashHasher>;
 
 /**
- * Struct stores all query shape configurations for a given tenant. It stores the same information
- * as QuerySettingsClusterParameterValue. The data present in the 'settingsArray' is stored in the
- * QueryShapeConfigurationsMap for faster access.
+ * Struct which stores all query shape configurations for a given tenant, containing the same
+ * information as the QuerySettingsClusterParameterValue. The data present in the 'settingsArray' is
+ * stored in the QueryShapeConfigurationsMap for faster access.
  */
 struct VersionedQueryShapeConfigurations {
     /**
-     * An unordered_map of all QueryShapeConfigurations stored within the
-     * QuerySettingsClusterParameter keyed by QueryShapHash.
+     * Nested map structure which essentially serves as a mapping from 'NamespaceString' ->
+     * 'QueryShapeHash' -> 'QueryShapeConfiguration'.
+     *
+     * Since computing the QueryShapeHash is the most expensive operation and its being done lazily,
+     * it just makes sense to skip this part whenever possible. This additional mapping enables
+     * first checking if there are any QueryShapeConfigurations set for the given namespace, and
+     * exiting early if none are found.
      */
-    QueryShapeConfigurationsMap queryShapeConfigurationsMap;
+    stdx::unordered_map<NamespaceString, QueryShapeConfigurationsMap>
+        nssToQueryShapeConfigurationsMap;
 
     /**
      * Cluster time of the current version of the QuerySettingsClusterParameter.
@@ -119,24 +126,22 @@ public:
 
     /**
      * Performs the QuerySettings lookup by computing QueryShapeHash only in cases when at least one
-     * QueryShapeConfiguration is set.
+     * QueryShapeConfiguration is set for the given namespace.
      */
     boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
         OperationContext* opCtx,
         std::function<query_shape::QueryShapeHash(void)> queryShapeHashFn,
-        const boost::optional<TenantId>& tenantId) const;
+        const NamespaceString& nss) const;
 
     /**
      * Returns (QuerySettings, QueryInstance) pair associated with the QueryShapeHash for the given
-     * tenant.
+     * tenant. Always default to using the other 'getQuerySettingsForQueryShapeHash()' versions if
+     * the 'NamespaceString' parameter is available.
      */
     boost::optional<std::pair<QuerySettings, QueryInstance>> getQuerySettingsForQueryShapeHash(
         OperationContext* opCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
-        const boost::optional<TenantId>& tenantId) const {
-        return getQuerySettingsForQueryShapeHash(
-            opCtx, [&]() { return queryShapeHash; }, tenantId);
-    }
+        const boost::optional<TenantId>& tenantId) const;
 
     /**
      * Returns all QueryShapeConfigurations stored for the given tenant.

@@ -194,6 +194,7 @@ env.Library(
         'query_settings_manager.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'query_settings',
     ],
     LIBDEPS_PRIVATE=[

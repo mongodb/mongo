@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <iterator>
 #include <memory>
@@ -54,6 +55,7 @@
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings_utils.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
@@ -61,28 +63,22 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {
 namespace {
-QueryShapeConfiguration makeQueryShapeConfiguration(
-    const QuerySettings& settings,
-    QueryInstance query,
-    boost::intrusive_ptr<ExpressionContext> expCtx) {
-    auto findCommandRequest = std::make_unique<FindCommandRequest>(
-        FindCommandRequest::parse(IDLParserContext("findCommandRequest"), query));
-    auto parsedFindCommandResult =
-        parsed_find_command::parse(expCtx, {std::move(findCommandRequest)});
-    ASSERT_OK(parsedFindCommandResult);
-    return QueryShapeConfiguration(
-        std::make_unique<query_shape::FindCmdShape>(*parsedFindCommandResult.getValue(), expCtx)
-            ->sha256Hash(expCtx->opCtx, SerializationContext::stateDefault()),
-        settings,
-        query);
+QueryShapeConfiguration makeQueryShapeConfiguration(const QuerySettings& settings,
+                                                    QueryInstance query,
+                                                    OperationContext* opCtx,
+                                                    boost::optional<TenantId> tenantId) {
+    auto queryShapeHash = createRepresentativeInfo(query, opCtx, tenantId).queryShapeHash;
+    return QueryShapeConfiguration(queryShapeHash, settings, query);
 }
 
 // QueryShapeConfiguration is not comparable, therefore comparing the corresponding
@@ -109,30 +105,28 @@ void assertQueryShapeConfigurationsEquals(
 
 class QuerySettingsManagerTest : public ServiceContextTest {
 public:
+    static constexpr StringData kCollName = "exampleCol"_sd;
+    static constexpr StringData kDbName = "foo"_sd;
+
     static std::vector<QueryShapeConfiguration> getExampleQueryShapeConfigurations(
-        boost::intrusive_ptr<ExpressionContext> expCtx) {
+        OperationContext* opCtx, boost::optional<TenantId> tenantId) {
         QuerySettings settings;
         settings.setQueryEngineVersion(QueryEngineVersionEnum::kV2);
         settings.setIndexHints({{IndexHintSpec({IndexHint("a_1")})}});
-        QueryInstance queryA = BSON("find"
-                                    << "exampleColl"
-                                    << "$db"
-                                    << "foo"
-                                    << "filter" << BSON("a" << 2));
-        QueryInstance queryB = BSON("find"
-                                    << "exampleColl"
-                                    << "$db"
-                                    << "foo"
-                                    << "filter" << BSON("a" << BSONNULL));
-        return {makeQueryShapeConfiguration(settings, queryA, expCtx),
-                makeQueryShapeConfiguration(settings, queryB, expCtx)};
+        QueryInstance queryA = BSON("find" << kCollName << "$db" << kDbName << "filter"
+                                           << BSON("a" << 2) << "$tenant" << TenantId{OID::gen()});
+        QueryInstance queryB =
+            BSON("find" << kCollName << "$db" << kDbName << "filter" << BSON("a" << BSONNULL)
+                        << "$tenant" << TenantId{OID::gen()});
+        return {makeQueryShapeConfiguration(settings, queryA, opCtx, tenantId),
+                makeQueryShapeConfiguration(settings, queryB, opCtx, tenantId)};
     }
 
     void setUp() final {
         QuerySettingsManager::create(getServiceContext());
 
         _opCtx = cc().makeOperationContext();
-        _expCtx = boost::intrusive_ptr{new ExpressionContextForTest(opCtx())};
+        _expCtx = ExpressionContext::makeBlankExpressionContext(opCtx(), {NamespaceString()});
     }
 
     OperationContext* opCtx() {
@@ -145,6 +139,17 @@ public:
 
     QuerySettingsManager& manager() {
         return QuerySettingsManager::get(opCtx());
+    }
+
+    static NamespaceString nss(boost::optional<TenantId> tenantId) {
+        static auto const kSerializationContext =
+            SerializationContext{SerializationContext::Source::Command,
+                                 SerializationContext::CallerType::Request,
+                                 SerializationContext::Prefix::Default,
+                                 true /* nonPrefixedTenantId */};
+
+        return NamespaceStringUtil::deserialize(
+            tenantId, kDbName, kCollName, kSerializationContext);
     }
 
 private:
@@ -160,15 +165,15 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsClusterParameterSerialization) {
                                << "exampleColl"
                                << "$db"
                                << "foo");
-    auto config = makeQueryShapeConfiguration(settings, query, expCtx());
+    auto config = makeQueryShapeConfiguration(settings, query, opCtx(), /* tenantId */ boost::none);
     LogicalTime clusterParameterTime(Timestamp(113, 59));
-    TenantId tenantId(OID::gen());
-    manager().setQueryShapeConfigurations(opCtx(), {config}, clusterParameterTime, tenantId);
+    manager().setQueryShapeConfigurations(
+        opCtx(), {config}, clusterParameterTime, /* tenantId */ boost::none);
 
     // Ensure the serialized parameter value contains 'settingsArray' with 'config' as value as well
     // parameter id and clusterParameterTime.
     BSONObjBuilder bob;
-    manager().appendQuerySettingsClusterParameterValue(opCtx(), &bob, tenantId);
+    manager().appendQuerySettingsClusterParameterValue(opCtx(), &bob, /* tenantId */ boost::none);
     ASSERT_BSONOBJ_EQ(
         bob.done(),
         BSON("_id" << QuerySettingsManager::kQuerySettingsClusterParameterName
@@ -179,10 +184,11 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsClusterParameterSerialization) {
 }
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
-    auto configs = getExampleQueryShapeConfigurations(expCtx());
-    auto firstConfig = configs[0], secondConfig = configs[1];
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     LogicalTime firstWriteTime(Timestamp(1, 0)), secondWriteTime(Timestamp(2, 0));
     TenantId tenantId(OID::fromTerm(1)), otherTenantId(OID::fromTerm(2));
+    auto firstConfig = getExampleQueryShapeConfigurations(opCtx(), tenantId)[0];
+    auto secondConfig = getExampleQueryShapeConfigurations(opCtx(), otherTenantId)[1];
 
     // Ensure that the maintained in-memory query shape configurations equal to the
     // configurations specified in the parameter for both tenants.
@@ -217,45 +223,89 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
 }
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
-    auto configs = getExampleQueryShapeConfigurations(expCtx());
-    TenantId tenantId(OID::fromTerm(1)), otherTenantId(OID::fromTerm(2));
-    manager().setQueryShapeConfigurations(
-        opCtx(), std::vector<QueryShapeConfiguration>(configs), LogicalTime(), tenantId);
+    using Result = boost::optional<std::pair<QuerySettings, QueryInstance>>;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
-    // Ensure QuerySettingsManager returns boost::none when QuerySettings are not found.
-    ASSERT_FALSE(manager().getQuerySettingsForQueryShapeHash(
-        opCtx(), query_shape::QueryShapeHash(), tenantId));
+    // Helper function for ensuring that two
+    // 'QuerySettingsManager::getQuerySettingsForQueryShapeHash()' results are identical.
+    auto assertResultsEq = [](Result r0, Result r1) {
+        // Ensure that either both results are there, or both are missing.
+        ASSERT_EQ(r0.has_value(), r1.has_value());
+
+        // Early exit if any of them are missing.
+        if (!r0.has_value() || !r1.has_value()) {
+            return;
+        }
+
+        // Otherwise, ensure that both pair components are equal.
+        ASSERT_BSONOBJ_EQ(r0->first.toBSON(), r1->first.toBSON());
+        ASSERT_BSONOBJ_EQ(r0->second, r1->second);
+    };
+
+    // Helper function to perform the same lookup using both the cold & hot path methods. Also booby
+    // traps the lazy query shape hash computation function on the hot path, so it can later be
+    // reasoned whether the computation happened or not.
+    auto doTest = [&](boost::optional<TenantId> tenantId,
+                      query_shape::QueryShapeHash hash,
+                      std::function<void(Result, bool)> assertionFn) {
+        auto slowResult = manager().getQuerySettingsForQueryShapeHash(opCtx(), hash, tenantId);
+        bool wasHashComputed = false;
+        auto fastResult = manager().getQuerySettingsForQueryShapeHash(
+            opCtx(),
+            [&]() {
+                wasHashComputed = true;
+                return hash;
+            },
+            nss(tenantId));
+
+        // Ensure that both code paths returned identical results, and pass the result to the
+        // `assertionFn` callback.
+        assertResultsEq(fastResult, slowResult);
+        assertionFn(fastResult, wasHashComputed);
+    };
+
+    TenantId firstTenantId(OID::fromTerm(1)), secondTenantId(OID::fromTerm(2));
+    auto configs = getExampleQueryShapeConfigurations(opCtx(), firstTenantId);
+    manager().setQueryShapeConfigurations(
+        opCtx(), std::vector<QueryShapeConfiguration>(configs), LogicalTime(), firstTenantId);
+
+    // Ensure QuerySettingsManager returns boost::none when QuerySettings are not found. Expect the
+    // hash to be computed since there are some settings set on this collection.
+    const auto emptyQueryShapeHash = query_shape::QueryShapeHash();
+    doTest(firstTenantId, emptyQueryShapeHash, [&](Result result, bool wasHashComputed) {
+        ASSERT_TRUE(wasHashComputed);
+        assertResultsEq(result, boost::none);
+    });
 
     // Ensure QuerySettingsManager returns a valid (QuerySettings, QueryInstance) pair on lookup.
-    auto querySettingsPair = manager().getQuerySettingsForQueryShapeHash(
-        opCtx(), configs[1].getQueryShapeHash(), tenantId);
-    ASSERT(querySettingsPair.has_value());
-    auto [settings, queryInstance] = *querySettingsPair;
-    ASSERT_BSONOBJ_EQ(settings.toBSON(), configs[1].getSettings().toBSON());
-    ASSERT_BSONOBJ_EQ(queryInstance, configs[1].getRepresentativeQuery());
+    doTest(firstTenantId, configs[1].getQueryShapeHash(), [&](Result result, bool wasHashComputed) {
+        ASSERT_TRUE(wasHashComputed);
+        assertResultsEq(
+            result, std::make_pair(configs[1].getSettings(), configs[1].getRepresentativeQuery()));
+    });
 
     // Ensure QuerySettingsManager returns boost::none when no QuerySettings are set for the given
-    // tenant, however, exists for other tenant.
-    ASSERT_FALSE(manager()
-                     .getQuerySettingsForQueryShapeHash(
-                         opCtx(), query_shape::QueryShapeHash(), otherTenantId)
-                     .has_value());
+    // tenant, however, exists for other tenant. There's no query settings set for this collection,
+    // so no query shape hash should be computed.
+    doTest(secondTenantId, emptyQueryShapeHash, [&](Result result, bool wasHashComputed) {
+        ASSERT_FALSE(wasHashComputed);
+        assertResultsEq(result, boost::none);
+    });
 }
 
 TEST(QuerySettingsClusterParameter, ParameterValidation) {
     // Ensure validation fails for invalid input.
-    TenantId tenantId(OID::gen());
     QuerySettingsClusterParameter querySettingsParameter(
         QuerySettingsManager::kQuerySettingsClusterParameterName,
         ServerParameterType::kClusterWide);
     ASSERT_NOT_OK(querySettingsParameter.validate(BSON("" << BSON("a"
                                                                   << "b"))
                                                       .firstElement(),
-                                                  tenantId));
+                                                  /* tenantId */ boost::none));
 
     // Ensure validation passes for valid input.
     QuerySettingsClusterParameterValue parameterValue({}, {});
     ASSERT_OK(querySettingsParameter.validate(BSON("" << parameterValue.toBSON()).firstElement(),
-                                              tenantId));
+                                              /* tenantId */ boost::none));
 }
 }  // namespace mongo::query_settings

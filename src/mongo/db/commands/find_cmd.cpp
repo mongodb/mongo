@@ -223,7 +223,7 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     };
 
     // Return the found query settings or an empty one.
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss.tenantId())
+    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
         .get_value_or({})
         .first;
 }

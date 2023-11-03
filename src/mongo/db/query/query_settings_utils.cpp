@@ -87,6 +87,7 @@ RepresentativeQueryInfo createRepresentativeInfoFind(
                             SerializationOptions::kDebugQueryShapeSerializeOptions,
                             serializationContext),
         findCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        nssOrUuid.nss(),
         std::move(involvedNamespaces),
         std::move(encryptionInformation),
         isIdHackEligibleQuery};
@@ -139,6 +140,7 @@ RepresentativeQueryInfo createRepresentativeInfoAgg(
                            SerializationOptions::kDebugQueryShapeSerializeOptions,
                            serializationContext),
         aggCmdShape.sha256Hash(expCtx->opCtx, serializationContext),
+        std::move(expCtx->ns),
         std::move(involvedNamespaces),
         std::move(encryptionInformation),
         false /* isIdHackEligibleQuery */};

@@ -38,6 +38,7 @@ namespace mongo::query_settings {
 struct RepresentativeQueryInfo {
     const BSONObj serializedQueryShape;
     const query_shape::QueryShapeHash queryShapeHash;
+    const NamespaceString namespaceString;
     const stdx::unordered_set<NamespaceString> involvedNamespaces;
     const boost::optional<mongo::EncryptionInformation> encryptionInformation;
     const bool isIdHackQuery;

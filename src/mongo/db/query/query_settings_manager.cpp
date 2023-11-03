@@ -85,6 +85,34 @@ private:
     int _size = 0;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettingsServerStatusSection::_mutex");
 } querySettingsServerStatusSection;
+
+NamespaceString extractNamespaceString(const QueryInstance& representativeQuery,
+                                       const boost::optional<TenantId>& tenantId) {
+    static auto const kSerializationContext =
+        SerializationContext{SerializationContext::Source::Command,
+                             SerializationContext::CallerType::Request,
+                             SerializationContext::Prefix::Default,
+                             true /* nonPrefixedTenantId */};
+    auto db = representativeQuery.getField("$db"_sd).String();
+    auto coll = representativeQuery.firstElement().String();
+    return NamespaceStringUtil::deserialize(tenantId, db, coll, kSerializationContext);
+}
+
+auto computeTenantConfiguration(std::vector<QueryShapeConfiguration>&& settingsArray,
+                                const boost::optional<TenantId>& tenantId) {
+    stdx::unordered_map<NamespaceString, QueryShapeConfigurationsMap> nssToQueryConfigurationsMap;
+    for (auto&& queryShapeConfiguration : settingsArray) {
+        auto nss =
+            extractNamespaceString(queryShapeConfiguration.getRepresentativeQuery(), tenantId);
+        auto insertResultPair =
+            nssToQueryConfigurationsMap.try_emplace(nss, QueryShapeConfigurationsMap{});
+        auto& queryShapeConfigurationsMap = insertResultPair.first->second;
+        queryShapeConfigurationsMap.insert({queryShapeConfiguration.getQueryShapeHash(),
+                                            {queryShapeConfiguration.getSettings(),
+                                             queryShapeConfiguration.getRepresentativeQuery()}});
+    }
+    return nssToQueryConfigurationsMap;
+}
 }  // namespace
 
 QuerySettingsManager& QuerySettingsManager::get(ServiceContext* service) {
@@ -103,31 +131,63 @@ boost::optional<std::pair<QuerySettings, QueryInstance>>
 QuerySettingsManager::getQuerySettingsForQueryShapeHash(
     OperationContext* opCtx,
     std::function<query_shape::QueryShapeHash(void)> queryShapeHashFn,
-    const boost::optional<TenantId>& tenantId) const {
+    const NamespaceString& nss) const {
     Lock::SharedLock readLock(opCtx, _mutex);
-
-    // Perform the lookup for query settings map maintained for the given tenant.
-    auto versionedQueryShapeConfigurationsIt =
-        _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
-    if (versionedQueryShapeConfigurationsIt ==
-        _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
-        return {};
+    // Perform the lookup for namespace string to query settings map maintained for the given
+    // tenant.
+    auto queryShapeConfigurationsIt =
+        _tenantIdToVersionedQueryShapeConfigurationsMap.find(nss.dbName().tenantId());
+    if (queryShapeConfigurationsIt == _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
+        return boost::none;
     }
 
-    // Avoid computing the query settings, if no query settings are set for the tenant.
-    auto& queryShapeConfigurationsMap =
-        versionedQueryShapeConfigurationsIt->second.queryShapeConfigurationsMap;
-    if (queryShapeConfigurationsMap.empty()) {
-        return {};
+    // Perform the lookup for query settings map maintained for the given namespace.
+    const auto& nssToQueryShapeConfigurationsMap =
+        queryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap;
+    auto nssToQueryShapeConfigurationsMapIt = nssToQueryShapeConfigurationsMap.find(nss);
+    if (nssToQueryShapeConfigurationsMapIt == nssToQueryShapeConfigurationsMap.end()) {
+        return boost::none;
     }
 
     // Lookup query settings for the QueryShapeHash.
+    const auto& queryShapeConfigurationsMap = nssToQueryShapeConfigurationsMapIt->second;
     auto queryShapeConfigurationIt = queryShapeConfigurationsMap.find(queryShapeHashFn());
     if (queryShapeConfigurationIt == queryShapeConfigurationsMap.end()) {
-        return {};
+        return boost::none;
     }
 
     return queryShapeConfigurationIt->second;
+}
+
+boost::optional<std::pair<QuerySettings, QueryInstance>>
+QuerySettingsManager::getQuerySettingsForQueryShapeHash(
+    OperationContext* opCtx,
+    const query_shape::QueryShapeHash& queryShapeHash,
+    const boost::optional<TenantId>& tenantId) const {
+    // Perform the lookup for namespace string to query settings map maintained for the given
+    // tenant.
+    auto queryShapeConfigurationsIt =
+        _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
+    if (queryShapeConfigurationsIt == _tenantIdToVersionedQueryShapeConfigurationsMap.end()) {
+        return boost::none;
+    }
+
+    // Iterate through all the possible QueryShapeConfiguration maps with the help of the previously
+    // resolved namespaces, and try to find the first one containing the query shape hash.
+    auto const nssToQueryShapeConfigurationsMap =
+        queryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap;
+    for (auto& nssToQueryShapeConfigurationsMapIt : nssToQueryShapeConfigurationsMap) {
+        // Finally, early exit with the resolved query shape configuration if one is found, or
+        // move on to the next ones otherwise.
+        auto queryShapeConfigurationsMap = nssToQueryShapeConfigurationsMapIt.second;
+        auto queryShapeConfigurationsIt = queryShapeConfigurationsMap.find(queryShapeHash);
+        if (queryShapeConfigurationsIt != queryShapeConfigurationsMap.end()) {
+            return queryShapeConfigurationsIt->second;
+        }
+    }
+
+    // The given query shape hash didn't point to any known query shape configuration.
+    return boost::none;
 }
 
 void QuerySettingsManager::setQueryShapeConfigurations(
@@ -135,17 +195,13 @@ void QuerySettingsManager::setQueryShapeConfigurations(
     std::vector<QueryShapeConfiguration>&& settingsArray,
     LogicalTime parameterClusterTime,
     const boost::optional<TenantId>& tenantId) {
-    QueryShapeConfigurationsMap queryShapeConfigurationsMap;
-    queryShapeConfigurationsMap.reserve(settingsArray.size());
-    for (auto&& queryShapeConfiguration : settingsArray) {
-        queryShapeConfigurationsMap.insert({queryShapeConfiguration.getQueryShapeHash(),
-                                            {queryShapeConfiguration.getSettings(),
-                                             queryShapeConfiguration.getRepresentativeQuery()}});
-    }
+    auto nssToQueryShapeConfigurationsMap =
+        computeTenantConfiguration(std::move(settingsArray), tenantId);
+
     Lock::ExclusiveLock writeLock(opCtx, _mutex);
     _tenantIdToVersionedQueryShapeConfigurationsMap.insert_or_assign(
         tenantId,
-        VersionedQueryShapeConfigurations{std::move(queryShapeConfigurationsMap),
+        VersionedQueryShapeConfigurations{std::move(nssToQueryShapeConfigurationsMap),
                                           parameterClusterTime});
 }
 
@@ -165,9 +221,11 @@ std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfi
     }
 
     std::vector<QueryShapeConfiguration> configurations;
-    for (const auto& [queryShapeHash, value] :
-         versionedQueryShapeConfigurationsIt->second.queryShapeConfigurationsMap) {
-        configurations.emplace_back(queryShapeHash, value.first, value.second);
+    for (const auto& it :
+         versionedQueryShapeConfigurationsIt->second.nssToQueryShapeConfigurationsMap) {
+        for (const auto& [queryShapeHash, value] : it.second) {
+            configurations.emplace_back(queryShapeHash, value.first, value.second);
+        }
     }
     return configurations;
 }

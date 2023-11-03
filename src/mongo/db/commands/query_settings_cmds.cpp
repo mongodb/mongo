@@ -236,7 +236,9 @@ public:
             // If there is already an entry for a given QueryShapeHash, then perform
             // an update, otherwise insert.
             if (auto lookupResult = querySettingsManager.getQuerySettingsForQueryShapeHash(
-                    opCtx, queryShapeHash, tenantId)) {
+                    opCtx,
+                    [&]() { return queryShapeHash; },
+                    representativeQueryInfo.namespaceString)) {
                 return updateQuerySettings(
                     opCtx,
                     request().getSettings(),
