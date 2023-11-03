@@ -67,6 +67,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
 
@@ -534,6 +535,39 @@ Timestamp getMaxTSEligibleForTruncate(OperationContext* opCtx) {
     auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
     return std::min(lastAppliedOpTime.getTimestamp(), allDurable);
 }
+
+// Dumps the contents of 'installedTruncateMarkersSnapshot' and 'highestRecordIdAndWallTimeSamples'.
+// If there is an 'nsUUID' reported in the 'installedTruncateMarkers' with no corresponding entry in
+// 'highestSampledRecords', something went wrong during initialization.
+BSONObj dumpInstalledMarkersAndHighestRecordSamples(
+    const NsUUIDToSamplesMap& highestRecordIdAndWallTimeSamples,
+    const PreImagesTruncateManager::TenantTruncateMarkers* installedTruncateMarkersSnapshot) {
+    BSONObjBuilder b;
+    {
+        BSONArrayBuilder samplesArrayBuilder;
+        for (const auto& [nsUUID, nsUUIDHighestRidAndWallTime] :
+             highestRecordIdAndWallTimeSamples) {
+            const auto& [highestRid, highestWallTime] = nsUUIDHighestRidAndWallTime[0];
+            BSONObjBuilder sampleBuilder;
+            sampleBuilder.append("nsUUID", nsUUID.toString());
+            sampleBuilder.append("ts",
+                                 change_stream_pre_image_util::getPreImageTimestamp(highestRid));
+            sampleBuilder.append("wallTime", highestWallTime);
+            samplesArrayBuilder.append(sampleBuilder.obj());
+        }
+        b.appendArray("highestSampledRecords", samplesArrayBuilder.obj());
+    }
+    {
+        BSONArrayBuilder truncateMarkerNsUUIDsArrayBuilder;
+        for (const auto& [nsUUID, _] : *installedTruncateMarkersSnapshot) {
+            BSONObjBuilder truncateMarkerDebugBuilder;
+            truncateMarkerDebugBuilder.append("nsUUID", nsUUID.toString());
+            truncateMarkerNsUUIDsArrayBuilder.append(truncateMarkerDebugBuilder.obj());
+        }
+        b.appendArray("installedTruncateMarkers", truncateMarkerNsUUIDsArrayBuilder.obj());
+    }
+    return b.obj();
+}
 }  // namespace
 
 void PreImagesTruncateManager::ensureMarkersInitialized(
@@ -689,6 +723,13 @@ void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
                 if (generatedTruncateMarkers.find(nsUUID) == generatedTruncateMarkers.end()) {
                     // Add this 'nsUUID' which was not present in (B)'s snapshot and was intercepted
                     // between (A) and (C).
+                    LOGV2_DEBUG(8204001,
+                                0,
+                                "Appending pre-image truncate markers created for a namespace not "
+                                "captured during truncate marker generation",
+                                "nsUUID"_attr = nsUUID,
+                                "tenantId"_attr = tenantId);
+
                     generatedTruncateMarkers.emplace(nsUUID, nsTruncateMarkers);
                 }
             }
@@ -721,12 +762,29 @@ void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
     auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
     NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;
     sampleLastRecordPerNsUUID(opCtx, rs, highestRecordIdAndWallTimeSamples);
+
     for (auto& [nsUUID, truncateMarkersForNsUUID] : *snapShottedTruncateMarkers) {
         // At this point, truncation could not possible occur yet, so the lastRecordIdAndWallTimes
         // is expected to always contain an entry for the 'nsUUID'.
         auto nsUUIDHighestRidAndWallTime = highestRecordIdAndWallTimeSamples.find(nsUUID);
-        invariant(nsUUIDHighestRidAndWallTime != highestRecordIdAndWallTimeSamples.end());
+        if (nsUUIDHighestRidAndWallTime == highestRecordIdAndWallTimeSamples.end()) {
+            // Pre-images inserted on the nsUUID won't be removed until either a new pre-image for
+            // the nsUUID is inserted or the server is restarted. This should only be possible if
+            // there were no pre-images for the nsUUID before the snapshot used to sample the
+            // highest RecordId and wall time.
+            const auto stateDump = kDebugBuild
+                ? dumpInstalledMarkersAndHighestRecordSamples(highestRecordIdAndWallTimeSamples,
+                                                              snapShottedTruncateMarkers.get())
+                : BSONObj();
+            LOGV2_WARNING(8204000,
+                          "Unable to update the highest seen RecordId and wall time for truncate "
+                          "markers on nsUUID during initialization",
+                          "nsUUID"_attr = nsUUID.toString(),
+                          "tenantId"_attr = tenantId,
+                          "details"_attr = stateDump);
 
+            dassert(nsUUIDHighestRidAndWallTime != highestRecordIdAndWallTimeSamples.end());
+        }
         auto [highestRid, highestWallTime] = nsUUIDHighestRidAndWallTime->second[0];
         truncateMarkersForNsUUID->updatePartialMarkerForInitialisation(
             opCtx, 0, highestRid, highestWallTime, 0);
