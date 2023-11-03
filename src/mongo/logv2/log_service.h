@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,23 +29,50 @@
 
 #pragma once
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include <string>
 
-namespace mongo::logv2::attributes {
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& tenant();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& service();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& id();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-const boost::log::attribute_name& truncation();
-const boost::log::attribute_name& userassert();
+namespace mongo::logv2 {
 
-}  // namespace mongo::logv2::attributes
+/** Describes the service (i.e. shard/router) a log line is associated with. */
+enum class LogService {
+    /**
+     * Defer to the thread_local accessed by getLogService() -- do not assign this value to the
+     * thread_local
+     */
+    defer,
+
+    /** Used when we lack context from which to infer a log service (i.e. no thread_local Client) */
+    unknown,
+
+    /**
+     * Used when the context that we do have is not associated with a log service (i.e., a
+     * thread_local Client with ClusterRole::None)
+     */
+    none,
+
+    /** Shard service */
+    shard,
+
+    /** Router service */
+    router,
+};
+
+/** Accesses the thread-local LogService attribute which log lines reference. */
+void setLogService(LogService logService);
+LogService getLogService();
+
+/** Returns full name. */
+StringData toStringData(LogService logService);
+
+/**
+ * Returns short name suitable for inclusion in formatted log message (just the first character).
+ */
+StringData getNameForLog(LogService logService);
+
+/** Appends the full name returned by toStringData(). */
+std::ostream& operator<<(std::ostream& os, LogService service);
+
+}  // namespace mongo::logv2

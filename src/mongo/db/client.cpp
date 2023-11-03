@@ -40,10 +40,12 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log_service.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -76,6 +78,7 @@ void Client::initThread(StringData desc,
 
     // Create the client obj, attach to thread
     currentClient = service->makeClient(fullDesc, std::move(session));
+    setLogService(toLogService(service));
 }
 
 namespace {
@@ -146,11 +149,13 @@ ServiceContext::UniqueClient Client::releaseCurrent() {
     if (auto opCtx = currentClient->_opCtx)
         if (auto timers = OperationCPUTimers::get(opCtx))
             timers->onThreadDetach();
+    setLogService(logv2::LogService::unknown);
     return std::move(currentClient);
 }
 
 void Client::setCurrent(ServiceContext::UniqueClient client) {
     invariantNoCurrentClient();
+    setLogService(toLogService(client.get()->getService()));
     currentClient = std::move(client);
     if (auto opCtx = currentClient->_opCtx)
         if (auto timers = OperationCPUTimers::get(opCtx))
@@ -188,6 +193,7 @@ ThreadClient::ThreadClient(StringData desc,
 ThreadClient::~ThreadClient() {
     invariant(currentClient);
     currentClient.reset(nullptr);
+    setLogService(logv2::LogService::unknown);
     setThreadNameRef(std::move(_originalThreadName));
 }
 

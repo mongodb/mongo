@@ -52,6 +52,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
@@ -245,6 +246,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
                            LogComponent component,
                            Date_t date,
                            int32_t id,
+                           LogService service,
                            StringData context,
                            StringData message,
                            const TypeErasedAttributeStorage& attrs,
@@ -255,6 +257,7 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
     static constexpr auto kFmt = JsonStringFormat::ExtendedRelaxedV2_0_0;
     StringData severityString = severity.toStringDataCompact();
     StringData componentString = component.getNameForLog();
+    StringData serviceString = getNameForLog(service);
     bool local = _timestampFormat == LogTimestampFormat::kISO8601Local;
     size_t attributeMaxSize = truncation != LogTruncation::Enabled
         ? 0
@@ -363,6 +366,8 @@ void JSONFormatter::format(fmt::memory_buffer& buffer,
         if (!tenant.empty()) {
             field(top, c::kTenantFieldName, quote(strFn(tenant)));
         }
+        if (shouldEmitLogService())
+            field(top, c::kServiceFieldName, padNextComma(top, 4, quote(strFn(serviceString))));
         field(top, c::kContextFieldName, quote(strFn(context)));
         field(top, c::kMessageFieldName, quote(escFn(message)));
         if (!attrs.empty()) {
@@ -393,6 +398,7 @@ void JSONFormatter::operator()(boost::log::record_view const& rec,
            extract<LogComponent>(attributes::component(), rec).get(),
            extract<Date_t>(attributes::timeStamp(), rec).get(),
            extract<int32_t>(attributes::id(), rec).get(),
+           extract<LogService>(attributes::service(), rec).get(),
            extract<StringData>(attributes::threadName(), rec).get(),
            extract<StringData>(attributes::message(), rec).get(),
            extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get(),

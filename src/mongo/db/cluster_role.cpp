@@ -80,6 +80,16 @@ bool ClusterRole::hasExclusively(const ClusterRole& role) const {
     return _roleMask == role._roleMask;
 }
 
+logv2::LogService toLogService(ClusterRole role) {
+    if (role.hasExclusively(ClusterRole::ShardServer))
+        return logv2::LogService::shard;
+    else if (role.hasExclusively(ClusterRole::RouterServer))
+        return logv2::LogService::router;
+    else if (role.hasExclusively(ClusterRole::None))
+        return logv2::LogService::none;
+    MONGO_UNREACHABLE;
+}
+
 BSONArray toBSON(ClusterRole role) {
     BSONArrayBuilder bab;
     for (auto&& [key, name] : roleNames) {

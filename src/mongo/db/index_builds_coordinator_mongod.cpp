@@ -53,6 +53,7 @@
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
@@ -69,6 +70,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
@@ -76,6 +78,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -540,10 +543,11 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             // Logs the index build statistics if it took longer than the server parameter
             // `slowMs` to complete.
             CurOp::get(opCtx.get())
-                ->completeAndLogOperation(MONGO_LOGV2_DEFAULT_COMPONENT,
-                                          CollectionCatalog::get(opCtx.get())
-                                              ->getDatabaseProfileSettings(nss.dbName())
-                                              .filter);
+                ->completeAndLogOperation(
+                    {MONGO_LOGV2_DEFAULT_COMPONENT, toLogService(opCtx->getService())},
+                    CollectionCatalog::get(opCtx.get())
+                        ->getDatabaseProfileSettings(nss.dbName())
+                        .filter);
         } catch (const DBException& e) {
             LOGV2(4656002, "unable to log operation", "error"_attr = e);
         }

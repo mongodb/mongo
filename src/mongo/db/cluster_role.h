@@ -38,6 +38,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/logv2/log_service.h"
 
 namespace mongo {
 
@@ -103,5 +104,11 @@ inline std::string toString(ClusterRole r) {
     os << r;
     return os.str();
 }
+
+/**
+ * Returns the LogService corresponding to `role`. Requires ClusterRole::Shard,
+ * ClusterRole::Router, or ClusterRole::None.
+ */
+logv2::LogService toLogService(ClusterRole role);
 
 }  // namespace mongo

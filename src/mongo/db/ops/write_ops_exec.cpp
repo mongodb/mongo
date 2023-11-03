@@ -1047,7 +1047,7 @@ void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
 
 void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
     const bool shouldProfile = curOp->completeAndLogOperation(
-        MONGO_LOGV2_DEFAULT_COMPONENT,
+        {MONGO_LOGV2_DEFAULT_COMPONENT},
         CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(curOp->getNSS().dbName()).filter);
 
     if (shouldProfile) {

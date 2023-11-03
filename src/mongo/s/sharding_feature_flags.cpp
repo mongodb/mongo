@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,19 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/base/init.h"
+#include "mongo/base/initializer.h"
+#include "mongo/db/server_options.h"
+#include "mongo/logv2/log_util.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
-#include <boost/log/attributes/attribute_name.hpp>
+namespace mongo {
 
-namespace mongo::logv2::attributes {
+MONGO_INITIALIZER_GENERAL(SetShouldEmitLogService, ("EndServerParameterRegistration"), ())
+(InitializerContext*) {
+    logv2::setShouldEmitLogService([]() {
+        return feature_flags::gEmbeddedRouter.isEnabled(serverGlobalParams.featureCompatibility);
+    });
+}
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& tenant();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& service();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& id();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-const boost::log::attribute_name& truncation();
-const boost::log::attribute_name& userassert();
-
-}  // namespace mongo::logv2::attributes
+}  // namespace mongo

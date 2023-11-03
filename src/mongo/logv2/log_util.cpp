@@ -52,6 +52,7 @@ namespace mongo::logv2 {
 namespace {
 AtomicWord<bool> redactionEnabled{false};
 AtomicWord<bool> redactBinDataEncrypt{true};
+ShouldEmitLogServiceFn emitLogServiceEnabled{nullptr};
 std::map<StringData, LogRotateCallback> logRotateCallbacks;
 }  // namespace
 
@@ -118,6 +119,16 @@ bool shouldRedactBinDataEncrypt() {
 
 void setShouldRedactBinDataEncrypt(bool enabled) {
     redactBinDataEncrypt.store(enabled);
+}
+
+bool shouldEmitLogService() {
+    auto fn = emitLogServiceEnabled;
+    return fn && fn();
+}
+
+void setShouldEmitLogService(ShouldEmitLogServiceFn enabled) {
+    invariant(enabled);
+    emitLogServiceEnabled = enabled;
 }
 
 }  // namespace mongo::logv2

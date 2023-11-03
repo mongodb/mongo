@@ -236,6 +236,7 @@ void _doLogImpl(int32_t id,
     auto record = source.open_record(id,
                                      severity,
                                      options.component(),
+                                     options.service(),
                                      options.tags(),
                                      options.truncation(),
                                      options.uassertErrorCode());

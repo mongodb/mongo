@@ -40,6 +40,7 @@
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_format.h"
+#include "mongo/logv2/log_service.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
@@ -59,6 +60,7 @@ public:
                 LogComponent component,
                 Date_t date,
                 int32_t id,
+                LogService service,
                 StringData context,
                 StringData message,
                 const TypeErasedAttributeStorage& attrs,

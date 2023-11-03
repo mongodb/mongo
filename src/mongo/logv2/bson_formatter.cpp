@@ -50,8 +50,10 @@
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_service.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
@@ -145,6 +147,9 @@ void BSONFormatter::operator()(boost::log::record_view const& rec, BSONObjBuilde
     if (!tenant.empty()) {
         builder.append(constants::kTenantFieldName, tenant.get());
     }
+    if (shouldEmitLogService())
+        builder.append(constants::kServiceFieldName,
+                       getNameForLog(extract<LogService>(attributes::service(), rec).get()));
     builder.append(constants::kContextFieldName,
                    extract<StringData>(attributes::threadName(), rec).get());
     builder.append(constants::kMessageFieldName,

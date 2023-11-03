@@ -105,6 +105,10 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
     globalServiceContext = serviceContext.release();
 }
 
+logv2::LogService toLogService(Service* service) {
+    return toLogService(service ? service->role() : ClusterRole::None);
+}
+
 /**
  * The global clusterRole determines which services are initialized.
  * If no role is set, then ShardServer is assumed, so there's always

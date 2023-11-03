@@ -900,4 +900,9 @@ ServiceContext* getCurrentServiceContext();
  */
 void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceContext);
 
+/**
+ * Maps `service`'s ClusterRole (or ClusterRole::None if `service` is nullptr) to a LogService.
+ */
+logv2::LogService toLogService(Service* service);
+
 }  // namespace mongo

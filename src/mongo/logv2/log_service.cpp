@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,50 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <string>
 
-#include <boost/log/attributes/attribute_name.hpp>
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/log_service.h"
+#include "mongo/util/assert_util.h"
 
-namespace mongo::logv2::attributes {
+namespace mongo::logv2 {
 
-// Reusable attribute names, so they only need to be constructed once.
-const boost::log::attribute_name& domain();
-const boost::log::attribute_name& severity();
-const boost::log::attribute_name& tenant();
-const boost::log::attribute_name& component();
-const boost::log::attribute_name& service();
-const boost::log::attribute_name& timeStamp();
-const boost::log::attribute_name& threadName();
-const boost::log::attribute_name& tags();
-const boost::log::attribute_name& id();
-const boost::log::attribute_name& message();
-const boost::log::attribute_name& attributes();
-const boost::log::attribute_name& truncation();
-const boost::log::attribute_name& userassert();
+namespace {
 
-}  // namespace mongo::logv2::attributes
+thread_local LogService logService = LogService::unknown;
+
+}  // namespace
+
+void setLogService(LogService service) {
+    invariant(service != LogService::defer);
+    logService = std::move(service);
+}
+
+LogService getLogService() {
+    return logService;
+}
+
+StringData toStringData(LogService service) {
+    switch (service) {
+        case LogService::unknown:
+            return "unknown";
+        case LogService::none:
+            return "none";
+        case LogService::shard:
+            return "shard";
+        case LogService::router:
+            return "router";
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+StringData getNameForLog(LogService service) {
+    return toStringData(service).substr(0, 1);
+}
+
+std::ostream& operator<<(std::ostream& os, LogService service) {
+    return os << toStringData(service);
+}
+
+}  // namespace mongo::logv2

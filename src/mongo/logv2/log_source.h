@@ -41,6 +41,7 @@
 #include "mongo/logv2/constants.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_domain.h"
+#include "mongo/logv2/log_service.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/log_truncation.h"
@@ -60,6 +61,7 @@ public:
         : _domain(domain),
           _severity(LogSeverity::Log()),
           _component(LogComponent::kDefault),
+          _service(LogService::defer),
           _tags(LogTag::kNone),
           _truncation(constants::kDefaultTruncation),
           _uassertErrorCode(ErrorCodes::OK),
@@ -67,6 +69,7 @@ public:
         add_attribute_unlocked(attributes::domain(), _domain);
         add_attribute_unlocked(attributes::severity(), _severity);
         add_attribute_unlocked(attributes::component(), _component);
+        add_attribute_unlocked(attributes::service(), _service);
         add_attribute_unlocked(attributes::tags(), _tags);
         add_attribute_unlocked(attributes::truncation(), _truncation);
         add_attribute_unlocked(attributes::userassert(), _uassertErrorCode);
@@ -85,6 +88,7 @@ public:
     boost::log::record open_record(int32_t id,
                                    LogSeverity severity,
                                    LogComponent component,
+                                   LogService service,
                                    LogTag tags,
                                    LogTruncation truncation,
                                    int32_t userassertErrorCode) {
@@ -92,6 +96,7 @@ public:
         if (this->core()->get_logging_enabled()) {
             _severity.set(severity);
             _component.set(component);
+            _service.set(service == LogService::defer ? getLogService() : service);
             _tags.set(tags);
             _truncation.set(truncation);
             _uassertErrorCode.set(userassertErrorCode);
@@ -105,6 +110,7 @@ public:
         Base::push_record_unlocked(boost::move(rec));
         _severity.set(LogSeverity::Log());
         _component.set(LogComponent::kDefault);
+        _service.set(LogService::defer);
         _tags.set(LogTag::kNone);
         _truncation.set(constants::kDefaultTruncation);
         _uassertErrorCode.set(ErrorCodes::OK);
@@ -115,6 +121,7 @@ private:
     boost::log::attributes::constant<const LogDomain::Internal*> _domain;
     boost::log::attributes::mutable_constant<LogSeverity> _severity;
     boost::log::attributes::mutable_constant<LogComponent> _component;
+    boost::log::attributes::mutable_constant<LogService> _service;
     boost::log::attributes::mutable_constant<LogTag> _tags;
     boost::log::attributes::mutable_constant<LogTruncation> _truncation;
     boost::log::attributes::mutable_constant<int32_t> _uassertErrorCode;

@@ -487,7 +487,7 @@ bool shouldOmitDiagnosticInformation(CurOp* curop) {
     return false;
 }
 
-bool CurOp::completeAndLogOperation(logv2::LogComponent component,
+bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
                                     std::shared_ptr<const ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
@@ -535,7 +535,7 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
         // settings.
         bool shouldSample;
         std::tie(shouldLogSlowOp, shouldSample) = shouldLogSlowOpWithSampling(
-            opCtx, component, Milliseconds(executionTimeMillis), Milliseconds(slowMs));
+            opCtx, logOptions.component(), Milliseconds(executionTimeMillis), Milliseconds(slowMs));
 
         shouldProfileAtLevel1 = shouldLogSlowOp && shouldSample;
     }
@@ -573,7 +573,7 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
                     opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
             } catch (const DBException& ex) {
                 LOGV2_WARNING_OPTIONS(20526,
-                                      {component},
+                                      logOptions,
                                       "Failed to gather storage statistics for slow operation",
                                       "opId"_attr = opCtx->getOpID(),
                                       "error"_attr = redact(ex));
@@ -598,7 +598,7 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
         _debug.report(
             opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), operationMetricsPtr, &attr);
 
-        LOGV2_OPTIONS(51803, {component}, "Slow query", attr);
+        LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
 
         _checkForFailpointsAfterCommandLogged();
     }
