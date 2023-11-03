@@ -74,11 +74,6 @@ feature_flags:
     cpp_varname: feature_flags::gTrackUnshardedCollectionsOnShardingCatalog
     default: false
     shouldBeFCVGated: true
-  featureFlagUnsplittableCollectionsOnNonPrimaryShard:
-    description: "Feature flag for enabling creation of unsplittable collection on non-primary shards"
-    cpp_varname: feature_flags::gUnsplittableCollectionsOnNonPrimaryShard
-    default: false
-    shouldBeFCVGated: true
   # TODO (SERVER-68132): Remove once 8.0 becomes last LTS.
   featureFlagClusterFsyncLock:
     description: "Feature flag to enable locking of a cluster through mongos"

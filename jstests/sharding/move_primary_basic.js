@@ -23,8 +23,6 @@ const coll4NS = dbName + '.' + coll4Name;
 
 const isMultiversion =
     jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
-const ffUnsplittableOutsideDbPrimary = !isMultiversion &&
-    FeatureFlagUtil.isEnabled(st.configRS.getPrimary(), "UnsplittableCollectionsOnNonPrimaryShard");
 const ffTrackUnsharded = !isMultiversion &&
     FeatureFlagUtil.isEnabled(st.configRS.getPrimary(),
                               "TrackUnshardedCollectionsOnShardingCatalog");
@@ -37,8 +35,7 @@ if (ffTrackUnsharded) {
     assert.commandWorked(
         mongos.getDB(dbName).runCommand({createUnsplittableCollection: coll3Name}));
     assert.commandWorked(mongos.getCollection(coll3NS).insert({name: 'Peter'}));
-}
-if (ffTrackUnsharded && ffUnsplittableOutsideDbPrimary) {
+
     assert.commandWorked(mongos.getDB(dbName).runCommand(
         {createUnsplittableCollection: coll4Name, dataShard: shard1.shardName}));
     assert.commandWorked(mongos.getCollection(coll4NS).insert({name: 'Jack'}));
@@ -81,8 +78,8 @@ jsTest.log('Test that unsharded and unsplittable collections are moved');
         //     3: { name : 'Harry' }
         //     4: { name : 'Peter' } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
         //     enabled)
-        //   * shard1: 0 docs (1 with featureFlagUnsplittableCollectionsOnNonPrimaryShard enabled)
-        //     1: { name : 'Jack'  } (if featureFlagUnsplittableCollectionsOnNonPrimaryShard is
+        //   * shard1: 0 docs (1 with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
+        //     1: { name : 'Jack'  } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
         //     enabled)
 
         // The unsharded collections' (1&3) documents are on shard0.
@@ -97,7 +94,7 @@ jsTest.log('Test that unsharded and unsplittable collections are moved');
         assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
         assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
 
-        if (ffTrackUnsharded && ffUnsplittableOutsideDbPrimary) {
+        if (ffTrackUnsharded) {
             // Unsharded collection 4's documents are on shard1.
             assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
             assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
@@ -110,14 +107,13 @@ jsTest.log('Test that unsharded and unsplittable collections are moved');
         // Expected documents placement after moving primary to shard1:
         //   * shard0: 1 doc
         //     1: { name : 'Harry' }
-        //   * shard1: 2 docs (4 with featureFlagTrackUnshardedCollectionsOnShardingCatalog and
-        //   featureFlagUnsplittableCollectionsOnNonPrimaryShard enabled)
+        //   * shard1: 2 docs (4 with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
         //     1: { name : 'Tom'   }
         //     2: { name : 'Dick'  }
-        //     3: { name : 'Peter' } (only with
-        //     featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
-        //     4: { name : 'Jack'  }
-        //     (only with featureFlagUnsplittableCollectionsOnNonPrimaryShard enabled)
+        //     3: { name : 'Peter' } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
+        //     enabled)
+        //     4: { name : 'Jack'  } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
+        //     enabled)
 
         // The unsharded collections' (1&3&4) documents are now on shard1.
         assert.eq(0, shard0.getCollection(coll1NS).find().itcount());
@@ -125,8 +121,7 @@ jsTest.log('Test that unsharded and unsplittable collections are moved');
         if (ffTrackUnsharded) {
             assert.eq(0, shard0.getCollection(coll3NS).find().itcount());
             assert.eq(1, shard1.getCollection(coll3NS).find().itcount());
-        }
-        if (ffTrackUnsharded && ffUnsplittableOutsideDbPrimary) {
+
             assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
             assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
         }
@@ -140,15 +135,14 @@ jsTest.log('Test that unsharded and unsplittable collections are moved');
 
     {
         // Expected documents placement after moving primary back to shard0:
-        //   * shard0: 3 docs (5 with featureFlagTrackUnshardedCollectionsOnShardingCatalog and
-        //   featureFlagUnsplittableCollectionsOnNonPrimaryShard enabled)
+        //   * shard0: 3 docs (5 with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
         //     1: { name : 'Tom'   }
         //     2: { name : 'Dick'  }
         //     3: { name : 'Harry' }
         //     4: { name : 'Peter' } (only with
         //     featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
         //     5: { name : 'Jack'  }
-        //     (only with featureFlagUnsplittableCollectionsOnNonPrimaryShard enabled)
+        //     (only with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
         //   * shard1: 0 docs
 
         // The unsharded collections' documents are on shard0.
@@ -157,8 +151,7 @@ jsTest.log('Test that unsharded and unsplittable collections are moved');
         if (ffTrackUnsharded) {
             assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
             assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
-        }
-        if (ffTrackUnsharded && ffUnsplittableOutsideDbPrimary) {
+
             assert.eq(1, shard0.getCollection(coll4NS).find().itcount());
             assert.eq(0, shard1.getCollection(coll4NS).find().itcount());
         }

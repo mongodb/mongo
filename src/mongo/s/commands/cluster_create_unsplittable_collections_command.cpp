@@ -86,21 +86,10 @@ public:
                 feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
                     serverGlobalParams.featureCompatibility);
 
-            bool isUnsplittableOnNonPrimary = isTrackUnshardedEnabled &&
-                feature_flags::gUnsplittableCollectionsOnNonPrimaryShard.isEnabled(
-                    serverGlobalParams.featureCompatibility);
-
             uassert(ErrorCodes::IllegalOperation,
                     "cannot create an unsplittable collection if "
                     "featureFlagTrackUnshardedCollectionsOnShardingCatalog is unset",
                     isTrackUnshardedEnabled);
-
-            if (request().getDataShard() && !isUnsplittableOnNonPrimary) {
-                uasserted(
-                    ErrorCodes::IllegalOperation,
-                    "cannot specify a shard if featureFlagUnsplittableCollectionsOnNonPrimaryShard"
-                    "is unset ");
-            }
 
             ShardsvrCreateCollection shardsvrCollRequest(nss);
             ShardsvrCreateCollectionRequest request;

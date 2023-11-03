@@ -517,29 +517,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         ShardVersionFactory::make(currentMetadata, wantedCollectionIndexes);
 
     const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
-
-    bool isUnsplittableOnlyOnPrimary =
-        feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        !feature_flags::gUnsplittableCollectionsOnNonPrimaryShard.isEnabled(
-            serverGlobalParams.featureCompatibility);
-    const bool isPlacementVersionIgnored = [&]() {
-        if (isUnsplittableOnlyOnPrimary && receivedShardVersion == ShardVersion::UNSHARDED() &&
-            currentMetadata.isUnsplittable()) {
-            // Any unsplittable collections request should attach a valid non-UNSHARDED
-            // ShardVersion However, this is not the case right now since the unsplittable
-            // collections project is still in progress. So, as a workaround to avoid
-            // throwing infinite StaleConfig errors, we are ignoring the
-            // ShardVersion::UNSHARDED for an unsplittable collection request which is fine
-            // as long as the unsplittable collections remain always on the same shard.
-            //
-            // TODO (SERVER-80337): Stop ignoring ShardVersion::UNSHARDED for unsplittable
-            // collections.
-            return true;
-        }
-        return ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
-    }();
-
+    const bool isPlacementVersionIgnored =
+        ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
     const boost::optional<Timestamp> receivedIndexVersion = receivedShardVersion.indexVersion();
 
     if ((wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) &&

@@ -5,7 +5,6 @@
  * works and that shardCollection won't generate unsplittable collection.
  * @tags: [
  *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
- *   featureFlagUnsplittableCollectionsOnNonPrimaryShard,
  *   multiversion_incompatible,
  *   assumes_balancer_off,
  * ]
