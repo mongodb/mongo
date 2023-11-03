@@ -27,6 +27,13 @@ export const $config = (function() {
          * what we'd expect.
          */
         advanceCursor: function advanceCursor(cursor, verifier) {
+            function safeExplain(cursor) {
+                try {
+                    return cursor.explain();
+                } catch (e) {
+                    return e;
+                }
+            }
             // Keep track of the previous doc in case the verifier is trying to verify a sorted
             // query.
             var prevDoc = null;
@@ -34,13 +41,14 @@ export const $config = (function() {
             while (cursor.hasNext()) {
                 prevDoc = doc;
                 doc = cursor.next();
-                assert(verifier(doc, prevDoc),
-                       'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
-                           (skipExplainInErrorMessage ? ''
-                                                      : 'Query plan: ' + tojson(cursor.explain())) +
-                           '\n' +
-                           'Previous doc: ' + tojson(prevDoc) + '\n' +
-                           'This doc: ' + tojson(doc));
+                assert(
+                    verifier(doc, prevDoc),
+                    'Verifier failed!\nQuery: ' + tojson(cursor._query) + '\n' +
+                        (skipExplainInErrorMessage ? ''
+                                                   : 'Query plan: ' + tojson(safeExplain(cursor))) +
+                        '\n' +
+                        'Previous doc: ' + tojson(prevDoc) + '\n' +
+                        'This doc: ' + tojson(doc));
             }
             assert.eq(cursor.itcount(), 0);
         },
