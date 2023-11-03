@@ -57,7 +57,6 @@ selector:
   # getMore is not causally consistent if collection is dropped
   - jstests/core/**/drop3.js
   # Explain format is not the same
-  - jstests/core/**/or_to_in.js # queryPlanner in different spot in explain()
 
   #
   # Denylists from session_jscore_passthrough.yml

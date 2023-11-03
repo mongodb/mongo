@@ -57,7 +57,6 @@ selector:
   - jstests/core/**/geo_s2sparse.js
   - jstests/core/**/operation_latency_histogram.js
   - jstests/core/**/killop_drop_collection.js
-  - jstests/core/**/or_to_in.js
   - jstests/core/**/explain_upsert.js
   exclude_with_any_tags:
   - assumes_standalone_mongod

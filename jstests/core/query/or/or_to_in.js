@@ -8,7 +8,11 @@
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {
+    getQueryPlanner,
+    getSingleNodeExplain,
+    getWinningPlanFromExplain
+} from "jstests/libs/analyze_plan.js";
 
 var coll = db.orToIn;
 coll.drop();
@@ -19,6 +23,13 @@ function compareValues(v1, v2) {
     } else {
         return (v1 == v2);
     }
+}
+
+function getParsedQueryFromExplain(explain) {
+    if ("shards" in explain) {
+        explain = Object.values(explain.shards)[0];
+    }
+    return getQueryPlanner(explain).parsedQuery;
 }
 
 // Check that 'expectedQuery' and 'actualQuery' have the same plans, and produce the same result.
@@ -38,8 +49,8 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
                  actualExplainCollation.queryPlanner.parsedQuery);
 
     // Make sure both queries have the same access plan.
-    const expectedPlan = getWinningPlan(expectedExplain.queryPlanner);
-    const actualPlan = getWinningPlan(actualExplain.queryPlanner);
+    const expectedPlan = getWinningPlanFromExplain(expectedExplain);
+    const actualPlan = getWinningPlanFromExplain(actualExplain);
     assert.docEq(expectedPlan, actualPlan);
 
     // The queries must produce the same result.
@@ -61,7 +72,8 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
 // This is the case when $eq is not equivalent to the implied equality
 // used by $in.
 function assertOrNotRewrittenToIn(query) {
-    const parsedQuery = coll.find(query).explain("queryPlanner").queryPlanner.parsedQuery;
+    const explain = coll.find(query).explain("queryPlanner");
+    const parsedQuery = getParsedQueryFromExplain(explain);
     const topOp = Object.keys(parsedQuery);
     assert(arrayEq(topOp, ["$or"]));
     // None of the children should be $in.
