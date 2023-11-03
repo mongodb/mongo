@@ -1376,7 +1376,7 @@ TEST(PhysRewriter, FilterIndexingStress) {
 
     // Without the changes to restrict SargableNode split to which this test is tied, we would
     // be exploring 2^kFilterCount plans, one for each created group.
-    ASSERT_BETWEEN(60, 80, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN_AUTO(55, 80, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
     ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.nodeType");
@@ -3677,7 +3677,11 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
                          {{"index1",
                            makeCompositeIndexDefinition(
                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
-                                {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+                                {"a", CollationOp::Ascending, true /*isMultiKey*/}})}},
+                         ConstEval::constFold,
+                         {DistributionType::Centralized},
+                         true,
+                         CEType{100000.0})}}},  // Sets large CE to offset IndexScan startup cost.
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -3824,8 +3828,11 @@ TEST(PhysRewriter, NestedElemMatch) {
            createScanDef(
 
                {},
-               {{"index1",
-                 makeIndexDefinition("a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
+               {{"index1", makeIndexDefinition("a", CollationOp::Ascending, true /*isMultiKey*/)}},
+               ConstEval::constFold,
+               {DistributionType::Centralized},
+               true,
+               CEType{100000.0})}}},  // Sets large CE to offset IndexScan startup cost.
         std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -5242,7 +5249,7 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
     hints.emplace(PartialSchemaKey{"root", _get("a", _traverse1(_get("x", _id())))._n},
                   kDefaultSelectivity);
     hints.emplace(PartialSchemaKey{"root", _get("a", _traverse1(_get("y", _id())))._n},
-                  kDefaultSelectivity * 0.1);
+                  kDefaultSelectivity * 0.01);
 
     auto phaseManager = makePhaseManager(
         {

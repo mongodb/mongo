@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/ce/sampling_executor.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -46,6 +47,21 @@
 namespace mongo::optimizer {
 
 class NodeSBE : public ServiceContextTest {};
+
+class ABTRecorder : public ce::SamplingExecutor {
+public:
+    ABTRecorder(ABTVector& nodes) : _nodes(nodes) {}
+    ~ABTRecorder() = default;
+
+    boost::optional<optimizer::SelectivityType> estimateSelectivity(
+        const Metadata& /*metadata*/,
+        int64_t /*sampleSize*/,
+        const PlanAndProps& planAndProps) final;
+
+private:
+    // We don't own this.
+    ABTVector& _nodes;
+};
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const std::vector<BSONObj>& rawPipeline, NamespaceString nss, OperationContext* opCtx);

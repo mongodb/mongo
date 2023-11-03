@@ -201,6 +201,17 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='sampling_estimator_test',
+    source=[
+        'sampling_estimator_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'test_utils',
+    ],
+)
+
+env.CppUnitTest(
     target="ce_benchmark_test",
     source=[
         'benchmark_test.cpp',

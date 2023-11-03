@@ -267,6 +267,9 @@ public:
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
 
+        const ScanDefinition& scanDef = getScanDefFromIndexingAvailability(
+            metadata, properties::getPropertyConst<properties::IndexingAvailability>(logicalProps));
+
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
         ABT extracted = planExtractor.extract(n.copy());
 
@@ -288,8 +291,13 @@ public:
                     boost::none /*residualCE*/,
                     lowered);
                 uassert(6624243, "Expected a filter node", lowered._node.is<FilterNode>());
-                const CEType filterCE = estimateFilterCE(
-                    metadata, memo, logicalProps, n, std::move(lowered._node), childResult);
+                // Continue the sampling estimation only if the field from the partial schema is
+                // indexed.
+                const bool isPartialSchemaKeyIndexed = isFieldPathIndexed(key, scanDef);
+                const CEType filterCE = isPartialSchemaKeyIndexed
+                    ? estimateFilterCE(
+                          metadata, memo, logicalProps, n, std::move(lowered._node), childResult)
+                    : _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
                 const SelectivityType sel =
                     childResult > 0.0 ? (filterCE / childResult) : SelectivityType{0.0};
                 selTreeBuilder.atom(sel);
@@ -384,6 +392,24 @@ private:
 
         return _executor->estimateSelectivity(
             _phaseManager.getMetadata(), _sampleSize, planAndProps);
+    }
+
+    const ScanDefinition& getScanDefFromIndexingAvailability(
+        const Metadata& metadata,
+        const properties::IndexingAvailability& indexingAvalability) const {
+        auto scanDefIter = metadata._scanDefs.find(indexingAvalability.getScanDefName());
+        uassert(8073400,
+                "Scan def of indexing avalability is not found",
+                scanDefIter != metadata._scanDefs.cend());
+        return scanDefIter->second;
+    }
+
+    /**
+     * Returns true if the field path from the partial schema entry is indexed.
+     */
+    inline bool isFieldPathIndexed(const PartialSchemaKey& key,
+                                   const ScanDefinition& scanDef) const {
+        return scanDef.getIndexedFieldPaths().isIndexed(key._path);
     }
 
     struct NodeRefHash {

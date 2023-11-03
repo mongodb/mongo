@@ -2388,7 +2388,6 @@ public:
                            const std::vector<bool>& reverseOrder,
                            ProjectionNameVector correlatedProjNames,
                            const std::map<size_t, SelectivityType>& indexPredSelMap,
-                           const CEType currentGroupCE,
                            const CEType scanGroupCE,
                            const bool useSortedMerge)
         : _prefixId(prefixId),
@@ -2406,7 +2405,7 @@ public:
           _scanGroupCE(scanGroupCE) {
         // Collect estimates for predicates satisfied with the current equality prefix.
         // TODO: rationalize cardinality estimates: estimate number of unique groups.
-        CEType indexCE = currentGroupCE;
+        CEType indexCE = _scanGroupCE;
         if (!_currentEqPrefix._predPosSet.empty()) {
             std::vector<SelectivityType> currentSels;
             for (const size_t index : _currentEqPrefix._predPosSet) {
@@ -2528,7 +2527,6 @@ public:
                                          _reverseOrder,
                                          currentCorrelatedProjNames,
                                          _indexPredSelMap,
-                                         currentCE,
                                          _scanGroupCE,
                                          _useSortedMerge);
 
@@ -2767,7 +2765,6 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 const std::vector<bool>& reverseOrder,
                                 ProjectionNameVector correlatedProjNames,
                                 const std::map<size_t, SelectivityType>& indexPredSelMap,
-                                const CEType indexCE,
                                 const CEType scanGroupCE,
                                 const bool useSortedMerge) {
     IntervalLowerTransport lowerTransport(prefixId,
@@ -2782,7 +2779,6 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                           reverseOrder,
                                           std::move(correlatedProjNames),
                                           indexPredSelMap,
-                                          indexCE,
                                           scanGroupCE,
                                           useSortedMerge);
     return lowerTransport.lower(eqPrefixes.at(eqPrefixIndex)._interval);

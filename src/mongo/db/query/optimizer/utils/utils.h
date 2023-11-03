@@ -476,7 +476,6 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 const std::vector<bool>& reverseOrder,
                                 ProjectionNameVector correlatedProjNames,
                                 const std::map<size_t, SelectivityType>& indexPredSelMap,
-                                CEType indexCE,
                                 CEType scanGroupCE,
                                 bool useSortedMerge);
 

@@ -716,28 +716,14 @@ TEST_F(NodeSBE, RequireRID) {
     ASSERT_EQ(1, resultSize);
 }
 
-class ABTRecorder : public ce::SamplingExecutor {
-public:
-    ABTRecorder(ABTVector& nodes) : _nodes(nodes) {}
-    ~ABTRecorder() = default;
-
-    boost::optional<optimizer::SelectivityType> estimateSelectivity(
-        const Metadata& /*metadata*/,
-        const int64_t /*sampleSize*/,
-        const PlanAndProps& planAndProps) final {
-        _nodes.push_back(planAndProps._node);
-        return SelectivityType{0.0};
-    }
-
-private:
-    // We don't own this.
-    ABTVector& _nodes;
-};
-
 TEST_F(NodeSBE, SamplingTest) {
     auto prefixId = PrefixId::createForTests();
     const std::string scanDefName = "test";
-    Metadata metadata{{{scanDefName, {}}}};
+    Metadata metadata{{{scanDefName,
+                        createScanDef({},
+                                      {{"index1",
+                                        makeIndexDefinition(
+                                            "a", CollationOp::Ascending, true /*isMultiKey*/)}})}}};
 
     auto opCtx = makeOperationContext();
     auto pipeline = parsePipeline(

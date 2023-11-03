@@ -81,6 +81,13 @@
 
 namespace mongo::optimizer {
 
+
+boost::optional<optimizer::SelectivityType> ABTRecorder::estimateSelectivity(
+    const Metadata& /*metadata*/, const int64_t /*sampleSize*/, const PlanAndProps& planAndProps) {
+    _nodes.push_back(planAndProps._node);
+    return SelectivityType{0.0};
+}
+
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const std::vector<BSONObj>& rawPipeline, NamespaceString nss, OperationContext* opCtx) {
     AggregateCommandRequest request(std::move(nss), rawPipeline);
@@ -254,5 +261,6 @@ std::vector<BSONObj> runPipeline(OperationContext* opCtx,
 
     return results;
 }
+
 
 }  // namespace mongo::optimizer

@@ -844,7 +844,6 @@ public:
                                                reverseOrder,
                                                candidateIndexEntry._correlatedProjNames.getVector(),
                                                indexPredSelMap,
-                                               currentGroupCE,
                                                scanGroupCE,
                                                usedSortedMerge);
 
