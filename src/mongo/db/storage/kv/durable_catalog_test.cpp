@@ -793,7 +793,7 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
 
 TEST_F(ImportCollectionTest, ImportCollection) {
     // Set a new rand so that it does not collide upon import.
-    auto rand = std::to_string(std::stoll(getCatalog()->getRand_forTest()) + 1);
+    auto rand = std::to_string(std::stoull(getCatalog()->getRand_forTest()) + 1);
     getCatalog()->setRand_forTest(rand);
 
     // Import should fail with empty metadata.

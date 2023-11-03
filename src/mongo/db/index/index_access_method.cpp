@@ -1262,7 +1262,7 @@ void SortedDataIndexAccessMethod::validateDocument(const CollectionPtr& collecti
  */
 std::string nextFileName() {
     static AtomicWord<unsigned> indexAccessMethodFileCounter;
-    static const int64_t randomSuffix = SecureRandom().nextInt64();
+    static const uint64_t randomSuffix = SecureRandom().nextUInt64();
     return str::stream() << "extsort-index." << indexAccessMethodFileCounter.fetchAndAdd(1) << '-'
                          << randomSuffix;
 }

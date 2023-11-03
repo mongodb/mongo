@@ -349,9 +349,7 @@ private:
 
     std::string _newInternalIdent(StringData identStem);
 
-    std::string _newRand() {
-        return str::stream() << SecureRandom().nextInt64();
-    }
+    std::string _newRand();
 
     /**
      * Helper which constructs a DurableCatalogEntry given 'catalogId' and 'obj'.

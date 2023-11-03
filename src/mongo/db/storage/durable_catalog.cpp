@@ -174,6 +174,10 @@ std::string DurableCatalog::_newInternalIdent(StringData identStem) {
     return buf.str();
 }
 
+std::string DurableCatalog::_newRand() {
+    return str::stream() << SecureRandom().nextUInt64();
+}
+
 std::string DurableCatalog::getFilesystemPathForDb(const DatabaseName& dbName) const {
     if (_directoryPerDb) {
         return storageGlobalParams.dbpath + '/' + escapeDbName(dbName);
