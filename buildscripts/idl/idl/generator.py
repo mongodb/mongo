@@ -1106,6 +1106,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             'mongo/idl/idl_parser.h',
             'mongo/rpc/op_msg.h',
             'mongo/stdx/unordered_map.h',
+            'mongo/util/decimal_counter.h',
             'mongo/util/serialization_context.h',
         ] + spec.globals.cpp_includes
 
@@ -1366,7 +1367,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         cpp_type_info = cpp_types.get_cpp_type_from_cpp_type_name(field, ast_type.cpp_type, True)
         cpp_type = cpp_type_info.get_type_name()
 
-        self._writer.write_line('std::uint32_t expectedFieldNumber{0};')
+        self._writer.write_line('DecimalCounter<std::uint32_t> expectedFieldNumber{0};')
         self._writer.write_line(
             'const IDLParserContext arrayCtxt(%s, &ctxt, %s, getSerializationContext());' %
             (_get_field_constant_name(field), tenant))
@@ -1379,19 +1380,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line(
                 'const auto arrayFieldName = arrayElement.fieldNameStringData();')
-            self._writer.write_line('std::uint32_t fieldNumber;')
-            self._writer.write_empty_line()
 
-            # Check the array field names are integers
-            self._writer.write_line('Status status = NumberParser{}(arrayFieldName, &fieldNumber);')
-            with self._predicate('MONGO_likely(status.isOK())'):
-
-                # Check that the array field names are sequential
-                with self._predicate('MONGO_unlikely(fieldNumber != expectedFieldNumber)'):
-                    self._writer.write_line('arrayCtxt.throwBadArrayFieldNumberSequence(' +
-                                            'fieldNumber, expectedFieldNumber);')
-                self._writer.write_empty_line()
-
+            with self._predicate('MONGO_likely(arrayFieldName == expectedFieldNumber)'):
                 check = _get_bson_type_check('arrayElement', 'arrayCtxt', ast_type)
                 check = "MONGO_likely(%s)" % (check) if check is not None else check
 
@@ -1412,7 +1402,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('values.emplace_back(%s);' % (array_value))
 
             with self._block('else {', '}'):
-                self._writer.write_line('arrayCtxt.throwBadArrayFieldNumberValue(arrayFieldName);')
+                self._writer.write_line(
+                    'arrayCtxt.throwBadArrayFieldNumberSequence(arrayFieldName, expectedFieldNumber);'
+                )
 
             self._writer.write_line('++expectedFieldNumber;')
 

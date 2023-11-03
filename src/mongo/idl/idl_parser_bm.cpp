@@ -43,6 +43,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/idl_parser_bm_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -294,6 +295,27 @@ void BM_LSID_TXN_BSON(benchmark::State& state) {
 
 BENCHMARK(BM_LSID_TXN_BSON)->Arg(10)->Arg(100)->Unit(benchmark::kNanosecond);
 
+void BM_ARRAY_BSON(benchmark::State& state) {
+    // Perform setup here
+    auto nEntries = state.range();
+    BSONObjBuilder bob;
+    BSONArrayBuilder bab(bob.subarrayStart("value"));
+    for (int i = 0; i < nEntries; i++) {
+        bab.append(int32_t(i + 101));
+    }
+    bab.done();
+    auto doc = bob.done();
+    size_t totalBytes = 0;
+
+    for (auto _ : state) {
+        // This code gets timed
+        benchmark::DoNotOptimize(idl::test::OneArray::parse(IDLParserContext("test"), doc));
+        totalBytes += doc.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+BENCHMARK(BM_ARRAY_BSON)->Arg(10)->Arg(1000)->Arg(10000)->Unit(benchmark::kNanosecond);
 
 }  // namespace
 }  // namespace mongo

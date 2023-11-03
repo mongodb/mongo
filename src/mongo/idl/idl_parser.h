@@ -382,15 +382,10 @@ public:
     MONGO_COMPILER_NORETURN void throwUnknownField(StringData fieldName) const;
 
     /**
-     * Throw an error message about an array field name not being a valid unsigned integer.
-     */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberValue(StringData value) const;
-
-    /**
      * Throw an error message about the array field name not being the next number in the sequence.
      */
-    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(
-        std::uint32_t actualValue, std::uint32_t expectedValue) const;
+    MONGO_COMPILER_NORETURN void throwBadArrayFieldNumberSequence(StringData actualValue,
+                                                                  StringData expectedValue) const;
 
     /**
      * Throw an error message about an unrecognized enum value.

@@ -50,6 +50,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/decimal_counter.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
@@ -438,28 +439,19 @@ int BSONElement::compareElements(const BSONElement& l,
     MONGO_UNREACHABLE;
 }
 
-/** transform a BSON array into a vector of BSONElements.
-    we match array # positions with their vector position, and ignore
-    any fields with non-numeric field names.
-    */
 std::vector<BSONElement> BSONElement::Array() const {
     chk(mongo::Array);
-    std::vector<BSONElement> v;
-    BSONObjIterator i(Obj());
-    while (i.more()) {
-        BSONElement e = i.next();
-        const char* f = e.fieldName();
 
-        unsigned u;
-        Status status = NumberParser{}(f, &u);
-        if (status.isOK()) {
-            MONGO_verify(u < 1000000);
-            if (u >= v.size())
-                v.resize(u + 1);
-            v[u] = e;
-        } else {
-            // ignore?
-        }
+    std::vector<BSONElement> v;
+    DecimalCounter<std::uint32_t> counter(0);
+    for (auto element : Obj()) {
+        auto fieldName = element.fieldNameStringData();
+        uassert(ErrorCodes::BadValue,
+                fmt::format(
+                    "Invalid array index field name: \"{}\", expected \"{}\"", fieldName, counter),
+                fieldName == counter);
+        counter++;
+        v.push_back(element);
     }
     return v;
 }

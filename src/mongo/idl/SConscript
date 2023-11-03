@@ -183,6 +183,7 @@ env.Benchmark(
     target='idl_parser_bm',
     source=[
         'idl_parser_bm.cpp',
+        'idl_parser_bm.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',

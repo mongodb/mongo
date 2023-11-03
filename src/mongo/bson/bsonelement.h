@@ -159,7 +159,14 @@ public:
     bool Bool() const {
         return chk(mongo::Bool).boolean();
     }
-    std::vector<BSONElement> Array() const;  // see implementation for detailed comments
+
+    /**
+     * Transform a BSON array into a vector of BSONElements.
+     * If the array keys are not in sequential order or are otherwise invalid, an exception is
+     * thrown.
+     */
+    std::vector<BSONElement> Array() const;
+
     mongo::OID OID() const {
         return chk(jstOID).__oid();
     }

@@ -843,7 +843,7 @@ TEST(IDLVariantTests, TestVariantTwoArrays) {
 
     ASSERT_THROWS_CODE(One_variant_two_arrays::parse(IDLParserContext{"root"}, bob.obj()),
                        AssertionException,
-                       40423);
+                       ErrorCodes::BadValue);
 }
 
 TEST(IDLVariantTests, TestVariantOptional) {
