@@ -362,6 +362,8 @@ QueryHints getHintsFromQueryKnobs() {
     hints._minIndexEqPrefixes = internalCascadesOptimizerMinIndexEqPrefixes.load();
     hints._maxIndexEqPrefixes = internalCascadesOptimizerMaxIndexEqPrefixes.load();
     hints._numSamplingChunks = internalCascadesOptimizerSampleChunks.load();
+    hints._forceSamplingCEFallBackForFilterNode =
+        internalCascadesOptimizerSamplingCEFallBackForFilterNode.load();
 
     return hints;
 }

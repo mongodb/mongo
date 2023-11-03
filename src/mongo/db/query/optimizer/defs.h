@@ -337,6 +337,9 @@ struct QueryHints {
     // prevent issues arising from yielding.
     bool _disableYieldingTolerantPlans = true;
 
+    // Controls if we force sampling CE to fall back on heuristic for filter node.
+    bool _forceSamplingCEFallBackForFilterNode = true;
+
     // Controls the minimum and maximum number of equalityPrefixes we generate for a candidate
     // index. The minimum bound is only used for testing and in production should remain set to 1.
     size_t _minIndexEqPrefixes = 1;

@@ -243,7 +243,8 @@ public:
                      const properties::LogicalProps& logicalProps,
                      CEType childResult,
                      CEType /*exprResult*/) {
-        if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
+        if (_phaseManager.getHints()._forceSamplingCEFallBackForFilterNode ||
+            !properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
         }
 

@@ -904,6 +904,13 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
     test_only: true
+  
+  internalCascadesOptimizerSamplingCEFallBackForFilterNode:
+    description: "Forces sampling CE to fall back on heuristic for filter node."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerSamplingCEFallBackForFilterNode"
+    cpp_vartype: AtomicWord<bool>
+    default: true
 
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."
