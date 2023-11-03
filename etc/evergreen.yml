@@ -1335,8 +1335,9 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
   - name: .change_streams
-  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode
-  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode
+  # TODO(SERVER-79848): Remove !.sharded
+  - name: .concurrency !.large !.ubsan !.no_txns !.compute_mode !.sharded
+  - name: .concurrency .large !.ubsan !.no_txns !.compute_mode !.sharded
     distros:
     - rhel80-medium
   - name: .encrypt
@@ -2016,7 +2017,8 @@ buildvariants:
   - name: .change_streams
   # - name: disk_wiredtiger
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
+  # TODO(SERVER-79848): Remove !.sharded
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode !.sharded
   - name: .encrypt
   - name: external_auth
   - name: external_auth_aws
@@ -2035,7 +2037,8 @@ buildvariants:
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
   - name: .replica_sets .encrypt
-  - name: .resharding_fuzzer
+  # TODO(SERVER-79848): Re-enable resharding_fuzzer
+  # - name: .resharding_fuzzer
   - name: .retry
   - name: .rollbackfuzzer
   - name: .read_only
