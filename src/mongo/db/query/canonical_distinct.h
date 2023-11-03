@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/parsed_distinct_command.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/uuid.h"
@@ -55,9 +56,9 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * The parsed form of the distinct command request.
+ * The canonical form of the distinct query.
  */
-class ParsedDistinct {
+class CanonicalDistinct {
 public:
     static const char kKeyField[];
     static const char kQueryField[];
@@ -66,10 +67,10 @@ public:
     static const char kUnwoundArrayFieldForViewUnwind[];
     static const char kHintField[];
 
-    ParsedDistinct(std::unique_ptr<CanonicalQuery> query,
-                   const std::string key,
-                   const bool mirrored = false,
-                   const boost::optional<UUID> sampleId = boost::none)
+    CanonicalDistinct(std::unique_ptr<CanonicalQuery> query,
+                      const std::string key,
+                      const bool mirrored = false,
+                      const boost::optional<UUID> sampleId = boost::none)
         : _query(std::move(query)),
           _key(std::move(key)),
           _mirrored(std::move(mirrored)),
@@ -100,20 +101,29 @@ public:
     }
 
     /**
-     * Convert this ParsedDistinct into an aggregation command object.
+     * Convert this CanonicalDistinct into an aggregation command object.
      */
     StatusWith<BSONObj> asAggregationCommand() const;
 
-    /**
-     * 'extensionsCallback' allows for additional mongod parsing. If called from mongos, an
-     * ExtensionsCallbackNoop object should be passed to skip this parsing.
-     */
-    static StatusWith<ParsedDistinct> parse(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            const BSONObj& cmdObj,
-                                            const ExtensionsCallback& extensionsCallback,
-                                            bool isExplain,
-                                            const CollatorInterface* defaultCollator = nullptr);
+    static CanonicalDistinct parseFromBSON(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& cmdObj,
+        const ExtensionsCallback& extensionsCallback,
+        const CollatorInterface* defaultCollator,
+        boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
+
+    static CanonicalDistinct parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
+                                   const CollatorInterface* defaultCollator = nullptr);
+
+
+    static boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const DistinctCommandRequest& distinctCommand,
+        const CollatorInterface* defaultCollator,
+        boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
 
 private:
     std::unique_ptr<CanonicalQuery> _query;

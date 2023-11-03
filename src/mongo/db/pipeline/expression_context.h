@@ -63,6 +63,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -157,6 +158,12 @@ public:
                       boost::optional<ExplainOptions::Verbosity> verbosity = boost::none,
                       bool allowDiskUseByDefault = false);
 
+    ExpressionContext(OperationContext* opCtx,
+                      const DistinctCommandRequest& distinctCmd,
+                      const NamespaceString& nss,
+                      std::unique_ptr<CollatorInterface> collator,
+                      bool mayDbProfile,
+                      boost::optional<ExplainOptions::Verbosity> verbosity);
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.

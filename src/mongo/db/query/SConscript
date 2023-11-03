@@ -40,7 +40,9 @@ env.Library(
     source=[
         'canonical_query.cpp',
         'canonical_query_encoder.cpp',
+        'parsed_distinct_command.cpp',
         'parsed_find_command.cpp',
+        'query_shape/distinct_cmd_shape.cpp',
         'query_shape/find_cmd_shape.cpp',
         'query_stats/find_key_generator.cpp',
         'query_utils.cpp',
@@ -231,7 +233,7 @@ env.Library(
     source=[
         "explain_common.cpp",
         "find_common.cpp",
-        "parsed_distinct.cpp",
+        "canonical_distinct.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -467,6 +469,7 @@ env.CppUnitTest(
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
+        "query_shape/distinct_cmd_shape_test.cpp",
         "query_shape/find_cmd_shape_test.cpp",
         "find_common_test.cpp",
         "get_executor_test.cpp",
@@ -485,7 +488,7 @@ env.CppUnitTest(
         "interval_test.cpp",
         "killcursors_request_test.cpp",
         "lru_key_value_test.cpp",
-        "parsed_distinct_test.cpp",
+        "canonical_distinct_test.cpp",
         "plan_cache_indexability_test.cpp",
         "plan_cache_key_info_test.cpp",
         "plan_cache_test.cpp",
