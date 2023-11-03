@@ -257,12 +257,11 @@ TEST_F(DBClientGRPCTest, ShutdownBehavior) {
 
         confirmHelloAndRespond(session);
 
-        if (firstRun.load()) {
+        if (firstRun.swap(false)) {
             // Cannot read from the stream after shutdown.
             auto ping = session->sourceMessage();
             ASSERT_NOT_OK(ping.getStatus());
             ASSERT_EQ(ping.getStatus().code(), ErrorCodes::StreamTerminated);
-            firstRun.store(false);
             return;
         }
 
