@@ -921,5 +921,53 @@ TEST_F(BucketAutoTests, RedactionWithOutputField) {
         })",
         redact(*docSource));
 }
+
+TEST_F(BucketAutoTests, QueryShapeReParseSerializedStage) {
+    auto expCtx = getExpCtx();
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$year',
+                buckets: 3,
+                granularity: "E192",
+                output: {
+                    count: { $sum: 1 },
+                    years: { $push: '$year' }
+                }
+            }})");
+
+    auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), expCtx);
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    std::vector<Value> serialized;
+    docSource->serializeToArray(serialized, opts);
+    auto serializedDocSource = serialized[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$bucketAuto": {
+                "groupBy": "$year",
+                "buckets": 1,
+                "granularity": "R5",
+                "output": {
+                    "count": {
+                        "$sum": {
+                            "$const":1
+                        }
+                    },
+                    "years": {
+                        "$push": "$year"
+                    }
+                }
+            }
+        })",
+        serializedDocSource);
+    auto docSourceFromQueryShape =
+        DocumentSourceBucketAuto::createFromBson(serializedDocSource.firstElement(), expCtx);
+
+    vector<Value> newSerialization;
+    docSourceFromQueryShape->serializeToArray(newSerialization, opts);
+    auto newSerializedDocSource = newSerialization[0].getDocument().toBson();
+    ASSERT_BSONOBJ_EQ(serializedDocSource, newSerializedDocSource);
+}
+
+
 }  // namespace
 }  // namespace mongo
