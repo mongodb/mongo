@@ -41,11 +41,13 @@
 #include "mongo/util/string_listset.h"
 
 namespace mongo::sbe {
+enum class FieldListScope { kClosed, kOpen };
+
 /**
  * MakeObjSpec is a wrapper around a FieldBehavior value and a list of field names / project names.
  */
 struct MakeObjSpec {
-    enum class FieldBehavior { kClosed, kOpen };
+    using FieldBehavior = FieldListScope;
     enum class NonObjInputBehavior { kReturnNothing, kReturnInput, kNewObj };
 
     struct KeepOrDrop {};

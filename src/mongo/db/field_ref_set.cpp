@@ -103,7 +103,7 @@ StatusWith<bool> FieldRefSet::checkForConflictsAndPrefix(const FieldRef* toCheck
     StringData prefixStr = safeFirstPart(toCheck);
     FieldRef prefixField(prefixStr);
 
-    FieldSet::iterator it = _fieldSet.lower_bound(&prefixField);
+    iterator it = _fieldSet.lower_bound(&prefixField);
     // Now, iterate over all the present fields in the set that have the same prefix.
 
     while (it != _fieldSet.end() && safeFirstPart(*it) == prefixStr) {
@@ -167,7 +167,7 @@ bool FieldRefSet::insert(const FieldRef* toInsert, const FieldRef** conflict) {
     // at least some common prefix with the 'toInsert' field.
     StringData prefixStr = safeFirstPart(toInsert);
     FieldRef prefixField(prefixStr);
-    FieldSet::iterator it = _fieldSet.lower_bound(&prefixField);
+    iterator it = _fieldSet.lower_bound(&prefixField);
 
     // Now, iterate over all the present fields in the set that have the same prefix.
     while (it != _fieldSet.end() && safeFirstPart(*it) == prefixStr) {

@@ -75,8 +75,6 @@ public:
     }
 
 protected:
-    using FieldSet = StringSet;
-
     // The raw BSON projection used to populate projection stats. Optional, since it is required
     // only in explain mode.
     boost::optional<BSONObj> _projObj;
@@ -147,7 +145,7 @@ private:
     void transform(WorkingSetMember* member) const final;
 
     // Field names present in the simple projection.
-    FieldSet _includedFields;
+    StringSet _includedFields;
 
     // This is the key pattern we're extracting covered data from. It is maintained here since
     // strings derived from it depend on its lifetime.
@@ -184,7 +182,7 @@ private:
     void transform(WorkingSetMember* member) const final;
 
     const projection_ast::ProjectType _projectType;
-    FieldSet _fields;
+    StringSet _fields;
 };
 
 }  // namespace mongo

@@ -63,11 +63,11 @@ class FieldRefSet {
         bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
     };
 
-    typedef std::set<const FieldRef*, FieldRefPtrLessThan> FieldSet;
+    typedef std::set<const FieldRef*, FieldRefPtrLessThan> SetType;
 
 public:
-    using iterator = FieldSet::iterator;
-    using const_iterator = FieldSet::const_iterator;
+    using iterator = SetType::iterator;
+    using const_iterator = SetType::const_iterator;
 
     FieldRefSet();
 
@@ -159,7 +159,7 @@ public:
 
 private:
     // A set of field_ref pointers, none of which is owned here.
-    FieldSet _fieldSet;
+    SetType _fieldSet;
 };
 
 /**

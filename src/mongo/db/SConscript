@@ -1617,6 +1617,7 @@ execEnv.Library(
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
+        '$BUILD_DIR/mongo/util/field_set',
         '$BUILD_DIR/third_party/s2/s2',
         'audit',
         'bson/dotted_path_support',
