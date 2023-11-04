@@ -1008,6 +1008,11 @@ private:
     const CollatorInterface* _collator;
 };
 
+struct MakeObjStackOffsets {
+    int fieldsStackOffset = 0;
+    int argsStackOffset = 0;
+};
+
 /**
  * This enum defines indices into an 'Array' that returns the partial sum result when 'needsMerge'
  * is requested.
@@ -1403,6 +1408,7 @@ class ByteCode {
 
 public:
     struct InvokeLambdaFunctor;
+    struct GetFromStackFunctor;
 
     ByteCode() {
         _argStack = reinterpret_cast<uint8_t*>(mongoMalloc(sizeOfElement * 4));
@@ -1754,58 +1760,56 @@ private:
      * values, and then it returns the output object. (Note the computed input values are not
      * directly passed in as C++ parameters -- instead the computed input values are passed via
      * the VM's stack.)
-     *
-     * 'spec' provides two lists of field names: "keepOrDrop" fields and "computed" fields. These
-     * lists are disjoint and do not contain duplicates. The number of computed input values passed
-     * in by the caller on the VM stack must match the number of fields in the "computed" list.
-     *
-     * For each field F in the "computed" list, this method will retrieve the corresponding computed
-     * input value V from the VM stack and add {F,V} to the output object.
-     *
-     * If 'root' is not an object, it is ignored. Otherwise, for each field F in 'root' with value V
-     * that does not appear in the "computed" list, this method will copy {F,V} to the output object
-     * if either: (1) field F appears in the "keepOrDrop" list and 'spec->fieldBehavior == keep'; or
-     * (2) field F does _not_ appear in the "keepOrDrop" list and 'spec->fieldBehavior == drop'. If
-     * neither of these conditions are met, field F in 'root' will be ignored.
-     *
-     * For any two distinct fields F1 and F2 in the output object, if F1 is in 'root' and F2 does
-     * not appear before F1 in 'root', -OR- if both F1 and F2 are not in 'root' and F2 does not
-     * appear before F1 in the "computed" list, then F2 will appear after F1 in the output object.
      */
     void produceBsonObject(const MakeObjSpec* spec,
-                           int stackOffset,
+                           MakeObjStackOffsets stackOffsets,
                            const CodeFragment* code,
                            UniqueBSONObjBuilder& bob,
                            value::TypeTags rootTag,
                            value::Value rootVal) {
         using TypeTags = value::TypeTags;
 
+        const auto& fields = spec->fields;
+        const auto& actions = spec->actions;
+        const auto defActionType = spec->fieldsScopeIsClosed() ? MakeObjSpec::ActionType::kDrop
+                                                               : MakeObjSpec::ActionType::kKeep;
+
         // Invoke the produceBsonObject() lambda with the appropriate iterator type.
         switch (rootTag) {
             case TypeTags::bsonObject: {
                 // For BSON objects, use BsonObjCursor.
-                auto cursor = BsonObjCursor(value::bitcastTo<const char*>(rootVal));
-                produceBsonObject(spec, stackOffset, code, bob, std::move(cursor));
+                auto cursor = BsonObjCursor(
+                    fields, actions, defActionType, value::bitcastTo<const char*>(rootVal));
+                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
                 break;
             }
             case TypeTags::Object: {
                 // For SBE objects, use ObjectCursor.
-                auto cursor = ObjectCursor(value::getObjectView(rootVal));
-                produceBsonObject(spec, stackOffset, code, bob, std::move(cursor));
+                auto cursor =
+                    ObjectCursor(fields, actions, defActionType, value::getObjectView(rootVal));
+                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
                 break;
             }
             default: {
                 // For all other types, use BsonObjCursor initialized with an empty object.
-                auto cursor = BsonObjCursor(BSONObj::kEmptyObject.objdata());
-                produceBsonObject(spec, stackOffset, code, bob, std::move(cursor));
+                auto cursor =
+                    BsonObjCursor(fields, actions, defActionType, BSONObj::kEmptyObject.objdata());
+                produceBsonObject(spec, stackOffsets, code, bob, std::move(cursor));
                 break;
             }
         }
     }
 
+    void produceBsonObjectWithInputFields(const MakeObjSpec* spec,
+                                          MakeObjStackOffsets stackOffsets,
+                                          const CodeFragment* code,
+                                          UniqueBSONObjBuilder& bob,
+                                          value::TypeTags objTag,
+                                          value::Value objVal);
+
     template <typename CursorT>
     void produceBsonObject(const MakeObjSpec* spec,
-                           int stackOffset,
+                           MakeObjStackOffsets stackOffsets,
                            const CodeFragment* code,
                            UniqueBSONObjBuilder& bob,
                            CursorT cursor);
@@ -1818,7 +1822,7 @@ private:
      */
     struct TraverseAndProduceBsonObjContext {
         const MakeObjSpec* spec;
-        int stackStartOffset;
+        MakeObjStackOffsets stackOffsets;
         const CodeFragment* code;
     };
 
@@ -2272,17 +2276,74 @@ struct ByteCode::InvokeLambdaFunctor {
     const int64_t lamPos;
 };
 
+struct ByteCode::GetFromStackFunctor {
+    GetFromStackFunctor(ByteCode& bytecode, int stackStartOffset)
+        : bytecode(&bytecode), stackStartOffset(stackStartOffset) {}
+
+    FastTuple<bool, value::TypeTags, value::Value> operator()(size_t idx) const {
+        return bytecode->getFromStack(stackStartOffset + idx);
+    }
+
+    ByteCode* bytecode;
+    const int stackStartOffset;
+};
+
+class MakeObjCursorInputFields {
+public:
+    MakeObjCursorInputFields(ByteCode& bytecode, int startOffset, size_t numFields)
+        : _getFieldFn(bytecode, startOffset), _numFields(numFields) {}
+
+    size_t size() const {
+        return _numFields;
+    }
+
+    FastTuple<bool, value::TypeTags, value::Value> operator[](size_t idx) const {
+        return _getFieldFn(idx);
+    }
+
+private:
+    ByteCode::GetFromStackFunctor _getFieldFn;
+    size_t _numFields;
+};
+
+class InputFieldsOnlyCursor;
+class BsonObjWithInputFieldsCursor;
+class ObjWithInputFieldsCursor;
+
+// There are five instantiations of the templated produceBsonObject() method, one for each
+// type of MakeObj input cursor.
 extern template void ByteCode::produceBsonObject<BsonObjCursor>(const MakeObjSpec* spec,
-                                                                int stackStartOffset,
+                                                                MakeObjStackOffsets stackOffsets,
                                                                 const CodeFragment* code,
                                                                 UniqueBSONObjBuilder& bob,
                                                                 BsonObjCursor cursor);
 
 extern template void ByteCode::produceBsonObject<ObjectCursor>(const MakeObjSpec* spec,
-                                                               int stackStartOffset,
+                                                               MakeObjStackOffsets stackOffsets,
                                                                const CodeFragment* code,
                                                                UniqueBSONObjBuilder& bob,
                                                                ObjectCursor cursor);
+
+extern template void ByteCode::produceBsonObject<InputFieldsOnlyCursor>(
+    const MakeObjSpec* spec,
+    MakeObjStackOffsets stackOffsets,
+    const CodeFragment* code,
+    UniqueBSONObjBuilder& bob,
+    InputFieldsOnlyCursor cursor);
+
+extern template void ByteCode::produceBsonObject<BsonObjWithInputFieldsCursor>(
+    const MakeObjSpec* spec,
+    MakeObjStackOffsets stackOffsets,
+    const CodeFragment* code,
+    UniqueBSONObjBuilder& bob,
+    BsonObjWithInputFieldsCursor cursor);
+
+extern template void ByteCode::produceBsonObject<ObjWithInputFieldsCursor>(
+    const MakeObjSpec* spec,
+    MakeObjStackOffsets stackOffsets,
+    const CodeFragment* code,
+    UniqueBSONObjBuilder& bob,
+    ObjWithInputFieldsCursor cursor);
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

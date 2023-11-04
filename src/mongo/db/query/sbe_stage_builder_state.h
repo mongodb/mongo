@@ -38,6 +38,7 @@
 
 namespace mongo {
 class InListData;
+class StringListSet;
 
 namespace stage_builder {
 struct Environment;

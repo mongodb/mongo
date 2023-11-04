@@ -191,6 +191,7 @@ public:
 
     static constexpr UnownedSlotName kResult = {kMeta, "result"_sd};
     static constexpr UnownedSlotName kRecordId = {kMeta, "recordId"_sd};
+    static constexpr UnownedSlotName kResultBase = {kMeta, "resultBase"_sd};
     static constexpr UnownedSlotName kReturnKey = {kMeta, "returnKey"_sd};
     static constexpr UnownedSlotName kSnapshotId = {kMeta, "snapshotId"_sd};
     static constexpr UnownedSlotName kIndexIdent = {kMeta, "indexIdent"_sd};
@@ -205,9 +206,137 @@ public:
     static constexpr UnownedSlotName kMetadataSearchSequenceToken = {
         kMeta, "metadataSearchSequenceToken"_sd};
 
+    /**
+     * In addition to holding individual output slots, a PlanStageSlots object can also optionally
+     * contain a single "MakeResultInfo" object. (Likewise, in addition to providing APIs to ask for
+     * individual named slots, PlanStageReqs provides an API to ask for a "MakeResultInfo" object.)
+     *
+     * Some stages, like project, work by returning a modified version of their child's result doc.
+     * If we have a chain of projects (or other stages that behave similarly) and the stage at the
+     * top of the chain receives a kResult req from its parent, ideally when possible we would like
+     * to avoid the scenario where each stage asks its child for kResult and each stage materializes
+     * a new result doc just to potentially add, modify, or drop 1 or 2 fields.
+     *
+     * "MakeResultInfo" provides a means for stages like project to satisfy a kResult req without
+     * having to ask their child for kResult.
+     *
+     * Conceptually, the MakeResultInfo class can be thought of as a "package" that contains (or
+     * points to) all the information that is needed to eventually materialize a result doc,
+     * specifically:
+     * - A kResultBase slot
+     * - 0 or more kField slots
+     *
+     * The requirement to produce a MakeResultInfo is represented by the MakeResultInfoReq class,
+     * which is defined inside PlanStageReqs.
+     *
+     * If a stage receives a kResult req from its parent and it decides it wants to ask its child
+     * for MakeResultInfo, it adds a MakeResultInfoReq to the reqs passed to the child containing a
+     * ProjectionEffects that describes how it plans to materialize the result doc. Specifically,
+     * the ProjectionEffects object inside MakeResultInfoReq indicates which fields from kResultBase
+     * are going to be ignored (i.e. dropped), which fields are going to be preserved as-is without
+     * any modification, and which fields will be updated with a new value.
+     *
+     * When a stage receives a MakeResultInfo req, it can satisfy the req either by producing the
+     * kResult document or by "participating" with the MakeResultInfo scheme. If a stage opts to not
+     * "participate" and returns kResult, the stage builder will create a "default" MakeResultInfo
+     * with kResultBase equal to kResult and an empty "modified fields" list that gets returned to
+     * the parent. If a stage opts to "participate", it will copy the MakeResultInfoReq and update
+     * the ProjectionEffects appropriately, and then it will pass the updated MakeResultInfoReq to
+     * its child. Then it will receive MakeResultInfo object from its child, it will add the
+     * appropriate field names the the MakeResultInfo's "modified fields" list, and then it will
+     * return the MakeResultInfo object to its parent.
+     *
+     * When the stage that received a kResult req and asked for MakeResultInfo eventually receives
+     * a MakeResultInfo object back from its child, it creates the kResult doc by taking the
+     * contents of kResultBase as a starting point, dropping 0 or more fields from the doc, writing
+     * new values (retrieved from kField slots) to 0 or more fields in the doc, and finally making
+     * stage-specific modifications as appropriate to the doc and then materializing it.
+     */
+    class MakeResultInfo {
+    public:
+        using TreeType = std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>;
+
+        /**
+         * When the build() depth-first traversal backtracks through a merge point in the QSN
+         * tree, if one or more of the PlanStageOutputs objects have "MakeResultInfo" set, then we
+         * need to do a "merge" process in order to produce a single unified "MakeResultInfo"
+         * object. The mergeInfos() method implements this merge process.
+         */
+        static void mergeInfos(StageBuilderState& state,
+                               PlanNodeId nodeId,
+                               const PlanStageReqs& reqs,
+                               std::vector<TreeType>& trees);
+
+        MakeResultInfo() = default;
+
+        explicit MakeResultInfo(std::vector<std::string> modifiedFields)
+            : modFields(std::move(modifiedFields)),
+              modFieldSet(modFields.begin(), modFields.end()) {}
+
+        ~MakeResultInfo() = default;
+
+        std::unique_ptr<MakeResultInfo> clone() const {
+            return std::make_unique<MakeResultInfo>(*this);
+        }
+        std::vector<UnownedSlotName> getRequiredNames() const {
+            std::vector<UnownedSlotName> names;
+            names.emplace_back(kResultBase);
+            for (auto&& fieldName : modFields) {
+                names.emplace_back(UnownedSlotName(kField, fieldName));
+            }
+            return names;
+        }
+        void addModField(const std::string& field) {
+            if (auto [_, inserted] = modFieldSet.insert(field); inserted) {
+                modFields.emplace_back(field);
+            }
+        }
+        void addModFields(const std::vector<std::string>& fields) {
+            for (auto&& field : fields) {
+                addModField(field);
+            }
+        }
+        const std::vector<std::string>& getModFields() const {
+            return modFields;
+        }
+        const StringSet& getModFieldSet() const {
+            return modFieldSet;
+        }
+
+        std::vector<std::string> modFields;
+        StringSet modFieldSet;
+    };
+
+    static std::unique_ptr<MakeResultInfo> cloneInfo(const std::unique_ptr<MakeResultInfo>& info) {
+        return info ? info->clone() : std::unique_ptr<MakeResultInfo>{};
+    }
+
+    static PlanStageSlots makeMergedPlanStageSlots(
+        StageBuilderState& state,
+        PlanNodeId nodeId,
+        const PlanStageReqs& reqs,
+        std::vector<std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>>&
+            inputStagesAndSlots);
+
     PlanStageSlots() = default;
 
-    PlanStageSlots(const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator);
+    PlanStageSlots(const PlanStageSlots& other)
+        : _slotNameToIdMap(other._slotNameToIdMap),
+          _makeResultInfo(cloneInfo(other._makeResultInfo)) {}
+
+    PlanStageSlots(PlanStageSlots&& other) = default;
+
+    PlanStageSlots& operator=(const PlanStageSlots& other) {
+        if (this != &other) {
+            _slotNameToIdMap = other._slotNameToIdMap;
+            _makeResultInfo = cloneInfo(other._makeResultInfo);
+        }
+        return *this;
+    }
+
+    PlanStageSlots& operator=(PlanStageSlots&& other) = default;
+
+    ~PlanStageSlots() = default;
 
     bool has(const UnownedSlotName& str) const {
         return _slotNameToIdMap.count(str);
@@ -285,25 +414,71 @@ public:
         }
     }
 
-    /**
-     * This method applies an action to some/all of the slots within this struct. For each slot in
-     * this struct, the action is will be applied to the slot if (and only if) the corresponding
-     * flag in 'reqs' is true.
-     */
-    inline void forEachSlot(const PlanStageReqs& reqs,
-                            const std::function<void(const TypedSlot&)>& fn) const;
+    bool hasResult() const {
+        return has(kResult);
+    }
 
-    inline void forEachSlot(
-        const PlanStageReqs& reqs,
-        const std::function<void(const TypedSlot&, const UnownedSlotName&)>& fn) const;
-    inline void forEachSlot(const std::function<void(const TypedSlot&)>& fn) const;
-    inline void forEachSlot(
-        const std::function<void(const UnownedSlotName&, const TypedSlot&)>& fn) const;
-    inline void clearNonRequiredSlots(const PlanStageReqs& reqs);
+    // Returns true if the kResult slot is set or if the MakeResultInfo object is set.
+    bool hasResultOrMRInfo() const {
+        return hasResult() || _makeResultInfo.get() != nullptr;
+    }
+
+    void clearResult() {
+        clear(kResult);
+    }
+
+    void clearMRInfo() {
+        _makeResultInfo.reset();
+    }
+
+    MakeResultInfo* getMRInfo() {
+        return _makeResultInfo.get();
+    }
+    const MakeResultInfo* getMRInfo() const {
+        return _makeResultInfo.get();
+    }
+
+    void setMRInfo(const MakeResultInfo& mf) {
+        if (!_makeResultInfo) {
+            _makeResultInfo = std::make_unique<MakeResultInfo>(mf);
+        } else {
+            *_makeResultInfo = mf;
+        }
+    }
+
+    void setMRInfo(MakeResultInfo&& mf) {
+        if (!_makeResultInfo) {
+            _makeResultInfo = std::make_unique<MakeResultInfo>(std::move(mf));
+        } else {
+            *_makeResultInfo = std::move(mf);
+        }
+    }
+
+    std::vector<UnownedSlotName> getRequiredNamesInOrder(const PlanStageReqs& reqs) const;
+
+    std::vector<TypedSlot> getRequiredSlotsInOrder(const PlanStageReqs& reqs) const;
+
+    std::vector<TypedSlot> getRequiredSlotsUnique(const PlanStageReqs& reqs) const;
+
+    std::vector<TypedSlot> getAllSlotsInOrder() const;
+
+    std::vector<std::pair<UnownedSlotName, TypedSlot>> getAllNamedSlotsInOrder() const;
+
+    void setMissingRequiredNamedSlots(const PlanStageReqs& reqs, const TypedSlot& slot);
+
+    void setAllRequiredNamedSlotsToNothing(StageBuilderState& state, const PlanStageReqs& reqs);
+
+    void clearNonRequiredSlotsAndInfos(const PlanStageReqs& reqs,
+                                       bool clearSlots = true,
+                                       bool clearInfos = true);
 
 private:
     // Slot type-and-name to SlotId map for the output slots produced by this plan stage.
     SlotNameMap _slotNameToIdMap;
+
+    // If this PlanStageSlots object has "MakeResultInfo" set, then this field will be point to a
+    // MakeResultInfo object, otherwise this field will be null.
+    std::unique_ptr<MakeResultInfo> _makeResultInfo{};
 };  // class PlanStageSlots
 
 /**
@@ -320,6 +495,65 @@ public:
     static constexpr SlotType kMeta = SlotType::kMeta;
     static constexpr SlotType kField = SlotType::kField;
     static constexpr SlotType kSortKey = SlotType::kSortKey;
+    static constexpr SlotType kPathExpr = SlotType::kPathExpr;
+
+    /**
+     * In addition to providing APIs to ask for individual named slots, PlanStageReqs provides an
+     * API to ask for a "MakeResultInfo" object. The requirement to produce a MakeResultInfo object
+     * is called a "MakeResultInfo req" and is represented using the 'MakeResultInfoReq' class.
+     */
+    class MakeResultInfoReq {
+    public:
+        explicit MakeResultInfoReq(ProjectionEffects effects) : effects(std::move(effects)) {}
+
+        ~MakeResultInfoReq() = default;
+
+        std::unique_ptr<MakeResultInfoReq> clone() const {
+            return std::make_unique<MakeResultInfoReq>(*this);
+        }
+        std::vector<UnownedSlotName> getDefaultInfoRequiredNames() const {
+            std::vector<UnownedSlotName> requiredNames;
+            requiredNames.emplace_back(PlanStageSlots::kResult);
+            return requiredNames;
+        }
+
+        FieldSet getNeededFieldSet() const {
+            return effects.getNonDroppedFieldSet();
+        }
+
+        ProjectionEffects effects;
+    };
+
+    static std::unique_ptr<MakeResultInfoReq> cloneInfoReq(
+        const std::unique_ptr<MakeResultInfoReq>& infoReq) {
+        return infoReq ? infoReq->clone() : std::unique_ptr<MakeResultInfoReq>{};
+    }
+
+    PlanStageReqs() = default;
+
+    PlanStageReqs(const PlanStageReqs& other)
+        : _slotNameSet(other._slotNameSet),
+          _makeResultInfoReq(cloneInfoReq(other._makeResultInfoReq)),
+          _isBuildingUnionForTailableCollScan(other._isBuildingUnionForTailableCollScan),
+          _isTailableCollScanResumeBranch(other._isTailableCollScanResumeBranch),
+          _targetNamespace(other._targetNamespace) {}
+
+    PlanStageReqs(PlanStageReqs&& other) = default;
+
+    PlanStageReqs& operator=(const PlanStageReqs& other) {
+        if (this != &other) {
+            _slotNameSet = other._slotNameSet;
+            _makeResultInfoReq = cloneInfoReq(other._makeResultInfoReq);
+            _isBuildingUnionForTailableCollScan = other._isBuildingUnionForTailableCollScan;
+            _isTailableCollScanResumeBranch = other._isTailableCollScanResumeBranch;
+            _targetNamespace = other._targetNamespace;
+        }
+        return *this;
+    }
+
+    PlanStageReqs& operator=(PlanStageReqs&& other) = default;
+
+    ~PlanStageReqs() = default;
 
     PlanStageReqs copy() const {
         return *this;
@@ -376,37 +610,15 @@ public:
         return *this;
     }
 
-    bool getIsBuildingUnionForTailableCollScan() const {
-        return _isBuildingUnionForTailableCollScan;
-    }
-
-    void setIsBuildingUnionForTailableCollScan(bool b) {
-        _isBuildingUnionForTailableCollScan = b;
-    }
-
-    bool getIsTailableCollScanResumeBranch() const {
-        return _isTailableCollScanResumeBranch;
-    }
-
-    void setIsTailableCollScanResumeBranch(bool b) {
-        _isTailableCollScanResumeBranch = b;
-    }
-
-    void setTargetNamespace(const NamespaceString& nss) {
-        _targetNamespace = nss;
-    }
-
-    const NamespaceString& getTargetNamespace() const {
-        return _targetNamespace;
-    }
-
     bool hasType(SlotType t) const {
         return std::any_of(
             _slotNameSet.begin(), _slotNameSet.end(), [t](auto& item) { return item.first == t; });
     }
+
     bool hasFields() const {
         return hasType(kField);
     }
+
     bool hasSortKeys() const {
         return hasType(kSortKey);
     }
@@ -421,20 +633,47 @@ public:
         std::sort(res.begin(), res.end());
         return res;
     }
+
+    /**
+     * Returns the list of fields that are explicitly required to be put into individual kField
+     * slots.
+     *
+     * Note that the list returned is not an exhaustive list of every field that might be
+     * needed, nor is it an exhaustive list of all the fields that will ultimately be required
+     * to be put into kField slots (since MakeResultInfo provides a mechanism that allows
+     * the child to "implicitly" require additional fields to be put in kField slots).
+     * For detais, see getNeededFieldSet().
+     */
     std::vector<std::string> getFields() const {
         return getOfType(kField);
     }
+
     std::vector<std::string> getSortKeys() const {
         return getOfType(kSortKey);
     }
+
+    /**
+     * Returns the set of all field names that are potentially needed (either in an individual
+     * kField slots or stored within kResult / kResultBase).
+     *
+     * This method returns a FieldSet. A FieldSet can either be a finite set (if scope == kClosed)
+     * or it can an infinite set that is the complement of some finite set (if scope == kOpen).
+     *
+     * If hasResult() is true, this method always returns the set of all possible fields names.
+     * Otherwise, this method returns getFields() unioned with the set of fields needed by the
+     * MakeResultInfo req (if it is set).
+     */
+    FieldSet getNeededFieldSet() const;
 
     PlanStageReqs& clearAllOfType(SlotType t) {
         absl::erase_if(_slotNameSet, [t](auto& item) { return item.first == t; });
         return *this;
     }
+
     PlanStageReqs& clearAllFields() {
         return clearAllOfType(kField);
     }
+
     PlanStageReqs& clearAllSortKeys() {
         return clearAllOfType(kSortKey);
     }
@@ -454,96 +693,143 @@ public:
         return *this;
     }
 
-    friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
-                                          sbe::value::SlotIdGenerator* slotIdGenerator);
-
-    inline void forEachReq(const std::function<void(const UnownedSlotName&)>& fn) const {
-        for (const auto& name : _slotNameSet) {
-            fn(name);
-        }
+    bool hasResult() const {
+        return has(PlanStageSlots::kResult);
     }
 
-    friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
-                                          sbe::value::SlotIdGenerator* slotIdGenerator);
+    // Returns true if the kResult req is set or if the MakeResultInfo req is set.
+    bool hasResultOrMRInfo() const {
+        return hasResult() || _makeResultInfoReq.get() != nullptr;
+    }
 
-    friend void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
-                                            const std::function<void(const TypedSlot&)>& fn) const;
+    PlanStageReqs& clearResult() {
+        return clear(PlanStageSlots::kResult);
+    }
 
-    friend void PlanStageSlots::forEachSlot(
-        const PlanStageReqs& reqs,
-        const std::function<void(const TypedSlot&, const UnownedSlotName&)>& fn) const;
+    PlanStageReqs& clearMRInfo() {
+        _makeResultInfoReq.reset();
+        return *this;
+    }
+
+    MakeResultInfoReq* getMRInfo() {
+        return _makeResultInfoReq.get();
+    }
+    const MakeResultInfoReq* getMRInfo() const {
+        return _makeResultInfoReq.get();
+    }
+
+    PlanStageReqs& setResult() {
+        return set(PlanStageSlots::kResult);
+    }
+
+    PlanStageReqs& setResultIf(bool condition) {
+        return setIf(PlanStageSlots::kResult, condition);
+    }
+
+    PlanStageReqs& setMRInfo(const MakeResultInfoReq& mf) {
+        if (!_makeResultInfoReq) {
+            _makeResultInfoReq = std::make_unique<MakeResultInfoReq>(mf);
+        } else {
+            *_makeResultInfoReq = mf;
+        }
+        return *this;
+    }
+
+    PlanStageReqs& setMRInfo(MakeResultInfoReq&& mf) {
+        if (!_makeResultInfoReq) {
+            _makeResultInfoReq = std::make_unique<MakeResultInfoReq>(std::move(mf));
+        } else {
+            *_makeResultInfoReq = std::move(mf);
+        }
+        return *this;
+    }
+
+    bool getIsBuildingUnionForTailableCollScan() const {
+        return _isBuildingUnionForTailableCollScan;
+    }
+
+    PlanStageReqs& setIsBuildingUnionForTailableCollScan(bool b) {
+        _isBuildingUnionForTailableCollScan = b;
+        return *this;
+    }
+
+    bool getIsTailableCollScanResumeBranch() const {
+        return _isTailableCollScanResumeBranch;
+    }
+
+    PlanStageReqs& setIsTailableCollScanResumeBranch(bool b) {
+        _isTailableCollScanResumeBranch = b;
+        return *this;
+    }
+
+    PlanStageReqs& setTargetNamespace(const NamespaceString& nss) {
+        _targetNamespace = nss;
+        return *this;
+    }
+
+    const NamespaceString& getTargetNamespace() const {
+        return _targetNamespace;
+    }
 
 private:
+    friend class PlanStageSlots;
+
     // The set of the type-and-names of the slots required as inputs by this plan stage.
     PlanStageSlots::SlotNameSet _slotNameSet;
 
-    // When we're in the middle of building a special union sub-tree implementing a tailable cursor
-    // collection scan, this flag will be set to true. Otherwise this flag will be false.
+    // If this PlanStageReqs object has a "MakeResultInfo" req set, then this field will be point
+    // to a MakeResultInfoReq object, otherwise this field will be null.
+    std::unique_ptr<MakeResultInfoReq> _makeResultInfoReq{};
+
+    // When we're in the middle of building a special union sub-tree implementing a tailable
+    // cursor collection scan, this flag will be set to true. Otherwise this flag will be false.
     bool _isBuildingUnionForTailableCollScan{false};
 
-    // When we're in the middle of building a special union sub-tree implementing a tailable cursor
-    // collection scan, this flag indicates whether we're currently building an anchor or resume
-    // branch. At all other times, this flag will be false.
+    // When we're in the middle of building a special union sub-tree implementing a tailable
+    // cursor collection scan, this flag indicates whether we're currently building an anchor or
+    // resume branch. At all other times, this flag will be false.
     bool _isTailableCollScanResumeBranch{false};
 
-    // Tracks the current namespace that we're building a plan over. Given that the stage builder
-    // can build plans for multiple namespaces, a node in the tree that targets a namespace
-    // different from its parent node can set this value to notify any child nodes of the correct
-    // namespace.
+    // Tracks the current namespace that we're building a plan over. Given that the stage
+    // builder can build plans for multiple namespaces, a node in the tree that targets a
+    // namespace different from its parent node can set this value to notify any child nodes of
+    // the correct namespace.
     NamespaceString _targetNamespace;
 };  // class PlanStageReqs
 
-void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
-                                 const std::function<void(const TypedSlot&)>& fn) const {
-    for (const auto& name : reqs._slotNameSet) {
-        auto it = _slotNameToIdMap.find(name);
-        tassert(7050900,
-                str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
-                              << name.second << "' in the slot map, expected slot to exist",
-                it != _slotNameToIdMap.end());
+struct BuildProjectionPlan {
+    enum Type {
+        kDoNotMakeResult,
+        kUseChildResult,
+        kUseCoveredProjection,
+        kUseInputPlanWithoutObj,
+        kUseMakeResultInfo
+    };
 
-        fn(it->second);
-    }
-}
+    PlanStageReqs childReqs;
+    Type type;
+    const PlanStageReqs::MakeResultInfoReq* reqMRInfo;
+    bool produceDefaultMRInfo;
+    bool isInclusion;
+    std::vector<std::string> paths;
+    std::vector<ProjectNode> nodes;
+    std::vector<std::string> nothingPaths;
+    std::vector<std::string> resultPaths;
+    std::vector<std::string> updatedPaths;
+    StringMap<Expression*> updatedPathsExprMap;
+    std::vector<std::string> mrInfoModifys;
+    std::vector<std::string> mrInfoDrops;
+    std::vector<std::string> projNothingInputFields;
+    boost::optional<std::vector<std::string>> inputPlanSingleFields;
+};
 
-void PlanStageSlots::forEachSlot(
-    const PlanStageReqs& reqs,
-    const std::function<void(const TypedSlot&, const UnownedSlotName&)>& fn) const {
-    for (const auto& name : reqs._slotNameSet) {
-        auto it = _slotNameToIdMap.find(name);
-        tassert(7050901,
-                str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
-                              << name.second << "' in the slot map, expected slot to exist",
-                it != _slotNameToIdMap.end());
-        fn(it->second, name);
-    }
-}
-
-void PlanStageSlots::forEachSlot(const std::function<void(const TypedSlot&)>& fn) const {
-    for (const auto& entry : _slotNameToIdMap) {
-        fn(entry.second);
-    }
-}
-
-void PlanStageSlots::forEachSlot(
-    const std::function<void(const UnownedSlotName&, const TypedSlot&)>& fn) const {
-    for (const auto& entry : _slotNameToIdMap) {
-        fn(entry.first, entry.second);
-    }
-}
-
-void PlanStageSlots::clearNonRequiredSlots(const PlanStageReqs& reqs) {
-    auto it = _slotNameToIdMap.begin();
-    while (it != _slotNameToIdMap.end()) {
-        auto& name = it->first;
-        // We never clear kResult, regardless of whether it is required by 'reqs'.
-        if (_slotNameToIdMap.key_eq()(name, kResult) || reqs.has(name)) {
-            ++it;
-        } else {
-            _slotNameToIdMap.erase(it++);
-        }
-    }
-}
+/**
+ * We use one of these structs per node in the QSN tree to store the results of the
+ * analyze() phase.
+ */
+struct QsnAnalysis {
+    FieldSet allowedFieldSet = FieldSet::makeUniverseSet();
+};
 
 /**
  * A stage builder which builds an executable tree using slot-based PlanStages.
@@ -554,8 +840,13 @@ public:
     using PlanType = std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageData>;
     using BaseType = StageBuilder<PlanType>;
 
+    static constexpr auto kMeta = PlanStageSlots::SlotType::kMeta;
+    static constexpr auto kField = PlanStageSlots::SlotType::kField;
+    static constexpr auto kSortKey = PlanStageSlots::SlotType::kSortKey;
+
     static constexpr auto kResult = PlanStageSlots::kResult;
     static constexpr auto kRecordId = PlanStageSlots::kRecordId;
+    static constexpr auto kResultBase = PlanStageSlots::kResultBase;
     static constexpr auto kReturnKey = PlanStageSlots::kReturnKey;
     static constexpr auto kSnapshotId = PlanStageSlots::kSnapshotId;
     static constexpr auto kIndexIdent = PlanStageSlots::kIndexIdent;
@@ -585,13 +876,35 @@ public:
     PlanType build(const QuerySolutionNode* root) final;
 
 private:
+    void analyzeTree();
+
+    QsnAnalysis analyze(const QuerySolutionNode* node);
+
+    inline const QsnAnalysis& getAnalysis(const QuerySolutionNode* node) const {
+        return _analysis.find(node)->second;
+    }
+
+    inline const QsnAnalysis& getAnalysis(const std::unique_ptr<QuerySolutionNode>& node) const {
+        return _analysis.find(node.get())->second;
+    }
+
+    const FieldSet& getAllowedFieldSet(const QuerySolutionNode* node) const {
+        return getAnalysis(node).allowedFieldSet;
+    }
+
+    const FieldSet& getAllowedFieldSet(const std::unique_ptr<QuerySolutionNode>& node) const {
+        return getAnalysis(node).allowedFieldSet;
+    }
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildTree();
+
     /**
      * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
      * descendents.
      *
-     * Based on the type of 'root', this method will dispatch to the appropriate buildXXX() method.
-     * This method will also handle generating calls to getField() to satisfy kField reqs that were
-     * not satisfied by the buildXXX() method.
+     * Based on the type of 'root', this method will dispatch to the appropriate buildXXX()
+     * method. This method will also handle generating calls to getField() to satisfy kField
+     * reqs that were not satisfied by the buildXXX() method.
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> build(const QuerySolutionNode* node,
                                                                      const PlanStageReqs& reqs);
@@ -641,16 +954,7 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildReplaceRoot(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
-    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionSimple(
-        const QuerySolutionNode* root, const PlanStageReqs& reqs);
-
-    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionCovered(
-        const QuerySolutionNode* root, const PlanStageReqs& reqs);
-
-    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionDefault(
-        const QuerySolutionNode* root, const PlanStageReqs& reqs);
-
-    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionDefaultCovered(
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjection(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildOr(
@@ -687,8 +991,8 @@ private:
      * Constructs an optimized SBE plan for 'root' in the case that the fields of the shard key
      * pattern are provided by the child index scan. In this case, the SBE plan for the child
      * index scan node will fill out slots for the necessary components of the index key. These
-     * slots can be read directly in order to determine the shard key that should be passed to the
-     * 'shardFiltererSlot'.
+     * slots can be read directly in order to determine the shard key that should be passed to
+     * the 'shardFiltererSlot'.
      */
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilterCovered(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
@@ -701,6 +1005,9 @@ private:
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildUnpackTsBucket(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::unique_ptr<BuildProjectionPlan> makeBuildProjectionPlan(const QuerySolutionNode* root,
+                                                                 const PlanStageReqs& reqs);
 
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a
@@ -728,15 +1035,19 @@ private:
 
     // Aside from generating the PlanStage tree, this builder also produces a few auxiliary data
     // structures that are needed to execute the tree: the RuntimeEnvironment, the CompileCtx,
-    // and the PlanStageStaticData. Note that the PlanStageStaticData ('_data') is mutable inside
-    // SlotBasedStageBuilder, but after the 'build(const QuerySolutionNode*)' method is called the
-    // data will become immutable.
+    // and the PlanStageStaticData. Note that the PlanStageStaticData ('_data') is mutable
+    // inside SlotBasedStageBuilder, but after the 'build(const QuerySolutionNode*)' method is
+    // called the data will become immutable.
     Environment _env;
     std::unique_ptr<PlanStageStaticData> _data;
+
+    const QuerySolutionNode* _root{nullptr};
+    absl::flat_hash_map<const QuerySolutionNode*, QsnAnalysis> _analysis;
 
     bool _buildHasStarted{false};
 
     // Common parameters to SBE stage builder functions.
     StageBuilderState _state;
 };  // class SlotBasedStageBuilder
+
 }  // namespace mongo::stage_builder

@@ -53,10 +53,18 @@
 
 namespace mongo::sbe::vm {
 
+class MakeObjCursorInputFields;
+
 // MakeObj input cursor for BSON objects.
 class BsonObjCursor {
 public:
-    BsonObjCursor(const char* be) : _be(be) {
+    using InputFields = MakeObjCursorInputFields;
+
+    BsonObjCursor(const StringListSet& fields,
+                  const std::vector<MakeObjSpec::FieldAction>& actions,
+                  MakeObjSpec::ActionType defActionType,
+                  const char* be)
+        : _fields(fields), _actions(actions), _defActionType(defActionType), _be(be) {
         _last = _be + ConstDataView(_be).read<LittleEndian<uint32_t>>() - 1;
         _be += 4;
         if (_be != _last) {
@@ -64,10 +72,11 @@ public:
             _nextBe = bson::advance(_be, _name.size());
         }
     }
+
     inline bool atEnd() const {
         return _be == _last;
     }
-    inline void moveNext(const StringListSet&) {
+    inline void moveNext() {
         _be = _nextBe;
         if (_be != _last) {
             _name = bson::fieldNameAndLength(_be);
@@ -76,6 +85,13 @@ public:
     }
     inline StringData fieldName() const {
         return _name;
+    }
+    inline std::pair<size_t, MakeObjSpec::ActionType> fieldIdxAndType() const {
+        // Look up '_name' in the '_fields' set.
+        size_t fieldIdx = _fields.findPos(_name);
+        // Return the index ('npos' if not found) and the ActionType for this field.
+        auto type = fieldIdx != StringListSet::npos ? _actions[fieldIdx].type() : _defActionType;
+        return {fieldIdx, type};
     }
     inline std::pair<value::TypeTags, value::Value> value() const {
         return bson::convertFrom<true>(bsonElement());
@@ -91,6 +107,10 @@ private:
         return BSONElement(_be, fieldNameLenWithNull, totalSize, BSONElement::TrustedInitTag{});
     }
 
+    const StringListSet& _fields;
+    const std::vector<MakeObjSpec::FieldAction>& _actions;
+    MakeObjSpec::ActionType _defActionType;
+
     const char* _be{nullptr};
     const char* _nextBe{nullptr};
     const char* _last{nullptr};
@@ -100,15 +120,34 @@ private:
 // MakeObj input cursor for SBE objects.
 class ObjectCursor {
 public:
-    ObjectCursor(value::Object* objRoot) : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {}
+    using InputFields = MakeObjCursorInputFields;
+
+    ObjectCursor(const StringListSet& fields,
+                 const std::vector<MakeObjSpec::FieldAction>& actions,
+                 MakeObjSpec::ActionType defActionType,
+                 value::Object* objRoot)
+        : _fields(fields),
+          _actions(actions),
+          _defActionType(defActionType),
+          _objRoot(objRoot),
+          _idx(0),
+          _endIdx(_objRoot->size()) {}
+
     inline bool atEnd() const {
         return _idx == _endIdx;
     }
-    inline void moveNext(const StringListSet&) {
+    inline void moveNext() {
         ++_idx;
     }
     inline StringData fieldName() const {
         return StringData(_objRoot->field(_idx));
+    }
+    inline std::pair<size_t, MakeObjSpec::ActionType> fieldIdxAndType() const {
+        // Look up '_name' in the '_fields' set.
+        size_t fieldIdx = _fields.findPos(fieldName());
+        // Return the index ('npos' if not found) and the ActionType for this field.
+        auto type = fieldIdx != StringListSet::npos ? _actions[fieldIdx].type() : _defActionType;
+        return {fieldIdx, type};
     }
     inline std::pair<value::TypeTags, value::Value> value() const {
         return _objRoot->getAt(_idx);
@@ -119,6 +158,10 @@ public:
     }
 
 private:
+    const StringListSet& _fields;
+    const std::vector<MakeObjSpec::FieldAction>& _actions;
+    MakeObjSpec::ActionType _defActionType;
+
     value::Object* _objRoot{nullptr};
     size_t _idx{0};
     size_t _endIdx{0};

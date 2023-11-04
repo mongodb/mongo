@@ -101,6 +101,16 @@ public:
         return *this;
     }
 
+    bool operator==(const StringListSet& other) const {
+        if (this == &other) {
+            return true;
+        }
+        return _strings == other._strings;
+    }
+
+    inline bool empty() const {
+        return _strings.empty();
+    }
     inline size_t size() const {
         return _strings.size();
     }
@@ -173,6 +183,13 @@ public:
         auto pos = findPos(str);
         return pos != npos ? _strings.cbegin() + pos : _strings.cend();
     }
+
+    inline size_t count(StringData str) const {
+        auto pos = findPos(str);
+        return pos != npos ? 1 : 0;
+    }
+
+    std::string toString() const;
 
     const auto& getUnderlyingVector() const {
         return _strings;

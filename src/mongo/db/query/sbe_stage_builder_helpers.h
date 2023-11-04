@@ -933,7 +933,7 @@ void visitPathTreeNodes(PathTreeNode<T>* treeRoot,
         std::is_invocable_v<PostVisitFn, Node*, const std::string&, const DfsState&> ||
         std::is_invocable_v<PostVisitFn, Node*, const std::string&>;
 
-    if (!treeRoot || treeRoot->children.empty()) {
+    if (!treeRoot || (treeRoot->children.empty() && !invokeCallbacksForRootNode)) {
         return;
     }
 
@@ -1038,6 +1038,19 @@ public:
     ProjectNode(const ExpressionASTNode* n) : _data(Expr{n->expressionRaw()}) {}
     ProjectNode(const ProjectionSliceASTNode* n) : _data(Slice{n->limit(), n->skip()}) {}
 
+    ProjectNode clone() const {
+        return stdx::visit(OverloadedVisitor{[](const Bool& b) {
+                                                 return b.value ? ProjectNode(Keep{})
+                                                                : ProjectNode(Drop{});
+                                             },
+                                             [](const Expr& e) { return ProjectNode(e.expr); },
+                                             [](const SbExpr& e) { return ProjectNode(e.clone()); },
+                                             [](const Slice& s) {
+                                                 return ProjectNode(s);
+                                             }},
+                           _data);
+    }
+
     Type type() const {
         return stdx::visit(OverloadedVisitor{[](const Bool&) { return Type::kBool; },
                                              [](const Expr&) { return Type::kExpr; },
@@ -1082,6 +1095,13 @@ public:
         return stdx::get<Slice>(_data);
     }
 
+    bool isKeep() const {
+        return type() == Type::kBool && stdx::get<Bool>(_data).value == true;
+    }
+    bool isDrop() const {
+        return type() == Type::kBool && stdx::get<Bool>(_data).value == false;
+    }
+
 private:
     VariantType _data{};
 };
@@ -1117,18 +1137,37 @@ inline StringData getTopLevelField(const T& path) {
     return StringData(getRawStringData(path), idx != std::string::npos ? idx : path.size());
 }
 
+inline std::vector<std::string> getTopLevelFields(std::vector<std::string> setOfPaths) {
+    StringDataSet topLevelFieldsSet;
+    std::vector<std::string> topLevelFields;
+
+    for (size_t i = 0; i < setOfPaths.size(); ++i) {
+        auto& path = setOfPaths[i];
+        auto field = getTopLevelField(path);
+
+        auto [_, inserted] = topLevelFieldsSet.insert(field);
+        if (inserted) {
+            if (path.find('.') == std::string::npos) {
+                topLevelFields.emplace_back(std::move(path));
+            } else {
+                topLevelFields.emplace_back(field.toString());
+            }
+        }
+    }
+
+    return topLevelFields;
+}
+
 template <typename T>
 inline std::vector<std::string> getTopLevelFields(const T& setOfPaths) {
     std::vector<std::string> topLevelFields;
-    if (!setOfPaths.empty()) {
-        StringSet topLevelFieldsSet;
+    StringSet topLevelFieldsSet;
 
-        for (const auto& path : setOfPaths) {
-            auto field = getTopLevelField(path);
-            if (!topLevelFieldsSet.count(field)) {
-                topLevelFields.emplace_back(std::string(field));
-                topLevelFieldsSet.emplace(std::string(field));
-            }
+    for (const auto& path : setOfPaths) {
+        auto field = getTopLevelField(path);
+        if (!topLevelFieldsSet.count(field)) {
+            topLevelFields.emplace_back(std::string(field));
+            topLevelFieldsSet.emplace(std::string(field));
         }
     }
 

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
+#include "mongo/db/exec/sbe/vm/makeobj_input_fields_cursors.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo::sbe::vm {
@@ -64,7 +65,7 @@ void ByteCode::traverseAndProduceBsonObj(const TraverseAndProduceBsonObjContext&
         } else {
             // For all other cases, call produceBsonObject().
             UniqueBSONObjBuilder bob(bab.subobjStart());
-            produceBsonObject(ctx.spec, ctx.stackStartOffset, ctx.code, bob, elemTag, elemVal);
+            produceBsonObject(ctx.spec, ctx.stackOffsets, ctx.code, bob, elemTag, elemVal);
         }
     });
 }
@@ -95,26 +96,28 @@ void ByteCode::traverseAndProduceBsonObj(const TraverseAndProduceBsonObjContext&
     } else {
         // For all other cases, call produceBsonObject().
         UniqueBSONObjBuilder nestedBob(bob.subobjStart(fieldName));
-        produceBsonObject(ctx.spec, ctx.stackStartOffset, ctx.code, nestedBob, tag, val);
+        produceBsonObject(ctx.spec, ctx.stackOffsets, ctx.code, nestedBob, tag, val);
     }
 }
 
 template <typename CursorT>
 void ByteCode::produceBsonObject(const MakeObjSpec* spec,
-                                 int stackStartOffset,
+                                 MakeObjStackOffsets stackOffsets,
                                  const CodeFragment* code,
                                  UniqueBSONObjBuilder& bob,
                                  CursorT cursor) {
     using TypeTags = value::TypeTags;
+    using InputFields = MakeObjCursorInputFields;
+
+    auto [fieldsStackOff, argsStackOff] = stackOffsets;
 
     auto& fields = spec->fields;
     auto& actions = spec->actions;
-    const size_t numFields = fields.size();
-    const size_t numKeepOrDrops = spec->numKeepOrDrops;
+    auto& mandatoryFields = spec->mandatoryFields;
+    const size_t numFieldsOfInterest = spec->numFieldsOfInterest;
     const size_t numValueArgs = spec->numValueArgs;
-    const size_t numMandatoryLamsAndMakeObjs =
-        spec->numMandatoryLambdas + spec->numMandatoryMakeObjs;
-    const bool isClosed = spec->fieldBehavior == MakeObjSpec::FieldBehavior::kClosed;
+    const size_t numMandatoryLamsAndMakeObjs = spec->mandatoryFields.size() - spec->numValueArgs;
+    const bool isClosed = spec->fieldsScopeIsClosed();
     const bool recordVisits = numValueArgs + numMandatoryLamsAndMakeObjs > 0;
 
     // The 'visited' array keeps track of which computed fields have been visited so far so
@@ -125,12 +128,12 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
     absl::InlinedVector<char, 128> visitedVec;
 
     if (recordVisits) {
-        size_t visitedSize = numFields - numKeepOrDrops;
+        size_t visitedSize = fields.size();
         visitedVec.resize(visitedSize);
         visited = visitedVec.data();
     }
 
-    size_t fieldsLeft = numFields;
+    size_t fieldsLeft = numFieldsOfInterest;
     size_t valueArgsLeft = numValueArgs;
     size_t mandatoryLamsAndMakeObjsVisited = 0;
 
@@ -138,44 +141,38 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
     // 'isClosed' is true, loop over the input object until 'fieldsLeft == 0' is true or until
     // 'fieldsLeft == 1 && valueArgsLeft == 1' is true.
     for (; !cursor.atEnd() && (fieldsLeft > (isClosed ? 1 : 0) || fieldsLeft != valueArgsLeft);
-         cursor.moveNext(fields)) {
-        // Get the current field name, store it in 'fieldName', and look it up in 'fields' to get
-        // its corresponding 'fieldIdx'.
-        StringData fieldName = cursor.fieldName();
-        size_t fieldIdx = fields.findPos(fieldName);
+         cursor.moveNext()) {
+        // Get the idx and type of the current field.
+        auto [fieldIdx, t] = cursor.fieldIdxAndType();
 
-        if (fieldIdx == StringListSet::npos) {
-            if (!isClosed) {
-                cursor.appendTo(bob);
-            }
+        if (t == MakeObjSpec::ActionType::kDrop) {
+            fieldsLeft -= static_cast<uint8_t>(!isClosed);
             continue;
         }
 
-        if (fieldIdx < numKeepOrDrops) {
-            --fieldsLeft;
-            if (isClosed) {
-                cursor.appendTo(bob);
-            }
+        if (t == MakeObjSpec::ActionType::kKeep) {
+            fieldsLeft -= static_cast<uint8_t>(isClosed);
+            cursor.appendTo(bob);
             continue;
         }
 
         --fieldsLeft;
         if (recordVisits) {
-            auto visitedIdx = fieldIdx - numKeepOrDrops;
-            visited[visitedIdx] = 1;
+            visited[fieldIdx] = 1;
         }
 
         auto& action = actions[fieldIdx];
 
-        if (action.isValueArg()) {
+        if (t == MakeObjSpec::ActionType::kValueArg) {
             // Get the value arg and store it into 'tag'/'val'.
             --valueArgsLeft;
             size_t argIdx = action.getValueArgIdx();
-            auto [_, tag, val] = getFromStack(stackStartOffset + argIdx);
+            auto [_, tag, val] = getFromStack(argsStackOff + argIdx);
 
             // Append the value arg to 'bob'.
+            auto fieldName = cursor.fieldName();
             bson::appendValueToBsonObj(bob, fieldName, tag, val);
-        } else if (action.isLambdaArg()) {
+        } else if (t == MakeObjSpec::ActionType::kLambdaArg) {
             // Increment 'mandatoryLamsAndMakeObjsVisited' if appropriate.
             const auto& lambdaArg = action.getLambdaArg();
             if (!lambdaArg.returnsNothingOnMissingInput) {
@@ -186,7 +183,7 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
 
             // Get the lambda corresponding to 'fieldIdx' and get the offset of the lambda.
             size_t argIdx = lambdaArg.argIdx;
-            auto [_, t, v] = getFromStack(stackStartOffset + argIdx);
+            auto [_, t, v] = getFromStack(argsStackOff + argIdx);
             tassert(7103501, "Expected arg to be LocalLambda", t == TypeTags::LocalLambda);
             int64_t lamPos = value::bitcastTo<int64_t>(v);
 
@@ -196,10 +193,11 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
 
             // Append the lambda's return value to 'bob', then pop the return value
             // off of the stack and release it.
+            auto fieldName = cursor.fieldName();
             auto [__, tag, val] = getFromStack(0);
             bson::appendValueToBsonObj(bob, fieldName, tag, val);
             popAndReleaseStack();
-        } else if (action.isMakeObj()) {
+        } else if (t == MakeObjSpec::ActionType::kMakeObj) {
             // Increment 'mandatoryLamsAndMakeObjsVisited' if appropriate.
             auto fieldSpec = action.getMakeObjSpec();
             if (!fieldSpec->returnsNothingOnMissingInput()) {
@@ -209,7 +207,8 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
             // Get the current value from 'cursor' and store it to 'inputTag'/'inputVal', and then
             // call traverseAndProduceBsonObj() to produce the object.
             auto [inputTag, inputVal] = cursor.value();
-            TraverseAndProduceBsonObjContext ctx{fieldSpec, stackStartOffset, code};
+            auto fieldName = cursor.fieldName();
+            TraverseAndProduceBsonObjContext ctx{fieldSpec, {fieldsStackOff, argsStackOff}, code};
             traverseAndProduceBsonObj(ctx, inputTag, inputVal, fieldName, bob);
         } else {
             MONGO_UNREACHABLE_TASSERT(7103502);
@@ -219,7 +218,7 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
     // If 'isClosed' is false and 'cursor' has not reached the end of the input object, copy over
     // the remaining fields from the input object to the output object.
     if (!isClosed) {
-        for (; !cursor.atEnd(); cursor.moveNext(fields)) {
+        for (; !cursor.atEnd(); cursor.moveNext()) {
             cursor.appendTo(bob);
         }
     }
@@ -230,22 +229,22 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
         (valueArgsLeft > 0 || mandatoryLamsAndMakeObjsVisited < numMandatoryLamsAndMakeObjs)) {
         // Loop over 'fields' (skipping past the simple "keeps"/"drops" at the beginning
         // of the vector).
-        for (size_t fieldIdx = numKeepOrDrops; fieldIdx < numFields; ++fieldIdx) {
+        for (size_t i = 0; i < mandatoryFields.size(); ++i) {
             // Skip fields that have already been visited.
-            auto& action = actions[fieldIdx];
-            auto visitedIdx = fieldIdx - numKeepOrDrops;
-            if (visited[visitedIdx]) {
+            size_t fieldIdx = mandatoryFields[i];
+            if (visited[fieldIdx]) {
                 continue;
             }
 
-            // Get the field name for this field and then consult 'action' to see what
+            // Get the field name for this field, and then consult 'action' to see what
             // action should be taken.
             auto fieldName = StringData(fields[fieldIdx]);
+            auto& action = actions[fieldIdx];
 
             if (action.isValueArg()) {
                 // Get the value arg and store it into 'tag'/'val'.
                 size_t argIdx = action.getValueArgIdx();
-                auto [_, tag, val] = getFromStack(stackStartOffset + argIdx);
+                auto [_, tag, val] = getFromStack(argsStackOff + argIdx);
 
                 // Append the value arg to 'bob'.
                 bson::appendValueToBsonObj(bob, fieldName, tag, val);
@@ -259,7 +258,7 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
 
                 // Get the lambda corresponding to 'fieldIdx' and the offset of the lambda.
                 size_t argIdx = lambdaArg.argIdx;
-                auto [_, t, v] = getFromStack(stackStartOffset + argIdx);
+                auto [_, t, v] = getFromStack(argsStackOff + argIdx);
                 tassert(7103506, "Expected arg to be LocalLambda", t == TypeTags::LocalLambda);
                 int64_t lamPos = value::bitcastTo<int64_t>(v);
 
@@ -281,7 +280,8 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
                 }
 
                 // Call traverseAndProduceBsonObj() to produce the object.
-                TraverseAndProduceBsonObjContext ctx{fieldSpec, stackStartOffset, code};
+                TraverseAndProduceBsonObjContext ctx{
+                    fieldSpec, {fieldsStackOff, argsStackOff}, code};
                 traverseAndProduceBsonObj(ctx, TypeTags::Nothing, 0, fieldName, bob);
             } else {
                 MONGO_UNREACHABLE_TASSERT(7103503);
@@ -291,15 +291,90 @@ void ByteCode::produceBsonObject(const MakeObjSpec* spec,
 }
 
 template void ByteCode::produceBsonObject<BsonObjCursor>(const MakeObjSpec* spec,
-                                                         int stackStartOffset,
+                                                         MakeObjStackOffsets stackOffsets,
                                                          const CodeFragment* code,
                                                          UniqueBSONObjBuilder& bob,
                                                          BsonObjCursor cursor);
 
 template void ByteCode::produceBsonObject<ObjectCursor>(const MakeObjSpec* spec,
-                                                        int stackStartOffset,
+                                                        MakeObjStackOffsets stackOffsets,
                                                         const CodeFragment* code,
                                                         UniqueBSONObjBuilder& bob,
                                                         ObjectCursor cursor);
+
+template void ByteCode::produceBsonObject<InputFieldsOnlyCursor>(const MakeObjSpec* spec,
+                                                                 MakeObjStackOffsets stackOffsets,
+                                                                 const CodeFragment* code,
+                                                                 UniqueBSONObjBuilder& bob,
+                                                                 InputFieldsOnlyCursor cursor);
+
+template void ByteCode::produceBsonObject<BsonObjWithInputFieldsCursor>(
+    const MakeObjSpec* spec,
+    MakeObjStackOffsets stackOffsets,
+    const CodeFragment* code,
+    UniqueBSONObjBuilder& bob,
+    BsonObjWithInputFieldsCursor cursor);
+
+template void ByteCode::produceBsonObject<ObjWithInputFieldsCursor>(
+    const MakeObjSpec* spec,
+    MakeObjStackOffsets stackOffsets,
+    const CodeFragment* code,
+    UniqueBSONObjBuilder& bob,
+    ObjWithInputFieldsCursor cursor);
+
+void ByteCode::produceBsonObjectWithInputFields(const MakeObjSpec* spec,
+                                                MakeObjStackOffsets stackOffs,
+                                                const CodeFragment* code,
+                                                UniqueBSONObjBuilder& bob,
+                                                value::TypeTags objTag,
+                                                value::Value objVal) {
+    using TypeTags = value::TypeTags;
+    using InputFields = MakeObjCursorInputFields;
+
+    const auto& fields = spec->fields;
+    const auto& actions = spec->actions;
+    const auto defActionType = spec->fieldsScopeIsClosed() ? MakeObjSpec::ActionType::kDrop
+                                                           : MakeObjSpec::ActionType::kKeep;
+
+    const size_t numInputFields = spec->numInputFields ? *spec->numInputFields : 0;
+
+    auto [fieldsStackOff, _] = stackOffs;
+    auto inputFields = InputFields(*this, fieldsStackOff, numInputFields);
+
+    auto bsonObjCursor = objTag == TypeTags::bsonObject
+        ? boost::make_optional(
+              BsonObjCursor(fields, actions, defActionType, value::bitcastTo<const char*>(objVal)))
+        : boost::none;
+    auto objCursor = objTag == TypeTags::Object
+        ? boost::make_optional(
+              ObjectCursor(fields, actions, defActionType, value::getObjectView(objVal)))
+        : boost::none;
+
+    // Invoke the produceBsonObject() lambda with the appropriate cursor type.
+    if (objTag == TypeTags::Null) {
+        size_t n = numInputFields;
+        produceBsonObject(spec,
+                          stackOffs,
+                          code,
+                          bob,
+                          InputFieldsOnlyCursor(fields, actions, defActionType, inputFields, n));
+    } else if (objTag == TypeTags::bsonObject) {
+        produceBsonObject(spec,
+                          stackOffs,
+                          code,
+                          bob,
+                          BsonObjWithInputFieldsCursor(
+                              fields, actions, defActionType, inputFields, *bsonObjCursor));
+    } else if (objTag == TypeTags::Object) {
+        produceBsonObject(
+            spec,
+            stackOffs,
+            code,
+            bob,
+            ObjWithInputFieldsCursor(fields, actions, defActionType, inputFields, *objCursor));
+    } else {
+        MONGO_UNREACHABLE_TASSERT(8146602);
+    }
+}
 
 }  // namespace mongo::sbe::vm

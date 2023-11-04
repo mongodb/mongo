@@ -5471,36 +5471,55 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
     ArityType arity, const CodeFragment* code) {
     tassert(6897002,
             str::stream() << "Unsupported number of arguments passed to makeBsonObj(): " << arity,
-            arity >= 2);
+            arity >= 3);
 
     auto [specOwned, specTag, specVal] = getFromStack(0);
     auto [objOwned, objTag, objVal] = getFromStack(1);
+    auto [hasInputFieldsOwned, hasInputFieldsTag, hasInputFieldsVal] = getFromStack(2);
 
     if (specTag != value::TypeTags::makeObjSpec) {
         return {false, value::TypeTags::Nothing, 0};
     }
+    if (hasInputFieldsTag != value::TypeTags::Boolean) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
 
     auto spec = value::getMakeObjSpecView(specVal);
+    bool hasInputFields = value::bitcastTo<bool>(hasInputFieldsVal);
 
-    if (spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
-        !value::isObject(objTag)) {
-        if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
-            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
-            // 'kReturnNothing', then return Nothing.
-            return {false, value::TypeTags::Nothing, 0};
-        } else if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnInput) {
-            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
-            // 'kReturnInput', then return the input.
-            topStack(false, value::TypeTags::Nothing, 0);
-            return {objOwned, objTag, objVal};
+    if (hasInputFields && objTag != value::TypeTags::Null && !value::isObject(objTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    if (!hasInputFields) {
+        if (spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
+            !value::isObject(objTag)) {
+            if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
+                // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+                // 'kReturnNothing', then return Nothing.
+                return {false, value::TypeTags::Nothing, 0};
+            } else if (spec->nonObjInputBehavior ==
+                       MakeObjSpec::NonObjInputBehavior::kReturnInput) {
+                // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+                // 'kReturnInput', then return the input.
+                topStack(false, value::TypeTags::Nothing, 0);
+                return {objOwned, objTag, objVal};
+            }
         }
     }
 
-    const int stackStartOffset = 2;
+    int numInputFields = hasInputFields && spec->numInputFields ? *spec->numInputFields : 0;
+    const int fieldsStackOff = 3;
+    const int argsStackOff = fieldsStackOff + numInputFields;
+    const auto stackOffsets = MakeObjStackOffsets{fieldsStackOff, argsStackOff};
 
     UniqueBSONObjBuilder bob;
 
-    produceBsonObject(spec, stackStartOffset, code, bob, objTag, objVal);
+    if (!hasInputFields) {
+        produceBsonObject(spec, stackOffsets, code, bob, objTag, objVal);
+    } else {
+        produceBsonObjectWithInputFields(spec, stackOffsets, code, bob, objTag, objVal);
+    }
 
     bob.doneFast();
     char* data = bob.bb().release().release();

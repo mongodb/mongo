@@ -30,6 +30,7 @@
 #include "mongo/util/string_listset.h"
 
 #include <absl/container/flat_hash_map.h>
+#include <sstream>
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -86,5 +87,14 @@ std::array<uint8_t, 128> StringListSet::buildFastHash() {
 size_t StringListSet::findInMapImpl(StringData str) const {
     auto it = _stringToIndexMap.find(str);
     return it != _stringToIndexMap.end() ? it->second : npos;
+}
+
+std::string StringListSet::toString() const {
+    std::stringstream ss;
+    for (size_t i = 0; i < _strings.size(); ++i) {
+        ss << (i > 0 ? ", " : "") << _strings[i];
+    }
+
+    return ss.str();
 }
 }  // namespace mongo

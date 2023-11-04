@@ -276,18 +276,20 @@ std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fie
 
     std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
     for (size_t i = 0; i < fields.size(); ++i) {
-        fieldActions.emplace_back(i);
+        fieldActions.emplace_back(sbe::MakeObjSpec::ValueArg{i});
     }
 
-    auto makeObjSpec = makeConstant(
-        sbe::value::TypeTags::makeObjSpec,
-        sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-            sbe::MakeObjSpec::FieldBehavior::kOpen, std::move(fields), std::move(fieldActions))));
+    auto makeObjSpec =
+        makeConstant(sbe::value::TypeTags::makeObjSpec,
+                     sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+                         FieldListScope::kOpen, std::move(fields), std::move(fieldActions))));
     auto makeObjRoot = makeNothingConstant();
+    auto hasInputFieldsExpr = makeBoolConstant(false);
     sbe::EExpression::Vector makeObjArgs;
-    makeObjArgs.reserve(2 + values.size());
+    makeObjArgs.reserve(3 + values.size());
     makeObjArgs.push_back(std::move(makeObjSpec));
     makeObjArgs.push_back(std::move(makeObjRoot));
+    makeObjArgs.push_back(std::move(hasInputFieldsExpr));
     std::move(values.begin(), values.end(), std::back_inserter(makeObjArgs));
 
     return sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs));

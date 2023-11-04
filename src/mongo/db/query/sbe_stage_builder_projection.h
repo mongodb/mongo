@@ -46,9 +46,8 @@ class PlanStageSlots;
  * can make use of kField slots when appropriate.
  */
 SbExpr generateProjection(StageBuilderState& state,
-                          const projection_ast::Projection* proj,
+                          const projection_ast::Projection* projection,
                           SbExpr inputExpr,
-                          boost::optional<TypedSlot> rootSlot = boost::none,
                           const PlanStageSlots* slots = nullptr);
 
 SbExpr generateProjection(StageBuilderState& state,
@@ -56,6 +55,19 @@ SbExpr generateProjection(StageBuilderState& state,
                           std::vector<std::string> paths,
                           std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
-                          boost::optional<TypedSlot> rootSlot = boost::none,
                           const PlanStageSlots* slots = nullptr);
+
+SbExpr generateProjectionWithInputFields(StageBuilderState& state,
+                                         const projection_ast::Projection* projection,
+                                         SbExpr inputExpr,
+                                         const sbe::MakeObjInputPlan& inputPlan,
+                                         const PlanStageSlots* slots);
+
+SbExpr generateProjectionWithInputFields(StageBuilderState& state,
+                                         projection_ast::ProjectType type,
+                                         std::vector<std::string> paths,
+                                         std::vector<ProjectNode> nodes,
+                                         SbExpr inputExpr,
+                                         const sbe::MakeObjInputPlan& inputPlan,
+                                         const PlanStageSlots* slots);
 }  // namespace mongo::stage_builder
