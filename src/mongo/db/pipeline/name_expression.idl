@@ -40,6 +40,6 @@ types:
         description: >-
             "A name expression that can be known at runtime. Can be a string literal as well."
         cpp_type: "mongo::NameExpression"
-        serializer: mongo::NameExpression::serializeToBSON
+        serializer: ::mongo::NameExpression::serializeToBSON
         deserializer: mongo::NameExpression::parseFromBSON
 

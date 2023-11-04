@@ -2246,10 +2246,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Generate custom serialization
         template_params = {
-            'field_name': _get_field_constant_name(field),
-            'access_member': _access_member(field),
-            'serialization_context': '_serializationContext',
-            'serialization_options': 'options',
+            'field_name': _get_field_constant_name(field), 'access_member': _access_member(field),
+            'serialization_context': '_serializationContext'
         }
 
         with self._with_template(template_params):
@@ -2287,51 +2285,65 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         assert False
 
             elif field.type.bson_serialization_type[0] == 'any':
-
-                def maybe_add_serialization_context(*args):
-                    """Append 'SerializationContext' arg if needed."""
-                    if field.type.deserialize_with_tenant:
-                        args += ('${serialization_context}', )
-                    return args
-
-                def maybe_add_serialization_options(*args):
-                    """Append 'SerializationOptions' arg if needed."""
-                    if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
-                        args += ('${serialization_options}', )
-                    return args
-
-                def generate_args_template(*args):
-                    """Simply return a string, with all the arguments separated by a comma."""
-                    return ", ".join(args)
-
-                def generate_call_site(serializer, subject, *args):
-                    """Generate either a function or a method invocation with the appropriate arguments."""
-                    args = maybe_add_serialization_context(*args)
-                    args = maybe_add_serialization_options(*args)
-                    if writer.is_function(serializer):
-                        # It should be invoked as 'function(subject, ...args);'
-                        return f"{serializer}({generate_args_template(subject, *args)});"
-                    else:
-                        # It should be invoked as 'subject.method(...args);'
-                        truncated_serializer = writer.get_method_name(serializer)
-                        return f"{subject}.{truncated_serializer}({generate_args_template(*args)});"
+                # Any types are special
+                # Array variants - we pass an array builder
+                # Non-array variants - we pass the field name they should use, and a BSONObjBuilder.
+                method_name = writer.get_method_name(field.type.serializer)
+                template_params['method_name'] = method_name
 
                 if field.type.is_array:
-                    # Array variants - we pass an array builder
                     self._writer.write_template(
                         'BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));')
                     with self._block('for (const auto& item : ${access_member}) {', '}'):
-                        template = generate_call_site(
-                            field.type.serializer,
-                            'item',
-                            '&arrayBuilder',
-                        )
-                        self._writer.write_template(template)
+                        # Call a method like class::method(BSONArrayBuilder*)
+                        self._writer.write_template('item.${method_name}(&arrayBuilder);')
                 else:
-                    # Non-array variants - we pass the field name they should use, and a BSONObjBuilder.
-                    template = generate_call_site(field.type.serializer, '${access_member}',
-                                                  '${field_name}', 'builder')
-                    self._writer.write_template(template)
+                    if writer.is_function(field.type.serializer):
+                        # SerializationContext bound to deserialize_with_tenant
+                        if field.type.deserialize_with_tenant:
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like method(value, StringData, BSONObjBuilder*, SerializationContext, SerializationOptions)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder, ${serialization_context}, options);'
+                                )
+                            else:
+                                # Call a method like method(value, StringData, BSONObjBuilder*, SerializationContext)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder, ${serialization_context});'
+                                )
+                        else:
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like method(value, StringData, BSONObjBuilder*, SerializationOptions)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder, options);'
+                                )
+                            else:
+                                # Call a method like method(value, StringData, BSONObjBuilder*)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder);')
+                    else:
+                        # SerializationContext bound to deserialize_with_tenant
+                        if field.type.deserialize_with_tenant:
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like class::method(StringData, BSONObjBuilder*, SerializationContext, SerializationOptions)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder, ${serialization_context}, options);'
+                                )
+                            else:
+                                # Call a method like class::method(StringData, BSONObjBuilder*, SerializationContext)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder, ${serialization_context});'
+                                )
+                        else:
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like class::method(StringData, BSONObjBuilder*, SerializationOptions)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder, options);'
+                                )
+                            else:
+                                # Call a method like class::method(StringData, BSONObjBuilder*)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder);')
 
             else:
                 method_name = writer.get_method_name(field.type.serializer)
