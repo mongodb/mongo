@@ -654,8 +654,6 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->wrapup_checkpoint = NULL;
     r->wrapup_checkpoint_compressed = false;
 
-    r->evict_matching_checksum_failed = false;
-
     /*
      * Dictionary compression only writes repeated values once. We grow the dictionary as necessary,
      * always using the largest size we've seen.
@@ -1645,7 +1643,7 @@ __rec_split_write_header(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK
     dsk->recno = btree->type == BTREE_ROW ? WT_RECNO_OOB : multi->key.recno;
 
     __rec_set_page_write_gen(btree, dsk);
-    dsk->mem_size = multi->size;
+    dsk->mem_size = WT_STORE_SIZE(chunk->image.size);
     dsk->u.entries = chunk->entries;
     dsk->type = page->type;
 
@@ -1666,83 +1664,6 @@ __rec_split_write_header(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK
 
     /* Clear the memory owned by the block manager. */
     memset(WT_BLOCK_HEADER_REF(dsk), 0, btree->block_header);
-}
-
-/*
- * __rec_split_write_reuse --
- *     Check if a previously written block can be reused.
- */
-static bool
-__rec_split_write_reuse(
-  WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *multi, WT_ITEM *image, bool last_block)
-{
-    WT_MULTI *multi_match;
-    WT_PAGE_MODIFY *mod;
-
-    mod = r->page->modify;
-
-    /*
-     * Don't bother calculating checksums for bulk loads, there's no reason to believe they'll be
-     * useful. Check because LSM does bulk-loads as part of normal operations and the check is
-     * cheap.
-     */
-    if (r->is_bulk_load)
-        return (false);
-
-    /*
-     * Calculating the checksum is the expensive part, try to avoid it.
-     *
-     * Ignore the last block of any reconciliation. Pages are written in the same block order every
-     * time, so the last block written for a page is unlikely to match any previously written block
-     * or block written in the future, (absent a point-update earlier in the page which didn't
-     * change the size of the on-page object in any way).
-     */
-    if (last_block)
-        return (false);
-
-    /*
-     * Quit if evicting with no previously written block to compare against. (In other words, if
-     * there's eviction pressure and the page was never written by a checkpoint, calculating a
-     * checksum is worthless.)
-     *
-     * Quit if evicting and a previous check failed, once there's a miss no future block will match.
-     */
-    if (F_ISSET(r, WT_REC_EVICT)) {
-        if (mod->rec_result != WT_PM_REC_MULTIBLOCK || mod->mod_multi_entries < r->multi_next)
-            return (false);
-        if (r->evict_matching_checksum_failed)
-            return (false);
-    }
-
-    /* Calculate the checksum for this block. */
-    multi->checksum = __wt_checksum(image->data, image->size);
-
-    /*
-     * Don't check for a block match when writing blocks during compaction, the whole idea is to
-     * move those blocks. Check after calculating the checksum, we don't distinguish between pages
-     * written solely as part of the compaction and pages written at around the same time, and so
-     * there's a possibility the calculated checksum will be useful in the future.
-     */
-    if (session->compact_state != WT_COMPACT_NONE)
-        return (false);
-
-    /*
-     * Pages are written in the same block order every time, only check the appropriate slot.
-     */
-    if (mod->rec_result != WT_PM_REC_MULTIBLOCK || mod->mod_multi_entries < r->multi_next)
-        return (false);
-
-    multi_match = &mod->mod_multi[r->multi_next - 1];
-    if (multi_match->size != multi->size || multi_match->checksum != multi->checksum) {
-        r->evict_matching_checksum_failed = true;
-        return (false);
-    }
-
-    multi_match->addr.reuse = 1;
-    multi->addr = multi_match->addr;
-
-    WT_STAT_DATA_INCR(session, rec_page_match);
-    return (true);
 }
 
 /*
@@ -1871,8 +1792,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
     default:
         return (__wt_illegal_value(session, page->type));
     }
-    multi->size = WT_STORE_SIZE(chunk->image.size);
-    multi->checksum = 0;
     multi->supd_restore = false;
 
     /* Set the key. */
@@ -1933,14 +1852,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
 
         WT_ASSERT(session, chunk->entries > 0);
     }
-
-    /*
-     * If we wrote this block before, re-use it. Prefer a checksum of the compressed image. It's an
-     * identical test and should be faster.
-     */
-    if (__rec_split_write_reuse(session, r, multi,
-          compressed_image == NULL ? &chunk->image : compressed_image, last_block))
-        goto copy_image;
 
     /* Write the disk image and get an address. */
     WT_RET(__wt_bt_write(session, compressed_image == NULL ? &chunk->image : compressed_image, addr,
@@ -2098,14 +2009,13 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
         __wt_free(session, multi->supd);
 
         /*
-         * If the page was re-written free the backing disk blocks used in the previous write
-         * (unless the blocks were reused in this write). The page may instead have been a disk
-         * image with associated saved updates: ownership of the disk image is transferred when
-         * rewriting the page in-memory and there may not have been saved updates. We've gotten this
-         * wrong a few times, so use the existence of an address to confirm backing blocks we care
-         * about, and free any disk image/saved updates.
+         * If the page was re-written free the backing disk blocks used in the previous write. The
+         * page may instead have been a disk image with associated saved updates: ownership of the
+         * disk image is transferred when rewriting the page in-memory and there may not have been
+         * saved updates. We've gotten this wrong a few times, so use the existence of an address to
+         * confirm backing blocks we care about, and free any disk image/saved updates.
          */
-        if (multi->addr.addr != NULL && !multi->addr.reuse) {
+        if (multi->addr.addr != NULL) {
             WT_RET(__wt_btree_block_free(session, multi->addr.addr, multi->addr.size));
             __wt_free(session, multi->addr.addr);
         }
@@ -2167,11 +2077,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_BM *bm;
     WT_BTREE *btree;
     WT_DECL_RET;
-    WT_MULTI *multi;
     WT_PAGE_MODIFY *mod;
     WT_REF *ref;
     WT_TIME_AGGREGATE ta;
-    uint32_t i;
 
     btree = S2BT(session);
     bm = btree->bm;
@@ -2320,14 +2228,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT))
             WT_RET(__rec_split_dump_keys(session, r));
 
-        /*
-         * The reuse flag was set in some cases, but we have to clear it, otherwise on subsequent
-         * reconciliation we would fail to remove blocks that are being discarded.
-         */
 split:
-        for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-            multi->addr.reuse = 0;
-
         mod->mod_multi = r->multi;
         mod->mod_multi_entries = r->multi_next;
         mod->rec_result = WT_PM_REC_MULTIBLOCK;
@@ -2349,33 +2250,15 @@ __rec_write_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
     WT_DECL_RET;
     WT_MULTI *multi;
-    WT_PAGE_MODIFY *mod;
     uint32_t i;
-
-    mod = page->modify;
-
-    /*
-     * Clear the address-reused flag from the multiblock reconciliation information (otherwise we
-     * might think the backing block is being reused on a subsequent reconciliation where we want to
-     * free it).
-     */
-    if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
-        for (multi = mod->mod_multi, i = 0; i < mod->mod_multi_entries; ++multi, ++i)
-            multi->addr.reuse = 0;
 
     /*
      * On error, discard blocks we've written, they're unreferenced by the tree. This is not a
      * question of correctness, we're avoiding block leaks.
-     *
-     * Don't discard backing blocks marked for reuse, they remain part of a previous reconciliation.
      */
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
-        if (multi->addr.addr != NULL) {
-            if (multi->addr.reuse)
-                multi->addr.addr = NULL;
-            else
-                WT_TRET(__wt_btree_block_free(session, multi->addr.addr, multi->addr.size));
-        }
+        if (multi->addr.addr != NULL)
+            WT_TRET(__wt_btree_block_free(session, multi->addr.addr, multi->addr.size));
 
     WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 
