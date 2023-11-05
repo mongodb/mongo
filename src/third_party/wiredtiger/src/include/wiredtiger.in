@@ -6803,125 +6803,123 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2181
 /*! reconciliation: overflow values written */
 #define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2182
-/*! reconciliation: page checksum matches */
-#define	WT_STAT_DSRC_REC_PAGE_MATCH			2183
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2184
+#define	WT_STAT_DSRC_REC_PAGES				2183
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2185
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2184
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2186
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2185
 /*!
  * reconciliation: pages written including an aggregated newest start
  * durable timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	2187
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	2186
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * durable timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	2188
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	2187
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TS	2189
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TS	2188
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * transaction ID
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TXN	2190
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TXN	2189
 /*!
  * reconciliation: pages written including an aggregated newest
  * transaction ID
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_TXN		2191
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_TXN		2190
 /*!
  * reconciliation: pages written including an aggregated oldest start
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_OLDEST_START_TS	2192
+#define	WT_STAT_DSRC_REC_TIME_AGGR_OLDEST_START_TS	2191
 /*! reconciliation: pages written including an aggregated prepare */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_PREPARED		2193
+#define	WT_STAT_DSRC_REC_TIME_AGGR_PREPARED		2192
 /*! reconciliation: pages written including at least one prepare */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_PREPARED	2194
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_PREPARED	2193
 /*!
  * reconciliation: pages written including at least one start durable
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	2195
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	2194
 /*! reconciliation: pages written including at least one start timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TS	2196
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TS	2195
 /*!
  * reconciliation: pages written including at least one start transaction
  * ID
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TXN	2197
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TXN	2196
 /*!
  * reconciliation: pages written including at least one stop durable
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	2198
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	2197
 /*! reconciliation: pages written including at least one stop timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TS	2199
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TS	2198
 /*!
  * reconciliation: pages written including at least one stop transaction
  * ID
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TXN	2200
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TXN	2199
 /*! reconciliation: records written including a prepare */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PREPARED		2201
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PREPARED		2200
 /*! reconciliation: records written including a start durable timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_START_TS	2202
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_START_TS	2201
 /*! reconciliation: records written including a start timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TS		2203
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TS		2202
 /*! reconciliation: records written including a start transaction ID */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TXN		2204
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TXN		2203
 /*! reconciliation: records written including a stop durable timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_STOP_TS	2205
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_STOP_TS	2204
 /*! reconciliation: records written including a stop timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TS		2206
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TS		2205
 /*! reconciliation: records written including a stop transaction ID */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2207
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2206
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2208
+#define	WT_STAT_DSRC_SESSION_COMPACT			2207
 /*! session: tiered operations dequeued and processed */
-#define	WT_STAT_DSRC_TIERED_WORK_UNITS_DEQUEUED		2209
+#define	WT_STAT_DSRC_TIERED_WORK_UNITS_DEQUEUED		2208
 /*! session: tiered operations scheduled */
-#define	WT_STAT_DSRC_TIERED_WORK_UNITS_CREATED		2210
+#define	WT_STAT_DSRC_TIERED_WORK_UNITS_CREATED		2209
 /*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_DSRC_TIERED_RETENTION			2211
+#define	WT_STAT_DSRC_TIERED_RETENTION			2210
 /*! transaction: checkpoint has acquired a snapshot for its transaction */
-#define	WT_STAT_DSRC_TXN_CHECKPOINT_SNAPSHOT_ACQUIRED	2212
+#define	WT_STAT_DSRC_TXN_CHECKPOINT_SNAPSHOT_ACQUIRED	2211
 /*! transaction: race to read prepared update retry */
-#define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2213
+#define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2212
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2214
+#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2213
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2215
+#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2214
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2216
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2215
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2217
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2216
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2218
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2217
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2219
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2218
 /*! transaction: rollback to stable skipping delete rle */
-#define	WT_STAT_DSRC_TXN_RTS_DELETE_RLE_SKIPPED		2220
+#define	WT_STAT_DSRC_TXN_RTS_DELETE_RLE_SKIPPED		2219
 /*! transaction: rollback to stable skipping stable rle */
-#define	WT_STAT_DSRC_TXN_RTS_STABLE_RLE_SKIPPED		2221
+#define	WT_STAT_DSRC_TXN_RTS_STABLE_RLE_SKIPPED		2220
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2222
+#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2221
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2223
+#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2222
 /*! transaction: transaction checkpoints due to obsolete pages */
-#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2224
+#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2223
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2225
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2224
 
 /*!
  * @}
