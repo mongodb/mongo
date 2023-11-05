@@ -1120,19 +1120,19 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
     WT_RET(ds->f(ds, ", entries %" PRIu32, entries));
     WT_RET(ds->f(ds, ", %s", __wt_page_is_modified(page) ? "dirty" : "clean"));
 
-    if (F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_BUILD_KEYS))
         WT_RET(ds->f(ds, ", keys-built"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_DISK_ALLOC))
         WT_RET(ds->f(ds, ", disk-alloc"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_DISK_MAPPED))
         WT_RET(ds->f(ds, ", disk-mapped"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU))
         WT_RET(ds->f(ds, ", evict-lru"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_OVERFLOW_KEYS))
         WT_RET(ds->f(ds, ", overflow-keys"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_SPLIT_INSERT))
         WT_RET(ds->f(ds, ", split-insert"));
-    if (F_ISSET_ATOMIC(page, WT_PAGE_UPDATE_IGNORE))
+    if (F_ISSET_ATOMIC_16(page, WT_PAGE_UPDATE_IGNORE))
         WT_RET(ds->f(ds, ", update-ignore"));
 
     if (mod != NULL)
