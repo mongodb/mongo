@@ -475,7 +475,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
      * discard these pages.
      */
     WT_RET(__wt_page_alloc(session, page->type, mod->mod_multi_entries, false, &next));
-    F_SET_ATOMIC(next, WT_PAGE_EVICT_NO_PROGRESS);
+    F_SET_ATOMIC_16(next, WT_PAGE_EVICT_NO_PROGRESS);
 
     WT_INTL_INDEX_GET(session, next, pindex);
     for (i = 0; i < mod->mod_multi_entries; ++i) {

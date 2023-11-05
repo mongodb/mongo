@@ -361,7 +361,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
     /* Allocate and initialize a new WT_PAGE. */
     WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, true, &page));
     page->dsk = dsk;
-    F_SET_ATOMIC(page, flags);
+    F_SET_ATOMIC_16(page, flags);
 
     /*
      * Track the memory allocated to build this page so we can update the cache statistics in a
@@ -663,7 +663,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
      * we can do during a checkpoint.
      */
     if (overflow_keys)
-        F_SET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS);
+        F_SET_ATOMIC_16(page, WT_PAGE_OVERFLOW_KEYS);
 
 err:
     __wt_scr_free(session, &current);
@@ -851,7 +851,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp)
      * Mark the page as not needing that work if there aren't stretches of prefix-compressed keys.
      */
     if (best_prefix_count <= 10)
-        F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
+        F_SET_ATOMIC_16(page, WT_PAGE_BUILD_KEYS);
 
     if (preparedp != NULL && prepare)
         *preparedp = true;
