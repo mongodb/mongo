@@ -65,7 +65,7 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
 
     def test_checkpoint_stats(self):
         nrows = 100
-        ntables = 10
+        ntables = 50
         multiplier = 1
 
         # Run the loop and increase the value size with each iteration until
@@ -119,7 +119,10 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             time_total = self.get_stat(stat.conn.txn_checkpoint_time_total)
             self.pr('txn_checkpoint_time_total ' + str(time_total))
 
-            self.assertEqual(num_ckpt, 2)
+            # Account for When the connection re-opens on an existing datable as we perform a
+            # checkpoint during the open stage. 
+            expected_ckpts = 3 if multiplier > 1 else 2
+            self.assertEqual(num_ckpt, expected_ckpts)
             self.assertEqual(running, 0)
             self.assertEqual(prep_running, 0)
             # Assert if this loop continues for more than 100 iterations.
@@ -129,11 +132,11 @@ class test_checkpoint04(wttest.WiredTigerTestCase):
             # Run the loop again if any of the below condition fails and exit if the test passes.
             if prep_min < time_min and prep_max < time_max and prep_recent < time_recent and prep_total < time_total:
                 break
-            else:
-                multiplier += 1
-                # Reopen the connection to reset statistics. 
-                # We don't want stats from earlier runs to interfere with later runs.
-                self.reopen_conn()
+
+            multiplier += 1
+            # Reopen the connection to reset statistics.
+            # We don't want stats from earlier runs to interfere with later runs.
+            self.reopen_conn()
 
 if __name__ == '__main__':
     wttest.run()
