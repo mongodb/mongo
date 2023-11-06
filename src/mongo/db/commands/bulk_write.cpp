@@ -116,6 +116,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -137,7 +138,11 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -961,6 +966,58 @@ bool attemptProcessFLEDelete(OperationContext* opCtx,
     }
 }
 
+BSONObj makeSingleOpSampledBulkWriteCommandRequest(OperationContext* opCtx,
+                                                   const BulkWriteCommandRequest& req,
+                                                   size_t opIdx) {
+    if (req.getOriginalQuery() || req.getOriginalCollation()) {
+        tassert(7787101,
+                "Found a _clusterWithoutShardKey command with bulkWrite ops size > 1",
+                req.getOps().size() == 1);
+        uassert(ErrorCodes::InvalidOptions,
+                "Cannot specify '$_originalQuery' or '$_originalCollation' since they are internal "
+                "fields",
+                analyze_shard_key::isInternalClient(opCtx));
+    }
+
+    auto op = BulkWriteCRUDOp(req.getOps()[opIdx]);
+
+    // Make a copy of the nsEntry for the op at opIdx.
+    NamespaceInfoEntry newNsEntry = req.getNsInfo()[op.getNsInfoIdx()];
+
+    // Make a copy of the operation and adjust its namespace index to 0.
+    auto newOp = req.getOps()[opIdx];
+    stdx::visit(OverloadedVisitor{
+                    [&](mongo::BulkWriteInsertOp& op) { MONGO_UNREACHABLE },
+                    [&](mongo::BulkWriteUpdateOp& op) {
+                        op.setUpdate(0);
+                        if (req.getOriginalQuery() || req.getOriginalCollation()) {
+                            op.setFilter(req.getOriginalQuery().get_value_or({}));
+                            op.setCollation(req.getOriginalCollation());
+                        }
+                    },
+                    [&](mongo::BulkWriteDeleteOp& op) {
+                        op.setDeleteCommand(0);
+                        if (req.getOriginalQuery() || req.getOriginalCollation()) {
+                            op.setFilter(req.getOriginalQuery().get_value_or({}));
+                            op.setCollation(req.getOriginalCollation());
+                        }
+                    },
+                },
+                newOp);
+
+    BulkWriteCommandRequest singleOpRequest;
+    singleOpRequest.setOps({newOp});
+    singleOpRequest.setNsInfo({newNsEntry});
+    singleOpRequest.setBypassDocumentValidation(req.getBypassDocumentValidation());
+    singleOpRequest.setLet(req.getLet());
+    singleOpRequest.setStmtId(bulk_write_common::getStatementId(req, opIdx));
+    singleOpRequest.setDbName(DatabaseName::kAdmin);
+
+    return singleOpRequest.toBSON(
+        BSON(BulkWriteCommandRequest::kDbNameFieldName << DatabaseNameUtil::serialize(
+                 DatabaseName::kAdmin, SerializationContext::stateCommandRequest())));
+}
+
 bool handleDeleteOp(OperationContext* opCtx,
                     const BulkWriteDeleteOp* op,
                     const BulkWriteCommandRequest& req,
@@ -1017,21 +1074,22 @@ bool handleDeleteOp(OperationContext* opCtx,
         // Initialize curOp information.
         setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opDelete, nsEntry, op->toBSON());
 
-        auto deleteRequest = DeleteRequest();
-        deleteRequest.setNsString(nsString);
-        deleteRequest.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
-        deleteRequest.setQuery(op->getFilter());
-        deleteRequest.setProj(BSONObj());
-        deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        deleteRequest.setLet(req.getLet());
-        deleteRequest.setHint(op->getHint());
-        deleteRequest.setCollation(op->getCollation().value_or(BSONObj()));
-        deleteRequest.setMulti(op->getMulti());
-        deleteRequest.setIsExplain(false);
+        auto deleteRequest = bulk_write_common::makeDeleteRequestFromDeleteOp(
+            opCtx, nsEntry, op, stmtId, req.getLet());
 
-        deleteRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
-
-        deleteRequest.setStmtId(stmtId);
+        if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                opCtx,
+                nsString,
+                analyze_shard_key::SampledCommandNameEnum::kBulkWrite,
+                deleteRequest)) {
+            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                ->addDeleteQuery(
+                    analyze_shard_key::SampledCommandNameEnum::kBulkWrite,
+                    {sampleId.value(),
+                     nsString,
+                     makeSingleOpSampledBulkWriteCommandRequest(opCtx, req, currentOpIdx)})
+                .getAsync([](auto) {});
+        }
 
         const bool inTransaction = opCtx->inMultiDocumentTransaction();
         lastOpFixer.startingOp(nsString);
@@ -1566,17 +1624,24 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         // Handle non-retryable normal and timeseries updates, as well as retryable normal
         // updates that were not already executed.
-        auto updateRequest = UpdateRequest(bulk_write_common::makeUpdateOpEntryFromUpdateOp(op));
-        updateRequest.setNamespaceString(nsString);
-        updateRequest.setIsTimeseriesNamespace(nsEntry.getIsTimeseriesNamespace());
-        updateRequest.setProj(BSONObj());
-        updateRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
-        updateRequest.setLetParameters(req.getLet());
-        updateRequest.setReturnDocs(UpdateRequest::RETURN_NONE);
-        updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
-        // We only execute one update op at a time.
-        updateRequest.setStmtIds({stmtId});
+        auto updateRequest = bulk_write_common::makeUpdateRequestFromUpdateOp(
+            opCtx, nsEntry, op, stmtId, req.getLet());
+
+        if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                opCtx,
+                nsString,
+                analyze_shard_key::SampledCommandNameEnum::kBulkWrite,
+                updateRequest)) {
+            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                ->addUpdateQuery(
+                    analyze_shard_key::SampledCommandNameEnum::kBulkWrite,
+                    {sampleId.value(),
+                     nsString,
+                     makeSingleOpSampledBulkWriteCommandRequest(opCtx, req, currentOpIdx)})
+                .getAsync([](auto) {});
+            updateRequest.setSampleId(sampleId);
+        }
 
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
         // is executing an update. This is done to ensure that we can always match,

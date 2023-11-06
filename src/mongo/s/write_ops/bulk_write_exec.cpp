@@ -354,13 +354,8 @@ void executeRetryableTimeseriesUpdate(OperationContext* opCtx,
     // Construct a single-op update request based on the update operation at opIdx.
     auto& bulkWriteReq = bulkWriteOp.getClientRequest();
 
-    BulkWriteCommandRequest singleUpdateRequest;
-    singleUpdateRequest.setOps({bulkWriteReq.getOps()[opIdx]});
-    singleUpdateRequest.setNsInfo(bulkWriteReq.getNsInfo());
-    singleUpdateRequest.setBypassDocumentValidation(bulkWriteReq.getBypassDocumentValidation());
-    singleUpdateRequest.setLet(bulkWriteReq.getLet());
-    singleUpdateRequest.setStmtId(bulk_write_common::getStatementId(bulkWriteReq, opIdx));
-    singleUpdateRequest.setDbName(DatabaseName::kAdmin);
+    BulkWriteCommandRequest singleUpdateRequest =
+        bulk_write_common::makeSingleOpBulkWriteCommandRequest(bulkWriteReq, opIdx);
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
@@ -447,10 +442,30 @@ void executeWriteWithoutShardKey(
     } else {
         // Execute the two phase write protocol for writes that cannot directly target a shard.
 
-        // TODO (SERVER-77871): Support shard key metrics sampling.
+        const auto targetedWriteBatch = [&] {
+            // If there is a targeted write with a sampleId, use that write instead in order to pass
+            // the sampleId to the two phase write protocol. Otherwise, just choose the first
+            // targeted write.
+            for (auto&& [_ /* shardId */, childBatch] : childBatches) {
+                auto nextBatch = childBatch.get();
+
+                // For a write without shard key, we expect each TargetedWriteBatch in childBatches
+                // to contain only one TargetedWrite directed to each shard.
+                tassert(7787100,
+                        "There must be only 1 targeted write in this targeted write batch.",
+                        nextBatch->getWrites().size() == 1);
+
+                auto targetedWrite = nextBatch->getWrites().begin()->get();
+                if (targetedWrite->sampleId) {
+                    return nextBatch;
+                }
+            }
+            return childBatches.begin()->second.get();
+        }();
+
         auto cmdObj = bulkWriteOp
                           .buildBulkCommandRequest(targeters,
-                                                   *childBatches.begin()->second.get(),
+                                                   *targetedWriteBatch,
                                                    allowShardKeyUpdatesWithoutFullShardKeyInQuery)
                           .toBSON({});
 
@@ -698,6 +713,16 @@ BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
     for (const auto& targetedWrite : targetedBatch.getWrites()) {
         const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
         ops.push_back(_clientRequest.getOps().at(writeOpRef.first));
+
+        if (targetedWrite->sampleId.has_value()) {
+            stdx::visit(
+                OverloadedVisitor{
+                    [&](mongo::BulkWriteInsertOp& op) { return; },
+                    [&](mongo::BulkWriteUpdateOp& op) { op.setSampleId(targetedWrite->sampleId); },
+                    [&](mongo::BulkWriteDeleteOp& op) { op.setSampleId(targetedWrite->sampleId); },
+                },
+                ops.back());
+        }
 
         // Set the nsInfo's shardVersion & databaseVersion fields based on the endpoint
         // of each operation. Since some operations may be on the same namespace, this
@@ -1112,11 +1137,30 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo(bool errorsOnly) {
         // If we encountered an error causing us to abort execution we may not have waited for
         // responses to all outstanding requests.
         dassert(writeOp.getWriteState() != WriteOpState_Pending || _aborted);
-        if (writeOp.getWriteState() == WriteOpState_Completed) {
+        auto writeOpState = writeOp.getWriteState();
+
+        // TODO (SERVER-79611): Improve mongos metrics.
+        if (writeOpState == WriteOpState_Completed || writeOpState == WriteOpState_Error) {
+            switch (writeOp.getWriteItem().getOpType()) {
+                case BatchedCommandRequest::BatchType_Insert:
+                    globalOpCounters.gotInsert();
+                    break;
+                case BatchedCommandRequest::BatchType_Update:
+                    globalOpCounters.gotUpdate();
+                    break;
+                case BatchedCommandRequest::BatchType_Delete:
+                    globalOpCounters.gotDelete();
+                    break;
+                default:
+                    MONGO_UNREACHABLE
+            }
+        }
+
+        if (writeOpState == WriteOpState_Completed) {
             if (!errorsOnly) {
                 replyItems.push_back(writeOp.takeBulkWriteReplyItem());
             }
-        } else if (writeOp.getWriteState() == WriteOpState_Error) {
+        } else if (writeOpState == WriteOpState_Error) {
             replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(),
                                     writeOp.getOpError().getStatus());
             // TODO SERVER-79510: Remove this. This is necessary right now because the nModified

@@ -255,13 +255,7 @@ export const BulkWriteUtils = (function() {
     function processDeleteOp(nsInfoIdx, cmdObj, deleteCmd) {
         let op = {"delete": nsInfoIdx, "filter": deleteCmd.q, "multi": deleteCmd.limit == 0};
 
-        ["sampleId"].forEach(property => {
-            if (cmdObj.hasOwnProperty(property)) {
-                op[property] = cmdObj[property];
-            }
-        });
-
-        ["collation", "hint"].forEach(property => {
+        ["sampleId", "collation", "hint"].forEach(property => {
             if (deleteCmd.hasOwnProperty(property)) {
                 op[property] = deleteCmd[property];
             }

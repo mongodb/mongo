@@ -144,10 +144,12 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
                                    bool includeUpsertSupplied,
                                    const boost::optional<mongo::BSONObj>& collation,
                                    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
-                                   const BSONObj& hint);
+                                   const BSONObj& hint,
+                                   const boost::optional<UUID>& sampleId);
 int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
                                    const boost::optional<mongo::BSONObj>& collation,
-                                   const mongo::BSONObj& hint);
+                                   const mongo::BSONObj& hint,
+                                   const boost::optional<UUID>& sampleId);
 
 /**
  * Set of utilities which return true if the estimated write size is greater than or equal to

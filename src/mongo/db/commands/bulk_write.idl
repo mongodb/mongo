@@ -127,6 +127,11 @@ structs:
                 type: object
                 optional: true
                 stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: internal
             $_allowShardKeyUpdatesWithoutFullShardKeyInQuery:
                 description: "Set to true if shard key updates are allowed without the full shard
                               key in the query."
@@ -165,6 +170,11 @@ structs:
                 type: object
                 optional: true
                 stability: unstable
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: internal
 
     # TODO (SERVER-77798): Get rid of this struct that duplicates the definition of a WriteConcernError.
     BulkWriteWriteConcernError:
@@ -335,4 +345,22 @@ commands:
                 type: bool
                 default: false
                 stability: unstable
+            $_originalQuery:
+                description: "The original write query. This is used for updateOne/deleteOne
+                              without shard key during the write phase of the two phase protocol in
+                              order to make sure the shard key query analysis stores the correct
+                              client query."
+                type: object
+                optional: true
+                cpp_name: originalQuery
+                stability: internal
+            $_originalCollation:
+                description: "The original write query. This is used for updateOne/deleteOne
+                              without shard key during the write phase of the two phase protocol in
+                              order to make sure the shard key query analysis stores the correct
+                              client collation."
+                type: object
+                optional: true
+                cpp_name: originalCollation
+                stability: internal
 

@@ -128,3 +128,8 @@ structs:
                               buckets namespace."
                 type: optionalBool
                 stability: internal
+            sampleId:
+                description: "The unique sample id for the operation if it has been chosen for sampling."
+                type: uuid
+                optional: true
+                stability: internal

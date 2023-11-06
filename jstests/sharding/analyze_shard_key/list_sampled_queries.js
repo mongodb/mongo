@@ -5,6 +5,7 @@
  * @tags: [requires_fcv_70]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     AnalyzeShardKeyUtil
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";
@@ -87,6 +88,7 @@ function runTest(conn, {rst, st}) {
             case "update":
             case "delete":
             case "findAndModify":
+            case "bulkWrite":
                 return sample.cmd.let.sampleNum;
             default:
                 throw Error("Unexpected command name");
@@ -174,6 +176,24 @@ function runTest(conn, {rst, st}) {
         cmd: Object.assign({}, deleteCmdObj, {$db: dbName})
     };
     numSamplesColl1++;
+
+    // TODO (SERVER-67711): Remove feature flag for bulkWrite command.
+    if (FeatureFlagUtil.isPresentAndEnabled(testDb, "BulkWriteCommand")) {
+        const bulkWriteCmdObj = {
+            bulkWrite: 1,
+            ops: [{update: 0, filter: {x: 7}, updateMods: {$set: {y: 7}}}],
+            nsInfo: [{ns: ns1}],
+            let : {sampleNum: ++sampleNum}
+        };
+        assert.commandWorked(testDb.adminCommand(bulkWriteCmdObj));
+        expectedSamples[sampleNum] = {
+            ns: ns1,
+            collectionUuid: collUuid1,
+            cmdName: "bulkWrite",
+            cmd: Object.assign({}, bulkWriteCmdObj, {$db: "admin"})
+        };
+        numSamplesColl1++;
+    }
 
     jsTest.log("Test running a $listSampledQueries aggregate command that doesn't involve " +
                "getMore commands");

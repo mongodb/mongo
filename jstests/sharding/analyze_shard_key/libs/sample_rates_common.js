@@ -42,6 +42,10 @@ export async function runDeleteCmdsOnRepeat(host, dbName, collName, targetNumPer
     const {fieldName} =
         await import("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
 
+    if (TestData.runningWithBulkWriteOverride) {
+        await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');
+    }
+
     const conn = new Mongo(host);
     const db = conn.getDB(dbName);
     const makeCmdObjFunc = () => {

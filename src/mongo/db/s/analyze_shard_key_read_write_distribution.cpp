@@ -35,6 +35,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/ops/write_ops.h"
@@ -228,55 +229,93 @@ void WriteDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
             _addFindAndModifyQuery(opCtx, cmd);
             break;
         }
+        case SampledCommandNameEnum::kBulkWrite: {
+            auto cmd = BulkWriteCommandRequest::parse(
+                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+            _addBulkWriteQuery(opCtx, cmd);
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
 }
 
 void WriteDistributionMetricsCalculator::_addUpdateQuery(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const BSONObj& filter,
+    const BSONObj& collation,
+    const write_ops::UpdateModification& updateMod,
+    bool upsert,
+    bool multi,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    _numUpdate++;
+    auto info =
+        _getTargetingInfoForQuery(opCtx, filter, collation, letParameters, runtimeConstants);
+
+    if (info.desc != QueryTargetingInfo::Description::kSingleKey) {
+        // If this is a non-upsert replacement update, the replacement document can be used as
+        // the filter.
+        auto isReplacementUpdate =
+            !upsert && updateMod.type() == write_ops::UpdateModification::Type::kReplacement;
+        auto isExactIdQuery = [&] {
+            return CollectionRoutingInfoTargeter::isExactIdQuery(
+                opCtx, ns, filter, collation, _getChunkManager());
+        };
+
+        // Currently, targeting by replacement document is only done when an updateOne without
+        // shard key is not supported or when the query targets an exact id value.
+        if (isReplacementUpdate &&
+            (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+                 serverGlobalParams.featureCompatibility) ||
+             isExactIdQuery())) {
+            auto filter =
+                _getShardKeyPattern().extractShardKeyFromDoc(updateMod.getUpdateReplacement());
+            info = _getTargetingInfoForQuery(
+                opCtx, filter, collation, letParameters, runtimeConstants);
+        }
+    }
+    _incrementMetricsForQuery(info, multi);
+}
+
+void WriteDistributionMetricsCalculator::_addUpdateQuery(
     OperationContext* opCtx, const write_ops::UpdateCommandRequest& cmd) {
     for (const auto& updateOp : cmd.getUpdates()) {
-        _numUpdate++;
-        auto collation = write_ops::collationOf(updateOp);
-        auto info = _getTargetingInfoForQuery(
-            opCtx, updateOp.getQ(), collation, cmd.getLet(), cmd.getLegacyRuntimeConstants());
-
-        if (info.desc != QueryTargetingInfo::Description::kSingleKey) {
-            // If this is a non-upsert replacement update, the replacement document can be used as
-            // the filter.
-            auto isReplacementUpdate = !updateOp.getUpsert() &&
-                updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement;
-            auto isExactIdQuery = [&] {
-                return CollectionRoutingInfoTargeter::isExactIdQuery(
-                    opCtx, cmd.getNamespace(), updateOp.getQ(), collation, _getChunkManager());
-            };
-
-            // Currently, targeting by replacement document is only done when an updateOne without
-            // shard key is not supported or when the query targets an exact id value.
-            if (isReplacementUpdate &&
-                (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                     serverGlobalParams.featureCompatibility) ||
-                 isExactIdQuery())) {
-                auto filter = _getShardKeyPattern().extractShardKeyFromDoc(
-                    updateOp.getU().getUpdateReplacement());
-                info = _getTargetingInfoForQuery(
-                    opCtx, filter, collation, cmd.getLet(), cmd.getLegacyRuntimeConstants());
-            }
-        }
-        _incrementMetricsForQuery(info, updateOp.getMulti());
+        _addUpdateQuery(opCtx,
+                        cmd.getNamespace(),
+                        updateOp.getQ(),
+                        write_ops::collationOf(updateOp),
+                        updateOp.getU(),
+                        updateOp.getUpsert(),
+                        updateOp.getMulti(),
+                        cmd.getLet(),
+                        cmd.getLegacyRuntimeConstants());
     }
+}
+
+void WriteDistributionMetricsCalculator::_addDeleteQuery(
+    OperationContext* opCtx,
+    const BSONObj& filter,
+    const BSONObj& collation,
+    bool multi,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    _numDelete++;
+    auto info =
+        _getTargetingInfoForQuery(opCtx, filter, collation, letParameters, runtimeConstants);
+    _incrementMetricsForQuery(info, multi);
 }
 
 void WriteDistributionMetricsCalculator::_addDeleteQuery(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& cmd) {
     for (const auto& deleteOp : cmd.getDeletes()) {
-        _numDelete++;
-        auto info = _getTargetingInfoForQuery(opCtx,
-                                              deleteOp.getQ(),
-                                              write_ops::collationOf(deleteOp),
-                                              cmd.getLet(),
-                                              cmd.getLegacyRuntimeConstants());
-        _incrementMetricsForQuery(info, deleteOp.getMulti());
+        _addDeleteQuery(opCtx,
+                        deleteOp.getQ(),
+                        write_ops::collationOf(deleteOp),
+                        deleteOp.getMulti(),
+                        cmd.getLet(),
+                        cmd.getLegacyRuntimeConstants());
     }
 }
 
@@ -289,6 +328,41 @@ void WriteDistributionMetricsCalculator::_addFindAndModifyQuery(
                                           cmd.getLet(),
                                           cmd.getLegacyRuntimeConstants());
     _incrementMetricsForQuery(info, false /* isMulti */);
+}
+
+void WriteDistributionMetricsCalculator::_addBulkWriteQuery(OperationContext* opCtx,
+                                                            const BulkWriteCommandRequest& cmd) {
+    const auto& ops = cmd.getOps();
+    const auto& nsInfo = cmd.getNsInfo();
+
+    for (const auto& opEntry : ops) {
+        auto op = BulkWriteCRUDOp(opEntry);
+        auto opType = op.getType();
+        if (opType == BulkWriteCRUDOp::kUpdate) {
+            auto updateOp = op.getUpdate();
+            const auto nsIdx = updateOp->getUpdate();
+            const auto& nsEntry = nsInfo[nsIdx];
+            _addUpdateQuery(opCtx,
+                            nsEntry.getNs(),
+                            updateOp->getFilter(),
+                            updateOp->getCollation().get_value_or({}),
+                            updateOp->getUpdateMods(),
+                            updateOp->getUpsert(),
+                            updateOp->getMulti(),
+                            cmd.getLet(),
+                            /*runtimeConstants=*/boost::none);  // legacyRuntimeConstants are not
+                                                                // supported in bulkWrite.
+        } else if (opType == BulkWriteCRUDOp::kDelete) {
+            auto deleteOp = op.getDelete();
+            _addDeleteQuery(opCtx,
+                            deleteOp->getFilter(),
+                            deleteOp->getCollation().get_value_or({}),
+                            deleteOp->getMulti(),
+                            cmd.getLet(),
+                            /*runtimeConstants=*/boost::none);  // legacyRuntimeConstants are not
+                                                                // supported in bulkWrite.
+        }
+    }
 }
 
 void WriteDistributionMetricsCalculator::_incrementMetricsForQuery(const QueryTargetingInfo& info,

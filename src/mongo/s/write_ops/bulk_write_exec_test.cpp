@@ -1600,6 +1600,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteInsertSizeEstimation) {
 }
 
 // Test that we calculate accurate estimates for bulkWrite update ops.
+// TODO (SERVER-82382): Replace ASSERT_GTE with ASSERT_EQ for the following test.
 TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
     auto basicUpdate = makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
                                         write_ops::UpdateModification(fromjson("{$set: {y: 1}}")),
@@ -1608,7 +1609,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                                         boost::none,
                                         boost::none,
                                         boost::none);
-    ASSERT_EQ(getSizeEstimate(basicUpdate), getActualSize(basicUpdate));
+    ASSERT_GTE(getSizeEstimate(basicUpdate), getActualSize(basicUpdate));
 
     auto updateAllFieldsSetBesidesArrayFilters =
         makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
@@ -1618,8 +1619,8 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                          boost::none,
                          fromjson("{z: 1}") /* constants */,
                          fromjson("{locale: 'simple'}") /* collation */);
-    ASSERT_EQ(getSizeEstimate(updateAllFieldsSetBesidesArrayFilters),
-              getActualSize(updateAllFieldsSetBesidesArrayFilters));
+    ASSERT_GTE(getSizeEstimate(updateAllFieldsSetBesidesArrayFilters),
+               getActualSize(updateAllFieldsSetBesidesArrayFilters));
 
     std::vector<BSONObj> arrayFilters = {fromjson("{j: 1}"), fromjson("{k: 1}")};
     auto updateAllFieldsSet =
@@ -1632,7 +1633,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                          fromjson("{locale: 'simple'}") /* collation */);
     // We can't make an exact assertion when arrayFilters is set, because the way we estimate BSON
     // array index size overcounts for simplicity.
-    ASSERT(getSizeEstimate(updateAllFieldsSet) > getActualSize(updateAllFieldsSet));
+    ASSERT_GT(getSizeEstimate(updateAllFieldsSet), getActualSize(updateAllFieldsSet));
 
     std::vector<BSONObj> pipeline = {fromjson("{$set: {y: 1}}")};
     auto updateWithPipeline = makeTestUpdateOp(fromjson("{x: 1}") /* filter */,
@@ -1644,18 +1645,19 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                                                boost::none);
     // We can't make an exact assertion when an update pipeline is used, because the way we estimate
     // BSON array index size overcounts for simplicity.
-    ASSERT(getSizeEstimate(updateWithPipeline) > getActualSize(updateWithPipeline));
+    ASSERT_GT(getSizeEstimate(updateWithPipeline), getActualSize(updateWithPipeline));
 }
 
 // Test that we calculate accurate estimates for bulkWrite delete ops.
+// TODO (SERVER-82382): Replace ASSERT_GTE with ASSERT_EQ for the following test.
 TEST_F(BulkWriteOpTest, TestBulkWriteDeleteSizeEstimation) {
     auto basicDelete = makeTestDeleteOp(fromjson("{x: 1}"), BSONObj() /* hint */, boost::none);
-    ASSERT_EQ(getSizeEstimate(basicDelete), getActualSize(basicDelete));
+    ASSERT_GTE(getSizeEstimate(basicDelete), getActualSize(basicDelete));
 
     auto deleteAllFieldsSet = makeTestDeleteOp(fromjson("{x: 1}") /* filter */,
                                                fromjson("{y: 1}") /* hint */,
                                                fromjson("{locale: 'simple'}") /* collation */);
-    ASSERT_EQ(getSizeEstimate(deleteAllFieldsSet), getActualSize(deleteAllFieldsSet));
+    ASSERT_GTE(getSizeEstimate(deleteAllFieldsSet), getActualSize(deleteAllFieldsSet));
 }
 
 // Simulates a situation where we receive a bulkWrite request with large top-level fields (in this

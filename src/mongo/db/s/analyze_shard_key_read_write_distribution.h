@@ -45,6 +45,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -217,12 +218,29 @@ public:
 private:
     WriteSampleSize _getSampleSize() const override;
 
+    void _addUpdateQuery(OperationContext* opCtx,
+                         const NamespaceString& ns,
+                         const BSONObj& filter,
+                         const BSONObj& collation,
+                         const write_ops::UpdateModification& updateMod,
+                         bool upsert,
+                         bool multi,
+                         const boost::optional<BSONObj>& letParameters,
+                         const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
     void _addUpdateQuery(OperationContext* opCtx, const write_ops::UpdateCommandRequest& cmd);
 
+    void _addDeleteQuery(OperationContext* opCtx,
+                         const BSONObj& filter,
+                         const BSONObj& collation,
+                         bool multi,
+                         const boost::optional<BSONObj>& letParameters,
+                         const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
     void _addDeleteQuery(OperationContext* opCtx, const write_ops::DeleteCommandRequest& cmd);
 
     void _addFindAndModifyQuery(OperationContext* opCtx,
                                 const write_ops::FindAndModifyCommandRequest& cmd);
+
+    void _addBulkWriteQuery(OperationContext* opCtx, const BulkWriteCommandRequest& cmd);
 
     void _incrementNumSingleWritesWithoutShardKey() {
         _numSingleWritesWithoutShardKey++;

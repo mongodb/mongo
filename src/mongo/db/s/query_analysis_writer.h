@@ -58,6 +58,13 @@
 namespace mongo {
 namespace analyze_shard_key {
 
+struct SampledCommandRequest {
+    UUID sampleId;
+    NamespaceString nss;
+    // The BSON for a SampledReadCommand or {Update,Delete,FindAndModify}CommandRequest.
+    BSONObj cmd;
+};
+
 /**
  * Owns the machinery for persisting sampled queries. That consists of the following:
  * - The buffer that stores sampled queries and the periodic background job that inserts those
@@ -188,6 +195,8 @@ public:
                                           const BSONObj& filter,
                                           const BSONObj& collation);
 
+    ExecutorFuture<void> addUpdateQuery(SampledCommandNameEnum cmdName,
+                                        SampledCommandRequest sampledUpdateCmd);
     ExecutorFuture<void> addUpdateQuery(OperationContext* opCtx,
                                         const UUID& sampleId,
                                         const write_ops::UpdateCommandRequest& updateCmd,
@@ -196,6 +205,8 @@ public:
                                         const write_ops::UpdateCommandRequest& updateCmd,
                                         int opIndex);
 
+    ExecutorFuture<void> addDeleteQuery(SampledCommandNameEnum cmdName,
+                                        SampledCommandRequest sampledDeleteCmd);
     ExecutorFuture<void> addDeleteQuery(OperationContext* opCtx,
                                         const UUID& sampleId,
                                         const write_ops::DeleteCommandRequest& deleteCmd,

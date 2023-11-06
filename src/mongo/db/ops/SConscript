@@ -141,6 +141,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='delete_request_idl',
+    source='delete_request.idl',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
 env.CppUnitTest(
     target='db_ops_test',
     source=[

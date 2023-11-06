@@ -263,7 +263,8 @@ void processSampledQueries(OperationContext* opCtx,
             }
             case SampledCommandNameEnum::kUpdate:
             case SampledCommandNameEnum::kDelete:
-            case SampledCommandNameEnum::kFindAndModify: {
+            case SampledCommandNameEnum::kFindAndModify:
+            case SampledCommandNameEnum::kBulkWrite: {
                 writeDistributionCalculator->addQuery(opCtx, doc);
                 break;
             }

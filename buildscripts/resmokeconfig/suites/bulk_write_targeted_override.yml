@@ -5,6 +5,11 @@ test_kind: js_test
 selector:
   roots:
   - jstests/sharding/updateOne_without_shard_key/*.js
+  - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
+  - jstests/sharding/analyze_shard_key/sampling_current_op_and_server_status_rs.js
+  - jstests/sharding/analyze_shard_key/sampling_current_op_and_server_status_sharded.js
+  - jstests/sharding/analyze_shard_key/sample_rates_rs.js
+  - jstests/sharding/analyze_shard_key/sample_rates_sharded.js
   - jstests/sharding/timeseries_delete_multi.js
   - jstests/sharding/timeseries_delete_one_with_shard_key.js
   - jstests/sharding/timeseries_delete_with_meta.js
@@ -27,8 +32,6 @@ selector:
   - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
   - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
   - jstests/sharding/updateOne_without_shard_key/would_change_owning_shard_test.js
-  # TODO (SERVER-77871): Support shard key metrics sampling.
-  - jstests/sharding/updateOne_without_shard_key/cluster_write_without_shard_key_basic.js
   # TODO (SERVER-80174): Handle transaction errors.
   - jstests/sharding/updateOne_without_shard_key/errors.js
   # Update API version tests should not be run with bulkWrite override.

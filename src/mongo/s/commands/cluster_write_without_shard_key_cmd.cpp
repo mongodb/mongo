@@ -207,7 +207,10 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             // The update case.
             auto updateOp = op.getUpdate();
 
-            // TODO (SERVER-77871): Support shard key metrics sampling.
+            if (updateOp->getSampleId()) {
+                bulkWriteRequest->setOriginalQuery(updateOp->getFilter());
+                bulkWriteRequest->setOriginalCollation(updateOp->getCollation());
+            }
 
             // If the original query contains either a positional operator ($) or targets a
             // time-series collection, include the original query alongside the target doc.
@@ -231,7 +234,10 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
             // The delete case.
             auto deleteOp = op.getDelete();
 
-            // TODO (SERVER-77871): Support shard key metrics sampling.
+            if (deleteOp->getSampleId()) {
+                bulkWriteRequest->setOriginalQuery(deleteOp->getFilter());
+                bulkWriteRequest->setOriginalCollation(deleteOp->getCollation());
+            }
 
             // If the query targets a time-series collection, include the original query alongside
             // the target doc.

@@ -603,6 +603,25 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
             res.readDistribution.sampleSize.total + res.writeDistribution.sampleSize.total;
         this.previousNumSampledQueries = currentNumSampledQueries;
 
+        if (isFinal) {
+            // Sanity check sampleSize to make sure we collected non-zero metrics for each of the
+            // commands.
+            for (const readCmd of ['find', 'aggregate', 'count', 'distinct']) {
+                assert.gt(res.readDistribution.sampleSize[readCmd],
+                          0,
+                          () => "Expected sampleSize for '" + readCmd +
+                              "' to be greater than zero: " +
+                              tojson(this.truncateAnalyzeShardKeyResponseForLogging(res)));
+            }
+            for (const writeCmd of ['update', 'delete', 'findAndModify']) {
+                assert.gt(res.writeDistribution.sampleSize[writeCmd],
+                          0,
+                          () => "Expected sampleSize for '" + writeCmd +
+                              "' to be greater than zero: " +
+                              tojson(this.truncateAnalyzeShardKeyResponseForLogging(res)));
+            }
+        }
+
         if (this.shouldValidateReadDistribution(res.readDistribution.sampleSize)) {
             assertReadMetricsDiff(res.readDistribution.percentageOfSingleShardReads,
                                   this.readDistribution.percentageOfSingleShardReads);

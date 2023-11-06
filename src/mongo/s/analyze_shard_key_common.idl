@@ -52,6 +52,7 @@ enums:
       kUpdate: "update"
       kDelete: "delete"
       kFindAndModify: "findAndModify"
+      kBulkWrite: "bulkWrite"
 
 structs:
   QueryAnalyzerConfiguration:

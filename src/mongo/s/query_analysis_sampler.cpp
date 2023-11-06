@@ -429,6 +429,7 @@ void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
         case SampledCommandNameEnum::kUpdate:
         case SampledCommandNameEnum::kDelete:
         case SampledCommandNameEnum::kFindAndModify:
+        case SampledCommandNameEnum::kBulkWrite:
             QueryAnalysisSampleTracker::get(opCtx).incrementWrites(opCtx, nss);
             break;
         default:
