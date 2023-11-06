@@ -62,7 +62,8 @@ bool ReplicationCoordinatorEmbedded::inQuiesceMode() const {
     return false;
 }
 
-void ReplicationCoordinatorEmbedded::shutdown(OperationContext* opCtx) {}
+void ReplicationCoordinatorEmbedded::shutdown(OperationContext* opCtx,
+                                              BSONObjBuilder* shutdownTimeElapsedBuilder) {}
 
 const ReplSettings& ReplicationCoordinatorEmbedded::getSettings() const {
     static ReplSettings _settings;

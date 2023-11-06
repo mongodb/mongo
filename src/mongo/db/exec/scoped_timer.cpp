@@ -69,6 +69,7 @@ boost::optional<TimeElapsedBuilderScopedTimer> createTimeElapsedBuilderScopedTim
     if (builder == nullptr) {
         return boost::none;
     }
-    return TimeElapsedBuilderScopedTimer(clockSource, description, builder);
+    return boost::optional<TimeElapsedBuilderScopedTimer>(
+        boost::in_place_init, clockSource, description, builder);
 }
 }  // namespace mongo

@@ -75,7 +75,7 @@ public:
 
     virtual bool inQuiesceMode() const;
 
-    virtual void shutdown(OperationContext* opCtx);
+    virtual void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder);
 
     virtual void appendDiagnosticBSON(BSONObjBuilder* bob) override {}
 

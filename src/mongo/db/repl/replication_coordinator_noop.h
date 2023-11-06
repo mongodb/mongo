@@ -55,7 +55,7 @@ public:
 
     bool inQuiesceMode() const final;
 
-    void shutdown(OperationContext* opCtx) final;
+    void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder) final;
 
     ServiceContext* getServiceContext() final {
         return _service;
