@@ -68,5 +68,6 @@ std::unique_ptr<PlanExplainer> make(
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     bool isFromPlanCache,
-    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo);
+    std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+    RemoteExplainVector* remoteExplains = nullptr);
 }  // namespace mongo::plan_explainer_factory

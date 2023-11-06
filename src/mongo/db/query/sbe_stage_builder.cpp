@@ -374,7 +374,6 @@ buildSearchMetadataExecutorSBE(OperationContext* opCtx,
                                                     boost::none /* limitSlot */,
                                                     boost::none /* sortKeySlot */,
                                                     boost::none /* collatorSlot */,
-                                                    boost::none /* explain */,
                                                     yieldPolicy,
                                                     PlanNodeId{} /* planNodeId */);
 
@@ -5768,7 +5767,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
                                                     boost::none /* limitSlot */,
                                                     boost::none /* sortKeySlot */,
                                                     boost::none /* collatorSlot */,
-                                                    expCtx->explain,
                                                     yieldPolicy,
                                                     root->nodeId());
     outputs.set(PlanStageSlots::kResult, searchResultSlot);
@@ -5852,7 +5850,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                                 limitSlot,
                                                                 _data->metadataSlots.sortKeySlot,
                                                                 collatorSlot,
-                                                                expCtx->explain,
                                                                 _yieldPolicy,
                                                                 sn->nodeId());
     if (isStoredSource) {

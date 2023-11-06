@@ -147,7 +147,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool planIsFromCache,
     bool generatedByBonsai,
-    std::unique_ptr<RemoteCursorMap> remoteCursors) {
+    std::unique_ptr<RemoteCursorMap> remoteCursors,
+    std::unique_ptr<RemoteExplainVector> remoteExplains) {
     auto&& [rootStage, data] = root;
     LOGV2_DEBUG(4822860,
                 5,
@@ -172,7 +173,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                  false /*isOpen*/,
                  std::move(yieldPolicy),
                  generatedByBonsai,
-                 std::move(remoteCursors)),
+                 std::move(remoteCursors),
+                 std::move(remoteExplains)),
              PlanExecutor::Deleter{opCtx}}};
 }
 

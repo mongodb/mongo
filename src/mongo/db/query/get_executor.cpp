@@ -1549,8 +1549,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
         plan_cache_util::updatePlanCache(opCtx, collections, *cq, *solutions[0], *root, data);
     }
 
-    auto remoteCursors = getSearchHelpers(cq->getOpCtx()->getServiceContext())
-                             ->getSearchRemoteCursors(cq->cqPipeline());
+    auto& searchHelper = getSearchHelpers(cq->getOpCtx()->getServiceContext());
+    auto remoteCursors =
+        cq->getExpCtx()->explain ? nullptr : searchHelper->getSearchRemoteCursors(cq->cqPipeline());
+    auto remoteExplains = cq->getExpCtx()->explain
+        ? searchHelper->getSearchRemoteExplains(cq->getExpCtxRaw(), cq->cqPipeline())
+        : nullptr;
 
     // Prepare the SBE tree for execution.
     stage_builder::prepareSlotBasedExecutableTree(
@@ -1566,7 +1570,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
                                        false /* generatedByBonsai */,
-                                       std::move(remoteCursors));
+                                       std::move(remoteCursors),
+                                       std::move(remoteExplains));
 }  // getSlotBasedExecutor
 
 /**

@@ -49,6 +49,7 @@ namespace mongo {
 static constexpr auto kReturnStoredSourceArg = "returnStoredSource"_sd;
 
 using RemoteCursorMap = absl::flat_hash_map<size_t, std::unique_ptr<executor::TaskExecutorCursor>>;
+using RemoteExplainVector = std::vector<BSONObj>;
 
 /**
  * A class that contains any functions needed to run $seach queries when the enterprise module
@@ -156,7 +157,9 @@ public:
      * Encode $search/$searchMeta to SBE plan cache.
      * Returns true if $search/$searchMeta is at the front of the 'pipeline' and encoding is done.
      */
-    virtual bool encodeSearchForSbeCache(DocumentSource* ds, BufBuilder* bufBuilder) {
+    virtual bool encodeSearchForSbeCache(const ExpressionContext* expCtx,
+                                         DocumentSource* ds,
+                                         BufBuilder* bufBuilder) {
         return false;
     }
 
@@ -178,6 +181,12 @@ public:
                                            std::unique_ptr<PlanYieldPolicy>) {}
 
     virtual std::unique_ptr<RemoteCursorMap> getSearchRemoteCursors(
+        std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline) {
+        return nullptr;
+    }
+
+    virtual std::unique_ptr<RemoteExplainVector> getSearchRemoteExplains(
+        const ExpressionContext* expCtx,
         std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline) {
         return nullptr;
     }

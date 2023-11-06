@@ -68,7 +68,8 @@ public:
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan,
                      bool isCachedPlan,
-                     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo)
+                     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
+                     RemoteExplainVector* remoteExplains = nullptr)
         : PlanExplainer{solution},
           _root{root},
           _rootData{data},
@@ -77,7 +78,8 @@ public:
           _rejectedCandidates{std::move(rejectedCandidates)},
           _isMultiPlan{isMultiPlan},
           _isFromPlanCache{isCachedPlan},
-          _debugInfo{debugInfo} {
+          _debugInfo{debugInfo},
+          _remoteExplains{remoteExplains} {
         tassert(5968203, "_debugInfo should not be null", _debugInfo);
     }
 
@@ -107,6 +109,7 @@ private:
         return boost::none;
     }
 
+    boost::optional<BSONArray> buildRemotePlanInfo() const;
     boost::optional<BSONObj> buildCascadesPlan() const;
 
     // These fields are are owned elsewhere (e.g. the PlanExecutor or CandidatePlan).
@@ -122,5 +125,6 @@ private:
     // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
     // All plans recovered from the same cached entry share the same debug info.
     const std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> _debugInfo;
+    const RemoteExplainVector* _remoteExplains;
 };
 }  // namespace mongo

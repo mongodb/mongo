@@ -1626,6 +1626,10 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
     const NamespaceString& nss,
     const AggregateCommandRequest* aggRequest,
     Pipeline* pipeline) {
+    uassert(7856009,
+            "Cannot have exchange specified in a $search pipeline",
+            !aggRequest || !aggRequest->getExchange());
+
     auto expCtx = pipeline->getContext();
     auto& searchHelper = getSearchHelpers(expCtx->opCtx->getServiceContext());
 
@@ -1634,12 +1638,14 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorSearch(
         expCtx->opCtx, PlanYieldPolicy::YieldPolicy::YIELD_AUTO, collections, nss);
     auto yieldPolicyPtr = yieldPolicy.get();
 
-    if (searchHelper->isSearchPipeline(pipeline)) {
-        searchHelper->establishSearchQueryCursors(expCtx, searchStage, std::move(yieldPolicy));
-    } else if (searchHelper->isSearchMetaPipeline(pipeline)) {
-        searchHelper->establishSearchMetaCursor(expCtx, searchStage, std::move(yieldPolicy));
-    } else {
-        tasserted(7856008, "Not search pipeline in buildInnerQueryExecutorSearch");
+    if (!expCtx->explain) {
+        if (searchHelper->isSearchPipeline(pipeline)) {
+            searchHelper->establishSearchQueryCursors(expCtx, searchStage, std::move(yieldPolicy));
+        } else if (searchHelper->isSearchMetaPipeline(pipeline)) {
+            searchHelper->establishSearchMetaCursor(expCtx, searchStage, std::move(yieldPolicy));
+        } else {
+            tasserted(7856008, "Not search pipeline in buildInnerQueryExecutorSearch");
+        }
     }
 
     auto [executor, callback, additionalExecutors] =

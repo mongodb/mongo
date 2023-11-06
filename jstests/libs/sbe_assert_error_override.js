@@ -174,6 +174,7 @@ const equivalentErrorCodesList = [
     [6050106, 7971205],
     [5643011, ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed],
     [5414201, 7870900],
+    [6253506, 7856009],
 ];
 
 // This map is generated based on the contents of 'equivalentErrorCodesList'. This map should _not_

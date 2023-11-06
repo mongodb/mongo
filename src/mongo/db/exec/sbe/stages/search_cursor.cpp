@@ -52,7 +52,6 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
                                      boost::optional<value::SlotId> limitSlot,
                                      boost::optional<value::SlotId> sortKeySlot,
                                      boost::optional<value::SlotId> collatorSlot,
-                                     boost::optional<ExplainOptions::Verbosity> explain,
                                      PlanYieldPolicy* yieldPolicy,
                                      PlanNodeId planNodeId)
     : PlanStage("search_cursor"_sd, yieldPolicy, planNodeId, false),
@@ -68,8 +67,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
       _sortSpecSlot(sortSpecSlot),
       _limitSlot(limitSlot),
       _sortKeySlot(sortKeySlot),
-      _collatorSlot(collatorSlot),
-      _explain(explain) {
+      _collatorSlot(collatorSlot) {
     _docsReturnedStats = getCommonStats();
 }
 
@@ -87,7 +85,6 @@ std::unique_ptr<PlanStage> SearchCursorStage::clone() const {
                                                _limitSlot,
                                                _sortKeySlot,
                                                _collatorSlot,
-                                               _explain,
                                                _yieldPolicy,
                                                _commonStats.nodeId);
 }
@@ -145,11 +142,13 @@ void SearchCursorStage::prepare(CompileCtx& ctx) {
         _collatorAccessor = ctx.getAccessor(*_collatorSlot);
     }
 
-    tassert(7816103,
-            "RemoteCursors must be established",
-            ctx.remoteCursors && ctx.remoteCursors->count(_remoteCursorId));
-    _cursor = ctx.remoteCursors->at(_remoteCursorId).get();
-    _cursorId = _cursor->getCursorId();
+    if (ctx.remoteCursors) {
+        tassert(7816103,
+                "RemoteCursors must be established",
+                ctx.remoteCursors->count(_remoteCursorId));
+        _cursor = ctx.remoteCursors->at(_remoteCursorId).get();
+        _cursorId = _cursor->getCursorId();
+    }
 }
 
 value::SlotAccessor* SearchCursorStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -187,8 +186,7 @@ void SearchCursorStage::open(bool reOpen) {
         }
     }
 
-    tassert(7816111, "The cursor should yield a non-null value", _cursor);
-    if (_limit != 0) {
+    if (_cursor && _limit != 0) {
         _cursor->updateGetMoreFunc(
             getSearchHelpers(_opCtx->getServiceContext())->buildSearchGetMoreFunc([this] {
                 return calcDocsNeeded();
@@ -228,15 +226,9 @@ bool SearchCursorStage::shouldReturnEOF() {
 
     // Return EOF if uuid is unset here; the collection we are searching over has not been created
     // yet.
-    if (!_collUuid) {
+    if (!_collUuid || !_cursor) {
         return true;
     }
-
-    if (_explain) {
-        // TODO SERVER-79267: Explain response for search cursor stage
-        return true;
-    }
-
     return false;
 }
 
@@ -348,6 +340,7 @@ boost::optional<long long> SearchCursorStage::calcDocsNeeded() {
 void SearchCursorStage::close() {
     auto optTimer(getOptTimer(_opCtx));
     trackClose();
+    _cursor = nullptr;
 }
 
 std::unique_ptr<PlanStageStats> SearchCursorStage::getStats(bool includeDebugInfo) const {
@@ -406,8 +399,8 @@ std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint() const {
     addDebugSlotVector(ret, _metadataSlots);
     addDebugSlotVector(ret, _fieldSlots);
 
-    DebugPrinter::addIdentifier(ret, _remoteCursorId);
-    DebugPrinter::addIdentifier(ret, _isStoredSource);
+    ret.emplace_back(std::to_string(_remoteCursorId));
+    ret.emplace_back(_isStoredSource ? "true" : "false");
     addDebugOptionalSlotIdentifier(ret, _sortSpecSlot);
     addDebugOptionalSlotIdentifier(ret, _limitSlot);
     addDebugOptionalSlotIdentifier(ret, _sortKeySlot);

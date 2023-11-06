@@ -148,7 +148,6 @@ std::unique_ptr<PlanStage> makeSearchCursorStage(value::SlotId resultSlot,
                                     limitSlot,
                                     boost::none, /* sortKeySlot */
                                     boost::none, /* collatorSlot */
-                                    expCtx->explain,
                                     nullptr /* yieldPolicy */,
                                     kEmptyPlanNodeId);
 }

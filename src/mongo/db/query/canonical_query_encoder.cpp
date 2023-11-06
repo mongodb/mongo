@@ -1079,7 +1079,7 @@ void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilde
 /**
  * Encode the stages pushed down to SBE via CanonicalQuery::cqPipeline.
  */
-void encodePipeline(const OperationContext* opCtx,
+void encodePipeline(const ExpressionContext* expCtx,
                     const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& cqPipeline,
                     BufBuilder* bufBuilder) {
     bufBuilder->appendChar(kEncodeSectionDelimiter);
@@ -1089,8 +1089,8 @@ void encodePipeline(const OperationContext* opCtx,
         if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(documentSource)) {
             // Match expressions are parameterized so need to be encoded differently.
             encodeKeyForAutoParameterizedMatchSBE(matchStage->getMatchExpression(), bufBuilder);
-        } else if (getSearchHelpers(opCtx->getServiceContext())
-                       ->encodeSearchForSbeCache(documentSource, bufBuilder)) {
+        } else if (getSearchHelpers(expCtx->opCtx->getServiceContext())
+                       ->encodeSearchForSbeCache(expCtx, documentSource, bufBuilder)) {
         } else {
             serializedArray.clear();
             documentSource->serializeToArray(serializedArray);
@@ -1171,7 +1171,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
 
-    encodePipeline(cq.getOpCtx(), cq.cqPipeline(), &bufBuilder);
+    encodePipeline(cq.getExpCtxRaw(), cq.cqPipeline(), &bufBuilder);
 
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }

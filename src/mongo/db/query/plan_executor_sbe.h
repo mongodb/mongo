@@ -91,7 +91,8 @@ public:
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                     bool generatedByBonsai,
-                    std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr);
+                    std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
+                    std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
@@ -293,6 +294,7 @@ private:
     CursorTypeEnum _cursorType = CursorTypeEnum::DocumentResult;
 
     std::unique_ptr<RemoteCursorMap> _remoteCursors;
+    std::unique_ptr<RemoteExplainVector> _remoteExplains;
 };
 
 /**

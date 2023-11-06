@@ -321,6 +321,13 @@ void statsToBSON(const QuerySolutionNode* node,
 
             break;
         }
+        case STAGE_SEARCH: {
+            auto sn = static_cast<const SearchNode*>(node);
+            bob->append("isSearchMeta", sn->isSearchMeta);
+            bob->appendNumber("remoteCursorId", static_cast<long long>(sn->remoteCursorId));
+            bob->append("searchQuery", sn->searchQuery);
+            break;
+        }
         default:
             break;
     }
@@ -456,6 +463,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const sbe::PlanStageStats& stats,
     const boost::optional<BSONObj>& execPlanDebugInfo,
     const boost::optional<BSONObj>& optimizerExplain,
+    const boost::optional<BSONArray>& remotePlanInfo,
     ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder bob;
 
@@ -479,13 +487,17 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     }
 
     invariant(execPlanDebugInfo);
+    BSONObjBuilder plan;
     if (optimizerExplain) {
-        return {BSON("optimizerPlan" << *optimizerExplain << "slotBasedPlan" << *execPlanDebugInfo),
-                boost::none};
+        plan.append("optimizerPlan", *optimizerExplain);
     } else {
-        return {BSON("queryPlan" << bob.obj() << "slotBasedPlan" << *execPlanDebugInfo),
-                boost::none};
+        plan.append("queryPlan", bob.obj());
     }
+    plan.append("slotBasedPlan", *execPlanDebugInfo);
+    if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
+        plan.append("remotePlans", *remotePlanInfo);
+    }
+    return {plan.obj(), boost::none};
 }
 }  // namespace
 
@@ -558,6 +570,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
                                  *stats,
                                  buildExecPlanDebugInfo(_root, _rootData),
                                  buildCascadesPlan(),
+                                 buildRemotePlanInfo(),
                                  verbosity);
 }
 
@@ -570,8 +583,9 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             *_rootData->savedStatsOnEarlyExit,
             // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
             // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
-            boost::none,
-            boost::none,
+            boost::none /* execPlanDebugInfo */,
+            boost::none /* optimizerExplain */,
+            boost::none /* remotePlanInfo */,
             ExplainOptions::Verbosity::kExecAllPlans);
     }
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
@@ -593,8 +607,12 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         invariant(stats);
         auto execPlanDebugInfo =
             buildExecPlanDebugInfo(candidate.root.get(), &candidate.data.stageData);
-        res.push_back(buildPlanStatsDetails(
-            candidate.solution.get(), *stats, execPlanDebugInfo, boost::none, verbosity));
+        res.push_back(buildPlanStatsDetails(candidate.solution.get(),
+                                            *stats,
+                                            execPlanDebugInfo,
+                                            boost::none /* optimizerExplain */,
+                                            boost::none /* remotePlanInfo */,
+                                            verbosity));
     }
     return res;
 }
@@ -606,4 +624,14 @@ boost::optional<BSONObj> PlanExplainerSBE::buildCascadesPlan() const {
     return {};
 }
 
+boost::optional<BSONArray> PlanExplainerSBE::buildRemotePlanInfo() const {
+    if (!_remoteExplains) {
+        return boost::none;
+    }
+    BSONArrayBuilder arrBuilder;
+    for (const auto& explain : *_remoteExplains) {
+        arrBuilder << explain;
+    }
+    return arrBuilder.arr();
+}
 }  // namespace mongo

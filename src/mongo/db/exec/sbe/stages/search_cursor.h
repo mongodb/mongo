@@ -70,7 +70,6 @@ public:
                       boost::optional<value::SlotId> limitSlot,
                       boost::optional<value::SlotId> sortKeySlot,
                       boost::optional<value::SlotId> collatorSlot,
-                      boost::optional<ExplainOptions::Verbosity> explain,
                       PlanYieldPolicy* yieldPolicy,
                       PlanNodeId planNodeId);
 
@@ -136,12 +135,12 @@ private:
     // Variables to save the value from input slots.
     boost::optional<BSONObj> _response;
     boost::optional<BSONObj> _resultObj;
+    boost::optional<BSONObj> _explainObj;
     uint64_t _limit{0};
 
     boost::optional<SortKeyGenerator> _sortKeyGen;
     executor::TaskExecutorCursor* _cursor{nullptr};
     SearchStats _specificStats;
-    const boost::optional<ExplainOptions::Verbosity> _explain;
     // A CommonStats that tracks how many documents is returned for $search, in the stored source
     // case, _docsReturnedStats ptr points to current stage, otherwise it points to another stage to
     // skip the docs that been filtered out.

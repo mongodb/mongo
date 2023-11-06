@@ -88,7 +88,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool isOpen,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                                  bool generatedByBonsai,
-                                 std::unique_ptr<RemoteCursorMap> remoteCursors)
+                                 std::unique_ptr<RemoteCursorMap> remoteCursors,
+                                 std::unique_ptr<RemoteExplainVector> remoteExplains)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
@@ -100,7 +101,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)),
       _generatedByBonsai(generatedByBonsai),
-      _remoteCursors(std::move(remoteCursors)) {
+      _remoteCursors(std::move(remoteCursors)),
+      _remoteExplains(std::move(remoteExplains)) {
     invariant(!_nss.isEmpty());
     invariant(_root);
 
@@ -163,7 +165,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
                                                   isCachedCandidate,
-                                                  _rootData.debugInfo);
+                                                  _rootData.debugInfo,
+                                                  _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 }
 
