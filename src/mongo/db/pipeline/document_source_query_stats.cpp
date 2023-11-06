@@ -104,23 +104,6 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     return ctor(algorithm, hmacKey);
 }
 
-
-/**
- * Given a partition, it copies the QueryStatsEntries located in partition of cache into a
- * vector of pairs that contain the cache key and a corresponding QueryStatsEntry. This ensures
- * that the partition mutex is only held for the duration of copying.
- */
-std::vector<QueryStatsEntry> copyPartition(const QueryStatsStore::Partition& partition) {
-    // Note the intentional copy of QueryStatsEntry and intentional additional shared pointer
-    // reference to the key generator. This will give us a snapshot of all the metrics we want to
-    // report, and keep the key around even if the entry gets evicted.
-    std::vector<QueryStatsEntry> currKeyMetrics;
-    for (auto&& [hash, metrics] : *partition) {
-        currKeyMetrics.push_back(metrics);
-    }
-    return currKeyMetrics;
-}
-
 }  // namespace
 
 BSONObj DocumentSourceQueryStats::computeQueryStatsKey(
@@ -203,93 +186,142 @@ Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) cons
 }
 
 DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
+    const auto shouldLog = _algorithm != TransformAlgorithmEnum::kNone;
     /**
-     * We maintain nested iterators:
-     * - Outer one over the set of partitions.
-     * - Inner one over the set of entries in a "materialized" partition.
+     * When a CopiedPartition is present (loaded) and contains more elements (QueryStatsEntry), we
+     * can process and return the next element in the _currentCopiedPartition.
      *
-     * When an inner iterator is present and contains more elements, we can return the next element.
-     * When the inner iterator is exhausted, we move to the next element in the outer iterator and
-     * create a new inner iterator. When the outer iterator is exhausted, we have finished iterating
-     * over the queryStats store entries.
+     * When the current CopiedPartition is exhausted (emptied), we move on to the next
+     * partition. Once we have iterated to the end of the valid partitions, we are done iteratiing
+     * over all the queryStatsStore entries.
      *
-     * The inner iterator iterates over a materialized container of all entries in the partition.
-     * This is done to reduce the time under which the partition lock is held.
+     * We iterate over a copied container (CopiedParitition) containing the entries in
+     * the partition to reduce the time under which the partition lock is held.
      */
-    bool shouldLog = _algorithm != TransformAlgorithmEnum::kNone;
-    while (true) {
-        // First, attempt to exhaust all elements in the materialized partition.
-        if (!_materializedPartition.empty()) {
-            // Move out of the container reference.
-            auto doc = std::move(_materializedPartition.front());
-            _materializedPartition.pop_front();
-            if (shouldLog) {
-                LOGV2_DEBUG_OPTIONS(7808301,
-                                    3,
-                                    {logv2::LogTruncation::Disabled},
-                                    "Logging all outputs of $queryStats",
-                                    "thisOutput"_attr = doc);
-            }
-            return {std::move(doc)};
+    auto& queryStatsStore = getQueryStatsStore(getContext()->opCtx);
+
+    while (_currentCopiedPartition.isValidPartitionId(queryStatsStore.numPartitions())) {
+        if (!_currentCopiedPartition.isLoaded()) {
+            _currentCopiedPartition.load(queryStatsStore);
         }
+        // CopiedPartition::load() will throw if any errors occur.
+        // Safe to assume _currentCopiedPartition is now loaded.
 
-        QueryStatsStore& _queryStatsStore = getQueryStatsStore(getContext()->opCtx);
-
-        // Materialized partition is exhausted, move to the next.
-        _currentPartition++;
-        if (_currentPartition >= _queryStatsStore.numPartitions()) {
-            if (shouldLog) {
-                LOGV2_DEBUG_OPTIONS(7808302,
-                                    3,
-                                    {logv2::LogTruncation::Disabled},
-                                    "Finished logging outout of $queryStats");
-            }
-            return DocumentSource::GetNextResult::makeEOF();
-        }
-
-        // Capture the time at which reading the partition begins to indicate to the caller
-        // when the snapshot began.
-        const auto partitionReadTime =
-            Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
-
-        // We only keep the partition (which holds a lock) for the time needed to collect the key
-        // and metric pairs
-        auto currKeyMetrics = copyPartition(_queryStatsStore.getPartition(_currentPartition));
-
-        for (auto&& metrics : currKeyMetrics) {
-            const auto& key = metrics.key;
-            const auto& hash = absl::HashOf(key);
-            try {
-                auto queryStatsKey =
-                    computeQueryStatsKey(key, SerializationContext::stateDefault());
-                _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
-                                                  {"metrics", metrics.toBSON()},
-                                                  {"asOf", partitionReadTime}});
-            } catch (const DBException& ex) {
-                queryStatsHmacApplicationErrors.increment();
-                const auto queryShape = key->universalComponents()._queryShape->toBson(
-                    pExpCtx->opCtx,
-                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                    SerializationContext::stateDefault());
-                LOGV2_DEBUG(7349403,
-                            3,
-                            "Error encountered when applying hmac to query shape, will not publish "
-                            "queryStats for this entry.",
-                            "status"_attr = ex.toStatus(),
-                            "hash"_attr = hash,
-                            "debugQueryShape"_attr = queryShape);
-
-                if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
-                    auto keyString = std::to_string(hash);
-                    tasserted(7349401,
-                              str::stream() << "Was not able to re-parse queryStats key when "
-                                               "reading queryStats.Status "
-                                            << ex.toString() << " Hash: " << keyString
-                                            << " Query Shape: " << queryShape.toString());
+        // Exhaust all elements in the current copied partition.
+        // Use a while loop here to handle cases where toDocument() may fail for a specific
+        // QueryStatsEntry, in which case we suppress the thrown exception and continue
+        // iterating to the next available entry.
+        while (!_currentCopiedPartition.empty()) {
+            auto& statsEntries = _currentCopiedPartition.statsEntries;
+            const auto& queryStatsEntry = statsEntries.front();
+            ON_BLOCK_EXIT([&statsEntries]() { statsEntries.pop_front(); });
+            if (auto doc =
+                    toDocument(_currentCopiedPartition.getReadTimestamp(), queryStatsEntry)) {
+                if (shouldLog) {
+                    LOGV2_DEBUG_OPTIONS(7808301,
+                                        3,
+                                        {logv2::LogTruncation::Disabled},
+                                        "Logging all outputs of $queryStats",
+                                        "thisOutput"_attr = *doc);
                 }
+                return std::move(*doc);
             }
         }
+        // Once we have exhausted entries in this partition, move on to the next partition.
+        _currentCopiedPartition.incrementPartitionId();
     }
+
+    if (shouldLog) {
+        LOGV2_DEBUG_OPTIONS(
+            7808302, 3, {logv2::LogTruncation::Disabled}, "Finished logging output of $queryStats");
+    }
+    return DocumentSource::GetNextResult::makeEOF();
 }
 
+boost::optional<Document> DocumentSourceQueryStats::toDocument(
+    const Timestamp& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
+    const auto& key = queryStatsEntry.key;
+    const auto& hash = absl::HashOf(key);
+    try {
+        auto queryStatsKey = computeQueryStatsKey(key, SerializationContext::stateDefault());
+        return Document{{"key", std::move(queryStatsKey)},
+                        {"metrics", queryStatsEntry.toBSON()},
+                        {"asOf", partitionReadTime}};
+    } catch (const DBException& ex) {
+        queryStatsHmacApplicationErrors.increment();
+        const auto queryShape = key->universalComponents()._queryShape->toBson(
+            pExpCtx->opCtx,
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+            SerializationContext::stateDefault());
+        LOGV2_DEBUG(7349403,
+                    3,
+                    "Error encountered when applying hmac to query shape, will not publish "
+                    "queryStats for this entry.",
+                    "status"_attr = ex.toStatus(),
+                    "hash"_attr = hash,
+                    "debugQueryShape"_attr = queryShape);
+
+        if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
+            auto keyString = std::to_string(hash);
+            tasserted(7349401,
+                      str::stream() << "Was not able to re-parse queryStats key when "
+                                       "reading queryStats.Status "
+                                    << ex.toString() << " Hash: " << keyString
+                                    << " Query Shape: " << queryShape.toString());
+        }
+    }
+    return {};
+}
+
+/**
+ * Loads the current CopiedPartition with copies of the QueryStatsEntries located in partition of
+ * cache corresponding to the partitionId of the current CopiedPartition. This ensures that the
+ * partition mutex is only held for the duration of copying.
+ */
+void DocumentSourceQueryStats::CopiedPartition::load(QueryStatsStore& queryStatsStore) {
+    tassert(7932100,
+            "Attempted to load invalid partition.",
+            _partitionId < queryStatsStore.numPartitions());
+    tassert(7932101, "Partition was already loaded.", !isLoaded());
+    // 'statsEntries' should be empty, clear just in case.
+    statsEntries.clear();
+
+    // Capture the time at which reading the partition begins.
+    _readTimestamp = Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0);
+    {
+        // We only keep the partition (which holds a lock)
+        // for the time needed to collect the metrics (QueryStatsEntry)
+        const auto partition = queryStatsStore.getPartition(_partitionId);
+
+        // Note the intentional copy of QueryStatsEntry.
+        // This will give us a snapshot of all the metrics we want to report.
+        for (auto&& [hash, metrics] : *partition) {
+            statsEntries.push_back(metrics);
+        }
+    }
+    _isLoaded = true;
+}
+
+bool DocumentSourceQueryStats::CopiedPartition::isLoaded() const {
+    return _isLoaded;
+}
+
+void DocumentSourceQueryStats::CopiedPartition::incrementPartitionId() {
+    // Ensure loaded state is reset when partitionId is incremented.
+    ++_partitionId;
+    _isLoaded = false;
+}
+
+bool DocumentSourceQueryStats::CopiedPartition::isValidPartitionId(
+    QueryStatsStore::PartitionId maxNumPartitions) const {
+    return _partitionId < maxNumPartitions;
+}
+
+const Timestamp& DocumentSourceQueryStats::CopiedPartition::getReadTimestamp() const {
+    return _readTimestamp;
+}
+
+bool DocumentSourceQueryStats::CopiedPartition::empty() const {
+    return statsEntries.empty();
+}
 }  // namespace mongo
