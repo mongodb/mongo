@@ -1074,8 +1074,10 @@ void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollec
             dropCollectionShardingIndexCatalog(opCtx.get(), _metadata.getTempReshardingNss());
         }
 
-        if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        {
+            // We need to do this even though the feature flag is not on because the resharding can
+            // be aborted by setFCV downgrade, when the FCV is already in downgrading and the
+            // feature flag is treated as off.
             auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
             std::string abortReason(str::stream()
                                     << "Index builds on "
