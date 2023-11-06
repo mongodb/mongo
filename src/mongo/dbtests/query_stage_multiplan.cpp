@@ -321,7 +321,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
                                     std::move(sharedWs),
                                     std::move(mps),
                                     &coll,
-                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                     QueryPlannerParams::DEFAULT);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -566,12 +566,13 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     mps->addPlan(std::make_unique<QuerySolution>(), std::move(secondPlan), ws.get());
 
     // Making a PlanExecutor chooses the best plan.
-    auto exec = uassertStatusOK(plan_executor_factory::make(_expCtx,
-                                                            std::move(ws),
-                                                            std::move(mps),
-                                                            &ctx.getCollection(),
-                                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                            QueryPlannerParams::DEFAULT));
+    auto exec =
+        uassertStatusOK(plan_executor_factory::make(_expCtx,
+                                                    std::move(ws),
+                                                    std::move(mps),
+                                                    &ctx.getCollection(),
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                    QueryPlannerParams::DEFAULT));
 
     auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
     ASSERT(execImpl);
@@ -636,7 +637,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
                                             &coll,
                                             std::move(cq),
                                             nullptr /* extractAndAttachPipelineStages */,
-                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             0));
 
     auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());

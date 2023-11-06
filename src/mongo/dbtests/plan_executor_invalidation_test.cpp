@@ -122,7 +122,7 @@ public:
                                         std::move(ws),
                                         std::move(scan),
                                         &collection(),
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
 
         ASSERT_OK(statusWithPlanExecutor.getStatus());
@@ -141,7 +141,7 @@ public:
                                           startKey,
                                           endKey,
                                           BoundInclusion::kIncludeBothStartAndEndKeys,
-                                          PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                          PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     }
 
     int N() {

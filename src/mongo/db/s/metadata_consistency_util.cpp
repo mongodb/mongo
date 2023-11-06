@@ -220,7 +220,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
                                     std::move(ws),
                                     std::move(root),
                                     &CollectionPtr::null,
-                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                     false, /* whether returned BSON must be owned */
                                     nss));
 }

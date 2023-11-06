@@ -61,7 +61,6 @@ PlanYieldPolicy::PlanYieldPolicy(
     stdx::visit(OverloadedVisitor{[&](const Yieldable* collectionPtr) {
                                       invariant(!collectionPtr || collectionPtr->yieldable() ||
                                                 policy == YieldPolicy::WRITE_CONFLICT_RETRY_ONLY ||
-                                                policy == YieldPolicy::NO_YIELD ||
                                                 policy == YieldPolicy::INTERRUPT_ONLY ||
                                                 policy == YieldPolicy::ALWAYS_TIME_OUT ||
                                                 policy == YieldPolicy::ALWAYS_MARK_KILLED);
@@ -87,11 +86,10 @@ PlanYieldPolicy::YieldPolicy PlanYieldPolicy::getPolicyOverrideForOperation(
     }
 
     // If the state of our locks held is not yieldable at all, we will assume this is an internal
-    // operation that should not be interrupted or yielded.
-    // TODO: SERVER-76238 Evaluate if we can make everything INTERRUPT_ONLY instead.
+    // operation that will not yield.
     if (!opCtx->lockState()->canSaveLockState() &&
         (desired == YieldPolicy::YIELD_AUTO || desired == YieldPolicy::YIELD_MANUAL)) {
-        return YieldPolicy::NO_YIELD;
+        return YieldPolicy::INTERRUPT_ONLY;
     }
 
     return desired;

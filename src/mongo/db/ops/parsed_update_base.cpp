@@ -264,7 +264,8 @@ void ParsedUpdateBase::parseUpdate() {
 }
 
 PlanYieldPolicy::YieldPolicy ParsedUpdateBase::yieldPolicy() const {
-    return _request->isGod() ? PlanYieldPolicy::YieldPolicy::NO_YIELD : _request->getYieldPolicy();
+    return _request->isGod() ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                             : _request->getYieldPolicy();
 }
 
 bool ParsedUpdateBase::hasParsedQuery() const {

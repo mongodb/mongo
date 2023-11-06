@@ -124,7 +124,7 @@ public:
                                         std::move(workingSet),
                                         std::move(queuedDataStage),
                                         &CollectionPtr::null,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT,
                                         kTestNss));
     }

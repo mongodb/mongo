@@ -121,7 +121,7 @@ structs:
             yieldPolicy:
                 description: "The yielding policy of the plan executor."
                 type: yield_policy
-                default: PlanYieldPolicy::YieldPolicy::NO_YIELD
+                default: PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
             isTimeseriesNamespace:
                 description: "This flag is set to true when the write command was originally sent
                               to the time-series view, but got rewritten to target time-series

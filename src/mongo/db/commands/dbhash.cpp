@@ -424,12 +424,12 @@ private:
                                               BSONObj(),
                                               BSONObj(),
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                              PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
         } else if (collection->isCapped() || collection->isClustered()) {
             exec = InternalPlanner::collectionScan(
-                opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         } else {
             LOGV2(20455, "Can't find _id index for namespace", logAttrs(collection->ns()));
             return "no _id _index";

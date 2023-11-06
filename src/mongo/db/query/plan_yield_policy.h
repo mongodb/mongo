@@ -102,15 +102,14 @@ public:
         // (e.g. collection drop) during yield.
         YIELD_MANUAL,
 
-        // Can be used in one of the following scenarios:
-        //  - The caller will hold a lock continuously for the lifetime of this PlanExecutor.
-        //  - This PlanExecutor doesn't logically belong to a Collection, and so does not need to be
-        //    locked during execution. For example, this yield policy is used for PlanExecutors
-        //    which unspool queued metadata ("virtual collection scans") for listCollections and
-        //    listIndexes.
-        NO_YIELD,
-
-        // Will not yield locks or storage engine resources, but will check for interrupt.
+        // Will not yield locks or storage engine resources, either because the caller intends to
+        // hold the lock continuously for the lifetime of this PlanExecutor, or because this
+        // PlanExecutor doesn't logically belong to a Collection, and so does not need to be
+        // locked during execution. For example, this yield policy is used for PlanExecutors
+        // which unspool queued metadata ("virtual collection scans") for listCollections and
+        // listIndexes.
+        //
+        // Will still check for interrupt.
         INTERRUPT_ONLY,
 
         // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
@@ -132,8 +131,6 @@ public:
                 return "WRITE_CONFLICT_RETRY_ONLY";
             case YieldPolicy::YIELD_MANUAL:
                 return "YIELD_MANUAL";
-            case YieldPolicy::NO_YIELD:
-                return "NO_YIELD";
             case YieldPolicy::INTERRUPT_ONLY:
                 return "INTERRUPT_ONLY";
             case YieldPolicy::ALWAYS_TIME_OUT:
@@ -154,9 +151,6 @@ public:
         }
         if (yieldPolicy == "YIELD_MANUAL") {
             return YieldPolicy::YIELD_MANUAL;
-        }
-        if (yieldPolicy == "NO_YIELD") {
-            return YieldPolicy::NO_YIELD;
         }
         if (yieldPolicy == "INTERRUPT_ONLY") {
             return YieldPolicy::INTERRUPT_ONLY;
@@ -201,7 +195,7 @@ public:
      * addition to releasing/restoring locks and the storage engine snapshot). The provided 'policy'
      * will be overridden depending on the nature of this operation. For example, multi-document
      * transactions will always downgrade to INTERRUPT_ONLY, and operations with recursively held
-     * locks will downgrade to NO_YIELD.
+     * locks will downgrade to INTERRUPT_ONLY.
      */
     PlanYieldPolicy(OperationContext* opCtx,
                     YieldPolicy policy,
@@ -263,7 +257,6 @@ public:
             case YieldPolicy::ALWAYS_MARK_KILLED: {
                 return true;
             }
-            case YieldPolicy::NO_YIELD:
             case YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
             case YieldPolicy::INTERRUPT_ONLY: {
                 return false;
@@ -285,7 +278,6 @@ public:
             case YieldPolicy::ALWAYS_MARK_KILLED: {
                 return true;
             }
-            case YieldPolicy::NO_YIELD:
             case YieldPolicy::YIELD_MANUAL:
             case YieldPolicy::INTERRUPT_ONLY:
                 return false;

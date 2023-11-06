@@ -106,7 +106,6 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(
     switch (policy) {
         case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
         case PlanYieldPolicy::YieldPolicy::YIELD_MANUAL:
-        case PlanYieldPolicy::YieldPolicy::NO_YIELD:
         case PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
         case PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY: {
             return std::make_unique<PlanYieldPolicyImpl>(
@@ -180,8 +179,10 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                               }},
             collection.get());
 
-    _yieldPolicy = makeYieldPolicy(
-        this, collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD, yieldable);
+    _yieldPolicy = makeYieldPolicy(this,
+                                   collectionExists ? yieldPolicy
+                                                    : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                   yieldable);
 
     uassertStatusOK(_pickBestPlan());
 

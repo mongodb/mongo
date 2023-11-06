@@ -142,7 +142,7 @@ public:
         ASSERT_TRUE(agc.getCollection());
 
         auto plan = InternalPlanner::collectionScan(
-            _opCtx.get(), &agc.getCollection(), PlanYieldPolicy::YieldPolicy::NO_YIELD);
+            _opCtx.get(), &agc.getCollection(), PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
         std::vector<BSONObj> result;
         BSONObj i;

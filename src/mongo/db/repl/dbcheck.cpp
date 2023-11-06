@@ -345,7 +345,7 @@ DbCheckHasher::DbCheckHasher(
                                                start,
                                                end,
                                                BoundInclusion::kIncludeEndKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                               PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                InternalPlanner::FORWARD,
                                                InternalPlanner::IXSCAN_DEFAULT);
         } else {
@@ -360,7 +360,7 @@ DbCheckHasher::DbCheckHasher(
                                              collection->getDefaultCollator())));
             params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
             _exec = InternalPlanner::collectionScan(
-                opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         }
     }
 

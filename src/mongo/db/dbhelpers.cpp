@@ -141,7 +141,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
                                             &collection,
                                             std::move(cq),
                                             nullptr /* extractAndAttachPipelineStages */,
-                                            PlanYieldPolicy::YieldPolicy::NO_YIELD));
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY));
 
     PlanExecutor::ExecState state;
     BSONObj obj;
@@ -247,8 +247,8 @@ bool Helpers::getSingleton(OperationContext* opCtx, const NamespaceString& nss, 
         return false;
     }
 
-    auto exec =
-        InternalPlanner::collectionScan(opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto exec = InternalPlanner::collectionScan(
+        opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
@@ -272,8 +272,10 @@ bool Helpers::getLast(OperationContext* opCtx, const NamespaceString& nss, BSONO
         return false;
     }
 
-    auto exec = InternalPlanner::collectionScan(
-        opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
+    auto exec = InternalPlanner::collectionScan(opCtx,
+                                                &collection,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.
@@ -313,7 +315,7 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
     if (fromMigrate) {
         request.setSource(OperationSource::kFromMigrate);
     }
-    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
     return ::mongo::update(opCtx, coll, request);
 }
@@ -333,7 +335,7 @@ void Helpers::update(OperationContext* opCtx,
     if (fromMigrate) {
         request.setSource(OperationSource::kFromMigrate);
     }
-    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
     ::mongo::update(opCtx, coll, request);
 }

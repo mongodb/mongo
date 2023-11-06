@@ -72,7 +72,7 @@ OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
       _exec(_oplogRead.getCollection()
                 ? InternalPlanner::collectionScan(opCtx,
                                                   &_oplogRead.getCollection(),
-                                                  PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                   InternalPlanner::BACKWARD)
                 : nullptr) {}
 

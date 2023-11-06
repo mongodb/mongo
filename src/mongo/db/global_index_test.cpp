@@ -365,7 +365,7 @@ void _assertDocumentsInGlobalIndexById(OperationContext* opCtx,
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         InternalPlanner::collectionScan(opCtx,
                                         &collToScan.getCollection(),
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         InternalPlanner::FORWARD);
 
     BSONObj obj;

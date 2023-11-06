@@ -274,7 +274,7 @@ public:
                                                BSONObj(),
                                                BSONObj(),
                                                BoundInclusion::kIncludeStartKeyOnly,
-                                               PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                               PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                InternalPlanner::FORWARD,
                                                InternalPlanner::IXSCAN_FETCH);
 

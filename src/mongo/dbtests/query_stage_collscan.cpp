@@ -158,7 +158,7 @@ public:
                                         std::move(ws),
                                         std::move(ps),
                                         &collection.getCollection(),
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -434,7 +434,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
                                     std::move(ws),
                                     std::move(ps),
                                     &collection.getCollection(),
-                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                     QueryPlannerParams::DEFAULT);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -467,7 +467,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
                                     std::move(ws),
                                     std::move(ps),
                                     &collection.getCollection(),
-                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                     QueryPlannerParams::DEFAULT);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -619,7 +619,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
                                     std::move(ws),
                                     std::move(ps),
                                     &collection.getCollection(),
-                                    PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                     QueryPlannerParams::DEFAULT);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());

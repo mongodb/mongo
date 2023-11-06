@@ -407,8 +407,8 @@ private:
     // without another query before or after the update.
     ReturnDocOption _returnDocs = ReturnDocOption::RETURN_NONE;
 
-    // Whether or not the update should yield. Defaults to NO_YIELD.
-    PlanYieldPolicy::YieldPolicy _yieldPolicy = PlanYieldPolicy::YieldPolicy::NO_YIELD;
+    // Whether or not the update should yield.
+    PlanYieldPolicy::YieldPolicy _yieldPolicy = PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
 };
 
 }  // namespace mongo

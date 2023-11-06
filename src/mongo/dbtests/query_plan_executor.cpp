@@ -126,7 +126,7 @@ public:
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeCollScanExec(
         const CollectionPtr* coll,
         BSONObj& filterObj,
-        PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::NO_YIELD,
+        PlanYieldPolicy::YieldPolicy yieldPolicy = PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
         TailableModeEnum tailableMode = TailableModeEnum::kNormal) {
         CollectionScanParams csparams;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -192,7 +192,7 @@ public:
                                         std::move(ws),
                                         std::move(root),
                                         coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                         QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());

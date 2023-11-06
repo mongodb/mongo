@@ -144,7 +144,7 @@ protected:
                                                 &_coll,
                                                 std::move(cq),
                                                 nullptr /* extractAndAttachPipelineStages */,
-                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                 QueryPlannerParams::RETURN_OWNED_DATA));
 
         _source = DocumentSourceCursor::create(MultipleCollectionAccessor(_coll),
@@ -345,7 +345,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         return;
     }
 
-    // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
+    // Make sure the collection exists, otherwise we'll default to an INTERRUPT_ONLY yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
     ASSERT_TRUE(client.createCollection(nss, cappedSize, capped));
@@ -393,7 +393,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
 }
 
 TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
-    // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
+    // Make sure the collection exists, otherwise we'll default to an INTERRUPT_ONLY yield policy.
     ASSERT_TRUE(client.createCollection(nss));
     client.insert(nss, BSON("a" << 1));
 
@@ -443,7 +443,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
         return;
     }
 
-    // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
+    // Make sure the collection exists, otherwise we'll default to an INTERRUPT_ONLY yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
     ASSERT_TRUE(client.createCollection(nss, cappedSize, capped));
@@ -490,7 +490,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
 }
 
 TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
-    // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
+    // Make sure the collection exists, otherwise we'll default to an INTERRUPT_ONLY yield policy.
     ASSERT_TRUE(client.createCollection(nss));
     client.insert(nss, BSON("a" << 1));
 

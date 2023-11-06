@@ -1044,7 +1044,7 @@ void dropCollection(OperationContext* opCtx,
         // in order to keep an archive of items that were rolled back.
         // As we're holding a strong MODE_X lock we disallow yielding the lock.
         auto exec = InternalPlanner::collectionScan(
-            opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+            opCtx, &collection, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         PlanExecutor::ExecState execState;
         try {
             BSONObj curObj;

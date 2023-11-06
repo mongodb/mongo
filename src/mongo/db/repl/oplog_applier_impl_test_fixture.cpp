@@ -444,7 +444,7 @@ CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceStrin
     : _collToScan(opCtx, nss),
       _exec(InternalPlanner::collectionScan(opCtx,
                                             &_collToScan.getCollection(),
-                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                             InternalPlanner::FORWARD)) {}
 
 StatusWith<BSONObj> CollectionReader::next() {

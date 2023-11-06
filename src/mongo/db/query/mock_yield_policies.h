@@ -97,7 +97,7 @@ public:
 class NoopYieldPolicy final : public MockYieldPolicy {
 public:
     NoopYieldPolicy(OperationContext* opCtx, ClockSource* clockSource)
-        : MockYieldPolicy(opCtx, clockSource, PlanYieldPolicy::YieldPolicy::NO_YIELD) {}
+        : MockYieldPolicy(opCtx, clockSource, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY) {}
 
     bool shouldYieldOrInterrupt(OperationContext*) override {
         return false;

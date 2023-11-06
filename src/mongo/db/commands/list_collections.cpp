@@ -532,7 +532,7 @@ public:
                                                 std::move(ws),
                                                 std::move(root),
                                                 &CollectionPtr::null,
-                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
                                                 false, /* whether owned BSON must be returned */
                                                 cursorNss));
 
