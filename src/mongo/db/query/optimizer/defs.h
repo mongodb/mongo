@@ -337,6 +337,10 @@ struct QueryHints {
     // prevent issues arising from yielding.
     bool _disableYieldingTolerantPlans = true;
 
+    // Controls if we permit the optimization to remove Not operators by pushing them
+    // down toward the leaves of an ABT.
+    bool _enableNotPushdown = false;
+
     // Controls if we force sampling CE to fall back on heuristic for filter node.
     bool _forceSamplingCEFallBackForFilterNode = true;
 

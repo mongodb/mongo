@@ -1117,10 +1117,12 @@ struct SubstituteConvert<FilterNode> {
             return;
         }
 
-        if (auto filter = NotPushdown::simplify(filterNode.getFilter(), ctx.getPrefixId())) {
-            ctx.addNode(make<FilterNode>(std::move(*filter), filterNode.getChild()),
-                        true /*substitute*/);
-            return;
+        if (ctx.getHints()._enableNotPushdown) {
+            if (auto filter = NotPushdown::simplify(filterNode.getFilter(), ctx.getPrefixId())) {
+                ctx.addNode(make<FilterNode>(std::move(*filter), filterNode.getChild()),
+                            true /*substitute*/);
+                return;
+            }
         }
 
         convertFilterToSargableNode(node, filterNode, ctx, scanProjName);

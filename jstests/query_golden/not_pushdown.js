@@ -1,5 +1,6 @@
 /**
- * Test query predicates with combinations of $not and array traversal.
+ * Test query predicates with combinations of $not and array traversal when the not pushdown
+ * is enabled.
  * When possible, we should remove Traverse nodes.
  *
  * @tags: [
@@ -7,7 +8,7 @@
  *   requires_cqf,
  * ]
  */
-import {findSubtrees} from "jstests/libs/optimizer_utils.js";
+import {findSubtrees, runWithParams} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_not_pushdown;
 coll.drop();
@@ -44,7 +45,11 @@ function run(note, pipeline) {
     jsTestLog(`Query: ${tojsononeline(pipeline)}\nnote: ${note}`);
 
     print(`Operators used: `);
-    const explain = coll.explain().aggregate(pipeline);
+    const explain = runWithParams(
+        [
+            {key: "internalCascadesOptimizerEnableNotPushdown", value: true},
+        ],
+        () => coll.explain().aggregate(pipeline));
     const ops =
         findSubtrees(explain, node => node.op === 'Not' || node.op === 'Eq' || node.op === 'Neq')
             .map(node => node.op);

@@ -1478,14 +1478,15 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
     CEType eqHeu{15.5279};
     CEType eqHeuElem{6.83772};
     CEType eqHeuNotNe{4.47214};
+    CEType eqHeuNotNeElem{3.16228};
     ASSERT_EQ_ELEMMATCH_CE(t, eqCE, eqElemCE, "a", "{$eq: 5}");
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "a", "{$not: {$eq: 5}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqElemCE, "a", "{$not: {$ne: 5}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqHeuNotNeElem, "a", "{$not: {$ne: 5}}");
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "a", "{$ne: 5}");
 
     ASSERT_EQ_ELEMMATCH_CE(t, eqCE, eqElemCE, "b", "{$eq: 'charB'}");
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "b", "{$not: {$eq: 'charB'}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqElemCE, "b", "{$not: {$ne: 'charB'}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqHeuNotNeElem, "b", "{$not: {$ne: 'charB'}}");
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "b", "{$ne: 'charB'}");
 
     // Test conjunctions where both fields have histograms. Note that when both ops are $ne, we

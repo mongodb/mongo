@@ -81,7 +81,7 @@ public:
                                           CEType /*inputCard*/,
                                           EvalFilterSelectivityResult pathResult,
                                           EvalFilterSelectivityResult /*inputResult*/) {
-        return pathResult;
+        return {{}, nullptr, pathResult.selectivity};
     }
 
     EvalFilterSelectivityResult transport(const PathGet& node,
@@ -127,6 +127,18 @@ public:
             disjunctionSel(leftChildResult.selectivity, rightChildResult.selectivity);
 
         return {{}, nullptr, sel};
+    }
+
+    EvalFilterSelectivityResult transport(const PathLambda& node,
+                                          CEType /*inputCard*/,
+                                          EvalFilterSelectivityResult childResult) {
+        return childResult;
+    }
+
+    EvalFilterSelectivityResult transport(const LambdaAbstraction& node,
+                                          CEType /*inputCard*/,
+                                          EvalFilterSelectivityResult childResult) {
+        return childResult;
     }
 
     EvalFilterSelectivityResult transport(const UnaryOp& node,

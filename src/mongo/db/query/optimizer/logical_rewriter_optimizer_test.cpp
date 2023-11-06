@@ -1348,6 +1348,8 @@ TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1401,6 +1403,9 @@ TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1447,6 +1452,8 @@ TEST(LogicalRewriter, NotPushdownComposeA) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1512,6 +1519,8 @@ TEST(LogicalRewriter, NotPushdownComposeABothPathsCannotBeNegated) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1571,6 +1580,8 @@ TEST(LogicalRewriter, NotPushdownComposeM) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1622,6 +1633,8 @@ TEST(LogicalRewriter, NotPushdownPathConstant) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1657,6 +1670,8 @@ TEST(LogicalRewriter, NotPushdownPathConstantNested) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1699,6 +1714,8 @@ TEST(LogicalRewriter, NotPushdownPathConstantNotsAreCancelled) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1739,6 +1756,8 @@ TEST(LogicalRewriter, NotPushdownPathDefault) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1775,6 +1794,9 @@ TEST(LogicalRewriter, NotPushdownPathDefaultNested) {
                                          Metadata{{{"coll", createScanDef({}, {})}}},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1880,6 +1902,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -1944,6 +1968,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
         }},
         boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 
@@ -2009,6 +2035,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaFailsWithFreeVar) {
                                          }},
                                          boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
+    phaseManager.getHints()._enableNotPushdown = true;
+
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
 

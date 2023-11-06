@@ -905,6 +905,14 @@ server_parameters:
     default: false
     test_only: true
   
+  internalCascadesOptimizerEnableNotPushdown:
+    description: "Enables the NotPushdown optimization which attempts to remove Not nodes by pushing them down towards the leaves."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerEnableNotPushdown"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
   internalCascadesOptimizerSamplingCEFallBackForFilterNode:
     description: "Forces sampling CE to fall back on heuristic for filter node."
     set_at: [ startup, runtime ]
