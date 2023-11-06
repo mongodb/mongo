@@ -265,8 +265,10 @@ public:
     /**
      * Returns the catalog entry for the given namespace, if it exists.
      */
-    virtual boost::optional<BSONObj> getCatalogEntry(OperationContext* opCtx,
-                                                     const NamespaceString& ns) const = 0;
+    virtual boost::optional<BSONObj> getCatalogEntry(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const boost::optional<UUID>& collUUID = boost::none) const = 0;
 
     /**
      * Appends operation latency statistics for collection "nss" to "builder"

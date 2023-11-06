@@ -90,8 +90,8 @@ DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
     if (!_catalogDocs) {
         if (pExpCtx->ns.isCollectionlessAggregateNS()) {
             _catalogDocs = pExpCtx->mongoProcessInterface->listCatalog(pExpCtx->opCtx);
-        } else if (auto catalogDoc = pExpCtx->mongoProcessInterface->getCatalogEntry(pExpCtx->opCtx,
-                                                                                     pExpCtx->ns)) {
+        } else if (auto catalogDoc = pExpCtx->mongoProcessInterface->getCatalogEntry(
+                       pExpCtx->opCtx, pExpCtx->ns, pExpCtx->uuid)) {
             _catalogDocs = {{std::move(*catalogDoc)}};
         } else {
             _catalogDocs.emplace();
