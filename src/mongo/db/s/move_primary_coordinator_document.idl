@@ -61,6 +61,7 @@ structs:
                 type: MovePrimaryCoordinatorPhase
                 description: "Current coordinator phase."
                 default: kUnset
+            # TODO (SERVER-82812): Chain MovePrimaryRequestBase and use its `to` field instead.
             toShardId:
                 type: shard_id
                 description: "Destination shard of the database."

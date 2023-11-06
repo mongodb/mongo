@@ -133,10 +133,16 @@ bool MovePrimaryCoordinator::_mustAlwaysMakeProgress() {
 void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = MovePrimaryCoordinatorDocument::parse(
         IDLParserContext("MovePrimaryCoordinatorDocument"), doc);
+
+    const auto toShardIdAreEqual = [&] {
+        stdx::lock_guard lk(_docMutex);
+        return _doc.getToShardId() == otherDoc.getToShardId();
+    }();
+
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another movePrimary operation with different arguments is already running ont the "
             "same database",
-            _doc.getToShardId() == otherDoc.getToShardId());
+            toShardIdAreEqual);
 }
 
 ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
