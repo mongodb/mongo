@@ -9,7 +9,10 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
-import {createRstArgs} from "jstests/replsets/rslib.js";
+import {
+    awaitRSClientHosts,
+    createRstArgs,
+} from "jstests/replsets/rslib.js";
 import {
     makeAbortTransactionCmdObj,
     makeCommitTransactionCmdObj,
@@ -129,6 +132,10 @@ function testBlockingRetry(retryFunc, testOpts) {
     }
     assert.eq(shard0TestColl.count(docToInsert), 1);
 
+    // Ensure mongos has learned of the new primary.
+    if (testOpts.stepDownPrimaryAfterBlockingRetry) {
+        awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
+    }
     assert.commandWorked(mongosTestColl.remove({}));
 }
 
