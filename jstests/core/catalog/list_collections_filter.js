@@ -37,12 +37,20 @@ function testListCollections(filter, expectedNames) {
     function stripToName(result) {
         return result.name;
     }
-    var cursorResultNames = cursor.toArray().map(stripToName);
+
+    // Sometimes the system.profile collection gets created due to a slow machine. We exclude it
+    // from the resulting names.
+    function isNotProfileCollection(name) {
+        return name !== "system.profile";
+    }
+
+    var cursorResultNames = cursor.toArray().map(stripToName).filter(isNotProfileCollection);
 
     assert.eq(cursorResultNames.sort(), expectedNames.sort());
 
     // Assert the shell helper returns the same list, but in sorted order.
-    var shellResultNames = mydb.getCollectionInfos(filter).map(stripToName);
+    var shellResultNames =
+        mydb.getCollectionInfos(filter).map(stripToName).filter(isNotProfileCollection);
     assert.eq(shellResultNames, expectedNames.sort());
 }
 
