@@ -2933,8 +2933,9 @@ buildvariants:
   - name: change_streams_multitenant_sharded_collections_passthrough
   - name: .misc_js
   - name: .clustered_collections
-  - name: .concurrency !.large !.ubsan !.no_txns
-  - name: .concurrency .large !.ubsan !.no_txns
+  # TODO(SERVER-79848): Remove !.sharded
+  - name: .concurrency !.large !.ubsan !.no_txns !.sharded
+  - name: .concurrency .large !.ubsan !.no_txns !.sharded
     distros:
     - rhel80-medium
   - name: .config_fuzzer !.large
