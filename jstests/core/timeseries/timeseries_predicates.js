@@ -10,35 +10,34 @@
  *   requires_timeseries,
  * ]
  */
-const coll = db.timeseries_predicates_normal;
-const tsColl = db.timeseries_predicates_timeseries;
-coll.drop();
-tsColl.drop();
-assert.commandWorked(
-    db.createCollection(tsColl.getName(), {timeseries: {timeField: 'time', metaField: 'mt'}}));
+
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js"
+
+const coll = assertDropAndRecreateCollection(db, "timeseries_predicates_normal");
+const tsColl = assertDropAndRecreateCollection(
+    db, "timeseries_predicates_timeseries", {timeseries: {timeField: 'time', metaField: 'mt'}})
 const bucketsColl = db.getCollection('system.buckets.' + tsColl.getName());
 
-// Test that 'predicate' behaves correctly on the example documents,
-// by comparing the result on a time-series collection against a normal collection.
-function checkPredicateResult(predicate, documents) {
-    assert.commandWorked(coll.deleteMany({}));
-    assert.commandWorked(bucketsColl.deleteMany({}));
-    assert.commandWorked(coll.insert(documents));
-    assert.commandWorked(tsColl.insert(documents));
-
-    const normalResult = coll.aggregate({$match: predicate}).toArray();
-    const tsResult = tsColl.aggregate({$match: predicate}).toArray();
-    assert.sameMembers(normalResult, tsResult);
-}
-
-// Test that 'predicate' behaves correctly, no matter how the documents are bucketed:
-// insert the documents with different combinations of metadata to change how they are bucketed.
-// 'documents' should be small, since this runs 2^N tests.
+// Tests that we produce the same results for a given 'predicate', with and without timeseries, and
+// regardless of timeseries bucketing placement.
+//
+// 1. Given two buckets, this function generates one testing scenario for every possible document in
+// bucket placement option.
+// 2. Then inserts the documents accordingly, leveraging metadata (meta.bucket) field.
+// 3. Finally retrieves the documents according to 'predicate' and verifies that the result is the
+// same as it would be without timeseries
+//
+// Since we're generating one scenario for each possible document placement option in two buckets,
+// that means we're generating 2^documents.length different scenarios. We recommend it to be < 8
 function checkAllBucketings(predicate, documents) {
     for (const doc of documents) {
         doc._id = ObjectId();
         doc.time = doc.time || ISODate();
     }
+
+    assert.commandWorked(coll.deleteMany({}));
+    assert.commandWorked(coll.insert(documents));
+    const normalResult = coll.aggregate({$match: predicate}).toArray();
 
     // For N documents, there are 2^N ways to assign them to buckets A and B.
     const numDocs = documents.length;
@@ -47,7 +46,10 @@ function checkAllBucketings(predicate, documents) {
         // The ith bit tells you how to assign documents[i].
         const labeledDocs = documents.map(
             (doc, i) => Object.merge(doc, {meta: {bucket: bucketing & (1 << i)}}, true /*deep*/));
-        checkPredicateResult(predicate, labeledDocs);
+        assert.commandWorked(bucketsColl.deleteMany({}));
+        assert.commandWorked(tsColl.insert(labeledDocs));
+        const tsResult = tsColl.aggregate([{$match: predicate}, {$project: {meta: 0}}]).toArray();
+        assert.sameMembers(normalResult, tsResult);
     }
 }
 
