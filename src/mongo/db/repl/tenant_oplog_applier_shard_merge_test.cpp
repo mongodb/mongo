@@ -356,17 +356,12 @@ TEST_F(TenantOplogApplierMergeTest, ApplyInsert_Success) {
 }
 
 TEST_F(TenantOplogApplierMergeTest, ApplyInserts_Grouped) {
-    // TODO(SERVER-50256): remove nss_workaround, which is used to work around a bug where
-    // the first operation assigned to a worker cannot be grouped.
-    NamespaceString nss_workaround = NamespaceString::createNamespaceString_forTest(
-        kTenantDB.toStringWithTenantId_forTest(), "a");
     NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
         kTenantDB.toStringWithTenantId_forTest(), "bar");
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
         kTenantDB.toStringWithTenantId_forTest(), "baz");
     auto uuid1 = createCollectionWithUuid(_opCtx.get(), nss1);
     auto uuid2 = createCollectionWithUuid(_opCtx.get(), nss2);
-    auto uuid_workaround = createCollectionWithUuid(_opCtx.get(), nss_workaround);
 
     std::vector<OplogEntry> entries;
     bool onInsertsCalledNss1 = false;
@@ -379,7 +374,6 @@ TEST_F(TenantOplogApplierMergeTest, ApplyInserts_Grouped) {
     entries.push_back(makeInsertOplogEntry(5, nss1, uuid1));
     entries.push_back(makeInsertOplogEntry(6, nss1, uuid1));
     entries.push_back(makeInsertOplogEntry(7, nss1, uuid1));
-    entries.push_back(makeInsertOplogEntry(8, nss_workaround, uuid_workaround));
     _opObserver->onInsertsFn =
         [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
             if (nss == nss1) {

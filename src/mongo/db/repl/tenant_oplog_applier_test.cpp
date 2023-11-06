@@ -688,10 +688,6 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
 }
 
 TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
-    // TODO(SERVER-50256): remove nss_workaround, which is used to work around a bug where
-    // the first operation assigned to a worker cannot be grouped.
-    NamespaceString nss_workaround =
-        NamespaceString::createNamespaceString_forTest(_dbName.toStringWithTenantId_forTest(), "a");
     NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
         _dbName.toStringWithTenantId_forTest(), "bar");
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
@@ -709,7 +705,6 @@ TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     entries.push_back(makeInsertOplogEntry(5, nss1, uuid1));
     entries.push_back(makeInsertOplogEntry(6, nss1, uuid1));
     entries.push_back(makeInsertOplogEntry(7, nss1, uuid1));
-    entries.push_back(makeInsertOplogEntry(8, nss_workaround, UUID::gen()));
     _opObserver->onInsertsFn =
         [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
             if (nss == nss1) {

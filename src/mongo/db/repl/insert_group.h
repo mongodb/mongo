@@ -75,9 +75,10 @@ public:
     StatusWith<ConstIterator> groupAndApplyInserts(ConstIterator oplogEntriesIterator) noexcept;
 
 private:
-    // _doNotGroupBeforePoint is used to prevent retrying bad group inserts by marking the final op
-    // of a failed group and not allowing further group inserts until that op has been processed.
-    ConstIterator _doNotGroupBeforePoint;
+    // _nextOpToGroup is used to prevent retrying bad group inserts by marking the next op to
+    // attempt group inserts and not allowing further group inserts until all previous ops have been
+    // processed.
+    ConstIterator _nextOpToGroup;
 
     // Used for constructing search bounds when grouping inserts.
     ConstIterator _end;

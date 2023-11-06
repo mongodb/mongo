@@ -1770,6 +1770,7 @@ if wiredtiger:
             'drop_pending_collection_reaper_test.cpp',
             'idempotency_document_structure_test.cpp',
             'initial_syncer_test.cpp',
+            'insert_group_test.cpp',
             'isself_test.cpp',
             'member_config_test.cpp',
             'multiapplier_test.cpp',

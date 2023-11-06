@@ -70,7 +70,7 @@ InsertGroup::InsertGroup(std::vector<ApplierOperation>* ops,
                          InsertGroup::Mode mode,
                          const bool isDataConsistent,
                          ApplyFunc applyOplogEntryOrGroupedInserts)
-    : _doNotGroupBeforePoint(ops->cbegin()),
+    : _nextOpToGroup(ops->cbegin()),
       _end(ops->cend()),
       _opCtx(opCtx),
       _mode(mode),
@@ -93,14 +93,12 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
         return Status(ErrorCodes::InvalidOptions,
                       "Cannot group insert operations on capped collections.");
     }
-    if (it <= _doNotGroupBeforePoint) {
+    if (it < _nextOpToGroup) {
         return Status(ErrorCodes::InvalidPath,
                       "Cannot group an insert operation that we previously attempted to group.");
     }
 
     // Attempt to group 'insert' ops if possible.
-    std::vector<BSONObj> toInsert;
-
     // Make sure to include the first op in the group size.
     size_t groupSize = op->getObject().objsize();
     auto opCount = std::vector<ApplierOperation>::size_type(1);
@@ -173,7 +171,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
 
         // Avoid quadratic run time from failed insert by not retrying until we
         // are beyond this group of ops.
-        _doNotGroupBeforePoint = endOfGroupableOpsIterator - 1;
+        _nextOpToGroup = endOfGroupableOpsIterator;
 
         return status;
     }
