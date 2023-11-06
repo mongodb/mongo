@@ -9,7 +9,8 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
     try {
         isShardedCluster = FixtureHelpers.isMongos(db);
     } catch (e) {
-        if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code)) {
+        if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
+            ErrorCodes.isNetworkTimeoutError(e.code)) {
             jsTest.log(
                 `Aborted metadata consistency check due to retriable error during topology discovery: ${
                     e}`);

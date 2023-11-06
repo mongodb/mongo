@@ -18,7 +18,8 @@ export var MetadataConsistencyChecker = (function() {
         // The isTransientError() function is responsible for setting an error as transient and
         // abort the metadata consistency check to be retried in the future.
         const isTransientError = function(e) {
-            if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code)) {
+            if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
+                ErrorCodes.isNetworkTimeoutError(e.code)) {
                 return true;
             }
 
