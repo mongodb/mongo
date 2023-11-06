@@ -178,6 +178,7 @@ selector:
   # Exclude tests that require a specific fcv.
   - requires_fcv_71
   - requires_fcv_72
+  - requires_fcv_73
   # Exclude tests that are not compatible with upgrade/downgrade.
   - cannot_run_during_upgrade_downgrade
 
