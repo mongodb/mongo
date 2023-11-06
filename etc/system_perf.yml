@@ -1478,6 +1478,24 @@ tasks:
         vars:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_SubDocId.yml
+  - name: genny_query_TenMDocCollection_IntId_Agg
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_IntId_Agg.yml
+  - name: genny_query_TenMDocCollection_IntId_IdentityView
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_IntId_IdentityView.yml
+  - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/TenMDocCollection_IntId_IdentityView_Agg.yml
   - name: genny_resharding_withIndexes
     exec_timeout_secs: 172800 # 2 days
     commands:
@@ -2140,6 +2158,12 @@ buildvariants:
       - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: m60-like-al2023-3-node-replSet.arm.aws.2023-09
     display_name: M60-like AL2023 3-Node ReplSet ARM AWS 2023-09
@@ -2197,6 +2221,12 @@ buildvariants:
       - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: atlas-M30-real
     display_name: M30-Atlas ReplSet AWS
@@ -2395,6 +2425,12 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: filter_with_complex_logical_expression_high_value
         cron: *high-value-workload-cron
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: linux-standalone-all-feature-flags.2022-11
     display_name: Linux Standalone (all feature flags) 2022-11
@@ -2441,6 +2477,12 @@ buildvariants:
       - name: column_store_tpch_10_denormalized
       - name: column_store_tpch_10_denormalized_unindexed
       - name: ssb_column_store_comparison
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: streams-single.intel.2023-10
     display_name: Streams-Single Intel 2023-10
@@ -2741,6 +2783,12 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: linux-standalone-limited-query-stats
     display_name: Linux Standalone 2022-11 (Rate Limited QueryStats)
@@ -2764,6 +2812,12 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: linux-1-node-replSet-all-feature-flags.2022-11
     display_name: Linux 1-Node ReplSet (all feature flags) 2022-11
@@ -2842,6 +2896,12 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: perf-1-node-replSet.arm.aws.2023-09
     display_name: PERF 1-Node ReplSet ARM AWS 2023-09
@@ -2988,6 +3048,12 @@ buildvariants:
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
       - name: tsbs_query_fixed_bucketing
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: linux-shard-lite-fle.2022-11
     display_name: Linux Shard Lite FLE 2022-11
@@ -3211,6 +3277,12 @@ buildvariants:
       - name: tsbs_query_finance_sharded
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 # A variant of 3-shard with $queryStats activated (unlimited).
   - <<: *shard-baseline
@@ -3230,6 +3302,12 @@ buildvariants:
       - name: tsbs_query_finance_sharded
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 # A variant of 3-shard with $queryStats activated but with a rate limit.
   - <<: *shard-baseline
@@ -3329,6 +3407,12 @@ buildvariants:
       - name: tsbs_query_finance_sharded
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: linux-shard-lite-intel.2022-11
     display_name: Linux Shard Lite Cluster Intel 2022-11
@@ -3426,6 +3510,12 @@ buildvariants:
       - name: tsbs_query_finance_sharded
       - name: tsbs_query_sharded_balancer
       - name: tsbs_query_finance_sharded_balancer
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 # A variant of shard-lite with $queryStats enabled with a rate limit.
   - <<: *shard-lite-baseline
@@ -3539,6 +3629,12 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: time_series_sort_high_value
         cron: *high-value-workload-cron
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 
   - name: linux-3-node-replSet-intel.2022-11
@@ -4051,6 +4147,12 @@ buildvariants:
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
       - name: tsbs_query_fixed_bucketing
+      - name: genny_query_TenMDocCollection_IntId
+      - name: genny_query_TenMDocCollection_ObjectId
+      - name: genny_query_TenMDocCollection_SubDocId
+      - name: genny_query_TenMDocCollection_IntId_Agg
+      - name: genny_query_TenMDocCollection_IntId_IdentityView
+      - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
   - name: linux-3-node-replSet-250mbwtcache.2023-05
     display_name: Linux 3-Node ReplSet 250 MB WiredTiger Cache 2023-05
@@ -4175,6 +4277,9 @@ buildvariants:
     - name: genny_query_TenMDocCollection_IntId
     - name: genny_query_TenMDocCollection_ObjectId
     - name: genny_query_TenMDocCollection_SubDocId
+    - name: genny_query_TenMDocCollection_IntId_Agg
+    - name: genny_query_TenMDocCollection_IntId_IdentityView
+    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
     - name: views-aggregation
     - name: views-query
   - <<: *linux-microbenchmarks-standalone-arm
@@ -4187,6 +4292,9 @@ buildvariants:
     - name: genny_query_TenMDocCollection_IntId
     - name: genny_query_TenMDocCollection_ObjectId
     - name: genny_query_TenMDocCollection_SubDocId
+    - name: genny_query_TenMDocCollection_IntId_Agg
+    - name: genny_query_TenMDocCollection_IntId_IdentityView
+    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
     - name: views-aggregation
     - name: views-query
     expansions:
@@ -4202,6 +4310,9 @@ buildvariants:
     - name: genny_query_TenMDocCollection_IntId
     - name: genny_query_TenMDocCollection_ObjectId
     - name: genny_query_TenMDocCollection_SubDocId
+    - name: genny_query_TenMDocCollection_IntId_Agg
+    - name: genny_query_TenMDocCollection_IntId_IdentityView
+    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
     - name: views-aggregation
     - name: views-query
     expansions:
