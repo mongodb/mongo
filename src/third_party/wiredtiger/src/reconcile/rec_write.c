@@ -123,7 +123,7 @@ err:
         conn->rec_maximum_image_build_milliseconds =
           WT_CLOCKDIFF_MS(session->reconcile_timeline.image_build_finish,
             session->reconcile_timeline.image_build_start);
-    if (WT_CLOCKDIFF_SEC(session->reconcile_timeline.reconcile_finish,
+    if (WT_CLOCKDIFF_MS(session->reconcile_timeline.reconcile_finish,
           session->reconcile_timeline.reconcile_start) > conn->rec_maximum_milliseconds)
         conn->rec_maximum_milliseconds =
           WT_CLOCKDIFF_MS(session->reconcile_timeline.reconcile_finish,
