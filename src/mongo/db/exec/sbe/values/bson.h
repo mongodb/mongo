@@ -51,7 +51,41 @@ std::pair<value::TypeTags, value::Value> convertFrom(const BSONElement& elem) {
         elem.rawdata(), elem.rawdata() + elem.size(), elem.fieldNameSize() - 1);
 }
 
-const char* advance(const char* be, size_t fieldNameSize);
+/**
+ * Advance table specifies how to change the pointer to skip current BSON value (so that pointer
+ * points to the next byte after the BSON value):
+ *  - For each entry N in 'kAdvanceTable' that is less than 0x7F, pointer is advanced by N.
+ *  - For each entry N in 'kAdvanceTable' that is greater than 0x7F, pointer is advanced by
+ *      the 32-bit integer stored in buffer plus ~N.
+ *  - For each entry N in 'kAdvanceTable' that is equal to 0x7F, the type is either RegEx or it
+ *      is an unsupported type (EOO) or its an invalid type value (i.e. the type value does not
+ *      correspond to any known type).
+ */
+extern const uint8_t kAdvanceTable alignas(64)[256];
+
+const char* advanceHelper(const char* be, size_t fieldNameSize);
+
+inline const char* advance(const char* be, size_t fieldNameSize) {
+    auto type = static_cast<unsigned char>(*be);
+    auto advOffset = kAdvanceTable[type];
+
+    size_t sizeOfTypeCodeAndFieldName =
+        1 /*type*/ + fieldNameSize + 1 /*zero at the end of fieldname*/;
+
+    if (MONGO_likely(advOffset < 0x7Fu)) {
+        be += sizeOfTypeCodeAndFieldName;
+        be += advOffset;
+        return be;
+    } else if (MONGO_likely(advOffset > 0x7Fu)) {
+        advOffset = ~advOffset;
+        be += sizeOfTypeCodeAndFieldName;
+        be += ConstDataView(be).read<LittleEndian<int32_t>>();
+        be += advOffset;
+        return be;
+    }
+
+    return advanceHelper(be, fieldNameSize);
+}
 
 inline auto fieldNameAndLength(const char* be) noexcept {
     return StringData{be + 1};
