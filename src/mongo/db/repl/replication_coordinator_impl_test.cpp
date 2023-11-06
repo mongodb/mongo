@@ -5177,7 +5177,7 @@ TEST_F(ReplCoordTest, LogAMessageWhenShutDownBeforeReplicationStartUpFinished) {
     startCapturingLogMessages();
     {
         auto opCtx = makeOperationContext();
-        getReplCoord()->shutdown(opCtx.get());
+        getReplCoord()->shutdown(opCtx.get(), nullptr /* shutdownTimeElapsedBuilder */);
     }
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,

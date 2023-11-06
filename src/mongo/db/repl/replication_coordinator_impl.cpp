@@ -60,6 +60,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
@@ -1040,7 +1041,8 @@ bool ReplicationCoordinatorImpl::inQuiesceMode() const {
     return _inQuiesceMode;
 }
 
-void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
+void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx,
+                                          BSONObjBuilder* shutdownTimeElapsedBuilder) {
     // Shutdown must:
     // * prevent new threads from blocking in awaitReplication
     // * wake up all existing threads blocking in awaitReplication
@@ -1050,8 +1052,14 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         return;
     }
 
-    LOGV2(5074000, "Shutting down the replica set aware services.");
-    ReplicaSetAwareServiceRegistry::get(_service).onShutdown();
+    {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Shut down the replica set aware services",
+                                                shutdownTimeElapsedBuilder);
+        LOGV2(5074000, "Shutting down the replica set aware services.");
+        ReplicaSetAwareServiceRegistry::get(_service).onShutdown();
+    }
 
     LOGV2(21328, "Shutting down replication subsystems");
 
@@ -1069,11 +1077,19 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         }
         if (_rsConfigState == kConfigStartingUp) {
             // Wait until we are finished starting up, so that we can cleanly shut everything down.
+            auto scopedTimer = createTimeElapsedBuilderScopedTimer(
+                opCtx->getServiceContext()->getFastClockSource(),
+                "Wait for startup to complete before shutting down",
+                shutdownTimeElapsedBuilder);
             lk.unlock();
             _waitForStartUpComplete();
             lk.lock();
             fassert(18823, _rsConfigState != kConfigStartingUp);
         }
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Shut down replication",
+                                                shutdownTimeElapsedBuilder);
         _replicationWaiterList.setErrorAll_inlock(
             {ErrorCodes::ShutdownInProgress, "Replication is being shut down"});
         _opTimeWaiterList.setErrorAll_inlock(
@@ -1085,6 +1101,10 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
 
     // joining the replication executor is blocking so it must be run outside of the mutex
     if (initialSyncerCopy) {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Shut down initial syncer",
+                                                shutdownTimeElapsedBuilder);
         LOGV2_DEBUG(
             21329, 1, "ReplicationCoordinatorImpl::shutdown calling InitialSyncer::shutdown");
         const auto status = initialSyncerCopy->shutdown();
@@ -1097,9 +1117,28 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* opCtx) {
         initialSyncerCopy->join();
         initialSyncerCopy.reset();
     }
-    _externalState->shutdown(opCtx);
-    _replExecutor->shutdown();
-    _replExecutor->join();
+
+    {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Shut down external state",
+                                                shutdownTimeElapsedBuilder);
+        _externalState->shutdown(opCtx);
+    }
+    {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Shut down replication executor",
+                                                shutdownTimeElapsedBuilder);
+        _replExecutor->shutdown();
+    }
+    {
+        auto scopedTimer =
+            createTimeElapsedBuilderScopedTimer(opCtx->getServiceContext()->getFastClockSource(),
+                                                "Join replication executor",
+                                                shutdownTimeElapsedBuilder);
+        _replExecutor->join();
+    }
 }
 
 const ReplSettings& ReplicationCoordinatorImpl::getSettings() const {
