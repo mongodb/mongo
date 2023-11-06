@@ -123,7 +123,10 @@ std::unique_ptr<MatchExpression> MatchExpression::optimize(
 
     try {
         auto optimizedExpr = optimizer(std::move(expression));
-        if (enableSimplification && internalQueryEnableBooleanExpressionsSimplifier.load()) {
+        const bool isTriviallySimple = optimizedExpr->numChildren() == 0 ||
+            (optimizedExpr->numChildren() == 1 && optimizedExpr->getChild(0)->numChildren() == 0);
+        if (enableSimplification && !isTriviallySimple &&
+            internalQueryEnableBooleanExpressionsSimplifier.load()) {
             ExpressionSimlifierSettings settings{
                 static_cast<size_t>(internalQueryMaximumNumberOfUniquePredicatesToSimplify.load()),
                 static_cast<size_t>(internalQueryMaximumNumberOfMintermsInSimplifier.load()),
