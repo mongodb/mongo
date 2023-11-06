@@ -12479,13 +12479,13 @@ buildvariants:
 #          Copybara buildvariants           #
 ###########################################
 
-- name: copybara-sync-between-repos
-  modules:
-  - enterprise
-  display_name: "* Copybara Sync Between Repos"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - ubuntu2204-small
-  stepback: false
-  tasks:
-  - name: sync_repo_with_copybara
+# - name: copybara-sync-between-repos
+#   modules:
+#   - enterprise
+#   display_name: "* Copybara Sync Between Repos"
+#   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+#   run_on:
+#   - ubuntu2204-small
+#   stepback: false
+#   tasks:
+#   - name: sync_repo_with_copybara
