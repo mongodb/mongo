@@ -66,7 +66,9 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder bb;
-        opCtx->getServiceContext()->getTransportLayerManager()->appendSessionManagerStats(&bb);
+        if (auto tlm = opCtx->getServiceContext()->getTransportLayerManager()) {
+            tlm->appendSessionManagerStats(&bb);
+        }
         return bb.obj();
     }
 
