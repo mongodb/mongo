@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -223,3 +223,21 @@ config_setting(
         "//bazel/config:use_libunwind": "True",
     },
 )
+
+# --------------------------------------
+# gdbserver options
+# --------------------------------------
+
+use_gdbserver(
+    name = "use_gdbserver",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_gdbserver_enabled",
+    flag_values = {
+        "//bazel/config:use_gdbserver": "True",
+    }
+)
+
+

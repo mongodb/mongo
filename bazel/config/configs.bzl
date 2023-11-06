@@ -37,6 +37,20 @@ build_mode = rule(
 )
 
 # =========
+# gdbserver
+# ========= 
+
+use_gdbserver_provider = provider(
+    doc = "Choose if gdbserver should be used"
+    fields = ["type"],
+)
+
+use_gdbserver = rule(
+    implementation = lambda ctx: use_gdbserver_provider(type = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # libunwind
 # =========
 

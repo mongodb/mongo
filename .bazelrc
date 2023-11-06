@@ -42,3 +42,7 @@ build:local --tls_client_key=
 build:local --experimental_remote_cache_compression=false
 build:local --grpc_keepalive_time=0s
 build:local --legacy_important_outputs
+
+
+# try to import the bazelrc files if available
+try-import %workspace%/.bazelrc.local

@@ -273,6 +273,7 @@ bazel-mongo*
 bazel-out
 bazel-testlogs
 bazelisk
+.bazelrc.local
 
 # generated configs for external fixture suites
 docker_compose/
