@@ -58,6 +58,7 @@ structs:
             clientId:
                 description: "Unique client ID for this OIDC client"
                 type: string
+                optional: true # Omitted if an IdP is intended for machine flows only
             requestScopes:
                 description: "Additional scopes to request from IDP"
                 type: array<string>
