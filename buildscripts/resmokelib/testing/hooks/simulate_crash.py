@@ -94,7 +94,14 @@ class SimulateCrash(bghook.BGHook):
         rel = fqfn[len(root):]
         os.makedirs(new_root + "/journal", exist_ok=True)
         out_fd = os.open(new_root + rel, os.O_WRONLY | os.O_CREAT)
-        os.sendfile(out_fd, in_fd, 0, in_bytes)
+
+        total_bytes_sent = 0
+        while (total_bytes_sent < in_bytes):
+            bytes_sent = os.sendfile(out_fd, in_fd, total_bytes_sent, in_bytes - total_bytes_sent)
+            if bytes_sent == 0:
+                raise ValueError("Unexpectedly reached EOF copying file")
+            total_bytes_sent += bytes_sent
+
         os.close(out_fd)
         os.close(in_fd)
 
