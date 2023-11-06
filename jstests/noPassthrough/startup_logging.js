@@ -19,7 +19,7 @@ function validateWaitingMessage(launcher) {
     testStartupLogging(
         launcher,
         makeRegExMatchFn(
-            /"id":23016,\s*"ctx":"listener","msg":"Waiting for connections","attr":{"port":/));
+            /"id":23016,\s*(?:"svc":".",\s*)?"ctx":"listener","msg":"Waiting for connections","attr":{"port":/));
 }
 
 print("********************\nTesting startup logging in mongod\n********************");
