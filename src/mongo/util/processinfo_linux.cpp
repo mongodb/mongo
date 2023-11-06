@@ -347,7 +347,7 @@ struct MountRecord {
     std::string superOpt;    //  (11) per-superblock options (see mount(2))
 };
 
-struct DiskStats {
+struct DiskStat {
     int major;
     int minor;
     // See https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
@@ -397,32 +397,49 @@ struct DiskStats {
 };
 
 void appendMountInfo(BSONObjBuilder& bob) {
-    std::ifstream ifs("/proc/diskstats");
+    std::set<std::pair<int, int>> majorMinors;
+    std::map<std::pair<int, int>, DiskStat> diskStats;
+    std::ifstream ifs;
+
     std::string line;
-    std::map<std::pair<int, int>, DiskStats> diskStatsMap;
+    ifs.open("/proc/diskstats");
     if (ifs) {
         while (ifs && getline(ifs, line)) {
-            DiskStats ds;
+            DiskStat ds;
             if (ds.readLine(line)) {
-                diskStatsMap.insert({std::make_pair(ds.major, ds.minor), ds});
+                std::pair<int, int> majorMinor = std::make_pair(ds.major, ds.minor);
+                majorMinors.insert(majorMinor);
+                diskStats.insert({majorMinor, ds});
             }
         }
     }
     ifs.close();
 
+    std::map<std::pair<int, int>, MountRecord> mountRecords;
     ifs.open("/proc/self/mountinfo");
-    if (!ifs)
-        return;
+    if (ifs) {
+        while (ifs && getline(ifs, line)) {
+            MountRecord mr;
+            mr.parseLine(line);
+            std::pair<int, int> majorMinor = std::make_pair(mr.major, mr.minor);
+            majorMinors.insert(majorMinor);
+            mountRecords.insert({majorMinor, mr});
+        }
+    }
+    ifs.close();
+
     BSONArrayBuilder arr = bob.subarrayStart("mountInfo");
-    MountRecord rec;
-    while (ifs && getline(ifs, line)) {
-        if (rec.parseLine(line)) {
-            auto bob = BSONObjBuilder(arr.subobjStart());
-            rec.appendBSON(bob);
-            auto majorMinor = std::make_pair(rec.major, rec.minor);
-            if (diskStatsMap.find(majorMinor) != diskStatsMap.end()) {
-                diskStatsMap[majorMinor].appendBSON(bob);
-            }
+    for (const auto& majorMinor : majorMinors) {
+        auto arrBob = BSONObjBuilder(arr.subobjStart());
+
+        auto mr = mountRecords.find(majorMinor);
+        if (mr != mountRecords.end()) {
+            mr->second.appendBSON(arrBob);
+        }
+
+        auto ds = diskStats.find(majorMinor);
+        if (ds != diskStats.end()) {
+            ds->second.appendBSON(arrBob);
         }
     }
 }
@@ -474,7 +491,7 @@ public:
     /**
      * Read the first 1023 bytes from a file
      */
-    static std::string readLineFromFile(const char* fname) {
+    static std::string parseLineFromFile(const char* fname) {
         FILE* f;
         char fstr[1024] = {0};
 
@@ -718,14 +735,14 @@ public:
 
         // There is no standard format for name and version so use the kernel version.
         version = "Kernel ";
-        version += LinuxSysHelper::readLineFromFile("/proc/sys/kernel/osrelease");
+        version += LinuxSysHelper::parseLineFromFile("/proc/sys/kernel/osrelease");
     }
 
     /**
      * Get system memory total
      */
     static unsigned long long getSystemMemorySize() {
-        std::string meminfo = readLineFromFile("/proc/meminfo");
+        std::string meminfo = parseLineFromFile("/proc/meminfo");
         size_t lineOff = 0;
         if (!meminfo.empty() && (lineOff = meminfo.find("MemTotal")) != std::string::npos) {
             // found MemTotal line.  capture everything between 'MemTotal:' and ' kB'.
@@ -760,7 +777,7 @@ public:
                  "/sys/fs/cgroup/memory/memory.limit_in_bytes"  // cgroups v1
              }) {
             unsigned long long groupMemBytes = 0;
-            std::string groupLimit = readLineFromFile(file);
+            std::string groupLimit = parseLineFromFile(file);
             if (!groupLimit.empty() && NumberParser{}(groupLimit, &groupMemBytes).isOK()) {
                 return std::min(systemMemBytes, groupMemBytes);
             }
@@ -865,7 +882,7 @@ unsigned long countNumaNodes() {
             // read the second column of first line to determine numa state
             // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
             std::string line =
-                LinuxSysHelper::readLineFromFile("/proc/self/numa_maps").append(" \0");
+                LinuxSysHelper::parseLineFromFile("/proc/self/numa_maps").append(" \0");
             size_t pos = line.find(' ');
             if (pos != std::string::npos &&
                 line.substr(pos + 1, 10).find("interleave") == std::string::npos) {
@@ -903,7 +920,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     int physicalCores;
     int cpuSockets;
 
-    std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
+    std::string verSig = LinuxSysHelper::parseLineFromFile("/proc/version_signature");
     LinuxSysHelper::getCpuInfo(cpuCount,
                                cpuString,
                                cpuFreq,
@@ -939,7 +956,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     hasNuma = numNumaNodes;
 
     BSONObjBuilder bExtra;
-    bExtra.append("versionString", LinuxSysHelper::readLineFromFile("/proc/version"));
+    bExtra.append("versionString", LinuxSysHelper::parseLineFromFile("/proc/version"));
 #ifdef __BIONIC__
     std::stringstream ss;
     ss << "bionic (android api " << __ANDROID_API__ << ")";
