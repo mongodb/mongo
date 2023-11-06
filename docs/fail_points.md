@@ -25,7 +25,7 @@ tests][fail_point_test].
 
 ## Configuring and Waiting on Fail Points
 
-Fail point configuration involves chosing a "mode" for activation (e.g., "alwaysOn") and optionally
+Fail point configuration involves choosing a "mode" for activation (e.g., "alwaysOn") and optionally
 providing additional data in the form of a BSON object. For the vast majority of cases, this is done
 by issuing a `configureFailPoint` command request. This is made easier in JavaScript using the
 `configureFailPoint` helper from [fail_point_util.js][fail_point_util]. Fail points can also be

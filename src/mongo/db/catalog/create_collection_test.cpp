@@ -289,6 +289,74 @@ TEST_F(CreateCollectionTest,
         << " missing: " << (*renamedCollectionNss).toStringForErrorMsg();
 }
 
+/**
+ * Testing an oplog sequence that can cause inconsistent data being read:
+ * 1. [TS1: Create timeseries coll "test.curColl", together with a system bucket
+ *          "test.system.buckets.curColl" with UUID2]
+ * 2. [TS2: Drop timeseries coll "test.curColl"]
+ * 3. [TS3: Create timeseries coll "test.curColl" together with a system bucket
+ *          "test.system.buckets.curColl" with UUID1]
+ *
+ * After initial sync, TS1 is applied and renames UUID1 away due to name conflict.
+ * Renaming needs to respect the system.buckets collection prefix when collections are listed.
+ */
+TEST_F(CreateCollectionTest, CreateCollectionForApplyOpsRespectsTimeseriesBucketsCollectionPrefix) {
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+    auto bucketsColl =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
+    auto opCtx = makeOpCtx();
+    Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
+
+    // Create a time series collection
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.getCreateCollectionRequest().setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
+
+    // The system.buckets collection was created with uuid1.
+    auto uuid1 = getCollectionUuid(opCtx.get(), bucketsColl);
+    // Now call createCollectionForApplyOps with the same name but a different uuid2.
+    auto uuid2 = UUID::gen();
+    ASSERT_NOT_EQUALS(uuid1, uuid2);
+    // This should rename the old collection to a randomly generated collection name.
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          bucketsColl.dbName(),
+                                          uuid2,
+                                          BSON("create" << bucketsColl.coll()),
+                                          /*allowRenameOutOfTheWay*/ true));
+    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
+    ASSERT_EQUALS(uuid2, getCollectionUuid(opCtx.get(), bucketsColl));
+
+    // Check that old collection that was renamed out of the way still exists.
+    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto renamedCollectionNss = catalog->lookupNSSByUUID(opCtx.get(), uuid1);
+    ASSERT(renamedCollectionNss);
+    ASSERT_TRUE(collectionExists(opCtx.get(), *renamedCollectionNss))
+        << "old renamed collection with UUID " << uuid1
+        << " missing: " << (*renamedCollectionNss).toStringForErrorMsg();
+    // The renamed collection should still have the system.buckets prefix.
+    ASSERT(renamedCollectionNss->isTimeseriesBucketsCollection());
+
+    // Drop the new collection (with uuid2).
+    {
+        repl::UnreplicatedWritesBlock uwb(opCtx.get());  // Do not use oplog.
+        ASSERT_OK(_storage->dropCollection(opCtx.get(), bucketsColl));
+    }
+    ASSERT_FALSE(collectionExists(opCtx.get(), bucketsColl));
+
+    // Now call createCollectionForApplyOps with uuid1.
+    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
+                                          bucketsColl.dbName(),
+                                          uuid1,
+                                          BSON("create" << bucketsColl.coll()),
+                                          /*allowRenameOutOfTheWay*/ false));
+    // This should rename the old collection back to its original name.
+    ASSERT_FALSE(collectionExists(opCtx.get(), *renamedCollectionNss));
+    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
+    ASSERT_EQUALS(uuid1, getCollectionUuid(opCtx.get(), bucketsColl));
+}
+
 TEST_F(CreateCollectionTest,
        CreateCollectionForApplyOpsWithSpecificUuidReturnsNamespaceExistsIfCollectionIsDropPending) {
     NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
