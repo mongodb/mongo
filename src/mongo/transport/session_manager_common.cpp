@@ -371,6 +371,7 @@ void SessionManagerCommon::endSessionByClient(Client* client) {
     auto sync = _sessions->sync();
     auto iter = sync.find(client);
     auto summary = iter->second.summary;
+    iter->second.workflow->terminate();
     sync.erase(iter);
     if (!quiet()) {
         LOGV2(22944, "Connection ended", logAttrs(summary), "connectionCount"_attr = sync.size());

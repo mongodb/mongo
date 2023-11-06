@@ -48,6 +48,17 @@ public:
                            Options options,
                            std::unique_ptr<SessionManager> sessionManager);
 
+    /**
+     * Create a GRPCTransportLayerImpl instance suitable for ingress (and optionally egress).
+     * The instantiated TL will have CommandService pre-attached to route requests via
+     * sessionManager->startSession().
+     *
+     * Note that this TransportLayer will throw during `setup()`
+     * if no tlsCertificateKeyFile is available.
+     */
+    static std::unique_ptr<GRPCTransportLayerImpl> createWithConfig(ServiceContext*,
+                                                                    Options options);
+
     Status registerService(std::unique_ptr<Service> svc) override;
 
     Status setup() override;

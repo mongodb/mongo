@@ -41,6 +41,8 @@
 #include "mongo/transport/grpc/grpc_transport_layer_impl.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/wire_version_provider.h"
+#include "mongo/transport/service_executor.h"
+#include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/assert.h"
@@ -64,11 +66,28 @@ public:
     void setUp() override {
         ServiceContextWithClockSourceMockTest::setUp();
 
-        getServiceContext()->setPeriodicRunner(newPeriodicRunner());
+        auto svcCtx = getServiceContext();
+
+        // Default SEP behavior is to fail.
+        // Tests utilizing SEP workflows must provide an implementation
+        // for serviceEntryPoint.handleRequestCb.
+        auto sep = std::make_unique<MockServiceEntryPoint>();
+        sep->handleRequestCb = [](OperationContext*, const Message&) -> Future<DbResponse> {
+            MONGO_UNIMPLEMENTED;
+        };
+        serviceEntryPoint = sep.get();
+        svcCtx->getService(ClusterRole::ShardServer)->setServiceEntryPoint(std::move(sep));
+        svcCtx->setPeriodicRunner(newPeriodicRunner());
+        ServiceExecutor::startupAll(svcCtx);
 
         sslGlobalParams.sslCAFile = CommandServiceTestFixtures::kCAFile;
         sslGlobalParams.sslPEMKeyFile = CommandServiceTestFixtures::kServerCertificateKeyFile;
         sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_requireSSL);
+    }
+
+    void tearDown() override {
+        ServiceContextWithClockSourceMockTest::tearDown();
+        ServiceExecutor::shutdownAll(getServiceContext(), Seconds{10});
     }
 
     virtual std::unique_ptr<PeriodicRunner> newPeriodicRunner() {
@@ -90,6 +109,12 @@ public:
     static CommandService::RPCHandler makeNoopRPCHandler() {
         return [](auto session) {
             session->end();
+        };
+    }
+
+    static CommandService::RPCHandler makeActiveRPCHandler() {
+        return [](auto session) {
+            session->getTransportLayer()->getSessionManager()->startSession(std::move(session));
         };
     }
 
@@ -122,7 +147,53 @@ public:
         auto session = makeEgressSession(tl, addr);
         ASSERT_OK(session->finish());
     }
+
+    static Message makeMessage(BSONObj body) {
+        OpMsgBuilder builder;
+        builder.setBody(body);
+        return builder.finish();
+    }
+
+    static BSONObj getMessageBody(const Message& message) {
+        return OpMsg::parse(message).body.getOwned();
+    }
+
+    MockServiceEntryPoint* serviceEntryPoint;
 };
+
+TEST_F(GRPCTransportLayerTest, RunCommand) {
+    constexpr auto kCommandName = "mockCommand"_sd;
+    constexpr auto kReplyField = "mockReply"_sd;
+    serviceEntryPoint->handleRequestCb = [&](OperationContext*,
+                                             const Message& request) -> Future<DbResponse> {
+        ASSERT_EQ(OpMsg::parse(request).body.firstElement().fieldName(), kCommandName);
+        OpMsgBuilder reply;
+        reply.setBody(BSON(kReplyField << 1));
+        return DbResponse{.response = reply.finish()};
+    };
+
+    auto tl = makeTL(makeActiveRPCHandler());
+    auto client = std::make_shared<GRPCClient>(
+        tl.get(), makeClientMetadataDocument(), CommandServiceTestFixtures::makeClientOptions());
+    client->start(getServiceContext());
+    ON_BLOCK_EXIT([&] { client->shutdown(); });
+
+    uassertStatusOK(tl->setup());
+    uassertStatusOK(tl->start());
+    ON_BLOCK_EXIT([&] { tl->shutdown(); });
+
+
+    auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
+                                   CommandServiceTestFixtures::kDefaultConnectTimeout,
+                                   {});
+
+    ASSERT_OK(session->sinkMessage(makeMessage(BSON(kCommandName << 1))));
+    auto replyMessage = uassertStatusOK(session->sourceMessage());
+    auto replyBody = getMessageBody(replyMessage);
+    ASSERT_EQ(replyBody.firstElement().fieldName(), kReplyField);
+
+    ASSERT_OK(session->finish());
+}
 
 /**
  * Modifies the `ServiceContext` with `PeriodicRunnerMock`, a custom `PeriodicRunner` that maintains

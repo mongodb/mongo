@@ -153,7 +153,7 @@ TEST_F(ServerTest, ECDSACertificates) {
     const std::string kECDSACAFile = "jstests/libs/ecdsa-ca.pem";
 
     auto options = CommandServiceTestFixtures::makeServerOptions();
-    options.tlsPEMKeyFile = "jstests/libs/ecdsa-server.pem";
+    options.tlsCertificateKeyFile = "jstests/libs/ecdsa-server.pem";
     options.tlsCAFile = kECDSACAFile;
 
     CommandServiceTestFixtures::runWithServer(
@@ -172,7 +172,7 @@ TEST_F(ServerTest, ECDSACertificates) {
 
 TEST_F(ServerTest, IntermediateCA) {
     auto options = CommandServiceTestFixtures::makeServerOptions();
-    options.tlsPEMKeyFile = "jstests/libs/server-intermediate-ca.pem";
+    options.tlsCertificateKeyFile = "jstests/libs/server-intermediate-ca.pem";
 
     CommandServiceTestFixtures::runWithServer(
         [](auto) {},
@@ -194,18 +194,18 @@ TEST_F(ServerTest, InvalidServerCertificateOptions) {
 
     {
         auto options = CommandServiceTestFixtures::makeServerOptions();
-        options.tlsPEMKeyFile = kNonExistentPath;
+        options.tlsCertificateKeyFile = kNonExistentPath;
         runInvalidCertTest(options);
     }
     {
         auto options = CommandServiceTestFixtures::makeServerOptions();
-        options.tlsPEMKeyFile = CommandServiceTestFixtures::kServerCertificateKeyFile;
+        options.tlsCertificateKeyFile = CommandServiceTestFixtures::kServerCertificateKeyFile;
         options.tlsCAFile = kNonExistentPath;
         runInvalidCertTest(options);
     }
     {
         auto options = CommandServiceTestFixtures::makeServerOptions();
-        options.tlsPEMKeyFile = kMissingPrivateKeyPath;
+        options.tlsCertificateKeyFile = kMissingPrivateKeyPath;
         runInvalidCertTest(options);
     }
 }

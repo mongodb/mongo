@@ -72,6 +72,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/message',
+        '$BUILD_DIR/mongo/transport/service_executor',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         '$BUILD_DIR/third_party/shim_grpc',

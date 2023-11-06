@@ -62,7 +62,7 @@ Server::~Server() {
 
 namespace {
 StatusWith<Server::Certificates> _readCertificatesFromDisk(boost::optional<StringData> tlsCAFile,
-                                                           StringData tlsPEMKeyFile) {
+                                                           StringData tlsCertificateKeyFile) {
     Server::Certificates certs;
     if (tlsCAFile) {
         StatusWith<std::string> swCAFileContents = ssl_util::readPEMFile(tlsCAFile.get());
@@ -77,7 +77,7 @@ StatusWith<Server::Certificates> _readCertificatesFromDisk(boost::optional<Strin
     }
 
     try {
-        certs.keyCertPair = util::parsePEMKeyFile(tlsPEMKeyFile);
+        certs.keyCertPair = util::parsePEMKeyFile(tlsCertificateKeyFile);
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -166,8 +166,8 @@ std::shared_ptr<::grpc::ServerCredentials> Server::_makeServerCredentialsWithFet
     auto certState = std::make_unique<CertificateState>();
 
     // Load the initial certificates into the certificate state cache.
-    auto newCertificates =
-        uassertStatusOK(_readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsPEMKeyFile));
+    auto newCertificates = uassertStatusOK(
+        _readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsCertificateKeyFile));
     certState->cache = newCertificates;
 
     grpc_ssl_server_credentials_options* opts =
@@ -184,7 +184,8 @@ std::shared_ptr<::grpc::ServerCredentials> Server::_makeServerCredentialsWithFet
 }
 
 Status Server::rotateCertificates() {
-    auto swNewCertificates = _readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsPEMKeyFile);
+    auto swNewCertificates =
+        _readCertificatesFromDisk(*_options.tlsCAFile, _options.tlsCertificateKeyFile);
     if (!swNewCertificates.isOK()) {
         return swNewCertificates.getStatus();
     }

@@ -47,7 +47,7 @@ public:
          */
         std::vector<HostAndPort> addresses;
         size_t maxThreads;
-        StringData tlsPEMKeyFile;
+        StringData tlsCertificateKeyFile;
         boost::optional<StringData> tlsCAFile;
         bool tlsAllowConnectionsWithoutCertificates;
         bool tlsAllowInvalidCertificates;
