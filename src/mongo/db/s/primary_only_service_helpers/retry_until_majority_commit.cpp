@@ -60,7 +60,6 @@ RetryUntilMajorityCommit::RetryUntilMajorityCommit(
 
 RetryUntilSuccessOrCancel RetryUntilMajorityCommit::_createRetryHelper(
     CancellationToken token, RetryabilityPredicate predicate) {
-    invariant(!token.isCanceled());
     return RetryUntilSuccessOrCancel{_serviceName,
                                      _taskExecutor,
                                      _markKilledExecutor,
