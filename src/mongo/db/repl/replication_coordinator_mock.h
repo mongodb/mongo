@@ -120,7 +120,7 @@ public:
 
     virtual bool inQuiesceMode() const;
 
-    virtual void shutdown(OperationContext* opCtx);
+    virtual void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder);
 
     void appendDiagnosticBSON(BSONObjBuilder* bob, StringData leafName) override {}
 

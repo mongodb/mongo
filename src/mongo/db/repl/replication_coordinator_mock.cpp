@@ -107,7 +107,8 @@ bool ReplicationCoordinatorMock::inQuiesceMode() const {
     return false;
 }
 
-void ReplicationCoordinatorMock::shutdown(OperationContext*) {
+void ReplicationCoordinatorMock::shutdown(OperationContext*,
+                                          BSONObjBuilder* shutdownTimeElapsedBuilder) {
     // TODO
 }
 

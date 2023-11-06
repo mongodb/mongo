@@ -181,8 +181,10 @@ public:
      * Does whatever cleanup is required to stop replication, including instructing the other
      * components of the replication system to shut down and stop any threads they are using,
      * blocking until all replication-related shutdown tasks are complete.
+     * The parameter `shutdownTimeElapsedBuilder` is for adding time elapsed of tasks done
+     * in this function into one single builder that records the time elapsed during shutdown.
      */
-    virtual void shutdown(OperationContext* opCtx) = 0;
+    virtual void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder) = 0;
 
     /**
      * Returns a reference to the parsed command line arguments that are related to replication.

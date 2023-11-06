@@ -217,7 +217,8 @@ void shutdown(ServiceContext* srvContext) {
 
         LogicalSessionCache::set(serviceContext, nullptr);
 
-        repl::ReplicationCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
+        repl::ReplicationCoordinator::get(serviceContext)
+            ->shutdown(shutdownOpCtx.get(), nullptr /* shutdownTimeElapsedBuilder */);
         IndexBuildsCoordinator::get(serviceContext)->shutdown(shutdownOpCtx.get());
 
         // Global storage engine may not be started in all cases before we exit

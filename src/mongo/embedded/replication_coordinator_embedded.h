@@ -94,7 +94,7 @@ public:
 
     bool inQuiesceMode() const override;
 
-    void shutdown(OperationContext* opCtx) override;
+    void shutdown(OperationContext* opCtx, BSONObjBuilder* shutdownTimeElapsedBuilder) override;
 
     // Returns the ServiceContext where this instance runs.
     ServiceContext* getServiceContext() override {

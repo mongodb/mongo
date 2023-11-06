@@ -166,7 +166,8 @@ public:
 
     virtual bool inQuiesceMode() const override;
 
-    virtual void shutdown(OperationContext* opCtx) override;
+    virtual void shutdown(OperationContext* opCtx,
+                          BSONObjBuilder* shutdownTimeElapsedBuilder) override;
 
     virtual const ReplSettings& getSettings() const override;
 

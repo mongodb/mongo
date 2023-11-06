@@ -487,7 +487,7 @@ void ReplCoordTest::runSingleNodeElection(OperationContext* opCtx) {
 void ReplCoordTest::shutdown(OperationContext* opCtx) {
     invariant(_callShutdown);
     _net->exitNetwork();
-    _repl->shutdown(opCtx);
+    _repl->shutdown(opCtx, nullptr /* shutdownTimeElapsedBuilder */);
     _callShutdown = false;
 }
 
