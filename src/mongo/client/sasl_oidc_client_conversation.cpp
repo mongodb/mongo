@@ -120,15 +120,17 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
                 deviceAuthorizationEndpoint.startsWith("http://localhost"_sd));
 
     auto clientId = serverReply.getClientId();
-    uassert(ErrorCodes::BadValue, "Encountered empty client ID in server reply", !clientId.empty());
+    uassert(ErrorCodes::BadValue,
+            "Encountered empty client ID in server reply",
+            clientId && !clientId->empty());
 
     // Cache clientId for potential refresh flow uses in the future.
-    oidcClientGlobalParams.oidcClientId = clientId.toString();
+    oidcClientGlobalParams.oidcClientId = clientId->toString();
 
     // Construct body of POST request to device authorization endpoint based on provided
     // parameters.
     StringBuilder deviceCodeRequestSb;
-    appendPostBodyRequiredParams(&deviceCodeRequestSb, clientId);
+    appendPostBodyRequiredParams(&deviceCodeRequestSb, clientId.value());
     appendPostBodyDeviceCodeRequestParams(&deviceCodeRequestSb, serverReply.getRequestScopes());
     auto deviceCodeRequest = deviceCodeRequestSb.str();
 
@@ -158,7 +160,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     // Poll token endpoint for access and refresh tokens. It should return immediately since
     // the shell blocks on the authenticationSimulator until it completes, but poll anyway.
     StringBuilder tokenRequestSb;
-    appendPostBodyRequiredParams(&tokenRequestSb, clientId);
+    appendPostBodyRequiredParams(&tokenRequestSb, clientId.value());
     appendPostBodyTokenRequestParams(&tokenRequestSb, deviceAuthorizationResponse.getDeviceCode());
     auto tokenRequest = tokenRequestSb.str();
 
