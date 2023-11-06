@@ -86,26 +86,6 @@ void updateBucketFetchAndQueryStats(const ReopeningContext& context,
 }
 
 /**
- * Calculate the bucket max size constrained by the cache size and the cardinality of active
- * buckets.
- */
-int32_t getCacheDerivedBucketMaxSize(StorageEngine* storageEngine, uint32_t workloadCardinality) {
-    invariant(storageEngine);
-    uint64_t storageCacheSize =
-        static_cast<uint64_t>(storageEngine->getEngine()->getCacheSizeMB() * 1024 * 1024);
-
-    if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
-        storageCacheSize == 0 || workloadCardinality == 0) {
-        return INT_MAX;
-    }
-
-    uint64_t derivedMaxSize = storageCacheSize / (2 * workloadCardinality);
-    uint64_t intMax = static_cast<uint64_t>(std::numeric_limits<int32_t>::max());
-    return std::min(derivedMaxSize, intMax);
-}
-
-/**
  * Abandons the write batch and notifies any waiters that the bucket has been cleared.
  */
 void abortWriteBatch(WriteBatch& batch, const Status& status) {
@@ -976,6 +956,19 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
     return boost::none;
 }
 
+std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSize,
+                                                         uint32_t workloadCardinality) {
+    if (workloadCardinality == 0) {
+        return {gTimeseriesBucketMaxSize, INT_MAX};
+    }
+
+    uint64_t intMax = static_cast<uint64_t>(std::numeric_limits<int32_t>::max());
+    int32_t derivedMaxSize = std::max(
+        static_cast<int32_t>(std::min(storageCacheSize / (2 * workloadCardinality), intMax)),
+        gTimeseriesBucketMinSize.load());
+    return {std::min(gTimeseriesBucketMaxSize, derivedMaxSize), derivedMaxSize};
+}
+
 ReopeningContext getReopeningContext(OperationContext* opCtx,
                                      BucketCatalog& catalog,
                                      Stripe& stripe,
@@ -1001,9 +994,11 @@ ReopeningContext getReopeningContext(OperationContext* opCtx,
         "." + std::to_string(gTimeseriesBucketMaxCount - 1);
 
     // Derive the maximum bucket size.
-    auto bucketMaxSize = getCacheDerivedBucketMaxSize(
-        opCtx->getServiceContext()->getStorageEngine(), catalog.numberOfActiveBuckets.load());
-    int32_t effectiveMaxSize = std::min(gTimeseriesBucketMaxSize, bucketMaxSize);
+    auto storageCacheSize = static_cast<uint64_t>(
+        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
+        1024);
+    auto [bucketMaxSize, _] =
+        getCacheDerivedBucketMaxSize(storageCacheSize, catalog.numberOfActiveBuckets.load());
 
     return {catalog,
             stripe,
@@ -1016,7 +1011,7 @@ ReopeningContext getReopeningContext(OperationContext* opCtx,
                                       controlMinTimePath,
                                       maxDataTimeFieldPath,
                                       *info.options.getBucketMaxSpanSeconds(),
-                                      effectiveMaxSize)};
+                                      bucketMaxSize)};
 }
 
 void abort(BucketCatalog& catalog,
@@ -1313,9 +1308,11 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
 
     // In scenarios where we have a high cardinality workload and face increased cache pressure we
     // will decrease the size of buckets before we close them.
-    int32_t cacheDerivedBucketMaxSize = getCacheDerivedBucketMaxSize(
-        opCtx->getServiceContext()->getStorageEngine(), numberOfActiveBuckets);
-    int32_t effectiveMaxSize = std::min(gTimeseriesBucketMaxSize, cacheDerivedBucketMaxSize);
+    auto storageCacheSize = static_cast<uint64_t>(
+        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getCacheSizeMB() * 1024 *
+        1024);
+    auto [effectiveMaxSize, cacheDerivedBucketMaxSize] =
+        getCacheDerivedBucketMaxSize(storageCacheSize, numberOfActiveBuckets);
 
     // Before we hit our bucket minimum count, we will allow for large measurements to be inserted
     // into buckets. Instead of packing the bucket to the BSON size limit, 16MB, we'll limit the max
