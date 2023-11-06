@@ -68,6 +68,11 @@ def gen_all_feature_flags(idl_dirs: List[str] = None):
         for idl_path in sorted(lib.list_idls(idl_dir)):
             if is_third_party_idl(idl_path):
                 continue
+            # Most IDL files do not contain feature flags.
+            # We can discard these quickly without expensive YAML parsing.
+            with open(idl_path) as idl_file:
+                if 'feature_flags' not in idl_file.read():
+                    continue
             with open(idl_path) as idl_file:
                 doc = parser.parse_file(idl_file, idl_path)
             for feature_flag in doc.spec.feature_flags:
