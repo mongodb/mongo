@@ -5,47 +5,128 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_fcv_62,
+ *   # Aggregation with explain may return incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   # "Explain of a resolved view must be executed by mongos"
+ *   directly_against_shardsvrs_incompatible,
  * ]
  */
 const coll = db.timeseries_project;
+let pipeline = [];
+
+function checkResult({expectedResult, pipeline}) {
+    assert.docEq(expectedResult,
+                 coll.aggregate(pipeline).toArray(),
+                 `Result of pipeline ${tojson(pipeline)} which was executed as ${
+                     tojson(coll.explain().aggregate(pipeline))}`);
+}
 
 // A $project stage that immediately follows unpacking might be incorporated into the unpacking
-// stage. Test that the unpacking stage correctly hides the fields that are dropped by the project.
-(function testAccessingDroppedField() {
+// stage. Test that the unpacking stage correctly hides the fields that are dropped by the project,
+// whether that's a meta, a time or a measurement field.
+(function testAccessingDroppedMetaField() {
     coll.drop();
     assert.commandWorked(
         db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
 
-    const timestamp = ISODate();
+    assert.commandWorked(coll.insert({_id: 42, time: ISODate(), meta: 1, a: "a"}));
 
-    assert.commandWorked(coll.insert({_id: 42, time: timestamp, meta: 1, a: "a"}));
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$project: {x: "$meta"}}],
+        expectedResult: [{_id: 42}],
+    });
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$addFields: {x: "$meta"}}],
+        expectedResult: [{_id: 42}],
+    });
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$replaceRoot: {newRoot: {x: "$meta"}}}],
+        expectedResult: [{}],
+    });
+})();
 
-    // Access dropped 'metaField'.
-    assert.docEq([{_id: 42}],
-                 coll.aggregate([{$project: {_id: 1}}, {$project: {x: "$meta"}}]).toArray());
-    assert.docEq([{_id: 42}],
-                 coll.aggregate([{$project: {_id: 1}}, {$addFields: {x: "$meta"}}]).toArray());
-    assert.docEq(
-        [{}],
-        coll.aggregate([{$project: {_id: 1}}, {$replaceRoot: {newRoot: {x: "$meta"}}}]).toArray());
+(function testAccessingDroppedTimeField() {
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
 
-    // Access dropped 'timeField'.
-    assert.docEq([{_id: 42}],
-                 coll.aggregate([{$project: {_id: 1}}, {$project: {x: "$time"}}]).toArray());
-    assert.docEq([{_id: 42}],
-                 coll.aggregate([{$project: {_id: 1}}, {$addFields: {x: "$time"}}]).toArray());
-    assert.docEq(
-        [{}],
-        coll.aggregate([{$project: {_id: 1}}, {$replaceRoot: {newRoot: {x: "$time"}}}]).toArray());
+    assert.commandWorked(coll.insert({_id: 42, time: ISODate(), a: "a"}));
 
-    // Access dropped measurement.
-    assert.docEq([{_id: 42}],
-                 coll.aggregate([{$project: {_id: 1}}, {$project: {x: "$a"}}]).toArray());
-    assert.docEq([{_id: 42}],
-                 coll.aggregate([{$project: {_id: 1}}, {$addFields: {x: "$a"}}]).toArray());
-    assert.docEq(
-        [{}],
-        coll.aggregate([{$project: {_id: 1}}, {$replaceRoot: {newRoot: {x: "$a"}}}]).toArray());
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$project: {x: "$time"}}],
+        expectedResult: [{_id: 42}],
+    });
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$addFields: {x: "$time"}}],
+        expectedResult: [{_id: 42}],
+    });
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$replaceRoot: {newRoot: {x: "$time"}}}],
+        expectedResult: [{}],
+    });
+})();
+
+(function testAccessingDroppedMeasurementField() {
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: 'time'}}));
+
+    assert.commandWorked(coll.insert({_id: 42, time: ISODate(), a: "a"}));
+
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$project: {x: "$a"}}],
+        expectedResult: [{_id: 42}],
+    });
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$addFields: {x: "$a"}}],
+        expectedResult: [{_id: 42}],
+    });
+    checkResult({
+        pipeline: [{$project: {_id: 1}}, {$replaceRoot: {newRoot: {x: "$a"}}}],
+        expectedResult: [{}],
+    });
+})();
+
+// The $replaceRoot stage itself isn't incorporated into unpacking but it causes the unpack
+// stage to include no fields, as if everything was projected away. It should still unpack the
+// correct _number_ of events. In SBE we rely on the 'timeField' to do this, but the field
+// shouldn't be visible to the rest of the query.
+(function testEmptyIncludeSet() {
+    coll.drop();
+    assert.commandWorked(
+        db.createCollection(coll.getName(), {timeseries: {timeField: 'time', metaField: 'meta'}}));
+
+    assert.commandWorked(coll.insertMany([
+        {_id: 42, time: ISODate(), meta: 1},
+        {_id: 43, time: ISODate(), meta: 2},
+    ]));
+
+    // With no filters the unpack stage would include no fields.
+    checkResult({
+        pipeline: [{$replaceRoot: {newRoot: {x: 17}}}, {$addFields: {y: "$time"}}],
+        expectedResult: [{x: 17}, {x: 17}],
+    });
+
+    // A 'metaField' filter is pushed below unpacking so the unpack stage would include no fields.
+    checkResult({
+        pipeline:
+            [{$match: {meta: 2}}, {$replaceRoot: {newRoot: {x: 17}}}, {$addFields: {y: "$time"}}],
+        expectedResult: [{x: 17}],
+    });
+
+    // With a trivially "false" event filter the unpack stage would still include no fields.
+    checkResult({
+        pipeline: [{$match: {_id: {$in: []}}}, {$replaceRoot: {newRoot: {x: 17}}}],
+        expectedResult: [],
+    });
+
+    // A non-trivial event filter would cause the unpack stage to include the field for the filter.
+    checkResult({
+        pipeline: [
+            {$match: {_id: 42}},
+            {$replaceRoot: {newRoot: {x: 17}}},
+            {$addFields: {y: "$time", z: "$_id"}}
+        ],
+        expectedResult: [{x: 17}],
+    });
 })();
 
 // Test that when $project redefines a field name, the unpacking stage does not overwrite it.

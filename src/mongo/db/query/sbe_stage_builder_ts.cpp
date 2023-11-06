@@ -220,8 +220,6 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     auto traversedCellSlots =
         sbe::value::SlotVector(allCellSlots.begin() + topLevelReqs.size(), allCellSlots.end());
 
-    MatchExpression* eventFilter = unpackNode->eventFilter.get();
-
     // If there are no required paths, that is if 'topLevelReqs' is empty, the parent is expecting
     // the unpacking to produce the same number of results as there are events in the bucket but it
     // doesn't care about the result's shape. For example, this comes up with "count-like" queries
@@ -231,8 +229,8 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // bucket without adding it to the outputs.
     if (topLevelReqs.empty()) {
         tassert(8032300,
-                "The set of required paths cannot be empty if there is an event filter",
-                !eventFilter);
+                "Should have no traverse fields if there are no top-level fields",
+                allReqs.empty());
         allReqs.push_back(sv::CellBlock::PathRequest{
             {sv::CellBlock::Get{unpackNode->bucketSpec.timeField()}, sv::CellBlock::Id{}}});
         allCellSlots.push_back(_slotIdGenerator.generate());
@@ -263,6 +261,8 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                   TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
         }
     }
+
+    MatchExpression* eventFilter = unpackNode->eventFilter.get();
 
     // It's possible for the event filter to be applied on fields that aren't being unpacked (the
     // simplest case of such pipeline: [{$project: {x: 1}},{$match: {y: 42}}]). We'll stub out the
@@ -351,6 +351,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         outputs.clear(std::make_pair(PlanStageSlots::kFilterCellField, field));
     }
 
+    // If 'topLevelReqs' is empty this is a "count-like" query and we are unpacking the 'timeField'.
     auto unpackedSlots =
         _slotIdGenerator.generateMultiple(std::max<size_t>(topLevelReqs.size(), 1));
 
