@@ -2250,5 +2250,36 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
               sideBucketCatalog->globalExecutionStats.numBucketsClosedDueToMemoryThreshold.load());
 }
 
+TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSize) {
+    auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
+        /*storageCacheSize=*/128 * 1000 * 1000, /*workloadCardinality=*/1000);
+    ASSERT_EQ(effectiveMaxSize, 64 * 1000);
+    ASSERT_EQ(cacheDerivedBucketMaxSize, 64 * 1000);
+
+    std::tie(effectiveMaxSize, cacheDerivedBucketMaxSize) = internal::getCacheDerivedBucketMaxSize(
+        /*storageCacheSize=*/0, /*workloadCardinality=*/1000);
+    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
+    ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
+
+    std::tie(effectiveMaxSize, cacheDerivedBucketMaxSize) = internal::getCacheDerivedBucketMaxSize(
+        /*storageCacheSize=*/128 * 1000 * 1000, /*workloadCardinality=*/0);
+    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
+    ASSERT_EQ(cacheDerivedBucketMaxSize, INT_MAX);
+}
+
+TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMax) {
+    auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
+        /*storageCacheSize=*/gTimeseriesBucketMaxSize * 10, /*workloadCardinality=*/1);
+    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMaxSize);
+    ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMaxSize * 5);
+}
+
+TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMin) {
+    auto [effectiveMaxSize, cacheDerivedBucketMaxSize] = internal::getCacheDerivedBucketMaxSize(
+        /*storageCacheSize=*/1, /*workloadCardinality=*/1);
+    ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
+    ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
+}
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog

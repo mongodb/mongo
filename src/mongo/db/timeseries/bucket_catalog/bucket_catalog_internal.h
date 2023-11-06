@@ -271,6 +271,14 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                                            const CreationInfo& info);
 
 /**
+ * Calculates the bucket max size constrained by the cache size and the cardinality of active
+ * buckets. Returns a pair of the effective value that respects the absolute bucket max and min
+ * sizes and the raw value.
+ */
+std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSize,
+                                                         uint32_t workloadCardinality);
+
+/**
  * Identifies a previously archived bucket that may be able to accommodate the measurement
  * represented by 'info', if one exists. Otherwise returns a pipeline to use for query-based
  * reopening if allowed.
