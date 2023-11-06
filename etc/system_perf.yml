@@ -3709,6 +3709,75 @@ buildvariants:
     depends_on: *_compile_amazon2
     tasks: *3node-intel-tasks
 
+  - &3node-query-stats-rate-limit
+    name: linux-3-node-replSet-intel-limited-1-query-stats.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11 (Rate Limited with 1, QueryStats)
+    cron: *query-stats-cron
+    modules: *modules
+    expansions: &3node-query-stats-rate-limit-expansions
+      mongodb_setup_release: 2022-11
+      # All of the Rate Limited 3node ReplSet QueryStats build variants currently use this
+      # mongodb_setup file with config params passed in for the different rate limits.
+      # If genny uses this setup file for autorun workloads, all of the build variants
+      # using this setup file will run those workloads. If you want to create a special workload
+      # configuration for a specific rate limit, a separate mongodb_setup YAML will need to be
+      # created. This will be changed in EVG-20490.
+      mongodb_setup: replica-query-stats-rate-limit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 1}'
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB.long
+      - name: linkbench2
+      - name: tpcc_majority
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: majority_reads10_k_threads_high_value
+      - name: bestbuy_agg
+      - name: large_indexed_ins_high_value
+      - name: expressive_queries_high_value
+      - name: time_series_sort_high_value
+      - name: tsbs_query
+      - name: genny_query_TenMDocCollection_IntId
+
+  - <<: *3node-query-stats-rate-limit
+    name: linux-3-node-replSet-intel-limited-10-query-stats.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11 (Rate Limited with 10, QueryStats)
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 10}'
+
+  - <<: *3node-query-stats-rate-limit
+    name: linux-3-node-replSet-intel-limited-100-query-stats.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11 (Rate Limited with 100, QueryStats)
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 100}'
+
+  - <<: *3node-query-stats-rate-limit
+    name: linux-3-node-replSet-intel-limited-1000-query-stats.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11 (Rate Limited with 1000, QueryStats)
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 1000}'
+
+  - <<: *3node-query-stats-rate-limit
+    name: linux-3-node-replSet-intel-limited-10000-query-stats.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11 (Rate Limited with 10000, QueryStats)
+    expansions:
+      <<: *3node-query-stats-rate-limit-expansions
+      config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 10000}'
+
   - name: linux-3-node-replSet-last-continuous-fcv.2022-11
     display_name: Linux 3-Node ReplSet (Last Continuous FCV) 2022-11
     cron: "0 0 * * 4"  # 00:00 on Thursday
