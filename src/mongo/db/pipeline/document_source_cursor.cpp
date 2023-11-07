@@ -43,6 +43,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -196,11 +197,15 @@ void DocumentSourceCursor::loadBatch() {
 
             // As long as we're waiting for inserts, we shouldn't do any batching at this level we
             // need the whole pipeline to see each document to see if we should stop waiting.
-            if (awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
-                static_cast<long long>(_currentBatch.memUsageBytes()) >
-                    internalDocumentSourceCursorBatchSizeBytes.load()) {
+            bool batchCountFull = _batchSizeCount != 0 && _currentBatch.count() >= _batchSizeCount;
+            if (batchCountFull || _currentBatch.memUsageBytes() > _batchSizeBytes ||
+                awaitDataState(pExpCtx->opCtx).shouldWaitForInserts) {
                 // End this batch and prepare PlanExecutor for yielding.
                 _exec->saveState();
+                // Double the size for next batch when batch is full.
+                if (batchCountFull && overflow::mul(_batchSizeCount, 2, &_batchSizeCount)) {
+                    _batchSizeCount = 0;  // Go unlimited if we overflow.
+                }
                 return;
             }
         }
@@ -402,6 +407,28 @@ DocumentSourceCursor::DocumentSourceCursor(
             CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, stats);
         }
     }
+
+    initializeBatchSizeCounts();
+    _batchSizeBytes = static_cast<size_t>(internalDocumentSourceCursorBatchSizeBytes.load());
+}
+
+void DocumentSourceCursor::initializeBatchSizeCounts() {
+    // '0' means there's no limitation.
+    _batchSizeCount = 0;
+    if (auto cq = _exec->getCanonicalQuery()) {
+        if (cq->getFindCommandRequest().getLimit().has_value()) {
+            // $limit is pushed down into executor, skipping batch size count limitation.
+            return;
+        }
+        for (const auto& ds : cq->cqPipeline()) {
+            if (ds->documentSource()->getSourceName() == DocumentSourceLimit::kStageName) {
+                // $limit is pushed down into executor, skipping batch size count limitation.
+                return;
+            }
+        }
+    }
+    // No $limit is pushed down into executor, reading limit from knobs.
+    _batchSizeCount = internalDocumentSourceCursorInitialBatchSize.load();
 }
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
