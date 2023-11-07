@@ -208,18 +208,9 @@ using namespace fmt::literals;
 
 Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
                                   std::shared_ptr<CommandInvocation> invocation) {
-    auto usesDedicatedThread = [&] {
-        auto client = rec->getOpCtx()->getClient();
-        if (auto context = transport::ServiceExecutorContext::get(client); context) {
-            return context->usesDedicatedThread();
-        }
-        tassert(5453901,
-                "Threading model may only be absent for internal and direct clients",
-                !client->hasRemote() || client->isInDirectClient());
-        return true;
-    }();
+    static constexpr bool useDedicatedThread = true;
     return CommandHelpers::runCommandInvocation(
-        std::move(rec), std::move(invocation), usesDedicatedThread);
+        std::move(rec), std::move(invocation), useDedicatedThread);
 }
 
 /*

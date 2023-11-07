@@ -47,8 +47,6 @@
 
 namespace mongo::transport {
 
-extern bool gInitialUseDedicatedThread;
-
 /*
  * This is the interface for all ServiceExecutors.
  */
@@ -123,7 +121,6 @@ public:
     // Roughly a 1:1 mapping to the ServiceExecutor type which will be used.
     // ThreadModel::kSynchronous + canUseReserved may result in ServiceExecutorReserved.
     enum class ThreadModel {
-        kFixed,
         kSynchronous,
         kInline,
     };
@@ -131,7 +128,6 @@ public:
     // Manually hoist these enum values into the class to aid callsite usage.
     // As our toolchain is updated, we may be able to replace this with a simple:
     // `using enum ThreadModel;`
-    static constexpr inline auto kFixed = ThreadModel::kFixed;
     static constexpr inline auto kSynchronous = ThreadModel::kSynchronous;
     static constexpr inline auto kInline = ThreadModel::kInline;
 
@@ -181,15 +177,6 @@ public:
     void setCanUseReserved(bool canUseReserved);
 
     /**
-     * Get the ThreadingModel for the associated Client.
-     *
-     * This function is valid to invoke either on the Client thread or with the Client lock.
-     */
-    bool usesDedicatedThread() const {
-        return _threadModel != ThreadModel::kFixed;
-    }
-
-    /**
      * Get an appropriate ServiceExecutor given the current parameters.
      *
      * This function is only valid to invoke from the associated Client thread. This function does
@@ -221,11 +208,8 @@ public:
      */
     static ServiceExecutorStats get(ServiceContext* ctx) noexcept;
 
-    // The number of Clients who use the dedicated executors.
-    size_t usesDedicated = 0;
-
-    // The number of Clients who use the borrowed executors.
-    size_t usesBorrowed = 0;
+    // The total number of Clients currently active.
+    size_t totalClients = 0;
 
     // The number of Clients that are allowed to ignore maxConns and use reserved resources.
     size_t limitExempt = 0;

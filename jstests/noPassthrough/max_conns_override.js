@@ -42,31 +42,18 @@ function verifyStats({exemptCount, normalCount}) {
             return false;
         }
 
-        const totalExecutorCount = threadedExecutorCount + executors.fixed.clientsInTotal;
-        if (totalCount != totalExecutorCount) {
-            print(`Not enough running clients yet: ${totalCount} != ${totalExecutorCount}`);
-            return false;
-        }
-
         return true;
     }, "Failed to verify initial conditions", 10000);
 
     const serverStatus = getStats();
     const connectionsStatus = serverStatus.connections;
     const reservedExecutorStatus = serverStatus.network.serviceExecutors.reserved;
-    const fixedExecutorStatus = serverStatus.network.serviceExecutors.fixed;
     const executorStatus = serverStatus.network.serviceExecutors.passthrough;
 
     // Log these serverStatus sections so we can debug this easily.
     const filteredSections = {
         connections: connectionsStatus,
-        network: {
-            serviceExecutors: {
-                passthrough: executorStatus,
-                fixed: fixedExecutorStatus,
-                reserved: reservedExecutorStatus
-            }
-        }
+        network: {serviceExecutors: {passthrough: executorStatus, reserved: reservedExecutorStatus}}
     };
     print(`serverStatus: ${tojson(filteredSections)}`);
 
@@ -92,11 +79,6 @@ function verifyStats({exemptCount, normalCount}) {
     assert.eq(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["clientsInTotal"]);
     assert.lte(reservedExecutorStatus["clientsRunning"], reservedExecutorStatus["threadsRunning"]);
     assert.eq(reservedExecutorStatus["clientsWaitingForData"], 0);
-
-    // Clients on the fixed executor borrow one thread and can wait asynchronously
-    assert.lte(fixedExecutorStatus["clientsRunning"], fixedExecutorStatus["clientsInTotal"]);
-    assert.lte(fixedExecutorStatus["clientsRunning"], fixedExecutorStatus["threadsRunning"]);
-    assert.lte(fixedExecutorStatus["clientsWaitingForData"], fixedExecutorStatus["clientsInTotal"]);
 }
 
 // Use the external ip to avoid our exempt CIDR.

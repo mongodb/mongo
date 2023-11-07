@@ -369,26 +369,6 @@ private:
     std::unique_ptr<MockServiceEntryPoint> _makeServiceEntryPoint() {
         auto sep = std::make_unique<MockServiceEntryPoint>();
         sep->handleRequestCb = [this](OperationContext* opCtx, const Message& msg) {
-            if (!gInitialUseDedicatedThread) {
-                // Simulates an async command implemented under the borrowed
-                // thread model. The returned future will be fulfilled while
-                // holding the ClientStrand for opCtx.
-                auto pf = PromiseAndFuture<DbResponse>();
-                ExecutorFuture<void>(_threadPool)
-                    .then([this,
-                           strand = ClientStrand::get(opCtx->getClient()),
-                           opCtx,
-                           msg = std::move(msg),
-                           p = std::move(pf.promise)]() mutable {
-                        strand->run([&] {
-                            p.setWith([&] {
-                                return _onMockEvent<Event::sepHandleRequest>(std::tie(opCtx, msg));
-                            });
-                        });
-                    })
-                    .getAsync([](auto&&) {});
-                return std::move(pf.future);
-            }
             return _onMockEvent<Event::sepHandleRequest>(std::tie(opCtx, msg));
         };
         return sep;
@@ -406,7 +386,7 @@ private:
         void configureServiceExecutorContext(Client* client,
                                              bool isPrivilegedSession) const override {
             auto seCtx = std::make_unique<ServiceExecutorContext>();
-            seCtx->setThreadModel(gInitialUseDedicatedThread ? seCtx->kSynchronous : seCtx->kFixed);
+            seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
             seCtx->setCanUseReserved(isPrivilegedSession);
             stdx::lock_guard lk(*client);
             ServiceExecutorContext::set(client, std::move(seCtx));
@@ -837,50 +817,16 @@ public:
     }
 };
 
-class SessionWorkflowWithDedicatedThreadsTest : public StepRunnerSessionWorkflowTest {
-    ScopedValueOverride<bool> _svo{gInitialUseDedicatedThread, true};
-};
-
-TEST_F(SessionWorkflowWithDedicatedThreadsTest, DefaultLoop) {
+TEST_F(StepRunnerSessionWorkflowTest, DefaultLoop) {
     runSteps(defaultLoop());
 }
 
-TEST_F(SessionWorkflowWithDedicatedThreadsTest, ExhaustLoop) {
+TEST_F(StepRunnerSessionWorkflowTest, ExhaustLoop) {
     runSteps(exhaustLoop());
 }
 
-TEST_F(SessionWorkflowWithDedicatedThreadsTest, MoreToComeLoop) {
+TEST_F(StepRunnerSessionWorkflowTest, MoreToComeLoop) {
     runSteps(moreToComeLoop());
-}
-
-class SessionWorkflowWithBorrowedThreadsTest : public StepRunnerSessionWorkflowTest {
-public:
-    /**
-     * Under the borrowed thread model, the steps are the same as for dedicated thread model,
-     * except that Session sourceMessage events are preceded by Session waitForData events.
-     */
-    std::deque<RunAllErrorsAtAllSteps::Step> convertStepsToBorrowed(
-        std::deque<RunAllErrorsAtAllSteps::Step> q) {
-        for (auto iter = q.begin(); iter != q.end(); ++iter)
-            if (iter->event == Event::sessionSourceMessage)
-                iter = std::next(q.insert(iter, {Event::sessionWaitForData}));
-        return q;
-    }
-
-private:
-    ScopedValueOverride<bool> _svo{gInitialUseDedicatedThread, false};
-};
-
-TEST_F(SessionWorkflowWithBorrowedThreadsTest, DefaultLoop) {
-    runSteps(convertStepsToBorrowed(defaultLoop()));
-}
-
-TEST_F(SessionWorkflowWithBorrowedThreadsTest, ExhaustLoop) {
-    runSteps(convertStepsToBorrowed(exhaustLoop()));
-}
-
-TEST_F(SessionWorkflowWithBorrowedThreadsTest, MoreToComeLoop) {
-    runSteps(convertStepsToBorrowed(moreToComeLoop()));
 }
 
 }  // namespace

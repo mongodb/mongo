@@ -424,10 +424,6 @@ public:
         return seCtx()->getServiceExecutor();
     }
 
-    bool usesDedicatedThread() {
-        return seCtx()->usesDedicatedThread();
-    }
-
     std::shared_ptr<ServiceExecutor::TaskRunner> taskRunner() {
         auto exec = executor();
         // Allows switching the executor between iterations of the workflow.
@@ -490,21 +486,16 @@ private:
         invariant(!_work);
         if (_nextWork)
             return Future{std::move(_nextWork)};  // Already have one ready.
-        if (usesDedicatedThread()) {
-            // Yield here to avoid pinning the CPU. Give other threads some CPU
-            // time to avoid a spiky latency distribution (BF-27452). Even if
-            // this client can run continuously and receive another command
-            // without blocking, we yield anyway. We WANT context switching, and
-            // we're trying deliberately to make it happen, to reduce long tail
-            // latency.
-            _yieldPointReached();
-            _iterationFrame->metrics.yieldedBeforeReceive();
-            return _receiveRequest();
-        }
-        auto&& [p, f] = makePromiseFuture<void>();
-        taskRunner()->runOnDataAvailable(
-            session(), _captureContext([p = std::move(p)](Status s) mutable { p.setFrom(s); }));
-        return std::move(f).then([this, anchor = shared_from_this()] { return _receiveRequest(); });
+
+        // Yield here to avoid pinning the CPU. Give other threads some CPU
+        // time to avoid a spiky latency distribution (BF-27452). Even if
+        // this client can run continuously and receive another command
+        // without blocking, we yield anyway. We WANT context switching, and
+        // we're trying deliberately to make it happen, to reduce long tail
+        // latency.
+        _yieldPointReached();
+        _iterationFrame->metrics.yieldedBeforeReceive();
+        return _receiveRequest();
     }
 
     /** Receives a message from the session and creates a new WorkItem from it. */
@@ -802,21 +793,12 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
             _cleanupSession(status);
             return;
         }
-        if (usesDedicatedThread()) {
-            try {
-                _doOneIteration().get();
-                _scheduleIteration();
-            } catch (const DBException& ex) {
-                _onLoopError(ex.toStatus());
-            }
-        } else {
-            _doOneIteration().getAsync([this, anchor = shared_from_this()](Status st) {
-                if (!st.isOK()) {
-                    _onLoopError(st);
-                    return;
-                }
-                _scheduleIteration();
-            });
+
+        try {
+            _doOneIteration().get();
+            _scheduleIteration();
+        } catch (const DBException& ex) {
+            _onLoopError(ex.toStatus());
         }
     }));
 } catch (const DBException& ex) {

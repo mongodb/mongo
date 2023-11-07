@@ -143,18 +143,9 @@ MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
 
 Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
                                   std::shared_ptr<CommandInvocation> invocation) {
-    bool usesDedicatedThread = [&] {
-        auto client = rec->getOpCtx()->getClient();
-        if (auto context = transport::ServiceExecutorContext::get(client); context) {
-            return context->usesDedicatedThread();
-        }
-        tassert(5453902,
-                "Threading model may only be absent for internal and direct clients",
-                !client->hasRemote() || client->isInDirectClient());
-        return true;
-    }();
+    static constexpr bool useDedicatedThread = true;
     return CommandHelpers::runCommandInvocation(
-        std::move(rec), std::move(invocation), usesDedicatedThread);
+        std::move(rec), std::move(invocation), useDedicatedThread);
 }
 
 /**

@@ -44,7 +44,7 @@ void AsioSessionManager::configureServiceExecutorContext(Client* client,
     // TODO SERVER-77921: use the return value of `Session::isFromRouterPort()` to choose an
     // instance of `ServiceEntryPoint`.
     auto seCtx = std::make_unique<ServiceExecutorContext>();
-    seCtx->setThreadModel(gInitialUseDedicatedThread ? seCtx->kSynchronous : seCtx->kFixed);
+    seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
     seCtx->setCanUseReserved(isPrivilegedSession);
     stdx::lock_guard lk(*client);
     ServiceExecutorContext::set(client, std::move(seCtx));
@@ -66,7 +66,7 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
     appendInt("active", _svcCtx->getActiveClientOperations());
 
     const auto seStats = ServiceExecutorStats::get(_svcCtx);
-    appendInt("threaded", seStats.usesDedicated);
+    appendInt("threaded", seStats.totalClients);
     if (!serverGlobalParams.maxConnsOverride.empty()) {
         appendInt("limitExempt", seStats.limitExempt);
     }

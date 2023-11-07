@@ -150,7 +150,6 @@ tlEnv.Library(
     target='service_executor',
     source=[
         'service_executor.cpp',
-        'service_executor_fixed.cpp',
         'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
         'service_executor_utils.cpp',

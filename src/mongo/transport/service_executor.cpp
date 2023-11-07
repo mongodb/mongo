@@ -39,7 +39,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
@@ -54,8 +53,6 @@
 
 namespace mongo::transport {
 
-bool gInitialUseDedicatedThread = true;
-
 namespace {
 static constexpr auto kDiagnosticLogLevel = 4;
 
@@ -63,10 +60,6 @@ auto getServiceExecutorStats =
     ServiceContext::declareDecoration<synchronized_value<ServiceExecutorStats>>();
 auto getServiceExecutorContext =
     Client::declareDecoration<std::unique_ptr<ServiceExecutorContext>>();
-
-void incrThreadingModelStats(ServiceExecutorStats& stats, bool usesDedicatedThread, int step) {
-    (usesDedicatedThread ? stats.usesDedicated : stats.usesBorrowed) += step;
-}
 
 // This is at best a naive solution. There could be a world where numOpenSessions() changes
 // very quickly. We are not taking locks on the SessionManager, so we may chose to schedule
@@ -86,7 +79,6 @@ void forEachServiceExecutor(ServiceContext* svcCtx, const Func& func) {
 
     call(std::type_identity<ServiceExecutorSynchronous>{});
     call(std::type_identity<ServiceExecutorReserved>{});
-    call(std::type_identity<ServiceExecutorFixed>{});
     call(std::type_identity<ServiceExecutorInline>{});
 }
 
@@ -113,14 +105,14 @@ void ServiceExecutorContext::set(Client* client,
         auto&& syncStats = *getServiceExecutorStats(client->getServiceContext());
         if (seCtx._canUseReserved)
             ++syncStats->limitExempt;
-        incrThreadingModelStats(*syncStats, seCtx.usesDedicatedThread(), 1);
+        ++syncStats->totalClients;
     }
 
     LOGV2_DEBUG(4898000,
                 kDiagnosticLogLevel,
                 "Setting initial ServiceExecutor context for client",
                 "client"_attr = client->desc(),
-                "usesDedicatedThread"_attr = seCtx.usesDedicatedThread(),
+                "usesDedicatedThread"_attr = true,
                 "canUseReserved"_attr = seCtx._canUseReserved);
     serviceExecutorContext = std::move(seCtxPtr);
 }
@@ -133,12 +125,12 @@ void ServiceExecutorContext::reset(Client* client) noexcept {
                 kDiagnosticLogLevel,
                 "Resetting ServiceExecutor context for client",
                 "client"_attr = client->desc(),
-                "threadingModel"_attr = seCtx->usesDedicatedThread(),
+                "threadingModel"_attr = true,
                 "canUseReserved"_attr = seCtx->_canUseReserved);
     auto stats = *getServiceExecutorStats(client->getServiceContext());
     if (seCtx->_canUseReserved)
         --stats->limitExempt;
-    incrThreadingModelStats(*stats, seCtx->usesDedicatedThread(), -1);
+    --stats->totalClients;
     seCtx.reset();
 }
 
@@ -146,13 +138,7 @@ void ServiceExecutorContext::setThreadModel(ThreadModel model) {
     if (_threadModel == model)
         return;
 
-    auto prev = std::exchange(_threadModel, model);
-    if (!_client)
-        return;
-
-    auto stats = *getServiceExecutorStats(_client->getServiceContext());
-    incrThreadingModelStats(*stats, prev != ThreadModel::kFixed, -1);
-    incrThreadingModelStats(*stats, model != ThreadModel::kFixed, +1);
+    std::exchange(_threadModel, model);
 }
 
 void ServiceExecutorContext::setCanUseReserved(bool canUseReserved) {
@@ -181,8 +167,6 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() {
     switch (_threadModel) {
         case ThreadModel::kInline:
             return ServiceExecutorInline::get(_client->getServiceContext());
-        case ThreadModel::kFixed:
-            return ServiceExecutorFixed::get(_client->getServiceContext());
         case ThreadModel::kSynchronous: {
             if (_canUseReserved && !_hasUsedSynchronous && shouldUseReserved(_client)) {
                 if (auto exec = ServiceExecutorReserved::get(_client->getServiceContext())) {
