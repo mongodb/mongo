@@ -68,4 +68,4 @@ splitThread.join();
 
 // Shut down all the other nodes.
 test.donor.nodes.filter(node => node.port != donorPrimary.port)
-    .forEach(node => donorRst.stop(node));
+    .forEach(node => donorRst.stop(node, null, {skipValidation: 1}));
