@@ -113,6 +113,7 @@
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
+#include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
@@ -5357,6 +5358,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 auto nExprPtr =
                     dynamic_cast<
                         window_function::ExpressionN<WindowFunctionLastN, AccumulatorLastN>*>(
+                        outputField.expr.get())
+                        ->nExpr.get();
+                initExprArgs.emplace(AccArgs::kMaxSize,
+                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
+                                         .extractExpr(_state)
+                                         .expr);
+                initExprArgs.emplace(AccArgs::kIsGroupAccum,
+                                     makeConstant(sbe::value::TypeTags::Boolean,
+                                                  sbe::value::bitcastFrom<bool>(false)));
+            } else if (outputField.expr->getOpName() == "$minN") {
+                auto nExprPtr =
+                    dynamic_cast<
+                        window_function::ExpressionN<WindowFunctionMinN, AccumulatorMinN>*>(
+                        outputField.expr.get())
+                        ->nExpr.get();
+                initExprArgs.emplace(AccArgs::kMaxSize,
+                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
+                                         .extractExpr(_state)
+                                         .expr);
+                initExprArgs.emplace(AccArgs::kIsGroupAccum,
+                                     makeConstant(sbe::value::TypeTags::Boolean,
+                                                  sbe::value::bitcastFrom<bool>(false)));
+            } else if (outputField.expr->getOpName() == "$maxN") {
+                auto nExprPtr =
+                    dynamic_cast<
+                        window_function::ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>*>(
                         outputField.expr.get())
                         ->nExpr.get();
                 initExprArgs.emplace(AccArgs::kMaxSize,

@@ -206,7 +206,8 @@ protected:
             ASSERT(false) << "Expected error: " << expectedError << " for " << groupSpec
                           << " but succeeded";
         } catch (const DBException& e) {
-            ASSERT_TRUE(e.code() == expectedError) << "group spec: " << groupSpec;
+            ASSERT_TRUE(e.code() == expectedError)
+                << "group spec: " << groupSpec << " received error " << e.code();
         }
     }
 

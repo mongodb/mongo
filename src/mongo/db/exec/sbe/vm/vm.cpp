@@ -4892,8 +4892,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetToArray(Arity
     value::ValueGuard resGuard{resTag, resVal};
     auto resView = value::getArrayView(resVal);
 
-    value::arrayForEach<true>(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
-        resView->push_back(elTag, elVal);
+    value::arrayForEach(tag, val, [&](value::TypeTags elTag, value::Value elVal) {
+        resView->push_back(value::copyValue(elTag, elVal));
     });
 
     resGuard.reset();
@@ -6109,7 +6109,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggFirstNNeedsMo
 int32_t updateAndCheckMemUsage(value::Array* state,
                                int32_t memUsage,
                                int32_t memAdded,
-                               int32_t memLimit) {
+                               int32_t memLimit,
+                               size_t idx = static_cast<size_t>(AggMultiElems::kMemUsage)) {
     memUsage += memAdded;
     uassert(ErrorCodes::ExceededMemoryLimit,
             str::stream()
@@ -6117,8 +6118,7 @@ int32_t updateAndCheckMemUsage(value::Array* state,
                    "consumption any further. Memory limit: "
                 << memLimit << " bytes",
             memUsage < memLimit);
-    state->setAt(
-        static_cast<size_t>(AggMultiElems::kMemUsage), value::TypeTags::NumberInt32, memUsage);
+    state->setAt(idx, value::TypeTags::NumberInt32, memUsage);
     return memUsage;
 }
 
@@ -6494,7 +6494,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNFin
     return {true, outputArrayTag, outputArrayVal};
 }
 
-template <bool less>
+template <AccumulatorMinMaxN::MinMaxSense S>
 int32_t aggMinMaxN(value::Array* state,
                    value::Array* array,
                    size_t maxSize,
@@ -6505,7 +6505,14 @@ int32_t aggMinMaxN(value::Array* state,
                    value::Value fieldVal) {
     value::ValueGuard guard{fieldTag, fieldVal};
     auto& heap = array->values();
-    ValueCompare<less> comp{collator};
+
+    constexpr auto less = []() -> bool {
+        if constexpr (S == AccumulatorMinMaxN::MinMaxSense::kMax) {
+            return false;
+        }
+        return true;
+    }();
+    value::ValueCompare<less> comp{collator};
 
     if (array->size() < maxSize) {
         memUsage = updateAndCheckMemUsage(
@@ -6537,7 +6544,7 @@ int32_t aggMinMaxN(value::Array* state,
     return memUsage;
 }
 
-template <bool less>
+template <AccumulatorMinMaxN::MinMaxSense S>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxN(ArityType arity) {
     invariant(arity == 2 || arity == 3);
 
@@ -6546,7 +6553,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxN(Arity
 
     auto [fieldTag, fieldVal] = moveOwnedFromStack(1);
     value::ValueGuard fieldGuard{fieldTag, fieldVal};
-
     if (value::isNullish(fieldTag)) {
         stateGuard.reset();
         return {true, stateTag, stateVal};
@@ -6562,13 +6568,13 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxN(Arity
         collator = value::getCollatorView(collVal);
     }
     fieldGuard.reset();
-    aggMinMaxN<less>(state, array, maxSize, memUsage, memLimit, collator, fieldTag, fieldVal);
+    aggMinMaxN<S>(state, array, maxSize, memUsage, memLimit, collator, fieldTag, fieldVal);
 
     stateGuard.reset();
     return {true, stateTag, stateVal};
 }
 
-template <bool less>
+template <AccumulatorMinMaxN::MinMaxSense S>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNMerge(ArityType arity) {
     invariant(arity == 2 || arity == 3);
 
@@ -6600,7 +6606,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNMerge(
 
     for (size_t i = 0; i < array->size(); ++i) {
         auto [tag, val] = array->swapAt(i, value::TypeTags::Null, 0);
-        mergeMemUsage = aggMinMaxN<less>(
+        mergeMemUsage = aggMinMaxN<S>(
             mergeState, mergeArray, mergeMaxSize, mergeMemUsage, mergeMemLimit, collator, tag, val);
     }
 
@@ -6608,7 +6614,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNMerge(
     return {true, mergeStateTag, mergeStateVal};
 }
 
-template <bool less>
+template <AccumulatorMinMaxN::MinMaxSense S>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinalize(
     ArityType arity) {
     invariant(arity == 2 || arity == 1);
@@ -6625,11 +6631,23 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinali
         collator = value::getCollatorView(collVal);
     }
 
-    ValueCompare<less> comp{collator};
+    constexpr auto less = []() -> bool {
+        if constexpr (S == AccumulatorMinMaxN::MinMaxSense::kMax) {
+            return false;
+        }
+        return true;
+    }();
+    value::ValueCompare<less> comp{collator};
     std::sort(array->values().begin(), array->values().end(), comp);
-    auto [arrayTag, arrayVal] =
-        state->swapAt(static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
-    return {true, arrayTag, arrayVal};
+    if (isGroupAccum) {
+        auto [arrayTag, arrayVal] = state->swapAt(
+            static_cast<size_t>(AggMultiElems::kInternalArr), value::TypeTags::Null, 0);
+        return {true, arrayTag, arrayVal};
+    } else {
+        auto [arrTag, arrVal] = state->getAt(0);
+        auto [outTag, outVal] = value::copyValue(arrTag, arrVal);
+        return {true, outTag, outVal};
+    }
 }
 
 std::tuple<value::Array*, std::pair<value::TypeTags, value::Value>, bool, int64_t, int64_t>
@@ -8626,7 +8644,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
                     value::TypeTags::NumberInt32,
                     value::bitcastFrom<int32_t>(accMultiSetSize + newElSize));
-
     accMultiSet->push_back(newElTag, newElVal);
     newElGuard.reset();
     stateGuard.reset();
@@ -8669,6 +8686,200 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     }
     resGuard.reset();
     return {true, accSetTag, accSetVal};
+}
+
+static std::tuple<value::Array*, value::ArrayMultiSet*, size_t, int32_t, int32_t> minNmaxNState(
+    value::TypeTags stateTag, value::Value stateVal) {
+    tassert(
+        8178100, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
+    auto stateArr = value::getArrayView(stateVal);
+
+    tassert(8178101,
+            str::stream() << "state array should have "
+                          << static_cast<size_t>(AggMinMaxNElems::kSizeOfArray)
+                          << " elements but found " << stateArr->size(),
+            stateArr->size() == static_cast<size_t>(AggMinMaxNElems::kSizeOfArray));
+
+    // Read the accumulator from the state.
+    auto [accMultiSetTag, accMultiSetVal] =
+        stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kValues));
+    tassert(8178102,
+            "accumulator should be of type MultiSet",
+            accMultiSetTag == value::TypeTags::ArrayMultiSet);
+    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
+
+    // Read N from the state
+    auto [nTag, nVal] = stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kN));
+    tassert(8178103, "N should be of type NumberInt64", nTag == value::TypeTags::NumberInt64);
+
+    // Read memory usage information from state
+    auto [memUsageTag, memUsage] = stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kMemUsage));
+    tassert(8178104,
+            "MemUsage component should be of type NumberInt32",
+            memUsageTag == value::TypeTags::NumberInt32);
+
+    auto [memLimitTag, memLimit] = stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kMemLimit));
+    tassert(8178105,
+            "MemLimit component should be of type NumberInt32",
+            memLimitTag == value::TypeTags::NumberInt32);
+
+    return {stateArr,
+            accMultiSet,
+            value::bitcastTo<size_t>(nVal),
+            value::bitcastTo<int32_t>(memUsage),
+            value::bitcastTo<int32_t>(memLimit)};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggRemovableMinMaxNInitImpl(
+    CollatorInterface* collator) {
+    auto [sizeOwned, sizeTag, sizeVal] = getFromStack(0);
+
+    auto [nOwned, nTag, nVal] = genericNumConvert(sizeTag, sizeVal, value::TypeTags::NumberInt64);
+    uassert(8178107, "Failed to convert to 64-bit integer", nTag == value::TypeTags::NumberInt64);
+
+    auto n = value::bitcastTo<int64_t>(nVal);
+    uassert(8178108, "Expected 'n' to be positive", n > 0);
+
+    auto [sizeCapOwned, sizeCapTag, sizeCapVal] = getFromStack(1);
+    uassert(8178109,
+            "The size cap must be of type NumberInt32",
+            sizeCapTag == value::TypeTags::NumberInt32);
+
+    // Initialize the state
+    auto [stateTag, stateVal] = value::makeNewArray();
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto stateArr = value::getArrayView(stateVal);
+
+    // the order is important!!!
+    auto [mSetTag, mSetVal] = value::makeNewArrayMultiSet(collator);
+    stateArr->push_back(mSetTag, mSetVal);  // The multiset with the values.
+    stateArr->push_back(nTag, nVal);        // The maximum number of elements in the multiset.
+    stateArr->push_back(value::TypeTags::NumberInt32,
+                        value::bitcastFrom<int32_t>(0));  // The size of the multiset in bytes.
+    stateArr->push_back(sizeCapTag,
+                        sizeCapVal);  // The maximum possible size of the multiset in bytes.
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxNCollInit(
+    ArityType arity) {
+    auto [collatorOwned, collatorTag, collatorVal] = getFromStack(2);
+    tassert(8178111, "expected value of type 'collator'", collatorTag == value::TypeTags::collator);
+    return aggRemovableMinMaxNInitImpl(value::getCollatorView(collatorVal));
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxNInit(
+    ArityType arity) {
+    return aggRemovableMinMaxNInitImpl(nullptr);
+}
+
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxNAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [newElTag, newElVal] = moveOwnedFromStack(1);
+    value::ValueGuard newElGuard{newElTag, newElVal};
+
+    if (value::isNullish(newElTag)) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+    int32_t newElSize = value::getApproximateSize(newElTag, newElVal);
+
+    updateAndCheckMemUsage(
+        stateArr, memUsage, newElSize, memLimit, static_cast<size_t>(AggMinMaxNElems::kMemUsage));
+
+    newElGuard.reset();
+    accMultiSet->push_back(newElTag, newElVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxNRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [elTag, elVal] = moveOwnedFromStack(1);
+    value::ValueGuard elGuard{elTag, elVal};
+
+    if (value::isNullish(elTag)) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+    int32_t elSize = value::getApproximateSize(elTag, elVal);
+    invariant(elSize <= memUsage);
+
+    // remove element
+    stateArr->setAt(static_cast<size_t>(AggMinMaxNElems::kMemUsage),
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(memUsage - elSize));
+    elGuard.reset();
+    tassert(8178116, "Element was not removed", accMultiSet->remove(elTag, elVal));
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+template <AccumulatorMinMaxN::MinMaxSense S>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxNFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+
+    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+
+    // Create an empty array to fill with the results
+    auto [resultArrayTag, resultArrayVal] = value::makeNewArray();
+    value::ValueGuard resultGuard{resultArrayTag, resultArrayVal};
+    auto resultArray = value::getArrayView(resultArrayVal);
+    resultArray->reserve(n);
+
+    if constexpr (S == AccumulatorMinMaxN::MinMaxSense::kMin) {
+        for (auto it = accMultiSet->values().cbegin();
+             it != accMultiSet->values().cend() && resultArray->size() < n;
+             ++it) {
+            resultArray->push_back(value::copyValue(it->first, it->second));
+        }
+    } else {
+        for (auto it = accMultiSet->values().crbegin();
+             it != accMultiSet->values().crend() && resultArray->size() < n;
+             ++it) {
+            resultArray->push_back(value::copyValue(it->first, it->second));
+        }
+    }
+
+    resultGuard.reset();
+    return {true, resultArrayTag, resultArrayVal};
+}
+
+template <AccumulatorMinMax::Sense S>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinMaxFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+
+    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+
+    if (accMultiSet->size() == 0) {
+        return {true, value::TypeTags::Null, 0};
+    }
+
+    if constexpr (S == AccumulatorMinMax::Sense::kMin) {
+        auto it = accMultiSet->values().cbegin();
+        auto [cTag, cValue] = value::copyValue(it->first, it->second);
+        return {true, cTag, cValue};
+    }
+
+    auto it = accMultiSet->values().crbegin();
+    auto [cTag, cValue] = value::copyValue(it->first, it->second);
+    return {true, cTag, cValue};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
@@ -8981,17 +9192,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::aggBottomNFinalize:
             return builtinAggTopBottomNFinalize(arity);
         case Builtin::aggMaxN:
-            return builtinAggMinMaxN<false /* less */>(arity);
+            return builtinAggMinMaxN<AccumulatorMinMaxN::MinMaxSense::kMax>(arity);
         case Builtin::aggMaxNMerge:
-            return builtinAggMinMaxNMerge<false /* less */>(arity);
+            return builtinAggMinMaxNMerge<AccumulatorMinMaxN::MinMaxSense::kMax>(arity);
         case Builtin::aggMaxNFinalize:
-            return builtinAggMinMaxNFinalize<false /* less */>(arity);
+            return builtinAggMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMax>(arity);
         case Builtin::aggMinN:
-            return builtinAggMinMaxN<true /* less */>(arity);
+            return builtinAggMinMaxN<AccumulatorMinMaxN::MinMaxSense::kMin>(arity);
         case Builtin::aggMinNMerge:
-            return builtinAggMinMaxNMerge<true /* less */>(arity);
+            return builtinAggMinMaxNMerge<AccumulatorMinMaxN::MinMaxSense::kMin>(arity);
         case Builtin::aggMinNFinalize:
-            return builtinAggMinMaxNFinalize<true /* less */>(arity);
+            return builtinAggMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMin>(arity);
         case Builtin::aggRank:
             return builtinAggRank(arity);
         case Builtin::aggRankColl:
@@ -9072,6 +9283,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableAddToSetRemove(arity);
         case Builtin::aggRemovableAddToSetFinalize:
             return builtinAggRemovableAddToSetFinalize(arity);
+        case Builtin::aggRemovableMinMaxNCollInit:
+            return builtinAggRemovableMinMaxNCollInit(arity);
+        case Builtin::aggRemovableMinMaxNInit:
+            return builtinAggRemovableMinMaxNInit(arity);
+        case Builtin::aggRemovableMinMaxNAdd:
+            return builtinAggRemovableMinMaxNAdd(arity);
+        case Builtin::aggRemovableMinMaxNRemove:
+            return builtinAggRemovableMinMaxNRemove(arity);
+        case Builtin::aggRemovableMinNFinalize:
+            return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMin>(arity);
+        case Builtin::aggRemovableMaxNFinalize:
+            return builtinAggRemovableMinMaxNFinalize<AccumulatorMinMaxN::MinMaxSense::kMax>(arity);
+        case Builtin::aggRemovableMinFinalize:
+            return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMin>(arity);
+        case Builtin::aggRemovableMaxFinalize:
+            return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMax>(arity);
         case Builtin::aggLinearFillCanAdd:
             return builtinAggLinearFillCanAdd(arity);
         case Builtin::aggLinearFillAdd:
@@ -9530,6 +9757,22 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableAddToSetRemove";
         case Builtin::aggRemovableAddToSetFinalize:
             return "aggRemovableAddToSetFinalize";
+        case Builtin::aggRemovableMinMaxNCollInit:
+            return "aggRemovableMinMaxNCollInit";
+        case Builtin::aggRemovableMinMaxNInit:
+            return "aggRemovableMinMaxNInit";
+        case Builtin::aggRemovableMinMaxNAdd:
+            return "aggRemovableMinMaxNAdd";
+        case Builtin::aggRemovableMinMaxNRemove:
+            return "aggRemovableMinMaxNRemove";
+        case Builtin::aggRemovableMinNFinalize:
+            return "aggRemovableMinNFinalize";
+        case Builtin::aggRemovableMaxNFinalize:
+            return "aggRemovableMaxNFinalize";
+        case Builtin::aggRemovableMinFinalize:
+            return "aggRemovableMinFinalize";
+        case Builtin::aggRemovableMaxFinalize:
+            return "aggRemovableMaxFinalize";
         case Builtin::valueBlockExists:
             return "valueBlockExists";
         case Builtin::valueBlockFillEmpty:

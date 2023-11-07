@@ -876,6 +876,14 @@ enum class Builtin : uint16_t {
     aggRemovableAddToSetAdd,
     aggRemovableAddToSetRemove,
     aggRemovableAddToSetFinalize,
+    aggRemovableMinMaxNCollInit,
+    aggRemovableMinMaxNInit,
+    aggRemovableMinMaxNAdd,
+    aggRemovableMinMaxNRemove,
+    aggRemovableMinNFinalize,
+    aggRemovableMaxNFinalize,
+    aggRemovableMinFinalize,
+    aggRemovableMaxFinalize,
 
     // Additional one-byte builtins go here.
 
@@ -986,26 +994,6 @@ struct PairKeyComp {
 
 private:
     const Comp _comp;
-};
-
-template <bool less>
-struct ValueCompare {
-    ValueCompare(const CollatorInterface* collator) : _collator(collator) {}
-
-    bool operator()(const std::pair<value::TypeTags, value::Value>& lhs,
-                    const std::pair<value::TypeTags, value::Value>& rhs) const {
-        auto [tag, val] =
-            value::compareValue(lhs.first, lhs.second, rhs.first, rhs.second, _collator);
-        uassert(7548805, "Invalid comparison result", tag == value::TypeTags::NumberInt32);
-        if constexpr (less) {
-            return value::bitcastTo<int>(val) < 0;
-        } else {
-            return value::bitcastTo<int>(val) > 0;
-        }
-    }
-
-private:
-    const CollatorInterface* _collator;
 };
 
 struct MakeObjStackOffsets {
@@ -1148,6 +1136,16 @@ enum class AggLinearFillElems { kX1, kY1, kX2, kY2, kPrevX, kCount, kSizeOfArray
  * window functions
  */
 enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
+
+/**
+ * This enum defines indices into an 'Array' that store state for $minN/$maxN
+ * window functions.
+ * Element at `kValues` stores a multiset with the elements
+ * Element at `kN` stores an integer with the number of values minN/maxN should return
+ * Element at `kMemUsage`stores the size of the multiset in bytes
+ * Element at `kMemLimit`stores the maximum allowed size of the multiset in bytes
+ */
+enum class AggMinMaxNElems { kValues = 0, kN, kMemUsage, kMemLimit, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -2012,11 +2010,11 @@ private:
     template <typename Less>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggTopBottomNFinalize(ArityType arity);
-    template <bool less>
+    template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxN(ArityType arity);
-    template <bool less>
+    template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNMerge(ArityType arity);
-    template <bool less>
+    template <AccumulatorMinMaxN::MinMaxSense S>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNFinalize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRank(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRankColl(ArityType arity);
@@ -2087,6 +2085,21 @@ private:
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableAddToSetFinalize(
         ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> aggRemovableMinMaxNInitImpl(
+        CollatorInterface* collator);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxNCollInit(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxNInit(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxNAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxNRemove(
+        ArityType arity);
+    template <AccumulatorMinMaxN::MinMaxSense S>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxNFinalize(
+        ArityType arity);
+    template <AccumulatorMinMax::Sense S>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableMinMaxFinalize(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtin(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> linearFillInterpolate(
         std::pair<value::TypeTags, value::Value> x1,
         std::pair<value::TypeTags, value::Value> y1,

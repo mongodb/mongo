@@ -432,7 +432,9 @@ public:
                                              "$stdDevSamp",
                                              "$stdDevPop",
                                              "$avg",
-                                             "$addToSet"};
+                                             "$addToSet",
+                                             "$min",
+                                             "$max"};
         if (compatibleAccumulators.count(_accumulatorName)) {
             expCtx->sbeWindowCompatibility =
                 std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);
@@ -998,7 +1000,7 @@ public:
         : Expression(expCtx, std::move(name), std::move(input), std::move(bounds)),
           nExpr(std::move(nExpr)),
           sortPattern(std::move(sortPattern)) {
-        StringDataSet compatibleAccumulators{"$firstN", "$lastN"};
+        StringDataSet compatibleAccumulators{"$firstN", "$lastN", "$minN", "$maxN"};
         if (compatibleAccumulators.count(_accumulatorName)) {
             expCtx->sbeWindowCompatibility =
                 std::min(expCtx->sbeWindowCompatibility, SbeCompatibility::flagGuarded);

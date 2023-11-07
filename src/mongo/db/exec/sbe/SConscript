@@ -212,6 +212,8 @@ env.CppUnitTest(
         'expressions/sbe_removable_stddev_test.cpp',
         'expressions/sbe_removable_sum_test.cpp',
         'expressions/sbe_removable_avg_test.cpp',
+        'expressions/sbe_removable_min_max_test.cpp',
+        'expressions/sbe_removable_minn_maxn_test.cpp',
         'expressions/sbe_replace_one_expression_test.cpp',
         'expressions/sbe_reverse_array_builtin_test.cpp',
         'expressions/sbe_round_builtin_test.cpp',

@@ -140,15 +140,6 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
     sbe::value::FrameIdGenerator&);
 
 /**
- * Translates an input AccumulationStatement into an SBE EExpression for the initialization of the
- * accumulator state.
- */
-std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
-    const AccumulationStatement& acc,
-    std::unique_ptr<sbe::EExpression> initExpr,
-    sbe::value::FrameIdGenerator&);
-
-/**
  * Similar to above but takes multiple arguments
  */
 std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(

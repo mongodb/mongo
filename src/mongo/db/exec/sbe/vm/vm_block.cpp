@@ -203,7 +203,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
     auto block = inputBlock->extract();
     auto bitset = bitsetBlock->extract();
 
-    ValueCompare<less> comp{nullptr /* collator */};
+    value::ValueCompare<less> comp;
 
     tassert(8137400, "Expected block and bitset to be the same size", block.count == bitset.count);
     tassert(8137401, "Expected bitset to be all bools", allBools(bitset.tags, bitset.count));

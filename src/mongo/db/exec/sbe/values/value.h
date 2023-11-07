@@ -46,9 +46,9 @@
 #include <limits>
 #include <memory>
 #include <ostream>
+#include <set>
 #include <string>
 #include <type_traits>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -551,6 +551,33 @@ private:
 };
 
 /**
+ * Defines less or greater, depending on the template instantiation, of two <TypeTags, Value> pairs.
+ * To be used in associative containers.
+ */
+template <bool less>
+struct ValueCompare {
+    explicit ValueCompare(const CollatorInterface* collator = nullptr) : _collator(collator) {}
+
+    bool operator()(const std::pair<TypeTags, Value>& lhs,
+                    const std::pair<TypeTags, Value>& rhs) const {
+        auto [tag, val] = compareValue(lhs.first, lhs.second, rhs.first, rhs.second, _collator);
+        uassert(7548805, "Invalid comparison result", tag == TypeTags::NumberInt32);
+        if constexpr (less) {
+            return bitcastTo<int>(val) < 0;
+        } else {
+            return bitcastTo<int>(val) > 0;
+        }
+    }
+
+    const CollatorInterface* getCollator() const {
+        return _collator;
+    }
+
+private:
+    const CollatorInterface* _collator;
+};
+
+/**
  * 'DeepEqualityHashSet' is a wrapper around 'absl::flat_hash_set' that provides a "truly" deep
  * equality comparison function between its instances. The equality operator in the underlying
  * 'absl::flat_hash_set' type doesn't use the provided equality functor. Instead, it relies on the
@@ -1013,6 +1040,10 @@ public:
      */
     bool push_back(TypeTags tag, Value val);
 
+    bool push_back(std::pair<TypeTags, Value> val) {
+        return push_back(val.first, val.second);
+    }
+
     auto& values() const noexcept {
         return _values;
     }
@@ -1039,28 +1070,21 @@ private:
 };
 
 /**
- * This is the SBE representation of unordered_multiset. It is similar to ArraySet but each value
- * can be stored multiple times.
+ * This is the SBE representation of multiset. It is similar to ArraySet but each value can be
+ * stored multiple times.
  */
 class ArrayMultiSet {
 public:
-    using iterator =
-        typename std::unordered_multiset<std::pair<TypeTags, Value>,
-                                         ValueHash,
-                                         ValueEq,
-                                         std::allocator<std::pair<TypeTags, Value>>>::iterator;
-    using const_iterator = typename std::unordered_multiset<
-        std::pair<TypeTags, Value>,
-        ValueHash,
-        ValueEq,
-        std::allocator<std::pair<TypeTags, Value>>>::const_iterator;
+    using ValueMultiSetType =
+        std::multiset<std::pair<TypeTags, Value>, ValueCompare<true>>;  // NOLINT
+    using iterator = typename ValueMultiSetType::iterator;
+    using const_iterator = typename ValueMultiSetType::const_iterator;
 
     ArrayMultiSet() = default;
     explicit ArrayMultiSet(const CollatorInterface* collator = nullptr)
-        : _values(0, ValueHash(collator), ValueEq(collator)) {}
+        : _values(ValueCompare<true>(collator)) {}
 
-    ArrayMultiSet(const ArrayMultiSet& other) {
-        reserve(other._values.size());
+    ArrayMultiSet(const ArrayMultiSet& other) : _values(ValueCompare<true>(other.getCollator())) {
         for (const auto& p : other._values) {
             const auto copy = copyValue(p.first, p.second);
             ValueGuard guard{copy.first, copy.second};
@@ -1092,18 +1116,24 @@ public:
     }
 
     /**
-     * Removes an element val from the multiset. Returns true if an element has been removed.
+     * Removes an element val from the multiset. Returns false if it was not possible to remove the
+     * element.
      */
     bool remove(std::pair<TypeTags, Value> val) {
-        if (val.first != TypeTags::Nothing) {
-            if (auto it = _values.find(val); it != _values.end()) {
-                releaseValue(it->first, it->second);
-                _values.erase(it);
-                return true;
-            }
+        // Remove Nothing is always succesful since ArrayMultiset ignores those elements.
+        if (val.first == TypeTags::Nothing) {
+            return true;
         }
 
-        return false;
+        // We cannot remove an element that is not present.
+        if (_values.find(val) == _values.end()) {
+            return false;
+        }
+
+        auto it = _values.equal_range(val).first;
+        releaseValue(it->first, it->second);
+        _values.erase(it);
+        return true;
     }
 
     bool remove(TypeTags tag, Value val) {
@@ -1114,18 +1144,16 @@ public:
         return _values.size();
     }
 
-    void reserve(size_t s) {
-        // Normalize to at least 1.
-        s = s ? s : 1;
-        _values.reserve(s);
-    }
-
     auto& values() const noexcept {
         return _values;
     }
 
     auto& values() noexcept {
         return _values;
+    }
+
+    void clearValues() {
+        _values.clear();
     }
 
     void clear() {
@@ -1135,8 +1163,8 @@ public:
         _values.clear();
     }
 
-    const CollatorInterface* getCollator() {
-        return _values.key_eq().getCollator();
+    const CollatorInterface* getCollator() const {
+        return _values.key_comp().getCollator();
     }
 
     friend bool operator==(const ArrayMultiSet& lhs, const ArrayMultiSet& rhs) {
@@ -1150,11 +1178,7 @@ public:
     friend class ArraySet;
 
 private:
-    std::unordered_multiset<std::pair<TypeTags, Value>,  // NOLINT
-                            ValueHash,
-                            ValueEq,
-                            std::allocator<std::pair<TypeTags, Value>>>
-        _values;
+    ValueMultiSetType _values;
 };
 
 /**

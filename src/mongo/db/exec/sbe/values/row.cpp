@@ -166,7 +166,6 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
             auto cnt = buf.read<LittleEndian<size_t>>();
             auto arr = getArrayMultiSetView(arrVal);
             if (cnt) {
-                arr->reserve(cnt);
                 for (size_t idx = 0; idx < cnt; ++idx) {
                     auto [tag, val] = deserializeValue(buf, collator);
                     arr->push_back(tag, val);
