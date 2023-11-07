@@ -299,8 +299,10 @@ public:
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
-        auto sc = SerializationContext::stateCommandRequest();
-        sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+        const auto sc = vts != boost::none
+            ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+            : SerializationContext::stateCommandRequest();
 
         auto request = CountCommandRequest::parse(
             IDLParserContext("count", false /* apiStrict */, dbName.tenantId(), sc), cmdObj);
@@ -342,14 +344,16 @@ public:
 
             uassertStatusOK(viewAggregation.getStatus());
             using VTS = auth::ValidatedTenancyScope;
-            boost::optional<VTS> vts = boost::none;
+            boost::optional<VTS> innerCmdVts = boost::none;
             if (dbName.tenantId()) {
-                vts = VTS(dbName.tenantId().value(), VTS::TrustedForInnerOpMsgRequestTag{});
+                innerCmdVts = VTS(dbName.tenantId().value(), VTS::TrustedForInnerOpMsgRequestTag{});
                 aggRequestSC.setTenantIdSource(true);
+                // Use the original VTS to check the client connection tenant protocol.
+                aggRequestSC.setPrefixState(vts->isFromAtlasProxy());
             }
 
             auto aggRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                dbName, vts, std::move(viewAggregation.getValue()), aggRequestSC);
+                dbName, innerCmdVts, std::move(viewAggregation.getValue()), aggRequestSC);
             BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
 
             uassertStatusOK(ViewResponseFormatter(aggResult).appendAsCountResponse(

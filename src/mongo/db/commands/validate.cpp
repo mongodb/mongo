@@ -243,6 +243,11 @@ public:
         }
         if (auto vts = auth::ValidatedTenancyScope::get(opCtx)) {
             reqSerializationCtx.setTenantIdSource(vts->hasTenantId());
+            // TODO SERVER-82319 we no longer need to check here once expectPrefix never comes from
+            // the command body.
+            if (reqSerializationCtx.getPrefix() == SerializationContext::Prefix::Default) {
+                reqSerializationCtx.setPrefixState(vts->isFromAtlasProxy());
+            }
         }
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         bool background = cmdObj["background"].trueValue();
