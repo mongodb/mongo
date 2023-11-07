@@ -601,6 +601,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_rpc',
         '$BUILD_DIR/mongo/executor/inline_executor',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter_server_status',
         '$BUILD_DIR/mongo/s/commands/cluster_commands_common',
         '$BUILD_DIR/mongo/s/commands/sharded_cluster_sharding_commands',
         '$BUILD_DIR/mongo/s/common_s',

@@ -51,6 +51,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/idl/cluster_server_parameter_server_status.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
@@ -109,6 +110,8 @@ public:
             grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
         result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
+        _clusterParameterStatus.report(opCtx, &result);
+
         // Get a migration status report if a migration is active. The call to
         // getActiveMigrationStatusReport will take an IS lock on the namespace of the active
         // migration if there is one that is active.
@@ -120,6 +123,9 @@ public:
 
         return result.obj();
     }
+
+private:
+    ClusterServerParameterServerStatus _clusterParameterStatus;
 
 } shardingServerStatus;
 

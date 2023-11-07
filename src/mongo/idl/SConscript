@@ -82,6 +82,16 @@ env.Library(
 )
 
 env.Library(
+    target='cluster_server_parameter_server_status',
+    source=[
+        'cluster_server_parameter_server_status.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='cluster_server_parameter_refresher',
     source=[
         'cluster_server_parameter_refresher.cpp',
@@ -105,6 +115,7 @@ env.CppUnitTest(
         'cluster_server_parameter_initializer_test.cpp',
         'cluster_server_parameter_op_observer_test.cpp',
         'cluster_server_parameter_refresher_test.cpp',
+        'cluster_server_parameter_server_status_test.cpp',
         'cluster_server_parameter_test_util.cpp',
         'cluster_server_parameter_test.idl',
     ],
@@ -128,6 +139,7 @@ env.CppUnitTest(
         'cluster_server_parameter_initializer',
         'cluster_server_parameter_op_observer',
         'cluster_server_parameter_refresher',
+        'cluster_server_parameter_server_status',
     ],
 )
 
