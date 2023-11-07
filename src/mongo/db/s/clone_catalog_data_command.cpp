@@ -162,7 +162,8 @@ public:
         {
             FixedFCVRegion fcvRegion{opCtx};
             forceSameUUIDAsSource =
-                feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(*fcvRegion);
+                feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                    (*fcvRegion).acquireFCVSnapshot());
         }
 
         Cloner cloner;

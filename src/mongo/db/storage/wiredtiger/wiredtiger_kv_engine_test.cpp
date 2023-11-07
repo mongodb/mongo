@@ -558,28 +558,27 @@ TEST_F(WiredTigerKVEngineTest, WiredTigerDowngrade) {
     WiredTigerFileVersion version = {WiredTigerFileVersion::StartupVersion::IS_42};
 
     // (Generic FCV reference): When FCV is kLatest, no downgrade is necessary.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
     ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 
     // (Generic FCV reference): When FCV is kLastContinuous or kLastLTS, a downgrade may be needed.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        multiversion::GenericFCV::kLastContinuous);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastContinuous);
     ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLastContinuousWTRelease, version.getDowngradeString());
 
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLastLTS);
     ASSERT_TRUE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLastLTSWTRelease, version.getDowngradeString());
 
     // (Generic FCV reference): While we're in a semi-downgraded state, we shouldn't try downgrading
     // the WiredTiger compatibility version.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+    serverGlobalParams.mutableFCV.setVersion(
         multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous);
     ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());
 
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+    serverGlobalParams.mutableFCV.setVersion(
         multiversion::GenericFCV::kDowngradingFromLatestToLastLTS);
     ASSERT_FALSE(version.shouldDowngrade(/*hasRecoveryTimestamp=*/false));
     ASSERT_EQ(WiredTigerFileVersion::kLatestWTRelease, version.getDowngradeString());

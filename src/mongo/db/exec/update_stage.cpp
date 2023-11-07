@@ -698,7 +698,7 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     // retryable write or in a transaction.
     if (_params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value() &&
         feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         bool isInternalThreadOrClient = !cc().session() || cc().isInternalClient();
         uassert(ErrorCodes::InvalidOptions,
                 "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
@@ -711,7 +711,7 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
         // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
         // we can skip validation.
         if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uassert(ErrorCodes::IllegalOperation,
                     "Must run update to shard key field in a multi-statement transaction or with "
                     "retryWrites: true.",
@@ -734,7 +734,7 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
         // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
         // we can skip validation.
         if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uassert(ErrorCodes::IllegalOperation,
                     "Must run update to shard key field in a multi-statement transaction or with "
                     "retryWrites: true.",

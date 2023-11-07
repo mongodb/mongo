@@ -829,7 +829,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
 
     auto chainCtx = std::make_shared<ChainContext>();
     auto reshardingImprovementsEnabled = resharding::gFeatureFlagReshardingImprovements.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
     return resharding::WithAutomaticRetry([this,
                                            chainCtx,

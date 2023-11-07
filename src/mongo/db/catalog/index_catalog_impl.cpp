@@ -275,7 +275,7 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
             // Note that TTL deletion is supported on capped clustered collections via bounded
             // collection scan, which does not use an index.
             if (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 !collection->isCapped()) {
                 if (opCtx->lockState()->inAWriteUnitOfWork()) {
                     opCtx->recoveryUnit()->onCommit(
@@ -519,7 +519,7 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     if (collection && collection->isCapped() &&
         validatedSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
         !feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         MONGO_likely(!ignoreTTLIndexCappedCollectionCheck.shouldFail())) {
         return {ErrorCodes::CannotCreateIndex, "Cannot create TTL index on a capped collection"};
     }
@@ -975,15 +975,15 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
             return wildcardSpecStatus;
         }
     } else if (pluginName == IndexNames::COLUMN) {
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << pluginName
                               << " indexes are under development and cannot be used without "
                                  "enabling the feature flag",
                 // With our testing failpoint we may try to run this code before we've initialized
                 // the FCV.
-                !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                !fcvSnapshot.isVersionInitialized() ||
+                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(fcvSnapshot));
         if (auto columnSpecStatus = validateColumnStoreSpec(collection, spec, indexVersion);
             !columnSpecStatus.isOK()) {
             return columnSpecStatus;
@@ -1740,7 +1740,7 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
     // index has incorrect keys. Replace this failpoint with a test command instead.
     if (auto failpoint = skipUpdatingIndexDocument.scoped(); MONGO_unlikely(failpoint.isActive()) &&
         repl::feature_flags::gSecondaryIndexChecksInDbCheck.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto indexName = failpoint.getData()["indexName"].valueStringDataSafe();
         if (indexName == index->descriptor()->indexName()) {
             LOGV2_DEBUG(

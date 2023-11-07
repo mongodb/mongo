@@ -55,7 +55,7 @@ ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
 
     // When enabled, we skip constructing ClosedBuckets as we don't need to compress the bucket.
     invariant(!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-        serverGlobalParams.featureCompatibility));
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     addDirectWrite(*_bucketStateRegistry, bucketId, ContinueTrackingBucket::kStop);
 }

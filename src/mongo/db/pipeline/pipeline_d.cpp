@@ -519,7 +519,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
 
         // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
         .unpackBucket = feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
-                            serverGlobalParams.featureCompatibility) &&
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+
             !queryKnob.getSbeDisableTimeSeriesForOp() &&
             cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::fullyCompatible,
     };

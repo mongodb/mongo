@@ -486,7 +486,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     }
 
     if (gFeatureFlagBanEncryptionOptionsInCollectionCreation.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         encryptionOptsRegex->matchView(config) &&
         MONGO_likely(!allowEncryptionOptionsInCreationString.shouldFail())) {
         return {ErrorCodes::IllegalOperation,

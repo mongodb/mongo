@@ -686,7 +686,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
                 "Resetting feature compatibility version to last-lts. If the sync source is in "
                 "latest feature compatibility version, we will find out when we clone the "
                 "server configuration collection (admin.system.version)");
-    serverGlobalParams.mutableFeatureCompatibility.reset();
+    serverGlobalParams.mutableFCV.reset();
 
     // Clear the oplog buffer.
     _oplogBuffer->clear(makeOpCtx().get());
@@ -1138,7 +1138,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
 
     // Changing the featureCompatibilityVersion during initial sync is unsafe.
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(version)) {
+    if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isUpgradingOrDowngrading(
+            version)) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(
             lock,
             Status(ErrorCodes::IncompatibleServerVersion,
@@ -1150,7 +1151,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         // and collection/index creation can depend on FCV, we set the in-memory FCV value to match
         // the version on the sync source. We won't persist the FCV on disk nor will we update our
         // minWireVersion until we clone the actual document.
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(version);
+        serverGlobalParams.mutableFCV.setVersion(version);
     }
 
     if (MONGO_unlikely(initialSyncHangBeforeSplittingControlFlow.shouldFail())) {

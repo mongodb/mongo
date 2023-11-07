@@ -107,7 +107,8 @@ public:
             uassert(
                 5356101,
                 "recipientSyncData not available while upgrading or downgrading the recipient FCV",
-                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+                !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                     .isUpgradingOrDowngrading());
 
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);

@@ -62,12 +62,13 @@ ParsedDelete::ParsedDelete(OperationContext* opCtx,
     : _opCtx(opCtx),
       _request(request),
       _collection(collection),
-      _timeseriesDeleteQueryExprs(isTimeseriesDelete
-                                      ? createTimeseriesWritesQueryExprsIfNecessary(
-                                            feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                                                serverGlobalParams.featureCompatibility),
-                                            collection)
-                                      : nullptr),
+      _timeseriesDeleteQueryExprs(
+          isTimeseriesDelete
+              ? createTimeseriesWritesQueryExprsIfNecessary(
+                    feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+                    collection)
+              : nullptr),
       _isRequestToTimeseries(isTimeseriesDelete) {}
 
 Status ParsedDelete::parseRequest() {

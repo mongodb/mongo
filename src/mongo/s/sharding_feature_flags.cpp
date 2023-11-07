@@ -38,7 +38,8 @@ namespace mongo {
 MONGO_INITIALIZER_GENERAL(SetShouldEmitLogService, ("EndServerParameterRegistration"), ())
 (InitializerContext*) {
     logv2::setShouldEmitLogService([]() {
-        return feature_flags::gEmbeddedRouter.isEnabled(serverGlobalParams.featureCompatibility);
+        return feature_flags::gEmbeddedRouter.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     });
 }
 

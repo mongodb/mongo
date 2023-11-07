@@ -1700,24 +1700,28 @@ Before the data clone phase begins, the node will do the following:
    node restarts while this flag is set, it will restart initial sync even though it may already
    have data because it means that initial sync didn't complete. We also check this flag to prevent
    reading from the oplog while initial sync is in progress.
-2. Find a sync source.
-3. Drop all of its data except for the local database and recreate the oplog.
-4. Get the Rollback ID (RBID) from the sync source to ensure at the end that no rollbacks occurred
+2. [Reset the in-memory FCV to `kUnsetDefaultLastLTSBehavior`.](https://github.com/10gen/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L689). This is to ensure compatibility between the sync source and sync
+target. If the sync source is actually in a different feature compatibility version, we will find
+out when we clone from the sync source.
+3. Find a sync source.
+4. Drop all of its data except for the local database and recreate the oplog.
+5. Get the Rollback ID (RBID) from the sync source to ensure at the end that no rollbacks occurred
    during initial sync.
-5. Query its sync source's oplog for its latest OpTime and save it as the
+6. Query its sync source's oplog for its latest OpTime and save it as the
    `defaultBeginFetchingOpTime`. If there are no open transactions on the sync source, this will be
    used as the `beginFetchingTimestamp` or the timestamp that it begins fetching oplog entries from.
-6. Query its sync source's transactions table for the oldest starting OpTime of all active
+7. Query its sync source's transactions table for the oldest starting OpTime of all active
    transactions. If this timestamp exists (meaning there is an open transaction on the sync source)
    this will be used as the `beginFetchingTimestamp`. If this timestamp doesn't exist, the node will
    use the `defaultBeginFetchingOpTime` instead. This will ensure that even if a transaction was
    started on the sync source after it was queried for the oldest active transaction timestamp, the
    syncing node will have all the oplog entries associated with an active transaction in its oplog.
-7. Query its sync source's oplog for its lastest OpTime. This will be the `beginApplyingTimestamp`,
+8. Query its sync source's oplog for its lastest OpTime. This will be the `beginApplyingTimestamp`,
    or the timestamp that it begins applying oplog entries at once it has completed the data clone
    phase. If there was no active transaction on the sync source, the `beginFetchingTimestamp` will
    be the same as the `beginApplyingTimestamp`.
-8. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
+9. [Set the in-memory FCV to the sync source's FCV.](https://github.com/10gen/mongo/blob/b718dc1aa3ffb3e6df4f61a30d54cda578cf2830/src/mongo/db/repl/initial_syncer.cpp#L1153). This is because during the cloning phase, we do expect to clone the sync source's "admin.system.version" collection eventually (which contains the FCV document), but we can't guarantee that we will clone "admin.system.version" first. Setting the in-memory FCV value to the sync source's FCV first will ensure that we clone collections using the same FCV as the sync source. However, we won't persist the FCV to disk nor will we update our minWireVersion until we clone the actual document.
+10. Create an `OplogFetcher` and start fetching and buffering oplog entries from the sync source
    to be applied later. Operations are buffered to a collection so that they are not limited by the
    amount of memory available.
 

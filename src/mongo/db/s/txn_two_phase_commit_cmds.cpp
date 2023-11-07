@@ -220,7 +220,7 @@ public:
             Response response;
             response.setPrepareTimestamp(std::move(prepareTimestamp));
             if (feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 response.setAffectedNamespaces(std::move(affectedNamespaces));
             }
             return response;

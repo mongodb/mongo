@@ -169,7 +169,7 @@ auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
 
 bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collection) {
     if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Always suppress.
         return true;
     }

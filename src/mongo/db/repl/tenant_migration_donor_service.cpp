@@ -958,7 +958,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     auto isFCVUpgradingOrDowngrading = [&]() -> bool {
         // We must abort the migration if we try to start or resume while upgrading or downgrading.
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                .isUpgradingOrDowngrading()) {
             LOGV2(5356302, "Must abort tenant migration as donor is upgrading or downgrading");
             return true;
         }

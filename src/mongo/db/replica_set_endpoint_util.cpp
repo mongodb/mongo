@@ -35,9 +35,9 @@ namespace mongo {
 namespace replica_set_endpoint {
 
 bool isFeatureFlagEnabled() {
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(
-            serverGlobalParams.featureCompatibility);
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot);
 }
 
 }  // namespace replica_set_endpoint

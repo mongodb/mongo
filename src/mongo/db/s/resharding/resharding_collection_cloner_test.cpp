@@ -175,7 +175,7 @@ protected:
         uassertStatusOK(createCollection(
             operationContext(), tempNss.dbName(), BSON("create" << tempNss.coll())));
         if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             uassertStatusOK(createCollection(
                 operationContext(),
                 NamespaceString::kRecipientReshardingResumeDataNamespace.dbName(),
@@ -239,7 +239,7 @@ protected:
         initializePipelineTest(shardKey, recipientShard, collectionData, configData);
         auto opCtx = operationContext();
         if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility))
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
             opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
         TxnNumber txnNum(0);
         while (_cloner->doOneBatch(operationContext(), *_pipeline, txnNum)) {

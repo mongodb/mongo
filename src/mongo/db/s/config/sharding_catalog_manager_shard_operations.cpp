@@ -928,8 +928,10 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // while blocking on the network).
         FixedFCVRegion fcvRegion(opCtx);
 
+        const auto fcvSnapshot = (*fcvRegion).acquireFCVSnapshot();
+
         std::vector<CollectionType> collList;
-        if (feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(*fcvRegion)) {
+        if (feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(fcvSnapshot)) {
             // TODO SERVER-80532: the sharding catalog might lose some collections.
             auto listStatus = _getCollListFromShard(opCtx, dbNamesStatus.getValue(), targeter);
             if (!listStatus.isOK()) {
@@ -939,17 +941,18 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             collList = std::move(listStatus.getValue());
         }
 
+        // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",
-                !fcvRegion->isUpgradingOrDowngrading());
+                !fcvSnapshot.isUpgradingOrDowngrading());
 
-        // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-        invariant(fcvRegion == multiversion::GenericFCV::kLatest ||
-                  fcvRegion == multiversion::GenericFCV::kLastContinuous ||
-                  fcvRegion == multiversion::GenericFCV::kLastLTS);
+        const auto currentFCV = fcvSnapshot.getVersion();
+        invariant(currentFCV == multiversion::GenericFCV::kLatest ||
+                  currentFCV == multiversion::GenericFCV::kLastContinuous ||
+                  currentFCV == multiversion::GenericFCV::kLastLTS);
 
         if (!isConfigShard) {
-            SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
+            SetFeatureCompatibilityVersion setFcvCmd(currentFCV);
             setFcvCmd.setDbName(DatabaseName::kAdmin);
             setFcvCmd.setFromConfigServer(true);
 

@@ -297,7 +297,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             }
             if (coll->isCapped() &&
                 !feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 return {ErrorCodes::InvalidOptions,
                         "TTL indexes are not supported for capped collections."};
             }
@@ -502,8 +502,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         multiversion::FeatureCompatibilityVersion fcv;
         if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-            serverGlobalParams.featureCompatibility.isLessThan(multiversion::GenericFCV::kLatest,
-                                                               &fcv)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
+                multiversion::GenericFCV::kLatest, &fcv)) {
             maxFeatureCompatibilityVersion = fcv;
         }
         auto validatorObj = *validator;
@@ -980,7 +980,7 @@ Status _collModInternal(OperationContext* opCtx,
             if (changed) {
                 coll.getWritableCollection(opCtx)->setTimeseriesOptions(opCtx, newOptions);
                 if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(
                         opCtx, true);
                 };
@@ -992,8 +992,9 @@ Status _collModInternal(OperationContext* opCtx,
         // (Generic FCV reference): This FCV check happens whenever we upgrade to the latest
         // version.
         // TODO SERVER-80490: remove this check when 8.0 becomes the next LTS release.
-        if (auto version = serverGlobalParams.featureCompatibility.getVersion();
-            cmrNew.numModifications == 0 &&
+        const auto version =
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
+        if (cmrNew.numModifications == 0 &&
             (version == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
              version == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest)) {
             auto writableCollection = coll.getWritableCollection(opCtx);
@@ -1007,8 +1008,7 @@ Status _collModInternal(OperationContext* opCtx,
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
         // TODO SERVER-80003 remove special version handling when LTS becomes 8.0.
         if (cmrNew.numModifications == 0 && coll->timeseriesBucketingParametersHaveChanged() &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                multiversion::GenericFCV::kDowngradingFromLatestToLastLTS) {
+            version == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS) {
             coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(opCtx,
                                                                                        boost::none);
         }

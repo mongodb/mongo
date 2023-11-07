@@ -73,9 +73,9 @@ public:
             ConfigsvrAbortReshardCollection configsvrAbortReshardCollection(nss);
             configsvrAbortReshardCollection.setDbName(request().getDbName());
             if (resharding::gFeatureFlagMoveCollection.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 resharding::gFeatureFlagUnshardCollection.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 configsvrAbortReshardCollection.setProvenance(ProvenanceEnum::kReshardCollection);
             }
 

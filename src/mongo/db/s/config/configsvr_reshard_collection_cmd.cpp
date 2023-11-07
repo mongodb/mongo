@@ -172,7 +172,7 @@ public:
             }
 
             if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject shardDistribution parameter",
@@ -188,9 +188,9 @@ public:
                         "Resharding improvements is not enabled, reject feature flag "
                         "moveCollection or unshardCollection",
                         !resharding::gFeatureFlagMoveCollection.isEnabled(
-                            serverGlobalParams.featureCompatibility) &&
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                             !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                                serverGlobalParams.featureCompatibility));
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             }
 
             if (const auto& shardDistribution = request().getShardDistribution()) {
@@ -203,22 +203,21 @@ public:
                                  -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
                 FixedFCVRegion fixedFcv(opCtx);
 
+                const auto fcvSnapshot = (*fixedFcv).acquireFCVSnapshot();
                 // (Generic FCV reference): To run this command and ensure the consistency of
                 // the metadata we need to make sure we are on a stable state.
                 uassert(ErrorCodes::CommandNotSupported,
                         "Resharding is not supported for this version, please update the FCV to "
                         "latest.",
-                        !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+                        !fcvSnapshot.isUpgradingOrDowngrading());
 
                 // We only want to use provenance in resharding if FCV is latest but it's still
                 // possible for a mongos on a higher fcv to send a reshard collection request to a
                 // configsvr on a lower fcv. We ignore the reshardCollection provenance in this
                 // case.
                 bool setProvenance = true;
-                if (resharding::gFeatureFlagMoveCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                    resharding::gFeatureFlagUnshardCollection.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                if (resharding::gFeatureFlagMoveCollection.isEnabled(fcvSnapshot) ||
+                    resharding::gFeatureFlagUnshardCollection.isEnabled(fcvSnapshot)) {
                     uassert(ErrorCodes::InvalidOptions,
                             "Expected provenance to be specified",
                             request().getProvenance().has_value());

@@ -275,7 +275,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             // collection scan, which does not use an index.
             if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
                 (feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                     serverGlobalParams.featureCompatibility) ||
+                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                  !coll->isCapped())) {
                 auto validateStatus = index_key_validate::validateExpireAfterSeconds(
                     spec[IndexDescriptor::kExpireAfterSecondsFieldName],

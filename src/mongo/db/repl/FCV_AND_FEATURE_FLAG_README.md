@@ -51,6 +51,25 @@ the sync source.
 A node that starts with `--replSet` will also have an FCV value of `kUnsetDefaultLastLTSBehavior`
 if it has not yet received the `replSetInitiate` command.
 
+## Checking the in memory FCV
+The in-memory FCV can be accessed through `serverGlobalParams.featureCompatibility.acquireFCVSnapshot()`. This 
+gets an immutable *copy* of the current FCV, so that we can use multiple functions like `getVersion` or `isVersionInitialized` to check a snapshot of the FCV value, without that value changing or getting reset (such as during initial sync) in-between the function calls. This
+means that if we want to check multiple properties of what the FCV is at a particular point in time, we should do it all on the same snapshot.
+
+For example: checking `isVersionInitialized() && isLessThan()` with the same `FCVSnapshot` value
+would have the guarantee that if the FCV value is initialized during `isVersionInitialized()`,
+it will still be during `isLessThan()`.
+
+Conversely, if we do set the in-memory FCV to another value through `serverGlobalParams.mutableFCV.setVersion`,
+and we want to now check something on the new FCV, we need to make sure to re-call `acquireFCVSnapshot` to get
+a new copy of the FCV. 
+
+In general, if you want to check multiple properties of the FCV at a specific point in time, you should use one snapshot. For example, if you want to check both that
+the FCV is initialized, and if it's less than some version, and that featureFlagXX is enabled
+on this FCV, this should all be using the same `FCVSnapshot`. But if you're doing a multiple completely separate FCV
+checks at different points in time, such as over multiple functions,or multiple distinct feature flag enablement checks (i.e. `featureFlagXX.isEnabled && featureFlagYY.isEnabled`), you should acquire a new FCV snapshot since the old one
+may be stale. 
+
 # setFeatureCompatibilityVersion Command Overview
 
 The FCV can be set using the `setFeatureCompatibilityVersion` admin command to one of the following:
@@ -598,7 +617,7 @@ For example, a new index build feature that is being flag-guarded may be declare
 
 To check if a feature flag is enabled, we should do the following: 
 ```
-if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility)) {
+if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
 	// The feature flag is enabled and we are guaranteed to be only communicating to
     // nodes with binary versions greater than or equal to 4.9.0. Perform the new 
     // feature behavior.
@@ -608,6 +627,18 @@ if(feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompat
     // older versions instead.
 }
 ```
+
+A common pattern is to check if the FCV is initialized AND if the feature flag is enabled on the FCV.
+In this case, we must make sure to do these checks on the SAME `FCVSnapshot`: 
+```
+const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+if(fcvSnapshot.isVersionInitialized() && feature_flags::gFeatureFlagToaster.isEnabled(fcvSnapshot)){
+
+}
+```
+This is because otherwise, if you use two different snapshots, the in-memory FCV may be uninitialized in between calling `isVersionInitialized` on the first snapshot, and checking `isEnabled` on the second snapshot, resulting in a race. 
+This same principle applies in general. If you want to check multiple properties of the FCV/feature flag at a specific point in time (i.e. you are expecting the FCV value to be the same in all of your function calls), you must do the checks on the SAME `FCVSnapshot`.
+See the [section about checking the in-memory FCV for more information](#checking-the-in-memory-FCV)
 
 If the feature flag has `shouldBeFCVGated` set to false, then `isEnabled` will simply return
 whether the feature flag is enabled.
@@ -621,12 +652,12 @@ whether the feature flag is enabled.
 the server's current FCV `serverGlobalParams.featureCompatibility`. However, during initial sync, we temporarily reset the FCV to be uninintialized. 
 
 Currently, if the FCV has not been initialized yet, it will check if the feature flag is enabled on the lastLTS FCV. After SERVER-82246, 
-this function will instead throw an invariant if the FCV is uninitialized.
+this function will instead invariant if the FCV is uninitialized.
 
 Each feature team should think about whether the feature could be run during initial sync, for example: 
  * if the feature is part of initial sync itself
  * if the feature is in a background thread that runs during initial sync
- * if the feature is run in a command that is allowed during initial sync, such as `hello`, etc 
+ * if the feature is run in a command that is allowed during initial sync, such as `hello`, `serverStatus`,etc, or any command that returns `secondaryAllowed() == kAlways` or `kOptIn`, and returns `maintenanceOk() == true`
 
 If the feature will never run during initial sync, it's fine to continue using `isEnabled`. However, if the feature could be run during initial sync, the feature team 
 should use one of these options instead: 
@@ -635,6 +666,8 @@ should use one of these options instead:
 latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
 even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
  * Write your own special logic to avoid the invariant. If there is a request for creating additional server-wide helper functions in this area, please reach out to the Replication team. 
+
+### Additional feature flag gating guidelines
 
 There are some cases outside of startup where we also want to check if the feature flag is turned on,
 regardless of which FCV we are on. In these cases we can use the `isEnabledAndIgnoreFCVUnsafe`

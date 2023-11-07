@@ -219,10 +219,10 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
  */
 bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
     return feature_flags::gFeatureFlagQueryStats.isEnabled(
-               serverGlobalParams.featureCompatibility) ||
+               serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         (!requiresFullQueryStatsFeatureFlag &&
          feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(
-             serverGlobalParams.featureCompatibility));
+             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 }
 
 void registerRequest(OperationContext* opCtx,

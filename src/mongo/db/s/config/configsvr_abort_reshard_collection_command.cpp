@@ -115,9 +115,10 @@ auto assertGetReshardingMachine(OperationContext* opCtx,
             "Could not find in-progress resharding operation to abort",
             machine);
 
-    if (resharding::gFeatureFlagMoveCollection.isEnabled(serverGlobalParams.featureCompatibility) ||
+    if (resharding::gFeatureFlagMoveCollection.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         resharding::gFeatureFlagUnshardCollection.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::IllegalOperation,
                 "Could not find in-progress resharding operation with matching provenance",
                 provenance && (*machine)->getMetadata().getProvenance() == provenance.get());

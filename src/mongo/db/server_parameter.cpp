@@ -87,9 +87,10 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
 }
 
 bool ServerParameter::isEnabled() const {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     return isEnabledOnVersion(
-        serverGlobalParams.featureCompatibility.isVersionInitialized()
-            ? serverGlobalParams.featureCompatibility.getVersion()
+        fcvSnapshot.isVersionInitialized()
+            ? fcvSnapshot.getVersion()
             : multiversion::FeatureCompatibilityVersion::kUnsetDefaultLastLTSBehavior);
 }
 

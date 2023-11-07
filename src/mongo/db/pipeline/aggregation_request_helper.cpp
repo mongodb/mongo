@@ -229,7 +229,7 @@ void validate(OperationContext* opCtx,
             "$_requestResumeToken is not supported without Resharding Improvements",
             !requestResumeTokenElem ||
                 resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
                           << " must be a boolean type",

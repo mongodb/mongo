@@ -507,8 +507,9 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
     // timeseries deletes or updates feature flag is enabled.
     const bool arbitraryTimeseriesWritesEnabled =
         feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
-        feature_flags::gTimeseriesUpdatesSupport.isEnabled(serverGlobalParams.featureCompatibility);
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+        feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (!arbitraryTimeseriesWritesEnabled || cri.cm.hasRoutingTable() ||
         maybeTsNss.isTimeseriesBucketsCollection()) {
         return cri;
@@ -863,7 +864,7 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
 
     if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
         if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             handleWouldChangeOwningShardError(opCtx, shardId, nss, cmdObj, responseStatus, result);
         } else {
             // TODO SERVER-67429: Remove this branch.

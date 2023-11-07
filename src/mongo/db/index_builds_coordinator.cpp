@@ -593,7 +593,7 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
 
         void act(OperationContext* opCtx, int64_t availableBytes) noexcept final {
             if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 LOGV2(6826200,
                       "Index build: disk space monitor detected we're low on storage space but "
                       "'featureFlagIndexBuildGracefulErrorHandling' is disabled. Ignoring it");
@@ -2804,7 +2804,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
 
             // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
             if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 replState->canVoteForAbort()) {
                 // Always request an abort to the primary node, even if we are primary. If
                 // primary, the signal will loop back and cause an asynchronous external
@@ -2945,7 +2945,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // to the primary node. Single-phase builds can also abort immediately, as the primary or
     // standalone is the only node aware of the build.
     if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Index builds only check index constraints when committing. If an error occurs at that
         // point, then the build is cleaned up while still holding the appropriate locks. The only
         // errors that we cannot anticipate are user interrupts and shutdown errors.

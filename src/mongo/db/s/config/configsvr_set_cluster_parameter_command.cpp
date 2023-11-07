@@ -81,7 +81,7 @@ Status allowedToEnable(const BSONObj& command) {
     auto name = getParameterName(command);
     if (name == "pauseMigrationsDuringMultiUpdates" &&
         !migration_blocking_operation::gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
-             .isEnabled(serverGlobalParams.featureCompatibility)) {
+             .isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status{
             ErrorCodes::IllegalOperation,
             "Unable to enable pauseMigrationsDuringMultiUpdates cluster parameter because "

@@ -143,10 +143,10 @@ public:
             : CommandInvocation(command),
               _opMsgRequest{&request},
               _request{std::move(bulkRequest)} {
-            uassert(
-                ErrorCodes::CommandNotSupported,
-                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
-                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+            uassert(ErrorCodes::CommandNotSupported,
+                    "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                    gFeatureFlagBulkWriteCommand.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             bulk_write_common::validateRequest(_request, /*isRouter=*/true);
         }

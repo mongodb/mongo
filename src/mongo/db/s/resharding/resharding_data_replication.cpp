@@ -270,7 +270,7 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     std::shared_ptr<executor::TaskExecutor> collectionClonerExecutor;
     if (!cloningDone) {
         if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             resharding::data_copy::ensureCollectionExists(
                 opCtx,
                 NamespaceString::kRecipientReshardingResumeDataNamespace,

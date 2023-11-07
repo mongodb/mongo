@@ -102,12 +102,13 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
       _canonicalQuery(),
       _extensionsCallback(std::move(extensionsCallback)),
       _collection(collection),
-      _timeseriesUpdateQueryExprs(isRequestToTimeseries
-                                      ? createTimeseriesWritesQueryExprsIfNecessary(
-                                            feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-                                                serverGlobalParams.featureCompatibility),
-                                            collection)
-                                      : nullptr),
+      _timeseriesUpdateQueryExprs(
+          isRequestToTimeseries
+              ? createTimeseriesWritesQueryExprsIfNecessary(
+                    feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+                    collection)
+              : nullptr),
       _isRequestToTimeseries(isRequestToTimeseries) {
     if (forgoOpCounterIncrements) {
         _expCtx->enabledCounters = false;

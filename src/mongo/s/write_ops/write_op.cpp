@@ -194,7 +194,7 @@ void WriteOp::targetWrites(OperationContext* opCtx,
             // Do not ignore shard version if this is an updateOne/deleteOne with exact _id
             // equality.
             if (!feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 (isNonTargetedWriteWithoutShardKeyWithExactId &&
                  !*isNonTargetedWriteWithoutShardKeyWithExactId)) {
                 endpoint.shardVersion->setPlacementVersionIgnored();

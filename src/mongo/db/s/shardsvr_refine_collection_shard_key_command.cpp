@@ -86,7 +86,8 @@ public:
                 // TODO SERVER-79064: remove once 8.0 is last LTS.
                 FixedFCVRegion fixedFcvRegion{opCtx};
                 const DDLCoordinatorTypeEnum coordType =
-                    feature_flags::gAuthoritativeRefineCollectionShardKey.isEnabled(*fixedFcvRegion)
+                    feature_flags::gAuthoritativeRefineCollectionShardKey.isEnabled(
+                        (*fixedFcvRegion).acquireFCVSnapshot())
                     ? DDLCoordinatorTypeEnum::kRefineCollectionShardKey
                     : DDLCoordinatorTypeEnum::kRefineCollectionShardKeyPre71Compatible;
 

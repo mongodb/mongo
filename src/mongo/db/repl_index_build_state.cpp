@@ -129,7 +129,7 @@ void IndexBuildState::setState(State state,
 bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentState,
                                               IndexBuildState::State newState) const {
     const auto graceful = feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     switch (currentState) {
         case IndexBuildState::State::kSetup:
             return
@@ -735,7 +735,7 @@ bool ReplIndexBuildState::_shouldSkipIndexBuildStateTransitionCheck(OperationCon
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().isReplSet() && protocol == IndexBuildProtocol::kTwoPhase) {
         if (replCoord->getMemberState() == repl::MemberState::RS_STARTUP2 &&
-            !serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+            !serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isVersionInitialized()) {
             // We're likely at the initial stages of a new logical initial sync attempt, and we
             // haven't yet replicated the FCV from the sync source. Skip the index build state
             // transition checks because they rely on the FCV.

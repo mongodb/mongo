@@ -4741,9 +4741,9 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
     // receive the replicated version. This is to avoid bugs like SERVER-32639.
     if (newState.arbiter()) {
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(
-            multiversion::GenericFCV::kLatest);
-        serverGlobalParams.featureCompatibility.logFCVWithContext("arbiter"_sd);
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
+            "arbiter"_sd);
     }
 
     _memberState = newState;

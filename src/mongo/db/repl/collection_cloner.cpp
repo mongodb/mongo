@@ -162,7 +162,8 @@ void CollectionCloner::preStage() {
 
     BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
     if (gMultitenancySupport &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) &&
+        gFeatureFlagRequireTenantID.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         _sourceNss.tenantId()) {
         _sourceNss.tenantId()->serializeToBSON("$tenant", &b);
     }

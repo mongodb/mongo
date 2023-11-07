@@ -136,7 +136,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
     if (additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed) {
         if (TestingProctor::instance().isEnabled() &&
             feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             _enforceTimeseriesBucketsAreAlwaysCompressed = true;
         } else {
             LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");

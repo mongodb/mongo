@@ -2117,9 +2117,10 @@ void ShardMergeRecipientService::Instance::_updateStateDoc(
 }
 
 void ShardMergeRecipientService::Instance::_assertIfMigrationIsSafeToRunWithCurrentFcv() {
+    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     //(Generic FCV reference): This FCV check should exist across LTS binary versions.
-    auto recipientFCV = serverGlobalParams.featureCompatibility.getVersion();
-    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(recipientFCV)) {
+    auto recipientFCV = fcvSnapshot.getVersion();
+    if (fcvSnapshot.isUpgradingOrDowngrading(recipientFCV)) {
         LOGV2(7339711, "Must abort shard merge as recipient is upgrading or downgrading");
         uasserted(ErrorCodes::TenantMigrationAborted,
                   "Can't run shard merge when FCV is downgrading or upgrading");

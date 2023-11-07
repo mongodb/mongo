@@ -383,10 +383,10 @@ Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opC
 void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, OperationContext* opCtx) {
     auto refresher = std::make_unique<ClusterServerParameterRefresher>();
     // On mongos, this should always be true after FCV initialization
+    const auto fcv = serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion();
     // (Generic FCV reference):
-    invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-              multiversion::GenericFCV::kLatest);
-    refresher->_lastFcv = serverGlobalParams.featureCompatibility.getVersion();
+    invariant(fcv == multiversion::GenericFCV::kLatest);
+    refresher->_lastFcv = fcv;
     auto periodicRunner = serviceCtx->getPeriodicRunner();
     invariant(periodicRunner);
 

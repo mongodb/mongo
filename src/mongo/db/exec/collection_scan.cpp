@@ -373,7 +373,7 @@ BSONObj CollectionScan::getPostBatchResumeToken() const {
         BSONObjBuilder builder;
         _lastSeenId.serializeToken("$recordId", &builder);
         if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             auto initialSyncId =
                 repl::ReplicationCoordinator::get(opCtx())->getInitialSyncId(opCtx());
             if (initialSyncId) {

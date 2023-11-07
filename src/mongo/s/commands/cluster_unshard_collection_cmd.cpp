@@ -57,7 +57,7 @@ public:
                 ErrorCodes::CommandNotSupported,
                 "Resharding improvements is not enabled, cannot perform unshardCollection command.",
                 resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             const auto& nss = ns();
             ShardsvrReshardCollection shardsvrReshardCollection(nss);

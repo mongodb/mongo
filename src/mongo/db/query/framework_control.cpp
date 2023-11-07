@@ -72,7 +72,7 @@ Status QueryFrameworkControl::setFromString(StringData value, const boost::optio
             break;
         case QueryFrameworkControlEnum::kTryBonsai:
             if (feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 break;
             }
             return {ErrorCodes::IllegalOperation,

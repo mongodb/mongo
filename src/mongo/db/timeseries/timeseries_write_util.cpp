@@ -178,7 +178,7 @@ BucketDocument makeNewDocument(const OID& bucketId,
 
     BucketDocument bucketDoc{builder.obj()};
     if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return bucketDoc;
     }
 
@@ -532,7 +532,7 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
 
     CompressionResult compressionResult;
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // TODO SERVER-80653: Handle bucket compression failure.
         compressionResult = timeseries::compressBucket(
             updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
@@ -936,7 +936,7 @@ BSONObj timeseriesViewCommand(const BSONObj& cmd, std::string cmdName, StringDat
 
 void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions& options) {
     if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a delete with a non-empty query on a time-series "
                 "collection that "
@@ -954,7 +954,7 @@ void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions&
 
 void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options) {
     if (!feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::InvalidOptions,
                 "Cannot perform a non-multi update on a time-series collection",
                 request->isMulti());

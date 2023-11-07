@@ -54,20 +54,18 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder bob;
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
-            bob.append(
-                "major",
-                multiversion::majorVersion(serverGlobalParams.featureCompatibility.getVersion()));
-            bob.append(
-                "minor",
-                multiversion::minorVersion(serverGlobalParams.featureCompatibility.getVersion()));
+        const ServerGlobalParams::FCVSnapshot fcvSnapshot =
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (fcvSnapshot.isVersionInitialized()) {
+            bob.append("major", multiversion::majorVersion(fcvSnapshot.getVersion()));
+            bob.append("minor", multiversion::minorVersion(fcvSnapshot.getVersion()));
 
             int currentlyTransitioning = 0;
             // (Generic FCV reference): append information to serverStatus on if we are in a state
             // of transitioning to a new FCV (upgrading or downgrading).
-            if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
-                const auto& [fromVersion, toVersion] = multiversion::getTransitionFCVFromAndTo(
-                    serverGlobalParams.featureCompatibility.getVersion());
+            if (fcvSnapshot.isUpgradingOrDowngrading()) {
+                const auto& [fromVersion, toVersion] =
+                    multiversion::getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
                 currentlyTransitioning = 1;
                 // from is greater, we are downgrading
                 if (fromVersion > toVersion) {

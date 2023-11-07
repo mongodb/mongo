@@ -75,7 +75,7 @@ void TimeseriesStats::append(OperationContext* opCtx, BSONObjBuilder* builder) c
     builder->appendNumber("numBytesCompressed", _compressedSize.load());
 
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
     }
 

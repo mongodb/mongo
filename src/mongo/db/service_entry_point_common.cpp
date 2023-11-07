@@ -1783,10 +1783,10 @@ void ExecCommandDatabase::_initiateCommand() {
 
     // Check that the client has the directShardOperations role if this is a direct operation to a
     // shard.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (command->requiresAuth() && ShardingState::get(opCtx)->enabled() &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gCheckForDirectShardOperations.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+        fcvSnapshot.isVersionInitialized() &&
+        feature_flags::gCheckForDirectShardOperations.isEnabled(fcvSnapshot)) {
         bool clusterHasTwoOrMoreShards = [&]() {
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
             auto* clusterCardinalityParam =

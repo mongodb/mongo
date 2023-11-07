@@ -95,7 +95,7 @@ public:
             reshardCollectionRequest.setCollectionUUID(request().getCollectionUUID());
 
             if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject shardDistribution parameter",
@@ -111,17 +111,17 @@ public:
                         "Resharding improvements is not enabled, reject feature flag "
                         "moveCollection or unshardCollection",
                         !resharding::gFeatureFlagMoveCollection.isEnabled(
-                            serverGlobalParams.featureCompatibility) &&
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                             !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                                serverGlobalParams.featureCompatibility));
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             }
             reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
             reshardCollectionRequest.setForceRedistribution(request().getForceRedistribution());
             reshardCollectionRequest.setReshardingUUID(request().getReshardingUUID());
             if (resharding::gFeatureFlagMoveCollection.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 resharding::gFeatureFlagUnshardCollection.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 reshardCollectionRequest.setProvenance(ProvenanceEnum::kReshardCollection);
             }
 

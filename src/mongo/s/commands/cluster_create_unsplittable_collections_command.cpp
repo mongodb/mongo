@@ -84,7 +84,7 @@ public:
 
             bool isTrackUnshardedEnabled =
                 feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
-                    serverGlobalParams.featureCompatibility);
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 
             uassert(ErrorCodes::IllegalOperation,
                     "cannot create an unsplittable collection if "

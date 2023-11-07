@@ -314,7 +314,7 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
             // earlier.
             md.timeseriesBucketsMayHaveMixedSchemaData = false;
             if (feature_flags::gTSBucketingParametersUnchanged.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 md.timeseriesBucketingParametersHaveChanged = false;
             }
         }

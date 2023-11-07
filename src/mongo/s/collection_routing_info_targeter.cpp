@@ -475,13 +475,13 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
                 feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     isMulti);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
                 feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     !isUpsert);
 
         // Translate the update query on a timeseries collection into the bucket-level predicate
@@ -495,7 +495,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             expCtx,
             _cri.cm.getTimeseriesFields()->getTimeseriesOptions(),
             feature_flags::gTimeseriesUpdatesSupport.isEnabled(
-                serverGlobalParams.featureCompatibility));
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
 
     validateUpdateDoc(updateOp);
@@ -525,7 +525,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // on the shard key. If we were to target based on the replacement doc, it could result in an
     // insertion even if a document matching the query exists on another shard.
     if ((!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-             serverGlobalParams.featureCompatibility) ||
+             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
          updateOp.getMulti()) &&
         isUpsert) {
         return targetByShardKey(extractShardKeyFromQuery(shardKeyPattern, *cq),
@@ -559,7 +559,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // is allowed, since we're able to decisively select a document to modify with the two phase
     // write without shard key protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         isExactId) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
@@ -590,7 +590,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                     shardKeyPattern.toString()),
         isMulti || isExactId ||
             feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                serverGlobalParams.featureCompatibility));
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     if (!isMulti) {
         // If the request is {multi:false} and it's not a write without shard key, then this is a
@@ -604,7 +604,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                 *useTwoPhaseWriteProtocol = true;
             } else if (!isUpsert && isNonTargetedWriteWithoutShardKeyWithExactId &&
                        feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                           serverGlobalParams.featureCompatibility)) {
+                           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 *isNonTargetedWriteWithoutShardKeyWithExactId = true;
             }
         } else {
@@ -652,7 +652,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot perform a non-multi delete on a time-series collection",
                 feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                    serverGlobalParams.featureCompatibility) ||
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                     isMulti);
 
         auto tsFields = _cri.cm.getTimeseriesFields();
@@ -669,7 +669,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             expCtx,
             tsFields->getTimeseriesOptions(),
             feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                serverGlobalParams.featureCompatibility));
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
     }
 
     // Parse delete query.
@@ -703,7 +703,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                         _cri.cm.getShardKeyPattern().toString()),
             isMulti || isExactId ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     if (!isMulti) {
         if (isExactId) {

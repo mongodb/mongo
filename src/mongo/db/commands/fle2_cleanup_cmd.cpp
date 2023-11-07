@@ -150,7 +150,8 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
     uassert(7618803,
             str::stream() << "Feature flag `FLE2CleanupCommand` must be enabled to run "
                           << CleanupStructuredEncryptionData::kCommandName,
-            gFeatureFlagFLE2CleanupCommand.isEnabled(serverGlobalParams.featureCompatibility));
+            gFeatureFlagFLE2CleanupCommand.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     uassert(7618804,
             str::stream() << CleanupStructuredEncryptionData::kCommandName

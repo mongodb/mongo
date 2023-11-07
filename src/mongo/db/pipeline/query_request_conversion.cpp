@@ -89,7 +89,7 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
 
     // Some options are disallowed when resharding improvements are disabled.
     if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
                               << " not supported in aggregation.",
@@ -158,7 +158,7 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
         result.setLet(findCommand.getLet()->getOwned());
     }
     if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         result.setRequestResumeToken(findCommand.getRequestResumeToken());
 
         if (!findCommand.getResumeAfter().isEmpty()) {

@@ -562,7 +562,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
             !opCtx->inMultiDocumentTransaction());
 
     if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassertStatusOK(IndexBuildsCoordinator::checkDiskSpaceSufficientToStartIndexBuild(opCtx));
     }
 

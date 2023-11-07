@@ -182,7 +182,8 @@ bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {
         return false;
     }
 
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (!fcvSnapshot.isVersionInitialized()) {
         // If the FCV document hasn't been read, trust the WT compatibility. MongoD will
         // downgrade to the same compatibility it discovered on startup.
         return _startupVersion == StartupVersion::IS_44_FCV_42 ||
@@ -192,7 +193,7 @@ bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {
     // (Generic FCV reference): Only consider downgrading when FCV has been fully downgraded to last
     // continuous or last LTS. It's possible for WiredTiger to introduce a data format change in a
     // continuous release. This FCV gate must remain across binary version releases.
-    const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
+    const auto currentVersion = fcvSnapshot.getVersion();
     if (currentVersion != multiversion::GenericFCV::kLastContinuous &&
         currentVersion != multiversion::GenericFCV::kLastLTS) {
         return false;
@@ -217,7 +218,8 @@ bool WiredTigerFileVersion::shouldDowngrade(bool hasRecoveryTimestamp) {
 }
 
 std::string WiredTigerFileVersion::getDowngradeString() {
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (!fcvSnapshot.isVersionInitialized()) {
         invariant(_startupVersion != StartupVersion::IS_44_FCV_44);
 
         switch (_startupVersion) {
@@ -234,7 +236,7 @@ std::string WiredTigerFileVersion::getDowngradeString() {
     // Either to kLastContinuous or kLastLTS. It's possible for the data format to differ between
     // kLastContinuous and kLastLTS and we'll need to handle that appropriately here. We only
     // consider downgrading when FCV has been fully downgraded.
-    const auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
+    const auto currentVersion = fcvSnapshot.getVersion();
     // (Generic FCV reference): This FCV check should exist across LTS binary versions because the
     // logic for keeping the WiredTiger release version compatible with the server FCV version will
     // be the same across different LTS binary versions.

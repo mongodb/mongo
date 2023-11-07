@@ -259,7 +259,7 @@ public:
             uassert(7746400,
                     "setQuerySettings command is unknown",
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             auto response =
                 stdx::visit(OverloadedVisitor{
                                 [&](const query_shape::QueryShapeHash& queryShapeHash) {
@@ -323,7 +323,7 @@ public:
             uassert(7746700,
                     "removeQuerySettings command is unknown",
                     feature_flags::gFeatureFlagQuerySettings.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             auto tenantId = request().getDbName().tenantId();
             auto queryShapeHash =
                 stdx::visit(OverloadedVisitor{
