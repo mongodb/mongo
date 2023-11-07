@@ -625,7 +625,7 @@ public:
             };
             auto const nssOrUUID = findCommand->getNamespaceOrUUID();
             if (nssOrUUID.isNamespaceString()) {
-                CommandHelpers::ensureNsNotCommand(nssOrUUID.nss());
+                CommandHelpers::ensureValidCollectionName(nssOrUUID.nss());
                 initializeTracker(nssOrUUID.nss());
             }
             const auto acquisitionRequest = [&] {
