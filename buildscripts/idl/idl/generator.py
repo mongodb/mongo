@@ -1888,6 +1888,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line(
                     '_serializationContext.setTenantIdSource(request.getValidatedTenantId() != boost::none);'
                 )
+                with self._block(
+                        'if (request.validatedTenancyScope != boost::none && request.validatedTenancyScope->isFromAtlasProxy()) {',
+                        '}'):
+                    self._writer.write_line('_serializationContext.setPrefixState(true);')
             else:
                 # if a non-default serialization context was passed in via the IDLParserContext,
                 # use that to set the local serialization context, otherwise set it to a command

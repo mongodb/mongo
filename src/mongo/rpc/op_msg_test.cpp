@@ -1076,6 +1076,45 @@ TEST_F(OpMsgWithAuth, TestVTSSetsPrefixStateTrue) {
     CheckVtsSetsPrefix(client.get(), true);
 }
 
+void CheckCommandMsgIdlParsingForOpMsgRequest(bool simulateAtlasProxyTenantProtocol) {
+    const TenantId tenantId(OID::gen());
+    const std::string dbString =
+        simulateAtlasProxyTenantProtocol ? (tenantId.toString() + "_testDb") : "testDb";
+    auto cmd = BSON("insert"
+                    << "bar"
+                    << "$db" << dbString << "documents" << BSON_ARRAY(BSONObj()));
+    OpMsgRequest msg;
+    msg.body = cmd;
+    using VTS = auth::ValidatedTenancyScope;
+    VTS vts = VTS(tenantId,
+                  simulateAtlasProxyTenantProtocol ? VTS::TenantProtocol::kAtlasProxy
+                                                   : VTS::TenantProtocol::kDefault,
+                  VTS::TenantForTestingTag{});
+    msg.validatedTenancyScope = vts;
+    auto op = InsertOp::parse(msg);
+    ASSERT_EQ(op.getSerializationContext().getPrefix(),
+              simulateAtlasProxyTenantProtocol ? SerializationContext::Prefix::IncludePrefix
+                                               : SerializationContext::Prefix::Default);
+}
+
+TEST_F(OpMsgWithAuth, TestExpectPrefixTrueParsedInMsg) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    CheckCommandMsgIdlParsingForOpMsgRequest(true);
+}
+
+TEST_F(OpMsgWithAuth, TestExpectPrefixFalseParsedInMsg) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+    RAIIServerParameterControllerForTest secretController("testOnlyValidatedTenancyScopeKey",
+                                                          "secret");
+
+    CheckCommandMsgIdlParsingForOpMsgRequest(false);
+}
+
 TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
