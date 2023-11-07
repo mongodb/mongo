@@ -18,7 +18,7 @@ import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 (function() {
 'use strict';
 
-var st = new ShardingTest({mongos: 1, shards: 2});
+var st = new ShardingTest({mongos: 1, shards: 1});
 
 const dbName = 'db';
 const collName = 'foo';
@@ -28,13 +28,13 @@ let mongos = st.s0;
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-let failpoint = configureFailPoint(st.rs1.getPrimary(), 'reshardingPauseRecipientDuringCloning');
+let failpoint = configureFailPoint(st.rs0.getPrimary(), 'reshardingPauseRecipientDuringCloning');
 
 const awaitResult = startParallelShell(
     funWithArgs(function(ns) {
         assert.commandFailedWithCode(db.adminCommand({reshardCollection: ns, key: {newKey: 1}}),
                                      ErrorCodes.ReshardCollectionAborted);
-    }, ns, st.shard1.shardName), st.s.port);
+    }, ns), st.s.port);
 
 failpoint.wait();
 
