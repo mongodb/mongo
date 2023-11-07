@@ -102,7 +102,7 @@ auto makeSeveritySuppressor() {
 }
 
 bool connHealthMetricsLoggingEnabled() {
-    return gEnableDetailedConnectionHealthMetricLogLines;
+    return gEnableDetailedConnectionHealthMetricLogLines.load();
 }
 
 void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMetrics) {

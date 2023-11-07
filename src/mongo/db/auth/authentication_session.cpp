@@ -354,7 +354,7 @@ void AuthenticationSession::markSuccessful() {
 
     BSONObj metrics = _metricsRecorder.capture();
 
-    if (gEnableDetailedConnectionHealthMetricLogLines) {
+    if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
         BSONObjBuilder extraInfoBob;
         if (_mech) {
             _mech->appendExtraInfo(&extraInfoBob);
@@ -385,7 +385,7 @@ void AuthenticationSession::markFailed(const Status& status) {
 
     BSONObj metrics = _metricsRecorder.capture();
 
-    if (gEnableDetailedConnectionHealthMetricLogLines) {
+    if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
         BSONObjBuilder extraInfoBob;
         if (_mech) {
             _mech->appendExtraInfo(&extraInfoBob);

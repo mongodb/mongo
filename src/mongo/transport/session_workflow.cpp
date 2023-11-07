@@ -230,7 +230,7 @@ struct SplitTimerPolicy {
         BSONObjBuilder bob;
         splitTimer->appendIntervals(bob);
 
-        if (!gEnableDetailedConnectionHealthMetricLogLines) {
+        if (!gEnableDetailedConnectionHealthMetricLogLines.load()) {
             return;
         }
 

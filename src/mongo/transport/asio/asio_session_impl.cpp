@@ -716,7 +716,7 @@ Future<bool> CommonAsioSession::maybeHandshakeSSLForIngress(const MutableBufferS
                 LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
             }
             const auto handshakeDurationMillis = durationCount<Milliseconds>(startTimer.elapsed());
-            if (gEnableDetailedConnectionHealthMetricLogLines) {
+            if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                 LOGV2(6723804,
                       "Ingress TLS handshake complete",
                       "durationMillis"_attr = handshakeDurationMillis);

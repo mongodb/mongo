@@ -2032,7 +2032,7 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     }
     const auto cipher = std::wstring(cipherInfo.szCipherSuite);
 
-    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines) {
+    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines.load()) {
         LOGV2_INFO(6723802,
                    "Accepted TLS connection from peer",
                    "peerSubjectName"_attr = peerSubjectName,

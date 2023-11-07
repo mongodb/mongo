@@ -334,7 +334,8 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(
                 durationCount<Microseconds>(fromConnAcquiredTimer.get()->elapsed());
             totalTimeForEgressConnectionAcquiredToWireMicros.increment(timeElapsedMicros);
 
-            if ((!gEnableDetailedConnectionHealthMetricLogLines || timeElapsedMicros < 1000) &&
+            if ((!gEnableDetailedConnectionHealthMetricLogLines.load() ||
+                 timeElapsedMicros < 1000) &&
                 !MONGO_unlikely(alwaysLogConnAcquisitionToWireTime.shouldFail())) {
                 return;
             }

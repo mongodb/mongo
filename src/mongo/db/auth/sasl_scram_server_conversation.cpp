@@ -227,7 +227,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     auto authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
     auto swUser = [&]() {
-        if (gEnableDetailedConnectionHealthMetricLogLines) {
+        if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
             ScopedCallbackTimer timer([&](Microseconds elapsed) {
                 LOGV2(6788604,
                       "Auth metrics report",

@@ -1013,7 +1013,7 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                 //    unknown.
                 ScopeGuard logLatencyGuard([requestLatency, purpose]() {
                     if (purpose != OCSPPurpose::kClientVerify ||
-                        !gEnableDetailedConnectionHealthMetricLogLines) {
+                        !gEnableDetailedConnectionHealthMetricLogLines.load()) {
                         return;
                     }
                     LOGV2_INFO(6840101,
@@ -3304,7 +3304,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     // TODO: check optional cipher restriction, using cert.
     auto peerSubject = getCertificateSubjectX509Name(peerCert.get());
     const auto cipher = SSL_get_current_cipher(conn);
-    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines) {
+    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines.load()) {
         LOGV2_INFO(6723801,
                    "Accepted TLS connection from peer",
                    "peerSubject"_attr = peerSubject,

@@ -485,7 +485,7 @@ void NetworkInterfaceTL::CommandStateBase::setTimer(std::shared_ptr<RequestState
     const auto timeoutCode = requestOnAny.timeoutCode;
     if (nowVal >= deadline) {
         connTimeoutWaitTime = stopwatch.elapsed();
-        if (gEnableDetailedConnectionHealthMetricLogLines) {
+        if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
             LOGV2(6496501,
                   "Operation timed out while waiting to acquire connection",
                   "requestId"_attr = requestOnAny.id,
@@ -860,7 +860,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
         if (cmdState->finishLine.arriveStrongly()) {
             if (swConn.getStatus() == cmdState->requestOnAny.timeoutCode) {
                 cmdState->connTimeoutWaitTime = cmdState->stopwatch.elapsed();
-                if (gEnableDetailedConnectionHealthMetricLogLines) {
+                if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
                     LOGV2(6496500,
                           "Operation timed out while waiting to acquire connection",
                           "requestId"_attr = cmdState->requestOnAny.id,
