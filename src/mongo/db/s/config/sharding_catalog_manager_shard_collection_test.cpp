@@ -130,11 +130,9 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
         auto opCtx = cc().makeOperationContext();
 
         ShardsvrCreateCollectionRequest request;
-        request.setNumInitialChunks(0);
         request.setPresplitHashedZones(false);
         auto optimization = create_collection_util::createPolicy(operationContext(),
                                                                  kShardKeyPattern,
-                                                                 request.getNumInitialChunks(),
                                                                  request.getPresplitHashedZones(),
                                                                  {}, /* tags */
                                                                  3 /* numShards */,
@@ -164,11 +162,9 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
     bool collectionIsEmpty = false;
 
     ShardsvrCreateCollectionRequest request;
-    request.setNumInitialChunks(0);
     request.setPresplitHashedZones(false);
     auto optimization = create_collection_util::createPolicy(operationContext(),
                                                              kShardKeyPattern,
-                                                             request.getNumInitialChunks(),
                                                              request.getPresplitHashedZones(),
                                                              std::move(zones),
                                                              3 /* numShards */,
@@ -207,11 +203,9 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
         bool isUnsplittable = false;
 
         ShardsvrCreateCollectionRequest request;
-        request.setNumInitialChunks(0);
         request.setPresplitHashedZones(false);
         auto optimization = create_collection_util::createPolicy(operationContext(),
                                                                  kShardKeyPattern,
-                                                                 request.getNumInitialChunks(),
                                                                  request.getPresplitHashedZones(),
                                                                  {} /* tags */,
                                                                  3 /* numShards */,
@@ -249,11 +243,9 @@ TEST_F(CreateFirstChunksTest, Unsplittable_OneChunkToPrimary) {
         auto opCtx = cc().makeOperationContext();
 
         ShardsvrCreateCollectionRequest request;
-        request.setNumInitialChunks(0);
         request.setPresplitHashedZones(false);
         auto optimization = create_collection_util::createPolicy(operationContext(),
                                                                  kIdShardKeyPattern,
-                                                                 request.getNumInitialChunks(),
                                                                  request.getPresplitHashedZones(),
                                                                  {} /* tags */,
                                                                  3 /* numShards */,
@@ -283,11 +275,9 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
                  ChunkRange(kShardKeyPattern.getKeyPattern().globalMin(), BSON("x" << 0)))};
     bool collectionIsEmpty = true;
     ShardsvrCreateCollectionRequest request;
-    request.setNumInitialChunks(0);
     request.setPresplitHashedZones(false);
     auto optimization = create_collection_util::createPolicy(operationContext(),
                                                              kShardKeyPattern,
-                                                             request.getNumInitialChunks(),
                                                              request.getPresplitHashedZones(),
                                                              std::move(zones),
                                                              3 /* numShards */,

@@ -414,19 +414,27 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnShardSplitPolicy::createF
 SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(
     const ShardKeyPattern& shardKeyPattern,
     size_t numShards,
-    size_t numInitialChunks,
-    boost::optional<std::vector<ShardId>> availableShardIds)
+    boost::optional<std::vector<ShardId>> availableShardIds,
+    // TODO SERVER-82611: get rid of the `numInitialChunks` argument.
+    // The `numInitialChunks` parameter was deprecated in SERVER-74747 and should not be used.
+    boost::optional<size_t> numInitialChunks)
     : _availableShardIds(std::move(availableShardIds)) {
-    int numInitialChunksPerShard = 1;
+    // `numInitialChunks` is a test-only paramter
+    uassert(ErrorCodes::InvalidOptions,
+            "numInitialChunks is deprecated",
+            !numInitialChunks || getTestCommandsEnabled());
+
+    size_t numInitialChunksPerShard = 1;
     // TODO SERVER-81884: update once 8.0 becomes last LTS.
     if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         numInitialChunksPerShard = 2;
     }
 
-    numInitialChunks = numInitialChunks ? numInitialChunks : (numShards * numInitialChunksPerShard);
-    _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numInitialChunks);
-    _numContiguousChunksPerShard = std::max(numInitialChunks / numShards, static_cast<size_t>(1));
+    size_t numInitialChunksVal = numInitialChunks.value_or(numShards * numInitialChunksPerShard);
+    _splitPoints = calculateHashedSplitPoints(shardKeyPattern, BSONObj(), numInitialChunksVal);
+    _numContiguousChunksPerShard =
+        std::max(numInitialChunksVal / numShards, static_cast<size_t>(1));
 }
 
 InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(
@@ -541,8 +549,6 @@ AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSpl
         return (x / y) + (x % y != 0);
     };
 
-    // TODO: SERVER-74747 simplify this function
-
     // This strategy presplits each tag such that at least 1 chunk is placed on every shard to which
     // the tag is assigned. We distribute the chunks such that at least '_numInitialChunks' are
     // created across the cluster, and we make a best-effort attempt to ensure that an equal number
@@ -587,10 +593,16 @@ PresplitHashedZonesSplitPolicy::PresplitHashedZonesSplitPolicy(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
     std::vector<TagsType> tags,
-    size_t numInitialChunks,
     bool isCollectionEmpty,
-    boost::optional<std::vector<ShardId>> availableShardIds)
+    boost::optional<std::vector<ShardId>> availableShardIds,
+    // TODO SERVER-82611: get rid of the `numInitialChunks` argument.
+    // The `numInitialChunks` parameter was deprecated in SERVER-74747 and should not be used.
+    boost::optional<size_t> numInitialChunks)
     : AbstractTagsBasedSplitPolicy(opCtx, tags, std::move(availableShardIds)) {
+    // `numInitialChunks` is a test-only parameter
+    uassert(ErrorCodes::InvalidOptions,
+            "numInitialChunks is deprecated",
+            !numInitialChunks || getTestCommandsEnabled());
     // Verify that tags have been set up correctly for this split policy.
     _validate(shardKeyPattern, isCollectionEmpty);
 
@@ -606,7 +618,7 @@ PresplitHashedZonesSplitPolicy::PresplitHashedZonesSplitPolicy(
     // created if they are associated with a zone and the zone has to be assigned to a shard.
     invariant(!_numTagsPerShard.empty());
 
-    int numInitialChunksPerShard = 1;
+    size_t numInitialChunksPerShard = 1;
     // TODO SERVER-81884: update once 8.0 becomes last LTS.
     if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
             serverGlobalParams.featureCompatibility)) {
@@ -614,7 +626,7 @@ PresplitHashedZonesSplitPolicy::PresplitHashedZonesSplitPolicy(
     }
     // If 'numInitialChunks' was not specified, use default value.
     _numInitialChunks =
-        numInitialChunks ? numInitialChunks : (_numTagsPerShard.size() * numInitialChunksPerShard);
+        numInitialChunks.value_or(_numTagsPerShard.size() * numInitialChunksPerShard);
 }
 
 /**

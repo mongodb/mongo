@@ -210,8 +210,7 @@ function runShardKeyPatternValidation(collectionExists) {
         assert.commandWorked(st.s.adminCommand({
             shardCollection: 'test.ts',
             key: {hostId: 'hashed', time: 1},
-            timeseries: {timeField: 'time', metaField: 'hostId'},
-            numInitialChunks: 2
+            timeseries: {timeField: 'time', metaField: 'hostId'}
         }));
 
         coll = sDB.getCollection('ts');

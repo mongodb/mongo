@@ -116,13 +116,8 @@ function runTest(startChangeStream) {
     validateExpectedEventAndConfirmResumability({shardCollection: collNS, key: {_id: 1}}, {
         operationType: "shardCollection",
         ns: ns,
-        operationDescription: {
-            "shardKey": {"_id": 1},
-            "unique": false,
-            "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false,
-            "capped": false
-        }
+        operationDescription:
+            {"shardKey": {"_id": 1}, "unique": false, "presplitHashedZones": false, "capped": false}
     });
 
     validateExpectedEventAndConfirmResumability({shardCollection: collNS, key: {_id: "hashed"}}, {
@@ -131,7 +126,6 @@ function runTest(startChangeStream) {
         operationDescription: {
             "shardKey": {"_id": "hashed"},
             "unique": false,
-            "numInitialChunks": NumberLong(0),
             "presplitHashedZones": false,
             "capped": false
         }
@@ -141,13 +135,8 @@ function runTest(startChangeStream) {
     validateExpectedEventAndDropCollection({shardCollection: collNS, key: {_id: 1}}, {
         operationType: "shardCollection",
         ns: ns,
-        operationDescription: {
-            "shardKey": {"_id": 1},
-            "unique": false,
-            "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false,
-            "capped": false
-        }
+        operationDescription:
+            {"shardKey": {"_id": 1}, "unique": false, "presplitHashedZones": false, "capped": false}
     });
 
     /* This test verifies simple hashed key parameter passing .*/
@@ -157,7 +146,6 @@ function runTest(startChangeStream) {
         operationDescription: {
             "shardKey": {"_id": "hashed"},
             "unique": false,
-            "numInitialChunks": NumberLong(0),
             "presplitHashedZones": false,
             "capped": false
         }
@@ -170,37 +158,17 @@ function runTest(startChangeStream) {
         operationDescription: {
             "shardKey": {"x": "hashed", "y": 1},
             "unique": false,
-            "numInitialChunks": NumberLong(0),
             "presplitHashedZones": false,
             "capped": false
         }
     });
 
-    /* This test verifies numInitialChunks parameter passing .*/
-    validateExpectedEventAndDropCollection(
-        {shardCollection: collNS, key: {_id: "hashed"}, numInitialChunks: 10}, {
-            operationType: "shardCollection",
-            ns: ns,
-            operationDescription: {
-                "shardKey": {"_id": "hashed"},
-                "unique": false,
-                "numInitialChunks": NumberLong(10),
-                "presplitHashedZones": false,
-                "capped": false
-            }
-        });
-
     /* This test verifies unique parameter passing .*/
     validateExpectedEventAndDropCollection({shardCollection: collNS, key: {_id: 1}, unique: true}, {
         operationType: "shardCollection",
         ns: ns,
-        operationDescription: {
-            "shardKey": {"_id": 1},
-            "unique": true,
-            "numInitialChunks": NumberLong(0),
-            "presplitHashedZones": false,
-            "capped": false
-        }
+        operationDescription:
+            {"shardKey": {"_id": 1}, "unique": true, "presplitHashedZones": false, "capped": false}
     });
 
     /* This test verifies collation parameter passing .*/
@@ -211,7 +179,6 @@ function runTest(startChangeStream) {
             operationDescription: {
                 "shardKey": {"_id": 1},
                 "unique": false,
-                "numInitialChunks": NumberLong(0),
                 "presplitHashedZones": false,
                 "capped": false,
                 "collation": {

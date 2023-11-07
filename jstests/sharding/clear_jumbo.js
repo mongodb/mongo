@@ -83,10 +83,9 @@ assert.eq(docCount.n, 0);
 // Hashed shard key
 testNs = hashedTestColl.getFullName();
 
-assert.commandWorked(
-    adminDB.runCommand({shardCollection: testNs, key: {x: 'hashed'}, numInitialChunks: 2}));
+assert.commandWorked(adminDB.runCommand({shardCollection: testNs, key: {x: 'hashed'}}));
 
-createJumboChunk(hashedTestColl, 0);
+createJumboChunk(hashedTestColl, -1);
 validateJumboFlag(testNs, {min: {x: 0}});
 
 jumboChunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});

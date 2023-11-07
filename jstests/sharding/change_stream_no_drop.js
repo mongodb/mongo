@@ -47,8 +47,8 @@ jsTest.log(
     configureFailPoint(st.shard0, 'failAtCommitCreateCollectionCoordinator', {}, {times: 1});
 
     let collectionName = dbName + '.coll';
-    assert.commandWorked(st.s.adminCommand(
-        {shardCollection: collectionName, key: {_id: "hashed"}, numInitialChunks: 10}));
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: collectionName, key: {_id: "hashed"}}));
 
     assertNoDrop(changeStream);
 }

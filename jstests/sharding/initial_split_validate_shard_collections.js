@@ -3,6 +3,7 @@
  * which spreads the collection across all available shards.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
@@ -12,19 +13,27 @@ let mongos = st.s0;
 assert.commandWorked(
     mongos.adminCommand({enableSharding: 'test', primaryShard: st.shard1.shardName}));
 
-assert.commandWorked(
-    mongos.adminCommand({shardCollection: 'test.user', key: {x: 'hashed'}, numInitialChunks: 2}));
+assert.commandWorked(mongos.adminCommand({shardCollection: 'test.user', key: {x: 'hashed'}}));
 
 // Ensure that all the pending (received chunks) have been incorporated in the shard's filtering
 // metadata so they will show up in the getShardVersion command
 assert.eq(0, mongos.getDB('test').user.find({}).itcount());
+
+let expectedChunksOnConfigCount = 2;
+let expectedChunksPerShardCount = 1;
+// TODO SERVER-81884: update once 8.0 becomes last LTS.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongos,
+                                         "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+    expectedChunksOnConfigCount = 4;
+    expectedChunksPerShardCount = 2;
+}
 
 st.printShardingStatus();
 
 function checkMetadata(metadata) {
     jsTestLog(tojson(metadata));
 
-    assert.eq(1, metadata.chunks.length);
+    assert.eq(expectedChunksPerShardCount, metadata.chunks.length);
 
     // Check that the single chunk on the shard's metadata is a valid chunk (getShardVersion
     // represents chunks as an array of [min, max])
@@ -56,7 +65,7 @@ assert.commandWorked(
     st.shard1.adminCommand({_flushRoutingTableCacheUpdates: 'test.user', syncFromConfig: false}));
 
 const chunksOnConfigCount = findChunksUtil.countChunksForNs(st.config, 'test.user');
-assert.eq(2, chunksOnConfigCount);
+assert.eq(expectedChunksOnConfigCount, chunksOnConfigCount);
 
 const chunksCollName = "cache.chunks.test.user";
 const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).find().toArray();

@@ -151,12 +151,6 @@ structs:
                 type: bool
                 description: "Whether the shard key index should enforce a unique constraint."
                 default: false
-            numInitialChunks:
-                type: safeInt64
-                description: >-
-                    The number of chunks to create initially when sharding an empty collection with
-                    a hashed shard key.
-                default: 0
             presplitHashedZones:
                 type: bool
                 description: >-

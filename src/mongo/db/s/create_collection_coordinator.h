@@ -71,7 +71,6 @@ namespace create_collection_util {
 std::unique_ptr<InitialSplitPolicy> createPolicy(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
-    std::int64_t numInitialChunks,
     bool presplitHashedZones,
     std::vector<TagsType> tags,
     size_t numShards,

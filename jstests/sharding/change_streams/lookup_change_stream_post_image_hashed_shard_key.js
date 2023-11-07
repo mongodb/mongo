@@ -5,6 +5,9 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 const st = new ShardingTest({
     shards: 2,
     enableBalancer: false,
@@ -25,9 +28,22 @@ assert.commandWorked(mongosDB.dropDatabase());
 assert.commandWorked(
     mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.rs0.getURL()}));
 
-// Shard the test collection on the field "shardKey", and split it into two chunks.
-assert.commandWorked(mongosDB.adminCommand(
-    {shardCollection: mongosColl.getFullName(), numInitialChunks: 2, key: {shardKey: "hashed"}}));
+// Shard the test collection on the field "shardKey".
+assert.commandWorked(
+    mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: "hashed"}}));
+
+// TODO SERVER-81884: update once 8.0 becomes last LTS.
+if (!FeatureFlagUtil.isPresentAndEnabled(mongosDB,
+                                         "OneChunkPerShardEmptyCollectionWithHashedShardKey")) {
+    assert.commandWorked(mongosDB.adminCommand({
+        mergeChunks: mongosColl.getFullName(),
+        bounds: [{shardKey: MinKey}, {shardKey: NumberLong("0")}]
+    }));
+    assert.commandWorked(mongosDB.adminCommand({
+        mergeChunks: mongosColl.getFullName(),
+        bounds: [{shardKey: NumberLong("0")}, {shardKey: MaxKey}]
+    }));
+}
 
 // Make sure the negative chunk is on shard 0.
 assert.commandWorked(mongosDB.adminCommand({

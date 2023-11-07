@@ -73,11 +73,9 @@ function testShardCollection() {
     const collName = 'coll';
     const nss = dbName + '.' + collName;
 
-    // Run shardCollection, ensuring that each shard will host at least one of the chunks.
+    // Run shardCollection, with each shard hosting one chunk.
     const topology = DiscoverTopology.findConnectedNodes(st.s);
-    const numInitialChunks = Object.values(topology.shards).length + 1;
-    assert.commandWorked(st.s.adminCommand(
-        {shardCollection: nss, key: {_id: 'hashed'}, numInitialChunks: numInitialChunks}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: 'hashed'}}));
 
     // Verify that the op entries for the creation of the parent DB have been generated on each
     // shard of the cluster.
@@ -104,7 +102,6 @@ function testShardCollection() {
                 shards: allShardNames,
                 shardKey: {_id: 'hashed'},
                 unique: false,
-                numInitialChunks: numInitialChunks,
                 presplitHashedZones: false,
                 capped: false
             }
@@ -118,7 +115,6 @@ function testShardCollection() {
                 shardCollection: nss,
                 shardKey: {_id: 'hashed'},
                 unique: false,
-                numInitialChunks: numInitialChunks,
                 presplitHashedZones: false,
                 capped: false
             }
@@ -162,7 +158,6 @@ function testShardCollection() {
                 shards: [primaryShard],
                 shardKey: {[encodedTimeField]: 1},
                 unique: false,
-                numInitialChunks: 0,
                 presplitHashedZones: false,
                 timeseries: {
                     timeField: timeField,
@@ -183,7 +178,6 @@ function testShardCollection() {
                 shardCollection: bucketsNss,
                 shardKey: {[encodedTimeField]: 1},
                 unique: false,
-                numInitialChunks: 0,
                 presplitHashedZones: false,
                 timeseries: {
                     timeField: timeField,

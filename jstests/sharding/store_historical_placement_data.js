@@ -101,8 +101,7 @@ function testShardCollection(dbName, collName) {
     const nss = dbName + '.' + collName;
 
     // Shard the collection. Ensure enough chunks to cover all shards.
-    assert.commandWorked(
-        st.s.adminCommand({shardCollection: nss, key: {_id: "hashed"}, numInitialChunks: 20}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {_id: "hashed"}}));
 
     // Verify that a consistent document has been added to config.placementHistory and that its list
     // of shards matches the current content of config.shards

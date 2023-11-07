@@ -397,13 +397,4 @@ assert.commandWorked(
 indexSpec = getIndexSpecByName(mongos.getDB(kDbName).foo, 'a_1');
 assert(!indexSpec.hasOwnProperty('collation'), tojson(indexSpec));
 
-jsTestLog('shardCollection() propagates the value for "numInitialChunks".');
-mongos.getDB(kDbName).foo.drop();
-assert.commandWorked(mongos.getDB(kDbName).createCollection('foo'));
-assert.commandWorked(
-    sh.shardCollection(kDbName + '.foo', {a: "hashed"}, false, {numInitialChunks: 5}));
-st.printShardingStatus();
-var numChunks = findChunksUtil.findChunksByNs(st.config, kDbName + '.foo').count();
-assert.eq(numChunks, 5, "unexpected number of chunks");
-
 st.stop();

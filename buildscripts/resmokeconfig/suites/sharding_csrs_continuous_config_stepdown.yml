@@ -40,7 +40,6 @@ selector:
   - jstests/sharding/hash_basic.js
   - jstests/sharding/hash_shard1.js
   - jstests/sharding/hash_shard_non_empty.js
-  - jstests/sharding/hash_shard_num_chunks.js
   - jstests/sharding/hash_single_shard.js
   - jstests/sharding/key_many.js
   - jstests/sharding/key_string.js

@@ -2,24 +2,38 @@
  * Tests that `onCurrentShardSince` is always consistent with  `history[0].validAfter` on
  * config.chunks entries
  */
+
 Random.setRandomSeed();
 
-/* Create new sharded collection on testDB with 111 initial chunks*/
+/* Perform up to 'maxNumSplits' random chunk splits */
+function performRandomSplitChunks(st, collFullName, maxNumSplits) {
+    for (let i = 0; i < maxNumSplits; i++) {
+        // pick a random split point between -50000 and 50000
+        const splitPoint = Math.floor(Math.random() * 100000 - 50000);
+        if (st.config.chunks.find({"min": {x: NumberLong(splitPoint)}}).count() != 0) {
+            continue;
+        }
+        assert.commandWorked(
+            st.s.adminCommand({split: collFullName, middle: {x: NumberLong(splitPoint)}}));
+    }
+}
+
+/* Create new sharded collection on testDB with up to 201 initial chunks*/
 let _collCounter = 0;
 function newShardedColl(st, testDB) {
-    const collNamePrefix = 'coll';
-    const coll = testDB[collNamePrefix + '_' + _collCounter++];
+    const coll = testDB["coll_" + _collCounter++];
     assert.commandWorked(st.s.adminCommand({
         shardCollection: coll.getFullName(),
         key: {x: "hashed"},
-        numInitialChunks: 111,
     }));
+    // Perform up to 200 chunk splits
+    performRandomSplitChunks(st, coll.getFullName(), 200);
     return coll;
 }
 
 /* Perform up to 5 random chunk moves */
-function performRandomMoveChunks(coll) {
-    const collUuid = st.s.getDB("config").collections.findOne({_id: coll.getFullName()}).uuid;
+function performRandomMoveChunks(st, collFullName) {
+    const collUuid = st.s.getDB("config").collections.findOne({_id: collFullName}).uuid;
 
     function getOppositeShard(shardName) {
         if (shardName === st.shard0.shardName) {
@@ -31,10 +45,10 @@ function performRandomMoveChunks(coll) {
 
     const numMoves = Math.floor(Math.random() * 5);
     for (let i = 0; i < numMoves; i++) {
-        const chunks = chunksColl.find({"uuid": collUuid}).sort({min: 1}).toArray();
+        const chunks = st.config.chunks.find({"uuid": collUuid}).sort({min: 1}).toArray();
         const chunk = chunks[Math.floor(Math.random() * chunks.length)];
         assert.commandWorked(st.s.adminCommand(
-            {moveChunk: coll.getFullName(), find: chunk.min, to: getOppositeShard(chunk.shard)}));
+            {moveChunk: collFullName, find: chunk.min, to: getOppositeShard(chunk.shard)}));
     }
 }
 
@@ -64,17 +78,17 @@ function assertChunksConsistency(chunksColl) {
     assert.eq(numTotalChunks, numConsistenChunks);
 }
 
-function moveAndMergeChunksTest(st, chunksColl, testDB) {
+function moveAndMergeChunksTest(st, testDB) {
     const coll = newShardedColl(st, testDB);
     const collUuid = st.s.getDB("config").collections.findOne({_id: coll.getFullName()}).uuid;
 
     // Perform some random moves to have different values on `onCurrentShardSince` fields
-    performRandomMoveChunks(coll);
-    assertChunksConsistency(chunksColl);
+    performRandomMoveChunks(st, coll.getFullName());
+    assertChunksConsistency(st.config.chunks);
 
     // Perform at most 10 random merges
     for (let i = 0; i < 10; i++) {
-        const chunks = chunksColl.find({"uuid": collUuid}).sort({min: 1}).toArray();
+        const chunks = st.config.chunks.find({"uuid": collUuid}).sort({min: 1}).toArray();
 
         const firstChunkToMergeIndex = Math.floor(Math.random() * (chunks.length - 3));
         const firstChunk = chunks[firstChunkToMergeIndex];
@@ -95,39 +109,29 @@ function moveAndMergeChunksTest(st, chunksColl, testDB) {
             {mergeChunks: coll.getFullName(), bounds: [firstChunk.min, lastChunk.max]}));
     }
 
-    assertChunksConsistency(chunksColl);
+    assertChunksConsistency(st.config.chunks);
 }
 
-function splitChunksTest(st, chunksColl, testDB) {
+function splitChunksTest(st, testDB) {
     const coll = newShardedColl(st, testDB);
 
     // Perform some random moves to have different values on `onCurrentShardSince` fields
-    performRandomMoveChunks(coll);
-    assertChunksConsistency(chunksColl);
+    performRandomMoveChunks(st, coll.getFullName());
+    assertChunksConsistency(st.config.chunks);
 
     // Perform at most 10 random splits
-    for (let i = 0; i < 10; i++) {
-        // pick a random split point between -50000 and 50000
-        const splitPoint = Math.floor(Math.random() * 100000 - 50000);
-        if (chunksColl.find({"min": {x: NumberLong(splitPoint)}}).count() != 0) {
-            continue;
-        }
-        assert.commandWorked(
-            st.s.adminCommand({split: coll.getFullName(), middle: {x: NumberLong(splitPoint)}}));
-    }
-
-    assertChunksConsistency(chunksColl);
+    performRandomSplitChunks(st, coll.getFullName(), 10);
+    assertChunksConsistency(st.config.chunks);
 }
 
 /* Test setup */
 const st = new ShardingTest({mongos: 1, shards: 2});
-const chunksColl = st.config.chunks;
 const testDB = st.s.getDB(jsTestName());
 
 /* Perform tests */
 if (!TestData.configShard) {
-    moveAndMergeChunksTest(st, chunksColl, testDB);
-    splitChunksTest(st, chunksColl, testDB);
+    moveAndMergeChunksTest(st, testDB);
+    splitChunksTest(st, testDB);
 }
 
 st.stop();

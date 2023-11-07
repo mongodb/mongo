@@ -155,8 +155,10 @@ public:
     SplitPointsBasedSplitPolicy(
         const ShardKeyPattern& shardKeyPattern,
         size_t numShards,
-        size_t numInitialChunks,
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none,
+        // TODO SERVER-82611: get rid of the `numInitialChunks` argument.
+        // The `numInitialChunks` parameter was deprecated in SERVER-74747 and should not be used.
+        boost::optional<size_t> numInitialChunks = boost::none);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -247,9 +249,11 @@ public:
         OperationContext* opCtx,
         const ShardKeyPattern& shardKeyPattern,
         std::vector<TagsType> tags,
-        size_t numInitialChunks,
         bool isCollectionEmpty,
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none,
+        // TODO SERVER-82611: get rid of the `numInitialChunks` argument.
+        // The `numInitialChunks` parameter was deprecated in SERVER-74747 and should not be used.
+        boost::optional<size_t> numInitialChunks = boost::none);
 
     SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 

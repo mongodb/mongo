@@ -10,11 +10,7 @@ var st = new ShardingTest({
 });
 assert.commandWorked(
     st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.shardName}));
-
-// Make sure that at least 1 chunk is on another shard so that mongos doesn't treat this as a
-// single-shard query (which doesn't exercise the bug)
-assert.commandWorked(
-    st.s.adminCommand({shardCollection: 'test.skip', key: {_id: 'hashed'}, numInitialChunks: 64}));
+assert.commandWorked(st.s.adminCommand({shardCollection: 'test.skip', key: {_id: 'hashed'}}));
 
 var mongosCol = st.s.getDB('test').getCollection('skip');
 var shardCol = st.shard0.getDB('test').getCollection('skip');

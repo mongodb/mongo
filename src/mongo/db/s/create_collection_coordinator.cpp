@@ -146,7 +146,6 @@ namespace create_collection_util {
 std::unique_ptr<InitialSplitPolicy> createPolicy(
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
-    const std::int64_t numInitialChunks,
     const bool presplitHashedZones,
     std::vector<TagsType> tags,
     size_t numShards,
@@ -155,22 +154,13 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
     boost::optional<ShardId> dataShard,
     boost::optional<std::vector<ShardId>> availableShardIds) {
     uassert(ErrorCodes::InvalidOptions,
-            str::stream() << "numInitialChunks is only supported when the collection is empty "
-                             "and has a hashed field in the shard key pattern",
-            !numInitialChunks || (shardKeyPattern.isHashedPattern() && collectionIsEmpty));
-    uassert(ErrorCodes::InvalidOptions,
-            str::stream()
-                << "When the prefix of the hashed shard key is a range field, "
-                   "'numInitialChunks' can only be used when the 'presplitHashedZones' is true",
-            !numInitialChunks || shardKeyPattern.hasHashedPrefix() || presplitHashedZones);
-    uassert(ErrorCodes::InvalidOptions,
             str::stream() << "dataShard can only be specified in unsplittable collections",
             !dataShard || (dataShard && isUnsplittable));
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "When dataShard or unsplittable is specified, the collection must be "
                              "empty and no other option must be specified",
             !isUnsplittable ||
-                (collectionIsEmpty && !presplitHashedZones && tags.empty() && !numInitialChunks &&
+                (collectionIsEmpty && !presplitHashedZones && tags.empty() &&
                  shardKeyPattern.getKeyPattern().toBSON().woCompare((BSON("_id" << 1))) == 0));
 
     // if unsplittable, the collection is always equivalent to a single chunk collection
@@ -188,7 +178,6 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
         return std::make_unique<PresplitHashedZonesSplitPolicy>(opCtx,
                                                                 shardKeyPattern,
                                                                 std::move(tags),
-                                                                numInitialChunks,
                                                                 collectionIsEmpty,
                                                                 std::move(availableShardIds));
     }
@@ -199,7 +188,7 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
             // Evenly distribute chunks across shards (in combination with hashed shard keys, this
             // should increase the probability of establishing an already balanced collection).
             return std::make_unique<SplitPointsBasedSplitPolicy>(
-                shardKeyPattern, numShards, numInitialChunks, std::move(availableShardIds));
+                shardKeyPattern, numShards, std::move(availableShardIds));
         }
         if (!tags.empty()) {
             // Enforce zone constraints.
@@ -715,24 +704,6 @@ void checkCommandArguments(OperationContext* opCtx,
             "Hashed shard keys cannot be declared unique. It's possible to ensure uniqueness on "
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
             !ShardKeyPattern(*request.getShardKey()).isHashedPattern() || !request.getUnique());
-
-    if (request.getNumInitialChunks()) {
-        // Ensure numInitialChunks is within valid bounds.
-        // Cannot have more than kMaxSplitPoints initial chunks per shard. Setting a maximum of
-        // 1,000,000 chunks in total to limit the amount of memory this command consumes so
-        // there is less danger of an OOM error.
-
-        const int maxNumInitialChunksForShards =
-            Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
-        const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
-        int numChunks = request.getNumInitialChunks();
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "numInitialChunks cannot be more than either: "
-                              << maxNumInitialChunksForShards << ", " << shardutil::kMaxSplitPoints
-                              << " * number of shards; or " << maxNumInitialChunksTotal,
-                numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
-                    numChunks <= maxNumInitialChunksTotal);
-    }
 
     if (originalNss.dbName() == DatabaseName::kConfig) {
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -1400,7 +1371,6 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                 _splitPolicy = create_collection_util::createPolicy(
                     opCtx,
                     shardKeyPattern,
-                    _request.getNumInitialChunks(),
                     _request.getPresplitHashedZones(),
                     getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
                     getNumShards(opCtx),
@@ -1655,7 +1625,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _splitPolicy = create_collection_util::createPolicy(
                     opCtx,
                     shardKeyPattern,
-                    _request.getNumInitialChunks(),
                     _request.getPresplitHashedZones(),
                     getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
                     getNumShards(opCtx),
