@@ -183,7 +183,8 @@ public:
                 FixedFCVRegion fixedFcvRegion{opCtx};
 
                 auto coordinatorDoc = [&] {
-                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(*fixedFcvRegion)) {
+                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(
+                            (*fixedFcvRegion).acquireFCVSnapshot())) {
                         const DDLCoordinatorTypeEnum coordType =
                             DDLCoordinatorTypeEnum::kCreateCollection;
                         auto doc = CreateCollectionCoordinatorDocument();

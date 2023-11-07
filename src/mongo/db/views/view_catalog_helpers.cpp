@@ -111,8 +111,8 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     multiversion::FeatureCompatibilityVersion fcv;
     if (serverGlobalParams.validateFeaturesAsPrimary.load() &&
-        serverGlobalParams.featureCompatibility.isLessThan(multiversion::GenericFCV::kLatest,
-                                                           &fcv)) {
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot().isLessThan(
+            multiversion::GenericFCV::kLatest, &fcv)) {
         expCtx->maxFeatureCompatibilityVersion = fcv;
     }
 

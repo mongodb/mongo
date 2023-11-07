@@ -617,7 +617,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
 
         const auto& collectionPtr = coll.getCollectionPtr();
         if (!feature_flags::gFeatureFlagTTLIndexesOnCappedCollections.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             collectionPtr->isCapped() && !collectionPtr->isClustered()) {
             return false;
         }

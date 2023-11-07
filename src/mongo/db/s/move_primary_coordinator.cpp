@@ -435,8 +435,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
             uassertStatusOK(bsonExtractStringField(collInfo, "name", &collName));
 
             const NamespaceString nss(NamespaceStringUtil::deserialize(_dbName, collName));
-            if (!nss.isSystem() ||
-                nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
+            if (!nss.isSystem() || nss.isLegalClientSystemNS()) {
                 colls.push_back(nss);
             }
         }

@@ -800,7 +800,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     }
 
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         result = sharding_util::createShardingIndexCatalogIndexes(
             opCtx, NamespaceString::kConfigsvrIndexCatalogNamespace);
         if (!result.isOK()) {

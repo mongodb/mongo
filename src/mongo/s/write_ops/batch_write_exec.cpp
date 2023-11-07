@@ -826,7 +826,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
             if (statusWithWriteType.getValue() == WriteType::Ordinary ||
                 (statusWithWriteType.getValue() == WriteType::WithoutShardKeyWithId &&
                  !feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
-                     serverGlobalParams.featureCompatibility))) {
+                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))) {
                 // Tries to execute all of the child batches. If there are any transaction errors,
                 // 'abortBatch' will be set.
                 executeChildBatches(

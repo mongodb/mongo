@@ -98,7 +98,8 @@ std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
         return ns.toStringWithTenantId();
     }
 
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagRequireTenantID.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return ns.toString();
     }
     return ns.toStringWithTenantId();
@@ -185,7 +186,8 @@ NamespaceString NamespaceStringUtil::deserializeForAuthPrevalidated(
 NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
                                                            StringData ns,
                                                            const SerializationContext& context) {
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagRequireTenantID.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         StringData dbName = ns.substr(0, ns.find('.'));
         if (!(dbName == DatabaseName::kAdmin.db()) && !(dbName == DatabaseName::kLocal.db()) &&
             !(dbName == DatabaseName::kConfig.db())) {

@@ -355,7 +355,7 @@ void dropReadyIndexes(OperationContext* opCtx,
                     const auto& shardKey = collDescription.getShardKeyPattern();
                     const bool skipDropIndex = skipDroppingHashedShardKeyIndex ||
                         !(gFeatureFlagShardKeyIndexOptionalHashedSharding.isEnabled(
-                              serverGlobalParams.featureCompatibility) &&
+                              serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                           shardKey.isHashedPattern());
                     if (isCompatibleWithShardKey(opCtx,
                                                  CollectionPtr(collection),

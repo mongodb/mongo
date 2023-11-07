@@ -460,7 +460,7 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
             BSONObjBuilder builder;
             sbe::value::getRecordIdView(val)->serializeToken("$recordId", &builder);
             if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 auto initialSyncId =
                     repl::ReplicationCoordinator::get(_opCtx)->getInitialSyncId(_opCtx);
                 if (initialSyncId) {

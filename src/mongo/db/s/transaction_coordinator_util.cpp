@@ -432,7 +432,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                 doc.setDecision(decision);
                 if (decision.getDecision() == CommitDecision::kCommit &&
                     feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                     doc.setAffectedNamespaces(std::move(affectedNamespaces));
                 }
                 return doc.toBSON();
@@ -939,7 +939,7 @@ Future<void> writeEndOfTransaction(txn::AsyncWorkScheduler& scheduler,
                                    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                    const std::vector<NamespaceString>& affectedNamespaces) {
     if (!feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Future<void>::makeReady();
     }
     return scheduler.scheduleWork(

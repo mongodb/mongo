@@ -71,7 +71,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "Global indexes are not enabled.",
-                    gFeatureFlagGlobalIndexes.isEnabled(serverGlobalParams.featureCompatibility));
+                    gFeatureFlagGlobalIndexes.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             uassert(6789400,
                     "_shardsvrInsertGlobalIndexKey must run inside a multi-doc transaction.",

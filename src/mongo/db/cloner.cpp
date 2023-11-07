@@ -371,7 +371,7 @@ StatusWith<std::vector<BSONObj>> DefaultClonerImpl::_filterCollectionsForClone(
 
         const auto nss = NamespaceStringUtil::deserialize(fromDBName, collectionName.c_str());
         if (nss.isSystem()) {
-            if (!nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
+            if (!nss.isLegalClientSystemNS()) {
                 LOGV2_DEBUG(20419, 2, "\t\t not cloning because system collection");
                 continue;
             }

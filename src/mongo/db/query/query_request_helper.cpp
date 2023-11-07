@@ -114,7 +114,7 @@ Status validateResumeAfter(OperationContext* opCtx,
 
     BSONType recordIdType = resumeAfter["$recordId"].type();
     if (mongo::resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (resumeAfter.nFields() > 2 ||
             (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
              recordIdType != BSONType::jstNULL) ||

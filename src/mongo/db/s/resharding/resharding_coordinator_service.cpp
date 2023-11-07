@@ -647,7 +647,7 @@ void writeToConfigIndexesForTempNss(OperationContext* opCtx,
                                     const ReshardingCoordinatorDocument& coordinatorDoc,
                                     TxnNumber txnNumber) {
     if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
     }
     auto nextState = coordinatorDoc.getState();
@@ -1243,7 +1243,7 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
                     "Resharding improvements is not enabled, should not have "
                     "shardDistribution in coordinatorDoc",
                     resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::InvalidOptions,
                     "ShardDistribution should not be empty if provided",
                     shardDistribution->size() > 0);
@@ -1399,7 +1399,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
                // downgrade simpler, so we can remove all of this initialization when the flag is
                // removed.
                if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                       serverGlobalParams.featureCompatibility)) {
+                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                    client.runCommand(
                        nss.dbName(),
                        BSON("createIndexes"
@@ -1961,7 +1961,7 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         .onCompletion([this, self = shared_from_this()](Status status) {
             _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
             if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 _logStatsOnCompletion(status.isOK());
             }
 
@@ -2133,7 +2133,7 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                // Ensure indexes are loaded in the catalog cache, along with the collection
                // placement.
                if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                       serverGlobalParams.featureCompatibility)) {
+                       serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
 
                    auto cri = uassertStatusOK(
                        Grid::get(opCtx)->catalogCache()->getTrackedCollectionRoutingInfoWithRefresh(

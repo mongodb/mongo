@@ -68,7 +68,7 @@ namespace change_stream_serverless_helpers {
 namespace {
 bool isServerlessChangeStreamFeatureFlagEnabled() {
     return feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
 }
 }  // namespace
 

@@ -67,7 +67,7 @@ FeatureFlag::FeatureFlag(bool enabled, StringData versionString, bool shouldBeFC
 
 // If the functionality of this function changes, make sure that the isEnabled/isPresentAndEnabled
 // functions in feature_flag_util.js also incorporate the change.
-bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv) const {
+bool FeatureFlag::isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const {
     // If the feature flag is not FCV gated, return whether it is enabled.
     if (!_shouldBeFCVGated) {
         return _enabled;
@@ -93,8 +93,8 @@ bool FeatureFlag::isEnabled(const ServerGlobalParams::FeatureCompatibility& fcv)
 }
 
 bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
-    const ServerGlobalParams::FeatureCompatibility& fcv) const {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    const ServerGlobalParams::FCVSnapshot fcv) const {
+    if (fcv.isVersionInitialized()) {
         return isEnabled(fcv);
     } else {
         // (Generic FCV reference): This reference is needed for the feature flag check API.
@@ -103,8 +103,8 @@ bool FeatureFlag::isEnabledUseLastLTSFCVWhenUninitialized(
 }
 
 bool FeatureFlag::isEnabledUseLatestFCVWhenUninitialized(
-    const ServerGlobalParams::FeatureCompatibility& fcv) const {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    const ServerGlobalParams::FCVSnapshot fcv) const {
+    if (fcv.isVersionInitialized()) {
         return isEnabled(fcv);
     } else {
         // (Generic FCV reference): This reference is needed for the feature flag check API.

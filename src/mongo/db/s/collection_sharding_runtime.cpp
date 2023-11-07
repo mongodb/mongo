@@ -506,7 +506,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& currentMetadata = optCurrentMetadata->get();
 
     const auto indexFeatureFlag = feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-        serverGlobalParams.featureCompatibility);
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     const auto wantedPlacementVersion = currentMetadata.getShardPlacementVersion();
     const auto wantedCollectionIndexes =
         indexFeatureFlag ? getCollectionIndexes(opCtx) : boost::none;
@@ -517,6 +517,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         ShardVersionFactory::make(currentMetadata, wantedCollectionIndexes);
 
     const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
+
     const bool isPlacementVersionIgnored =
         ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
     const boost::optional<Timestamp> receivedIndexVersion = receivedShardVersion.indexVersion();

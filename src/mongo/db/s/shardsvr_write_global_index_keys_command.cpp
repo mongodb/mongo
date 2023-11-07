@@ -106,7 +106,8 @@ public:
 void ShardsvrWriteGlobalIndexKeysCmd::Invocation::typedRun(OperationContext* opCtx) {
     uassert(ErrorCodes::CommandNotSupported,
             "Global indexes are not enabled.",
-            gFeatureFlagGlobalIndexes.isEnabled(serverGlobalParams.featureCompatibility));
+            gFeatureFlagGlobalIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     uassert(6789500,
             "_shardsvrWriteGlobalIndexKeys must run inside a multi-doc transaction.",

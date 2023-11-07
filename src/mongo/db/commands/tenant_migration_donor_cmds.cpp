@@ -104,7 +104,8 @@ public:
             uassert(
                 5356100,
                 "donorStartMigration not available while upgrading or downgrading the donor FCV",
-                !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+                !serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                     .isUpgradingOrDowngrading());
 
             uassert(ErrorCodes::IllegalOperation,
                     "tenant migrations are only available if --serverless is enabled",

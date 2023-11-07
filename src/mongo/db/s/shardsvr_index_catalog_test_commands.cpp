@@ -96,7 +96,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
@@ -179,7 +179,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,

@@ -202,7 +202,7 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     const NamespaceString& nss) {
     // No QuerySettings lookup for IDHACK queries.
     if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         (collection &&
          isIdHackEligibleQuery(
              collection, *parsedRequest.findCommandRequest, parsedRequest.collator.get()))) {

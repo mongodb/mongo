@@ -169,9 +169,9 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
     std::vector<mongo::BSONObj> databasesArray;
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     const bool multiTenancyAndRequireTenantIdEnabled = gMultitenancySupport &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility);
+        fcvSnapshot.isVersionInitialized() && gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot);
 
     databasesArray = getClient()->getDatabaseInfos(
         BSONObj(),
@@ -248,7 +248,8 @@ void AllDatabaseCloner::postStage() {
             BSONObj cmdObj = BSON("dbStats" << 1);
             BSONObjBuilder b(cmdObj);
             if (gMultitenancySupport &&
-                gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) &&
+                gFeatureFlagRequireTenantID.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 dbName.tenantId()) {
                 dbName.tenantId()->serializeToBSON("$tenant", &b);
             }

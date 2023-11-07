@@ -268,7 +268,7 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
         // shard key is not supported or when the query targets an exact id value.
         if (isReplacementUpdate &&
             (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                 serverGlobalParams.featureCompatibility) ||
+                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
              isExactIdQuery())) {
             auto filter =
                 _getShardKeyPattern().extractShardKeyFromDoc(updateMod.getUpdateReplacement());

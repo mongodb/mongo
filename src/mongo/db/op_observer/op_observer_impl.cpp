@@ -1689,7 +1689,8 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
                                     getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/false);
 
-    if (!gFeatureFlagLargeBatchedOperations.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (!gFeatureFlagLargeBatchedOperations.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Before SERVER-70765, we relied on packTransactionStatementsForApplyOps() to check if the
         // batch of operations could fit in a single applyOps entry. Now, we pass the size limit to
         // TransactionOperations::getApplyOpsInfo() and are now able to return an error earlier.

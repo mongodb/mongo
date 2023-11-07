@@ -668,7 +668,7 @@ public:
      * Returns true if a client can modify this namespace even though it is under ".system."
      * For example <dbname>.system.users is ok for regular clients to update.
      */
-    bool isLegalClientSystemNS(const ServerGlobalParams::FeatureCompatibility& currentFCV) const;
+    bool isLegalClientSystemNS() const;
 
     /**
      * Returns true if this namespace refers to a drop-pending collection.

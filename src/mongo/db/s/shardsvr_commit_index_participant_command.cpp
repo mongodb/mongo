@@ -100,7 +100,7 @@ public:
             uassert(ErrorCodes::CommandNotSupported,
                     format(FMT_STRING("{} command not enabled"), definition()->getName()),
                     feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassert(ErrorCodes::IllegalOperation,
                     "This command can only be executed in steady state shards.",
                     ShardingState::get(opCtx)->canAcceptShardedCommands() == Status::OK());

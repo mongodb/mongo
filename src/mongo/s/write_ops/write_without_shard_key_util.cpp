@@ -206,7 +206,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     // For existing unittests that do not expect sharding utilities to be initialized, we can set
     // this failpoint if we know the test will not use the two phase write protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility) ||
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
         MONGO_unlikely(skipUseTwoPhaseWriteProtocolCheck.shouldFail())) {
         return false;
     }
@@ -238,9 +238,11 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                                                                let,
                                                                legacyRuntimeConstants);
 
-    bool arbitraryTimeseriesWritesEnabled = feature_flags::gTimeseriesDeletesSupport.isEnabled(
-                                                serverGlobalParams.featureCompatibility) ||
-        feature_flags::gTimeseriesUpdatesSupport.isEnabled(serverGlobalParams.featureCompatibility);
+    bool arbitraryTimeseriesWritesEnabled =
+        feature_flags::gTimeseriesDeletesSupport.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+        feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     auto shardKey = uassertStatusOK(extractShardKeyFromBasicQueryWithContext(
         expCtx,
         cri.cm.getShardKeyPattern(),

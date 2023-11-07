@@ -257,7 +257,7 @@ StringData ReshardingMetrics::getStateString() const noexcept {
 BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
     BSONObjBuilder builder;
     if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         reportDurationsForAllPhases<Seconds>(
             kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});
         switch (_role) {
@@ -310,7 +310,7 @@ void ReshardingMetrics::restoreRecipientSpecificFields(
 void ReshardingMetrics::restoreCoordinatorSpecificFields(
     const ReshardingCoordinatorDocument& document) {
     if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto isSameKeyResharding =
             document.getForceRedistribution() && *document.getForceRedistribution();
         setIsSameKeyResharding(isSameKeyResharding);
@@ -350,7 +350,7 @@ void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipien
 void ReshardingMetrics::reportOnCompletion(BSONObjBuilder* builder) {
     invariant(builder);
     if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         reportDurationsForAllPhases<Seconds>(
             kTimedPhaseNamesMap, getClockSource(), builder, Seconds{0});
     } else {

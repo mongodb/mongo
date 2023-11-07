@@ -144,7 +144,13 @@ public:
 };
 
 /**
- * Utility class to prevent the FCV from changing while the FixedFCVRegion is in scope.
+ * Utility class to prevent the on-disk FCV from changing while the FixedFCVRegion is in scope.
+ *
+ * Note that this does not prevent the in-memory FCV from changing (which for example could be reset
+ * during initial sync). The operator* and operator-> functions return a MutableFCV, which could
+ * change at different points in time, so if you wanted to get a consistent snapshot of the
+ * in-memory FCV, you should still use the ServerGlobalParams::MutableFCV's acquireFCVSnapshot()
+ * function.
  */
 class FixedFCVRegion {
 public:
@@ -154,8 +160,8 @@ public:
     bool operator==(const multiversion::FeatureCompatibilityVersion& other) const;
     bool operator!=(const multiversion::FeatureCompatibilityVersion& other) const;
 
-    const ServerGlobalParams::FeatureCompatibility& operator*() const;
-    const ServerGlobalParams::FeatureCompatibility* operator->() const;
+    const ServerGlobalParams::MutableFCV& operator*() const;
+    const ServerGlobalParams::MutableFCV* operator->() const;
 
 private:
     Lock::SharedLock _lk;

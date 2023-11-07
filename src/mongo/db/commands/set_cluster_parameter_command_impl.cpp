@@ -87,7 +87,7 @@ void setClusterParameterImplShard(OperationContext* opCtx,
             (serverGlobalParams.clusterRole.has(ClusterRole::None)));
 
     if (!feature_flags::gFeatureFlagAuditConfigClusterParameter.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << SetClusterParameter::kCommandName
                               << " cannot be run on standalones",

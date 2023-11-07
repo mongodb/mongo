@@ -331,7 +331,7 @@ DocumentSourceChangeStreamUnwindTransaction::TransactionOpIterator::TransactionO
     // We need endOfTransaction only for unprepared transactions: so this must be an applyOps with
     // set lsid and txnNumber.
     _needEndOfTransaction = feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
-                                serverGlobalParams.featureCompatibility) &&
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         !applyOps.missing() && _lsid.has_value() && _txnNumber.has_value();
 
     if (BSONType::Object ==

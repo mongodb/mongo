@@ -148,7 +148,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setNumInitialChunks(_doc.getNumInitialChunks());
 
             if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject shardDistribution parameter",
@@ -164,15 +164,15 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                         "Resharding improvements is not enabled, reject feature flag "
                         "moveCollection or unshardCollection",
                         !resharding::gFeatureFlagMoveCollection.isEnabled(
-                            serverGlobalParams.featureCompatibility) &&
+                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                             !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                                serverGlobalParams.featureCompatibility));
+                                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             }
 
             if (!resharding::gFeatureFlagMoveCollection.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                 !resharding::gFeatureFlagUnshardCollection.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(ErrorCodes::InvalidOptions,
                         "Feature flag move collection or unshard collection is not enabled, reject "
                         "provenance",

@@ -230,7 +230,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const DbCheckSingleInvocation& invocation) {
     const auto gSecondaryIndexChecksInDbCheck =
         repl::feature_flags::gSecondaryIndexChecksInDbCheck.isEnabled(
-            serverGlobalParams.featureCompatibility);
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (!gSecondaryIndexChecksInDbCheck) {
         uassert(ErrorCodes::InvalidOptions,
                 "When featureFlagSecondaryIndexChecksInDbCheck is not enabled, the validateMode "

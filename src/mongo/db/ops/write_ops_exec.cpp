@@ -2263,7 +2263,7 @@ void tryPerformTimeseriesBucketCompression(
     const write_ops::InsertCommandRequest& request) {
     // When enabled, we skip constructing ClosedBuckets which results in skipping compression.
     invariant(!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-        serverGlobalParams.featureCompatibility));
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // Buckets with just a single measurement is not worth compressing.
     if (closedBucket.numMeasurements.has_value() && closedBucket.numMeasurements.value() <= 1) {

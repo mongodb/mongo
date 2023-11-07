@@ -51,11 +51,11 @@ std::string ServerGlobalParams::getPortSettingHelpText() {
     return str::stream() << "Specify port number - " << serverGlobalParams.port << " by default";
 }
 
-void ServerGlobalParams::FeatureCompatibility::logFCVWithContext(StringData context) const {
+void ServerGlobalParams::FCVSnapshot::logFCVWithContext(StringData context) const {
     LOGV2_OPTIONS(5853300,
                   {logv2::LogComponent::kReplication},
                   "current featureCompatibilityVersion value",
-                  "featureCompatibilityVersion"_attr = multiversion::toString(_version.load()),
+                  "featureCompatibilityVersion"_attr = multiversion::toString(_version),
                   "context"_attr = context);
 }
 

@@ -108,7 +108,8 @@ void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
         }
     }
 
-    serverGlobalParams.featureCompatibility.logFCVWithContext("log rotation"_sd);
+    serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
+        "log rotation"_sd);
     logProcessDetails(nullptr);
 }
 

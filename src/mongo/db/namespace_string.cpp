@@ -64,8 +64,7 @@ bool NamespaceString::isCollectionlessAggregateNS() const {
     return coll() == collectionlessAggregateCursorCol;
 }
 
-bool NamespaceString::isLegalClientSystemNS(
-    const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
+bool NamespaceString::isLegalClientSystemNS() const {
     auto collectionName = coll();
     if (isAdminDB()) {
         if (collectionName == "system.roles")

@@ -79,7 +79,8 @@ std::string DatabaseNameUtil::serializeForAuthPrevalidated(const DatabaseName& d
 
 std::string DatabaseNameUtil::serializeForStorage(const DatabaseName& dbName,
                                                   const SerializationContext& context) {
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagRequireTenantID.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return dbName.toString();
     }
     return dbName.toStringWithTenantId();
@@ -188,7 +189,8 @@ DatabaseName DatabaseNameUtil::deserializeForAuthPrevalidated(boost::optional<Te
 DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> tenantId,
                                                      StringData db,
                                                      const SerializationContext& context) {
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (gFeatureFlagRequireTenantID.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         if (db != DatabaseName::kAdmin.db() && db != DatabaseName::kLocal.db() &&
             db != DatabaseName::kConfig.db() && db != DatabaseName::kExternal.db())
             uassert(7005300, "TenantId must be set", tenantId != boost::none);

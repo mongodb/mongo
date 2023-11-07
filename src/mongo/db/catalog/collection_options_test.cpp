@@ -113,7 +113,7 @@ TEST(CollectionOptions, ErrorBadMax) {
 }
 
 TEST(CollectionOptions, CappedSizeNotRoundUpForAlignment) {
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+    serverGlobalParams.mutableFCV.setVersion(
         multiversion::FeatureCompatibilityVersion::kVersion_6_2);
     const long long kUnalignedCappedSize = 1000;
     const long long kAlignedCappedSize = 1000;

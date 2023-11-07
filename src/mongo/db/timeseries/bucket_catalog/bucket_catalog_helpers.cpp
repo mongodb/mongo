@@ -104,7 +104,7 @@ BSONObj generateReopeningMatchFilter(const Date_t& time,
                                      int64_t bucketMaxSpanSeconds) {
     boost::optional<BSONObj> versionFilter;
     if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // The bucket must be uncompressed.
         versionFilter = BSON(kControlVersionPath << kTimeseriesControlUncompressedVersion);
     }

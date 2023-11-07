@@ -182,7 +182,8 @@ inline Status validateProtocolFCVCompatibility(
         return Status::OK();
 
     if (*protocol == MigrationProtocolEnum::kShardMerge &&
-        !repl::feature_flags::gShardMerge.isEnabled(serverGlobalParams.featureCompatibility)) {
+        !repl::feature_flags::gShardMerge.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "protocol '" << MigrationProtocol_serializer(*protocol)
                                     << "' not supported");

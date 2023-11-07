@@ -65,7 +65,7 @@ public:
     bool includeByDefault() const override {
         // Only include if Query Settings are enabled.
         return feature_flags::gFeatureFlagQuerySettings.isEnabled(
-            serverGlobalParams.featureCompatibility);
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     }
 
     BSONObj generateSection(OperationContext* opCtx,

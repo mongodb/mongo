@@ -132,8 +132,7 @@ public:
 
         // (Generic FCV reference): Test latest FCV behavior. This FCV reference should exist across
         // LTS binary versions.
-        serverGlobalParams.mutableFeatureCompatibility.setVersion(
-            multiversion::GenericFCV::kLatest);
+        serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
         if (haveClient()) {
             Client::releaseCurrent();

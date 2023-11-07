@@ -190,7 +190,7 @@ void DocumentSourceOut::initialize() {
     uassert(7406100,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
             feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
-                serverGlobalParams.featureCompatibility) ||
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 !_timeseries);
 
     const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
@@ -270,7 +270,7 @@ void DocumentSourceOut::finalize() {
     uassert(7406101,
             "$out to time-series collections is only supported on FCV greater than or equal to 7.1",
             feature_flags::gFeatureFlagAggOutTimeseries.isEnabled(
-                serverGlobalParams.featureCompatibility) ||
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 !_timeseries);
 
     // If the collection is time-series, we must rename to the "real" buckets collection.

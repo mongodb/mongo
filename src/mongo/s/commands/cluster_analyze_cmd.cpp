@@ -97,7 +97,7 @@ public:
             uassert(6765500,
                     "Analyze command requires common query framework feature flag to be enabled",
                     feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                        serverGlobalParams.featureCompatibility));
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             const NamespaceString& nss = ns();
 

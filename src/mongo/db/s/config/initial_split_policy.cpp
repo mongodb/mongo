@@ -427,7 +427,7 @@ SplitPointsBasedSplitPolicy::SplitPointsBasedSplitPolicy(
     size_t numInitialChunksPerShard = 1;
     // TODO SERVER-81884: update once 8.0 becomes last LTS.
     if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         numInitialChunksPerShard = 2;
     }
 
@@ -621,7 +621,7 @@ PresplitHashedZonesSplitPolicy::PresplitHashedZonesSplitPolicy(
     size_t numInitialChunksPerShard = 1;
     // TODO SERVER-81884: update once 8.0 becomes last LTS.
     if (!feature_flags::gOneChunkPerShardEmptyCollectionWithHashedShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         numInitialChunksPerShard = 2;
     }
     // If 'numInitialChunks' was not specified, use default value.

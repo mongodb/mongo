@@ -87,7 +87,7 @@ public:
             // how the recipient's primary-only service is set up.
             ThreadPool::Options threadPoolOptions;
             if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 // With reshardingImprovements, we need a larger executor.
                 auto donorShards = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx).size();
                 threadPoolOptions.maxThreads =

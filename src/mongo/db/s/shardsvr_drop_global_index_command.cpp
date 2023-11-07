@@ -97,7 +97,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "Global indexes are not enabled.",
-                    gFeatureFlagGlobalIndexes.isEnabled(serverGlobalParams.featureCompatibility));
+                    gFeatureFlagGlobalIndexes.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
             const auto indexUUID = request().getCommandParameter();
             global_index::dropContainer(opCtx, indexUUID);

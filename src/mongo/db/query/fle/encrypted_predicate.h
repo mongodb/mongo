@@ -265,7 +265,7 @@ extern MatchTypeToRewriteMap matchPredicateRewriteMap;
  */
 #define REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag) \
     REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE_GUARDED(                                            \
-        matchType, rewriteClass, featureFlag.isEnabled(serverGlobalParams.featureCompatibility))
+        matchType, rewriteClass, featureFlag.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
 
 /**
  * Register a MatchExpression rewrite if a condition is true at startup time.
@@ -298,6 +298,6 @@ extern MatchTypeToRewriteMap matchPredicateRewriteMap;
  */
 #define REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_WITH_FLAG(matchType, rewriteClass, featureFlag) \
     REGISTER_ENCRYPTED_MATCH_PREDICATE_REWRITE_GUARDED(                                            \
-        matchType, rewriteClass, featureFlag.isEnabled(serverGlobalParams.featureCompatibility))
+        matchType, rewriteClass, featureFlag.isEnabled(serverGlobalParams.featureCompatibility.acquireFCVSnapshot())
 }  // namespace fle
 }  // namespace mongo

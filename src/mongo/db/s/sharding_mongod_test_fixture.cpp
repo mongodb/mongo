@@ -270,7 +270,7 @@ void ShardingMongodTestFixture::setUp() {
     // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
     // testing this release's code, not backwards compatibility code.
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLatest);
+    serverGlobalParams.mutableFCV.setVersion(multiversion::GenericFCV::kLatest);
 
     if (_setUpMajorityReads && service->getStorageEngine()->getSnapshotManager()) {
         WriteUnitOfWork wuow{operationContext()};

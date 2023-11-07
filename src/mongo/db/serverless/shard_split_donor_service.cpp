@@ -308,7 +308,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
         // We must abort the migration if we try to start or resume while upgrading or downgrading.
         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-        if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        if (serverGlobalParams.featureCompatibility.acquireFCVSnapshot()
+                .isUpgradingOrDowngrading()) {
             LOGV2(8423360, "Aborting shard split since donor is upgrading or downgrading.");
             _abortSource->cancel();
         }
