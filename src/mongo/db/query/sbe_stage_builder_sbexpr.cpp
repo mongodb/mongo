@@ -199,7 +199,16 @@ TypedExpression abtToExpr(optimizer::ABT& abt,
     sbe::value::SlotIdGenerator ids;
     auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
     optimizer::SBEExpressionLowering exprLower{
-        env, std::move(varResolver), runtimeEnv, ids, staticData->inputParamToSlotMap};
+        env,
+        std::move(varResolver),
+        runtimeEnv,
+        ids,
+        staticData->inputParamToSlotMap,
+        nullptr /*metadata*/,
+        nullptr /*nodeProps*/,
+        // SBE stage builders assume that binary comparison operations in ABT are type bracketed and
+        // must specify this to the class responsible for lowering to SBE.
+        optimizer::ComparisonOpSemantics::kTypeBracketing};
     return {exprLower.optimize(abt), signature};
 }
 

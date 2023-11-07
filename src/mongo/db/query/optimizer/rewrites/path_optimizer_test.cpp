@@ -907,13 +907,11 @@ TEST(Path, LowerPathCompare) {
     auto env = VariableEnvironment::build(tree);
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "BinaryOp [FillEmpty]\n"
         "  BinaryOp [Eq]\n"
-        "    BinaryOp [Cmp3w]\n"
-        "      Variable [root]\n"
-        "      Const [1]\n"
-        "    Const [0]\n"
+        "    Variable [root]\n"
+        "    Const [1]\n"
         "  Const [false]\n",
         tree);
 }
@@ -1180,10 +1178,8 @@ TEST(Path, FuseTraverseWithConstant) {
         "Root [{x}]\n"
         "Filter []\n"
         "|   BinaryOp [Eq]\n"
-        "|   |   Const [0]\n"
-        "|   BinaryOp [Cmp3w]\n"
-        "|   |   Const [2]\n"
-        "|   Const [\"hello\"]\n"
+        "|   |   Const [\"hello\"]\n"
+        "|   Const [2]\n"
         "Evaluation [{x}]\n"
         "|   EvalPath []\n"
         "|   |   Variable [root]\n"

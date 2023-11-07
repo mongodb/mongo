@@ -34,32 +34,43 @@
 
 namespace mongo::optimizer {
 
-#define PATHSYNTAX_OPNAMES(F)   \
-    /* comparison operations */ \
-    F(Eq)                       \
-    F(EqMember)                 \
-    F(Neq)                      \
-    F(Gt)                       \
-    F(Gte)                      \
-    F(Lt)                       \
-    F(Lte)                      \
-    F(Cmp3w)                    \
-                                \
-    /* binary operations */     \
-    F(Add)                      \
-    F(Sub)                      \
-    F(Mult)                     \
-    F(Div)                      \
-                                \
-    /* unary operations */      \
-    F(Neg)                      \
-                                \
-    /* Nothing-handling */      \
-    F(FillEmpty)                \
-                                \
-    /* logical operations */    \
-    F(And)                      \
-    F(Or)                       \
+#define PATHSYNTAX_OPNAMES(F)                                                                      \
+    /* comparison operations */                                                                    \
+    F(Eq)                                                                                          \
+    F(EqMember)                                                                                    \
+    F(Neq)                                                                                         \
+    /*                                                                                             \
+     * In Bonsai, the comparison operators Gt/Gte/Lt/Lte form a total order (they are non-type     \
+     * bracketing). This means that for operands of different canonical BSON types, they will use  \
+     * the total BSON order to determine the result of the comparison. This is opposed to          \
+     * type-bracketing operators which return Nothing when applied to operands of different types. \
+     *                                                                                             \
+     * NOTE: The SBE stage builders use ABTs as intermediate representations of expressions. In    \
+     * this context, the comparison operators have type-bracketing semantics. There is no meaning  \
+     * to this, it appears to be a historical accident. The result of this is configurable         \
+     * semantics during ABT lowering, see abt_lower.h & `SBEExpressionLowering` for more details.  \
+     */                                                                                            \
+    F(Gt)                                                                                          \
+    F(Gte)                                                                                         \
+    F(Lt)                                                                                          \
+    F(Lte)                                                                                         \
+    F(Cmp3w)                                                                                       \
+                                                                                                   \
+    /* binary operations */                                                                        \
+    F(Add)                                                                                         \
+    F(Sub)                                                                                         \
+    F(Mult)                                                                                        \
+    F(Div)                                                                                         \
+                                                                                                   \
+    /* unary operations */                                                                         \
+    F(Neg)                                                                                         \
+                                                                                                   \
+    /* Nothing-handling */                                                                         \
+    F(FillEmpty)                                                                                   \
+                                                                                                   \
+    /* logical operations */                                                                       \
+    F(And)                                                                                         \
+    F(Or)                                                                                          \
     F(Not)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(Operations, PATHSYNTAX_OPNAMES);

@@ -129,11 +129,8 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
                 return true;
             }
 
-            auto result = make<PathConstant>(make<BinaryOp>(
-                lhsCmp->op(),
-                make<BinaryOp>(Operations::Cmp3w, rhsConst->getConstant(), lhsCmp->getVal()),
-                Constant::int64(0)));
-
+            auto result = make<PathConstant>(
+                make<BinaryOp>(lhsCmp->op(), lhsCmp->getVal(), rhsConst->getConstant()));
             std::swap(lhs, result);
             return true;
         }

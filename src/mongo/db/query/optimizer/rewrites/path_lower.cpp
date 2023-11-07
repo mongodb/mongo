@@ -297,18 +297,9 @@ void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
                                     make<BinaryOp>(Operations::Cmp3w, make<Variable>(name), c),
                                     Constant::int64(0))));
     } else {
-        // All ABT comparisons (eq/neq, gt/lt, gte/lte) work across types, but SBE equivalents will
-        // return Nothing if the types do not match. We can express a type-agnostic comparison in an
-        // SBE compatible way using cmp3w (<=>), which works with any two values of any types in
-        // SBE. cmp(X, Y) is equivalent to cmp(X <=> Y, 0) in ABT, but will return a boolean rather
-        // than Nothing in SBE.
         n = make<LambdaAbstraction>(
             name,
-            make<BinaryOp>(cmp.op(),
-                           make<BinaryOp>(Operations::Cmp3w,
-                                          make<Variable>(name),
-                                          std::exchange(c, make<Blackhole>())),
-                           Constant::int64(0)));
+            make<BinaryOp>(cmp.op(), make<Variable>(name), std::exchange(c, make<Blackhole>())));
     }
 
     _changed = true;
