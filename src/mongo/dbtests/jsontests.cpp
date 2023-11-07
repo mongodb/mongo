@@ -42,6 +42,7 @@
 #include <limits>
 #include <sstream>
 
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
@@ -838,9 +839,23 @@ TEST(FromJsonTest, BinDataTypes) {
         {0x80, bdtCustom},
     };
     for (const auto& ts : specs) {
-        checkEquivalence(
-            fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
-            BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        if (ts.bdt == Column) {
+            BSONColumnBuilder cb("");
+            cb.append(BSON("a"
+                           << "abc")
+                          .getField("a"));
+            BSONBinData columnData = cb.finalize();
+            checkEquivalence(fmt::sprintf(R"({ "a" : { "$binary" : "%s", "$type" : "%02x" } })",
+                                          base64::encode(columnData.data, columnData.length),
+                                          ts.code),
+                             BSONObjBuilder()
+                                 .appendBinData("a", columnData.length, ts.bdt, columnData.data)
+                                 .obj());
+        } else {
+            checkEquivalence(
+                fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
+                BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        }
     }
 }
 
