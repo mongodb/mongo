@@ -787,6 +787,9 @@ struct SortStats : public SpecificStats {
     // disk use is allowed.
     uint64_t totalDataSizeBytes = 0u;
 
+    // The amount of memory that is currently being used, even prior to being sorted.
+    uint64_t memoryUsageBytes = 0u;
+
     // The number of keys that we've sorted.
     uint64_t keysSorted = 0u;
 

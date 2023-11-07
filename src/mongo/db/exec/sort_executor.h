@@ -127,6 +127,9 @@ public:
     }
 
     const SortStats& stats() const {
+        if (_sorter) {
+            _stats.memoryUsageBytes = _sorter->stats().memUsage();
+        }
         return _stats;
     }
 
@@ -229,7 +232,7 @@ private:
     std::unique_ptr<DocumentSorter> _sorter;
     std::unique_ptr<typename DocumentSorter::Iterator> _output;
 
-    SortStats _stats;
+    mutable SortStats _stats;
 
     bool _isEOF = false;
 };
