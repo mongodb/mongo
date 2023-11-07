@@ -23,8 +23,10 @@ selector:
   # Transactions are aborted upon fcv upgrade or downgrade.
   - uses_transactions
   # Exclude tests that require a specific fcv.
+  # Once SERVER-81054 is complete this is no longer needed.
   - requires_fcv_71
   - requires_fcv_72
+  - requires_fcv_73
   # Exclude tests that are not compatible with upgrade/downgrade.
   - cannot_run_during_upgrade_downgrade
 
