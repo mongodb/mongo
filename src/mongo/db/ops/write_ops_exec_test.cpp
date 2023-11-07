@@ -156,10 +156,6 @@ TEST_F(WriteOpsExecTest, TestInsertRequestSizeEstimationLogic) {
     insert.setDocuments({docToInsert});
     ASSERT(write_ops::verifySizeEstimate(insert));
 
-    // Configure $tenant.
-    insert.setDollarTenant(mongo::TenantId(mongo::OID::gen()));
-    ASSERT(write_ops::verifySizeEstimate(insert));
-
     // Configure different fields for 'wcb'.
     write_ops::WriteCommandRequestBase wcb;
 
@@ -210,10 +206,6 @@ TEST_F(WriteOpsExecTest, TestUpdateRequestSizeEstimationLogic) {
     write_ops::UpdateOpEntry updateOpEntry(BSON("_id" << 1), std::move(mod));
     update.setUpdates({updateOpEntry});
 
-    ASSERT(write_ops::verifySizeEstimate(update));
-
-    // Configure $tenant.
-    update.setDollarTenant(mongo::TenantId(mongo::OID::gen()));
     ASSERT(write_ops::verifySizeEstimate(update));
 
     // Configure different fields for 'wcb'.
@@ -296,10 +288,6 @@ TEST_F(WriteOpsExecTest, TestDeleteRequestSizeEstimationLogic) {
     write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << 1), false /* multi */);
     deleteReq.setDeletes({deleteOpEntry});
 
-    ASSERT(write_ops::verifySizeEstimate(deleteReq));
-
-    // Configure $tenant.
-    deleteReq.setDollarTenant(mongo::TenantId(mongo::OID::gen()));
     ASSERT(write_ops::verifySizeEstimate(deleteReq));
 
     // Configure different fields for 'wcb'.

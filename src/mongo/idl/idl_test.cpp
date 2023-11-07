@@ -5077,60 +5077,6 @@ TEST(IDLFieldTests, TestOptionalBoolField) {
     }
 }
 
-TEST(IDLFieldTests, TenantOverrideField) {
-    const auto mkdoc = [](boost::optional<TenantId> tenantId) {
-        BSONObjBuilder doc;
-        doc.append("BasicIgnoredCommand", 1);
-        doc.append("$db", "admin");
-        if (tenantId) {
-            tenantId->serializeToBSON("$tenant", &doc);
-        }
-        doc.append("field1", 42);
-        doc.append("field2", "foo");
-        return doc.obj();
-    };
-
-    // Test optionality of $tenant arg.
-    {
-        auto obj = BasicIgnoredCommand::parse(IDLParserContext{"nil"}, mkdoc(boost::none));
-        auto tenant = obj.getDollarTenant();
-        ASSERT(tenant == boost::none);
-        ASSERT_FALSE(obj.getSerializationContext().receivedNonPrefixedTenantId());
-    }
-
-    // Test passing an tenant id (acting on behalf of a specific tenant)
-    {
-        auto id = TenantId(OID::gen());
-        auto obj = BasicIgnoredCommand::parse(IDLParserContext{"oid"}, mkdoc(id));
-        auto tenant = obj.getDollarTenant();
-        ASSERT(tenant == id);
-        ASSERT_TRUE(obj.getSerializationContext().receivedNonPrefixedTenantId());
-    }
-}
-
-TEST(IDLFieldTests, TenantOverrideFieldWithInvalidValue) {
-    const auto mkdoc = [](auto tenantId) {
-        BSONObjBuilder doc;
-        doc.append("BasicIgnoredCommand", 1);
-        doc.append("$db", "admin");
-        doc.append("$tenant", tenantId);
-        doc.append("field1", 42);
-        doc.append("field2", "foo");
-        return doc.obj();
-    };
-
-    // Negative: Parse invalid types.
-    {
-        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"int"}, mkdoc(123)), DBException);
-        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"float"}, mkdoc(3.14)),
-                      DBException);
-        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"string"}, mkdoc("bar")),
-                      DBException);
-        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"object"}, mkdoc(BSONObj())),
-                      DBException);
-    }
-}
-
 TEST(IDLOwnershipTests, ParseOwnAssumesOwnership) {
     IDLParserContext ctxt("root");
     One_plain_object idlStruct;

@@ -121,18 +121,6 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithoutTenantOK) 
     ASSERT_TRUE(validated == boost::none);
 }
 
-TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantOK) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-
-    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-    auto validated = ValidatedTenancyScope::create(client.get(), body, {});
-    ASSERT_TRUE(validated != boost::none);
-    ASSERT_TRUE(validated->tenantId() == TenantId(kOid));
-}
-
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
@@ -152,32 +140,6 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK)
     ASSERT_TRUE(validated->authenticatedUser() == user);
 }
 
-TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithTenantNOK) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
-
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-
-    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-    ASSERT_THROWS_CODE(ValidatedTenancyScope(client.get(), TenantId(kOid)),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
-    ASSERT_TRUE(ValidatedTenancyScope::create(client.get(), body, {}) == boost::none);
-}
-
-TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantNOK) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-
-    ASSERT_THROWS_CODE(
-        ValidatedTenancyScope(client.get(), TenantId(kOid)), DBException, ErrorCodes::Unauthorized);
-    ASSERT_THROWS_CODE(ValidatedTenancyScope::create(client.get(), body, ""_sd),
-                       DBException,
-                       ErrorCodes::Unauthorized);
-}
-
 // TODO SERVER-66822: Re-enable this test case.
 // TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithoutTenantAndSecurityTokenNOK) {
 //     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
@@ -186,19 +148,6 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantNOK) {
 //     ASSERT_THROWS_CODE(ValidatedTenancyScope::create(client.get(), body, {}), DBException,
 //     ErrorCodes::Unauthorized);
 // }
-
-TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantAndSecurityTokenNOK) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    UserName user("user", "admin", TenantId(kOid));
-    auto token = makeSecurityToken(user);
-
-    AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
-    ASSERT_THROWS_CODE(
-        ValidatedTenancyScope::create(client.get(), body, token), DBException, 6545800);
-}
 
 TEST_F(ValidatedTenancyScopeTestFixture, NoScopeKey) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);

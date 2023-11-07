@@ -670,7 +670,7 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].end);
 }
 
-
+// TODO: SERVER-82748 Remove $tenant in BSON objects and pass the tenant information another way
 TEST_F(AllDatabaseClonerTest,
        DatabaseStatsMultitenancySupportAndFeatureFlagRequireTenantIdEnabled) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
