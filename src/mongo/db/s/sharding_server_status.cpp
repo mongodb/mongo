@@ -85,7 +85,8 @@ public:
 
         BSONObjBuilder result;
 
-        result.append("clusterRoles", toBSON(serverGlobalParams.clusterRole));
+        result.append("routerServiceEnabled",
+                      serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
 
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
