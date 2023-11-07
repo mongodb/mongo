@@ -942,6 +942,12 @@ public:
     static const long long kLargestSafeLongLongAsDouble;
     static const long long kSmallestSafeLongLongAsDouble;
 
+    /**
+     * Compute the size of the encoding of the BSON object.  If bufSize is provided, it will do
+     * so in an overflow-safe manner.
+     */
+    static int computeSize(int8_t type, const char* data, int fieldNameSize, int bufSize = 0);
+
 private:
     /**
      * This is to enable structured bindings for BSONElement, it should not be used explicitly.
@@ -999,9 +1005,6 @@ private:
         }
         return *this;
     }
-
-    // Only called from constructors.
-    static int computeSize(int8_t type, const char* data, int fieldNameSize);
 };
 
 inline bool BSONElement::trueValue() const {

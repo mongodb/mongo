@@ -68,6 +68,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -877,9 +878,23 @@ TEST(FromJsonTest, BinDataTypes) {
         {0x80, bdtCustom},
     };
     for (const auto& ts : specs) {
-        checkEquivalence(
-            fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
-            BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        if (ts.bdt == Column) {
+            BSONColumnBuilder cb;
+            cb.append(BSON("a"
+                           << "abc")
+                          .getField("a"));
+            BSONBinData columnData = cb.finalize();
+            checkEquivalence(fmt::sprintf(R"({ "a" : { "$binary" : "%s", "$type" : "%02x" } })",
+                                          base64::encode(columnData.data, columnData.length),
+                                          ts.code),
+                             BSONObjBuilder()
+                                 .appendBinData("a", columnData.length, ts.bdt, columnData.data)
+                                 .obj());
+        } else {
+            checkEquivalence(
+                fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
+                BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        }
     }
 }
 

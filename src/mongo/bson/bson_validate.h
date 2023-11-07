@@ -72,4 +72,9 @@ Status validateBSON(const char* buf,
                     BSONValidateMode mode = BSONValidateMode::kDefault) noexcept;
 
 Status validateBSON(const BSONObj& obj, BSONValidateMode mode = BSONValidateMode::kDefault);
+
+Status validateBSONColumn(const char* buf,
+                          int maxLength,
+                          BSONValidateMode mode = BSONValidateMode::kDefault) noexcept;
+
 }  // namespace mongo

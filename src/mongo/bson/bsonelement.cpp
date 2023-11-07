@@ -675,7 +675,7 @@ MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (const char* data) 
 }
 }  // namespace
 
-int BSONElement::computeSize(int8_t type, const char* elem, int fieldNameSize) {
+int BSONElement::computeSize(int8_t type, const char* elem, int fieldNameSize, int bufSize) {
     enum SizeStyle : uint8_t {
         kFixed,         // Total size is a fixed amount + key length.
         kIntPlusFixed,  // Like Fixed, but also add in the int32 immediately following the key.
@@ -747,10 +747,23 @@ int BSONElement::computeSize(int8_t type, const char* elem, int fieldNameSize) {
 
     // RegEx is two c-strings back-to-back.
     const char* p = elem + fieldNameSize + 1;
-    size_t len1 = strlen(p);
-    p = p + len1 + 1;
-    size_t len2 = strlen(p);
-    return (len1 + 1 + len2 + 1) + fieldNameSize + 1;
+    if (bufSize == 0) {
+        size_t len1 = strlen(p);
+        p = p + len1 + 1;
+        size_t len2 = strlen(p);
+        return (len1 + 1 + len2 + 1) + fieldNameSize + 1;
+    } else {
+        int searchSize = bufSize - fieldNameSize - 1;
+        int len1 = strnlen(p, searchSize);
+        if (len1 == searchSize)
+            return -1;
+        p = p + len1 + 1;
+        searchSize -= len1 + 1;
+        int len2 = strnlen(p, searchSize);
+        if (len2 == searchSize)
+            return -1;
+        return (len1 + 1 + len2 + 1) + fieldNameSize + 1;
+    }
 }
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {

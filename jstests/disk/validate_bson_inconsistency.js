@@ -205,7 +205,7 @@ resetDbpath(dbpath);
     db.createCollection(collName);
     let testColl = db[collName];
 
-    // Inserts a rubbish (random string) BSON Column.
+    // Inserts a rubbish (random string) BSON Column (should fail validation to insert)
     testColl.insert({a: BinData(7, "O2FkZmdqYWtsamhnJ2xhamhkZzthaCdmZGphZ2hkYQ==")});
     // Inserts one valid BSON Column to check that it doesn't cause a false positive.
     testColl.insert(
@@ -217,10 +217,11 @@ resetDbpath(dbpath);
     assert.eq(res.warnings.length, 0);
     assert.eq(res.nNonCompliantDocuments, 0);
 
+    // Calling validate with 'checkBSONConformance' also should not return warnings
     res = assert.commandWorked(testColl.validate({checkBSONConformance: true}));
     assert(res.valid, tojson(res));
-    assert.eq(res.warnings.length, 1);
-    assert.eq(res.nNonCompliantDocuments, 1);
+    assert.eq(res.warnings.length, 0);
+    assert.eq(res.nNonCompliantDocuments, 0);
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
