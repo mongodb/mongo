@@ -335,9 +335,10 @@ public:
         return _engine.get();
     }
 
-    void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) override;
+    void addDropPendingIdent(
+        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        std::shared_ptr<Ident> ident,
+        DropIdentCallback&& onDrop) override;
 
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) override;
 
@@ -346,6 +347,11 @@ public:
     void startTimestampMonitor() override;
 
     void checkpoint(OperationContext* opCtx) override;
+
+    StorageEngine::CheckpointIteration getCheckpointIteration() const override;
+
+    virtual bool hasDataBeenCheckpointed(
+        StorageEngine::CheckpointIteration checkpointIteration) const override;
 
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
         OperationContext* opCtx, Timestamp stableTs, LastShutdownState lastShutdownState) override;

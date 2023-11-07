@@ -33,6 +33,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/serialization/strong_typedef.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
@@ -451,12 +453,19 @@ public:
      */
     virtual void clearDropPendingState(OperationContext* opCtx) = 0;
 
+    BOOST_STRONG_TYPEDEF(uint64_t, CheckpointIteration);
+
     /**
      * Adds 'ident' to a list of indexes/collections whose data will be dropped when:
-     * - the dropTimestamp' is sufficiently old to ensure no future data accesses
+     * - the 'dropTime' is sufficiently old to ensure no future data accesses
      * - and no holders of 'ident' remain (the index/collection is no longer in active use)
+     *
+     * 'dropTime' can be either a CheckpointIteration or a Timestamp. In the case of a Timestamp the
+     * ident will be dropped when we can guarantee that no other operation can access the ident.
+     * CheckpointIteration should be chosen when performing untimestamped drops as they
+     * will make the ident wait for a catalog checkpoint before proceeding with the ident drop.
      */
-    virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
+    virtual void addDropPendingIdent(const stdx::variant<Timestamp, CheckpointIteration>& dropTime,
                                      std::shared_ptr<Ident> ident,
                                      DropIdentCallback&& onDrop = nullptr) = 0;
 
@@ -486,6 +495,23 @@ public:
      * Acquires a resource mutex before taking the checkpoint.
      */
     virtual void checkpoint(OperationContext* opCtx) = 0;
+
+    /**
+     * Returns the checkpoint iteration the committed write will be part of.
+     *
+     * This token is only meaningful if obtained after a WriteUnitOfWork commit. You can use the
+     * number with StorageEngine::hasDataBeenCheckpointed(CheckpointIteration) in order to check
+     * whether the write has been checkpointed or not.
+     *
+     * Mostly of use for writes that are untimestamped. Timestamped writes should use the commit
+     * time used and the durable timestamp.
+     */
+    virtual CheckpointIteration getCheckpointIteration() const = 0;
+
+    /**
+     * Returns whether the given checkpoint iteration has been durably flushed to disk.
+     */
+    virtual bool hasDataBeenCheckpointed(CheckpointIteration checkpointIteration) const = 0;
 
     /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
