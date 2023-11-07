@@ -38,9 +38,30 @@
 #include <limits>
 #include <sstream>
 
+#include <boost/core/swap.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/multi_index/detail/bidir_node_iterator.hpp"
+#include <boost/operators.hpp>
+// IWYU pragma: no_include "boost/property_tree/detail/exception_implementation.hpp"
+// IWYU pragma: no_include "boost/property_tree/detail/ptree_implementation.hpp"
+#include <boost/property_tree/ptree_fwd.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 
@@ -839,9 +860,23 @@ TEST(FromJsonTest, BinDataTypes) {
         {0x80, bdtCustom},
     };
     for (const auto& ts : specs) {
-        checkEquivalence(
-            fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
-            BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        if (ts.bdt == Column) {
+            BSONColumnBuilder cb;
+            cb.append(BSON("a"
+                           << "abc")
+                          .getField("a"));
+            BSONBinData columnData = cb.finalize();
+            checkEquivalence(fmt::sprintf(R"({ "a" : { "$binary" : "%s", "$type" : "%02x" } })",
+                                          base64::encode(columnData.data, columnData.length),
+                                          ts.code),
+                             BSONObjBuilder()
+                                 .appendBinData("a", columnData.length, ts.bdt, columnData.data)
+                                 .obj());
+        } else {
+            checkEquivalence(
+                fmt::sprintf(R"({ "a" : { "$binary" : "YWJj", "$type" : "%02x" } })", ts.code),
+                BSONObjBuilder().appendBinData("a", 3, ts.bdt, "abc").obj());
+        }
     }
 }
 
