@@ -3,6 +3,7 @@ functions:
     - command: git.get_project
       params:
         directory: src/mongo
+        clone_depth: 1000
         revisions:
           dsi: ${dsi_rev}
           genny: ${genny_rev}
@@ -37,6 +38,7 @@ functions:
     - command: git.get_project
       params:
         directory: src/mongo
+        clone_depth: 1000
         revisions:
           dsi: ${dsi_rev}
           genny: ${genny_rev}
