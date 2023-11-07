@@ -39,7 +39,7 @@ assert.commandWorked(t.createIndex({a: 1}));
 
 // Generate enough documents for index to be preferable.
 const bulk = t.initializeUnorderedBulkOp();
-for (let i = 0; i < 400; i++) {
+for (let i = 0; i < 1000; i++) {
     bulk.insert({a: i + 10});
 }
 assert.commandWorked(bulk.execute());

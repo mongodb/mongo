@@ -802,6 +802,156 @@ TEST_F(NodeSBE, SamplingTest) {
         nodes.front());
 }
 
+TEST_F(NodeSBE, SampleTwoPredicatesAtOnceTest) {
+    auto prefixId = PrefixId::createForTests();
+    const std::string scanDefName = "test";
+    Metadata metadata{{{scanDefName,
+                        createScanDef({},
+                                      {{"index1",
+                                        makeCompositeIndexDefinition(
+                                            {{"a", CollationOp::Ascending, false},
+                                             {"b", CollationOp::Ascending, false}})}})}}};
+    auto opCtx = makeOperationContext();
+    auto pipeline = parsePipeline("[{$match: {a: {$gte: 1}, b: {$gte: 1}}}]",
+                                  NamespaceString::createNamespaceString_forTest("test"),
+                                  opCtx.get());
+    const ProjectionName scanProjName = prefixId.getNextId("scan");
+
+    ABT tree = translatePipelineToABT(metadata,
+                                      *pipeline.get(),
+                                      scanProjName,
+                                      make<ScanNode>(scanProjName, scanDefName),
+                                      prefixId);
+
+    // We are not lowering the paths.
+    OptPhaseManager phaseManagerForSampling{{OptPhase::MemoSubstitutionPhase,
+                                             OptPhase::MemoExplorationPhase,
+                                             OptPhase::MemoImplementationPhase},
+                                            prefixId,
+                                            false /*requireRID*/,
+                                            metadata,
+                                            makeHeuristicCE(),
+                                            makeHeuristicCE(),
+                                            makeCostEstimator(getTestCostModel()),
+                                            defaultConvertPathToInterval,
+                                            defaultConvertPathToInterval,
+                                            DebugInfo::kDefaultForProd,
+                                            {._numSamplingChunks = 5}};
+
+    // Used to record the sampling plans.
+    ABTVector nodes;
+
+    // Not optimizing fully.
+    OptPhaseManager phaseManager{
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        metadata,
+        std::make_unique<ce::SamplingEstimator>(std::move(phaseManagerForSampling),
+                                                1000 /*collectionSize*/,
+                                                makeHeuristicCE(),
+                                                std::make_unique<ABTRecorder>(nodes)),
+        makeHeuristicCE(),
+        makeCostEstimator(getTestCostModel()),
+        defaultConvertPathToInterval,
+        ConstEval::constFold,
+        DebugInfo::kDefaultForTests,
+        {} /*queryHints*/};
+
+    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(tree));
+
+    ASSERT_EQ(3, nodes.size());
+
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{sum}]\n"
+        "GroupBy []\n"
+        "|   aggregations: \n"
+        "|       [sum]\n"
+        "|           FunctionCall [$sum]\n"
+        "|           Const [1]\n"
+        "Filter []\n"
+        "|   BinaryOp [And]\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [scan_0]\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathComposeM []\n"
+        "|   |   |   PathCompare [Lt]\n"
+        "|   |   |   Const [\"\"]\n"
+        "|   |   PathCompare [Gte]\n"
+        "|   |   Const [1]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathCompare [Lt]\n"
+        "|   |   Const [\"\"]\n"
+        "|   PathCompare [Gte]\n"
+        "|   Const [1]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
+        "LimitSkip [limit: 5, skip: 0]\n"
+        "PhysicalScan [{'<rid>': rid_0}, test]\n",
+        nodes.front());
+
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{sum}]\n"
+        "GroupBy []\n"
+        "|   aggregations: \n"
+        "|       [sum]\n"
+        "|           FunctionCall [$sum]\n"
+        "|           Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Lt]\n"
+        "|   Const [\"\"]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Gte]\n"
+        "|   Const [1]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
+        "LimitSkip [limit: 5, skip: 0]\n"
+        "PhysicalScan [{'<rid>': rid_0}, test]\n",
+        nodes.at(1));
+
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Root [{sum}]\n"
+        "GroupBy []\n"
+        "|   aggregations: \n"
+        "|       [sum]\n"
+        "|           FunctionCall [$sum]\n"
+        "|           Const [1]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Lt]\n"
+        "|   Const [\"\"]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [scan_0]\n"
+        "|   PathGet [b]\n"
+        "|   PathCompare [Gte]\n"
+        "|   Const [1]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 200, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
+        "LimitSkip [limit: 5, skip: 0]\n"
+        "PhysicalScan [{'<rid>': rid_0}, test]\n",
+        nodes.at(2));
+}
+
 /**
  * This transport is used to populate default values into the NodeToGroupProps map to get around the
  * fact that the plan was not obtained from the memo. At this point we are interested only in the

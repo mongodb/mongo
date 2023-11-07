@@ -25,6 +25,14 @@ for (let i = 1; i < nMatches + 1000; i++) {
     documents.push({a: i + nMatches, b: i + nMatches, c: i + nMatches});
 }
 
+// Because a and b are both indexed fields and they have the same value in most documents, the
+// optimal plan will be to estimate their cardinality together due to their high correlation.
+// Instead, add around 1000 documents where a != b and neither is 3 to encourage a MergeJoin.
+for (let i = 4; i < 1000; i++) {
+    documents.push({a: 3, b: i, c: i});
+    documents.push({a: i, b: 3, c: i});
+}
+
 assert.commandWorked(t.insertMany(documents));
 
 assert.commandWorked(t.createIndex({'a': 1}));

@@ -42,6 +42,7 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
+#include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/assert_util.h"
@@ -208,8 +209,9 @@ bool PartialSchemaRequirement::mayReturnNull(const ConstFoldFn& constFold) const
     return _boundProjectionName && checkMaybeHasNull(getIntervals(), constFold);
 };
 
-bool IndexPathLessComparator::operator()(const ABT& path1, const ABT& path2) const {
-    return compareExprAndPaths(path1, path2) < 0;
+
+size_t IndexPathHash::operator()(const ABT& node) const {
+    return ABTHashGenerator::generate(node);
 }
 
 int PartialSchemaKeyComparator::Cmp3W::operator()(const PartialSchemaKey& k1,

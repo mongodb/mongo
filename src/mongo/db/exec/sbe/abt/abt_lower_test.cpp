@@ -50,6 +50,7 @@
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
@@ -201,7 +202,7 @@ protected:
         ScanDefOptions opts;
         opts.insert({"type", "mongod"});
         MultikeynessTrie trie;
-        IndexedFieldPaths indexedFieldPaths;
+        IndexPathOccurrences indexPathOccurrences;
         bool exists = true;
         CEType ce{false};
         return ScanDefinition(DatabaseNameUtil::deserialize(
@@ -214,7 +215,7 @@ protected:
                               exists,
                               ce,
                               shardingMetadata,
-                              indexedFieldPaths);
+                              indexPathOccurrences);
     }
 
     // Does not add the node to the Node map, must be called inside '_node()'.

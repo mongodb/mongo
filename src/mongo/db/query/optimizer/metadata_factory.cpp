@@ -66,14 +66,14 @@ MultikeynessTrie createTrie(const IndexDefinitions& indexDefs) {
     return multikeynessTrie;
 }
 
-static IndexedFieldPaths createIndexedFieldPaths(IndexDefinitions indexDefs) {
-    IndexedFieldPaths indexedFieldPaths;
+static IndexPathOccurrences createIndexPathOccurrences(IndexDefinitions indexDefs) {
+    IndexPathOccurrences indexPathOccurrences;
     for (const auto& [indexDefName, indexDef] : indexDefs) {
         for (const auto& component : indexDef.getCollationSpec()) {
-            indexedFieldPaths.add(component._path);
+            indexPathOccurrences[component._path]++;
         }
     }
-    return indexedFieldPaths;
+    return indexPathOccurrences;
 }
 
 ScanDefinition createScanDef(ScanDefOptions options, IndexDefinitions indexDefs) {
@@ -126,7 +126,7 @@ ScanDefinition createScanDef(DatabaseName dbName,
                              ShardingMetadata shardingMetadata,
                              const PathToIntervalFn& pathToInterval) {
 
-    IndexedFieldPaths indexedFieldPaths = createIndexedFieldPaths(indexDefs);
+    IndexPathOccurrences indexPathOccurrences = createIndexPathOccurrences(indexDefs);
 
     // Simplify partial filter requirements using the non-multikey paths.
     for (auto& [indexDefName, indexDef] : indexDefs) {
@@ -154,7 +154,7 @@ ScanDefinition createScanDef(DatabaseName dbName,
             exists,
             std::move(ce),
             std::move(shardingMetadata),
-            std::move(indexedFieldPaths)};
+            std::move(indexPathOccurrences)};
 }
 
 }  // namespace mongo::optimizer

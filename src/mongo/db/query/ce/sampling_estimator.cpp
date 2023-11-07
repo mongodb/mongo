@@ -273,12 +273,40 @@ public:
         SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
         ABT extracted = planExtractor.extract(n.copy());
 
+        // If there are at least two indexed fields, this ABT pair will hold the paths of the
+        // two indexed fields that appear most frequently across all indexes. If such a pair exists,
+        // canCombine will be set to true.
+        boost::optional<std::pair<ABT, ABT>> paths;
+        bool canCombine = false;
+        if (PSRExpr::isSingletonDisjunction(node.getReqMap())) {
+            const IndexPathOccurrences& indexMap = scanDef.getIndexPathOccurrences();
+            std::vector<std::pair<int, ABT>> indexedFields;
+            PSRExpr::visitSingletonDNF(
+                node.getReqMap(),
+                [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
+                    const ABT& path = entry.first._path;
+                    if (indexMap.contains(path)) {
+                        indexedFields.emplace_back(indexMap.at(path), path);
+                    }
+                });
+            if (indexedFields.size() > 1) {
+                std::partial_sort(indexedFields.begin(),
+                                  indexedFields.begin() + 2,
+                                  indexedFields.end(),
+                                  [](const auto& a, const auto& b) { return a.first < b.first; });
+                paths = std::make_pair(indexedFields.at(0).second, indexedFields.at(1).second);
+                canCombine = true;
+            }
+        }
+        // If there exist two suitable fields to estimate together, one will be held in
+        // conjKeyPair.first until its match is found by the lambda below. conjKeyPair.second is
+        // used to identify the PartialSchemaKey path of each conjunct.
+        boost::optional<std::pair<ABT, ABT>> conjKeyPair;
         // Estimate individual requirements separately by potentially re-using cached results.
         // TODO: consider estimating together the entire set of requirements (but caching!)
         EstimatePartialSchemaEntrySelFn estimateFn = [&](SelectivityTreeBuilder& selTreeBuilder,
                                                          const PartialSchemaEntry& e) {
             const auto& [key, req] = e;
-
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 PhysPlanBuilder lowered{extracted};
                 // Lower requirement without an output binding.
@@ -291,19 +319,37 @@ public:
                     boost::none /*residualCE*/,
                     lowered);
                 uassert(6624243, "Expected a filter node", lowered._node.is<FilterNode>());
+                ABT entry = lowered._node;
+                if (canCombine) {
+                    if (conjKeyPair.has_value()) {
+                        if ((conjKeyPair->second == paths->first && key._path == paths->second) ||
+                            (conjKeyPair->second == paths->second && key._path == paths->first)) {
+                            entry = make<FilterNode>(
+                                make<BinaryOp>(
+                                    Operations::And,
+                                    std::move(
+                                        conjKeyPair.get().first.cast<FilterNode>()->getFilter()),
+                                    std::move(entry.cast<FilterNode>()->getFilter())),
+                                std::move(entry.cast<FilterNode>()->getChild()));
+                            conjKeyPair = boost::none;
+                        }
+                    } else if (key._path == paths->first || key._path == paths->second) {
+                        conjKeyPair = std::make_pair(entry, key._path);
+                        return;
+                    }
+                }
                 // Continue the sampling estimation only if the field from the partial schema is
                 // indexed.
                 const bool isPartialSchemaKeyIndexed = isFieldPathIndexed(key, scanDef);
                 const CEType filterCE = isPartialSchemaKeyIndexed
                     ? estimateFilterCE(
-                          metadata, memo, logicalProps, n, std::move(lowered._node), childResult)
+                          metadata, memo, logicalProps, n, std::move(entry), childResult)
                     : _fallbackCE->deriveCE(metadata, memo, logicalProps, n);
                 const SelectivityType sel =
                     childResult > 0.0 ? (filterCE / childResult) : SelectivityType{0.0};
                 selTreeBuilder.atom(sel);
             }
         };
-
         PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult);
         return estimator.estimateCE(node.getReqMap());
     }
@@ -409,7 +455,7 @@ private:
      */
     inline bool isFieldPathIndexed(const PartialSchemaKey& key,
                                    const ScanDefinition& scanDef) const {
-        return scanDef.getIndexedFieldPaths().isIndexed(key._path);
+        return scanDef.getIndexPathOccurrences().contains(key._path);
     }
 
     struct NodeRefHash {

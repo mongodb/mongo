@@ -276,14 +276,15 @@ private:
     bool _isPerfOnly;
 };
 
-/**
- * This comparator is used to compare paths with Get, Traverse, and Id.
- */
-struct IndexPathLessComparator {
-    bool operator()(const ABT& path1, const ABT& path2) const;
+struct IndexPathHash {
+    size_t operator()(const ABT& node) const;
 };
 
-using IndexPathSet = std::set<ABT, IndexPathLessComparator>;
+/**
+ * Allows fast index path lookup with an unordered map whose keys
+ * are index paths and values are the number of times each one occurs across all indexes.
+ */
+using IndexPathOccurrences = opt::unordered_map<ABT, int, IndexPathHash>;
 
 struct PartialSchemaKeyComparator {
     struct Less {
