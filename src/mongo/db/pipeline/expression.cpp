@@ -3243,7 +3243,15 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
 
 ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaType)
     : Expression(expCtx), _metaType(metaType) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    switch (_metaType) {
+        case MetaType::kSearchScore:
+        case MetaType::kSearchHighlights:
+        case MetaType::kSearchScoreDetails:
+        case MetaType::kSearchSequenceToken:
+            break;
+        default:
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 }
 
 Value ExpressionMeta::serialize(const SerializationOptions& options) const {

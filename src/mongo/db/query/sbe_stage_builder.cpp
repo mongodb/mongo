@@ -5326,6 +5326,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
+    if (root->metadataExhausted()) {
+        // Metadata is exhausted by current node, later nodes/stages won't see metadata from input.
+        _data->metadataSlots.reset();
+    }
+
     // Clear non-required slots (excluding ~10 stages to preserve legacy behavior for now),
     // and also clear MakeResultInfo if it's not required.
     bool clearSlots = stageType != STAGE_VIRTUAL_SCAN && stageType != STAGE_COLUMN_SCAN &&

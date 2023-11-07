@@ -2449,7 +2449,29 @@ public:
         unsupportedExpression("$map");
     }
     void visit(const ExpressionMeta* expr) final {
-        unsupportedExpression("$meta");
+        auto pushMetadataABT = [this](boost::optional<sbe::value::SlotId> slot) {
+            if (slot) {
+                pushABT(makeABTVariable(*slot));
+            } else {
+                pushABT(optimizer::Constant::nothing());
+            }
+        };
+        switch (expr->getMetaType()) {
+            case DocumentMetadataFields::MetaType::kSearchScore:
+                pushMetadataABT(_context->state.data->metadataSlots.searchScoreSlot);
+                break;
+            case DocumentMetadataFields::MetaType::kSearchHighlights:
+                pushMetadataABT(_context->state.data->metadataSlots.searchHighlightsSlot);
+                break;
+            case DocumentMetadataFields::MetaType::kSearchScoreDetails:
+                pushMetadataABT(_context->state.data->metadataSlots.searchDetailsSlot);
+                break;
+            case DocumentMetadataFields::MetaType::kSearchSequenceToken:
+                pushMetadataABT(_context->state.data->metadataSlots.searchSequenceToken);
+                break;
+            default:
+                unsupportedExpression("$meta");
+        }
     }
     void visit(const ExpressionMod* expr) final {
         auto rhs = _context->popABTExpr();

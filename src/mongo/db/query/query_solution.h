@@ -298,6 +298,15 @@ struct QuerySolutionNode {
     bool isEligibleForPlanCache() const;
 
     /**
+     * True, if later stages won't need more metadata from input. The return value should be aligned
+     * with corresponding DocumentSource's DepsTracker::State, true for EXHAUSTIVE_META or
+     * EXHAUSTIVE_ALL.
+     */
+    virtual bool metadataExhausted() const {
+        return false;
+    }
+
+    /**
      * Returns the id associated with this node. Each node in a 'QuerySolution' tree is assigned a
      * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
      * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
@@ -1648,6 +1657,10 @@ struct GroupNode : public QuerySolutionNode {
 
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
+    bool metadataExhausted() const final {
+        return true;
+    }
+
     boost::intrusive_ptr<Expression> groupByExpression;
     std::vector<AccumulationStatement> accumulators;
     bool doingMerge;
@@ -1939,6 +1952,10 @@ struct UnpackTsBucketNode : public QuerySolutionNode {
                                                     eventFilter->clone(),
                                                     wholeBucketFilter->clone(),
                                                     includeMeta);
+    }
+
+    bool metadataExhausted() const final {
+        return true;
     }
 
     timeseries::BucketSpec bucketSpec;
