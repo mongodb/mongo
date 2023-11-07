@@ -891,8 +891,13 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                 << ", UUID: " << uuid << ". Future collection name: "
                                 << newCollName.toStringForErrorMsg());
 
+        std::string tmpNssPattern("tmp%%%%%.create");
+        if (newCollName.isTimeseriesBucketsCollection()) {
+            tmpNssPattern =
+                NamespaceString::kTimeseriesBucketsCollectionPrefix.toString() + tmpNssPattern;
+        }
         for (int tries = 0; needsRenaming && tries < 10; ++tries) {
-            auto tmpNameResult = makeUniqueCollectionName(opCtx, dbName, "tmp%%%%%.create");
+            auto tmpNameResult = makeUniqueCollectionName(opCtx, dbName, tmpNssPattern);
             if (!tmpNameResult.isOK()) {
                 return tmpNameResult.getStatus().withContext(str::stream()
                                                              << "Cannot generate temporary "
