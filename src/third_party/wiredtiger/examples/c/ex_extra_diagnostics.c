@@ -39,6 +39,15 @@ main(int argc, char *argv[])
     WT_CONNECTION *conn;
 
     home = example_setup(argc, argv);
+
+#ifdef HAVE_DIAGNOSTIC
+    /*
+     * In diagnostic mode diagnostics are always enabled. Attempting to configure them will return
+     * an error.
+     */
+    testutil_assert(
+      wiredtiger_open(home, NULL, "create,extra_diagnostics=[key_out_of_order]", &conn) == EINVAL);
+#else
     /*! [Configure extra_diagnostics] */
     /* Open a connection to the database, enabling key ordering checks. */
     error_check(wiredtiger_open(home, NULL, "create,extra_diagnostics=[key_out_of_order]", &conn));
@@ -49,6 +58,7 @@ main(int argc, char *argv[])
      */
     error_check(conn->reconfigure(conn, "extra_diagnostics=[txn_visibility]"));
     /*! [Configure extra_diagnostics] */
+#endif
 
     return (EXIT_SUCCESS);
 }
