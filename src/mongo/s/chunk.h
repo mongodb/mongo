@@ -70,6 +70,13 @@ public:
         return _range.getMax();
     }
 
+    bool overlapsWith(const ChunkInfo& other) const {
+        // Comparing keystrings is more performant than comparing BSONObj
+        const auto minKeyString = ShardKeyPattern::toKeyString(getMin());
+        return minKeyString < other.getMaxKeyString() &&
+            getMaxKeyString() > ShardKeyPattern::toKeyString(other.getMin());
+    }
+
     const std::string& getMaxKeyString() const {
         return _maxKeyString;
     }

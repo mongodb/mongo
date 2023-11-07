@@ -66,17 +66,6 @@ void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
             ChunkMap::allElementsAreOfType(type, o));
 }
 
-bool overlaps(const ChunkInfo& a, const ChunkInfo& b) {
-    // Microbenchmarks results showed that comparing keystrings
-    // is more performant than comparing BSONObj
-    const auto aMinKeyStr = ShardKeyPattern::toKeyString(a.getMin());
-    const auto& aMaxKeyStr = a.getMaxKeyString();
-    const auto bMinKeyStr = ShardKeyPattern::toKeyString(b.getMin());
-    const auto& bMaxKeyStr = b.getMaxKeyString();
-
-    return aMinKeyStr < bMaxKeyStr && aMaxKeyStr > bMinKeyStr;
-}
-
 void checkChunksAreContiguous(const ChunkInfo& left, const ChunkInfo& right) {
     const auto& leftKeyString = left.getMaxKeyString();
     const auto rightKeyString = ShardKeyPattern::toKeyString(right.getMin());
@@ -130,7 +119,7 @@ std::vector<std::shared_ptr<ChunkInfo>> flatten(const std::vector<ChunkType>& ch
 
     for (size_t i = 1; i < changedChunkInfos.size(); ++i) {
         auto& chunk = changedChunkInfos[i];
-        if (overlaps(*chunk, *flattened.back())) {
+        if (chunk->overlapsWith(*flattened.back())) {
             if (flattened.back()->getLastmod().isOlderThan(chunk->getLastmod())) {
                 flattened.pop_back();
                 flattened.emplace_back(std::move(chunk));
@@ -421,7 +410,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
 
         // We have both update and old chunk to peak from
         // If they overlaps we discard the old chunk otherwise we process the one with smaller key
-        if (overlaps(updateChunk, oldChunk)) {
+        if (updateChunk.overlapsWith(oldChunk)) {
             processOldChunk(*(oldChunkIt++), true /* discard */);
             return;
         } else {
