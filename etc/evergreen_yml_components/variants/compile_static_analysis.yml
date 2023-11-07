@@ -25,6 +25,14 @@ variables:
     - enterprise
   stepback: false
 
+- &linux-x86-compile-params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - amazon2
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  modules:
+    - enterprise
+  stepback: false
+
 - &linux-x86-dynamic-compile-expansions
   scons_cache_scope: shared
   scons_cache_mode: all
@@ -35,6 +43,16 @@ variables:
     -j$(grep -c ^processor /proc/cpuinfo)
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --link-model=dynamic
+
+- &linux-x86-compile-expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  compile_flags: >-
+    --ssl
+    MONGO_DISTMOD=amazon2
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
 
 - &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
@@ -54,6 +72,16 @@ variables:
     -j$(grep -c ^processor /proc/cpuinfo)
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --link-model=dynamic
+
+- &amazon-linux2-arm64-compile-expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  compile_flags: >-
+    --ssl
+    MONGO_DISTMOD=amazon2
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
@@ -86,6 +114,28 @@ buildvariants:
     - name: server_selection_json_test_TG
       distros:
       - rhel80-large
+
+- <<: *linux-x86-compile-params
+  name: &linux-x86-compile linux-x86-compile #static compile
+  display_name: "Linux x86 Static Library"
+  expansions:
+    <<: *linux-x86-compile-expansions
+    compile_variant: *linux-x86-compile
+  tasks:
+    - name: compile_test_parallel_core_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    - name: run_pretty_printer_tests
+
+- <<: *linux-arm64-dynamic-compile-params
+  name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
+  display_name: "Amazon Linux2 Arm64 Static Compile"
+  expansions:
+    <<: *amazon-linux2-arm64-compile-expansions
+    compile_variant: *amazon-linux2-arm64-compile
+  tasks:
+    - name: compile_test_parallel_core_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    - name: run_pretty_printer_tests
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-compile-future-tag-multiversion linux-x86-dynamic-compile-future-tag-multiversion
@@ -229,12 +279,12 @@ buildvariants:
     - name: compile_bazel_TG
 
 - <<: *linux-arm64-dynamic-compile-params
-  name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
+  name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
   display_name: "! Amazon Linux 2 arm64 Shared Library Compile & Static Analysis"
   expansions:
     <<: *linux-arm64-dynamic-compile-expansions
     clang_tidy_toolchain: v4
-    compile_variant: *amazon-linux2-arm64-compile
+    compile_variant: *amazon-linux2-arm64-dynamic-compile
   tasks:
     - name: clang_tidy_TG
       distros:
@@ -336,7 +386,7 @@ buildvariants:
   display_name: "* Amazon Linux 2 arm64 Dev Compile"
   expansions:
     <<: *linux-arm64-dynamic-compile-expansions
-    compile_variant: *amazon-linux2-arm64-compile
+    compile_variant: *amazon-linux2-arm64-dynamic-compile
   tasks:
     - name: scons_compile_smoke_test_TG
     - name: ninja_compile_smoke_test_TG

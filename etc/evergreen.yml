@@ -78,14 +78,34 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
     variant: linux-x86-dynamic-compile
 
-- &amazon_linux2_arm64_compile_variant_dependency
+- &linux_x86_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
-    variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile
+    variant: &linux_x86_compile_variant_name linux-x86-compile #static compile
+  - name: version_gen
+    variant: generate-tasks-for-version
+    omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: linux-x86-compile
+
+- &amazon_linux2_arm64_dynamic_compile_variant_dependency
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: amazon-linux2-arm64-dynamic-compile
+
+- &amazon_linux2_arm64_compile_variant_dependency
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile #static compile
+  - name: version_gen
+    variant: generate-tasks-for-version
     omit_generated_tasks: true
   - name: generate_buildid_to_debug_symbols_mapping
     variant: amazon-linux2-arm64-compile
@@ -135,6 +155,13 @@ variables:
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
+- &linux_x86_expansions
+  multiversion_platform: amazon2
+  multiversion_edition: enterprise
+  repo_edition: enterprise
+  num_scons_link_jobs_available: 0.99
+  compile_variant: *linux_x86_compile_variant_name
+
 - &linux_arm64_generic_expansions
   multiversion_platform: amazon2
   multiversion_edition: enterprise
@@ -144,7 +171,7 @@ variables:
   repo_edition: enterprise
   large_distro_name: amazon2-arm64-large
   num_scons_link_jobs_available: 0.99
-  compile_variant: *amazon_linux2_arm64_compile_variant_name
+  compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
@@ -308,7 +335,7 @@ buildvariants:
   name: perf-1-node-replSet.arm.aws.2023-09
   display_name: PERF 1-Node ReplSet ARM AWS 2023-09
   # Leave off for now
-  modules:
+  modules: &perf_modules
     - enterprise
     - dsi
     - genny
@@ -321,10 +348,6 @@ buildvariants:
     - flamegraph
   expansions:
     <<: *linux_arm64_generic_expansions
-    scons_cache_scope: shared
-    scons_cache_mode: all
-    has_packages: false
-    max_sub_suites: 5
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     mongodb_setup_release: 2022-11
@@ -333,7 +356,7 @@ buildvariants:
     infrastructure_provisioning: single
     workload_setup: 2022-11
     platform: linux
-    project_dir: dsi
+    project_dir: &perf_project_dir dsi
     authentication: enabled
     storageEngine: wiredTiger
     compile_variant: *amazon_linux2_arm64_compile_variant_name
@@ -376,6 +399,50 @@ buildvariants:
 ###########################################
 #         Linux buildvariants             #
 ###########################################
+- <<: *linux_x86_compile_variant_dependency
+  name: perf-standalone-classic-query-engine.intel.aws.2023-09
+  display_name: PERF Standalone (Classic Query Engine) Intel AWS 2023-09
+  # cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
+  activate: false
+  modules: *perf_modules
+  expansions:
+    <<: *linux_x86_expansions
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    mongodb_setup_release: 2022-11
+    mongodb_setup: standalone-classic-query-engine
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: single-intel
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: *linux_x86_compile_variant_name
+  run_on:
+    - amazon2
+  tasks: &classic_engine_tasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
+    - name: industry_benchmarks
+    - name: ycsb_60GB
+    - name: ycsb_60GB.long
+    - name: crud_workloads_majority
+    # - name: bestbuy_agg
+    # - name: bestbuy_agg_merge_different_db
+    # - name: bestbuy_agg_merge_same_db
+    # - name: bestbuy_agg_merge_wordcount
+    # - name: bestbuy_query
+    # - name: cursor_manager
+    # - name: map_reduce_workloads
+    # - name: tpcc
+    # - name: tpcc_majority
+    # - name: tpch_1_normalized
+    # - name: tpch_1_denormalized
+    # - name: tpch_10_normalized
+    # - name: tpch_10_denormalized
+    - name: canaries_only
+
 - &linux-64-debug-required-template
   <<: *linux_x86_dynamic_debug_compile_variant_dependency
   name: &linux-64-debug-required linux-64-debug-required
@@ -868,10 +935,10 @@ buildvariants:
       enterprise-rhel-80-64-bit-inmem
       enterprise-rhel-80-64-bit-multiversion
     burn_in_tag_compile_task_dependency: archive_dist_test_debug
-    compile_variant: *amazon_linux2_arm64_compile_variant_name
+    compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
   depends_on:
   - name: archive_dist_test_debug
-    variant: *amazon_linux2_arm64_compile_variant_name
+    variant: *amazon_linux2_arm64_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
@@ -1806,7 +1873,7 @@ buildvariants:
 ###########################################
 
 - &enterprise-amazon-linux2-arm64-all-feature-flags-template
-  <<: *amazon_linux2_arm64_compile_variant_dependency
+  <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
   name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
   display_name: "! Amazon Linux 2 arm64 (all feature flags)"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
@@ -2709,7 +2776,7 @@ buildvariants:
     <<: *linux_arm64_generic_expansions
     scons_cache_scope: shared
     scons_cache_mode: all
-    commit_queue_alternate_cache: amazon-linux2-arm64-compile
+    commit_queue_alternate_cache: amazon-linux2-arm64-dynamic-compile
     has_packages: false
     compile_flags: >-
       --ssl
@@ -2772,7 +2839,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
 
-- <<: *amazon_linux2_arm64_compile_variant_dependency
+- <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
   name: &amazon-linux2-arm64-fixed-concurrent-transactions amazon-linux2-arm64-fixed-concurrent-transactions
   display_name: "Amazon Linux 2 arm64 (Fixed Concurrent Transactions)"
   cron: "0 0 * * 0" # From the ${project_nightly_cron} parameter. Runs every Sunday.
@@ -2787,7 +2854,7 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source
     scons_cache_scope: shared
     scons_cache_mode: all
-    commit_queue_alternate_cache: amazon-linux2-arm64-compile
+    commit_queue_alternate_cache: amazon-linux2-arm64-dynamic-compile
     has_packages: false
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
