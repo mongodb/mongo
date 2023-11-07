@@ -2,7 +2,12 @@
  * Testing that config.tags are correctly updated after resharding hashed shard key with zones.
  */
 
-const st = new ShardingTest({shard: 2});
+const st = new ShardingTest({
+    shard: 2,
+    configOptions:
+        {setParameter:
+             {'reshardingCriticalSectionTimeoutMillis': 24 * 60 * 60 * 1000 /* 1 day */}}
+});
 const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
