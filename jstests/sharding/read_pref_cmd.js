@@ -200,10 +200,10 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
             formatProfileQuery(kShardedNs, {distinct: kShardedCollName}));
 
     // Test command that can't be sent to secondary
-    cmdTest({create: kUnshardedCollName},
+    cmdTest({createIndexes: kUnshardedCollName, indexes: [{key: {x: 1}, name: "idx_x"}]},
             allowedOnSecondary.kNever,
             false,
-            formatProfileQuery(kUnshardedNs, {create: kUnshardedCollName}));
+            formatProfileQuery(kUnshardedNs, {createIndexes: kUnshardedCollName}));
 
     // Make sure the unsharded collection is propagated to secondaries before proceeding.
     rst.awaitReplication();
@@ -229,6 +229,7 @@ let testConnReadPreference = function(conn, isMongos, rst, {readPref, expectedNo
     }
 
     // Test inline mapReduce on unsharded collection.
+    conn.getDB(kDbName).runCommand({create: kUnshardedCollName});
     if (isMongos) {
         const comment = 'mapReduce_inline_unsharded_' + ObjectId();
         cmdTest(

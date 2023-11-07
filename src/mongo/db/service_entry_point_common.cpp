@@ -1158,12 +1158,15 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // ensure commands, including those occurring after the first statement in their respective
         // transactions, are checked for readConcern support. Presently, only `create` and
         // `createIndexes` do not support readConcern inside transactions.
+        // Note: _shardsvrCreateCollection is used to run the 'create' command on the primary in
+        // case of sharded cluster
         // TODO(SERVER-46971): Consider how to extend this check to other commands.
         auto cmdName = command->getName();
         auto readConcernSupport = invocation->supportsReadConcern(
             readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault());
         if (readConcernArgs.hasLevel() &&
-            (cmdName == "create"_sd || cmdName == "createIndexes"_sd)) {
+            (cmdName == "create"_sd || cmdName == "_shardsvrCreateCollection"_sd ||
+             cmdName == "createIndexes"_sd)) {
             if (!readConcernSupport.readConcernSupport.isOK()) {
                 uassertStatusOK(readConcernSupport.readConcernSupport.withContext(
                     "Command {} does not support this transaction's {}"_format(

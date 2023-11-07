@@ -80,22 +80,16 @@ std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     return requests;
 }
 
-AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const CachedDatabaseInfo& dbInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
-    ShardId shardId;
-    if (dbName == DatabaseName::kConfig) {
-        auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
-        std::sort(shardIds.begin(), shardIds.end());
-        shardId = shardIds[0];
-    } else {
-        shardId = dbInfo->getPrimary();
-    }
+AsyncRequestsSender::Response executeCommandAgainstFirstShard(OperationContext* opCtx,
+                                                              const DatabaseName& dbName,
+                                                              const CachedDatabaseInfo& dbInfo,
+                                                              const BSONObj& cmdObj,
+                                                              const ReadPreferenceSetting& readPref,
+                                                              Shard::RetryPolicy retryPolicy) {
+    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
+    std::sort(shardIds.begin(), shardIds.end());
+    ShardId shardId = shardIds[0];
 
     auto responses =
         gatherResponses(opCtx,
@@ -149,13 +143,55 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
     const auto& nss = request.getNamespace();
     const auto dbInfo = createDatabase(opCtx, nss.dbName());
 
-    auto cmdResponse = executeCommandAgainstDatabasePrimaryOrFirstShard(
-        opCtx,
-        nss.dbName(),
-        dbInfo,
-        CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
+    auto cmdObj = request.toBSON({});
+    BSONObjBuilder builder;
+    request.serialize({}, &builder);
+
+    auto rc = repl::ReadConcernArgs::get(opCtx);
+    rc.appendInfo(&builder);
+
+    const bool isSharded = !request.getUnsplittable();
+    auto cmdObjWithWc = [&]() {
+        // TODO SERVER-77915: Remove the check "isSharded && nss.isConfigDB()" once 8.0 becomes last
+        // LTS. This is a special check for config.system.sessions since the request comes from
+        // the CSRS which is upgraded first
+        if (isSharded && nss.isConfigDB()) {
+            return CommandHelpers::appendMajorityWriteConcern(builder.obj());
+        }
+        // propagate write concern if asked by the caller otherwise we set
+        //  - majority if we are not in a transaction
+        //  - default wc in case of transaction (no other wc are allowed).
+        if (opCtx->getWriteConcern().getProvenance().isClientSupplied()) {
+            auto wc = opCtx->getWriteConcern();
+            return CommandHelpers::appendWCToObj(builder.obj(), wc);
+        } else {
+            if (opCtx->inMultiDocumentTransaction()) {
+                return builder.obj();
+            } else {
+                // TODO SERVER-82859 remove appendMajorityWriteConcern
+                return CommandHelpers::appendMajorityWriteConcern(builder.obj());
+            }
+        }
+    }();
+    auto cmdResponse = [&]() {
+        if (isSharded && nss.isConfigDB())
+            return executeCommandAgainstFirstShard(
+                opCtx,
+                nss.dbName(),
+                dbInfo,
+                cmdObjWithWc,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
+        else {
+            return executeCommandAgainstDatabasePrimary(
+                opCtx,
+                nss.dbName(),
+                dbInfo,
+                cmdObjWithWc,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
+        }
+    }();
 
     const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
     uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));

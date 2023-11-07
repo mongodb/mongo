@@ -353,7 +353,7 @@ export let MongosAPIParametersUtil = (function() {
             commandName: "create",
             run: {
                 inAPIVersion1: true,
-                shardCommandName: "create",
+                shardCommandName: "_shardsvrCreateCollection",
                 command: () => ({create: "collection2"})
             }
         },

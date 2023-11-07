@@ -478,7 +478,7 @@ BSONObj CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGene
     return b.obj();
 }
 
-BSONObj appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC) {
+BSONObj CommandHelpers::appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC) {
     // Append all original fields except the writeConcern field to the new command.
     BSONObjBuilder cmdObjWithWriteConcern;
     for (const auto& elem : cmdObj) {

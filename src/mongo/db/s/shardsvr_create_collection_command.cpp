@@ -69,6 +69,49 @@
 namespace mongo {
 namespace {
 
+CreateCommand makeCreateCommand(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ShardsvrCreateCollectionRequest& request) {
+    // TODO SERVER-81447: build CreateCommand by simply extracting CreateCollectionRequest
+    // from ShardsvrCreateCollectionRequest
+    CreateCommand cmd(nss);
+    CreateCollectionRequest createRequest;
+    createRequest.setCapped(request.getCapped());
+    createRequest.setTimeseries(request.getTimeseries());
+    createRequest.setSize(request.getSize());
+    createRequest.setAutoIndexId(request.getAutoIndexId());
+    createRequest.setClusteredIndex(request.getClusteredIndex());
+    createRequest.setCollation(request.getCollation());
+    createRequest.setEncryptedFields(request.getEncryptedFields());
+    createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
+    createRequest.setMax(request.getMax());
+    createRequest.setFlags(request.getFlags());
+    createRequest.setTemp(request.getTemp());
+    createRequest.setIdIndex(request.getIdIndex());
+    createRequest.setViewOn(request.getViewOn());
+    createRequest.setIndexOptionDefaults(request.getIndexOptionDefaults());
+    createRequest.setExpireAfterSeconds(request.getExpireAfterSeconds());
+    createRequest.setValidationAction(request.getValidationAction());
+    createRequest.setValidationLevel(request.getValidationLevel());
+    createRequest.setValidator(request.getValidator());
+    createRequest.setPipeline(request.getPipeline());
+    createRequest.setStorageEngine(request.getStorageEngine());
+
+    cmd.setCreateCollectionRequest(createRequest);
+    return cmd;
+}
+
+void runCreateCommandDirectClient(OperationContext* opCtx,
+                                  NamespaceString ns,
+                                  const CreateCommand& cmd) {
+    BSONObj createRes;
+    DBDirectClient localClient(opCtx);
+    // Forward the api parameters required by the aggregation framework
+    localClient.runCommand(ns.dbName(), cmd.toBSON(APIParameters::get(opCtx).toBSON()), createRes);
+    auto createStatus = getStatusFromCommandResult(createRes);
+    uassertStatusOK(createStatus);
+}
+
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {
 public:
     using Request = ShardsvrCreateCollection;
@@ -87,6 +130,10 @@ public:
         return false;
     }
 
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -97,15 +144,31 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
-                                                          opCtx->getWriteConcern());
+            bool inTransaction = opCtx->inMultiDocumentTransaction();
+            bool isUnsplittable = request().getUnsplittable();
+            bool isFromCreateCommand =
+                isUnsplittable && !request().getIsFromCreateUnsplittableCollectionTestCommand();
+            bool isConfigCollection = isUnsplittable && ns().isConfigDB();
+            if (inTransaction) {
+                // only unsplittable collections are allowed in a transaction
+                uassert(ErrorCodes::InvalidOptions,
+                        "cannot shard a collection in a transaction",
+                        isUnsplittable);
+            }
 
             uassert(ErrorCodes::NotImplemented,
                     "Create Collection path has not been implemented",
                     request().getShardKey());
+
+            // TODO SERVER-81190 remove isFromCreatecommand from the check
+            if (isFromCreateCommand || inTransaction || isConfigCollection) {
+                auto cmd =
+                    makeCreateCommand(opCtx, ns(), request().getShardsvrCreateCollectionRequest());
+                runCreateCommandDirectClient(opCtx, ns(), cmd);
+                auto response = CreateCollectionResponse{ShardVersion::UNSHARDED()};
+                return response;
+            }
 
             const auto createCollectionCoordinator = [&] {
                 auto requestToForward = request().getShardsvrCreateCollectionRequest();

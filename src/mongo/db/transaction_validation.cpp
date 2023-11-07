@@ -54,6 +54,11 @@ bool isRetryableWriteCommand(Service* service, StringData cmdName) {
 }
 
 bool isTransactionCommand(Service* service, StringData cmdName) {
+    // TODO SERVER-82282 refactor: This code runs when commands are invoked from both mongod and
+    // mongos and the latter does not know _shardsvrCreateCommand.
+    if (cmdName == "_shardsvrCreateCollection")
+        return false;
+
     auto command = CommandHelpers::findCommand(service, cmdName);
     uassert(ErrorCodes::CommandNotFound,
             str::stream() << "Encountered unknown command during isTransactionCommand check: "

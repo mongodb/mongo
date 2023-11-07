@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
@@ -101,25 +102,28 @@ public:
                     "the 'temp' field is an invalid option",
                     !cmd.getTemp());
 
-            // Manually forward the create collection command to the primary shard.
-            const auto dbInfo =
-                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-            auto response = uassertStatusOK(
-                executeCommandAgainstDatabasePrimary(
-                    opCtx,
-                    dbName,
-                    dbInfo,
-                    applyReadWriteConcern(
-                        opCtx,
-                        this,
-                        CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    Shard::RetryPolicy::kIdempotent)
-                    .swResponse);
+            auto nss = cmd.getNamespace();
+            ShardsvrCreateCollection shardsvrCollCommand(nss);
 
-            const auto createStatus = mongo::getStatusFromCommandResult(response.data);
-            uassertStatusOK(createStatus);
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
+            auto cmdObj = cmd.toBSON({});
+            // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj
+            // guaratees to propagate the apiVersion and apiStrict paramers. Note that
+            // shardsvrCreateCollection as internal command will skip the apiVersionCheck.
+            // However in case of view, the create command might run an aggregation. Having those
+            // fields propagated guaratees the api version check will keep working within the
+            // aggregation framework
+            auto request =
+                ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), cmdObj);
+
+            request.setUnsplittable(true);
+            request.setShardKey(BSON("_id" << 1));
+
+            request.setIsFromCreateUnsplittableCollectionTestCommand(false);
+
+            shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
+            shardsvrCollCommand.setDbName(nss.dbName());
+
+            cluster::createCollection(opCtx, shardsvrCollCommand);
             return CreateCommandReply();
         }
     };

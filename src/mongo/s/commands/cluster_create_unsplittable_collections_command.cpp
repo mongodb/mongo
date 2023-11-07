@@ -92,13 +92,14 @@ public:
                     isTrackUnshardedEnabled);
 
             ShardsvrCreateCollection shardsvrCollRequest(nss);
-            ShardsvrCreateCollectionRequest request;
-            request.parse(IDLParserContext("createUnsplittableCollection"), req.toBSON({}));
-            request.setShardKey(BSON("_id" << 1));
-            request.setUnsplittable(true);
-            request.setDataShard(req.getDataShard());
+            auto svrRequest = ShardsvrCreateCollectionRequest::parse(
+                IDLParserContext("createUnsplittableCollection"), req.toBSON({}));
+            svrRequest.setShardKey(BSON("_id" << 1));
+            svrRequest.setUnsplittable(true);
+            svrRequest.setDataShard(req.getDataShard());
+            svrRequest.setIsFromCreateUnsplittableCollectionTestCommand(true);
             shardsvrCollRequest.setDbName(nss.dbName());
-            shardsvrCollRequest.setShardsvrCreateCollectionRequest(request);
+            shardsvrCollRequest.setShardsvrCreateCollectionRequest(svrRequest);
             cluster::createCollection(opCtx, shardsvrCollRequest);
         }
 
