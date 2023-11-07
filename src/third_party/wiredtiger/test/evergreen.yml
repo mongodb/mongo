@@ -1707,7 +1707,7 @@ tasks:
         vars:
           directory: bench/wtperf
 
-  - name: unittest-test
+  - name: catch2-unittest-test
     tags: ["pull_request"]
     commands:
       - func: "get project"
@@ -1722,9 +1722,9 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            test/unittest/unittests
+            test/unittest/catch2-unittests
 
-  - name: unittest-assertions
+  - name: catch2-unittest-assertions
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -1738,7 +1738,7 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            test/unittest/unittests
+            test/unittest/catch2-unittests
 
   # End of normal make check test tasks
 
@@ -3218,7 +3218,7 @@ tasks:
             # Perform the tests to get code coverage metrics for
             . ../test/evergreen/find_cmake.sh
 
-            test/unittest/unittests
+            test/unittest/catch2-unittests
 
             $CTEST -R '(ex_|lsm_workload|filesys|metadata_salvage|col_efficiency|dup_index_collator|compact_quick|test_checkpoint_4_mixed_timestamps|test_checkpoint_6_row_named_prepare|random_directio|scope|join_main_table_row|pad_byte_collator|meta_ckptlist_get_alloc)'
 
@@ -3422,7 +3422,7 @@ tasks:
             # Record the start time, in seconds
             date +%s > ../time.txt
             # Perform the tests to get code coverage metrics for
-            test/unittest/unittests
+            test/unittest/catch2-unittests
             # Record the end time, in seconds
             date +%s >> ../time.txt
       - func: "code coverage analysis"
@@ -3537,7 +3537,7 @@ tasks:
           # Set this in case of a core to get the correct python binary.
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered06
-  - name: s3-tiered-unittest-test
+  - name: s3-tiered-catch2-unittest-test
     tags: ["pull_request", "tiered_unittest"]
     commands:
       - func: "get project"
@@ -3571,7 +3571,7 @@ tasks:
           # Set this in case of a core to get the correct python binary.
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered
-  - name: azure-gcp-tiered-unittest-test
+  - name: azure-gcp-tiered-catch2-unittest-test
     tags: ["pull_request", "tiered_unittest"]
     commands:
       - func: "get project"
@@ -5906,7 +5906,7 @@ buildvariants:
     - name: format-smoke-test
     - name: format-failure-configs-test
     - name: ".data-validation-stress-test"
-    - name: unittest-test
+    - name: catch2-unittest-test
     - name: s3-tiered-storage-extensions-test
     - name: azure-gcp-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
@@ -5915,7 +5915,7 @@ buildvariants:
     - name: unit-test-extra-long-nonstandalone
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test-nonstandalone"
-    - name: unittest-assertions
+    - name: catch2-unittest-assertions
     - name: ".tiered_unittest"
     - name: bench-tiered-push-pull-s3
     - name: csuite-timestamp-abort-test-s3
@@ -5957,7 +5957,7 @@ buildvariants:
     - name: compile
     - name: make-check-test
     - name: fops
-    - name: unittest-test
+    - name: catch2-unittest-test
     - name: examples-c-test
 
 - name: ubuntu2004-msan
@@ -6169,7 +6169,7 @@ buildvariants:
     - name: make-check-test
     - name: ".unit_test"
     - name: fops
-    - name: unittest-test
+    - name: catch2-unittest-test
 
 - <<: *mac_test_template
   name: macos-1100-arm64
