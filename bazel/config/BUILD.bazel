@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -240,4 +240,20 @@ config_setting(
     }
 )
 
+# --------------------------------------
+# Spider Monkey Debug options
+# --------------------------------------
 
+# TODO(SERVER-82800): use this flag to enable/disable SpiderMonkey debug mode in mozjs when mozjs
+# is ported over to bazel.
+spider_monkey_dbg(
+    name = "spider_monkey_dbg",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "spider_monkey_dbg_enabled",
+    flag_values = {
+        "//bazel/config:spider_monkey_dbg": "True",
+    },
+)

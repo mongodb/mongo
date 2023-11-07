@@ -337,6 +337,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:build_mode={build_mode}',
             f'--//bazel/config:use_libunwind={env["USE_VENDORED_LIBUNWIND"]}',
             f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',
+            f'--//bazel/config:spider_monkey_dbg={True if env.GetOption("spider-monkey-dbg") == "on" else False}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
             '--dynamic_mode=%s' % ('off' if static_link else 'fully'),
         ]

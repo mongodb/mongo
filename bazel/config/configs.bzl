@@ -41,7 +41,7 @@ build_mode = rule(
 # ========= 
 
 use_gdbserver_provider = provider(
-    doc = "Choose if gdbserver should be used"
+    doc = "Choose if gdbserver should be used",
     fields = ["type"],
 )
 
@@ -54,9 +54,20 @@ use_gdbserver = rule(
 # libunwind
 # =========
 
-use_libunwind_provider = provider(fields = ["type"])
+use_libunwind_provider = provider(fields = ["enabled"])
 
 use_libunwind = rule(
-    implementation = lambda ctx: use_libunwind_provider(type = ctx.build_setting_value),
+    implementation = lambda ctx: use_libunwind_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# spider_monkey_dbg
+# =========
+
+spider_monkey_dbg_provider = provider(doc = "Enable SpiderMonkey debug mode.", fields = ["enabled"])
+
+spider_monkey_dbg = rule(
+    implementation = lambda ctx: spider_monkey_dbg_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
