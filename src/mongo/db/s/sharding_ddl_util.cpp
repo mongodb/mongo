@@ -768,6 +768,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
             newOpCtx,
             inlineExecutor,
             sleepInlineExecutor,
+            executor,
             std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
                 newOpCtx->getServiceContext()));
     }();
