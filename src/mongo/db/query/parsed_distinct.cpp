@@ -269,10 +269,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                                  const ExtensionsCallback& extensionsCallback,
                                                  bool isExplain,
                                                  const CollatorInterface* defaultCollator) {
-    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-    const auto sc = vts != boost::none
-        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
-        : SerializationContext::stateCommandRequest();
+    SerializationContext sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
 
     IDLParserContext ctx("distinct", false /* apiStrict */, nss.tenantId(), sc);
 

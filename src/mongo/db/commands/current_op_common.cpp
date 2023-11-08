@@ -120,10 +120,8 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     pipeline.push_back(groupBuilder.obj());
 
     // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
-    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-    const auto sc = vts != boost::none
-        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
-        : SerializationContext::stateCommandRequest();
+    SerializationContext sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
     AggregateCommandRequest request(
         NamespaceString::makeCollectionlessAggregateNSS(DatabaseNameUtil::deserialize(
             dbName.tenantId(), "admin", SerializationContext::stateDefault())),

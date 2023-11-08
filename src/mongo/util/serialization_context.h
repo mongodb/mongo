@@ -106,14 +106,6 @@ struct SerializationContext {
                                     requestCtxt._nonPrefixedTenantId);
     }
 
-    static SerializationContext stateCommandRequest(bool hasTenantId, bool isFromAtlasProxy) {
-        return SerializationContext{Source::Command,
-                                    CallerType::Request,
-                                    isFromAtlasProxy ? Prefix::IncludePrefix
-                                                     : Prefix::ExcludePrefix,
-                                    hasTenantId};
-    }
-
     static const SerializationContext& stateCommandRequest() {
         static StaticImmortal<SerializationContext> stateCommandRequest{Source::Command,
                                                                         CallerType::Request};

@@ -304,9 +304,8 @@ Status insertAuthzDocument(OperationContext* opCtx,
     // The sc is used to control serialization behavior executed on the request in client.insert,
     // and tenantIds should not be prefixed on the $db field.  Indicating that the request received
     // a tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
-    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-    auto sc = SerializationContext::stateCommandRequest(
-        nss.tenantId() != boost::none, vts != boost::none && vts->isFromAtlasProxy());
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
 
     write_ops::checkWriteErrors(
         client.insert(write_ops::InsertCommandRequest(nss, {document}, sc)));
@@ -332,9 +331,8 @@ StatusWith<std::int64_t> updateAuthzDocuments(OperationContext* opCtx,
     // The sc is used to control serialization behavior executed on the request in client.update,
     // and tenantIds should not be prefixed on the $db field.  Indicating that the request received
     // a tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
-    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-    auto sc = SerializationContext::stateCommandRequest(
-        nss.tenantId() != boost::none, vts != boost::none && vts->isFromAtlasProxy());
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
 
     auto result = client.update([&] {
         write_ops::UpdateCommandRequest updateOp(nss, sc);
@@ -401,9 +399,8 @@ StatusWith<std::int64_t> removeAuthzDocuments(OperationContext* opCtx,
     // The sc is used to control serialization behavior executed on the request in client.remove,
     // and tenantIds should not be prefixed on the $db field.  Indicating that the request received
     // a tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
-    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-    auto sc = SerializationContext::stateCommandRequest(
-        nss.tenantId() != boost::none, vts != boost::none && vts->isFromAtlasProxy());
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
 
     auto result = client.remove([&] {
         write_ops::DeleteCommandRequest deleteOp(nss, sc);
@@ -2410,9 +2407,8 @@ Status queryAuthzDocument(OperationContext* opCtx,
     // The sc is used to control serialization behavior executed on the request in client.find, and
     // tenantIds should not be prefixed on the $db field.  Indicating that the request received a
     // tenantId from something other than a prefix, in this case the nss, will prevent prefixing.
-    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-    auto sc = SerializationContext::stateCommandRequest(
-        nss.tenantId() != boost::none, vts != boost::none && vts->isFromAtlasProxy());
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(nss.tenantId() != boost::none);
 
     FindCommandRequest findRequest{nss, sc};
     findRequest.setFilter(query);

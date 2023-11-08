@@ -404,10 +404,8 @@ public:
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-        const auto sc = vts != boost::none
-            ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
-            : SerializationContext::stateCommandRequest();
+        auto sc = SerializationContext::stateCommandRequest();
+        sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
 
         auto cmd = HelloCommand::parse(IDLParserContext("hello", apiStrict, dbName.tenantId(), sc),
                                        cmdObj);

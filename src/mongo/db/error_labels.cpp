@@ -140,10 +140,8 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
 
     // Get the namespace string from CurOp. We will need it to build the LiteParsedPipeline.
     const auto& nss = CurOp::get(_opCtx)->getNSS();
-    const auto vts = auth::ValidatedTenancyScope::get(_opCtx);
-    auto sc = vts != boost::none
-        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
-        : SerializationContext::stateCommandRequest();
+    auto sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(_opCtx) != boost::none);
 
     bool apiStrict = APIParameters::get(_opCtx).getAPIStrict().value_or(false);
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
