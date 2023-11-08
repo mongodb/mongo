@@ -1,46 +1,46 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
 #include "src/core/ext/filters/http/client_authority_filter.h"
 
-#include <assert.h>
 #include <limits.h>
-#include <string.h>
 
-#include <grpc/support/alloc.h>
-#include <grpc/support/log.h>
-#include <grpc/support/string_util.h>
+#include <functional>
+#include <memory>
 
-#include "src/core/ext/filters/http/client_authority_filter.h"
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
+#include <grpc/impl/channel_arg_names.h>
+
+#include "src/core/lib/channel/channel_stack.h"
 #include "src/core/lib/channel/channel_stack_builder.h"
 #include "src/core/lib/config/core_configuration.h"
-#include "src/core/lib/gpr/string.h"
-#include "src/core/lib/slice/slice_internal.h"
-#include "src/core/lib/slice/slice_string_helpers.h"
-#include "src/core/lib/surface/call.h"
 #include "src/core/lib/surface/channel_stack_type.h"
+#include "src/core/lib/transport/metadata_batch.h"
 
 namespace grpc_core {
 
 absl::StatusOr<ClientAuthorityFilter> ClientAuthorityFilter::Create(
-    ChannelArgs args, ChannelFilter::Args) {
+    const ChannelArgs& args, ChannelFilter::Args) {
   absl::optional<absl::string_view> default_authority =
       args.GetString(GRPC_ARG_DEFAULT_AUTHORITY);
   if (!default_authority.has_value()) {
@@ -70,17 +70,12 @@ const grpc_channel_filter ClientAuthorityFilter::kFilter =
 
 namespace {
 bool add_client_authority_filter(ChannelStackBuilder* builder) {
-  const grpc_channel_args* channel_args = builder->channel_args();
-  const grpc_arg* disable_client_authority_filter_arg = grpc_channel_args_find(
-      channel_args, GRPC_ARG_DISABLE_CLIENT_AUTHORITY_FILTER);
-  if (disable_client_authority_filter_arg != nullptr) {
-    const bool is_client_authority_filter_disabled =
-        grpc_channel_arg_get_bool(disable_client_authority_filter_arg, false);
-    if (is_client_authority_filter_disabled) {
-      return true;
-    }
+  if (builder->channel_args()
+          .GetBool(GRPC_ARG_DISABLE_CLIENT_AUTHORITY_FILTER)
+          .value_or(false)) {
+    return true;
   }
-  builder->PrependFilter(&ClientAuthorityFilter::kFilter, nullptr);
+  builder->PrependFilter(&ClientAuthorityFilter::kFilter);
   return true;
 }
 }  // namespace

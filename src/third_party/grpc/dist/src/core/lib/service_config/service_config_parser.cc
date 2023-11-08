@@ -18,6 +18,12 @@
 
 #include "src/core/lib/service_config/service_config_parser.h"
 
+#include <stdlib.h>
+
+#include <string>
+
+#include "absl/strings/str_cat.h"
+
 #include <grpc/support/log.h>
 
 namespace grpc_core {
@@ -42,43 +48,25 @@ void ServiceConfigParser::Builder::RegisterParser(
 }
 
 ServiceConfigParser::ParsedConfigVector
-ServiceConfigParser::ParseGlobalParameters(const grpc_channel_args* args,
+ServiceConfigParser::ParseGlobalParameters(const ChannelArgs& args,
                                            const Json& json,
-                                           grpc_error_handle* error) const {
+                                           ValidationErrors* errors) const {
   ParsedConfigVector parsed_global_configs;
-  std::vector<grpc_error_handle> error_list;
-  for (size_t i = 0; i < registered_parsers_.size(); i++) {
-    grpc_error_handle parser_error = GRPC_ERROR_NONE;
-    auto parsed_config =
-        registered_parsers_[i]->ParseGlobalParams(args, json, &parser_error);
-    if (parser_error != GRPC_ERROR_NONE) {
-      error_list.push_back(parser_error);
-    }
-    parsed_global_configs.push_back(std::move(parsed_config));
-  }
-  if (!error_list.empty()) {
-    *error = GRPC_ERROR_CREATE_FROM_VECTOR("Global Params", &error_list);
+  for (auto& parser : registered_parsers_) {
+    parsed_global_configs.push_back(
+        parser->ParseGlobalParams(args, json, errors));
   }
   return parsed_global_configs;
 }
 
 ServiceConfigParser::ParsedConfigVector
-ServiceConfigParser::ParsePerMethodParameters(const grpc_channel_args* args,
+ServiceConfigParser::ParsePerMethodParameters(const ChannelArgs& args,
                                               const Json& json,
-                                              grpc_error_handle* error) const {
+                                              ValidationErrors* errors) const {
   ParsedConfigVector parsed_method_configs;
-  std::vector<grpc_error_handle> error_list;
-  for (size_t i = 0; i < registered_parsers_.size(); ++i) {
-    grpc_error_handle parser_error = GRPC_ERROR_NONE;
-    auto parsed_config =
-        registered_parsers_[i]->ParsePerMethodParams(args, json, &parser_error);
-    if (parser_error != GRPC_ERROR_NONE) {
-      error_list.push_back(parser_error);
-    }
-    parsed_method_configs.push_back(std::move(parsed_config));
-  }
-  if (!error_list.empty()) {
-    *error = GRPC_ERROR_CREATE_FROM_VECTOR("methodConfig", &error_list);
+  for (auto& parser : registered_parsers_) {
+    parsed_method_configs.push_back(
+        parser->ParsePerMethodParams(args, json, errors));
   }
   return parsed_method_configs;
 }

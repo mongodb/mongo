@@ -28,14 +28,14 @@
 #include "upb/util/required_fields.h"
 
 #include <inttypes.h>
-#include <setjmp.h>
 #include <stdarg.h>
-#include <stdio.h>
 
-#include "upb/reflection.h"
+#include "upb/collections/map.h"
+#include "upb/port/vsnprintf_compat.h"
+#include "upb/reflection/message.h"
 
 // Must be last.
-#include "upb/port_def.inc"
+#include "upb/port/def.inc"
 
 ////////////////////////////////////////////////////////////////////////////////
 // upb_FieldPath_ToText()
@@ -55,7 +55,7 @@ static void upb_FieldPath_Printf(upb_PrintfAppender* a, const char* fmt, ...) {
   va_list args;
 
   va_start(args, fmt);
-  n = vsnprintf(a->ptr, have, fmt, args);
+  n = _upb_vsnprintf(a->ptr, have, fmt, args);
   va_end(args);
 
   if (UPB_LIKELY(have > n)) {
@@ -208,7 +208,7 @@ static void upb_util_FindUnsetInMessage(upb_FindContext* ctx,
     const upb_FieldDef* f = upb_MessageDef_Field(m, i);
     if (upb_FieldDef_Label(f) != kUpb_Label_Required) continue;
 
-    if (!msg || !upb_Message_Has(msg, f)) {
+    if (!msg || !upb_Message_HasFieldByDef(msg, f)) {
       // A required field is missing.
       ctx->has_unset_required = true;
 
@@ -265,9 +265,8 @@ static void upb_util_FindUnsetRequiredInternal(upb_FindContext* ctx,
       if (!val_m) continue;
       const upb_Map* map = val.map_val;
       size_t iter = kUpb_Map_Begin;
-      while (upb_MapIterator_Next(map, &iter)) {
-        upb_MessageValue key = upb_MapIterator_Key(map, iter);
-        upb_MessageValue map_val = upb_MapIterator_Value(map, iter);
+      upb_MessageValue key, map_val;
+      while (upb_Map_Next(map, &key, &map_val, &iter)) {
         upb_FindContext_Push(ctx, (upb_FieldPathEntry){.map_key = key});
         upb_util_FindUnsetRequiredInternal(ctx, map_val.msg_val, val_m);
         upb_FindContext_Pop(ctx);
@@ -301,11 +300,13 @@ bool upb_util_HasUnsetRequired(const upb_Message* msg, const upb_MessageDef* m,
   upb_FieldPathVector_Init(&ctx.out_fields);
   upb_util_FindUnsetRequiredInternal(&ctx, msg, m);
   free(ctx.stack.path);
-  if (fields) {
+
+  if (ctx.has_unset_required && fields) {
     upb_FieldPathVector_Reserve(&ctx, &ctx.out_fields, 1);
     ctx.out_fields.path[ctx.out_fields.size] =
         (upb_FieldPathEntry){.field = NULL};
     *fields = ctx.out_fields.path;
   }
+
   return ctx.has_unset_required;
 }

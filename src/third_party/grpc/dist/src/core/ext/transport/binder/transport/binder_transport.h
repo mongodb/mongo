@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef GRPC_CORE_EXT_TRANSPORT_BINDER_TRANSPORT_BINDER_TRANSPORT_H
-#define GRPC_CORE_EXT_TRANSPORT_BINDER_TRANSPORT_BINDER_TRANSPORT_H
+#ifndef GRPC_SRC_CORE_EXT_TRANSPORT_BINDER_TRANSPORT_BINDER_TRANSPORT_H
+#define GRPC_SRC_CORE_EXT_TRANSPORT_BINDER_TRANSPORT_BINDER_TRANSPORT_H
 
 #include <grpc/support/port_platform.h>
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <utility>
@@ -31,6 +32,7 @@
 #include "src/core/ext/transport/binder/wire_format/binder.h"
 #include "src/core/ext/transport/binder/wire_format/wire_reader.h"
 #include "src/core/ext/transport/binder/wire_format/wire_writer.h"
+#include "src/core/lib/gprpp/crash.h"
 #include "src/core/lib/iomgr/combiner.h"
 #include "src/core/lib/transport/transport.h"
 #include "src/core/lib/transport/transport_impl.h"
@@ -56,7 +58,7 @@ struct grpc_binder_transport {
     return next_free_tx_code++;
   }
 
-  grpc_transport base; /* must be first */
+  grpc_transport base;  // must be first
 
   std::shared_ptr<grpc_binder::TransportStreamReceiver>
       transport_stream_receiver;
@@ -68,19 +70,24 @@ struct grpc_binder_transport {
   absl::flat_hash_map<int, grpc_binder_stream*> registered_stream;
   grpc_core::Combiner* combiner;
 
-  grpc_closure accept_stream_closure;
-
   // The callback and the data for the callback when the stream is connected
-  // between client and server.
+  // between client and server. registered_method_matcher_cb is called before
+  // invoking the recv initial metadata callback.
   void (*accept_stream_fn)(void* user_data, grpc_transport* transport,
                            const void* server_data) = nullptr;
+  void (*registered_method_matcher_cb)(
+      void* user_data, grpc_core::ServerMetadata* metadata) = nullptr;
   void* accept_stream_user_data = nullptr;
+  // `accept_stream_locked()` could be called before `accept_stream_fn` has been
+  // set, we need to remember those requests that comes too early and call them
+  // later when we can.
+  int accept_stream_fn_called_count_{0};
 
   grpc_core::ConnectivityStateTracker state_tracker;
   grpc_core::RefCount refs;
 
  private:
-  int next_free_tx_code = grpc_binder::kFirstCallId;
+  std::atomic<int> next_free_tx_code{grpc_binder::kFirstCallId};
 };
 
 grpc_transport* grpc_create_binder_transport_client(
@@ -92,4 +99,4 @@ grpc_transport* grpc_create_binder_transport_server(
     std::shared_ptr<grpc::experimental::binder::SecurityPolicy>
         security_policy);
 
-#endif  // GRPC_CORE_EXT_TRANSPORT_BINDER_TRANSPORT_BINDER_TRANSPORT_H
+#endif  // GRPC_SRC_CORE_EXT_TRANSPORT_BINDER_TRANSPORT_BINDER_TRANSPORT_H

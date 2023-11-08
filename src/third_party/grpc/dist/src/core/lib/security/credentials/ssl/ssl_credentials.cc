@@ -1,20 +1,20 @@
-/*
- *
- * Copyright 2016 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
@@ -22,14 +22,24 @@
 
 #include <string.h>
 
+#include <string>
+#include <utility>
+
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
+#include <grpc/impl/channel_arg_names.h>
 #include <grpc/support/alloc.h>
 #include <grpc/support/log.h>
 #include <grpc/support/string_util.h>
 
 #include "src/core/lib/channel/channel_args.h"
+#include "src/core/lib/debug/trace.h"
 #include "src/core/lib/security/security_connector/ssl_utils.h"
 #include "src/core/lib/surface/api_trace.h"
+#include "src/core/tsi/ssl/session_cache/ssl_session_cache.h"
 #include "src/core/tsi/ssl_transport_security.h"
+#include "src/core/tsi/transport_security_interface.h"
 
 //
 // SSL Channel Credentials.
@@ -39,6 +49,26 @@ grpc_ssl_credentials::grpc_ssl_credentials(
     const char* pem_root_certs, grpc_ssl_pem_key_cert_pair* pem_key_cert_pair,
     const grpc_ssl_verify_peer_options* verify_options) {
   build_config(pem_root_certs, pem_key_cert_pair, verify_options);
+  // Use default (e.g. OS) root certificates if the user did not pass any root
+  // certificates.
+  if (config_.pem_root_certs == nullptr) {
+    const char* pem_root_certs =
+        grpc_core::DefaultSslRootStore::GetPemRootCerts();
+    if (pem_root_certs == nullptr) {
+      gpr_log(GPR_ERROR, "Could not get default pem root certs.");
+    } else {
+      char* default_roots = gpr_strdup(pem_root_certs);
+      config_.pem_root_certs = default_roots;
+      root_store_ = grpc_core::DefaultSslRootStore::GetRootStore();
+    }
+  } else {
+    config_.pem_root_certs = config_.pem_root_certs;
+    root_store_ = nullptr;
+  }
+
+  client_handshaker_initialization_status_ = InitializeClientHandshakerFactory(
+      &config_, config_.pem_root_certs, root_store_, nullptr,
+      &client_handshaker_factory_);
 }
 
 grpc_ssl_credentials::~grpc_ssl_credentials() {
@@ -48,41 +78,73 @@ grpc_ssl_credentials::~grpc_ssl_credentials() {
     config_.verify_options.verify_peer_destruct(
         config_.verify_options.verify_peer_callback_userdata);
   }
+  tsi_ssl_client_handshaker_factory_unref(client_handshaker_factory_);
 }
 
 grpc_core::RefCountedPtr<grpc_channel_security_connector>
 grpc_ssl_credentials::create_security_connector(
     grpc_core::RefCountedPtr<grpc_call_credentials> call_creds,
-    const char* target, const grpc_channel_args* args,
-    grpc_channel_args** new_args) {
-  const char* overridden_target_name = nullptr;
-  tsi_ssl_session_cache* ssl_session_cache = nullptr;
-  for (size_t i = 0; args && i < args->num_args; i++) {
-    grpc_arg* arg = &args->args[i];
-    if (strcmp(arg->key, GRPC_SSL_TARGET_NAME_OVERRIDE_ARG) == 0 &&
-        arg->type == GRPC_ARG_STRING) {
-      overridden_target_name = arg->value.string;
-    }
-    if (strcmp(arg->key, GRPC_SSL_SESSION_CACHE_ARG) == 0 &&
-        arg->type == GRPC_ARG_POINTER) {
-      ssl_session_cache =
-          static_cast<tsi_ssl_session_cache*>(arg->value.pointer.p);
-    }
+    const char* target, grpc_core::ChannelArgs* args) {
+  if (config_.pem_root_certs == nullptr) {
+    gpr_log(GPR_ERROR,
+            "No root certs in config. Client-side security connector must have "
+            "root certs.");
+    return nullptr;
   }
-  grpc_core::RefCountedPtr<grpc_channel_security_connector> sc =
-      grpc_ssl_channel_security_connector_create(
-          this->Ref(), std::move(call_creds), &config_, target,
-          overridden_target_name, ssl_session_cache);
-  if (sc == nullptr) {
-    return sc;
+  absl::optional<std::string> overridden_target_name =
+      args->GetOwnedString(GRPC_SSL_TARGET_NAME_OVERRIDE_ARG);
+  auto* ssl_session_cache = args->GetObject<tsi::SslSessionLRUCache>();
+  tsi_ssl_session_cache* session_cache =
+      ssl_session_cache == nullptr ? nullptr : ssl_session_cache->c_ptr();
+
+  grpc_core::RefCountedPtr<grpc_channel_security_connector> security_connector =
+      nullptr;
+  if (session_cache != nullptr) {
+    // We need a separate factory and SSL_CTX if there's a cache in the channel
+    // args. SSL_CTX should live with the factory and that should live on the
+    // credentials. However, there is a way to configure a session cache in the
+    // channel args, so that prevents us from also keeping the session cache at
+    // the credentials level. In the case of a session cache, we still need to
+    // keep a separate factory and SSL_CTX at the subchannel/security_connector
+    // level.
+    tsi_ssl_client_handshaker_factory* factory_with_cache = nullptr;
+    grpc_security_status status = InitializeClientHandshakerFactory(
+        &config_, config_.pem_root_certs, root_store_, session_cache,
+        &factory_with_cache);
+    if (status != GRPC_SECURITY_OK) {
+      gpr_log(GPR_ERROR,
+              "InitializeClientHandshakerFactory returned bad "
+              "status.");
+      return nullptr;
+    }
+    security_connector = grpc_ssl_channel_security_connector_create(
+        this->Ref(), std::move(call_creds), &config_, target,
+        overridden_target_name.has_value() ? overridden_target_name->c_str()
+                                           : nullptr,
+        factory_with_cache);
+    tsi_ssl_client_handshaker_factory_unref(factory_with_cache);
+  } else {
+    if (client_handshaker_initialization_status_ != GRPC_SECURITY_OK) {
+      return nullptr;
+    }
+    security_connector = grpc_ssl_channel_security_connector_create(
+        this->Ref(), std::move(call_creds), &config_, target,
+        overridden_target_name.has_value() ? overridden_target_name->c_str()
+                                           : nullptr,
+        client_handshaker_factory_);
   }
-  grpc_arg new_arg = grpc_channel_arg_string_create(
-      const_cast<char*>(GRPC_ARG_HTTP2_SCHEME), const_cast<char*>("https"));
-  *new_args = grpc_channel_args_copy_and_add(args, &new_arg, 1);
-  return sc;
+
+  if (security_connector == nullptr) {
+    return security_connector;
+  }
+  *args = args->Set(GRPC_ARG_HTTP2_SCHEME, "https");
+  return security_connector;
 }
 
-const char* grpc_ssl_credentials::Type() { return "Ssl"; }
+grpc_core::UniqueTypeName grpc_ssl_credentials::Type() {
+  static grpc_core::UniqueTypeName::Factory kFactory("Ssl");
+  return kFactory.Create();
+}
 
 void grpc_ssl_credentials::build_config(
     const char* pem_root_certs, grpc_ssl_pem_key_cert_pair* pem_key_cert_pair,
@@ -119,8 +181,52 @@ void grpc_ssl_credentials::set_max_tls_version(
   config_.max_tls_version = max_tls_version;
 }
 
-/* Deprecated in favor of grpc_ssl_credentials_create_ex. Will be removed
- * once all of its call sites are migrated to grpc_ssl_credentials_create_ex. */
+grpc_security_status grpc_ssl_credentials::InitializeClientHandshakerFactory(
+    const grpc_ssl_config* config, const char* pem_root_certs,
+    const tsi_ssl_root_certs_store* root_store,
+    tsi_ssl_session_cache* ssl_session_cache,
+    tsi_ssl_client_handshaker_factory** handshaker_factory) {
+  // This class level factory can't have a session cache by design. If we want
+  // to init one with a cache we need to make a new one
+  if (client_handshaker_factory_ != nullptr && ssl_session_cache == nullptr) {
+    return GRPC_SECURITY_OK;
+  }
+
+  bool has_key_cert_pair = config->pem_key_cert_pair != nullptr &&
+                           config->pem_key_cert_pair->private_key != nullptr &&
+                           config->pem_key_cert_pair->cert_chain != nullptr;
+  tsi_ssl_client_handshaker_options options;
+  if (pem_root_certs == nullptr) {
+    gpr_log(
+        GPR_ERROR,
+        "Handshaker factory creation failed. pem_root_certs cannot be nullptr");
+    return GRPC_SECURITY_ERROR;
+  }
+  options.pem_root_certs = pem_root_certs;
+  options.root_store = root_store;
+  options.alpn_protocols =
+      grpc_fill_alpn_protocol_strings(&options.num_alpn_protocols);
+  if (has_key_cert_pair) {
+    options.pem_key_cert_pair = config->pem_key_cert_pair;
+  }
+  options.cipher_suites = grpc_get_ssl_cipher_suites();
+  options.session_cache = ssl_session_cache;
+  options.min_tls_version = grpc_get_tsi_tls_version(config->min_tls_version);
+  options.max_tls_version = grpc_get_tsi_tls_version(config->max_tls_version);
+  const tsi_result result =
+      tsi_create_ssl_client_handshaker_factory_with_options(&options,
+                                                            handshaker_factory);
+  gpr_free(options.alpn_protocols);
+  if (result != TSI_OK) {
+    gpr_log(GPR_ERROR, "Handshaker factory creation failed with %s.",
+            tsi_result_to_string(result));
+    return GRPC_SECURITY_ERROR;
+  }
+  return GRPC_SECURITY_OK;
+}
+
+// Deprecated in favor of grpc_ssl_credentials_create_ex. Will be removed
+// once all of its call sites are migrated to grpc_ssl_credentials_create_ex.
 grpc_channel_credentials* grpc_ssl_credentials_create(
     const char* pem_root_certs, grpc_ssl_pem_key_cert_pair* pem_key_cert_pair,
     const verify_peer_options* verify_options, void* reserved) {
@@ -182,11 +288,14 @@ grpc_ssl_server_credentials::~grpc_ssl_server_credentials() {
 }
 grpc_core::RefCountedPtr<grpc_server_security_connector>
 grpc_ssl_server_credentials::create_security_connector(
-    const grpc_channel_args* /* args */) {
+    const grpc_core::ChannelArgs& /* args */) {
   return grpc_ssl_server_security_connector_create(this->Ref());
 }
 
-const char* grpc_ssl_server_credentials::Type() { return "Ssl"; }
+grpc_core::UniqueTypeName grpc_ssl_server_credentials::Type() {
+  static grpc_core::UniqueTypeName::Factory kFactory("Ssl");
+  return kFactory.Create();
+}
 
 tsi_ssl_pem_key_cert_pair* grpc_convert_grpc_to_tsi_cert_pairs(
     const grpc_ssl_pem_key_cert_pair* pem_key_cert_pairs,

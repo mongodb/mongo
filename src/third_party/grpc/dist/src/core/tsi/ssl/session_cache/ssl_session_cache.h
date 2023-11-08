@@ -1,23 +1,23 @@
-/*
- *
- * Copyright 2018 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2018 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#ifndef GRPC_CORE_TSI_SSL_SESSION_CACHE_SSL_SESSION_CACHE_H
-#define GRPC_CORE_TSI_SSL_SESSION_CACHE_SSL_SESSION_CACHE_H
+#ifndef GRPC_SRC_CORE_TSI_SSL_SESSION_CACHE_SSL_SESSION_CACHE_H
+#define GRPC_SRC_CORE_TSI_SSL_SESSION_CACHE_SSL_SESSION_CACHE_H
 
 #include <grpc/support/port_platform.h>
 
@@ -25,9 +25,11 @@
 
 #include <openssl/ssl.h>
 
+#include <grpc/impl/grpc_types.h>
 #include <grpc/slice.h>
 #include <grpc/support/sync.h>
 
+#include "src/core/lib/gprpp/cpp_impl_of.h"
 #include "src/core/lib/gprpp/memory.h"
 #include "src/core/lib/gprpp/ref_counted.h"
 #include "src/core/lib/gprpp/sync.h"
@@ -44,7 +46,10 @@
 
 namespace tsi {
 
-class SslSessionLRUCache : public grpc_core::RefCounted<SslSessionLRUCache> {
+class SslSessionLRUCache
+    : public grpc_core::CppImplOf<SslSessionLRUCache,
+                                  struct tsi_ssl_session_cache>,
+      public grpc_core::RefCounted<SslSessionLRUCache> {
  public:
   /// Create new LRU cache with the given capacity.
   static grpc_core::RefCountedPtr<SslSessionLRUCache> Create(size_t capacity) {
@@ -58,6 +63,10 @@ class SslSessionLRUCache : public grpc_core::RefCounted<SslSessionLRUCache> {
   // Not copyable nor movable.
   SslSessionLRUCache(const SslSessionLRUCache&) = delete;
   SslSessionLRUCache& operator=(const SslSessionLRUCache&) = delete;
+
+  static absl::string_view ChannelArgName() {
+    return GRPC_SSL_SESSION_CACHE_ARG;
+  }
 
   /// Returns current number of sessions in the cache.
   size_t Size();
@@ -87,4 +96,4 @@ class SslSessionLRUCache : public grpc_core::RefCounted<SslSessionLRUCache> {
 
 }  // namespace tsi
 
-#endif /* GRPC_CORE_TSI_SSL_SESSION_CACHE_SSL_SESSION_CACHE_H */
+#endif  // GRPC_SRC_CORE_TSI_SSL_SESSION_CACHE_SSL_SESSION_CACHE_H

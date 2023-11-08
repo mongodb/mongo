@@ -14,27 +14,37 @@
 // limitations under the License.
 //
 
-#ifndef GRPC_CORE_EXT_XDS_XDS_ENDPOINT_H
-#define GRPC_CORE_EXT_XDS_XDS_ENDPOINT_H
+#ifndef GRPC_SRC_CORE_EXT_XDS_XDS_ENDPOINT_H
+#define GRPC_SRC_CORE_EXT_XDS_XDS_ENDPOINT_H
 
 #include <grpc/support/port_platform.h>
 
-#include <map>
-#include <set>
-#include <string>
+#include <stdint.h>
 
-#include "absl/container/inlined_vector.h"
+#include <algorithm>
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "absl/base/thread_annotations.h"
+#include "absl/random/random.h"
+#include "absl/strings/string_view.h"
 #include "envoy/config/endpoint/v3/endpoint.upbdefs.h"
+#include "upb/reflection/def.h"
 
 #include "src/core/ext/xds/xds_client.h"
 #include "src/core/ext/xds/xds_client_stats.h"
+#include "src/core/ext/xds/xds_resource_type.h"
 #include "src/core/ext/xds/xds_resource_type_impl.h"
+#include "src/core/lib/gprpp/ref_counted.h"
 #include "src/core/lib/gprpp/ref_counted_ptr.h"
+#include "src/core/lib/gprpp/sync.h"
 #include "src/core/lib/resolver/server_address.h"
 
 namespace grpc_core {
 
-struct XdsEndpointResource {
+struct XdsEndpointResource : public XdsResourceType::ResourceData {
   struct Priority {
     struct Locality {
       RefCountedPtr<XdsLocalityName> name;
@@ -54,7 +64,7 @@ struct XdsEndpointResource {
     bool operator==(const Priority& other) const;
     std::string ToString() const;
   };
-  using PriorityList = absl::InlinedVector<Priority, 2>;
+  using PriorityList = std::vector<Priority>;
 
   // There are two phases of accessing this class's content:
   // 1. to initialize in the control plane combiner;
@@ -72,7 +82,7 @@ struct XdsEndpointResource {
       const uint32_t parts_per_million;
     };
 
-    using DropCategoryList = absl::InlinedVector<DropCategory, 2>;
+    using DropCategoryList = std::vector<DropCategory>;
 
     void AddCategory(std::string name, uint32_t parts_per_million) {
       drop_category_list_.emplace_back(
@@ -82,7 +92,7 @@ struct XdsEndpointResource {
 
     // The only method invoked from outside the WorkSerializer (used in
     // the data plane).
-    bool ShouldDrop(const std::string** category_name) const;
+    bool ShouldDrop(const std::string** category_name);
 
     const DropCategoryList& drop_category_list() const {
       return drop_category_list_;
@@ -100,6 +110,11 @@ struct XdsEndpointResource {
    private:
     DropCategoryList drop_category_list_;
     bool drop_all_ = false;
+
+    // TODO(roth): Consider using a separate thread-local BitGen for each CPU
+    // to avoid the need for this mutex.
+    Mutex mu_;
+    absl::BitGen bit_gen_ ABSL_GUARDED_BY(&mu_);
   };
 
   PriorityList priorities;
@@ -117,19 +132,15 @@ class XdsEndpointResourceType
   absl::string_view type_url() const override {
     return "envoy.config.endpoint.v3.ClusterLoadAssignment";
   }
-  absl::string_view v2_type_url() const override {
-    return "envoy.api.v2.ClusterLoadAssignment";
-  }
 
-  absl::StatusOr<DecodeResult> Decode(const XdsEncodingContext& context,
-                                      absl::string_view serialized_resource,
-                                      bool is_v2) const override;
+  DecodeResult Decode(const XdsResourceType::DecodeContext& context,
+                      absl::string_view serialized_resource) const override;
 
-  void InitUpbSymtab(upb_DefPool* symtab) const override {
+  void InitUpbSymtab(XdsClient*, upb_DefPool* symtab) const override {
     envoy_config_endpoint_v3_ClusterLoadAssignment_getmsgdef(symtab);
   }
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_XDS_XDS_ENDPOINT_H
+#endif  // GRPC_SRC_CORE_EXT_XDS_XDS_ENDPOINT_H

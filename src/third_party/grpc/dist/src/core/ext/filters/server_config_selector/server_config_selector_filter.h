@@ -16,11 +16,12 @@
 //
 //
 
-#ifndef GRPC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_FILTER_H
-#define GRPC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_FILTER_H
+#ifndef GRPC_SRC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_FILTER_H
+#define GRPC_SRC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_FILTER_H
 
 #include <grpc/support/port_platform.h>
 
+#include "src/core/lib/channel/channel_fwd.h"
 #include "src/core/lib/channel/channel_stack.h"
 
 namespace grpc_core {
@@ -29,4 +30,4 @@ extern const grpc_channel_filter kServerConfigSelectorFilter;
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_FILTER_H
+#endif  // GRPC_SRC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_FILTER_H

@@ -14,15 +14,22 @@
 // limitations under the License.
 //
 
-#ifndef GRPC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_H
-#define GRPC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_H
+#ifndef GRPC_SRC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_H
+#define GRPC_SRC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_H
 
 #include <grpc/support/port_platform.h>
 
-#include "absl/status/statusor.h"
+#include <memory>
 
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+
+#include "src/core/lib/gpr/useful.h"
 #include "src/core/lib/gprpp/dual_ref_counted.h"
+#include "src/core/lib/gprpp/ref_counted.h"
+#include "src/core/lib/gprpp/ref_counted_ptr.h"
 #include "src/core/lib/service_config/service_config.h"
+#include "src/core/lib/service_config/service_config_parser.h"
 #include "src/core/lib/transport/metadata_batch.h"
 
 namespace grpc_core {
@@ -33,14 +40,15 @@ class ServerConfigSelector : public RefCounted<ServerConfigSelector> {
  public:
   // Configuration to apply to an incoming call
   struct CallConfig {
-    grpc_error_handle error = GRPC_ERROR_NONE;
     const ServiceConfigParser::ParsedConfigVector* method_configs = nullptr;
     RefCountedPtr<ServiceConfig> service_config;
   };
 
   ~ServerConfigSelector() override = default;
+
   // Returns the CallConfig to apply to a call based on the incoming \a metadata
-  virtual CallConfig GetCallConfig(grpc_metadata_batch* metadata) = 0;
+  virtual absl::StatusOr<CallConfig> GetCallConfig(
+      grpc_metadata_batch* metadata) = 0;
 };
 
 // ServerConfigSelectorProvider allows for subscribers to watch for updates on
@@ -61,11 +69,15 @@ class ServerConfigSelectorProvider
       std::unique_ptr<ServerConfigSelectorWatcher> watcher) = 0;
   virtual void CancelWatch() = 0;
 
-  static absl::string_view ChannelArgName();
-
-  grpc_arg MakeChannelArg() const;
+  static absl::string_view ChannelArgName() {
+    return "grpc.internal.server_config_selector_provider";
+  }
+  static int ChannelArgsCompare(const ServerConfigSelectorProvider* a,
+                                const ServerConfigSelectorProvider* b) {
+    return QsortCompare(a, b);
+  }
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_H
+#endif  // GRPC_SRC_CORE_EXT_FILTERS_SERVER_CONFIG_SELECTOR_SERVER_CONFIG_SELECTOR_H

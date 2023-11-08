@@ -34,6 +34,9 @@
 #include "python/map.h"
 #include "python/message.h"
 #include "python/repeated.h"
+#include "python/unknown_fields.h"
+
+static upb_Arena* PyUpb_NewArena(void);
 
 static void PyUpb_ModuleDealloc(void* module) {
   PyUpb_ModuleState* s = PyModule_GetState(module);
@@ -121,7 +124,7 @@ struct PyUpb_WeakMap {
 };
 
 PyUpb_WeakMap* PyUpb_WeakMap_New(void) {
-  upb_Arena* arena = upb_Arena_New();
+  upb_Arena* arena = PyUpb_NewArena();
   PyUpb_WeakMap* map = upb_Arena_Malloc(arena, sizeof(*map));
   map->arena = arena;
   upb_inttable_init(&map->table, map->arena);
@@ -130,10 +133,14 @@ PyUpb_WeakMap* PyUpb_WeakMap_New(void) {
 
 void PyUpb_WeakMap_Free(PyUpb_WeakMap* map) { upb_Arena_Free(map->arena); }
 
+// To give better entropy in the table key, we shift away low bits that are
+// always zero.
+static const int PyUpb_PtrShift = (sizeof(void*) == 4) ? 2 : 3;
+
 uintptr_t PyUpb_WeakMap_GetKey(const void* key) {
   uintptr_t n = (uintptr_t)key;
-  assert((n & 7) == 0);
-  return n >> 3;
+  assert((n & ((1 << PyUpb_PtrShift) - 1)) == 0);
+  return n >> PyUpb_PtrShift;
 }
 
 void PyUpb_WeakMap_Add(PyUpb_WeakMap* map, const void* key, PyObject* py_obj) {
@@ -168,8 +175,8 @@ bool PyUpb_WeakMap_Next(PyUpb_WeakMap* map, const void** key, PyObject** obj,
                         intptr_t* iter) {
   uintptr_t u_key;
   upb_value val;
-  if (!upb_inttable_next2(&map->table, &u_key, &val, iter)) return false;
-  *key = (void*)(u_key << 3);
+  if (!upb_inttable_next(&map->table, &u_key, &val, iter)) return false;
+  *key = (void*)(u_key << PyUpb_PtrShift);
   *obj = upb_value_getptr(val);
   return true;
 }
@@ -216,10 +223,54 @@ typedef struct {
   upb_Arena* arena;
 } PyUpb_Arena;
 
+// begin:google_only
+// static upb_alloc* global_alloc = &upb_alloc_global;
+// end:google_only
+
+// begin:github_only
+#ifdef __GLIBC__
+#include <malloc.h>  // malloc_trim()
+#endif
+
+// A special allocator that calls malloc_trim() periodically to release
+// memory to the OS.  Without this call, we appear to leak memory, at least
+// as measured in RSS.
+//
+// We opt not to use this instead of PyMalloc (which would also solve the
+// problem) because the latter requires the GIL to be held.  This would make
+// our messages unsafe to share with other languages that could free at
+// unpredictable
+// times.
+static void* upb_trim_allocfunc(upb_alloc* alloc, void* ptr, size_t oldsize,
+                                size_t size) {
+  (void)alloc;
+  (void)oldsize;
+  if (size == 0) {
+    free(ptr);
+#ifdef __GLIBC__
+    static int count = 0;
+    if (++count == 10000) {
+      malloc_trim(0);
+      count = 0;
+    }
+#endif
+    return NULL;
+  } else {
+    return realloc(ptr, size);
+  }
+}
+static upb_alloc trim_alloc = {&upb_trim_allocfunc};
+static const upb_alloc* global_alloc = &trim_alloc;
+// end:github_only
+
+static upb_Arena* PyUpb_NewArena(void) {
+  return upb_Arena_Init(NULL, 0, global_alloc);
+}
+
 PyObject* PyUpb_Arena_New(void) {
   PyUpb_ModuleState* state = PyUpb_ModuleState_Get();
   PyUpb_Arena* arena = (void*)PyType_GenericAlloc(state->arena_type, 0);
-  arena->arena = upb_Arena_New();
+  arena->arena = PyUpb_NewArena();
   return &arena->ob_base;
 }
 
@@ -321,7 +372,7 @@ PyObject* PyUpb_Forbidden_New(PyObject* cls, PyObject* args, PyObject* kwds) {
 // Module Entry Point
 // -----------------------------------------------------------------------------
 
-PyMODINIT_FUNC PyInit__message(void) {
+__attribute__((visibility("default"))) PyMODINIT_FUNC PyInit__message(void) {
   PyObject* m = PyModule_Create(&module_def);
   if (!m) return NULL;
 
@@ -335,7 +386,8 @@ PyMODINIT_FUNC PyInit__message(void) {
   if (!PyUpb_InitDescriptorContainers(m) || !PyUpb_InitDescriptorPool(m) ||
       !PyUpb_InitDescriptor(m) || !PyUpb_InitArena(m) ||
       !PyUpb_InitExtensionDict(m) || !PyUpb_Map_Init(m) ||
-      !PyUpb_InitMessage(m) || !PyUpb_Repeated_Init(m)) {
+      !PyUpb_InitMessage(m) || !PyUpb_Repeated_Init(m) ||
+      !PyUpb_UnknownFields_Init(m)) {
     Py_DECREF(m);
     return NULL;
   }

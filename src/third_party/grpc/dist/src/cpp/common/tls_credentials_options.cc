@@ -1,25 +1,30 @@
-/*
- *
- * Copyright 2019 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2019 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#include "absl/container/inlined_vector.h"
+#include <memory>
+#include <string>
+#include <utility>
 
 #include <grpc/grpc_security.h>
-#include <grpc/support/alloc.h>
+#include <grpc/grpc_security_constants.h>
+#include <grpc/support/log.h>
+#include <grpcpp/security/tls_certificate_provider.h>
+#include <grpcpp/security/tls_certificate_verifier.h>
 #include <grpcpp/security/tls_credentials_options.h>
 
 namespace grpc {
@@ -99,6 +104,14 @@ void TlsServerCredentialsOptions::set_cert_request_type(
   GPR_ASSERT(options != nullptr);
   grpc_tls_credentials_options_set_cert_request_type(options,
                                                      cert_request_type);
+}
+
+void TlsServerCredentialsOptions::set_send_client_ca_list(
+    bool send_client_ca_list) {
+  grpc_tls_credentials_options* options = c_credentials_options();
+  GPR_ASSERT(options != nullptr);
+  grpc_tls_credentials_options_set_send_client_ca_list(options,
+                                                       send_client_ca_list);
 }
 
 }  // namespace experimental

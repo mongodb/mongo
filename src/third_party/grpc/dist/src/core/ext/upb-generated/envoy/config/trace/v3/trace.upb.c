@@ -7,19 +7,21 @@
  * regenerated. */
 
 #include <stddef.h>
-#include "upb/msg_internal.h"
+#include "upb/generated_code_support.h"
 #include "envoy/config/trace/v3/trace.upb.h"
 #include "envoy/config/trace/v3/datadog.upb.h"
 #include "envoy/config/trace/v3/dynamic_ot.upb.h"
 #include "envoy/config/trace/v3/http_tracer.upb.h"
 #include "envoy/config/trace/v3/lightstep.upb.h"
 #include "envoy/config/trace/v3/opencensus.upb.h"
+#include "envoy/config/trace/v3/opentelemetry.upb.h"
 #include "envoy/config/trace/v3/service.upb.h"
 #include "envoy/config/trace/v3/zipkin.upb.h"
 
-#include "upb/port_def.inc"
+// Must be last.
+#include "upb/port/def.inc"
 
-const upb_MiniTable_File envoy_config_trace_v3_trace_proto_upb_file_layout = {
+const upb_MiniTableFile envoy_config_trace_v3_trace_proto_upb_file_layout = {
   NULL,
   NULL,
   NULL,
@@ -28,5 +30,5 @@ const upb_MiniTable_File envoy_config_trace_v3_trace_proto_upb_file_layout = {
   0,
 };
 
-#include "upb/port_undef.inc"
+#include "upb/port/undef.inc"
 

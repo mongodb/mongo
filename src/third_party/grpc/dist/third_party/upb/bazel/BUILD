@@ -25,7 +25,16 @@
 
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 
+# begin:google_only
+# package(default_applicable_licenses = ["//:license"])
+# end:google_only
+
 licenses(["notice"])
+
+exports_files(
+    ["workspace_deps.bzl"],
+    visibility = ["//cmake:__pkg__"],
+)
 
 py_binary(
     name = "amalgamate",

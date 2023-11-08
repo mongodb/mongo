@@ -14,11 +14,21 @@
 // limitations under the License.
 //
 
-#ifndef GRPC_CORE_LIB_SECURITY_CREDENTIALS_EXTERNAL_AWS_EXTERNAL_ACCOUNT_CREDENTIALS_H
-#define GRPC_CORE_LIB_SECURITY_CREDENTIALS_EXTERNAL_AWS_EXTERNAL_ACCOUNT_CREDENTIALS_H
+#ifndef GRPC_SRC_CORE_LIB_SECURITY_CREDENTIALS_EXTERNAL_AWS_EXTERNAL_ACCOUNT_CREDENTIALS_H
+#define GRPC_SRC_CORE_LIB_SECURITY_CREDENTIALS_EXTERNAL_AWS_EXTERNAL_ACCOUNT_CREDENTIALS_H
 
 #include <grpc/support/port_platform.h>
 
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "src/core/lib/gprpp/orphanable.h"
+#include "src/core/lib/gprpp/ref_counted_ptr.h"
+#include "src/core/lib/http/httpcli.h"
+#include "src/core/lib/http/parser.h"
+#include "src/core/lib/iomgr/error.h"
 #include "src/core/lib/security/credentials/external/aws_request_signer.h"
 #include "src/core/lib/security/credentials/external/external_account_credentials.h"
 
@@ -35,6 +45,7 @@ class AwsExternalAccountCredentials final : public ExternalAccountCredentials {
                                 grpc_error_handle* error);
 
  private:
+  bool ShouldUseMetadataServer();
   void RetrieveSubjectToken(
       HTTPRequestContext* ctx, const Options& options,
       std::function<void(std::string, grpc_error_handle)> cb) override;
@@ -42,6 +53,10 @@ class AwsExternalAccountCredentials final : public ExternalAccountCredentials {
   void RetrieveRegion();
   static void OnRetrieveRegion(void* arg, grpc_error_handle error);
   void OnRetrieveRegionInternal(grpc_error_handle error);
+
+  void RetrieveImdsV2SessionToken();
+  static void OnRetrieveImdsV2SessionToken(void* arg, grpc_error_handle error);
+  void OnRetrieveImdsV2SessionTokenInternal(grpc_error_handle error);
 
   void RetrieveRoleName();
   static void OnRetrieveRoleName(void* arg, grpc_error_handle error);
@@ -55,6 +70,8 @@ class AwsExternalAccountCredentials final : public ExternalAccountCredentials {
   void FinishRetrieveSubjectToken(std::string subject_token,
                                   grpc_error_handle error);
 
+  void AddMetadataRequestHeaders(grpc_http_request* request);
+
   std::string audience_;
   OrphanablePtr<HttpRequest> http_request_;
 
@@ -62,6 +79,7 @@ class AwsExternalAccountCredentials final : public ExternalAccountCredentials {
   std::string region_url_;
   std::string url_;
   std::string regional_cred_verification_url_;
+  std::string imdsv2_session_token_url_;
 
   // Information required by request signer
   std::string region_;
@@ -69,6 +87,7 @@ class AwsExternalAccountCredentials final : public ExternalAccountCredentials {
   std::string access_key_id_;
   std::string secret_access_key_;
   std::string token_;
+  std::string imdsv2_session_token_;
 
   std::unique_ptr<AwsRequestSigner> signer_;
   std::string cred_verification_url_;
@@ -79,4 +98,4 @@ class AwsExternalAccountCredentials final : public ExternalAccountCredentials {
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_LIB_SECURITY_CREDENTIALS_EXTERNAL_AWS_EXTERNAL_ACCOUNT_CREDENTIALS_H
+#endif  // GRPC_SRC_CORE_LIB_SECURITY_CREDENTIALS_EXTERNAL_AWS_EXTERNAL_ACCOUNT_CREDENTIALS_H

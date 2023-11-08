@@ -1,53 +1,73 @@
-/*
- *
- * Copyright 2016 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2016 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
 #include <grpc/support/port_platform.h>
 
 #include "src/core/ext/filters/load_reporting/server_load_reporting_filter.h"
 
-#include <string.h>
+#include <limits.h>
+#include <stdint.h>
+#include <stdlib.h>
 
+#include <functional>
+#include <initializer_list>
+#include <memory>
 #include <string>
+#include <utility>
 
+#include "absl/meta/type_traits.h"
+#include "absl/status/status.h"
 #include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "opencensus/stats/stats.h"
+#include "opencensus/tags/tag_key.h"
 
 #include <grpc/grpc_security.h>
-#include <grpc/slice.h>
-#include <grpc/support/alloc.h>
+#include <grpc/impl/channel_arg_names.h>
+#include <grpc/status.h>
 #include <grpc/support/log.h>
+#include <grpc/support/time.h>
 
-#include "src/core/ext/filters/client_channel/lb_policy/grpclb/grpclb.h"
 #include "src/core/ext/filters/load_reporting/registered_opencensus_objects.h"
-#include "src/core/ext/filters/load_reporting/server_load_reporting_filter.h"
 #include "src/core/lib/address_utils/parse_address.h"
+#include "src/core/lib/channel/call_finalization.h"
 #include "src/core/lib/channel/channel_args.h"
+#include "src/core/lib/channel/channel_fwd.h"
+#include "src/core/lib/channel/channel_stack.h"
 #include "src/core/lib/channel/channel_stack_builder.h"
-#include "src/core/lib/channel/context.h"
 #include "src/core/lib/config/core_configuration.h"
-#include "src/core/lib/iomgr/resolve_address.h"
+#include "src/core/lib/iomgr/resolved_address.h"
 #include "src/core/lib/iomgr/sockaddr.h"
 #include "src/core/lib/iomgr/socket_utils.h"
+#include "src/core/lib/promise/context.h"
+#include "src/core/lib/promise/promise.h"
 #include "src/core/lib/promise/seq.h"
 #include "src/core/lib/security/context/security_context.h"
-#include "src/core/lib/slice/slice_internal.h"
-#include "src/core/lib/surface/call.h"
+#include "src/core/lib/slice/slice.h"
+#include "src/core/lib/surface/channel_stack_type.h"
+#include "src/core/lib/transport/metadata_batch.h"
 #include "src/core/lib/uri/uri_parser.h"
+#include "src/cpp/server/load_reporter/constants.h"
+
+// IWYU pragma: no_include "opencensus/stats/recording.h"
 
 namespace grpc_core {
 
@@ -56,7 +76,7 @@ constexpr char kEncodedIpv6AddressLengthString[] = "32";
 constexpr char kEmptyAddressLengthString[] = "00";
 
 absl::StatusOr<ServerLoadReportingFilter> ServerLoadReportingFilter::Create(
-    ChannelArgs channel_args, ChannelFilter::Args) {
+    const ChannelArgs& channel_args, ChannelFilter::Args) {
   // Find and record the peer_identity.
   ServerLoadReportingFilter filter;
   const auto* auth_context = channel_args.GetObject<grpc_auth_context>();
@@ -78,14 +98,15 @@ namespace {
 std::string GetCensusSafeClientIpString(
     const ClientMetadataHandle& initial_metadata) {
   // Find the client URI string.
-  auto client_uri_str = initial_metadata->get(PeerString());
-  if (!client_uri_str.has_value()) {
+  Slice* client_uri_slice = initial_metadata->get_pointer(PeerString());
+  if (client_uri_slice == nullptr) {
     gpr_log(GPR_ERROR,
             "Unable to extract client URI string (peer string) from gRPC "
             "metadata.");
     return "";
   }
-  absl::StatusOr<URI> client_uri = URI::Parse(*client_uri_str);
+  absl::StatusOr<URI> client_uri =
+      URI::Parse(client_uri_slice->as_string_view());
   if (!client_uri.ok()) {
     gpr_log(GPR_ERROR,
             "Unable to parse the client URI string (peer string) to a client "
@@ -117,7 +138,7 @@ std::string GetCensusSafeClientIpString(
     }
     return client_ip;
   } else {
-    GPR_UNREACHABLE_CODE();
+    GPR_UNREACHABLE_CODE(abort());
   }
 }
 
@@ -136,7 +157,7 @@ std::string MakeClientIpAndLrToken(
       prefix = kEncodedIpv6AddressLengthString;
       break;
     default:
-      GPR_UNREACHABLE_CODE();
+      GPR_UNREACHABLE_CODE(abort());
   }
   return absl::StrCat(prefix, client_ip, lr_token);
 }
@@ -237,9 +258,8 @@ ArenaPromise<ServerMetadataHandle> ServerLoadReportingFilter::MakeCallPromise(
 }
 
 namespace {
-bool MaybeAddServerLoadReportingFilter(const grpc_channel_args& args) {
-  return grpc_channel_arg_get_bool(
-      grpc_channel_args_find(&args, GRPC_ARG_ENABLE_LOAD_REPORTING), false);
+bool MaybeAddServerLoadReportingFilter(const ChannelArgs& args) {
+  return args.GetBool(GRPC_ARG_ENABLE_LOAD_REPORTING).value_or(false);
 }
 
 const grpc_channel_filter kFilter =
@@ -264,9 +284,8 @@ struct ServerLoadReportingFilterStaticRegistrar {
       grpc::load_reporter::MeasureOtherCallMetric();
       builder->channel_init()->RegisterStage(
           GRPC_SERVER_CHANNEL, INT_MAX, [](ChannelStackBuilder* cs_builder) {
-            if (MaybeAddServerLoadReportingFilter(
-                    *cs_builder->channel_args())) {
-              cs_builder->PrependFilter(&kFilter, nullptr);
+            if (MaybeAddServerLoadReportingFilter(cs_builder->channel_args())) {
+              cs_builder->PrependFilter(&kFilter);
             }
             return true;
           });

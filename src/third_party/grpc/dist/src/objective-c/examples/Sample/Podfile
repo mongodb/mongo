@@ -1,12 +1,7 @@
 source 'https://github.com/CocoaPods/Specs.git'
-platform :ios, '9.0'
+platform :ios, '10.0'
 
 install! 'cocoapods', :deterministic_uuids => false
-
-# Default to use framework, so that providing no 'FRAMEWORK' env parameter works consistently
-# for all Samples, specifically because Swift only supports framework.
-# Only effective for examples/
-use_frameworks! if ENV['FRAMEWORKS'] != 'NO'
 
 # Location of gRPC's repo root relative to this file.
 GRPC_LOCAL_SRC = '../../../..'
@@ -23,7 +18,6 @@ target 'Sample' do
   pod 'Protobuf', :path => "#{GRPC_LOCAL_SRC}/third_party/protobuf"
 
   pod 'BoringSSL-GRPC', :podspec => "#{GRPC_LOCAL_SRC}/src/objective-c"
-  pod 'Libuv-gRPC', :podspec => "#{GRPC_LOCAL_SRC}/src/objective-c"
 
   pod 'gRPC', :path => GRPC_LOCAL_SRC
   pod 'gRPC-Core', :path => GRPC_LOCAL_SRC

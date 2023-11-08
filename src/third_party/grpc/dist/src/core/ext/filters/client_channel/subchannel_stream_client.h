@@ -14,27 +14,39 @@
 // limitations under the License.
 //
 
-#ifndef GRPC_CORE_EXT_FILTERS_CLIENT_CHANNEL_SUBCHANNEL_STREAM_CLIENT_H
-#define GRPC_CORE_EXT_FILTERS_CLIENT_CHANNEL_SUBCHANNEL_STREAM_CLIENT_H
+#ifndef GRPC_SRC_CORE_EXT_FILTERS_CLIENT_CHANNEL_SUBCHANNEL_STREAM_CLIENT_H
+#define GRPC_SRC_CORE_EXT_FILTERS_CLIENT_CHANNEL_SUBCHANNEL_STREAM_CLIENT_H
 
 #include <grpc/support/port_platform.h>
 
 #include <atomic>
+#include <memory>
 
+#include "absl/base/thread_annotations.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+
+#include <grpc/event_engine/event_engine.h>
+#include <grpc/event_engine/memory_allocator.h>
+#include <grpc/slice.h>
+#include <grpc/status.h>
 
 #include "src/core/ext/filters/client_channel/subchannel.h"
 #include "src/core/lib/backoff/backoff.h"
+#include "src/core/lib/channel/context.h"
 #include "src/core/lib/gprpp/orphanable.h"
 #include "src/core/lib/gprpp/ref_counted_ptr.h"
 #include "src/core/lib/gprpp/sync.h"
 #include "src/core/lib/iomgr/call_combiner.h"
 #include "src/core/lib/iomgr/closure.h"
+#include "src/core/lib/iomgr/error.h"
+#include "src/core/lib/iomgr/iomgr_fwd.h"
 #include "src/core/lib/iomgr/polling_entity.h"
-#include "src/core/lib/iomgr/timer.h"
 #include "src/core/lib/resource_quota/arena.h"
-#include "src/core/lib/transport/byte_stream.h"
+#include "src/core/lib/resource_quota/memory_quota.h"
+#include "src/core/lib/slice/slice.h"
+#include "src/core/lib/slice/slice_buffer.h"
 #include "src/core/lib/transport/metadata_batch.h"
 #include "src/core/lib/transport/transport.h"
 
@@ -120,17 +132,14 @@ class SubchannelStreamClient
     void CallEndedLocked(bool retry)
         ABSL_EXCLUSIVE_LOCKS_REQUIRED(&subchannel_stream_client_->mu_);
 
+    void RecvMessageReady();
+
     static void OnComplete(void* arg, grpc_error_handle error);
     static void RecvInitialMetadataReady(void* arg, grpc_error_handle error);
     static void RecvMessageReady(void* arg, grpc_error_handle error);
     static void RecvTrailingMetadataReady(void* arg, grpc_error_handle error);
     static void StartCancel(void* arg, grpc_error_handle error);
     static void OnCancelComplete(void* arg, grpc_error_handle error);
-
-    static void OnByteStreamNext(void* arg, grpc_error_handle error);
-    void ContinueReadingRecvMessage();
-    grpc_error_handle PullSliceFromRecvMessage();
-    void DoneReadingRecvMessage(grpc_error_handle error);
 
     static void AfterCallStackDestruction(void* arg, grpc_error_handle error);
 
@@ -157,7 +166,7 @@ class SubchannelStreamClient
     grpc_metadata_batch send_initial_metadata_;
 
     // send_message
-    absl::optional<SliceBufferByteStream> send_message_;
+    SliceBuffer send_message_;
 
     // send_trailing_metadata
     grpc_metadata_batch send_trailing_metadata_;
@@ -167,9 +176,8 @@ class SubchannelStreamClient
     grpc_closure recv_initial_metadata_ready_;
 
     // recv_message
-    OrphanablePtr<ByteStream> recv_message_;
+    absl::optional<SliceBuffer> recv_message_;
     grpc_closure recv_message_ready_;
-    grpc_slice_buffer recv_message_buffer_;
     std::atomic<bool> seen_response_{false};
 
     // True if the cancel_stream batch has been started.
@@ -188,7 +196,7 @@ class SubchannelStreamClient
   void StartCallLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(&mu_);
 
   void StartRetryTimerLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(&mu_);
-  static void OnRetryTimer(void* arg, grpc_error_handle error);
+  void OnRetryTimer() ABSL_LOCKS_EXCLUDED(mu_);
 
   RefCountedPtr<ConnectedSubchannel> connected_subchannel_;
   grpc_pollset_set* interested_parties_;  // Do not own.
@@ -204,11 +212,14 @@ class SubchannelStreamClient
 
   // Call retry state.
   BackOff retry_backoff_ ABSL_GUARDED_BY(mu_);
-  grpc_timer retry_timer_ ABSL_GUARDED_BY(mu_);
-  grpc_closure retry_timer_callback_ ABSL_GUARDED_BY(mu_);
-  bool retry_timer_callback_pending_ ABSL_GUARDED_BY(mu_) = false;
+  absl::optional<grpc_event_engine::experimental::EventEngine::TaskHandle>
+      retry_timer_handle_ ABSL_GUARDED_BY(mu_);
+  // A raw pointer will suffice since connected_subchannel_ holds a copy of the
+  // ChannelArgs which holds an std::shared_ptr of the EventEngine.
+  grpc_event_engine::experimental::EventEngine* event_engine_
+      ABSL_GUARDED_BY(mu_);
 };
 
 }  // namespace grpc_core
 
-#endif  // GRPC_CORE_EXT_FILTERS_CLIENT_CHANNEL_SUBCHANNEL_STREAM_CLIENT_H
+#endif  // GRPC_SRC_CORE_EXT_FILTERS_CLIENT_CHANNEL_SUBCHANNEL_STREAM_CLIENT_H

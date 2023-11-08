@@ -1,51 +1,60 @@
-/*
- *
- * Copyright 2015 gRPC authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- */
+//
+//
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//
 
-#ifndef GRPC_CORE_LIB_SECURITY_SECURITY_CONNECTOR_SECURITY_CONNECTOR_H
-#define GRPC_CORE_LIB_SECURITY_SECURITY_CONNECTOR_SECURITY_CONNECTOR_H
+#ifndef GRPC_SRC_CORE_LIB_SECURITY_SECURITY_CONNECTOR_SECURITY_CONNECTOR_H
+#define GRPC_SRC_CORE_LIB_SECURITY_SECURITY_CONNECTOR_SECURITY_CONNECTOR_H
 
 #include <grpc/support/port_platform.h>
 
-#include <stdbool.h>
+#include <memory>
 
+#include "absl/status/status.h"
+#include "absl/strings/string_view.h"
+
+#include <grpc/grpc.h>
 #include <grpc/grpc_security.h>
 
-#include "src/core/lib/channel/handshaker.h"
+#include "src/core/lib/channel/channel_args.h"
+#include "src/core/lib/debug/trace.h"
 #include "src/core/lib/gprpp/ref_counted.h"
+#include "src/core/lib/gprpp/ref_counted_ptr.h"
+#include "src/core/lib/gprpp/unique_type_name.h"
+#include "src/core/lib/iomgr/closure.h"
 #include "src/core/lib/iomgr/endpoint.h"
-#include "src/core/lib/iomgr/pollset.h"
-#include "src/core/lib/iomgr/tcp_server.h"
+#include "src/core/lib/iomgr/error.h"
+#include "src/core/lib/iomgr/iomgr_fwd.h"
 #include "src/core/lib/promise/arena_promise.h"
+#include "src/core/lib/transport/handshaker.h"
 #include "src/core/tsi/transport_security_interface.h"
 
 extern grpc_core::DebugOnlyTraceFlag grpc_trace_security_connector_refcount;
 
-/* --- URL schemes. --- */
+// --- URL schemes. ---
 
 #define GRPC_SSL_URL_SCHEME "https"
 #define GRPC_FAKE_SECURITY_URL_SCHEME "http+fake_security"
 
 typedef enum { GRPC_SECURITY_OK = 0, GRPC_SECURITY_ERROR } grpc_security_status;
 
-/* --- security_connector object. ---
+// --- security_connector object. ---
 
-    A security connector object represents away to configure the underlying
-    transport security mechanism and check the resulting trusted peer.  */
+//  A security connector object represents away to configure the underlying
+//  transport security mechanism and check the resulting trusted peer.
 
 #define GRPC_ARG_SECURITY_CONNECTOR "grpc.internal.security_connector"
 
@@ -58,16 +67,16 @@ class grpc_security_connector
                 ? "security_connector_refcount"
                 : nullptr),
         url_scheme_(url_scheme) {}
-  ~grpc_security_connector() override = default;
 
   static absl::string_view ChannelArgName() {
     return GRPC_ARG_SECURITY_CONNECTOR;
   }
 
   // Checks the peer. Callee takes ownership of the peer object.
+  // The channel args represent the args after the handshaking is performed.
   // When done, sets *auth_context and invokes on_peer_checked.
   virtual void check_peer(
-      tsi_peer peer, grpc_endpoint* ep,
+      tsi_peer peer, grpc_endpoint* ep, const grpc_core::ChannelArgs& args,
       grpc_core::RefCountedPtr<grpc_auth_context>* auth_context,
       grpc_closure* on_peer_checked) = 0;
 
@@ -76,7 +85,7 @@ class grpc_security_connector
   virtual void cancel_check_peer(grpc_closure* on_peer_checked,
                                  grpc_error_handle error) = 0;
 
-  /* Compares two security connectors. */
+  // Compares two security connectors.
   virtual int cmp(const grpc_security_connector* other) const = 0;
 
   static int ChannelArgsCompare(const grpc_security_connector* a,
@@ -86,24 +95,26 @@ class grpc_security_connector
 
   absl::string_view url_scheme() const { return url_scheme_; }
 
+  virtual grpc_core::UniqueTypeName type() const = 0;
+
  private:
   absl::string_view url_scheme_;
 };
 
-/* Util to encapsulate the connector in a channel arg. */
+// Util to encapsulate the connector in a channel arg.
 grpc_arg grpc_security_connector_to_arg(grpc_security_connector* sc);
 
-/* Util to get the connector from a channel arg. */
+// Util to get the connector from a channel arg.
 grpc_security_connector* grpc_security_connector_from_arg(const grpc_arg* arg);
 
-/* Util to find the connector from channel args. */
+// Util to find the connector from channel args.
 grpc_security_connector* grpc_security_connector_find_in_args(
     const grpc_channel_args* args);
 
-/* --- channel_security_connector object. ---
+// --- channel_security_connector object. ---
 
-    A channel security connector object represents a way to configure the
-    underlying transport security mechanism on the client side.  */
+//  A channel security connector object represents a way to configure the
+//  underlying transport security mechanism on the client side.
 
 class grpc_channel_security_connector : public grpc_security_connector {
  public:
@@ -111,7 +122,6 @@ class grpc_channel_security_connector : public grpc_security_connector {
       absl::string_view url_scheme,
       grpc_core::RefCountedPtr<grpc_channel_credentials> channel_creds,
       grpc_core::RefCountedPtr<grpc_call_credentials> request_metadata_creds);
-  ~grpc_channel_security_connector() override;
 
   /// Checks that the host that will be set for a call is acceptable.
   /// Returns ok if the host is acceptable, otherwise returns an error.
@@ -119,7 +129,7 @@ class grpc_channel_security_connector : public grpc_security_connector {
       absl::string_view host, grpc_auth_context* auth_context) = 0;
 
   /// Registers handshakers with \a handshake_mgr.
-  virtual void add_handshakers(const grpc_channel_args* args,
+  virtual void add_handshakers(const grpc_core::ChannelArgs& args,
                                grpc_pollset_set* interested_parties,
                                grpc_core::HandshakeManager* handshake_mgr) = 0;
 
@@ -135,6 +145,8 @@ class grpc_channel_security_connector : public grpc_security_connector {
   grpc_call_credentials* mutable_request_metadata_creds() {
     return request_metadata_creds_.get();
   }
+
+  grpc_core::UniqueTypeName type() const override;
 
  protected:
   // Helper methods to be used in subclasses.
@@ -152,19 +164,18 @@ class grpc_channel_security_connector : public grpc_security_connector {
   std::unique_ptr<grpc_channel_args> channel_args_;
 };
 
-/* --- server_security_connector object. ---
+// --- server_security_connector object. ---
 
-    A server security connector object represents a way to configure the
-    underlying transport security mechanism on the server side.  */
+//  A server security connector object represents a way to configure the
+//  underlying transport security mechanism on the server side.
 
 class grpc_server_security_connector : public grpc_security_connector {
  public:
   grpc_server_security_connector(
       absl::string_view url_scheme,
       grpc_core::RefCountedPtr<grpc_server_credentials> server_creds);
-  ~grpc_server_security_connector() override;
 
-  virtual void add_handshakers(const grpc_channel_args* args,
+  virtual void add_handshakers(const grpc_core::ChannelArgs& args,
                                grpc_pollset_set* interested_parties,
                                grpc_core::HandshakeManager* handshake_mgr) = 0;
 
@@ -175,6 +186,8 @@ class grpc_server_security_connector : public grpc_security_connector {
     return server_creds_.get();
   }
 
+  grpc_core::UniqueTypeName type() const override;
+
  protected:
   // Helper methods to be used in subclasses.
   int server_security_connector_cmp(
@@ -184,4 +197,4 @@ class grpc_server_security_connector : public grpc_security_connector {
   grpc_core::RefCountedPtr<grpc_server_credentials> server_creds_;
 };
 
-#endif /* GRPC_CORE_LIB_SECURITY_SECURITY_CONNECTOR_SECURITY_CONNECTOR_H */
+#endif  // GRPC_SRC_CORE_LIB_SECURITY_SECURITY_CONNECTOR_SECURITY_CONNECTOR_H

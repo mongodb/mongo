@@ -13,25 +13,22 @@
 # limitations under the License.
 """Channelz debug service implementation in gRPC Python."""
 
+from envoy.service.status.v3 import csds_pb2
+from envoy.service.status.v3 import csds_pb2_grpc
 from google.protobuf import json_format
 from grpc._cython import cygrpc
 
-try:
-    from envoy.service.status.v3 import csds_pb2
-    from envoy.service.status.v3 import csds_pb2_grpc
-except ImportError:
-    from src.proto.grpc.testing.xds.v3 import csds_pb2
-    from src.proto.grpc.testing.xds.v3 import csds_pb2_grpc
-
 
 class ClientStatusDiscoveryServiceServicer(
-        csds_pb2_grpc.ClientStatusDiscoveryServiceServicer):
+    csds_pb2_grpc.ClientStatusDiscoveryServiceServicer
+):
     """CSDS Servicer works for both the sync API and asyncio API."""
 
     @staticmethod
     def FetchClientStatus(request, unused_context):
         client_config = csds_pb2.ClientConfig.FromString(
-            cygrpc.dump_xds_configs())
+            cygrpc.dump_xds_configs()
+        )
         response = csds_pb2.ClientStatusResponse()
         response.config.append(client_config)
         return response
@@ -40,7 +37,8 @@ class ClientStatusDiscoveryServiceServicer(
     def StreamClientStatus(request_iterator, context):
         for request in request_iterator:
             yield ClientStatusDiscoveryServiceServicer.FetchClientStatus(
-                request, context)
+                request, context
+            )
 
 
 def add_csds_servicer(server):
@@ -49,13 +47,14 @@ def add_csds_servicer(server):
     CSDS is part of xDS protocol used to expose in-effective traffic
     configuration (or xDS resources). It focuses on simplify the debugging of
     unexpected routing behaviors, which could be due to a misconfiguration,
-    unhealthy backends or issues in the control or data plane. 
+    unhealthy backends or issues in the control or data plane.
 
     Args:
         server: A gRPC server to which the CSDS service will be added.
     """
     csds_pb2_grpc.add_ClientStatusDiscoveryServiceServicer_to_server(
-        ClientStatusDiscoveryServiceServicer(), server)
+        ClientStatusDiscoveryServiceServicer(), server
+    )
 
 
-__all__ = ['ClientStatusDiscoveryServiceServicer', 'add_csds_servicer']
+__all__ = ["ClientStatusDiscoveryServiceServicer", "add_csds_servicer"]
