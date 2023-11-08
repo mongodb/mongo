@@ -710,9 +710,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     startMongoDFTDC(serviceContext);
 
     if (mongodGlobalParams.scriptingEnabled) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Scripting engine not supported in the serverless environment",
-                !gMultitenancySupport);
         ScriptEngine::setup();
     }
 
