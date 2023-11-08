@@ -29,30 +29,34 @@ for (let i = 0; i < 100; ++i) {
     assert.commandWorked(coll.insert({time: new Date(), tag: {a: 1, b: {c: 1, d: 1}}, _id: i}));
 }
 
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDB.runCommand({
     update: coll.getName(),
     updates: [{q: {}, u: {$set: {tag: {b: {d: 1, c: 1}, a: 1}}}, multi: true}]
 }));
 verifyMetaFields(coll);
 
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDB.runCommand({
     update: coll.getName(),
     updates: [{q: {}, u: {$set: {tag: {b: {d: 1, c: 1}, a: 1}}}, multi: false}]
 }));
 verifyMetaFields(coll);
 
-assert.commandWorked(db.runCommand({
-    update: coll.getName(),
-    updates: [{
-        q: {time: new Date()},
-        u: {$set: {tag: {b: {d: 1, c: 1}, a: 1}}},
-        multi: true,
-        upsert: true
-    }]
-}));
-verifyMetaFields(coll);
+// Skip in sharded passthrough suites since query on time-series time field cannot target the
+// command to one single shard.
+if (!db.getMongo().isMongos()) {
+    assert.commandWorked(testDB.runCommand({
+        update: coll.getName(),
+        updates: [{
+            q: {time: ISODate("2023-01-01T12:00:02.000Z")},
+            u: {$set: {tag: {b: {d: 1, c: 1}, a: 1}}},
+            multi: true,
+            upsert: true
+        }]
+    }));
+    verifyMetaFields(coll);
+}
 
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDB.runCommand({
     update: coll.getName(),
     updates: [{
         q: {time: new Date()},
