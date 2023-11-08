@@ -71,3 +71,25 @@ spider_monkey_dbg = rule(
     implementation = lambda ctx: spider_monkey_dbg_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# allocator
+# =========
+
+allocator_values = ["auto", "system", "tcmalloc"]
+
+allocator_provider = provider(
+    doc = "Allocator to use (use \"auto\" for best choice for current platform)",
+    fields = {"allocator": "choose one of " + ".".join(allocator_values)},
+)
+
+def allocator_impl(ctx):
+    allocator_value = ctx.build_setting_value
+    if allocator_value not in allocator_values:
+        fail(str(ctx.label) + " allocator allowed to take values {" + ", ".join(allocator_values) + "} but was set to unallowed value " + allocator_value)
+    return allocator_provider(allocator = allocator_value)
+
+allocator = rule(
+    implementation = allocator_impl,
+    build_setting = config.string(flag = True),
+)

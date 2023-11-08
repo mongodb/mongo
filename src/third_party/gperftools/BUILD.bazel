@@ -17,7 +17,10 @@ config_setting(
 
 mongo_cc_library(
     name = "tcmalloc_minimal",
-    hdrs = glob(["**/*.h"]),
+    hdrs = glob(["**/*.h"]) + [
+        # debugallocation.cc sources this as an include.
+        "dist/src/tcmalloc.cc"
+    ],
     srcs = [
         "dist/src/base/dynamic_annotations.c",
         "dist/src/base/elf_mem_image.cc",

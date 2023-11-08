@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -255,5 +255,41 @@ config_setting(
     name = "spider_monkey_dbg_enabled",
     flag_values = {
         "//bazel/config:spider_monkey_dbg": "True",
+    }
+)
+
+# --------------------------------------
+# allocator options
+# --------------------------------------
+
+allocator(
+    name = "allocator",
+    build_setting_default = "system",
+)
+
+config_setting(
+    name = "auto_allocator_linux",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//bazel/config:allocator": "auto",
+    },
+)
+
+config_setting(
+    name = "auto_allocator_windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//bazel/config:allocator": "auto",
+    },
+)
+
+config_setting(
+    name = "tcmalloc_allocator",
+    flag_values = {
+        "//bazel/config:allocator": "tcmalloc",
     },
 )

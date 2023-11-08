@@ -153,5 +153,11 @@ def mongo_cc_binary(
         tags = tags,
         linkstatic = linkstatic,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
+        malloc = select({
+          "//bazel/config:tcmalloc_allocator": "//src/third_party/gperftools:tcmalloc_minimal",
+          "//bazel/config:auto_allocator_windows": "//src/third_party/gperftools:tcmalloc_minimal",
+          "//bazel/config:auto_allocator_linux": "//src/third_party/gperftools:tcmalloc_minimal",
+          "//conditions:default": "@bazel_tools//tools/cpp:malloc",
+        }),
         includes = [],
     )
