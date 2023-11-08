@@ -7,12 +7,11 @@
  *   - Test case 2: Broadcasted operations (from router) on orphaned documents
  *
  * @tags: [
- *   # To avoid multiversion tests
- *   requires_fcv_71,
+ *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
+ *   # flag can be removed.
+ *   multiversion_incompatible,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";

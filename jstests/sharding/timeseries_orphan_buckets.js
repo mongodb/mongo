@@ -2,11 +2,9 @@
  * Tests to validate that an orphan bucket is not updatable after a chunk migration.
  *
  * @tags: [
- *   # The validation hook in this suite enforces that all time-series buckets are compressed. This
- *   # will not be the case in multiversion suites.
- *   requires_fcv_71,
- *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
+ *   # flag can be removed.
+ *   multiversion_incompatible,
  * ]
  */
 

@@ -2,13 +2,11 @@
  * Tests 'deleteOne' command on sharded collections when specifying shard key.
  *
  * @tags: [
- *   # The validation hook in this suite enforces that all time-series buckets are compressed. This
- *   # will not be the case in multiversion suites.
- *   requires_fcv_71,
+ *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
+ *   # flag can be removed.
+ *   multiversion_incompatible,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
 

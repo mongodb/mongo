@@ -2,9 +2,9 @@
  * Test updates into sharded timeseries collection.
  *
  * @tags: [
- *   requires_fcv_51,
- *   # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
- *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   # TODO (SERVER-70605): Remove this tag once the time-series always compressed buckets feature
+ *   # flag can be removed.
+ *   multiversion_incompatible,
  * ]
  */
 

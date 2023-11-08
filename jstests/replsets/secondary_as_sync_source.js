@@ -6,7 +6,7 @@
  * @tags: [
  *     requires_fcv_71,
  *     requires_replication,
- *     # TODO (SERVER-80521): Re-enable this test once redness is resolve in multiversion suites.
+ *     # TODO (SERVER-80568): Re-enable this test once redness is resolved in multiversion suites.
  *     DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
  * ]
  */
