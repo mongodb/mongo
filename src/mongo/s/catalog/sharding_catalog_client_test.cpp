@@ -394,6 +394,39 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
     future.default_timed_get();
 }
 
+TEST_F(ShardingCatalogClientTest, GetAllShardsWithDrainingShard) {
+    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
+
+    auto future = launchAsync([this]() {
+        const auto shards =
+            assertGet(catalogClient()->getAllShards(operationContext(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern,
+                                                    true /* excludeDraining */));
+        return shards.value;
+    });
+
+    onFindCommand([this](const RemoteCommandRequest& request) {
+        ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+
+        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
+
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
+        ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(ShardType::draining.ne(true)));
+        ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
+        ASSERT_FALSE(query->getLimit().has_value());
+
+        checkReadConcern(request.cmdObj,
+                         VectorClock::kInitialComponentTime.asTimestamp(),
+                         repl::OpTime::kUninitializedTerm);
+
+        return vector<BSONObj>{};
+    });
+
+    future.default_timed_get();
+}
+
 TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 

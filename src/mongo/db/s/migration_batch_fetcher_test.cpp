@@ -161,7 +161,9 @@ private:
             StaticCatalogClient() = default;
 
             StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-                OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
+                OperationContext* opCtx,
+                repl::ReadConcernLevel readConcern,
+                bool excludeDraining) override {
 
                 ShardType donorShard;
                 donorShard.setName(kDonorConnStr.getSetName());

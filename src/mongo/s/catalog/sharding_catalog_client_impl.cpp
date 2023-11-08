@@ -1144,38 +1144,35 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
 }
 
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::getAllShards(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
-    auto findStatus = _exhaustiveFindOnConfig(opCtx,
-                                              kConfigReadSelector,
-                                              readConcern,
-                                              NamespaceString::kConfigsvrShardsNamespace,
-                                              BSONObj(),     // no query filter
-                                              BSONObj(),     // no sort
-                                              boost::none);  // no limit
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
+    const auto& findRes = uassertStatusOK(
+        _exhaustiveFindOnConfig(opCtx,
+                                kConfigReadSelector,
+                                readConcern,
+                                NamespaceString::kConfigsvrShardsNamespace,
+                                excludeDraining ? BSON(ShardType::draining.ne(true)) : BSONObj(),
+                                BSONObj() /* No sorting */,
+                                boost::none /* No limit */));
 
     std::vector<ShardType> shards;
-    shards.reserve(findStatus.getValue().value.size());
-    for (const BSONObj& doc : findStatus.getValue().value) {
+    shards.reserve(findRes.value.size());
+    for (const BSONObj& doc : findRes.value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
             return shardRes.getStatus().withContext(str::stream()
                                                     << "Failed to parse shard document " << doc);
         }
 
-        Status validateStatus = shardRes.getValue().validate();
-        if (!validateStatus.isOK()) {
+        ShardType& shard = shardRes.getValue();
+        if (const Status validateStatus = shard.validate(); !validateStatus.isOK()) {
             return validateStatus.withContext(str::stream()
                                               << "Failed to validate shard document " << doc);
         }
 
-        shards.push_back(shardRes.getValue());
+        shards.push_back(std::move(shard));
     }
 
-    return repl::OpTimeWith<std::vector<ShardType>>{std::move(shards),
-                                                    findStatus.getValue().opTime};
+    return repl::OpTimeWith<std::vector<ShardType>>{std::move(shards), findRes.opTime};
 }
 
 Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* opCtx,

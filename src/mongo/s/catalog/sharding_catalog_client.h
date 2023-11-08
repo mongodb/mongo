@@ -314,11 +314,15 @@ public:
         OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
-     * Retrieves all shards in this sharded cluster.
+     * Retrieves the list of shards in this sharded cluster. If `excludeDraining` is set to `false`
+     * (default), it retrieves all shards. Otherwise, it retrieves only shards that are not
+     * draining.
      * Returns a !OK status if an error occurs.
      */
     virtual StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-        OperationContext* opCtx, repl::ReadConcernLevel readConcern) = 0;
+        OperationContext* opCtx,
+        repl::ReadConcernLevel readConcern,
+        bool excludeDraining = false) = 0;
 
     /**
      * Runs a user management command on the config servers. Do not use for general write command

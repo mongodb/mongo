@@ -171,7 +171,7 @@ std::vector<NamespaceString> ShardingCatalogClientMock::getAllNssThatHaveZonesFo
 }
 
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::getAllShards(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
+    OperationContext* opCtx, repl::ReadConcernLevel readConcern, bool excludeDraining) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
