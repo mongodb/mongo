@@ -744,6 +744,7 @@ buildvariants:
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
+  - name: .bulk_write
   - name: causally_consistent_jscore_txns_passthrough
     distros:
     - windows-vsCurrent-large
@@ -1259,6 +1260,7 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: buildscripts_test
+  - name: .bulk_write
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
@@ -1530,6 +1532,7 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: buildscripts_test
+  - name: .bulk_write
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
@@ -2164,6 +2167,7 @@ buildvariants:
   - name: audit
   - name: .aggregation
   - name: .auth
+  - name: .bulk_write
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: .config_fuzzer
   - name: .config_fuzzer_stress
@@ -2958,6 +2962,7 @@ buildvariants:
   - name: audit
   - name: .auth
   - name: buildscripts_test
+  - name: .bulk_write
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
