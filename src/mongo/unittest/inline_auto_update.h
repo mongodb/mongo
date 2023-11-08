@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/platform/source_location.h"
 #include "mongo/unittest/assert.h"
 
 namespace mongo::unittest {
@@ -52,6 +53,12 @@ bool handleAutoUpdate(const std::string& expected,
                       const std::string& fileName,
                       size_t lineNumber,
                       bool needsEscaping);
+
+bool expandNoPlanMacro(const std::string& fileName, size_t lineNumber);
+
+void updateDelta(const std::string& fileName, const size_t lineNumber, int64_t delta);
+
+void expandActualPlan(const SourceLocation& location, const std::string& actual);
 
 // Account for maximum line length after linting. We need to indent, add quotes, etc.
 static constexpr size_t kAutoUpdateMaxLineLength = 88;

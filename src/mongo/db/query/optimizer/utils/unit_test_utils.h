@@ -44,6 +44,7 @@
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/platform/source_location.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/inline_auto_update.h"
 
@@ -66,6 +67,13 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
     maybePrintABT(abt);                    \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explain(abt))
 
+/**
+ * The macros named *INITIAL_AUTO are used for an initial adding of tests without plans.
+ * When the test is run with the --autoUpdateAsserts flag, the macro is substituted for the
+ * corresponding *AUTO macro with the actual plan.
+ */
+#define ASSERT_EXPLAIN_INITIAL_AUTO(abt) \
+    ::mongo::unittest::expandActualPlan(MONGO_SOURCE_LOCATION(), ExplainGenerator::explain(abt))
 
 #define ASSERT_EXPLAIN_V2(expected, abt) \
     maybePrintABT(abt);                  \
@@ -75,6 +83,8 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
     maybePrintABT(abt);                       \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2(abt))
 
+#define ASSERT_EXPLAIN_V2_INITIAL_AUTO(abt) \
+    ::mongo::unittest::expandActualPlan(MONGO_SOURCE_LOCATION(), ExplainGenerator::explainV2(abt))
 
 #define ASSERT_EXPLAIN_V2Compact(expected, abt) \
     maybePrintABT(abt);                         \
@@ -84,6 +94,9 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
     maybePrintABT(abt);                              \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2Compact(abt))
 
+#define ASSERT_EXPLAIN_V2Compact_INITIAL_AUTO(abt)               \
+    ::mongo::unittest::expandActualPlan(MONGO_SOURCE_LOCATION(), \
+                                        ExplainGenerator::explainV2Compact(abt))
 
 #define ASSERT_EXPLAIN_BSON(expected, abt) \
     maybePrintABT(abt);                    \

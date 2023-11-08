@@ -252,8 +252,11 @@ bool handleAutoUpdate(const std::string& expected,
         return false;
     }
 
+    // If an ...INITIAL_AUTO macro is expanded, the source file is updated with an empty plan just
+    // before the call to handleAutoUpdate(). Make an exception and accept more recent source file.
     if (boost::filesystem::last_write_time(boost::filesystem::path(fileName)) >
-        boost::filesystem::last_write_time(config.executablePath)) {
+            boost::filesystem::last_write_time(config.executablePath) &&
+        !expectedFormatted.empty()) {
         std::cout << "Source file " << fileName
                   << " was modified more recently than the executable, won't auto-update.\n";
         return false;
@@ -310,5 +313,93 @@ bool handleAutoUpdate(const std::string& expected,
 
     // Do not assert in order to allow multiple tests to be updated.
     return true;
+}
+
+bool expandNoPlanMacro(const std::string& fileName, size_t lineNumber) {
+    const auto config = mongo::unittest::getAutoUpdateConfig();
+    if (!config.updateFailingAsserts) {
+        std::cout << "Auto-updating is disabled. To expand the *INITIAL_AUTO macro with"
+                     " actual plan, run the test with the flag --autoUpdateAsserts\n";
+        return false;
+    }
+
+    // Compute the total number of lines added or removed before the current macro line.
+    auto& lineDeltas = gLineDeltaMap.emplace(fileName, LineDeltaVector{}).first->second;
+    int64_t totalDelta = 0;
+    for (const auto& [line, delta] : lineDeltas) {
+        if (line < lineNumber) {
+            totalDelta += delta;
+        }
+    }
+
+    const size_t replacementStartLine = lineNumber + totalDelta;
+    const size_t replacementEndLine = replacementStartLine + 1;
+
+    const std::string tempFileName = fileName + kTempFileSuffix;
+    std::string line;
+    size_t lineIndex = 0;
+
+    try {
+        std::ifstream in;
+        in.open(fileName);
+        std::ofstream out;
+        out.open(tempFileName);
+
+        // Generate a new test file, updated with the replacement string.
+        while (std::getline(in, line)) {
+            lineIndex++;
+
+            if (lineIndex < replacementStartLine || lineIndex >= replacementEndLine) {
+                out << line << "\n";
+            } else if (lineIndex == replacementStartLine) {
+                auto pos1 = line.find("_INITIAL");
+                auto pos2 = line.find("AUTO(");
+                if (pos1 == std::string::npos || pos2 == std::string::npos) {
+                    out << line << "\n";
+                    std::cout << "The macro doesn't have the expected format. Skip "
+                                 "auto-update and keep the original line "
+                              << lineIndex << std::endl;
+                } else {
+                    // Replace
+                    // ASSERT_EXPLAIN_INITIAL_AUTO(abt);
+                    // with
+                    // ASSERT_EXPLAIN_AUTO( // NOLINT
+                    //      "",
+                    //      abt);
+                    out << line.substr(0, pos1) << "_AUTO("
+                        << "  // NOLINT\n";
+                    out << "        \"\","
+                        << "\n";
+                    out << "        " << line.substr(pos2 + 5) << "\n";
+                }
+            }
+        }
+
+        out.close();
+        in.close();
+
+        std::rename(tempFileName.c_str(), fileName.c_str());
+    } catch (const std::exception& ex) {
+        // Print and re-throw exception.
+        std::cout << "Caught an exception while manipulating files: " << ex.what();
+        throw ex;
+    }
+    return true;
+}
+
+void updateDelta(const std::string& fileName, const size_t lineNumber, int64_t delta) {
+    auto& lineDeltas = gLineDeltaMap.emplace(fileName, LineDeltaVector{}).first->second;
+    lineDeltas.emplace_back(lineNumber, delta);
+}
+
+void expandActualPlan(const SourceLocation& location, const std::string& actual) {
+    const auto& fileName = location.file_name();
+    const auto& lineNumber = location.line();
+    std::cout << "expandActualPlan " << fileName << ":" << lineNumber << std::endl;
+    if (::mongo::unittest::expandNoPlanMacro(fileName, lineNumber)) {
+        ::mongo::unittest::handleAutoUpdate("", actual, fileName, lineNumber + 2, true);
+        // Update the delta with the two lines introduced by expandNoPlanMacro.
+        ::mongo::unittest::updateDelta(fileName, lineNumber, 2);
+    }
 }
 }  // namespace mongo::unittest
