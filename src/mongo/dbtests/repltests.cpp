@@ -287,15 +287,6 @@ protected:
             }
         }
 
-        if (!serverGlobalParams.enableMajorityReadConcern) {
-            if (ops.size() > 0) {
-                if (auto tsElem = ops.front()["ts"]) {
-                    _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                        tsElem.timestamp());
-                }
-            }
-        }
-
         OldClientContext ctx(&_opCtx, nss());
         for (std::vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
