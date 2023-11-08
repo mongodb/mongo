@@ -176,8 +176,7 @@ variables:
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
 # and also to the san_options in compile_static_analysis.yml and sanitizer.yml
-- aubsan_options: &aubsan_options
-  >-
+- aubsan_options: &aubsan_options >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -244,7 +243,6 @@ variables:
   - name: sasl
   - name: sharding_auth_audit_gen
 
-# TODO: SERVER-XYZ remove this duplicate task definition.
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "Enterprise RHEL 7.0"
@@ -1080,7 +1078,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-template
   name: &enterprise-rhel-80-64-bit-dynamic-debug-mode enterprise-rhel-80-64-bit-dynamic-debug-mode
   display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
-  cron: "0 4 * * 0" # Run once a week on sunday at 4am
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-expansions
@@ -1501,7 +1499,8 @@ buildvariants:
 # Classic Engine variant above.
 # TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
 # feature flag is not always-disabled.
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
+- &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
+  <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled
   display_name: "Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -1526,7 +1525,6 @@ buildvariants:
   #     variant: *linux_x86_dynamic_compile_variant_name
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer .cqf_only
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
@@ -1570,7 +1568,6 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer .cqf_only
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -1615,6 +1612,15 @@ buildvariants:
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
+
+# TODO SERVER-71163: Replace this variant with a dedicated variant for stage builders once the CQF
+# feature flag is not always-disabled.
+- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled-template
+  name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-and-cqf-enabled-fuzzers
+  display_name: "*| Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled) Fuzzers"
+  tasks:
+  - name: .aggfuzzer .cqf_only
+  - name: .query_fuzzer .cqf_only
 
 - <<: *linux_x86_dynamic_compile_variant_dependency
   name: &enterprise-rhel-80-64-bit-large-txns-format enterprise-rhel-80-64-bit-large-txns-format
@@ -1755,7 +1761,7 @@ buildvariants:
 
 - name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
-  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   modules:
   - enterprise
   run_on:
@@ -1903,7 +1909,6 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer !.cqf_only
   - name: .aggregation
   - name: aggregation_repeat_queries
   - name: audit
@@ -1914,7 +1919,6 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
-  - name: .change_stream_fuzzer
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
@@ -1948,7 +1952,6 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer !.cqf_only
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
   - name: .read_write_concern !.large
@@ -1986,13 +1989,22 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: streams
   - name: streams_auth
-  - name: .updatefuzzer
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
+
+- &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
+  <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+  name: enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers
+  display_name: "*| Amazon Linux 2 arm64 (all feature flags) Fuzzers"
+  tasks:
+  - name: .aggfuzzer !.cqf_only
+  - name: .change_stream_fuzzer
+  - name: .query_fuzzer !.cqf_only
+  - name: .updatefuzzer
 
 ###########################################
 #     Experimental buildvariants          #
@@ -2257,7 +2269,8 @@ buildvariants:
   - name: compile_test_serial_TG
   - name: compile_integration_and_test_parallel_stream_TG
   - name: check_feature_flag_tags
-  - name: .aggfuzzer !.feature_flag_guarded !.timeseries
+  # TODO SERVER-82766: timeseries and multiversion fuzzers had been timing out on TSAN builds.
+  - name: .aggfuzzer !.feature_flag_guarded !.timeseries !.multiversion
   - name: .aggregation !.feature_flag_guarded
   - name: audit
   # - name: .auth  # Not passing
@@ -2407,7 +2420,7 @@ buildvariants:
   # - name: .crypt # Doesn't pass on v4
   #   distros:
   #   - rhel80-xlarge
-  # - name: .updatefuzzer # Cannot find the variant on older versions
+  # - name: .updatefuzzer # Cannot find the variant on older versions. Should not be enabled with TSAN.
   - name: .serverless
     distros:
     - rhel80-xlarge
@@ -2797,7 +2810,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
   name: &amazon-linux2-arm64-fixed-concurrent-transactions amazon-linux2-arm64-fixed-concurrent-transactions
   display_name: "Amazon Linux 2 arm64 (Fixed Concurrent Transactions)"
-  cron: "0 0 * * 0" # From the ${project_nightly_cron} parameter. Runs every Sunday.
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   modules:
     - enterprise
   run_on:
@@ -2918,7 +2931,8 @@ buildvariants:
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
       --excludeWithAnyTags=resource_intensive,requires_sbe
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
+- &enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
+  <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only
   display_name: "~ Shared Library Enterprise RHEL 8.0 Query Patch Only (Classic Engine all feature flags)"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
@@ -2939,7 +2953,6 @@ buildvariants:
   - name: test_api_version_compatibility
   - name: check_feature_flag_tags
   - name: check_for_todos
-  - name: .aggfuzzer !.cqf_only
   - name: .aggregation !.sbe_only
   - name: aggregation_repeat_queries
   - name: audit
@@ -2949,7 +2962,6 @@ buildvariants:
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
-  - name: .change_stream_fuzzer
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
@@ -2987,7 +2999,6 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
-  - name: .query_fuzzer !.cqf_only
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
     distros:
@@ -3031,7 +3042,6 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: streams
@@ -3043,6 +3053,15 @@ buildvariants:
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
   - name: query_stats_mongos_passthrough
+
+- <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-required-query-patch-only-template
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
+  display_name: "*| Shared Library Enterprise RHEL 8.0 (Classic Engine all feature flags) Fuzzers"
+  tasks:
+  - name: .aggfuzzer !.cqf_only
+  - name: .change_stream_fuzzer
+  - name: .query_fuzzer !.cqf_only
+  - name: .updatefuzzer
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-query-patch-only
@@ -3220,7 +3239,7 @@ buildvariants:
 
 - name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
   display_name: "~ Build Metrics Enterprise RHEL 8.0 "
-  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   stepback: false
   modules:
   - enterprise
@@ -3239,7 +3258,7 @@ buildvariants:
 
 - name: &enterprise-rhel-80-aarch64-build-metrics enterprise-rhel-80-aarch64-build-metrics
   display_name: "~ Build Metrics Enterprise AL22 ARM"
-  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter
   stepback: false
   modules:
   - enterprise
