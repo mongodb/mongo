@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=protobuf
-REVISION="v3.19.5"
-VERSION="3.19.5"
+REVISION="v4.25.0"
+VERSION="4.25.0"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/protobuf
 if [[ -d $DEST_DIR/dist ]]; then
