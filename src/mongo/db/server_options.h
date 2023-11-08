@@ -94,7 +94,8 @@ struct ServerGlobalParams {
     ClusterRole clusterRole = ClusterRole::None;  // --configsvr/--shardsvr
     MaintenanceMode maintenanceMode;              // --maintenanceMode
 
-    boost::optional<int> routerPort;  // --routerPort
+    boost::optional<int> routerPort;      // --routerPort
+    bool doAutoBootstrapSharding{false};  // This is derived from other settings during startup.
 
     bool objcheck = true;  // --objcheck
 

@@ -703,6 +703,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         }
     } else if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
                serverGlobalParams.maintenanceMode == ServerGlobalParams::MaintenanceMode::None) {
+        serverGlobalParams.doAutoBootstrapSharding = true;
         serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
     }
 

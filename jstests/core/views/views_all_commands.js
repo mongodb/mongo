@@ -743,6 +743,7 @@ let viewsCommandTests = {
     top: {skip: "tested in views/views_stats.js"},
     transitionFromDedicatedConfigServer: {skip: isUnrelated},
     transitionToDedicatedConfigServer: {skip: isUnrelated},
+    transitionToShardedCluster: {skip: isUnrelated},
     unshardCollection: {
         command: {unshardCollection: "test.view", toShard: "unshard_collection-rs"},
         setup: function(conn) {

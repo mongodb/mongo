@@ -425,6 +425,7 @@ const allCommands = {
     testVersion2: {skip: isNotAUserDataRead},
     timeseriesCatalogBucketParamsChanged: {skip: isAnInternalCommand},
     top: {skip: isNotAUserDataRead},
+    transitionToShardedCluster: {skip: isNotAUserDataRead},
     update: {skip: isPrimaryOnly},
     updateRole: {skip: isPrimaryOnly},
     updateSearchIndex: {skip: isNotAUserDataRead},

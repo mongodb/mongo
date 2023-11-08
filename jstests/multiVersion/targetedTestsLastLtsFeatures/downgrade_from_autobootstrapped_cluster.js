@@ -1,5 +1,6 @@
-// Must keep until v8.0 becomes last lts
-(function() {
+// Must keep this test until v8.0 becomes last lts.
+
+import "jstests/multiVersion/libs/multi_rs.js";
 
 const kDocId = 1;
 
@@ -17,6 +18,24 @@ let makeNewCluster = function() {
         st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV, confirm: true}));
 
     return st;
+};
+
+let makeUpgradedClusterFromOldReplSet = function() {
+    let nodeOption = {binVersion: 'last-lts'};
+    // Need at least 2 nodes because upgradeSet method needs to be able call step down
+    // with another primariy eligible node available.
+    let replSet = new ReplSetTest({nodes: [nodeOption, nodeOption]});
+    replSet.startSet();
+    replSet.initiate();
+
+    replSet.upgradeSet(
+        {binVersion: 'latest', setParameter: {featureFlagAllMongodsAreSharded: true}});
+
+    let primary = replSet.getPrimary();
+    assert.commandWorked(
+        primary.adminCommand({transitionToShardedCluster: 1, writeConcern: {w: 'majority'}}));
+
+    return replSet;
 };
 
 let testCRUD = function(conn) {
@@ -107,7 +126,7 @@ let verifyConfigColl = function(conn) {
 };
 
 (function() {
-jsTest.log('Testing downgrade to sharded cluster');
+jsTest.log('Testing downgrade to sharded cluster from a fresh new cluster');
 
 let st = makeNewCluster();
 
@@ -164,7 +183,7 @@ MongoRunner.stopMongod(configConn);
 })();
 
 (function() {
-jsTest.log('Testing downgrade to replica set');
+jsTest.log('Testing downgrade to replica set from a fresh new cluster');
 
 let st = makeNewCluster();
 
@@ -200,7 +219,7 @@ MongoRunner.stopMongod(configConn);
 })();
 
 (function() {
-jsTest.log('Testing downgrade to standalone');
+jsTest.log('Testing downgrade to standalone from a fresh new cluster');
 
 let st = makeNewCluster();
 
@@ -248,4 +267,79 @@ assert.soon(() => {
 testCRUD(configConn);
 MongoRunner.stopMongod(configConn);
 })();
+
+(function() {
+jsTest.log('Testing downgrade to sharded cluster from a cluster upgraded from replSet');
+
+let replTest = makeUpgradedClusterFromOldReplSet();
+
+const mongos = MongoRunner.runMongos({configdb: replTest.getURL()});
+assert(mongos);
+assert.commandWorked(mongos.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(mongos.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
+assert.commandWorked(mongos.getDB('test').user.insert({_id: kDocId, z: 1}));
+
+// Add a shard in order to be able to transition to dedicated config
+const additionalShard = new ReplSetTest({name: "shard0", nodes: 2, nodeOptions: {shardsvr: ""}});
+additionalShard.startSet();
+additionalShard.initiate();
+
+assert.commandWorked(mongos.adminCommand({addShard: additionalShard.getURL(), name: 'shard0'}));
+assert.commandWorked(mongos.adminCommand(
+    {moveChunk: 'test.user', find: {_id: MinKey}, to: 'shard0', _waitForDelete: true}));
+assert.commandWorked(mongos.adminCommand({movePrimary: 'test', to: 'shard0'}));
+
+let res = mongos.adminCommand({transitionToDedicatedConfigServer: 1});
+assert.eq("started", res.state);
+
+assert.soon(() => {
+    return mongos.adminCommand({transitionToDedicatedConfigServer: 1}).state == 'completed';
+});
+
+let replConfig = replTest.getReplSetConfigFromNode();
+replConfig.version += 1;
+replConfig.configsvr = true;
+
+assert.commandWorked(replTest.getPrimary().adminCommand({replSetReconfig: replConfig}));
+
+MongoRunner.stopMongos(mongos);
+
+delete replTest.nodeOptions['n0'].setParameter.featureFlagAllMongodsAreSharded;
+delete replTest.nodeOptions['n1'].setParameter.featureFlagAllMongodsAreSharded;
+replTest.upgradeSet({binVersion: 'last-lts', configsvr: ''});
+additionalShard.upgradeSet({binVersion: 'last-lts'});
+
+const newOpt = Object.merge({binVersion: 'last-lts'}, mongos.fullOptions);
+let mongosConn = MongoRunner.runMongos(newOpt);
+
+testCRUD(mongosConn);
+
+MongoRunner.stopMongos(mongosConn);
+replTest.stopSet();
+additionalShard.stopSet();
+})();
+
+(function() {
+jsTest.log('Testing downgrade to replica set from a cluster upgraded from replSet');
+
+let replTest = makeUpgradedClusterFromOldReplSet();
+
+var mongos = MongoRunner.runMongos({configdb: replTest.getURL()});
+assert(mongos);
+assert.commandWorked(mongos.adminCommand({enableSharding: 'test'}));
+assert.commandWorked(mongos.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
+assert.commandWorked(mongos.getDB('test').user.insert({_id: kDocId, z: 1}));
+MongoRunner.stopMongos(mongos);
+
+delete replTest.nodeOptions['n0'].setParameter.featureFlagAllMongodsAreSharded;
+delete replTest.nodeOptions['n1'].setParameter.featureFlagAllMongodsAreSharded;
+replTest.upgradeSet({binVersion: 'last-lts'});
+
+let configConn = replTest.getPrimary();
+removeShardingMetadata(configConn);
+verifyConfigColl(configConn);
+
+testCRUD(configConn);
+
+replTest.stopSet();
 })();

@@ -77,7 +77,7 @@ void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
         // sets the _isReady promise when it sees that a shard with _id "config" has been added to
         // config.shards (which only occurs after transition to config shard has completed).
         (void)AsyncTry([this, serviceContext = opCtx->getServiceContext()] {
-            transitionToConfigShard(serviceContext);
+            _transitionToConfigShard(serviceContext);
         })
             .until([](Status status) {
                 if (!status.isOK()) {
@@ -96,7 +96,7 @@ void ShardingReady::scheduleTransitionToConfigShard(OperationContext* opCtx) {
     }
 }
 
-void ShardingReady::transitionToConfigShard(ServiceContext* serviceContext) {
+void ShardingReady::_transitionToConfigShard(ServiceContext* serviceContext) {
     // Since this function is async, we need to create a new client and operation context to run
     // 'transitionFromDedicatedConfigServer'.
     auto clientGuard =

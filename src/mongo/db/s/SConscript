@@ -556,6 +556,8 @@ env.Library(
         'shardsvr_split_chunk_command.cpp',
         'shardsvr_validate_shard_key_candidate.cpp',
         'split_vector_command.cpp',
+        'transition_to_sharded_cluster.idl',
+        'transition_to_sharded_cluster_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
         'get_sharding_ready_command.cpp',
     ],

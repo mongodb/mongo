@@ -778,6 +778,7 @@ let testCases = {
     top: {skip: "does not accept read or write concern"},
     transitionFromDedicatedConfigServer: {skip: "does not accept read or write concern"},
     transitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
+    transitionToShardedCluster: {skip: "accepts only majority"},
     unshardCollection: {skip: "does not accept read or write concern"},
     update: {
         setUp: function(conn) {

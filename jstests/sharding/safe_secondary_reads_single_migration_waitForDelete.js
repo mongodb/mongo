@@ -401,6 +401,7 @@ let testCases = {
     testVersion2: {skip: "does not return user data"},
     transitionFromDedicatedConfigServer: {skip: "primary only"},
     transitionToDedicatedConfigServer: {skip: "primary only"},
+    transitionToShardedCluster: {skip: "primary only"},
     top: {skip: "does not return user data"},
     unshardCollection: {skip: "primary only"},
     update: {skip: "primary only"},

@@ -1537,6 +1537,7 @@ const allCommands = {
         // dedicated config server, which is not allowed in a transitionary FCV.
         skip: cannotRunWhileDowngrading
     },
+    transitionToShardedCluster: {skip: isAnInternalCommand},
     unshardCollection: {skip: cannotRunWhileDowngrading},
     update: {
         setUp: function(conn) {
