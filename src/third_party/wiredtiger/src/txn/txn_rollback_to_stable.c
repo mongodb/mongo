@@ -1307,25 +1307,65 @@ __wt_rts_page_skip(
 }
 
 /*
+ * __rollback_progress_msg --
+ *     Log a verbose message about the progress of the current rollback to stable.
+ */
+static void
+__rollback_progress_msg(WT_SESSION_IMPL *session, struct timespec rollback_start,
+  uint64_t rollback_count, uint64_t *rollback_msg_count, bool walk)
+{
+    struct timespec cur_time;
+    uint64_t time_diff;
+
+    __wt_epoch(session, &cur_time);
+
+    /* Time since the rollback started. */
+    time_diff = WT_TIMEDIFF_SEC(cur_time, rollback_start);
+
+    if ((time_diff / WT_PROGRESS_MSG_PERIOD) > *rollback_msg_count) {
+        if (walk)
+            __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+              "Rollback to stable has been performing on %s for %" PRIu64
+              " seconds. For more detailed logging, enable WT_VERB_RTS ",
+              session->dhandle->name, time_diff);
+        else
+            __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+              "Rollback to stable has been running for %" PRIu64
+              " seconds and has inspected %" PRIu64
+              " files. For more detailed logging, enable WT_VERB_RTS",
+              time_diff, rollback_count);
+        *rollback_msg_count = time_diff / WT_PROGRESS_MSG_PERIOD;
+    }
+}
+
+/*
  * __rollback_to_stable_btree_walk --
  *     Called for each open handle - choose to either skip or wipe the commits
  */
 static int
 __rollback_to_stable_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
 {
+    struct timespec rollback_timer;
     WT_DECL_RET;
     WT_REF *ref;
+    uint64_t rollback_msg_count;
+
+    /* Initialize the verbose tracking timer. */
+    __wt_epoch(session, &rollback_timer);
+    rollback_msg_count = 0;
 
     /* Walk the tree, marking commits aborted where appropriate. */
     ref = NULL;
     while ((ret = __wt_tree_walk_custom_skip(session, &ref, __wt_rts_page_skip, &rollback_timestamp,
               WT_READ_NO_EVICT | WT_READ_WONT_NEED | WT_READ_VISIBLE_ALL)) == 0 &&
-      ref != NULL)
+      ref != NULL) {
+        __rollback_progress_msg(session, rollback_timer, 0, &rollback_msg_count, true);
         if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
             WT_WITH_PAGE_INDEX(
               session, ret = __rollback_abort_fast_truncate(session, ref, rollback_timestamp));
         else
             WT_RET(__rollback_abort_updates(session, ref, rollback_timestamp));
+    }
 
     return (ret);
 }
@@ -1565,31 +1605,6 @@ err:
 }
 
 /*
- * __rollback_progress_msg --
- *     Log a verbose message about the progress of the current rollback to stable.
- */
-static void
-__rollback_progress_msg(WT_SESSION_IMPL *session, struct timespec rollback_start,
-  uint64_t rollback_count, uint64_t *rollback_msg_count)
-{
-    struct timespec cur_time;
-    uint64_t time_diff;
-
-    __wt_epoch(session, &cur_time);
-
-    /* Time since the rollback started. */
-    time_diff = WT_TIMEDIFF_SEC(cur_time, rollback_start);
-
-    if ((time_diff / WT_PROGRESS_MSG_PERIOD) > *rollback_msg_count) {
-        __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
-          "Rollback to stable has been running for %" PRIu64 " seconds and has inspected %" PRIu64
-          " files. For more detailed logging, enable WT_VERB_RTS",
-          time_diff, rollback_count);
-        ++(*rollback_msg_count);
-    }
-}
-
-/*
  * __rollback_to_stable_btree_apply --
  *     Perform rollback to stable on a single file.
  */
@@ -1799,7 +1814,8 @@ __rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t ro
     WT_RET(__wt_metadata_cursor(session, &cursor));
     while ((ret = cursor->next(cursor)) == 0) {
         /* Log a progress message. */
-        __rollback_progress_msg(session, rollback_timer, rollback_count, &rollback_msg_count);
+        __rollback_progress_msg(
+          session, rollback_timer, rollback_count, &rollback_msg_count, false);
         ++rollback_count;
 
         WT_ERR(cursor->get_key(cursor, &uri));
