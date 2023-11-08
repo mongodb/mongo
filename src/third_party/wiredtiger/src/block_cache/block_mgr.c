@@ -368,9 +368,9 @@ __bm_compact_page_skip_readonly(
  *     Output compact progress message.
  */
 static void
-__bm_compact_progress(WT_BM *bm, WT_SESSION_IMPL *session, u_int *msg_countp)
+__bm_compact_progress(WT_BM *bm, WT_SESSION_IMPL *session)
 {
-    __wt_block_compact_progress(session, bm->block, msg_countp);
+    __wt_block_compact_progress(session, bm->block);
 }
 
 /*

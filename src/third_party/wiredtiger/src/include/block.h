@@ -193,7 +193,7 @@ struct __wt_bm {
     int (*compact_page_rewrite)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, bool *);
     int (*compact_page_skip)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t, bool *);
     int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, bool *);
-    void (*compact_progress)(WT_BM *, WT_SESSION_IMPL *, u_int *);
+    void (*compact_progress)(WT_BM *, WT_SESSION_IMPL *);
     int (*compact_start)(WT_BM *, WT_SESSION_IMPL *);
     int (*corrupt)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
     int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);

@@ -407,7 +407,7 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
  *     Output compact progress message.
  */
 void
-__wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *msg_countp)
+__wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     struct timespec cur_time;
     uint64_t time_diff;
@@ -419,9 +419,9 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
     __wt_epoch(session, &cur_time);
 
     /* Log one progress message every twenty seconds. */
-    time_diff = WT_TIMEDIFF_SEC(cur_time, session->compact->begin);
-    if (time_diff / WT_PROGRESS_MSG_PERIOD > *msg_countp) {
-        ++*msg_countp;
+    time_diff = WT_TIMEDIFF_SEC(cur_time, session->compact->last_progress);
+    if (time_diff > WT_PROGRESS_MSG_PERIOD) {
+        session->compact->last_progress = cur_time;
 
         /*
          * If we don't have the estimate at this point, it means that we haven't reviewed even

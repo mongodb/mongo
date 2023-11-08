@@ -311,7 +311,7 @@ __wt_compact(WT_SESSION_IMPL *session)
     WT_BM *bm;
     WT_DECL_RET;
     WT_REF *ref;
-    u_int i, msg_count;
+    u_int i;
     bool first, skip;
 
     uint64_t stats_pages_reviewed;           /* Pages reviewed */
@@ -320,7 +320,6 @@ __wt_compact(WT_SESSION_IMPL *session)
     uint64_t stats_pages_skipped;            /* Pages skipped */
 
     bm = S2BT(session)->bm;
-    msg_count = 0;
     ref = NULL;
 
     WT_STAT_DATA_INCR(session, session_compact);
@@ -366,7 +365,7 @@ __wt_compact(WT_SESSION_IMPL *session)
          */
         if (first || ++i > 100) {
             if (!first)
-                bm->compact_progress(bm, session, &msg_count);
+                bm->compact_progress(bm, session);
             WT_ERR(__wt_session_compact_check_interrupted(session));
 
             if (__wt_cache_stuck(session))
