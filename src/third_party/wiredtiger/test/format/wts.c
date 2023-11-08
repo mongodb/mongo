@@ -168,6 +168,8 @@ configure_timing_stress(char *p, size_t max)
         CONFIG_APPEND(p, ",history_store_search");
     if (GV(STRESS_HS_SWEEP))
         CONFIG_APPEND(p, ",history_store_sweep_race");
+    if (GV(STRESS_PREPARE_RESOLUTION))
+        CONFIG_APPEND(p, ",prepare_resolution");
     if (GV(STRESS_SPLIT_1))
         CONFIG_APPEND(p, ",split_1");
     if (GV(STRESS_SPLIT_2))

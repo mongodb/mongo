@@ -258,6 +258,8 @@ CONFIG configuration_list[] = {
 
 {"stress.hs_sweep", "stress history store sweep", C_BOOL, 2, 0, 0}
 
+{"stress.prepare_resolution", "stress prepare resolution", C_BOOL, 2, 0, 0}
+
 {"stress.split_1", "stress splits (#1)", C_BOOL, 2, 0, 0}
 
 {"stress.split_2", "stress splits (#2)", C_BOOL, 2, 0, 0}

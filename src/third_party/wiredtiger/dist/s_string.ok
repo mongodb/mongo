@@ -687,6 +687,7 @@ colgroup
 colgroups
 collatorp
 comparator
+comparators
 comparep
 compat
 compressStream
@@ -1413,6 +1414,7 @@ slvg
 snaplen
 snapsort
 snprintf
+sortable
 sp
 sparc
 spinlock
