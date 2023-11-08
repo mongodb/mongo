@@ -118,7 +118,7 @@
 namespace mongo {
 
 // Hangs in the beginning of each hello command when set.
-MONGO_FAIL_POINT_DEFINE(waitInHello);
+MONGO_FAIL_POINT_DEFINE(shardWaitInHello);
 // Awaitable hello requests with the proper topologyVersions will sleep for maxAwaitTimeMS on
 // standalones. This failpoint will hang right before doing this sleep when set.
 MONGO_FAIL_POINT_DEFINE(hangWaitingForHelloResponseOnStandalone);
@@ -410,7 +410,7 @@ public:
         auto cmd = HelloCommand::parse(IDLParserContext("hello", apiStrict, dbName.tenantId(), sc),
                                        cmdObj);
 
-        waitInHello.execute(
+        shardWaitInHello.execute(
             [&](const BSONObj& customArgs) { _handleHelloFailPoint(customArgs, opCtx, cmdObj); });
 
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
@@ -663,7 +663,7 @@ private:
               "cmd"_attr = cmdObj,
               "client"_attr = opCtx->getClient()->clientAddress(true),
               "desc"_attr = opCtx->getClient()->desc());
-        waitInHello.pauseWhileSet(opCtx);
+        shardWaitInHello.pauseWhileSet(opCtx);
     }
 };
 MONGO_REGISTER_COMMAND(CmdHello).forShard();

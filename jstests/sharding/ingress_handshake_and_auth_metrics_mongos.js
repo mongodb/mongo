@@ -3,6 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
+import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
 
 let runTest = (connectionHealthLoggingOn) => {
@@ -15,7 +16,8 @@ let runTest = (connectionHealthLoggingOn) => {
         preAuthDelayMillis: 50,
         postAuthDelayMillis: 100,
         helloProcessingDelayMillis: 50,
-        helloResponseDelayMillis: 100
+        helloResponseDelayMillis: 100,
+        helloFailPointName: getFailPointName("routerWaitInHello", conn.getMaxWireVersion()),
     });
 
     jsTestLog("Connecting to mongos and running the test.");

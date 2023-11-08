@@ -1327,7 +1327,7 @@ public:
         auto conn = std::move(swConn.getValue());
         uassert(ErrorCodes::SocketException, "connection failed", conn);
 
-        _configureFailPoint(conn.get());
+        _configureFailPoint(conn.get(), conn->isMongos());
         return conn;
     }
 
@@ -1349,13 +1349,15 @@ public:
     }
 
 private:
-    void _configureFailPoint(DBClientBase* conn) const {
+    void _configureFailPoint(DBClientBase* conn, bool isRouter) const {
         const auto threadName = getThreadNameByAppName(conn, _appName);
-        const auto failPointObj = BSON("configureFailPoint"
-                                       << "appendHelloOkToHelloResponse"
-                                       << "mode"
-                                       << "alwaysOn"
-                                       << "data" << BSON("threadName" << threadName));
+        // failpoint has a different name on the router
+        StringData failPointName =
+            isRouter ? "routerAppendHelloOkToHelloResponse" : "appendHelloOkToHelloResponse";
+        const auto failPointObj =
+            BSON("configureFailPoint" << failPointName << "mode"
+                                      << "alwaysOn"
+                                      << "data" << BSON("threadName" << threadName));
         auto response =
             conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, failPointObj));
         ASSERT_OK(getStatusFromCommandResult(response->getCommandReply()));

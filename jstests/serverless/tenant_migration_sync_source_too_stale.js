@@ -24,6 +24,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
@@ -93,12 +94,13 @@ hangRecipientPrimaryAfterCreatingRSM.wait();
 awaitRSClientHosts(recipientPrimary, donorSecondary, {ok: true, secondary: true});
 awaitRSClientHosts(recipientPrimary, delayedSecondary, {ok: true, secondary: true});
 
-// Turn on the 'waitInHello' failpoint. This will cause the delayed secondary to cease sending
+// Turn on the 'shardWaitInHello' failpoint. This will cause the delayed secondary to cease sending
 // hello responses and the RSM should mark the node as down. This is necessary so that the
 // delayed secondary is not chosen as the sync source here.
 jsTestLog(
-    "Turning on waitInHello failpoint. Delayed donor secondary should stop sending hello responses.");
-const helloFailpoint = configureFailPoint(delayedSecondary, "waitInHello");
+    "Turning on shardWaitInHello failpoint. Delayed donor secondary should stop sending hello responses.");
+const helloFailpoint = configureFailPoint(
+    delayedSecondary, getFailPointName("shardWaitInHello", delayedSecondary.getMaxWireVersion()));
 awaitRSClientHosts(recipientPrimary, delayedSecondary, {ok: false});
 
 hangRecipientPrimaryAfterCreatingRSM.off();

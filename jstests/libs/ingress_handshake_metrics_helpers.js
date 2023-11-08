@@ -14,6 +14,7 @@ export function ingressHandshakeMetricsTest(conn, options) {
         postAuthDelayMillis,
         helloProcessingDelayMillis,
         helloResponseDelayMillis,
+        helloFailPointName,
     } = options;
 
     const totalDelayMillis = preAuthDelayMillis + postAuthDelayMillis;
@@ -47,7 +48,7 @@ export function ingressHandshakeMetricsTest(conn, options) {
 
     function performHelloTestConnection() {
         let waitInHelloFailPoint =
-            configureFailPoint(conn, 'waitInHello', {delayMillis: helloProcessingDelayMillis});
+            configureFailPoint(conn, helloFailPointName, {delayMillis: helloProcessingDelayMillis});
         let delaySendMessageFailPoint = configureFailPoint(
             conn, 'sessionWorkflowDelayOrFailSendMessage', {millis: helloResponseDelayMillis});
         let testConn = new Mongo(conn.host);

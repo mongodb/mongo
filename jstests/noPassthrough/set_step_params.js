@@ -8,6 +8,8 @@ import {
     launchFinds
 } from "jstests/libs/conn_pool_helpers.js";
 
+import {getFailPointName} from "jstests/libs/fail_point_util.js";
+
 const kDbName = 'test';
 
 const minConns = 4;
@@ -35,6 +37,7 @@ const cfg = primary.getDB('local').system.replset.findOne();
 const allHosts = cfg.members.map(x => x.host);
 const mongosDB = mongos.getDB(kDbName);
 const primaryOnly = [primary.name];
+const waitInHelloFpName = getFailPointName("shardWaitInHello", mongos.getMaxWireVersion());
 
 var threads = [];
 var currentCheckNum = 0;
@@ -124,7 +127,7 @@ runSubTest("MaxConnecting", function() {
         ShardingTaskExecutorPoolMaxConnecting: maxPending1,
     });
 
-    configureReplSetFailpoint(st, kDbName, "waitInHello", "alwaysOn");
+    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "alwaysOn");
     configureReplSetFailpoint(st, kDbName, "waitInFindBeforeMakingBatch", "alwaysOn");
     dropConnections();
 
@@ -149,7 +152,7 @@ runSubTest("MaxConnecting", function() {
         assertHasConnPoolStats(mongos, allHosts, {pending: maxPending2}, currentCheckNum);
 
     // Release our pending and walk away
-    configureReplSetFailpoint(st, kDbName, "waitInHello", "off");
+    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "off");
     currentCheckNum =
         assertHasConnPoolStats(mongos,
                                allHosts,
@@ -190,7 +193,7 @@ runSubTest("Timeouts", function() {
     currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {ready: conns}, currentCheckNum);
 
     // Block refreshes and wait for the toRefresh timeout
-    configureReplSetFailpoint(st, kDbName, "waitInHello", "alwaysOn");
+    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "alwaysOn");
     sleep(toRefreshTimeoutMS);
 
     // Confirm that we're in pending for all of our conns
@@ -205,7 +208,7 @@ runSubTest("Timeouts", function() {
     sleep(pendingTimeoutMS);
     currentCheckNum = assertHasConnPoolStats(mongos, allHosts, {}, currentCheckNum);
 
-    configureReplSetFailpoint(st, kDbName, "waitInHello", "off");
+    configureReplSetFailpoint(st, kDbName, waitInHelloFpName, "off");
 
     // Reset the min conns to make sure normal refresh doesn't extend the timeout
     updateSetParameters({
