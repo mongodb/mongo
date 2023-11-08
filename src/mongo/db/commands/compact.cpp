@@ -99,8 +99,10 @@ public:
              BSONObjBuilder& result) override {
         NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
-        auto sc = SerializationContext::stateCommandRequest();
-        sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+        const auto sc = vts != boost::none
+            ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+            : SerializationContext::stateCommandRequest();
 
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto params = CompactCommand::parse(

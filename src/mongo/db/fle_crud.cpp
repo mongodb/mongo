@@ -1882,13 +1882,14 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     as->grantInternalAuthorization(opCtx.get());
 
     const auto setDollarTenant = nss.tenantId() && gMultitenancySupport;
-    auto sc = SerializationContext::stateCommandRequest();
+    const auto vts = auth::ValidatedTenancyScope::get(_opCtx);
 
     // We need to instruct the request object (via serialization context passed in when constructing
     // getCountsCmd) that we do not ALSO prefix the $db field when serialize() is later called since
     // we will already be setting the $tenant field below.  Providing both a tenant prefix and a
     // $tenant field is unsupported and can lead to namespace errors.
-    sc.setTenantIdSource(setDollarTenant);
+    auto sc = SerializationContext::stateCommandRequest(
+        setDollarTenant, vts != boost::none && vts->isFromAtlasProxy());
 
     GetQueryableEncryptionCountInfo getCountsCmd(nss, sc);
 

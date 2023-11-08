@@ -271,8 +271,10 @@ CanonicalDistinct CanonicalDistinct::parseFromBSON(
     const ExtensionsCallback& extensionsCallback,
     const CollatorInterface* defaultCollator,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto serializationContext = SerializationContext::stateCommandRequest();
-    serializationContext.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+    const auto serializationContext = vts != boost::none
+        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+        : SerializationContext::stateCommandRequest();
 
     auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
         IDLParserContext(

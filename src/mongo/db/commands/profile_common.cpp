@@ -60,8 +60,10 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
                                              const BSONObj& cmdObj) const {
     AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
 
-    auto sc = SerializationContext::stateCommandRequest();
-    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+    auto sc = vts != boost::none
+        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+        : SerializationContext::stateCommandRequest();
 
     auto request = ProfileCmdRequest::parse(
         IDLParserContext("profile", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
@@ -88,8 +90,10 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
                          const DatabaseName& dbName,
                          const BSONObj& cmdObj,
                          BSONObjBuilder& result) {
-    auto sc = SerializationContext::stateCommandRequest();
-    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+    const auto sc = vts != boost::none
+        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+        : SerializationContext::stateCommandRequest();
 
     auto request = ProfileCmdRequest::parse(
         IDLParserContext("profile", false /*apiStrict*/, dbName.tenantId(), sc), cmdObj);
