@@ -207,7 +207,7 @@ export function assertExpectedResults(results,
                                       expectedDocsReturnedMin,
                                       expectedDocsReturnedSumOfSq,
                                       getMores) {
-    const {key, metrics} = results;
+    const {key, metrics, asOf} = results;
     confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
     assert.eq(expectedExecCount, metrics.execCount);
     assert.docEq({
@@ -231,6 +231,7 @@ export function assertExpectedResults(results,
     assert.neq(lastExecutionMicros, NumberLong(0));
     assert.neq(firstSeenTimestamp.getTime(), 0);
     assert.neq(latestSeenTimestamp.getTime(), 0);
+    assert.neq(asOf.getTime(), 0);
 
     const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
     for (const field of distributionFields) {

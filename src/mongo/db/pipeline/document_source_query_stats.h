@@ -170,7 +170,7 @@ private:
 
         bool isValidPartitionId(QueryStatsStore::PartitionId maxNumPartitions) const;
 
-        const Timestamp& getReadTimestamp() const;
+        const Date_t& getReadTimestamp() const;
 
         bool empty() const;
 
@@ -179,7 +179,7 @@ private:
         std::deque<QueryStatsEntry> statsEntries;
 
     private:
-        Timestamp _readTimestamp;
+        Date_t _readTimestamp;
         QueryStatsStore::PartitionId _partitionId;
         bool _isLoaded{false};
     };
@@ -198,7 +198,7 @@ private:
 
     GetNextResult doGetNext() final;
 
-    boost::optional<Document> toDocument(const Timestamp& partitionReadTime,
+    boost::optional<Document> toDocument(const Date_t& partitionReadTime,
                                          const QueryStatsEntry& queryStatsEntry) const;
 
     // The current partition copied from query stats store to avoid holding lock during reads.
