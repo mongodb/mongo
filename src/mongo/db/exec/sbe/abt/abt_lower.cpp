@@ -411,7 +411,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
         return handleShardFilterFunctionCall(fn, args, name);
     }
 
-    if (name == parameterFunctionName) {
+    if (name == kParameterFunctionName) {
         uassert(8128700, "Invalid number of arguments to getParam()", fn.nodes().size() == 2);
         const auto* paramId = fn.nodes().at(0).cast<Constant>();
         auto paramIdVal = paramId->getValueInt32();

@@ -128,6 +128,16 @@ inline auto _cbool(const bool val) {
     return ExprHolder{Constant::boolean(val)};
 }
 
+// MinKey constant.
+inline auto _cminKey() {
+    return ExprHolder{Constant::minKey()};
+}
+
+// MaxKey constant.
+inline auto _cmaxKey() {
+    return ExprHolder{Constant::maxKey()};
+}
+
 // Array constant. We expect the arguments to be Constants.
 inline auto _carray(auto&&... elements) {
     using namespace sbe::value;

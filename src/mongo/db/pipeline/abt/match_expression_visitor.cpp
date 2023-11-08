@@ -260,7 +260,7 @@ public:
 
             if (expr->getInputParamId())
                 result =
-                    make<FunctionCall>(parameterFunctionName,
+                    make<FunctionCall>(kParameterFunctionName,
                                        makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
                                                               *expr->getInputParamId()),
                                                make<Constant>(sbe::value::TypeTags::NumberInt32,
@@ -271,7 +271,7 @@ public:
         } else {
             if (expr->getInputParamId()) {
                 result =
-                    make<FunctionCall>(parameterFunctionName,
+                    make<FunctionCall>(kParameterFunctionName,
                                        makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32,
                                                               *expr->getInputParamId()),
                                                make<Constant>(sbe::value::TypeTags::NumberInt32,
@@ -486,7 +486,7 @@ public:
         auto result = [&]() {
             if (expr->getInputParamId())
                 return make<FunctionCall>(
-                    parameterFunctionName,
+                    kParameterFunctionName,
                     makeSeq(
                         make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
                         make<Constant>(sbe::value::TypeTags::NumberInt32,
@@ -598,7 +598,7 @@ private:
         auto result = ABT{make<PathIdentity>()};
         if (expr->getInputParamId())
             result = make<FunctionCall>(
-                parameterFunctionName,
+                kParameterFunctionName,
                 makeSeq(make<Constant>(sbe::value::TypeTags::NumberInt32, *expr->getInputParamId()),
                         make<Constant>(sbe::value::TypeTags::NumberInt32, static_cast<int>(tag))));
         else

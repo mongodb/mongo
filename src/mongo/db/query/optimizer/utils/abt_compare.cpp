@@ -454,9 +454,64 @@ CmpResult cmpEqFast(const ABT& lhs, const ABT& rhs) {
     return CmpResult::kIncomparable;
 }
 
+namespace {
+
+// Returns true if the given ABT represent a query parameter, otherwise returns false.
+bool isParameter(const ABT& abt) {
+    auto p = abt.cast<FunctionCall>();
+    if (!p) {
+        return false;
+    }
+    return p->name() == kParameterFunctionName;
+}
+
+// Given an ABT representing a query parameter, return the type tag of the parameter.
+sbe::value::TypeTags parameterType(const ABT& abt) {
+    // See defintion of 'kParameterFunctionName' for details about representation of query
+    // parameters in ABT.
+    return static_cast<sbe::value::TypeTags>(
+        abt.cast<FunctionCall>()->nodes()[1].cast<Constant>()->get().second);
+}
+
+// Compare two type tags for the purposes of constant evaluation of FunctionCall[getParam]
+// expressions which are guarenteed to evaluate to the specified SBE type.
+// This function returns kIncomparable if the given type tags are of the same canonical BSON type.
+// This is becuase we cannot determine anything about two expressions that are of the same type.
+// If the two tags are of different canonical BSON types, this function will compare them according
+// to the specified operation. For example, in the BSON order, integers are always less than
+// strings.
+CmpResult cmpTags(Operations op, sbe::value::TypeTags lhsTag, sbe::value::TypeTags rhsTag) {
+    auto lhsBsonType = tagToType(lhsTag);
+    auto rhsBsonType = tagToType(rhsTag);
+    auto result = canonicalizeBSONType(lhsBsonType) - canonicalizeBSONType(rhsBsonType);
+    // If the lhs and rhs have the same type, return incomparable since we have no information about
+    // their values.
+    if (result == 0) {
+        return CmpResult::kIncomparable;
+    }
+    // By this point, there is no difference betwen Lt/Lte and Gt/Gte since we know the types
+    // are different.
+    switch (op) {
+        case Operations::Lt:
+        case Operations::Lte:
+            return (result < 0) ? CmpResult::kTrue : CmpResult::kFalse;
+        case Operations::Gt:
+        case Operations::Gte:
+            return (result > 0) ? CmpResult::kTrue : CmpResult::kFalse;
+        case Operations::Cmp3w:
+            return (result > 0) ? CmpResult::kGt : CmpResult::kLt;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+}  // namespace
+
 CmpResult cmp3wFast(Operations op, const ABT& lhs, const ABT& rhs) {
     const auto lhsConst = lhs.cast<Constant>();
     const auto rhsConst = rhs.cast<Constant>();
+    const bool isLhsParam = isParameter(lhs);
+    const bool isRhsParam = isParameter(rhs);
 
     if (lhsConst) {
         const auto [lhsTag, lhsVal] = lhsConst->get();
@@ -486,6 +541,8 @@ CmpResult cmp3wFast(Operations op, const ABT& lhs, const ABT& rhs) {
                 default:
                     MONGO_UNREACHABLE;
             }
+        } else if (isRhsParam) {
+            return cmpTags(op, lhsTag, parameterType(rhs));
         } else {
             if (lhsTag == sbe::value::TypeTags::MinKey) {
                 switch (op) {
@@ -510,6 +567,10 @@ CmpResult cmp3wFast(Operations op, const ABT& lhs, const ABT& rhs) {
     } else if (rhsConst) {
         const auto [rhsTag, rhsVal] = rhsConst->get();
 
+        if (isLhsParam) {
+            return cmpTags(op, parameterType(lhs), rhsTag);
+        }
+
         if (rhsTag == sbe::value::TypeTags::MinKey) {
             switch (op) {
                 case Operations::Lt:
@@ -529,6 +590,10 @@ CmpResult cmp3wFast(Operations op, const ABT& lhs, const ABT& rhs) {
                     break;
             }
         }
+    }
+
+    if (isLhsParam && isRhsParam) {
+        return cmpTags(op, parameterType(lhs), parameterType(rhs));
     }
 
     return CmpResult::kIncomparable;

@@ -37,15 +37,6 @@
 
 
 namespace mongo::optimizer {
-/**
- * Function that replaces parameterized constants in a MatchExpression with their corresponding
- * param id's in ABT.
- *
- * Represented by an ABT FunctionCall node with two children:
- * (1) parameter id (int) that maps to the constant value
- * (2) enum/int representation of the constant's sbe type tag
- */
-static constexpr auto parameterFunctionName = "getParam";
 
 /**
  * Returns a path encoding the match expression.

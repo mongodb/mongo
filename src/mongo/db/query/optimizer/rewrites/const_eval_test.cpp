@@ -36,6 +36,10 @@
 
 namespace mongo::optimizer {
 namespace {
+
+using namespace unit_test_abt_literals;
+using namespace sbe::value;
+
 TEST(ConstEvalTest, RIDUnion) {
     using namespace properties;
 
@@ -95,5 +99,131 @@ TEST(ConstEvalTest, FoldRedundantExists) {
         "Const [true]\n",
         exists);
 }
+
+ExprHolder getParam(TypeTags typeTag) {
+    return _fn(
+        kParameterFunctionName, "0"_cint64, ExprHolder{Constant::int32(static_cast<int>(typeTag))});
+}
+
+TEST(ConstEvalTest, GetParamMinKey) {
+    ABT abt = _binary("Gt", _cminKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Gte", _cminKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Lt", _cminKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Lte", _cminKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Gt", getParam(TypeTags::NumberInt32), _cminKey())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Gte", getParam(TypeTags::NumberInt32), _cminKey())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Lt", getParam(TypeTags::NumberInt32), _cminKey())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Lt", getParam(TypeTags::NumberInt32), _cminKey())._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Cmp3w", _cminKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [-1]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, GetParamMaxKey) {
+    ABT abt = _binary("Lt", _cmaxKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [false]\n",
+        abt);
+
+    abt = _binary("Gt", _cmaxKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+
+    abt = _binary("Cmp3w", _cmaxKey(), getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [1]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, GetParamSameType) {
+    ABT abt = _binary("Lt", "5"_cint64, getParam(TypeTags::NumberInt32))._n;
+    ConstEval::constFold(abt);
+    // Can't simplify this expression since getParam might evaluate to any number.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Lt]\n"
+        "|   FunctionCall [getParam]\n"
+        "|   |   Const [1]\n"
+        "|   Const [0]\n"
+        "Const [5]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, GetParamDiffType) {
+    ABT abt = _binary("Lt", "5"_cint64, getParam(TypeTags::ObjectId))._n;
+    ConstEval::constFold(abt);
+    // The number 5 is always less than an ObjectId
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, GetParamDifferentNumberTypes) {
+    ABT abt = _binary("Lt", "5"_cint64, getParam(TypeTags::NumberDouble))._n;
+    ConstEval::constFold(abt);
+    // Can't simplify this expression since getParam(double) is the same canonicalized BSON type as
+    // the integer constant.
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "BinaryOp [Lt]\n"
+        "|   FunctionCall [getParam]\n"
+        "|   |   Const [3]\n"
+        "|   Const [0]\n"
+        "Const [5]\n",
+        abt);
+}
+
+TEST(ConstEvalTest, GetParamTwoParams) {
+    ABT abt = _binary("Lt", getParam(TypeTags::NumberInt32), getParam(TypeTags::ObjectId))._n;
+    ConstEval::constFold(abt);
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT
+        "Const [true]\n",
+        abt);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer
