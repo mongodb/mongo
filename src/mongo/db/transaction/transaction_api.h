@@ -312,10 +312,12 @@ public:
     SEPTransactionClient(OperationContext* opCtx,
                          std::shared_ptr<executor::InlineExecutor> inlineExecutor,
                          std::shared_ptr<executor::InlineExecutor::SleepableExecutor> executor,
+                         std::shared_ptr<executor::TaskExecutor> cancelExecutor,
                          std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
         : _serviceContext(opCtx->getServiceContext()),
           _inlineExecutor(inlineExecutor),
           _executor(executor),
+          _cancelExecutor(cancelExecutor),
           _behaviors(std::move(behaviors)) {}
 
     SEPTransactionClient(const SEPTransactionClient&) = delete;
@@ -370,6 +372,7 @@ private:
     ServiceContext* const _serviceContext;
     std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
     std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;
+    std::shared_ptr<executor::TaskExecutor> _cancelExecutor;
     std::unique_ptr<SEPTransactionClientBehaviors> _behaviors;
     std::unique_ptr<details::TxnHooks> _hooks;
 };

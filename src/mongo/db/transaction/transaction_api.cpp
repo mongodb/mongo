@@ -132,6 +132,7 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
                           opCtx,
                           inlineExecutor,
                           _sleepExec,
+                          _cleanupExecutor,
                           std::make_unique<details::DefaultSEPTransactionClientBehaviors>()))) {
     // Callers should always provide a yielder when using the API with a session checked out,
     // otherwise commands run by the API won't be able to check out that session.
@@ -474,7 +475,8 @@ ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& db
     // Note that _token is only cancelled once the caller of the transaction no longer cares about
     // its result, so CancelableOperationContexts only being interrupted by ErrorCodes::Interrupted
     // shouldn't impact any upstream retry logic.
-    auto opCtxFactory = CancelableOperationContextFactory(_hooks->getTokenForCommand(), _executor);
+    auto opCtxFactory =
+        CancelableOperationContextFactory(_hooks->getTokenForCommand(), _cancelExecutor);
 
     auto cancellableOpCtx = opCtxFactory.makeOperationContext(&cc());
 

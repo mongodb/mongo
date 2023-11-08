@@ -442,7 +442,11 @@ protected:
         _inlineExecutor = std::make_shared<executor::InlineExecutor>();
 
         auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
-            opCtx(), _inlineExecutor, _inlineExecutor->getSleepableExecutor(_executor), nullptr);
+            opCtx(),
+            _inlineExecutor,
+            _inlineExecutor->getSleepableExecutor(_executor),
+            _executor,
+            nullptr);
         _mockClient = mockClient.get();
         _txnWithRetries =
             std::make_unique<txn_api::SyncTransactionWithRetries>(opCtx(),
@@ -494,6 +498,7 @@ protected:
             opCtx(),
             _inlineExecutor,
             _inlineExecutor->getSleepableExecutor(executorToUse),
+            executorToUse,
             nullptr);
         _mockClient = mockClient.get();
         if (resourceYielder) {
