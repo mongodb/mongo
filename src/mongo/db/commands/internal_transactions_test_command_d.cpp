@@ -55,6 +55,7 @@ public:
                     opCtx,
                     inlineExecutor,
                     sleepInlineExecutor,
+                    executor,
                     std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
                         opCtx->getServiceContext())));
         }
