@@ -35,7 +35,6 @@ const expectedParamDefaults = {
     internalQueryExecYieldPeriodMS: 10,
     internalQueryFacetBufferSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024,
-    internalDocumentSourceCursorInitialBatchSize: 4,
     internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
@@ -216,10 +215,6 @@ assertSetParameterFails("internalInsertMaxBatchSize", -1);
 assertSetParameterSucceeds("internalDocumentSourceCursorBatchSizeBytes", 11);
 assertSetParameterSucceeds("internalDocumentSourceCursorBatchSizeBytes", 0);
 assertSetParameterFails("internalDocumentSourceCursorBatchSizeBytes", -1);
-
-assertSetParameterSucceeds("internalDocumentSourceCursorInitialBatchSize", 11);
-assertSetParameterSucceeds("internalDocumentSourceCursorInitialBatchSize", 0);
-assertSetParameterFails("internalDocumentSourceCursorInitialBatchSize", -1);
 
 assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 11);
 assertSetParameterSucceeds("internalDocumentSourceLookupCacheSizeBytes", 0);

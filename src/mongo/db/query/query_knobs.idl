@@ -482,17 +482,6 @@ server_parameters:
     validator:
       gte: 0
 
-  internalDocumentSourceCursorInitialBatchSize:
-    description: "The initial number of documents that DocumentSourceCursor will cache from the
-    underlying PlanExecutor, the batch size will grow exponentially until reaching
-    internalDocumentSourceCursorBatchSizeBytes, A value of 0 means unlimited."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalDocumentSourceCursorInitialBatchSize"
-    cpp_vartype: AtomicWord<int>
-    default: 4
-    validator:
-      gte: 0
-
   internalDocumentSourceLookupCacheSizeBytes:
     description: "Maximum amount of non-correlated foreign-collection data that the $lookup stage
     will cache before abandoning the cache and executing the full pipeline on each iteration."
@@ -849,7 +838,7 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
-
+  
   internalCascadesOptimizerSampleChunks:
     description: "Controls the number of chunks to sample for CE."
     set_at: [ startup, runtime ]
@@ -915,7 +904,7 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
     test_only: true
-
+  
   internalCascadesOptimizerEnableNotPushdown:
     description: "Enables the NotPushdown optimization which attempts to remove Not nodes by pushing them down towards the leaves."
     set_at: [ startup, runtime ]
@@ -1257,7 +1246,7 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryEnableBooleanExpressionsSimplifier:
-    description: "Boolean expression simplifier converts filter expression into Disjunctive Normal
+    description: "Boolean expression simplifier converts filter expression into Disjunctive Normal 
      Form and applies some simplifications."
     set_at: [ startup, runtime ]
     cpp_varname: internalQueryEnableBooleanExpressionsSimplifier
@@ -1280,7 +1269,7 @@ server_parameters:
     default: 1000
 
   internalQueryMaxSizeFactorToSimplify:
-    description: "If the simplified expression is larger than the original expression's size times
+    description: "If the simplified expression is larger than the original expression's size times 
       `internalQueryMaxSizeFactorToSimplify`, the simplified one will be rejected."
     set_at: [ startup, runtime ]
     cpp_varname: internalQueryMaxSizeFactorToSimplify
@@ -1362,7 +1351,7 @@ server_parameters:
     default: 1024
     validator:
         gt: 0
-
+  
   internalQuerySlotBasedExecutionDisableTimeSeriesPushdown:
     description: "If true, the system will not push down time-series queries to the SBE execution engine."
     set_at: [ startup, runtime ]

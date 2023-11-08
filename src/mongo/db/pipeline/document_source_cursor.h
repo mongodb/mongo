@@ -250,13 +250,6 @@ private:
             return _resumeTokens.front();
         }
 
-        /**
-         * Returns the number of documents currently in the batch.
-         */
-        size_t count() const {
-            return _type == CursorType::kRegular ? _batchOfDocs.size() : _count;
-        }
-
     private:
         // If 'kEmptyDocuments', then dependency analysis has indicated that all we need to execute
         // the query is a count of the incoming documents.
@@ -304,16 +297,6 @@ private:
      */
     void _updateNonOplogResumeToken();
 
-    /**
-     * Initialize the exponential growth batch size which allows for batching a small number of
-     * documents when no $limit is pushed down into underlying executor. This approach can offer a
-     * performance benefit when only a limited amount of data is required. However, small batching
-     * may necessitate multiple yields in a potentially fast query, that's why we avoid to do so
-     * when $limit is pushed down. Note that we still maintain a separate size limit in bytes
-     * controlled by 'internalDocumentSourceCursorBatchSizeBytes' parameter.
-     */
-    void initializeBatchSizeCounts();
-
     // Batches results returned from the underlying PlanExecutor.
     Batch _currentBatch;
 
@@ -349,11 +332,6 @@ private:
     DocumentSourceCursorStats _stats;
 
     PlanExecutor::QueryFramework _queryFramework;
-
-    // The size of each batch, grows exponentially. 0 means unlimited.
-    size_t _batchSizeCount = 0;
-    // The size limit in bytes of each batch.
-    size_t _batchSizeBytes = 0;
 };
 
 }  // namespace mongo
