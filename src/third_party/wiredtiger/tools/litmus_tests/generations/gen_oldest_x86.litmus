@@ -1,0 +1,12 @@
+X86 wt_gen_oldest
+{
+conn_gen=5;
+}
+
+P0                   | P1                   | P2                       ;
+MOV EAX, [conn_gen]  | MOV EAX,[conn_gen]   | LOCK; ADD [conn_gen], $1 ;
+MOV EBX, [sess_gen]  | MOV [sess_gen], EAX  |                          ;
+                     | MFENCE               |                          ;
+                     | MOV EBX,[conn_gen]   |                          ;
+
+exists (0:EAX=6 /\ 0:EBX=0 /\ 1:EAX=5 /\ 1:EBX=5)

@@ -1,0 +1,14 @@
+AArch64 wt_gen_drain
+{
+conn_gen=5;
+0:X0=conn_gen; 0:X1=sess_gen;
+1:X0=conn_gen; 1:X1=sess_gen;
+}
+
+ P0                   | P1             ;
+ MOV X9, #1           | LDR X2, [X0]   ;
+ ldaddal X9, X2, [X0] | STR X2, [X1]   ;
+ LDR X2, [X1]         | dmb ish        ;
+                      | LDR X3, [X0]   ;
+
+exists (0:X2=0 /\ 1:X2=5 /\ 1:X3=5)
