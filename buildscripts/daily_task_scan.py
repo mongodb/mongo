@@ -49,6 +49,7 @@ def process_version(version: evergreen.Version) -> None:
 def main(expansions_file: str, output_file: str) -> int:
     expansions = read_config_file(expansions_file)
     current_task_id = expansions.get("task_id", None)
+    is_patch = expansions.get("is_patch", False)
 
     today = datetime.datetime.utcnow().date()
     start_of_today = datetime.datetime(today.year, today.month, today.day, tzinfo=tz.UTC)
@@ -132,10 +133,11 @@ def main(expansions_file: str, output_file: str) -> int:
         f"For more details view the `Task Errors` file <https://spruce.mongodb.com/task/{current_task_id}/files|here>."
     )
 
-    evg_api.send_slack_message(
-        target="#sdp-triager",
-        msg="\n".join(msg),
-    )
+    if not is_patch:
+        evg_api.send_slack_message(
+            target="#sdp-triager",
+            msg="\n".join(msg),
+        )
 
     return 1
 
