@@ -147,13 +147,27 @@ __wt_curstat_table_init(
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
+    stats = &cst->u.dsrc_stats;
+
+    /*
+     * If gathering statistics for a simple table, retrieve the underlying file's statistics rather
+     * than going through the usual schema parsing flow. This avoids unnecessary overhead in the
+     * statistics gathering process.
+     *
+     * There will always be at least one column group for a table.
+     */
+    if (table->is_simple) {
+        WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", table->cgroups[0]->name));
+        WT_ERR(__wt_curstat_init(session, buf->data, NULL, cfg, cst));
+        goto done;
+    }
+
     /*
      * Process the column groups.
      *
      * Set the cursor to reference the data source statistics; we don't initialize it, instead we
      * copy (rather than aggregate), the first column's statistics, which has the same effect.
      */
-    stats = &cst->u.dsrc_stats;
     for (i = 0; i < WT_COLGROUPS(table); i++) {
         WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", table->cgroups[i]->name));
         WT_ERR(__wt_curstat_open(session, buf->data, NULL, cfg, &stat_cursor));
@@ -177,6 +191,7 @@ __wt_curstat_table_init(
 
     __wt_curstat_dsrc_final(cst);
 
+done:
 err:
     WT_TRET(__wt_schema_release_table(session, &table));
 

@@ -245,10 +245,6 @@ __schema_open_index(
     const char *idxconf, *name, *tablename, *uri;
     bool match;
 
-    /* Check if we've already done the work. */
-    if (idxname == NULL && table->idx_complete)
-        return (0);
-
     cursor = NULL;
     idx = NULL;
     match = false;
@@ -371,6 +367,10 @@ __wt_schema_open_index(
   WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len, WT_INDEX **indexp)
 {
     WT_DECL_RET;
+
+    /* Check if we've already done the work. */
+    if (idxname == NULL && table->idx_complete)
+        return (0);
 
     WT_WITH_TABLE_WRITE_LOCK(session,
       WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
