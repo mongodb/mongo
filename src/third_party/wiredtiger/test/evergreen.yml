@@ -167,7 +167,7 @@ functions:
           ${CMAKE_INSTALL_PREFIX|-DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL} \
           ${CMAKE_PREFIX_PATH|-DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"} \
           ${CMAKE_TOOLCHAIN_FILE|-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake} \
-          ${ENABLE_TCMALLOC|}
+          ${ENABLE_TCMALLOC|} \
           ${NONSTANDALONE|} \
           ${ENABLE_SHARED|} \
           ${ENABLE_STATIC|} \
