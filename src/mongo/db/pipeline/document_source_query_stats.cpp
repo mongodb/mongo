@@ -39,7 +39,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source_query_stats_gen.h"
@@ -239,7 +238,7 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
 }
 
 boost::optional<Document> DocumentSourceQueryStats::toDocument(
-    const Timestamp& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
+    const Date_t& partitionReadTime, const QueryStatsEntry& queryStatsEntry) const {
     const auto& key = queryStatsEntry.key;
     const auto& hash = absl::HashOf(key);
     try {
@@ -287,7 +286,7 @@ void DocumentSourceQueryStats::CopiedPartition::load(QueryStatsStore& queryStats
     statsEntries.clear();
 
     // Capture the time at which reading the partition begins.
-    _readTimestamp = Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0);
+    _readTimestamp = Date_t::now();
     {
         // We only keep the partition (which holds a lock)
         // for the time needed to collect the metrics (QueryStatsEntry)
@@ -317,7 +316,7 @@ bool DocumentSourceQueryStats::CopiedPartition::isValidPartitionId(
     return _partitionId < maxNumPartitions;
 }
 
-const Timestamp& DocumentSourceQueryStats::CopiedPartition::getReadTimestamp() const {
+const Date_t& DocumentSourceQueryStats::CopiedPartition::getReadTimestamp() const {
     return _readTimestamp;
 }
 
