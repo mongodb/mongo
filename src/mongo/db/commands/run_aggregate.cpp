@@ -107,6 +107,9 @@ using std::unique_ptr;
 CounterMetric allowDiskUseFalseCounter("query.allowDiskUseFalse");
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterCreatingAggregationPlan);
+
 /**
  * If a pipeline is empty (assuming that a $cursor stage hasn't been created yet), it could mean
  * that we were able to absorb all pipeline stages and pull them into a single PlanExecutor. So,
@@ -1101,6 +1104,9 @@ Status runAggregate(OperationContext* opCtx,
     // cursor manager. The global cursor manager does not deliver invalidations or kill
     // notifications; the underlying PlanExecutor(s) used by the pipeline will be receiving
     // invalidations and kill notifications themselves, not the cursor we create here.
+    hangAfterCreatingAggregationPlan.executeIf(
+        [](const auto&) { hangAfterCreatingAggregationPlan.pauseWhileSet(); },
+        [&](const BSONObj& data) { return uuid && UUID::parse(data["uuid"]) == *uuid; });
 
     std::vector<ClientCursorPin> pins;
     std::vector<ClientCursor*> cursors;
