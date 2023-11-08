@@ -66,20 +66,20 @@ public:
      * If the functionality of this function changes, make sure that the
      * isEnabled/isPresentAndEnabled functions in feature_flag_util.js also incorporate the change.
      */
-    bool isEnabled(const ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabled(ServerGlobalParams::FCVSnapshot fcv) const;
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
      * is unset, instead checks against the default last LTS FCV version.
      */
-    bool isEnabledUseLastLTSFCVWhenUninitialized(const ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabledUseLastLTSFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
 
 
     /**
      * Returns true if the flag is set to true and enabled for this FCV version. If the FCV version
      * is unset, instead checks against the latest FCV version.
      */
-    bool isEnabledUseLatestFCVWhenUninitialized(const ServerGlobalParams::FCVSnapshot fcv) const;
+    bool isEnabledUseLatestFCVWhenUninitialized(ServerGlobalParams::FCVSnapshot fcv) const;
 
     /**
      * Returns true if this flag is enabled regardless of the current FCV version. When using this
