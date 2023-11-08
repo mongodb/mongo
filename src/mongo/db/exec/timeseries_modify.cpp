@@ -599,12 +599,16 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
         // it in memory.
         [&] { /* noop */ });
 
-    if (status == NEED_YIELD && isEOF()) {
+    if (status == NEED_YIELD && isEOF() && !opCtx()->lockState()->inAWriteUnitOfWork()) {
         // If this stage is already exhausted it won't use its children stages anymore and therefore
         // it's okay if we failed to restore them. Avoid requesting a yield to the plan executor.
         // Restoring from yield could fail due to a sharding placement change. Throwing a
         // StaleConfig error is undesirable after an "update one" operation has already performed a
         // write because the router would retry.
+        //
+        // If this plan is part of a larger encompassing WUOW it would be illegal to skip returning
+        // NEED_YIELD, so we don't skip it. In this case, such as multi-doc transactions, this is
+        // okay as the PlanExecutor is not allowed to auto-yield.
         status = PlanStage::NEED_TIME;
     }
 
