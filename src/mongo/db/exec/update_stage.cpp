@@ -597,13 +597,18 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             });
 
         if (restoreStateRet != PlanStage::NEED_TIME) {
-            if (restoreStateRet == PlanStage::NEED_YIELD && stageIsEOF) {
+            if (restoreStateRet == PlanStage::NEED_YIELD && stageIsEOF &&
+                !opCtx()->lockState()->inAWriteUnitOfWork()) {
                 // If this stage is already exhausted it won't use its children stages anymore and
                 // therefore it's okay if we failed to restore them. Avoid requesting a yield to the
                 // plan executor. Restoring from yield could fail due to a sharding placement
                 // change. Throwing a StaleConfig error is undesirable after an "update one"
                 // operation has already performed a write because the router would retry. Unset
                 // _idReturning as we'll return the document in this stage iteration.
+                //
+                // If this plan is part of a larger encompassing WUOW it would be illegal to skip
+                // returning NEED_YIELD, so we don't skip it. In this case, such as multi-doc
+                // transactions, this is okay as the PlanExecutor is not allowed to auto-yield.
                 _idReturning = WorkingSet::INVALID_ID;
             } else {
                 return restoreStateRet;
