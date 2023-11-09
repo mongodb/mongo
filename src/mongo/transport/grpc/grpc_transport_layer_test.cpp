@@ -530,8 +530,8 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceeds) {
             auto initialBadStub =
                 CommandServiceTestFixtures::makeStubWithCerts(kTrustedCAFile, kTrustedClientFile);
 
-            initialGoodStub.assertConnected();
-            initialBadStub.assertNotConnected();
+            ASSERT_GRPC_STUB_CONNECTED(initialGoodStub);
+            ASSERT_GRPC_STUB_NOT_CONNECTED(initialBadStub);
 
             // Overwrite the tmp files to hold new certs.
             boost::filesystem::copy_file(kTrustedCAFile,
@@ -543,8 +543,8 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceeds) {
 
             ASSERT_OK(tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false));
 
-            initialGoodStub.assertConnected();
-            initialBadStub.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(initialGoodStub);
+            ASSERT_GRPC_STUB_CONNECTED(initialBadStub);
         },
         CommandServiceTestFixtures::makeTLOptions());
 }
@@ -557,14 +557,14 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceedsWhenU
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            stub.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(stub);
 
             ASSERT_OK(tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false));
 
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            stub2.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(stub2);
         },
         CommandServiceTestFixtures::makeTLOptions());
 }
@@ -577,7 +577,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesThrowsAndUses
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            stub.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(stub);
 
             boost::filesystem::resize_file(getFilePathCA().toString(), 0);
 
@@ -588,7 +588,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesThrowsAndUses
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            stub2.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(stub2);
         },
         CommandServiceTestFixtures::makeTLOptions());
 }
@@ -604,7 +604,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            stub.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(stub);
 
             // Overwrite the tmp files to hold new, invalid certs.
             boost::filesystem::copy_file(kInvalidPEMFile,
@@ -619,7 +619,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            stub2.assertConnected();
+            ASSERT_GRPC_STUB_CONNECTED(stub2);
         },
         CommandServiceTestFixtures::makeTLOptions());
 }

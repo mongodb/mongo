@@ -343,20 +343,20 @@ public:
         return _tempDir->getPEMKeyFile();
     }
 
-    void assertConnectingSucceedsASIO() {
-        auto swSession = getAsioTransportLayer().connect(
-            HostAndPort("localhost", 27017),
-            ConnectSSLMode::kEnableSSL,
-            grpc::CommandServiceTestFixtures::kDefaultConnectTimeout,
-            boost::none);
-        ASSERT_OK(swSession);
-        ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });
-        grpc::assertEchoSucceeds(*swSession.getValue());
-    }
-
 private:
     std::unique_ptr<test::TempCertificatesDir> _tempDir;
 };
+
+#define ASSERT_ECHO_SUCCEEDS(tl)                                                              \
+    {                                                                                         \
+        auto swSession = tl.connect(HostAndPort("localhost", 27017),                          \
+                                    ConnectSSLMode::kEnableSSL,                               \
+                                    grpc::CommandServiceTestFixtures::kDefaultConnectTimeout, \
+                                    boost::none);                                             \
+        ASSERT_OK(swSession);                                                                 \
+        ON_BLOCK_EXIT([&] { swSession.getValue()->end(); });                                  \
+        grpc::assertEchoSucceeds(*swSession.getValue());                                      \
+    }
 
 TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesSucceeds) {
     runTest([&](auto&) {
@@ -371,9 +371,9 @@ TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesSucceeds) 
         auto initialBadStub =
             grpc::CommandServiceTestFixtures::makeStubWithCerts(kEcdsaCAFile, kEcdsaClientFile);
 
-        assertConnectingSucceedsASIO();
-        initialGoodStub.assertConnected();
-        initialBadStub.assertNotConnected();
+        ASSERT_ECHO_SUCCEEDS(getAsioTransportLayer());
+        ASSERT_GRPC_STUB_CONNECTED(initialGoodStub);
+        ASSERT_GRPC_STUB_NOT_CONNECTED(initialBadStub);
 
         // Overwrite the tmp files to hold new certs.
         boost::filesystem::copy_file(kEcdsaCAFile,
@@ -385,9 +385,9 @@ TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesSucceeds) 
 
         ASSERT_DOES_NOT_THROW(SSLManagerCoordinator::get()->rotate());
 
-        assertConnectingSucceedsASIO();
-        initialGoodStub.assertConnected();
-        initialBadStub.assertConnected();
+        ASSERT_ECHO_SUCCEEDS(getAsioTransportLayer());
+        ASSERT_GRPC_STUB_CONNECTED(initialGoodStub);
+        ASSERT_GRPC_STUB_CONNECTED(initialBadStub);
     });
 }
 
@@ -399,8 +399,8 @@ TEST_F(RotateCertificatesTransportLayerManagerTest,
             grpc::CommandServiceTestFixtures::kCAFile,
             grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
 
-        stub.assertConnected();
-        assertConnectingSucceedsASIO();
+        ASSERT_GRPC_STUB_CONNECTED(stub);
+        ASSERT_ECHO_SUCCEEDS(getAsioTransportLayer());
 
         boost::filesystem::resize_file(getFilePathCA().toString(), 0);
 
@@ -408,11 +408,11 @@ TEST_F(RotateCertificatesTransportLayerManagerTest,
                            DBException,
                            ErrorCodes::InvalidSSLConfiguration);
 
-        assertConnectingSucceedsASIO();
+        ASSERT_ECHO_SUCCEEDS(getAsioTransportLayer());
         auto stub2 = grpc::CommandServiceTestFixtures::makeStubWithCerts(
             grpc::CommandServiceTestFixtures::kCAFile,
             grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-        stub2.assertConnected();
+        ASSERT_GRPC_STUB_CONNECTED(stub2);
     });
 }
 
@@ -424,8 +424,8 @@ TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesUsesOldCer
         auto stub = grpc::CommandServiceTestFixtures::makeStubWithCerts(
             grpc::CommandServiceTestFixtures::kCAFile,
             grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-        stub.assertConnected();
-        assertConnectingSucceedsASIO();
+        ASSERT_GRPC_STUB_CONNECTED(stub);
+        ASSERT_ECHO_SUCCEEDS(getAsioTransportLayer());
 
         // Overwrite the tmp files to hold new, invalid certs.
         boost::filesystem::copy_file(kInvalidPEMFile,
@@ -439,8 +439,8 @@ TEST_F(RotateCertificatesTransportLayerManagerTest, RotateCertificatesUsesOldCer
         auto stub2 = grpc::CommandServiceTestFixtures::makeStubWithCerts(
             grpc::CommandServiceTestFixtures::kCAFile,
             grpc::CommandServiceTestFixtures::kClientCertificateKeyFile);
-        stub2.assertConnected();
-        assertConnectingSucceedsASIO();
+        ASSERT_GRPC_STUB_CONNECTED(stub2);
+        ASSERT_ECHO_SUCCEEDS(getAsioTransportLayer());
     });
 }
 

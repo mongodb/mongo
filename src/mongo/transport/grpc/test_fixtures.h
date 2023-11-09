@@ -69,6 +69,10 @@
 namespace mongo::transport::grpc {
 
 #define ASSERT_EQ_MSG(a, b) ASSERT_EQ((a).opMsgDebugString(), (b).opMsgDebugString())
+#define ASSERT_GRPC_STUB_CONNECTED(stub) \
+    ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK)
+#define ASSERT_GRPC_STUB_NOT_CONNECTED(stub) \
+    ASSERT_EQ(stub.connect(Milliseconds(50)).error_code(), ::grpc::StatusCode::UNAVAILABLE)
 
 inline Message makeUniqueMessage() {
     OpMsg msg;
@@ -211,14 +215,6 @@ public:
             return std::shared_ptr<ClientStream>{
                 ::grpc::internal::ClientReaderWriterFactory<WriteMessageType, ReadMessageType>::
                     Create(_channel.get(), _unauthenticatedCommandStreamMethod, context)};
-        }
-
-        void assertConnected() {
-            ASSERT_EQ(connect().error_code(), ::grpc::StatusCode::OK);
-        }
-
-        void assertNotConnected() {
-            ASSERT_EQ(connect(Milliseconds(50)).error_code(), ::grpc::StatusCode::UNAVAILABLE);
         }
 
     private:
