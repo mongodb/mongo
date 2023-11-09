@@ -24,3 +24,95 @@ export function waitForAutoBootstrap(node, keyFile) {
         keyFile ? authutil.asCluster(node, keyFile, getShardIdentityDoc) : getShardIdentityDoc();
     assert.eq(shardIdentityDoc.shardName, "config", shardIdentityDoc);
 }
+
+export const execCtxTypes = {
+    kNoSession: 1,
+    kNonRetryableWrite: 2,
+    kRetryableWrite: 3,
+    kTransaction: 4
+};
+
+export function runCommands(conn, execCtxType, dbName, collName, cmdFunc) {
+    switch (execCtxType) {
+        case execCtxTypes.kNoSession: {
+            const coll = conn.getDB(dbName).getCollection(collName);
+            cmdFunc(coll);
+            return;
+        }
+        case execCtxTypes.kNonRetryableWrite: {
+            const session = conn.startSession({retryWrites: false});
+            const coll = session.getDatabase(dbName).getCollection(collName);
+            cmdFunc(coll);
+            session.endSession();
+            return;
+        }
+        case execCtxTypes.kRetryableWrite: {
+            const session = conn.startSession({retryWrites: true});
+            const coll = session.getDatabase(dbName).getCollection(collName);
+            cmdFunc(coll);
+            session.endSession();
+            return;
+        }
+        case execCtxTypes.kTransaction: {
+            const session = conn.startSession({retryWrites: false});
+            const coll = session.getDatabase(dbName).getCollection(collName);
+            session.startTransaction();
+            cmdFunc(coll);
+            session.commitTransaction();
+            session.endSession();
+            return;
+        }
+        default:
+            throw Error("Unknown execution context");
+    }
+}
+
+export function getCollectionUuid(db, dbName, collName) {
+    const listCollectionRes = assert.commandWorked(
+        db.getSiblingDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
+    return listCollectionRes.cursor.firstBatch[0].info.uuid;
+}
+
+export function assertShardingMetadataForUnshardedCollectionExists(db, collUuid, dbName, collName) {
+    const nss = dbName + "." + collName;
+    const configDB = db.getSiblingDB("config");
+
+    const collDoc = configDB.getCollection("collections").findOne({uuid: collUuid});
+    assert.neq(collDoc, null);
+    assert.eq(collDoc._id, nss, collDoc);
+    assert(collDoc.unsplittable, collDoc);
+    assert.eq(collDoc.key, {_id: 1}, collDoc);
+
+    const chunkDocs = configDB.getCollection("chunks").find({uuid: collUuid}).toArray();
+    assert.eq(chunkDocs.length, 1, chunkDocs);
+}
+
+export function assertShardingMetadataForUnshardedCollectionDoesNotExist(db, collUuid) {
+    const configDB = db.getSiblingDB("config");
+
+    const collDoc = configDB.getCollection("collections").findOne({uuid: collUuid});
+    assert.eq(collDoc, null);
+
+    const chunkDocs = configDB.getCollection("chunks").find({uuid: collUuid}).toArray();
+    assert.eq(chunkDocs.length, 0, chunkDocs);
+}
+
+export function makeCreateUserCmdObj(user) {
+    const cmdObj = {
+        createUser: user.userName,
+        pwd: user.password,
+        roles: user.roles,
+    };
+    if (user.tenantId) {
+        cmdObj["$tenant"] = user.tenantId;
+    }
+    return cmdObj;
+}
+
+export function makeCreateRoleCmdObj(role) {
+    const cmdObj = {createRole: role.name, roles: role.roles, privileges: role.privileges};
+    if (role.tenantId) {
+        cmdObj["$tenant"] = role.tenantId;
+    }
+    return cmdObj;
+}
