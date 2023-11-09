@@ -267,10 +267,6 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
 
         if (maybeImpersonationData->getUser()) {
             maybeImpersonationData->getUser()->serializeToBSON(&users);
-        } else if (maybeImpersonationData->getUsers()) {
-            for (const auto& user : maybeImpersonationData->getUsers().get()) {
-                user.serializeToBSON(&users);
-            }
         }
 
         users.doneFast();

@@ -42,9 +42,6 @@ structs:
         description: "A struct representing the impersonated users associated with a specific operation."
         strict: false
         fields:
-            users:
-                type: array<UserName>
-                optional: true
             user:
                 type: UserName
                 optional: true

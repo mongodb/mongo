@@ -56,20 +56,14 @@ ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : 
                 authSession->isAuthorizedForPrivilege(
                     Privilege(ResourcePattern::forClusterResource(authSession->getUserTenantId()),
                               ActionType::impersonate)));
-        fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
-        if (impersonatedUsersAndRoles->getUser()) {
-            fassert(ErrorCodes::InternalError,
-                    impersonatedUsersAndRoles->getUsers() == boost::none);
 
+        fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
+
+        if (impersonatedUsersAndRoles->getUser()) {
             authSession->setImpersonatedUserData(impersonatedUsersAndRoles->getUser().get(),
                                                  impersonatedUsersAndRoles->getRoles());
-
-        } else if (impersonatedUsersAndRoles->getUsers()) {
-            // TODO SERVER-72448: Remove
-            fassert(ErrorCodes::InternalError, impersonatedUsersAndRoles->getUsers()->size() == 1);
-            authSession->setImpersonatedUserData(impersonatedUsersAndRoles->getUsers().get()[0],
-                                                 impersonatedUsersAndRoles->getRoles());
         }
+
         _active = true;
         return;
     }

@@ -39,10 +39,6 @@ structs:
     description: "A struct representing the impersonated users from a mongos"
     strict: true
     fields:
-      "$impersonatedUsers":
-        type: array<UserName>
-        cpp_name: "users"
-        optional: true
       "$impersonatedUser":
         type: UserName
         cpp_name: "user"

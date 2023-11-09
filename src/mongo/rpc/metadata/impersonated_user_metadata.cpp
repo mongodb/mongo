@@ -73,24 +73,11 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
         IDLParserContext errCtx(kImpersonationMetadataSectionName);
         auto data = ImpersonatedUserMetadata::parse(errCtx, elem.embeddedObject());
 
-        // TODO SERVER-72448: Remove the getUsers() pathway
-        // In the meantime, we only accept $impersonatedUser OR $impersonatedUsers with exactly 1
-        // user.
         auto newImpersonatedUser = data.getUser();
-        auto legacyImpersonatedUser = data.getUsers();
-        uassert(ErrorCodes::BadValue,
-                "Cannot specify both $impersonatedUser and $impersonatedUsers",
-                !newImpersonatedUser || !legacyImpersonatedUser);
-        uassert(ErrorCodes::BadValue,
-                "Can only impersonate up to one user per connection",
-                !legacyImpersonatedUser || legacyImpersonatedUser->empty() ||
-                    legacyImpersonatedUser->size() == 1);
 
         // Set the impersonation data only if there are actually impersonated
         // users/roles.
-        const bool userExists =
-            newImpersonatedUser || (legacyImpersonatedUser && !legacyImpersonatedUser->empty());
-        if (userExists || !data.getRoles().empty()) {
+        if (newImpersonatedUser.has_value() || !data.getRoles().empty()) {
             newData = std::move(data);
         }
     }

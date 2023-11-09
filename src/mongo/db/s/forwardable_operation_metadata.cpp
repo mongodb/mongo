@@ -61,15 +61,11 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     if (auto optComment = opCtx->getComment()) {
         setComment(optComment->wrap());
     }
+
     if (const auto authMetadata = rpc::getImpersonatedUserMetadata(opCtx)) {
         if (authMetadata->getUser()) {
             AuthenticationMetadata metadata;
             metadata.setUser(authMetadata->getUser().get());
-            metadata.setRoles(authMetadata->getRoles());
-            setImpersonatedUserMetadata(metadata);
-        } else if (authMetadata->getUsers()) {
-            AuthenticationMetadata metadata;
-            metadata.setUsers(authMetadata->getUsers().get());
             metadata.setRoles(authMetadata->getRoles());
             setImpersonatedUserMetadata(metadata);
         }
@@ -87,17 +83,7 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     if (const auto& optAuthMetadata = getImpersonatedUserMetadata()) {
         const auto& authMetadata = optAuthMetadata.value();
-        UserName username;
-
-        if (authMetadata.getUser()) {
-            fassert(ErrorCodes::InternalError, authMetadata.getUsers() == boost::none);
-
-            username = authMetadata.getUser().get();
-        } else if (authMetadata.getUsers()) {
-            // TODO SERVER-72448: Remove
-            fassert(ErrorCodes::InternalError, authMetadata.getUsers()->size() == 1);
-            username = authMetadata.getUsers().get()[0];
-        }
+        UserName username(authMetadata.getUser().value_or(UserName()));
 
         if (!authMetadata.getRoles().empty()) {
             AuthorizationSession::get(client)->setImpersonatedUserData(username,

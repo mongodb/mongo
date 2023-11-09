@@ -33,45 +33,6 @@ function testMongod(mongod, systemuserpwd = undefined) {
     assertError(
         kImpersonatedHello, 'Unauthorized use of impersonation metadata', ErrorCodes.Unauthorized);
 
-    // TODO SERVER-72448: Remove
-    const kImpersonatedHelloLegacy = {
-        hello: 1,
-        "$audit": {
-            "$impersonatedUsers": [{user: 'admin', db: 'admin'}],
-            "$impersonatedRoles": [{role: 'root', db: 'admin'}],
-        }
-    };
-    assertError(kImpersonatedHelloLegacy,
-                'Unauthorized use of impersonation metadata',
-                ErrorCodes.Unauthorized);
-
-    // TODO SERVER-72448: Remove, checks that both legacy and new impersonation metadata fields
-    // cannot be set simultaneously.
-    const kImpersonatedHelloBoth = {
-        hello: 1,
-        "$audit": {
-            "$impersonatedUser": {user: 'admin', db: 'admin'},
-            "$impersonatedUsers": [{user: 'admin', db: 'admin'}],
-            "$impersonatedRoles": [{role: 'root', db: 'admin'}],
-        }
-    };
-    assertError(kImpersonatedHelloBoth,
-                'Cannot specify both $impersonatedUser and $impersonatedUsers',
-                ErrorCodes.BadValue);
-
-    // TODO SERVER-72448: Remove, checks that the legacy impersonation metadata field can only
-    // contain at most 1 field if specified.
-    const kImpersonatedHelloLegacyMultiple = {
-        hello: 1,
-        "$audit": {
-            "$impersonatedUsers": [{user: 'admin', db: 'admin'}, {user: 'test', db: 'pwd'}],
-            "$impersonatedRoles": [{role: 'root', db: 'admin'}],
-        }
-    };
-    assertError(kImpersonatedHelloLegacyMultiple,
-                'Can only impersonate up to one user per connection',
-                ErrorCodes.BadValue);
-
     // Try as admin (root role), should still fail.
     admin.auth('admin', 'admin');
     assertError(
