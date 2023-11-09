@@ -150,7 +150,7 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
             "Cannot kill a cluster client cursor that has already been killed",
             !_hasBeenKilled);
 
-    if (_queryStatsKeyHash && opCtx) {
+    if (_queryStatsKey && opCtx) {
         query_stats::writeQueryStats(opCtx,
                                      _queryStatsKeyHash,
                                      std::move(_queryStatsKey),
