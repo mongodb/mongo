@@ -94,7 +94,6 @@ allocator = rule(
     build_setting = config.string(flag = True),
 )
 
-
 # =========
 # lldb-server
 # ========= 
@@ -106,5 +105,19 @@ use_lldbserver_provider = provider(
 
 use_lldbserver = rule(
     implementation = lambda ctx: use_lldbserver_provider(type = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
+# wait_for_debugger
+# ========= 
+
+use_wait_for_debugger_provider = provider(
+    doc = "Wait for debugger attach on process startup",
+    fields = ["enabled"],
+)
+
+use_wait_for_debugger = rule(
+    implementation = lambda ctx: use_wait_for_debugger_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )

@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator", "use_lldbserver")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator", "use_lldbserver", "use_wait_for_debugger")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -307,5 +307,21 @@ config_setting(
     name = "use_lldbserver_enabled",
     flag_values = {
         "//bazel/config:use_lldbserver": "True",
+    }
+)
+
+# --------------------------------------
+# wait-for-debugger options
+# --------------------------------------
+
+use_wait_for_debugger(
+    name = "use_wait_for_debugger",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_wait_for_debugger_enabled",
+    flag_values = {
+        "//bazel/config:use_wait_for_debugger": "True",
     }
 )
