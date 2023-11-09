@@ -114,6 +114,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
+#include "mongo/db/pipeline/window_function/window_function_shift.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
@@ -4198,6 +4199,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             std::move(outputs)};
 }
 
+namespace {
+
+std::unique_ptr<sbe::EExpression> getDefaultValueExpr(const WindowFunctionStatement& wfStmt) {
+    if (wfStmt.expr->getOpName() == "$shift") {
+        auto defaultVal =
+            dynamic_cast<window_function::ExpressionShift*>(wfStmt.expr.get())->defaultVal();
+
+        if (defaultVal) {
+            auto val = sbe::value::makeValue(*defaultVal);
+            return makeConstant(val.first, val.second);
+        } else {
+            return makeNullConstant();
+        }
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
+}  // namespace
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildWindow(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto windowNode = static_cast<const WindowNode*>(root);
@@ -4659,6 +4679,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         } else if (outputField.expr->getOpName() == "$last" && removable) {
             windowFrameFirstSlotIdx.push_back(boost::none);
             windowFrameLastSlotIdx.push_back(registerFrameLastSlots());
+        } else if (outputField.expr->getOpName() == "$shift") {
+            windowFrameFirstSlotIdx.push_back(registerFrameFirstSlots());
+            windowFrameLastSlotIdx.push_back(boost::none);
         } else {
             windowFrameFirstSlotIdx.push_back(boost::none);
             windowFrameLastSlotIdx.push_back(boost::none);
@@ -4822,6 +4845,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto inputExpr = it->second->clone();
             auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
             finalArgExprs.emplace(AccArgs::kInput, std::move(frameFirstInput));
+            finalArgExprs.emplace(AccArgs::kDefaultVal, makeNullConstant());
         } else if (outputField.expr->getOpName() == "$last" && removable) {
             tassert(8085503,
                     str::stream() << "Window function $last expects 1 argument",
@@ -4831,8 +4855,23 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto& frameLastSlots = windowFrameLastSlots[*windowFrameLastSlotIdx.back()];
             auto frameLastInput = getModifiedExpr(inputExpr->clone(), frameLastSlots);
             finalArgExprs.emplace(AccArgs::kInput, std::move(frameLastInput));
+            finalArgExprs.emplace(AccArgs::kDefaultVal, makeNullConstant());
         } else if (outputField.expr->getOpName() == "$linearFill") {
             finalArgExprs = std::move(argExprs);
+        } else if (outputField.expr->getOpName() == "$shift") {
+            // The window bounds of $shift is DocumentBounds{shiftByPos, shiftByPos}, so it is a
+            // window frame of size 1. So $shift is equivalent to $first or $last on the window
+            // bound.
+            tassert(8293500,
+                    str::stream() << "Window function $shift expects 1 argument",
+                    argExprs.size() == 1);
+            tassert(8293501, "$shift is expected to be removable", removable);
+            auto it = argExprs.begin();
+            auto& frameFirstSlots = windowFrameFirstSlots[*windowFrameFirstSlotIdx.back()];
+            auto inputExpr = it->second->clone();
+            auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
+            finalArgExprs.emplace(AccArgs::kInput, std::move(frameFirstInput));
+            finalArgExprs.emplace(AccArgs::kDefaultVal, getDefaultValueExpr(outputField));
         }
 
         // Build finalize expressions.
@@ -4858,12 +4897,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
 
         // Deal with empty window for finalize expressions.
-        auto emptyWindowExpr = [](StringData accExprName) {
+        auto emptyWindowExpr = [&](StringData accExprName) {
             if (accExprName == "$sum") {
                 return makeConstant(sbe::value::TypeTags::NumberInt32, 0);
             } else if (accExprName == "$push" || accExprName == AccumulatorAddToSet::kName) {
                 auto [tag, val] = sbe::value::makeNewArray();
                 return makeConstant(tag, val);
+            } else if (accExprName == "$shift") {
+                return getDefaultValueExpr(outputField);
             } else {
                 return makeConstant(sbe::value::TypeTags::Null, 0);
             }

@@ -394,17 +394,25 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeFirstLast(
     tassert(8085500, "Expected a single slot", slots.size() == 1);
     auto it = args.find(AccArgs::kInput);
     tassert(8085501,
-            str::stream() << "Window function " << AccumulatorFirst::kName << " expects '"
+            str::stream() << "Window function " << stmt.expr->getOpName() << " expects '"
                           << AccArgs::kInput << "' argument",
             it != args.end());
+    auto input = std::move(it->second);
+
+    it = args.find(AccArgs::kDefaultVal);
+    tassert(8293502,
+            str::stream() << "Window function " << stmt.expr->getOpName() << " expects '"
+                          << AccArgs::kDefaultVal << "' argument",
+            it != args.end());
+    auto defaultVal = std::move(it->second);
 
     return sbe::makeE<sbe::EIf>(
         makeBinaryOp(
             sbe::EPrimBinary::logicAnd,
             makeFunction("exists", makeVariable(slots[0])),
             makeBinaryOp(sbe::EPrimBinary::greater, makeVariable(slots[0]), makeInt64Constant(0))),
-        makeFillEmptyNull(std::move(it->second)),
-        makeNullConstant());
+        makeFillEmptyNull(std::move(input)),
+        std::move(defaultVal));
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInitializeFirstN(
@@ -682,6 +690,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowInit(
         {AccumulatorAddToSet::kName, &buildWindowInitializeAddToSet},
         {AccumulatorMin::kName, &buildWindowInitializeMinMax},
         {AccumulatorMax::kName, &buildWindowInitializeMinMax},
+        {"$shift", &emptyInitializer<1>},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -746,6 +755,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAdd(
         {AccumulatorMaxN::kName, &buildWindowAddMinMaxN},
         {AccumulatorMin::kName, &buildWindowAddMinMaxN},
         {AccumulatorMax::kName, &buildWindowAddMinMaxN},
+        {"$shift", &buildWindowAddFirstLast},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -810,6 +820,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildWindowRemove(
         {AccumulatorMaxN::kName, &buildWindowRemoveMinMaxN},
         {AccumulatorMin::kName, &buildWindowRemoveMinMaxN},
         {AccumulatorMax::kName, &buildWindowRemoveMinMaxN},
+        {"$shift", &buildWindowRemoveFirstLast},
     };
 
     auto opName = stmt.expr->getOpName();
@@ -900,6 +911,7 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalize(
         {"$derivative", &buildWindowFinalizeDerivative},
         {AccumulatorFirst::kName, &buildWindowFinalizeFirstLast},
         {AccumulatorLast::kName, &buildWindowFinalizeFirstLast},
+        {"$shift", &buildWindowFinalizeFirstLast},
     };
 
     auto opName = stmt.expr->getOpName();

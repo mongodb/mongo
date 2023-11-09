@@ -65,6 +65,8 @@ const StringData kDerivativeInputFirst = "inputFirst"_sd;
 const StringData kDerivativeInputLast = "inputLast"_sd;
 const StringData kDerivativeSortByFirst = "sortByFirst"_sd;
 const StringData kDerivativeSortByLast = "sortByLast"_sd;
+
+const StringData kDefaultVal = "defaultVal"_sd;
 }  // namespace AccArgs
 
 /**
