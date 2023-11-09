@@ -341,7 +341,7 @@ void shellHistoryAdd(const char* line) {
 }
 
 void killOps() {
-    if (shellGlobalParams.nokillop)
+    if (shellGlobalParams.nokillop.load())
         return;
 
     if (atPrompt.load())

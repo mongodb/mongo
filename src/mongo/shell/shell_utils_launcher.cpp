@@ -216,7 +216,7 @@ BSONObj WaitMongoProgram(const BSONObj& a, void* data) {
 // an array with all commandline tokens. The Object may have a field named "env" which contains an
 // object of Key Value pairs which will be loaded into the environment of the spawned process.
 BSONObj StartMongoProgram(const BSONObj& a, void* data) {
-    shellGlobalParams.nokillop = true;
+    shellGlobalParams.nokillop.store(true);
     BSONObj args = a;
     BSONObj env{};
     BSONElement firstElement = args.firstElement();

@@ -946,7 +946,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
 ConnectionRegistry connectionRegistry;
 
 void onConnect(DBClientBase& c, StringData uri) {
-    if (shellGlobalParams.nokillop) {
+    if (shellGlobalParams.nokillop.load()) {
         return;
     }
 
