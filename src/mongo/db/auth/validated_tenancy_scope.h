@@ -50,7 +50,7 @@ namespace auth {
 
 class ValidatedTenancyScope {
 public:
-    enum class TenantProtocol { kUninitialized = 0, kDefault, kAtlasProxy };
+    enum class TenantProtocol { kDefault, kAtlasProxy };
 
     ValidatedTenancyScope() = delete;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;

@@ -194,7 +194,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenDoesNotExpectPrefix) {
 
     token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kAtlasProxy);
     ASSERT_THROWS_CODE(
-        ValidatedTenancyScope::create(client.get(), body, token), DBException, 8054401);
+        ValidatedTenancyScope::create(client.get(), body, token), DBException, 8154400);
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenHasPrefixExpectPrefix) {
@@ -215,7 +215,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, SecurityTokenHasPrefixExpectPrefix) {
 
     token = makeSecurityToken(user, ValidatedTenancyScope::TenantProtocol::kDefault);
     ASSERT_THROWS_CODE(
-        ValidatedTenancyScope::create(client.get(), body, token), DBException, 8054401);
+        ValidatedTenancyScope::create(client.get(), body, token), DBException, 8154400);
 }
 
 }  // namespace
