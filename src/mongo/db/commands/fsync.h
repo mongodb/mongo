@@ -83,8 +83,6 @@ extern Mutex fsyncStateMutex;
 /**
  * The FSyncLockThread must be external available for interruption during shutdown.
  * Must lock the 'fsyncStateMutex' before accessing.
- *
- * TODO (SERVER-76131): consider whether this should decorate the service context.
  */
 extern std::unique_ptr<FSyncLockThread> globalFsyncLockThread;
 
