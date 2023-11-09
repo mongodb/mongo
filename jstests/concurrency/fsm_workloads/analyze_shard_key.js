@@ -772,7 +772,7 @@ export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     // 'analyzeShardKeySplitPointExpirationSecs' and 'ttlMonitorSleepSecs' server parameters to make
     // the clean up occur as the workload runs, and then restore the original values during
     // teardown().
-    $config.data.splitPointExpirationSecs = 10;
+    $config.data.splitPointExpirationSecs = 30;
     $config.data.ttlMonitorSleepSecs = 5;
     $config.data.originalSplitPointExpirationSecs = {};
     $config.data.originalTTLMonitorSleepSecs = {};
