@@ -1719,14 +1719,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }
 
-    // Shutdown the TransportLayer so that new connections aren't accepted
-    if (auto tl = serviceContext->getTransportLayerManager()) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Shut down the transport layer",
-                                                  &shutdownTimeElapsedBuilder);
-        LOGV2_OPTIONS(
-            20562, {LogComponent::kNetwork}, "Shutdown: going to close listening sockets");
-        tl->shutdown();
+    // Inform the TransportLayers to stop accepting new connections.
+    if (auto tlm = serviceContext->getTransportLayerManager()) {
+        LOGV2_OPTIONS(8314100, {LogComponent::kNetwork}, "Shutdown: Closing listener sockets");
+        tlm->stopAcceptingSessions();
     }
 
     // Shut down the global dbclient pool so callers stop waiting for connections.
@@ -1945,6 +1941,15 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
         LOGV2_OPTIONS(4784922, {LogComponent::kSharding}, "Shutting down the CatalogCacheLoader");
         CatalogCacheLoader::get(serviceContext).shutDown();
+    }
+
+    // Finish shutting down the TransportLayers
+    if (auto tlm = serviceContext->getTransportLayerManager()) {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down the transport layer",
+                                                  &shutdownTimeElapsedBuilder);
+        LOGV2_OPTIONS(20562, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
+        tlm->shutdown();
     }
 
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {

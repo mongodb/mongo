@@ -38,6 +38,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer.h"
@@ -209,6 +210,8 @@ public:
 
     void shutdown() final;
 
+    void stopAcceptingSessions() final;
+
     void appendStatsForServerStatus(BSONObjBuilder* bob) const override;
 
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;
@@ -283,6 +286,7 @@ private:
     void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
 
     Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsioTransportLayer::_mutex");
+    void stopAcceptingSessionsWithLock(stdx::unique_lock<Mutex> lk);
 
     // There are three reactors that are used by AsioTransportLayer. The _ingressReactor contains
     // all the accepted sockets and all ingress networking activity. The _acceptorReactor contains
@@ -319,9 +323,22 @@ private:
 
     // Only used if _listenerOptions.async is false.
     struct Listener {
+        /**
+         * During {kActive}, we are actively accepting new connections and processing existing one.
+         * When we transition to {kShuttingDown}, no new connections will be accepted,
+         * and once all listening sockets have been cancelled,
+         * the running thread will transition to {kShutdown}.
+         */
+        enum class State {
+            kNew,
+            kActive,
+            kShuttingDown,
+            kShutdown,
+        };
+
         stdx::thread thread;
         stdx::condition_variable cv;
-        bool active = false;
+        State state{State::kNew};
     };
     Listener _listener;
 

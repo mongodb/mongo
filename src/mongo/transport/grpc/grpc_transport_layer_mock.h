@@ -58,6 +58,10 @@ public:
 
     virtual void shutdown() override;
 
+    void stopAcceptingSessions() override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     virtual StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
         Milliseconds timeout,

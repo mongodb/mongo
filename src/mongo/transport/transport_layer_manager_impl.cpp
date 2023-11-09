@@ -72,6 +72,12 @@ Status TransportLayerManagerImpl::start() {
     return Status::OK();
 }
 
+void TransportLayerManagerImpl::stopAcceptingSessions() {
+    for (auto&& tl : _tls) {
+        tl->stopAcceptingSessions();
+    }
+}
+
 void TransportLayerManagerImpl::shutdown() {
     invariant(_state.swap(State::kShutdown) != State::kShutdown);
     for (auto&& tl : _tls) {

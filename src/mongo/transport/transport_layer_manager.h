@@ -95,6 +95,11 @@ public:
      * End all sessions that do not match the mask in tags.
      */
     virtual void endAllSessions(Client::TagMask tags) = 0;
+
+    /**
+     * Instruct transport layers to discontinue accepting new sessions.
+     */
+    virtual void stopAcceptingSessions() = 0;
 };
 
 }  // namespace mongo::transport

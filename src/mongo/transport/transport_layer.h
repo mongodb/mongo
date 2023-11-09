@@ -127,6 +127,11 @@ public:
     virtual void shutdown() = 0;
 
     /**
+     * Stop accepting new sessions.
+     */
+    virtual void stopAcceptingSessions() = 0;
+
+    /**
      * Optional method for subclasses to setup their state before being ready to accept
      * connections.
      */

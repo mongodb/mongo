@@ -56,6 +56,8 @@ public:
 
     virtual void shutdown() override;
 
+    void stopAcceptingSessions() override;
+
     virtual StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
         Milliseconds timeout,

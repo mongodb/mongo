@@ -222,6 +222,12 @@ void GRPCTransportLayerImpl::shutdown() {
     }
 }
 
+void GRPCTransportLayerImpl::stopAcceptingSessions() {
+    if (_server) {
+        _server->stopAcceptingRequests();
+    }
+}
+
 #ifdef MONGO_CONFIG_SSL
 Status GRPCTransportLayerImpl::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                                   bool asyncOCSPStaple) {
