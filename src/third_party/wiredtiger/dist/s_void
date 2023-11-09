@@ -39,6 +39,8 @@ func_ok()
         -e '/int __curlog_reset$/d' \
         -e '/int __cursor_fix_implicit$/d' \
         -e '/int __delete_redo_window_cleanup_skip$/d' \
+        -e '/int __gen_active_callback$/d' \
+        -e '/int __gen_oldest_callback$/d' \
         -e '/int __handle_close_default$/d' \
         -e '/int __handle_general_default$/d' \
         -e '/int __handle_progress_default$/d' \
@@ -53,6 +55,7 @@ func_ok()
         -e '/int __page_write_gen_wrapped_check$/d' \
         -e '/int __posix_terminate$/d' \
         -e '/int __rec_destroy_session$/d' \
+        -e '/int __rts_check_callback$/d' \
         -e '/int __time_aggregate_validate_parent$/d' \
         -e '/int __time_aggregate_validate_parent_stable$/d' \
         -e '/int __time_value_validate_parent$/d' \

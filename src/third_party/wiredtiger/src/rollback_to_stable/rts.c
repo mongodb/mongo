@@ -9,6 +9,32 @@
 #include "wt_internal.h"
 
 /*
+ * __rts_check_callback --
+ *     Check if a single session has an active transaction or open cursors. Callback from the
+ *     session array walk.
+ */
+static int
+__rts_check_callback(
+  WT_SESSION_IMPL *session, WT_SESSION_IMPL *array_session, bool *exit_walkp, void *cookiep)
+{
+    WT_RTS_COOKIE *cookie;
+
+    WT_UNUSED(session);
+    cookie = (WT_RTS_COOKIE *)cookiep;
+
+    /* Check if a user session has a running transaction. */
+    if (F_ISSET(array_session->txn, WT_TXN_RUNNING)) {
+        cookie->ret_txn_active = true;
+        *exit_walkp = true;
+    } else if (array_session->ncursors != 0) {
+        /* Check if a user session has an active file cursor. */
+        cookie->ret_cursor_active = true;
+        *exit_walkp = true;
+    }
+    return (0);
+}
+
+/*
  * __wt_rts_check --
  *     Check to the extent possible that the rollback request is reasonable.
  */
@@ -17,12 +43,10 @@ __wt_rts_check(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_SESSION_IMPL *session_in_list;
-    uint32_t i, session_cnt;
-    bool cursor_active, txn_active;
+    WT_RTS_COOKIE cookie;
 
+    WT_CLEAR(cookie);
     conn = S2C(session);
-    cursor_active = txn_active = false;
 
     WT_STAT_CONN_INCR(session, txn_walk_sessions);
 
@@ -35,35 +59,16 @@ __wt_rts_check(WT_SESSION_IMPL *session)
      * acquiring the lock shouldn't be an issue.
      */
     __wt_spin_lock(session, &conn->api_lock);
-
-    WT_ORDERED_READ(session_cnt, conn->session_cnt);
-    for (i = 0, session_in_list = conn->sessions; i < session_cnt; i++, session_in_list++) {
-
-        /* Skip inactive or internal sessions. */
-        if (!session_in_list->active || F_ISSET(session_in_list, WT_SESSION_INTERNAL))
-            continue;
-
-        /* Check if a user session has a running transaction. */
-        if (F_ISSET(session_in_list->txn, WT_TXN_RUNNING)) {
-            txn_active = true;
-            break;
-        }
-
-        /* Check if a user session has an active file cursor. */
-        if (session_in_list->ncursors != 0) {
-            cursor_active = true;
-            break;
-        }
-    }
+    WT_IGNORE_RET(__wt_session_array_walk(session, __rts_check_callback, true, &cookie));
     __wt_spin_unlock(session, &conn->api_lock);
 
     /*
      * A new cursor may be positioned or a transaction may start after we return from this call and
      * callers should be aware of this limitation.
      */
-    if (cursor_active)
+    if (cookie.ret_cursor_active)
         WT_RET_MSG(session, EBUSY, "rollback_to_stable illegal with active file cursors");
-    if (txn_active) {
+    if (cookie.ret_txn_active) {
         ret = EBUSY;
         WT_TRET(__wt_verbose_dump_txn(session));
         WT_RET_MSG(session, ret, "rollback_to_stable illegal with active transactions");
