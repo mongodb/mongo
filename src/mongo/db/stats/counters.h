@@ -603,5 +603,8 @@ extern CounterMetric updateOneNonTargetedShardedCount;
 extern CounterMetric deleteOneNonTargetedShardedCount;
 // Track the number of non-targeted findAndModify commands on sharded collections
 extern CounterMetric findAndModifyNonTargetedShardedCount;
+// Track the number of non-targeted deleteOne commands (without shard key with _id) on sharded
+// collections.
+extern CounterMetric deleteOneWithoutShardKeyWithIdCount;
 
 }  // namespace mongo

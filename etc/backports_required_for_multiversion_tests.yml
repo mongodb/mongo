@@ -495,6 +495,10 @@ last-continuous:
     ticket: SERVER-81985
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-81379
+  - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
+    ticket: SERVER-80842
+  - test_file: jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
+    ticket: SERVER-80842
   suites: null
 last-lts:
   all:
@@ -1052,4 +1056,8 @@ last-lts:
     ticket: SERVER-81985
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-81379
+  - test_file: jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
+    ticket: SERVER-80842
+  - test_file: jstests/sharding/server_status_crud_metrics_delete_one_without_shard_key_with_id.js
+    ticket: SERVER-80842
   suites: null

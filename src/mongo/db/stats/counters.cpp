@@ -360,5 +360,6 @@ CounterMetric findAndModifyUnshardedCount("query.findAndModifyUnshardedCount");
 CounterMetric updateOneNonTargetedShardedCount("query.updateOneNonTargetedShardedCount");
 CounterMetric deleteOneNonTargetedShardedCount("query.deleteOneNonTargetedShardedCount");
 CounterMetric findAndModifyNonTargetedShardedCount("query.findAndModifyNonTargetedShardedCount");
+CounterMetric deleteOneWithoutShardKeyWithIdCount("query.deleteOneWithoutShardKeyWithIdCount");
 
 }  // namespace mongo

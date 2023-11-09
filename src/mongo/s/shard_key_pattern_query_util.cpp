@@ -485,7 +485,7 @@ void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
                                   QueryTargetingInfo* info,
                                   bool bypassIsFieldHashedCheck) {
     if (info) {
-        tassert(7670300, "Invalid non-empty 'info->chungRanges'", info->chunkRanges.empty());
+        tassert(7670300, "Invalid non-empty 'info->chunkRanges'", info->chunkRanges.empty());
     }
 
     // Fast path for targeting equalities on the shard key.

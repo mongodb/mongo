@@ -621,6 +621,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     OperationContext* opCtx,
     const BatchItemRef& itemRef,
     bool* useTwoPhaseWriteProtocol,
+    bool* isNonTargetedWriteWithoutShardKeyWithExactId,
     std::set<ChunkRange>* chunkRanges) const {
     const auto& deleteOp = itemRef.getDeleteRef();
     const bool isMulti = deleteOp.getMulti();
@@ -706,10 +707,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     if (!isMulti) {
+        deleteOneNonTargetedShardedCount.increment(1);
         if (isExactId) {
-            deleteOneTargetedShardedCount.increment(1);
+            if (isNonTargetedWriteWithoutShardKeyWithExactId &&
+                feature_flags::gUpdateOneWithIdWithoutShardKey.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+                deleteOneWithoutShardKeyWithIdCount.increment(1);
+            }
         } else {
-            deleteOneNonTargetedShardedCount.increment(1);
             if (useTwoPhaseWriteProtocol) {
                 *useTwoPhaseWriteProtocol = true;
             }

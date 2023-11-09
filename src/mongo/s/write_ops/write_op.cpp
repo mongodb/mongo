@@ -161,7 +161,10 @@ void WriteOp::targetWrites(OperationContext* opCtx,
                                          useTwoPhaseWriteProtocol,
                                          isNonTargetedWriteWithoutShardKeyWithExactId);
         } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            return targeter.targetDelete(opCtx, _itemRef, useTwoPhaseWriteProtocol);
+            return targeter.targetDelete(opCtx,
+                                         _itemRef,
+                                         useTwoPhaseWriteProtocol,
+                                         isNonTargetedWriteWithoutShardKeyWithExactId);
         }
         MONGO_UNREACHABLE;
     }();
