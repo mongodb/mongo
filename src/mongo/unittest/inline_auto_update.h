@@ -56,7 +56,7 @@ bool handleAutoUpdate(const std::string& expected,
 
 bool expandNoPlanMacro(const std::string& fileName, size_t lineNumber);
 
-void updateDelta(const std::string& fileName, const size_t lineNumber, int64_t delta);
+void updateDelta(const std::string& fileName, size_t lineNumber, int64_t delta);
 
 void expandActualPlan(const SourceLocation& location, const std::string& actual);
 

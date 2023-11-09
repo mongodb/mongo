@@ -315,7 +315,7 @@ bool handleAutoUpdate(const std::string& expected,
     return true;
 }
 
-bool expandNoPlanMacro(const std::string& fileName, size_t lineNumber) {
+bool expandNoPlanMacro(const std::string& fileName, const size_t lineNumber) {
     const auto config = mongo::unittest::getAutoUpdateConfig();
     if (!config.updateFailingAsserts) {
         std::cout << "Auto-updating is disabled. To expand the *INITIAL_AUTO macro with"
@@ -387,7 +387,7 @@ bool expandNoPlanMacro(const std::string& fileName, size_t lineNumber) {
     return true;
 }
 
-void updateDelta(const std::string& fileName, const size_t lineNumber, int64_t delta) {
+void updateDelta(const std::string& fileName, const size_t lineNumber, const int64_t delta) {
     auto& lineDeltas = gLineDeltaMap.emplace(fileName, LineDeltaVector{}).first->second;
     lineDeltas.emplace_back(lineNumber, delta);
 }
