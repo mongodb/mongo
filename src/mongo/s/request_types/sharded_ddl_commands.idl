@@ -151,6 +151,13 @@ structs:
                 type: bool
                 description: "Whether the shard key index should enforce a unique constraint."
                 default: false
+            # TODO SERVER-83006: remove deprecated numInitialChunks parameter.
+            numInitialChunks:
+                type: safeInt64
+                description: >-
+                    The number of chunks to create initially when sharding an empty collection with
+                    a hashed shard key.
+                optional: true
             presplitHashedZones:
                 type: bool
                 description: >-
