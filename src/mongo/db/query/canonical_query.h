@@ -121,9 +121,8 @@ public:
      *
      * Does not take ownership of 'root'.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
-                                                                    const CanonicalQuery& baseQuery,
-                                                                    MatchExpression* root);
+    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalizeSubQuery(
+        OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root);
 
     /**
      * Returns true if "query" describes an exact-match query on _id.

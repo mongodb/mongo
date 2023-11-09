@@ -135,7 +135,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 }
 
 // static
-StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
+StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalizeSubQuery(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
     auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
     findCommand->setFilter(root->serialize());
@@ -154,10 +154,12 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     if (!swParsedFind.isOK()) {
         return swParsedFind.getStatus();
     }
-    auto initStatus = cq->init(baseQuery.getExpCtx(),
-                               std::move(swParsedFind.getValue()),
-                               {} /* an empty pipeline */,
-                               baseQuery.isCountLike());
+    auto initStatus =
+        cq->init(baseQuery.getExpCtx(),
+                 std::move(swParsedFind.getValue()),
+                 {} /* an empty pipeline */,
+                 false  // The parent query countLike is independent from the subquery countLike.
+        );
     invariant(initStatus.isOK());
     return {std::move(cq)};
 }
