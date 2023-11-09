@@ -12,6 +12,7 @@ selector:
   # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
   - jstests/core/query/explain/explain_agg_write_concern.js
   - jstests/aggregation/sources/out/replace_collection.js
+  - jstests/aggregation/explain_writing_aggs.js
   # `rolesInfo` is returning unprefixed database names
   - jstests/core/administrative/builtin_roles_external.js
   # QueryExecutorStats assertions are hardcoded for single-node results
@@ -21,9 +22,6 @@ selector:
   # failed on: Tests that the internal stage '$mergeCursors' does not throw 'ApiStrictError' with an
   # internal client and 'apiStrict' set to true.
   - jstests/aggregation/api_version_stage_allowance_checks.js
-  # failed on: prefix check in response
-  - jstests/aggregation/explain_per_stage_exec_stats.js
-  - jstests/aggregation/explain_writing_aggs.js
   # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
   - jstests/aggregation/view_resolution_namespace_collision.js
 
