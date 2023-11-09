@@ -4,9 +4,6 @@
  * @tags: [
  *   # This test requires the fix from SERVER-73032.
  *   requires_fcv_63,
- *   # SBE is not yet used for clustered collections, and this test centers on the behavior of the
- *   # SBE plan cache.
- *   expects_explicit_underscore_id_index,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
  * ]
