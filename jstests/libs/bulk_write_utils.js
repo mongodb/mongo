@@ -20,6 +20,17 @@ export const cursorSizeValidator = function(response, expectedSize) {
         "Expected cursor size did not match response cursor size. Response: " + tojson(response));
 };
 
+export const summaryFieldsValidator = function(response, fields) {
+    const assertMsg =
+        " value did not match for bulkWrite summary fields. actual reply: " + tojson(response);
+    assert.eq(response.nErrors, fields.nErrors, "nErrors" + assertMsg);
+    assert.eq(response.nInserted, fields.nInserted, "nInserted" + assertMsg);
+    assert.eq(response.nDeleted, fields.nDeleted, "nDeleted" + assertMsg);
+    assert.eq(response.nMatched, fields.nMatched, "nMatched" + assertMsg);
+    assert.eq(response.nModified, fields.nModified, "nModified" + assertMsg);
+    assert.eq(response.nUpserted, fields.nUpserted, "nUpserted" + assertMsg);
+};
+
 // Helper class for the bulkwrite_metrics tests.
 export class BulkWriteMetricChecker {
     constructor(testDB, namespace, bulkWrite, fle) {

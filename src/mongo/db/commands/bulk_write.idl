@@ -255,7 +255,22 @@ structs:
             cursor:
                 type: BulkWriteCommandResponseCursor
                 stability: unstable
-            numErrors:
+            nErrors:
+                type: int
+                stability: unstable
+            nInserted:
+                type: int
+                stability: unstable
+            nMatched:
+                type: int
+                stability: unstable
+            nModified:
+                type: int
+                stability: unstable
+            nUpserted:
+                type: int
+                stability: unstable
+            nDeleted:
                 type: int
                 stability: unstable
             electionId:

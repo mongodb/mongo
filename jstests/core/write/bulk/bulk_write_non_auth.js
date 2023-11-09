@@ -35,7 +35,7 @@ let res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.InvalidNamespace});
@@ -54,7 +54,7 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
@@ -76,7 +76,7 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
@@ -103,7 +103,7 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, code: ErrorCodes.InvalidNamespace});
@@ -133,5 +133,5 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 7);
-assert.eq(res.numErrors, 3, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 3, "bulkWrite command response: " + tojson(res));
 coll.drop();

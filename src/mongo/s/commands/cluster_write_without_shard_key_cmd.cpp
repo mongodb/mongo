@@ -434,7 +434,7 @@ public:
             // transaction api to use in case of a retry.
             uassertStatusOK(getStatusFromWriteCommandReply(response.data));
             if (cmdObj.firstElementFieldNameStringData() == BulkWriteCommandRequest::kCommandName &&
-                response.data[BulkWriteCommandReply::kNumErrorsFieldName].Int() != 0) {
+                response.data[BulkWriteCommandReply::kNErrorsFieldName].Int() != 0) {
                 // It was a bulkWrite, extract the first and only reply item and uassert on error so
                 // that we can fail the internal transaction correctly.
                 auto bulkWriteResponse = BulkWriteCommandReply::parse(

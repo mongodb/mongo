@@ -17,7 +17,11 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator
+} from "jstests/libs/bulk_write_utils.js";
 
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
@@ -38,7 +42,8 @@ var res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 0, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 assert(res.cursor.id != 0,
        "Unexpectedly found cursor ID 0 in bulkWrite command response: " + tojson(res));

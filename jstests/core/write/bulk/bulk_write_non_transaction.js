@@ -14,7 +14,11 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
-import {cursorEntryValidator, cursorSizeValidator} from "jstests/libs/bulk_write_utils.js";
+import {
+    cursorEntryValidator,
+    cursorSizeValidator,
+    summaryFieldsValidator
+} from "jstests/libs/bulk_write_utils.js";
 
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
@@ -160,7 +164,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 1, nModified: 0, nUpserted: 1});
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
@@ -184,7 +189,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0],
                      {ok: 0, idx: 0, n: 0, nModified: 0, code: ErrorCodes.ImmutableField});
@@ -217,7 +223,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -250,7 +257,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -281,7 +289,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 2);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -309,7 +318,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 2, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 assert.eq(res.cursor.id, 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -332,7 +342,7 @@ res = db.adminCommand({
     bypassDocumentValidation: false,
 });
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 1, "bulkWrite command response: " + tojson(res));
 
 assert.eq(0, coll.count({_id: 3}));
 coll.drop();
@@ -350,7 +360,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 3);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 1, nModified: 1, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1, nModified: 1});
@@ -375,7 +386,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 51198});
 assert.eq(res.cursor.firstBatch[0].errmsg,
@@ -401,7 +413,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res);
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 0, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, n: 0, nModified: 0, code: 9});
 assert.eq(res.cursor.firstBatch[0].errmsg,
@@ -419,7 +432,8 @@ res = db.adminCommand({
 
 assert.commandWorked(res, "bulkWrite command response: " + tojson(res));
 cursorSizeValidator(res, 1);
-assert.eq(res.numErrors, 1, "bulkWrite command response: " + tojson(res));
+summaryFieldsValidator(
+    res, {nErrors: 1, nInserted: 1, nDeleted: 0, nMatched: 0, nModified: 0, nUpserted: 0});
 
 assert(res.cursor.id == 0, "bulkWrite command response: " + tojson(res));
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, n: 0, idx: 1, code: 11000});

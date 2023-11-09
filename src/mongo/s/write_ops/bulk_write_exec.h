@@ -56,12 +56,23 @@ namespace mongo {
 namespace bulk_write_exec {
 
 /**
- * Contains replies for individual bulk write ops along with a count of how many replies in the
- * vector are errors.
+ * Contains counters which aggregate all the individual bulk write responses.
+ */
+struct SummaryFields {
+    int nErrors = 0;
+    int nInserted = 0;
+    int nMatched = 0;
+    int nModified = 0;
+    int nUpserted = 0;
+    int nDeleted = 0;
+};
+
+/**
+ * Contains replies for individual bulk write ops along with the summary fields for all responses.
  */
 struct BulkWriteReplyInfo {
     std::vector<BulkWriteReplyItem> replyItems;
-    int numErrors = 0;
+    SummaryFields summaryFields;
     boost::optional<BulkWriteWriteConcernError> wcErrors;
     boost::optional<std::vector<StmtId>> retriedStmtIds;
 };
@@ -302,6 +313,13 @@ private:
     // - Any error encountered while in a transaction.
     // - A local error indicating that this process is shutting down.
     bool _aborted = false;
+
+    // Summary fields.
+    int _nInserted = 0;
+    int _nMatched = 0;
+    int _nModified = 0;
+    int _nUpserted = 0;
+    int _nDeleted = 0;
 };
 
 /**

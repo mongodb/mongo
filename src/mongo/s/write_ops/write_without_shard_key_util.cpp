@@ -154,7 +154,12 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
         BulkWriteCommandReply bulkWriteReply(
             BulkWriteCommandResponseCursor(
                 0, {replyItem}, NamespaceString::makeBulkWriteNSS(boost::none)),
-            0);
+            0 /* nErrors */,
+            0 /* nInserted */,
+            writeRes.getN() /* nMatched */,
+            0 /* nModified */,
+            1 /* nUpserted */,
+            0 /* nDeleted */);
         reply = bulkWriteReply.toBSON();
     } else if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {

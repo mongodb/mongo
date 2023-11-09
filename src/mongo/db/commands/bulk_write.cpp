@@ -185,13 +185,14 @@ public:
         for (size_t i = 0; i < writes.results.size(); ++i) {
             auto idx = firstOpIdx + i;
             if (auto error = write_ops_exec::generateError(
-                    opCtx, writes.results[i].getStatus(), idx, _numErrors)) {
+                    opCtx, writes.results[i].getStatus(), idx, _summaryFields.nErrors)) {
                 auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
                 _addReply(replyItem);
-                _numErrors++;
+                _summaryFields.nErrors++;
             } else {
                 auto replyItem = BulkWriteReplyItem(idx);
                 replyItem.setN(writes.results[i].getValue().getN());
+                _summaryFields.nInserted += *replyItem.getN();
                 _addReply(replyItem);
             }
         }
@@ -208,16 +209,19 @@ public:
         }
 
         if (auto error = write_ops_exec::generateError(
-                opCtx, writeResult.results[0].getStatus(), currentOpIdx, _numErrors)) {
+                opCtx, writeResult.results[0].getStatus(), currentOpIdx, _summaryFields.nErrors)) {
             auto replyItem = BulkWriteReplyItem(currentOpIdx, error.get().getStatus());
             _addReply(replyItem);
-            _numErrors++;
+            _summaryFields.nErrors++;
         } else {
             auto replyItem = BulkWriteReplyItem(currentOpIdx);
             replyItem.setN(writeResult.results[0].getValue().getN());
+            _summaryFields.nMatched += *replyItem.getN();
             replyItem.setNModified(writeResult.results[0].getValue().getNModified());
+            _summaryFields.nModified += *replyItem.getNModified();
             if (auto idElement = writeResult.results[0].getValue().getUpsertedId().firstElement()) {
                 replyItem.setUpserted(write_ops::Upserted(0, idElement));
+                _summaryFields.nUpserted += 1;
             }
             _addReply(replyItem);
         }
@@ -230,11 +234,15 @@ public:
                         const boost::optional<int32_t>& stmtId) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setNModified(numDocsModified);
+        _summaryFields.nModified += numDocsModified;
         if (upserted.has_value()) {
             replyItem.setUpserted(upserted);
             replyItem.setN(1);
+            _summaryFields.nUpserted += 1;
+            _summaryFields.nMatched += 1;
         } else {
             replyItem.setN(numMatched);
+            _summaryFields.nMatched += numMatched;
         }
 
         if (stmtId) {
@@ -274,6 +282,7 @@ public:
                         const boost::optional<int32_t>& stmtId) {
         auto replyItem = BulkWriteReplyItem(currentOpIdx);
         replyItem.setN(nDeleted);
+        _summaryFields.nDeleted += nDeleted;
 
         if (stmtId) {
             _retriedStmtIds.emplace_back(*stmtId);
@@ -296,13 +305,14 @@ public:
     void addErrorReply(OperationContext* opCtx,
                        BulkWriteReplyItem& replyItem,
                        const Status& status) {
-        auto error = write_ops_exec::generateError(opCtx, status, replyItem.getIdx(), _numErrors);
+        auto error = write_ops_exec::generateError(
+            opCtx, status, replyItem.getIdx(), _summaryFields.nErrors);
         invariant(error);
         replyItem.setStatus(error.get().getStatus());
         replyItem.setOk(status.isOK() ? 1.0 : 0.0);
         replyItem.setN(0);
         _addReply(replyItem);
-        _numErrors++;
+        _summaryFields.nErrors++;
     }
 
     const std::vector<BulkWriteReplyItem>& getReplies() const {
@@ -313,8 +323,8 @@ public:
         return _retriedStmtIds;
     }
 
-    int getNumErrors() const {
-        return _numErrors;
+    bulk_write::SummaryFields getSummaryFields() const {
+        return _summaryFields;
     }
 
     // Approximate Size in bytes.
@@ -326,8 +336,7 @@ private:
     const BulkWriteCommandRequest& _req;
     std::vector<BulkWriteReplyItem> _replies;
     std::vector<int32_t> _retriedStmtIds;
-    /// The number of error replies contained in _replies.
-    int _numErrors = 0;
+    bulk_write::SummaryFields _summaryFields;
     int32_t _approximateSize = 0;  // Only accounting for _replies.
 
     // Helper to keep _approximateSize up to date when appending to _replies.
@@ -1342,10 +1351,10 @@ public:
             auto& req = request();
 
             // Apply all of the write operations.
-            auto [replies, retriedStmtIds, numErrors] = bulk_write::performWrites(opCtx, req);
+            auto [replies, retriedStmtIds, summaryFields] = bulk_write::performWrites(opCtx, req);
 
             return _populateCursorReply(
-                opCtx, req, std::move(replies), std::move(retriedStmtIds), numErrors);
+                opCtx, req, std::move(replies), std::move(retriedStmtIds), summaryFields);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final try {
@@ -1393,7 +1402,7 @@ public:
                                    const BulkWriteCommandRequest& req,
                                    bulk_write::BulkWriteReplyItems replies,
                                    bulk_write::RetriedStmtIds retriedStmtIds,
-                                   int numErrors) {
+                                   bulk_write::SummaryFields summaryFields) {
             auto reqObj = unparsedRequest().body;
             const NamespaceString cursorNss =
                 NamespaceString::makeBulkWriteNSS(req.getDollarTenant());
@@ -1401,7 +1410,12 @@ public:
             if (replies.size() == 0) {
                 return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
                                                  0 /* cursorId */, {} /* firstBatch */, cursorNss),
-                                             numErrors);
+                                             summaryFields.nErrors,
+                                             summaryFields.nInserted,
+                                             summaryFields.nMatched,
+                                             summaryFields.nModified,
+                                             summaryFields.nUpserted,
+                                             summaryFields.nDeleted);
             }
 
             // Try and fit all replies into the firstBatch.
@@ -1485,7 +1499,13 @@ public:
 
             replies.resize(numRepliesInFirstBatch);
             auto reply = BulkWriteCommandReply(
-                BulkWriteCommandResponseCursor(cursorId, std::move(replies), cursorNss), numErrors);
+                BulkWriteCommandResponseCursor(cursorId, std::move(replies), cursorNss),
+                summaryFields.nErrors,
+                summaryFields.nInserted,
+                summaryFields.nMatched,
+                summaryFields.nModified,
+                summaryFields.nUpserted,
+                summaryFields.nDeleted);
 
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
@@ -1849,7 +1869,7 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     invariant(insertGrouper.isEmpty());
 
     return make_tuple(
-        responses.getReplies(), responses.getRetriedStmtIds(), responses.getNumErrors());
+        responses.getReplies(), responses.getRetriedStmtIds(), responses.getSummaryFields());
 }
 
 }  // namespace bulk_write

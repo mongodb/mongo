@@ -255,8 +255,7 @@ function isFailedToSatisfyPrimaryReadPreferenceError(res) {
 }
 
 function hasError(res) {
-    return res.ok !== 1 || res.writeErrors ||
-        (res.hasOwnProperty("numErrors") && res.numErrors != 0);
+    return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0);
 }
 
 function hasWriteConcernError(res) {

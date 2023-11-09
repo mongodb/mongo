@@ -406,11 +406,10 @@ function runCommandRetryOnTenantMigrationErrors(
                 } else {
                     // The last item from the previous response is guaranteed to be a
                     // tenant migration error. Remove it to append the retried response.
-                    let newIdx = bulkWriteResponse.cursor.firstBatch.pop().idx;
+                    let newIdxBase = bulkWriteResponse.cursor.firstBatch.pop().idx;
                     // Iterate over new response and change the indexes to start with newIdx.
                     for (let opRes of resObj.cursor.firstBatch) {
-                        opRes.idx = newIdx;
-                        newIdx += 1;
+                        opRes.idx += newIdxBase;
                     }
 
                     // Add the new responses (with modified indexes) onto the original responses.
@@ -419,7 +418,12 @@ function runCommandRetryOnTenantMigrationErrors(
 
                     // Add new numErrors onto old numErrors. Subtract one to account for the
                     // tenant migration error that was popped off.
-                    bulkWriteResponse.numErrors += resObj.numErrors - 1;
+                    bulkWriteResponse.nErrors += resObj.nErrors - 1;
+                    bulkWriteResponse.nInserted += resObj.nInserted;
+                    bulkWriteResponse.nDeleted += resObj.nDeleted;
+                    bulkWriteResponse.nMatched += resObj.nMatched;
+                    bulkWriteResponse.nModified += resObj.nModified;
+                    bulkWriteResponse.nUpserted += resObj.nUpserted;
                 }
             }
 

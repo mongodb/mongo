@@ -223,9 +223,14 @@ public:
             params.originatingPrivileges = bulk_write_common::getPrivileges(req);
 
             auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
-            auto& [replyItems, numErrors, wcErrors, retriedStmtIds] = replyInfo;
+            auto& [replyItems, summaryFields, wcErrors, retriedStmtIds] = replyInfo;
             BulkWriteCommandReply reply;
-            reply.setNumErrors(numErrors);
+            reply.setNErrors(summaryFields.nErrors);
+            reply.setNInserted(summaryFields.nInserted);
+            reply.setNDeleted(summaryFields.nDeleted);
+            reply.setNMatched(summaryFields.nMatched);
+            reply.setNModified(summaryFields.nModified);
+            reply.setNUpserted(summaryFields.nUpserted);
             reply.setWriteConcernError(wcErrors);
             reply.setRetriedStmtIds(retriedStmtIds);
 

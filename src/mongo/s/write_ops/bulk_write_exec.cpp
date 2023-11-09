@@ -204,6 +204,7 @@ void fillOKInsertReplies(BulkWriteReplyInfo& replyInfo, int size) {
         reply.setOk(1);
         reply.setIdx(i);
         replyInfo.replyItems.push_back(reply);
+        replyInfo.summaryFields.nInserted += 1;
     }
 }
 
@@ -223,9 +224,14 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                     // BulkWrite needs only _id, not index.
                     reply.setUpserted(
                         IDLAnyTypeOwned(upsertDetails[0]->getUpsertedID().firstElement()));
+                    replyInfo.summaryFields.nUpserted += 1;
                 }
 
                 reply.setNModified(response.getNModified());
+                replyInfo.summaryFields.nModified += response.getNModified();
+                replyInfo.summaryFields.nMatched += response.getN();
+            } else {
+                replyInfo.summaryFields.nDeleted += response.getN();
             }
             reply.setOk(1);
             reply.setIdx(0);
@@ -241,6 +247,7 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                     replyInfo.replyItems[idx].setN(0);
                     replyInfo.replyItems[idx].setOk(0);
                     replyInfo.replyItems[idx].setStatus(err.getStatus());
+                    replyInfo.summaryFields.nInserted -= 1;
                 }
             } else {
                 invariant(errDetails.size() == 1 && response.getN() == 0);
@@ -251,7 +258,7 @@ BulkWriteReplyInfo processFLEResponse(const BulkWriteCRUDOp::OpType& firstOpType
                 }
                 replyInfo.replyItems.push_back(reply);
             }
-            replyInfo.numErrors += errDetails.size();
+            replyInfo.summaryFields.nErrors += errDetails.size();
         } else {
             // response.toStatus() is not OK but there is no errDetails so the
             // top level status should be not OK instead. Raising an exception.
@@ -339,7 +346,7 @@ std::pair<FLEBatchResult, BulkWriteReplyInfo> attemptExecuteFLE(
         }
 
         replyInfo.replyItems.push_back(reply);
-        replyInfo.numErrors = 1;
+        replyInfo.summaryFields.nErrors = 1;
         return {FLEBatchResult::kProcessed, std::move(replyInfo)};
     }
 }
@@ -880,6 +887,12 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
         // batch.
         const auto& replyItems = bwReply.getCursor().getFirstBatch();
 
+        _nInserted += bwReply.getNInserted();
+        _nDeleted += bwReply.getNDeleted();
+        _nMatched += bwReply.getNMatched();
+        _nUpserted += bwReply.getNUpserted();
+        _nModified += bwReply.getNModified();
+
         // Capture the errors if any exist and mark the writes in the TargetedWriteBatch so that
         // they may be re-targeted if needed.
         noteChildBatchResponse(
@@ -1109,6 +1122,15 @@ void BulkWriteOp::noteWriteOpFinalResponse(
     }
 
     if (reply.getStatus().isOK()) {
+        if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Insert) {
+            _nInserted += reply.getN().value_or(0);
+        } else if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Delete) {
+            _nDeleted += reply.getN().value_or(0);
+        } else {
+            _nModified += reply.getNModified().value_or(0);
+            _nMatched += reply.getN().value_or(0);
+            _nUpserted += reply.getUpserted() ? 1 : 0;
+        }
         writeOp.setOpComplete(reply);
     } else {
         auto writeError = write_ops::WriteError(opIdx, reply.getStatus());
@@ -1129,7 +1151,12 @@ void BulkWriteOp::noteWriteOpFinalResponse(
 BulkWriteReplyInfo BulkWriteOp::generateReplyInfo(bool errorsOnly) {
     dassert(isFinished());
     std::vector<BulkWriteReplyItem> replyItems;
-    int numErrors = 0;
+    SummaryFields summary;
+    summary.nInserted = _nInserted;
+    summary.nDeleted = _nDeleted;
+    summary.nMatched = _nMatched;
+    summary.nModified = _nModified;
+    summary.nUpserted = _nUpserted;
     replyItems.reserve(_writeOps.size());
 
     const auto ordered = _clientRequest.getOrdered();
@@ -1173,14 +1200,18 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo(bool errorsOnly) {
             if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update) {
                 replyItems.back().setNModified(0);
             }
-            numErrors++;
+            // We only count nErrors at the end of the command because it is simpler and less error
+            // prone. If we counted errors as we encountered them we could hit edge cases where we
+            // accidentally count the same error multiple times. At this point in the execution we
+            // have already resolved any repeat errors.
+            summary.nErrors++;
             // Only return the first error if we are ordered.
             if (ordered)
                 break;
         }
     }
 
-    return {std::move(replyItems), numErrors, generateWriteConcernError(), _retriedStmtIds};
+    return {std::move(replyItems), summary, generateWriteConcernError(), _retriedStmtIds};
 }
 
 void BulkWriteOp::saveWriteConcernError(ShardId shardId, BulkWriteWriteConcernError wcError) {

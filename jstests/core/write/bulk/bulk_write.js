@@ -33,7 +33,7 @@ var res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 0, "bulkWrite command response: " + tojson(res));
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 0);
@@ -47,7 +47,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 0, "bulkWrite command response: " + tojson(res));
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 1);
@@ -62,7 +62,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 0, "bulkWrite command response: " + tojson(res));
 
 assert.eq(coll.find().itcount(), 2);
 assert.eq(coll1.find().itcount(), 0);
@@ -80,7 +80,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 0, "bulkWrite command response: " + tojson(res));
+assert.eq(res.nErrors, 0, "bulkWrite command response: " + tojson(res));
 
 assert.eq(1, coll.count({_id: 3}));
 

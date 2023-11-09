@@ -32,7 +32,7 @@ let res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+assert.eq(res.nErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1],
@@ -52,7 +52,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
-assert.eq(res.numErrors, 1);
+assert.eq(res.nErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1],

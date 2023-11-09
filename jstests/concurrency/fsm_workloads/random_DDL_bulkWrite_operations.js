@@ -288,7 +288,7 @@ export const $config = (function() {
                 // Check if insert succeeded
                 var res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
-                assert.eq(res.numErrors, 0);
+                assert.eq(res.nErrors, 0);
 
                 jsTestLog('BulkWrite - Update tid:' + tid + ' currentTid:' + this.tid +
                           ' collection:' + collNames);
@@ -311,7 +311,7 @@ export const $config = (function() {
                     nsInfo: [{ns: fullNs1}, {ns: fullNs2}]
                 };
                 res = db.adminCommand(bulkWriteCmd);
-                if (res.numErrors != 0) {
+                if (res.nErrors != 0) {
                     // Should only be possible for the first namespace to be renamed.
                     var err = res.cursor.firstBatch[0].code;
                     if (err == ErrorCodes.QueryPlanKilled) {
@@ -323,7 +323,7 @@ export const $config = (function() {
                     }
                 }
                 assert.commandWorked(res);
-                assert.eq(res.numErrors, 0);
+                assert.eq(res.nErrors, 0);
 
                 // Delete Data
                 jsTestLog('BulkWrite - Remove tid:' + tid + ' currentTid:' + this.tid +
@@ -339,7 +339,7 @@ export const $config = (function() {
                 };
                 res = db.adminCommand(bulkWriteCmd);
                 assert.commandWorked(res);
-                assert.eq(res.numErrors, 0);
+                assert.eq(res.nErrors, 0);
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 assert.eq(countDocuments(coll, {generation: generation}), 0);
             } finally {

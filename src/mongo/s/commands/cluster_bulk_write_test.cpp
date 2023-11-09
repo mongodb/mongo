@@ -63,7 +63,12 @@ protected:
             auto cursor = BulkWriteCommandResponseCursor(
                 0, replyItems, NamespaceString::makeBulkWriteNSS(boost::none));
             bob.append("cursor", cursor.toBSON());
-            bob.append("numErrors", 0);
+            bob.append("nErrors", 0);
+            bob.append("nInserted", 0);
+            bob.append("nDeleted", 0);
+            bob.append("nMatched", 0);
+            bob.append("nModified", 0);
+            bob.append("nUpserted", 0);
             appendTxnResponseMetadata(bob);
             return bob.obj();
         });
@@ -81,7 +86,12 @@ protected:
             auto cursor = BulkWriteCommandResponseCursor(
                 0, replyItems, NamespaceString::makeBulkWriteNSS(boost::none));
             bob.append("cursor", cursor.toBSON());
-            bob.append("numErrors", 0);
+            bob.append("nErrors", 0);
+            bob.append("nInserted", 0);
+            bob.append("nDeleted", 0);
+            bob.append("nMatched", 0);
+            bob.append("nModified", 0);
+            bob.append("nUpserted", 0);
             appendTxnResponseMetadata(bob);
             return bob.obj();
         });
