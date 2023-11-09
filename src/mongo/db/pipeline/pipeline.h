@@ -319,9 +319,10 @@ public:
     bool needsShard() const;
 
     /**
-     * Returns 'true' if any stage in the pipeline requires being run on all shards.
+     * Returns 'true' if any stage in the pipeline requires being run on all hosts within targeted
+     * shards.
      */
-    bool needsAllShardServers() const;
+    bool needsAllShardHosts() const;
 
     /**
      * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run

@@ -245,98 +245,16 @@ std::vector<RemoteCursor> establishShardCursors(
     OperationContext* opCtx,
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
-    bool mustRunOnAllShards,
-    const boost::optional<CollectionRoutingInfo>& cri,
-    const std::set<ShardId>& shardIds,
-    const BSONObj& cmdObj,
-    const boost::optional<analyze_shard_key::TargetedSampleId>& sampleId,
     const ReadPreferenceSetting& readPref,
+    const std::vector<AsyncRequestsSender::Request>& requests,
     AsyncRequestsSender::ShardHostMap designatedHostsMap,
-    stdx::unordered_map<ShardId, BSONObj> resumeTokenMap,
-    bool targetEveryShardServer) {
+    bool targetAllHosts) {
+    tassert(8221800, "expected at least one shard request, found: 0", !requests.empty());
+    const BSONObj& cmdObj = requests.begin()->cmdObj;
     LOGV2_DEBUG(20904,
                 1,
                 "Dispatching command {cmdObj} to establish cursors on shards",
                 "cmdObj"_attr = redact(cmdObj));
-
-    std::vector<std::pair<ShardId, BSONObj>> requests;
-
-    // If we don't need to run on all shards, then we should always have a valid routing table.
-    invariant(cri || mustRunOnAllShards);
-
-    if (targetEveryShardServer) {
-        // If we are running on all shard servers we should never designate a particular server.
-        invariant(designatedHostsMap.empty());
-        // Resume tokens are particular to a host, so it will never make sense to use them when
-        // running on all shard servers.
-        invariant(resumeTokenMap.empty());
-        if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
-            LOGV2(
-                7355704,
-                "shardedAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
-                "until fail point is disabled.");
-            while (
-                MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
-                sleepsecs(1);
-            }
-        }
-        return establishCursorsOnAllHosts(
-            opCtx, std::move(executor), nss, shardIds, cmdObj, false, getDesiredRetryPolicy(opCtx));
-    }
-
-    if (mustRunOnAllShards) {
-        // The pipeline contains a stage which must be run on all shards. Skip versioning and
-        // enqueue the raw command objects.
-        for (const auto& shardId : shardIds) {
-            requests.emplace_back(shardId, cmdObj);
-        }
-    } else if (cri->cm.hasRoutingTable()) {
-        // The collection has a routing table. Use it to decide which shards to target based on the
-        // query and collation, and build versioned requests for them.
-        for (const auto& shardId : shardIds) {
-            auto versionedCmdObj = appendShardVersion(cmdObj, cri->getShardVersion(shardId));
-
-            if (sampleId && sampleId->isFor(shardId)) {
-                versionedCmdObj =
-                    analyze_shard_key::appendSampleId(versionedCmdObj, sampleId->getId());
-            }
-
-            requests.emplace_back(shardId, std::move(versionedCmdObj));
-        }
-    } else {
-        // The collection does not have a routing table. We should be targeting only a single shard.
-        tassert(7958200,
-                "expected aggregation without routing table to target only a single shard",
-                shardIds.size() == 1);
-        const auto& shardId = *shardIds.begin();
-
-        auto versionedCmdObj = cmdObj;
-        if (sampleId && sampleId->isFor(shardId)) {
-            versionedCmdObj = analyze_shard_key::appendSampleId(versionedCmdObj, sampleId->getId());
-        }
-
-        if (shardId == cri->cm.dbPrimary()) {
-            versionedCmdObj = !cri->cm.dbVersion().isFixed()
-                ? appendShardVersion(versionedCmdObj, ShardVersion::UNSHARDED())
-                : versionedCmdObj;
-            versionedCmdObj = appendDbVersionIfPresent(versionedCmdObj, cri->cm.dbVersion());
-        }
-        requests.emplace_back(shardId, versionedCmdObj);
-    }
-
-    // If we have resume data, use it.
-    if (!resumeTokenMap.empty()) {
-        for (auto& requestPair : requests) {
-            const auto& shardId = requestPair.first;
-            auto& request = requestPair.second;
-            auto resumeTokenIter = resumeTokenMap.find(shardId);
-            if (resumeTokenIter != resumeTokenMap.end()) {
-                request = request.addField(
-                    BSON(AggregateCommandRequest::kResumeAfterFieldName << resumeTokenIter->second)
-                        .firstElement());
-            }
-        }
-    }
 
     if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
         LOGV2(20905,
@@ -347,15 +265,32 @@ std::vector<RemoteCursor> establishShardCursors(
         }
     }
 
-    return establishCursors(opCtx,
-                            std::move(executor),
-                            nss,
-                            readPref,
-                            requests,
-                            false /* do not allow partial results */,
-                            getDesiredRetryPolicy(opCtx),
-                            {} /* providedOpKeys */,
-                            designatedHostsMap);
+    if (targetAllHosts) {
+        // If we are running on all shard servers we should never designate a particular server.
+        invariant(designatedHostsMap.empty());
+        std::set<ShardId> shardIds;
+        for (const auto& request : requests) {
+            shardIds.emplace(request.shardId);
+            tassert(
+                8133500,
+                str::stream() << "Expected same request for each shard when targeting every shard "
+                                 "server, found different requests for shards: "
+                              << cmdObj << " " << request.cmdObj,
+                cmdObj.binaryEqual(cmdObj));
+        }
+        return establishCursorsOnAllHosts(
+            opCtx, std::move(executor), nss, shardIds, cmdObj, false, getDesiredRetryPolicy(opCtx));
+    } else {
+        return establishCursors(opCtx,
+                                std::move(executor),
+                                nss,
+                                readPref,
+                                requests,
+                                false /* do not allow partial results */,
+                                getDesiredRetryPolicy(opCtx),
+                                {} /* providedOpKeys */,
+                                std::move(designatedHostsMap));
+    }
 }
 
 std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -886,26 +821,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
     auto cri =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespace()));
 
-    auto versionedCmdObj = [&] {
-        if (cri.cm.hasRoutingTable()) {
-            return appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
-                                      cri.getShardVersion(shardId));
-        } else {
-            // The collection does not have a routing table. Don't append shard version info when
-            // contacting a fixed db collection.
-            auto cmdObjWithShardVersion = !cri.cm.dbVersion().isFixed()
-                ? appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
-                                     ShardVersion::UNSHARDED())
-                : aggregation_request_helper::serializeToCommandObj(request);
-            return appendDbVersionIfPresent(cmdObjWithShardVersion, cri.cm.dbVersion());
-        }
-    }();
-
+    auto requests =
+        buildVersionedRequests(expCtx,
+                               request.getNamespace(),
+                               cri,
+                               {shardId},
+                               aggregation_request_helper::serializeToCommandObj(request));
     auto cursors = establishCursors(opCtx,
                                     expCtx->mongoProcessInterface->taskExecutor,
                                     request.getNamespace(),
                                     std::move(readPreference),
-                                    {{shardId, versionedCmdObj}},
+                                    requests,
                                     false /* allowPartialResults */,
                                     Shard::RetryPolicy::kIdempotent);
     invariant(cursors.size() == 1);
@@ -1106,7 +1032,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
                                                    shardTargetingCollation,
                                                    mergeShardId);
 
-    bool targetEveryShardServer = pipeline->needsAllShardServers();
+    bool targetAllHosts = pipeline->needsAllShardHosts();
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
     // - There is a stage that needs to be run on the primary shard and the single target shard
     //   is not the primary.
@@ -1115,7 +1041,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
     // TODO SERVER-79583: This reference to dbPrimary can be removed once
     // HostTypeRequirement::kPrimaryShard is no longer used.
     const bool needsSplit =
-        (shardIds.size() > 1u || needsMongosMerge || targetEveryShardServer ||
+        (shardIds.size() > 1u || needsMongosMerge || targetAllHosts ||
          (needsPrimaryShardMerge && cri && *(shardIds.begin()) != cri->cm.dbPrimary())) ||
         (mergeShardId && *(shardIds.begin()) != mergeShardId);
 
@@ -1149,6 +1075,70 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
             needsSplit,
             mustRunOnAllShards,
             shardRegistryReloadTime};
+}
+
+std::vector<AsyncRequestsSender::Request> buildShardRequests(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const boost::optional<CollectionRoutingInfo>& cri,
+    const std::set<ShardId>& shardIds,
+    BSONObj targetedCommand,
+    bool eligibleForSampling,
+    bool mustRunOnAllShards,
+    bool targetAllHosts,
+    const stdx::unordered_map<ShardId, BSONObj>& resumeTokenMap) {
+    std::vector<AsyncRequestsSender::Request> requests;
+    const bool needsVersionedRequests = !mustRunOnAllShards && !targetAllHosts;
+    if (needsVersionedRequests) {
+        tassert(7742700,
+                "Aggregations on a real namespace should use the routing table to target "
+                "shards, and should participate in the shard version protocol",
+                cri);
+        requests = buildVersionedRequests(
+            expCtx, expCtx->ns, *cri, shardIds, targetedCommand, eligibleForSampling);
+
+    } else {
+        // The pipeline contains a stage which must be run on all shards and/or on all targeted
+        // shard hosts. Skip versioning and enqueue the raw command objects.
+        requests.reserve(shardIds.size());
+        const auto targetedSampleId = eligibleForSampling
+            ? analyze_shard_key::tryGenerateTargetedSampleId(
+                  expCtx->opCtx,
+                  expCtx->ns,
+                  targetedCommand.firstElementFieldNameStringData(),
+                  shardIds)
+            : boost::none;
+
+        for (const ShardId& shardId : shardIds) {
+            auto shardCmdObj = targetedCommand;
+            if (targetedSampleId && targetedSampleId->isFor(shardId)) {
+                shardCmdObj =
+                    analyze_shard_key::appendSampleId(shardCmdObj, targetedSampleId->getId());
+            }
+            requests.emplace_back(shardId, std::move(shardCmdObj));
+        }
+    }
+
+    if (!resumeTokenMap.empty()) {
+        // Resume tokens are particular to a host, so it will never make sense to use them when
+        // running on all shard servers.
+        invariant(!targetAllHosts);
+        std::vector<AsyncRequestsSender::Request> requestsWithResumeTokens;
+        requestsWithResumeTokens.reserve(requests.size());
+        for (const auto& request : requests) {
+            auto resumeTokenIt = resumeTokenMap.find(request.shardId);
+            if (resumeTokenIt == resumeTokenMap.end()) {
+                requestsWithResumeTokens.emplace_back(request);
+            } else {
+                requestsWithResumeTokens.emplace_back(
+                    request.shardId,
+                    request.cmdObj.addField(BSON(AggregateCommandRequest::kResumeAfterFieldName
+                                                 << resumeTokenIt->second)
+                                                .firstElement()));
+            }
+        }
+        requests.swap(requestsWithResumeTokens);
+    }
+    return requests;
 }
 
 DispatchShardPipelineResults dispatchTargetedShardPipeline(
@@ -1186,7 +1176,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
 
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
-    const bool needsAllShardServers = pipeline->needsAllShardServers();
+    const bool targetAllHosts = pipeline->needsAllShardHosts();
     const bool needsPrimaryShardMerger = pipeline->needsPrimaryShardMerger();
 
     if (needsSplit) {
@@ -1225,11 +1215,6 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                                                            pipeline.get(),
                                                            std::move(readConcern),
                                                            boost::none));
-    const auto targetedSampleId = eligibleForSampling
-        ? analyze_shard_key::tryGenerateTargetedSampleId(
-              opCtx, expCtx->ns, analyze_shard_key::SampledCommandNameEnum::kAggregate, shardIds)
-        : boost::none;
-
     // If there were no shards when we began execution, we wouldn't have run this aggregation in the
     // first place. Here, we double-check that the shards have not been removed mid-operation.
     uassert(ErrorCodes::ShardNotFound,
@@ -1237,46 +1222,28 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
             "the shards removed mid-operation?",
             shardCount > 0);
 
+    std::vector<AsyncRequestsSender::Request> requests = buildShardRequests(expCtx,
+                                                                            cri,
+                                                                            shardIds,
+                                                                            targetedCommand,
+                                                                            eligibleForSampling,
+                                                                            mustRunOnAllShards,
+                                                                            targetAllHosts,
+                                                                            resumeTokenMap);
+
+    auto readPref = ReadPreferenceSetting::get(opCtx);
     if (explain) {
-        if (mustRunOnAllShards) {
-            // Some stages (such as $currentOp) need to be broadcast to all shards, and
-            // should not participate in the shard version protocol.
-            shardResults =
-                scatterGatherUnversionedTargetAllShards(opCtx,
-                                                        expCtx->ns.dbName(),
-                                                        targetedCommand,
-                                                        ReadPreferenceSetting::get(opCtx),
-                                                        Shard::RetryPolicy::kIdempotent);
-        } else {
-            tassert(7742700,
-                    "Aggregations on a real namespace should use the routing table to target "
-                    "shards, and should participate in the shard version protocol",
-                    cri);
-            shardResults =
-                scatterGatherVersionedTargetSpecificShards(expCtx,
-                                                           expCtx->ns.dbName(),
-                                                           expCtx->ns,
-                                                           *cri,
-                                                           targetedCommand,
-                                                           ReadPreferenceSetting::get(opCtx),
-                                                           Shard::RetryPolicy::kIdempotent,
-                                                           shardIds);
-        }
+        shardResults = gatherResponses(
+            opCtx, expCtx->ns.dbName(), readPref, Shard::RetryPolicy::kIdempotent, requests);
     } else {
         try {
             cursors = establishShardCursors(opCtx,
                                             expCtx->mongoProcessInterface->taskExecutor,
                                             expCtx->ns,
-                                            mustRunOnAllShards,
-                                            cri,
-                                            shardIds,
-                                            targetedCommand,
-                                            targetedSampleId,
-                                            ReadPreferenceSetting::get(opCtx),
-                                            designatedHostsMap,
-                                            resumeTokenMap,
-                                            needsAllShardServers);
-
+                                            readPref,
+                                            requests,
+                                            std::move(designatedHostsMap),
+                                            targetAllHosts);
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
             // Check to see if the command failed because of a stale shard version or something
             // else.
@@ -1293,7 +1260,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
                               << ") is not a multiple of the number of targeted shards ("
                               << shardCount
                               << ") and we were not targeting each mongod in each shard",
-                needsAllShardServers || cursors.size() % shardCount == 0);
+                targetAllHosts || cursors.size() % shardCount == 0);
 
         // For $changeStream, we must open an extra cursor on the 'config.shards' collection, so
         // that we can monitor for the addition of new shards inline with real events.

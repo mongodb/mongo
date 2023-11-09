@@ -105,7 +105,7 @@ public:
      * Make a RequestSender and thus send requests.
      */
     void sendRequests(const ReadPreferenceSetting& readPref,
-                      const std::vector<std::pair<ShardId, BSONObj>>& remotes,
+                      const std::vector<AsyncRequestsSender::Request>& remotes,
                       Shard::RetryPolicy retryPolicy);
 
     /**
@@ -169,7 +169,7 @@ private:
 };
 
 void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
-                                     const std::vector<std::pair<ShardId, BSONObj>>& remotes,
+                                     const std::vector<AsyncRequestsSender::Request>& remotes,
                                      Shard::RetryPolicy retryPolicy) {
     // Construct the requests
     std::vector<AsyncRequestsSender::Request> requests;
@@ -178,10 +178,10 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
     for (const auto& remote : remotes) {
         if (_providedOpKeys.size()) {
             // Caller provided their own keys so skip appending the default key.
-            dassert(remote.second.hasField(kOperationKeyField));
-            requests.emplace_back(remote.first, remote.second);
+            dassert(remote.cmdObj.hasField(kOperationKeyField));
+            requests.emplace_back(remote);
         } else {
-            requests.emplace_back(remote.first, appendOpKey(_defaultOpKey, remote.second));
+            requests.emplace_back(remote.shardId, appendOpKey(_defaultOpKey, remote.cmdObj));
         }
     }
 
@@ -425,7 +425,7 @@ std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            std::shared_ptr<executor::TaskExecutor> executor,
                                            const NamespaceString& nss,
                                            const ReadPreferenceSetting readPref,
-                                           const std::vector<std::pair<ShardId, BSONObj>>& remotes,
+                                           const std::vector<AsyncRequestsSender::Request>& remotes,
                                            bool allowPartialResults,
                                            Shard::RetryPolicy retryPolicy,
                                            std::vector<OperationKey> providedOpKeys,

@@ -351,7 +351,7 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
 
         tassert(7355707,
                 "If a stage is broadcast to all shard servers then it must be a data source.",
-                constraints.hostRequirement != HostTypeRequirement::kAllShardServers ||
+                constraints.hostRequirement != HostTypeRequirement::kAllShardHosts ||
                     !constraints.requiresInputDocSource);
     }
 }
@@ -505,10 +505,10 @@ bool Pipeline::needsMongosMerger() const {
     });
 }
 
-bool Pipeline::needsAllShardServers() const {
+bool Pipeline::needsAllShardHosts() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         return stage->constraints().resolvedHostTypeRequirement(pCtx) ==
-            HostTypeRequirement::kAllShardServers;
+            HostTypeRequirement::kAllShardHosts;
     });
 }
 
@@ -517,7 +517,7 @@ bool Pipeline::needsShard() const {
         auto hostType = stage->constraints().resolvedHostTypeRequirement(pCtx);
         return (hostType == HostTypeRequirement::kAnyShard ||
                 hostType == HostTypeRequirement::kPrimaryShard ||
-                hostType == HostTypeRequirement::kAllShardServers);
+                hostType == HostTypeRequirement::kAllShardHosts);
     });
 }
 
@@ -747,7 +747,7 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
 
         const bool needsShard = (hostRequirement == HostTypeRequirement::kAnyShard ||
                                  hostRequirement == HostTypeRequirement::kPrimaryShard ||
-                                 hostRequirement == HostTypeRequirement::kAllShardServers);
+                                 hostRequirement == HostTypeRequirement::kAllShardHosts);
 
         const bool mustWriteToDisk =
             (constraints.diskRequirement == DiskUseRequirement::kWritesPersistentData);

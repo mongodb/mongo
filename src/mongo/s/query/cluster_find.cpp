@@ -205,7 +205,7 @@ StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
  * Constructs the find commands sent to each targeted shard to establish cursors, attaching the
  * shardVersion, txnNumber and sampleId if necessary.
  */
-std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
+std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     OperationContext* opCtx,
     const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardIds,
@@ -250,7 +250,7 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     }
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    std::vector<std::pair<ShardId, BSONObj>> requests;
+    std::vector<AsyncRequestsSender::Request> requests;
     for (const auto& shardId : shardIds) {
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
         invariant(!shard->isConfig() || shard->getConnString());

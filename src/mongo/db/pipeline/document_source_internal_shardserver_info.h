@@ -102,7 +102,7 @@ public:
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAllShardServers,
+                                     HostTypeRequirement::kAllShardHosts,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,

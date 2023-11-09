@@ -153,7 +153,7 @@ protected:
 };
 
 TEST_F(EstablishCursorsTest, NoRemotes) {
-    std::vector<std::pair<ShardId, BSONObj>> remotes;
+    std::vector<AsyncRequestsSender::Request> remotes;
     auto cursors = establishCursors(operationContext(),
                                     executor(),
                                     _nss,
@@ -167,7 +167,7 @@ TEST_F(EstablishCursorsTest, NoRemotes) {
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         auto cursors = establishCursors(operationContext(),
@@ -193,7 +193,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccess) {
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     AsyncRequestsSender::ShardHostMap designatedHosts;
     auto shard0Secondary = HostAndPort("SecondaryHostShard0", 12345);
@@ -228,7 +228,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithDesignatedHost) {
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         ASSERT_THROWS(establishCursors(operationContext(),
@@ -250,7 +250,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
 
 TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj},
     };
 
@@ -296,7 +296,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableErrorAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         // A non-retriable error is not ignored even though allowPartialResults is true.
@@ -319,7 +319,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableErrorAllowParti
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         auto cursors = establishCursors(operationContext(),
@@ -351,7 +351,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccess) 
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccessAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         auto cursors = establishCursors(operationContext(),
@@ -384,7 +384,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccessAl
 
 TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrors) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         ASSERT_THROWS(establishCursors(operationContext(),
@@ -412,7 +412,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrors) {
 
 TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrorsAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
+    std::vector<AsyncRequestsSender::Request> remotes{{kTestShardIds[0], cmdObj}};
 
     auto future = launchAsync([&] {
         auto cursors = establishCursors(operationContext(),
@@ -445,7 +445,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrorsAllowPartialResu
 
 TEST_F(EstablishCursorsTest, MultipleRemotesRespondWithSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -474,7 +474,7 @@ TEST_F(EstablishCursorsTest, MultipleRemotesRespondWithSuccess) {
 
 TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableError) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -543,7 +543,7 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
     auto cmdObj2 = BSON("find"
                         << "testcoll"
                         << "clientOperationKey" << providedOpKeys[1]);
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj0}, {kTestShardIds[1], cmdObj1}, {kTestShardIds[2], cmdObj2}};
 
     auto future = launchAsync([&] {
@@ -611,7 +611,7 @@ TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
 TEST_F(EstablishCursorsTest,
        MultipleRemotesOneRemoteRespondsWithNonretriableErrorAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -657,7 +657,7 @@ TEST_F(EstablishCursorsTest,
 
 TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithRetriableErrorThenSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -709,7 +709,7 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithRetriableErrorT
 TEST_F(EstablishCursorsTest,
        MultipleRemotesOneRemoteRespondsWithRetriableErrorThenSuccessAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -760,7 +760,7 @@ TEST_F(EstablishCursorsTest,
 
 TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrors) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -813,7 +813,7 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrors) {
 
 TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrorsAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     auto future = launchAsync([&] {
@@ -873,7 +873,7 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrorsAllo
 
 TEST_F(EstablishCursorsTest, MultipleRemotesAllMaxOutRetriableErrorsAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
 
     // Failure to establish a cursor due to maxing out retriable errors on all three remotes
@@ -911,7 +911,7 @@ TEST_F(EstablishCursorsTest, MultipleRemotesAllMaxOutRetriableErrorsAllowPartial
 
 TEST_F(EstablishCursorsTest, InterruptedWithDanglingRemoteRequest) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
-    std::vector<std::pair<ShardId, BSONObj>> remotes{
+    std::vector<AsyncRequestsSender::Request> remotes{
         {kTestShardIds[0], cmdObj},
         {kTestShardIds[1], cmdObj},
     };

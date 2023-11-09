@@ -491,12 +491,15 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     }
 
     // For all consumers construct a request with appropriate cursor ids and send to shards.
-    std::vector<std::pair<ShardId, BSONObj>> requests;
-    auto numConsumers = shardDispatchResults->exchangeSpec->consumerShards.size();
+    std::vector<AsyncRequestsSender::Request> requests;
     std::vector<SplitPipeline> consumerPipelines;
+    auto numConsumers = shardDispatchResults->exchangeSpec->consumerShards.size();
+    requests.reserve(numConsumers);
+    consumerPipelines.reserve(numConsumers);
     for (size_t idx = 0; idx < numConsumers; ++idx) {
         // Pick this consumer's cursors from producers.
         std::vector<OwnedRemoteCursor> producers;
+        producers.reserve(shardDispatchResults->numProducers);
         for (size_t p = 0; p < shardDispatchResults->numProducers; ++p) {
             producers.emplace_back(
                 std::move(shardDispatchResults->remoteCursors[p * numConsumers + idx]));

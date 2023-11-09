@@ -153,7 +153,7 @@ public:
         if (showLocalOps) {
             hostTypeRequirement = HostTypeRequirement::kLocalOnly;
         } else if (_targetAllNodes.value_or(false)) {
-            hostTypeRequirement = HostTypeRequirement::kAllShardServers;
+            hostTypeRequirement = HostTypeRequirement::kAllShardHosts;
         } else {
             hostTypeRequirement = HostTypeRequirement::kAnyShard;
         }

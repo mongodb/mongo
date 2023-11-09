@@ -113,7 +113,7 @@ public:
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     _allHosts ? HostTypeRequirement::kAllShardServers
+                                     _allHosts ? HostTypeRequirement::kAllShardHosts
                                                : HostTypeRequirement::kAnyShard,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,

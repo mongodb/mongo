@@ -154,14 +154,11 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     return expCtx;
 }
 
-namespace {
-
 std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardIds,
-    const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     bool eligibleForSampling) {
     const auto& cm = cri.cm;
@@ -183,31 +180,26 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
         : boost::none;
 
     for (const ShardId& shardId : shardIds) {
-        if (shardsToSkip.find(shardId) == shardsToSkip.end()) {
-            auto shardCmdObj = needShardVersion
-                ? appendShardVersion(cmdObjWithDbVersion, cri.getShardVersion(shardId))
-                : cmdObjWithDbVersion;
-            if (targetedSampleId && targetedSampleId->isFor(shardId)) {
-                shardCmdObj =
-                    analyze_shard_key::appendSampleId(shardCmdObj, targetedSampleId->getId());
-            }
-            requests.emplace_back(shardId, std::move(shardCmdObj));
+        auto shardCmdObj = needShardVersion
+            ? appendShardVersion(cmdObjWithDbVersion, cri.getShardVersion(shardId))
+            : cmdObjWithDbVersion;
+        if (targetedSampleId && targetedSampleId->isFor(shardId)) {
+            shardCmdObj = analyze_shard_key::appendSampleId(shardCmdObj, targetedSampleId->getId());
         }
+        requests.emplace_back(shardId, std::move(shardCmdObj));
     }
 
     return requests;
 }
 
+namespace {
+
 /**
- * Consults the routing info to build requests for:
- *  - If it has a routing table, shards that own chunks for the namespace, or
- *  - If it doesn't have a routing table, the primary shard for the database.
+ * Builds requests for each shard, that is affected by given query with given collation. Uses
+ * buildVersionedRequests function to build the requests after determining the list of shards.
  *
  * If a shard is included in shardsToSkip, it will be excluded from the list returned to the
  * caller.
- * If the command is eligible for sampling, attaches a unique sample id to one of the requests if
- * the collection has query sampling enabled and the rate-limited sampler successfully generates a
- * sample id for it.
  */
 std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(
     boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -237,8 +229,10 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 
         getShardIdsForQuery(expCtx, query, collation, cm, &shardIds, nullptr /* info */);
     }
-    return buildVersionedRequests(
-        expCtx, nss, cri, shardIds, shardsToSkip, cmdObj, eligibleForSampling);
+    for (const auto& shardToSkip : shardsToSkip) {
+        shardIds.erase(shardToSkip);
+    }
+    return buildVersionedRequests(expCtx, nss, cri, shardIds, cmdObj, eligibleForSampling);
 }
 
 std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
@@ -445,8 +439,9 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
     std::vector<AsyncRequestsSender::Request> requests;
-    for (auto&& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx))
+    for (auto&& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx)) {
         requests.emplace_back(std::move(shardId), cmdObj);
+    }
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
 }
@@ -514,24 +509,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     bool eligibleForSampling) {
     const auto requests = buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
-    return gatherResponses(expCtx->opCtx, dbName, readPref, retryPolicy, requests);
-}
-
-/**
- * Utility for dispatching versioned commands on a namespace to a passed set of shards
- */
-[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetSpecificShards(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const DatabaseName& dbName,
-    const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const std::set<ShardId>& shardIds,
-    bool eligibleForSampling) {
-    const auto requests = buildVersionedRequests(
-        expCtx, nss, cri, shardIds, {} /* shardsToSkip */, cmdObj, eligibleForSampling);
     return gatherResponses(expCtx->opCtx, dbName, readPref, retryPolicy, requests);
 }
 
@@ -788,7 +765,7 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
     return {cm.dbPrimary()};
 }
 
-std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
+std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
@@ -804,18 +781,8 @@ std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
                                                                boost::none /*explainVerbosity*/,
                                                                letParameters,
                                                                runtimeConstants);
-
-    std::vector<std::pair<ShardId, BSONObj>> requests;
-    auto ars_requests = buildVersionedRequestsForTargetedShards(
+    return buildVersionedRequestsForTargetedShards(
         expCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation);
-    std::transform(std::make_move_iterator(ars_requests.begin()),
-                   std::make_move_iterator(ars_requests.end()),
-                   std::back_inserter(requests),
-                   [](auto&& ars) {
-                       return std::pair<ShardId, BSONObj>(std::move(ars.shardId),
-                                                          std::move(ars.cmdObj));
-                   });
-    return requests;
 }
 
 StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationContext* opCtx,
@@ -856,8 +823,8 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
 
         if (cm.hasRoutingTable()) {
             // For a collection that has a routing table, we must load indexes from a shard with
-            // chunks. For consistency with cluster listIndexes, load from the shard that owns the
-            // minKey chunk.
+            // chunks. For consistency with cluster listIndexes, load from the shard that owns
+            // the minKey chunk.
             const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
             return {
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),

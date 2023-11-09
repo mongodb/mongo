@@ -265,8 +265,6 @@ public:
          */
         std::vector<RemoteCursor> _establishCursorOnParticipants(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
-            std::vector<std::pair<ShardId, BSONObj>> requests;
-
             // Shard requests
             const auto shardOpKey = UUID::gen();
             ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
@@ -276,6 +274,9 @@ public:
             const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
             auto participantRequestWithOpKey =
                 appendOpKey(shardOpKey, participantRequest.toBSON({}));
+
+            std::vector<AsyncRequestsSender::Request> requests;
+            requests.reserve(participants.size() + 1);
             for (const auto& shardId : participants) {
                 requests.emplace_back(shardId, participantRequestWithOpKey.getOwned());
             }

@@ -171,7 +171,7 @@ public:
                                   << nss.coll(),
                     nss.isCollectionlessCursorNamespace());
 
-            std::vector<std::pair<ShardId, BSONObj>> requests;
+            std::vector<AsyncRequestsSender::Request> requests;
             ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
             shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
@@ -224,7 +224,7 @@ public:
         ClusterClientCursorGuard _establishCursors(
             OperationContext* opCtx,
             const NamespaceString& nss,
-            const std::vector<std::pair<ShardId, BSONObj>>& requests,
+            const std::vector<AsyncRequestsSender::Request>& requests,
             std::vector<OperationKey> opKeys = {}) {
 
             ClusterClientCursorParams params(

@@ -103,6 +103,25 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
+ * Builds requests for each given shard.
+ *
+ * Consults the routing info to build requests for specified list of shards:
+ *  - If it has a routing table, shards that own chunks for the namespace, or
+ *  - If it doesn't have a routing table, the primary shard for the database.
+ *
+ * If the command is eligible for sampling, attaches a unique sample id to one of the requests if
+ * the collection has query sampling enabled and the rate-limited sampler successfully generates a
+ * sample id for it.
+ */
+std::vector<AsyncRequestsSender::Request> buildVersionedRequests(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const CollectionRoutingInfo& cri,
+    const std::set<ShardId>& shardIds,
+    const BSONObj& cmdObj,
+    bool eligibleForSampling = false);
+
+/**
  * Dispatches all the specified requests in parallel and waits until all complete, returning a
  * vector of the same size and positions as that of 'requests'.
  *
@@ -268,20 +287,6 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
- * Utility for dispatching versioned commands on a namespace to a passed set of shards.
- */
-[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetSpecificShards(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const DatabaseName& dbName,
-    const NamespaceString& nss,
-    const CollectionRoutingInfo& cri,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy,
-    const std::set<ShardId>& shardIds,
-    bool eligibleForSampling = false);
-
-/**
  * Utility for dispatching commands against the primary of a database and attaching the appropriate
  * database version. Also attaches UNSHARDED to the command. Does not retry on stale version.
  */
@@ -366,7 +371,7 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
  * Determines the shard(s) to which the given query will be targeted, and builds a separate
  * versioned copy of the command object for each such shard.
  */
-std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
+std::vector<AsyncRequestsSender::Request> getVersionedRequestsForTargetedShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionRoutingInfo& cri,
