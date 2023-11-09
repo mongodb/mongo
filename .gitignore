@@ -282,14 +282,18 @@ docker_compose/
 
 # artifacts from antithesis docker base image builds
 antithesis-dist-test
-buildscripts/antithesis/base_images/mongo_binaries/dist-test
+buildscripts/antithesis/base_images/mongo_binaries/bin
+buildscripts/antithesis/base_images/mongo_binaries/lib
 buildscripts/antithesis/base_images/mongo_binaries/libvoidstar.so
+buildscripts/antithesis/base_images/mongo_binaries/tsan.suppressions
 
+buildscripts/antithesis/base_images/workload/bin
+buildscripts/antithesis/base_images/workload/lib
 buildscripts/antithesis/base_images/workload/src
-buildscripts/antithesis/base_images/workload/mongo
 buildscripts/antithesis/base_images/workload/jstestfuzz
 buildscripts/antithesis/base_images/workload/QA
 buildscripts/antithesis/base_images/workload/libvoidstar.so
+buildscripts/antithesis/base_images/workload/tsan.suppressions
 
 # default download location for resmoke core-analyzer
 core-analyzer

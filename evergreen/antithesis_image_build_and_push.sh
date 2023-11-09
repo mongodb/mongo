@@ -6,15 +6,21 @@ set -o errexit
 # The antithesis docker repository to push images to
 antithesis_repo="us-central1-docker.pkg.dev/molten-verve-216720/mongodb-repository"
 
-# push images as evergreen-latest-${branch_name}, unless it's a patch
-tag="evergreen-latest-${branch_name}"
-if [ "${is_patch}" = "true" ]; then
-  tag="evergreen-patch"
-fi
-
+# tag images as evergreen[-${antithesis_build_type}]-{latest,patch} or just ${antithesis_image_tag}
 if [ -n "${antithesis_image_tag:-}" ]; then
   echo "Using provided tag: '$antithesis_image_tag' for docker pushes"
   tag=$antithesis_image_tag
+else
+  tag="evergreen"
+  if [[ -n "${antithesis_build_type}" ]]; then
+    tag="${tag}-${antithesis_build_type}"
+  fi
+
+  if [ "${is_patch}" = "true" ]; then
+    tag="${tag}-patch"
+  else
+    tag="${tag}-latest-${branch_name}"
+  fi
 fi
 
 # Clean up any leftover docker artifacts

@@ -1,5 +1,5 @@
 import os
-from shlex import quote
+import shlex
 import shutil
 import subprocess
 import sys
@@ -7,6 +7,7 @@ import sys
 import git
 import yaml
 from buildscripts.resmokelib import config
+from buildscripts.util.read_config import read_config_file
 from buildscripts.resmokelib.errors import RequiresForceRemove
 
 
@@ -57,10 +58,13 @@ class DockerComposeImageBuilder:
         self.MONGO_BINARIES_DOCKERFILE = f"{self.MONGO_BINARIES_BUILD_CONTEXT}/Dockerfile"
 
         # Artifact constants
-        self.MONGODB_BINARIES_RELATIVE_DIR = "dist-test" if self.in_evergreen else "antithesis-dist-test"
-        self.MONGO_BINARY = f"{self.MONGODB_BINARIES_RELATIVE_DIR}/bin/mongo"
-        self.MONGOD_BINARY = f"{self.MONGODB_BINARIES_RELATIVE_DIR}/bin/mongod"
-        self.MONGOS_BINARY = f"{self.MONGODB_BINARIES_RELATIVE_DIR}/bin/mongos"
+        self.DIST_TEST_DIR = "dist-test" if self.in_evergreen else "antithesis-dist-test"
+        self.MONGODB_BINARIES_DIR = os.path.join(self.DIST_TEST_DIR, "bin")
+        self.MONGODB_LIBRARIES_DIR = os.path.join(self.DIST_TEST_DIR, "lib")
+        self.TSAN_SUPPRESSIONS_SOURCE = "etc/tsan.suppressions"
+        self.MONGO_BINARY = os.path.join(self.MONGODB_BINARIES_DIR, "mongo")
+        self.MONGOD_BINARY = os.path.join(self.MONGODB_BINARIES_DIR, "mongod")
+        self.MONGOS_BINARY = os.path.join(self.MONGODB_BINARIES_DIR, "mongos")
 
         self.LIBVOIDSTAR_PATH = "/usr/lib/libvoidstar.so"
         self.MONGODB_DEBUGSYMBOLS = "mongo-debugsymbols.tgz"
@@ -72,6 +76,26 @@ class DockerComposeImageBuilder:
         # Port suffix ranging from 1-24 is subject to fault injection while ports 130+ are safe.
         self.next_available_fault_enabled_ip = 2
         self.next_available_fault_disabled_ip = 130
+
+        self.san_options = self._get_san_options()
+
+    def _get_san_options(self):
+        if self.in_evergreen:
+            expansions = read_config_file("../expansions.yml")
+            san_options = expansions.get("san_options", "")
+        else:
+            san_options = os.environ.get("san_options", "")
+        lines = [line for line in san_options.split() if line]
+        options = {}
+        for line in lines:
+            lst = [x.strip() for x in line.split("=", maxsplit=1)]
+            assert len(lst) == 2, f"Failed to parse $san_options: {line}"
+            k, v = lst
+            if v.startswith(('"', "'")) or v.endswith(("'", '"')):
+                assert v[0] == v[-1], f"Failed to parse $san_options: {line}"
+                v = v[1:-1]
+            options[k] = v
+        return options
 
     @staticmethod
     def get_resmoke_run_command() -> str:
@@ -147,7 +171,7 @@ class DockerComposeImageBuilder:
 
             # Write the `Process` args as an init script
             with open(os.path.join(build_context, "scripts", f"{service_name}.sh"), "w") as file:
-                file.write(" ".join(map(quote, process.args)) + '\n')
+                file.write(" ".join(map(shlex.quote, process.args)) + '\n')
 
         print("Writing `docker-compose.yml`...")
         with open(os.path.join(build_context, "docker-compose.yml"), "w") as docker_compose:
@@ -185,6 +209,19 @@ class DockerComposeImageBuilder:
         for volume in ["scripts", "logs", "data", "debug"]:
             os.makedirs(os.path.join(build_context, volume))
 
+    def _get_docker_build_san_args(self):
+        args = []
+        for key, value in self.san_options.items():
+            args += ["--build-arg", f'{key}={value}']
+        return args
+
+    def _docker_build(self, image_name, dockerfile, build_context):
+        cmd = ["docker", "build", "-t", f"{image_name}:{self.tag}", "-f", dockerfile]
+        cmd += self._get_docker_build_san_args()
+        cmd += [build_context]
+        print(f"Building image: {shlex.join(cmd)}")
+        return subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr, check=True)
+
     def build_config_image(self):
         """
         Build the config image containing the `docker-compose.yml` file, init scripts and volumes for the suite.
@@ -207,10 +244,8 @@ class DockerComposeImageBuilder:
 
         print(f"Done setting up antithesis config image build context for `{self.suite_name}...")
         print("Building antithesis config image...")
-        subprocess.run([
-            "docker", "build", "-t", f"{self.suite_name}:{self.tag}", "-f",
-            f"{self.DOCKER_COMPOSE_BUILD_CONTEXT}/Dockerfile", self.DOCKER_COMPOSE_BUILD_CONTEXT
-        ], stdout=sys.stdout, stderr=sys.stderr, check=True)
+        self._docker_build(self.suite_name, f"{self.DOCKER_COMPOSE_BUILD_CONTEXT}/Dockerfile",
+                           self.DOCKER_COMPOSE_BUILD_CONTEXT)
         print("Done building antithesis config image.")
 
     def build_workload_image(self):
@@ -227,18 +262,17 @@ class DockerComposeImageBuilder:
         print("Prepping `workload` image build context...")
         # Set up build context
         self._fetch_mongodb_binaries()
+        self._copy_mongodb_libraries_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._copy_mongo_binary_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._clone_mongo_repo_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._clone_qa_repo_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._clone_jstestfuzz_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
+        self._copy_config_files_to_build_context(self.WORKLOAD_BUILD_CONTEXT)
 
         # Build docker image
         print("Building workload image...")
-        subprocess.run([
-            "docker", "build", "-t", f"workload:{self.tag}", "-f", self.WORKLOAD_DOCKERFILE,
-            self.WORKLOAD_BUILD_CONTEXT
-        ], stdout=sys.stdout, stderr=sys.stderr, check=True)
+        self._docker_build("workload", self.WORKLOAD_DOCKERFILE, self.WORKLOAD_BUILD_CONTEXT)
         print("Done building workload image.")
 
     def build_mongo_binaries_image(self):
@@ -251,15 +285,15 @@ class DockerComposeImageBuilder:
         print("Prepping `mongo binaries` image build context...")
 
         self._fetch_mongodb_binaries()
+        self._copy_mongodb_libraries_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._copy_mongodb_binaries_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
+        self._copy_config_files_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
 
         # Build docker image
         print("Building mongo binaries image...")
-        subprocess.run([
-            "docker", "build", "-t", f"mongo-binaries:{self.tag}", "-f",
-            self.MONGO_BINARIES_DOCKERFILE, self.MONGO_BINARIES_BUILD_CONTEXT
-        ], stdout=sys.stdout, stderr=sys.stderr, check=True)
+        self._docker_build("mongo-binaries", self.MONGO_BINARIES_DOCKERFILE,
+                           self.MONGO_BINARIES_BUILD_CONTEXT)
         print("Done building mongo binaries image.")
 
     def _fetch_mongodb_binaries(self):
@@ -271,7 +305,7 @@ class DockerComposeImageBuilder:
 
         :return: None.
         """
-        mongodb_binaries_destination = os.path.join(self.MONGODB_BINARIES_RELATIVE_DIR, "bin")
+        mongodb_binaries_destination = self.MONGODB_BINARIES_DIR
 
         if not self.in_evergreen and os.path.exists(mongodb_binaries_destination):
             print(
@@ -343,13 +377,16 @@ class DockerComposeImageBuilder:
 
         :param dir_path: Directory path to add mongo binary to.
         """
-        mongo_binary_destination = os.path.join(dir_path, "mongo")
+        mongo_binary_destination_dir = os.path.join(dir_path, "bin")
+        mongo_binary_destination = os.path.join(mongo_binary_destination_dir, "mongo")
 
         print("Copy mongo binary to build context...")
         # Clean up any old artifacts in the build context
         if os.path.exists(mongo_binary_destination):
             print("Cleaning up mongo binary from build context first...")
             os.remove(mongo_binary_destination)
+
+        os.makedirs(mongo_binary_destination_dir, exist_ok=True)
         shutil.copy(self.MONGO_BINARY, mongo_binary_destination)
         print("Done copying mongo binary to build context.")
 
@@ -438,6 +475,14 @@ class DockerComposeImageBuilder:
             git.Repo.clone_from("git@github.com:10gen/jstestfuzz.git", jstestfuzz_repo_destination)
             print("Done cloning jstestfuzz repo to build context.")
 
+    def _copy_config_files_to_build_context(self, dir_path):
+        """
+        Copy any additional config files needed into the build context.
+
+        :param dir_path: Directory path to copy config files to.
+        """
+        shutil.copy(self.TSAN_SUPPRESSIONS_SOURCE, dir_path)
+
     def _copy_mongodb_binaries_to_build_context(self, dir_path):
         """
         Copy the MongodDB binaries to the build context.
@@ -445,14 +490,34 @@ class DockerComposeImageBuilder:
         :param dir_path: Directory path to add MongoDB binaries to.
         """
         print("Copy all MongoDB binaries to build context...")
-        mongodb_binaries_destination = os.path.join(dir_path, "dist-test")
+        mongodb_binaries_destination = os.path.join(dir_path, "bin")
 
         # Clean up any old artifacts in the build context
         if os.path.exists(mongodb_binaries_destination):
             print("Cleaning up all MongoDB binaries from build context first...")
             shutil.rmtree(mongodb_binaries_destination)
-        shutil.copytree(self.MONGODB_BINARIES_RELATIVE_DIR, mongodb_binaries_destination)
+        shutil.copytree(self.MONGODB_BINARIES_DIR, mongodb_binaries_destination)
+
         print("Done copying all MongoDB binaries to build context.")
+
+    def _copy_mongodb_libraries_to_build_context(self, dir_path):
+        print("Copy all MongoDB libraries to build context...")
+        mongodb_libraries_destination = os.path.join(dir_path, "lib")
+
+        if os.path.exists(mongodb_libraries_destination):
+            print("Cleaning up all MongoDB libaries from build context first...")
+            shutil.rmtree(mongodb_libraries_destination)
+
+        if os.path.exists(self.MONGODB_LIBRARIES_DIR):
+            shutil.copytree(self.MONGODB_LIBRARIES_DIR, mongodb_libraries_destination)
+
+        # We create lib/empty so that the relevant COPY in the Dockerfiles always has
+        # something to copy - the docker build step will fail if it doesn't. This is important
+        # when we're using a statically-linked build.
+        mongodb_libs_dir = os.path.join(mongodb_libraries_destination, "empty")
+        os.makedirs(mongodb_libs_dir, exist_ok=True)
+
+        print("Done copying all MongoDB libraries to build context.")
 
     def _add_libvoidstar_to_build_context(self, dir_path):
         """
@@ -460,7 +525,7 @@ class DockerComposeImageBuilder:
 
         :param dir_path: Directory path to add `libvoidstar.so` to.
         """
-        print("Add `livoidstar.so` to build context...")
+        print("Add `libvoidstar.so` to build context...")
         libvoidstar_destination = os.path.join(dir_path, "libvoidstar.so")
 
         # Clean up any old artifacts in the build context
