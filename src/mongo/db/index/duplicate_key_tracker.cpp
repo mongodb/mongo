@@ -78,7 +78,7 @@ DuplicateKeyTracker::DuplicateKeyTracker(OperationContext* opCtx,
                                          StringData ident) {
     _keyConstraintsTable =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, ident);
+            opCtx, ident, KeyFormat::Long);
 
     invariant(entry->descriptor()->unique(),
               str::stream() << "Duplicate key tracker table exists on disk with ident: " << ident

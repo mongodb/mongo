@@ -136,7 +136,7 @@ public:
         OperationContext* opCtx, KeyFormat keyFormat) override;
 
     virtual std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-        OperationContext* opCtx, StringData ident) override;
+        OperationContext* opCtx, StringData ident, KeyFormat keyFormat) override;
 
     virtual void cleanShutdown(ServiceContext* svcCtx) override;
 

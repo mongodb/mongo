@@ -1078,8 +1078,8 @@ StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationConte
 }
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
-    OperationContext* opCtx, StringData ident) {
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString::kEmpty, ident, CollectionOptions());
+    OperationContext* opCtx, StringData ident, KeyFormat keyFormat) {
+    auto rs = _engine->getTemporaryRecordStore(opCtx, ident, keyFormat);
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 

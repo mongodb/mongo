@@ -194,6 +194,10 @@ public:
                                                 StringData ident,
                                                 const CollectionOptions& options) override;
 
+    std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
+                                                         StringData ident,
+                                                         KeyFormat keyFormat) override;
+
     std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                           StringData ident,
                                                           KeyFormat keyFormat) override;

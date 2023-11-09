@@ -91,7 +91,8 @@ protected:
         return operationContext()
             ->getServiceContext()
             ->getStorageEngine()
-            ->makeTemporaryRecordStoreFromExistingIdent(operationContext(), sideWritesIdent);
+            ->makeTemporaryRecordStoreFromExistingIdent(
+                operationContext(), sideWritesIdent, KeyFormat::Long);
     }
 
     std::vector<BSONObj> getSideWritesTableContents(

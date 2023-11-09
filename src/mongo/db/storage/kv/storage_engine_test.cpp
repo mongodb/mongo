@@ -221,6 +221,46 @@ TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
     ASSERT_FALSE(identExists(opCtx.get(), rs->rs()->getIdent()));
 }
 
+TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
+    auto opCtx = cc().makeOperationContext();
+
+    const auto insertRecordAndAssertSize = [&](RecordStore* rs, const RecordId& rid) {
+        // Verify a temporary record store does not track size adjustments.
+        const auto data = "data";
+
+        WriteUnitOfWork wuow(opCtx.get());
+        StatusWith<RecordId> s =
+            rs->insertRecord(opCtx.get(), rid, data, strlen(data), Timestamp());
+        ASSERT_TRUE(s.isOK());
+        wuow.commit();
+
+        ASSERT_EQ(rs->numRecords(opCtx.get()), 0);
+        ASSERT_EQ(rs->dataSize(opCtx.get()), 0);
+    };
+
+    // Create the temporary record store and get its ident.
+    const std::string ident = [&]() {
+        std::unique_ptr<TemporaryRecordStore> rs;
+        Lock::GlobalLock lk(&*opCtx, MODE_IS);
+        rs = makeTemporary(opCtx.get());
+        ASSERT(rs.get());
+
+        insertRecordAndAssertSize(rs->rs(), RecordId(1));
+
+        // Keep ident even when TemporaryRecordStore goes out of scope.
+        rs->keep();
+        return rs->rs()->getIdent();
+    }();
+    ASSERT(identExists(opCtx.get(), ident));
+
+    std::unique_ptr<TemporaryRecordStore> rs;
+    rs = _storageEngine->makeTemporaryRecordStoreFromExistingIdent(
+        opCtx.get(), ident, KeyFormat::Long);
+
+    // Verify a temporary record store does not track size adjustments after re-opening.
+    insertRecordAndAssertSize(rs->rs(), RecordId(2));
+}
+
 class StorageEngineTimestampMonitorTest : public StorageEngineTest {
 public:
     void setUp() {

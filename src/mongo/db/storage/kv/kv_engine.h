@@ -84,6 +84,16 @@ public:
                                                         StringData ident,
                                                         const CollectionOptions& options) = 0;
 
+    /**
+     * Opens an existing ident as a temporary record store. Must be used for record stores created
+     * with `makeTemporaryRecordStore`. Using `getRecordStore` would cause the record store to use
+     * the same settings as a regular collection, and would differ in behaviour as when it was
+     * originally created with `makeTemporaryRecordStore`.
+     */
+    virtual std::unique_ptr<RecordStore> getTemporaryRecordStore(OperationContext* opCtx,
+                                                                 StringData ident,
+                                                                 KeyFormat keyFormat) = 0;
+
     virtual std::unique_ptr<SortedDataInterface> getSortedDataInterface(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -109,6 +119,10 @@ public:
                                      const CollectionOptions& options,
                                      KeyFormat keyFormat = KeyFormat::Long) = 0;
 
+    /**
+     * RecordStores initially created with `makeTemporaryRecordStore` must be opened with
+     * `getTemporaryRecordStore`.
+     */
     virtual std::unique_ptr<RecordStore> makeTemporaryRecordStore(OperationContext* opCtx,
                                                                   StringData ident,
                                                                   KeyFormat keyFormat) = 0;

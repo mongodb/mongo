@@ -96,7 +96,7 @@ public:
         return {};
     }
     std::unique_ptr<TemporaryRecordStore> makeTemporaryRecordStoreFromExistingIdent(
-        OperationContext* opCtx, StringData ident) final {
+        OperationContext* opCtx, StringData ident, KeyFormat keyFormat) final {
         return {};
     }
     void cleanShutdown(ServiceContext* svcCtx) final {}

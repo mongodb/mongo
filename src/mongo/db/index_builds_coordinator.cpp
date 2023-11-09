@@ -215,6 +215,9 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
     if (memberState.rollback()) {
         return false;
     }
+
+    // This check happens before spawning the index build thread. So it does not race with the
+    // replication recovery flag being modified.
     if (inReplicationRecovery(opCtx->getServiceContext())) {
         return false;
     }

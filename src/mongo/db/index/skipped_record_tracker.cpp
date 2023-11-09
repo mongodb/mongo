@@ -85,7 +85,7 @@ SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
     // lazily initialize table when we record the first document.
     _skippedRecordsTable =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, ident.value());
+            opCtx, ident.value(), KeyFormat::Long);
 }
 
 void SkippedRecordTracker::keepTemporaryTable() {

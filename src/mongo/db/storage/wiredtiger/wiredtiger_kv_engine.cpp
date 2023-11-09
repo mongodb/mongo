@@ -1765,6 +1765,34 @@ std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
         opCtx, _uri(ident), ident, descriptor, WiredTigerUtil::useTableLogging(nss));
 }
 
+std::unique_ptr<RecordStore> WiredTigerKVEngine::getTemporaryRecordStore(OperationContext* opCtx,
+                                                                         StringData ident,
+                                                                         KeyFormat keyFormat) {
+    // We don't log writes to temporary record stores.
+    const bool isLogged = false;
+    WiredTigerRecordStore::Params params;
+    params.nss = NamespaceString::kEmpty;
+    params.uuid = boost::none;
+    params.ident = ident.toString();
+    params.engineName = _canonicalName;
+    params.isCapped = false;
+    params.keyFormat = keyFormat;
+    params.overwrite = true;
+    params.isEphemeral = _ephemeral;
+    params.isLogged = isLogged;
+    // Temporary collections do not need to persist size information to the size storer.
+    params.sizeStorer = nullptr;
+    // Temporary collections do not need to reconcile collection size/counts.
+    params.tracksSizeAdjustments = false;
+    params.forceUpdateWithFullDocument = false;
+
+    std::unique_ptr<WiredTigerRecordStore> rs;
+    rs = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
+    rs->postConstructorInit(opCtx, params.nss);
+
+    return std::move(rs);
+}
+
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                           StringData ident,
                                                                           KeyFormat keyFormat) {
@@ -1794,27 +1822,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
                 "config"_attr = config);
     uassertStatusOK(wtRCToStatus(session->create(session, uri.c_str(), config.c_str()), session));
 
-    WiredTigerRecordStore::Params params;
-    params.nss = NamespaceString::kEmpty;
-    params.uuid = boost::none;
-    params.ident = ident.toString();
-    params.engineName = _canonicalName;
-    params.isCapped = false;
-    params.keyFormat = keyFormat;
-    params.overwrite = true;
-    params.isEphemeral = _ephemeral;
-    params.isLogged = isLogged;
-    // Temporary collections do not need to persist size information to the size storer.
-    params.sizeStorer = nullptr;
-    // Temporary collections do not need to reconcile collection size/counts.
-    params.tracksSizeAdjustments = false;
-    params.forceUpdateWithFullDocument = false;
-
-    std::unique_ptr<WiredTigerRecordStore> rs;
-    rs = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
-    rs->postConstructorInit(opCtx, params.nss);
-
-    return std::move(rs);
+    return getTemporaryRecordStore(opCtx, ident, keyFormat);
 }
 
 void WiredTigerKVEngine::alterIdentMetadata(OperationContext* opCtx,

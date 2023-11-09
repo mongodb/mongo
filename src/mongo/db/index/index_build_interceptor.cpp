@@ -108,7 +108,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
                                              boost::optional<StringData> skippedRecordTrackerIdent)
     : _sideWritesTable(
           opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-              opCtx, sideWritesIdent)),
+              opCtx, sideWritesIdent, KeyFormat::Long)),
       _skippedRecordTracker(opCtx, skippedRecordTrackerIdent),
       _skipNumAppliedCheck(true) {
 
