@@ -193,6 +193,7 @@ MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
 MONGO_FAIL_POINT_DEFINE(includeAdditionalParticipantInResponse);
+MONGO_FAIL_POINT_DEFINE(enforceDirectShardOperationsCheck);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -1806,6 +1807,14 @@ void ExecCommandDatabase::_initiateCommand() {
                           ActionType::issueDirectShardOperations)));
 
             if (!hasDirectShardOperations) {
+                // TODO (SERVER-77073): Remove this failpoint.
+                if (MONGO_unlikely(enforceDirectShardOperationsCheck.shouldFail())) {
+                    uasserted(
+                        ErrorCodes::Unauthorized,
+                        "You are connecting to a sharded cluster using a replica set or standalone"
+                        "connection string. Please use the sharded connection string.");
+                }
+
                 bool timeUpdated = false;
                 auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
                 {

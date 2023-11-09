@@ -32,7 +32,7 @@ checkClusterParameter(shard1Rst, true);
 
 removeShard(st, shard1Name);
 
-// The removeShard command should set to cluster parameter to false if the binVersion is >= 7.2.
+// The removeShard command should set to cluster parameter to false if the binVersion is >= 7.3.
 const expectedHasTwoOrMoreShards = jsTestOptions().shardMixedBinVersions == null;
 checkClusterParameter(st.configRS, expectedHasTwoOrMoreShards);
 checkClusterParameter(st.rs0, expectedHasTwoOrMoreShards);
@@ -59,7 +59,7 @@ assert.commandFailedWithCode(addShardThread.returnData(), ErrorCodes.Interrupted
 fp.off();
 
 jsTest.log("Checking the cluster parameter");
-// The addShard command has not set the cluster parameter to true again.
+// The addShard command has not set the cluster parameter to true again because of the interrupt.
 checkClusterParameter(st.configRS, false);
 checkClusterParameter(st.rs0, false);
 checkClusterParameter(shard1Rst, false);
