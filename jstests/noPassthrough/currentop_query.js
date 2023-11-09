@@ -447,12 +447,9 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     comment: "currentop_query_agg_getmore",
                     cursor: {batchSize: 0}
                 },
-                // Even when CQF is enabled, aggregation commands against sharded collections are
-                // not eligible for CQF because mongos attaches unsupported fields including
-                // let parameters and collation to the command sent to the shard.
-                queryFramework: (!isRemoteShardCurOp && cqfEnabled) ? "cqf"
-                    : sbeEnabled                                    ? "sbe"
-                                                                    : "classic",
+                queryFramework: cqfEnabled ? "cqf"
+                    : sbeEnabled           ? "sbe"
+                                           : "classic",
                 cmdName: "aggregate",
             },
         ];

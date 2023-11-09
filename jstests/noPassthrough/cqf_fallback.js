@@ -286,6 +286,8 @@ assertNotSupportedByBonsai({find: coll.getName(), filter: {}, allowSpeculativeMa
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, tailable: true, awaitData: true},
                            false);
 // collation
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, collation: {}});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, collation: {locale: "simple"}});
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, collation: {locale: "fr_CA"}}, false);
 assertNotSupportedByBonsai({
     aggregate: coll.getName(),
@@ -294,12 +296,22 @@ assertNotSupportedByBonsai({
     cursor: {}
 },
                            false);
-// let
+
+// When let variables are used in the query, it is experimentally supported.
 assertNotSupportedByBonsai({find: coll.getName(), projection: {foo: "$$val"}, let : {val: 1}},
-                           false);
-assertNotSupportedByBonsai(
-    {aggregate: coll.getName(), pipeline: [{$match: {a: "$$val"}}], let : {val: 1}, cursor: {}},
-    false);
+                           true);
+assertNotSupportedByBonsai({
+    aggregate: coll.getName(),
+    pipeline: [{$match: {$expr: {$eq: ["$a", "$$val"]}}}],
+    let : {val: 1},
+    cursor: {}
+},
+                           true);
+
+// When let variables are specified but unused in the query, it is eligible for CQF.
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [{$match: {a: 2}}], let : {val: 1}, cursor: {}});
+
 // limit
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}, limit: 1}, true);
 assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [{$limit: 1}], cursor: {}}, true);
@@ -681,3 +693,40 @@ try {
               ErrorCodes.BadValue,
               "Expected a BadValue error, but encountered: " + e.message);
 }
+
+// Show that finds and aggregations against sharded collections are eligible for bonsai.
+let shardingConn = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    other: {
+        shardOptions: {
+            setParameter: {
+                "failpoint.enableExplainInBonsai": tojson({mode: "alwaysOn"}),
+                featureFlagCommonQueryFramework: true,
+                internalQueryFrameworkControl: 'tryBonsai'
+            }
+        },
+        mongosOptions: {
+            setParameter: {
+                featureFlagCommonQueryFramework: true,
+            }
+        },
+    }
+});
+
+db = shardingConn.getDB("test");
+coll = db[jsTestName()];
+coll.drop();
+
+coll.insertMany([...Array(100).keys()].map(i => {
+    return {_id: i, a: i};
+}));
+shardingConn.shardColl(coll.getName(), {_id: 1}, {_id: 50}, {_id: 51});
+
+explain = coll.explain().aggregate({$match: {a: {$gt: 12}}});
+assert(usedBonsaiOptimizer(explain), tojson(explain));
+
+explain = coll.explain().find({a: {$gt: 12}}).finish();
+assert(usedBonsaiOptimizer(explain), tojson(explain));
+
+shardingConn.stop();

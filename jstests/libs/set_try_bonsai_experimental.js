@@ -22,8 +22,14 @@ if (typeof db !== "undefined") {
     });
 }
 
-if (typeof TestData !== "undefined" && TestData.hasOwnProperty("setParameters") &&
-    TestData.hasOwnProperty("setParametersMongos")) {
+if (typeof TestData !== "undefined") {
+    if (!TestData.hasOwnProperty("setParameters")) {
+        TestData["setParameters"] = {};
+    }
+    if (!TestData.hasOwnProperty("setParametersMongos")) {
+        TestData["setParametersMongos"] = {};
+    }
+
     TestData["setParameters"]["internalQueryFrameworkControl"] = "tryBonsaiExperimental";
     TestData["setParametersMongos"]["internalQueryFrameworkControl"] = "tryBonsaiExperimental";
 

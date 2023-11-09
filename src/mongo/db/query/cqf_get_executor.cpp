@@ -575,9 +575,6 @@ void validateFindCommandOptions(const FindCommandRequest& req) {
             req.getCollation().isEmpty() ||
                 SimpleBSONObjComparator::kInstance.evaluate(req.getCollation() ==
                                                             CollationSpec::kSimpleSpec));
-    uassert(ErrorCodes::InternalErrorNotSupported,
-            "let unsupported in CQF",
-            !req.getLet() || req.getLet()->isEmpty());
     uassert(
         ErrorCodes::InternalErrorNotSupported, "min unsupported in CQF", req.getMin().isEmpty());
     uassert(

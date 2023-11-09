@@ -37,6 +37,28 @@ export function checkCascadesFeatureFlagEnabled(theDB) {
  * Given the result of an explain command, returns whether the bonsai optimizer was used.
  */
 export function usedBonsaiOptimizer(explain) {
+    if (explain.hasOwnProperty("shards")) {
+        // This section handles the explain output for aggregations against sharded colls.
+        for (let shardName of Object.keys(explain.shards)) {
+            if (!explain.shards[shardName].queryPlanner.winningPlan.hasOwnProperty(
+                    "optimizerPlan")) {
+                return false;
+            }
+        }
+        return true;
+    } else if (explain.hasOwnProperty("queryPlanner") &&
+               explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
+        // This section handles the explain output for find queries against sharded colls.
+        for (let shardExplain of explain.queryPlanner.winningPlan.shards) {
+            if (!shardExplain.winningPlan.hasOwnProperty("optimizerPlan")) {
+                return false;
+            }
+        }
+        return true
+    }
+
+    // This section handles the explain output for unsharded queries.
+
     if (!isAggregationPlan(explain)) {
         return explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
     }

@@ -1086,9 +1086,23 @@ bool isEligibleCommon(const RequestType& request,
             return !param.isEmpty();
         }
     };
-    if (hasParam(request.getCollation()) || hasParam(request.getLet()) ||
-        hasParam(request.getResumeAfter()) || request.getRequestResumeToken() ||
+    if (hasParam(request.getResumeAfter()) || request.getRequestResumeToken() ||
         request.getLegacyRuntimeConstants()) {
+        return false;
+    }
+
+    // Below we enforce that the collection collation is empty (aka, "simple"). Therefore we can
+    // support either empty collation or simple collation on the query.
+    auto hasNonSimpleCollation = [](auto param) {
+        if constexpr (std::is_same_v<decltype(param), boost::optional<BSONObj>>) {
+            return param && !param->isEmpty() &&
+                SimpleBSONObjComparator::kInstance.evaluate(*param != CollationSpec::kSimpleSpec);
+        } else {
+            return !param.isEmpty() &&
+                SimpleBSONObjComparator::kInstance.evaluate(param != CollationSpec::kSimpleSpec);
+        }
+    }(request.getCollation());
+    if (hasNonSimpleCollation) {
         return false;
     }
 

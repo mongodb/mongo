@@ -1335,9 +1335,6 @@ Status runAggregate(OperationContext* opCtx,
                     "Exchanging is not supported in the Cascades optimizer",
                     !request.getExchange().has_value());
             uassert(ErrorCodes::InternalErrorNotSupported,
-                    "let unsupported in CQF",
-                    !request.getLet() || request.getLet()->isEmpty());
-            uassert(ErrorCodes::InternalErrorNotSupported,
                     "runtimeConstants unsupported in CQF",
                     !request.getLegacyRuntimeConstants());
             uassert(ErrorCodes::InternalErrorNotSupported,
