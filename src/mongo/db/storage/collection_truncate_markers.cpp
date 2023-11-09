@@ -98,8 +98,7 @@ CollectionTruncateMarkers::Marker& CollectionTruncateMarkers::createNewMarker(
         _currentRecords.swap(0), _currentBytes.swap(0), lastRecord, wallTime);
 }
 
-void CollectionTruncateMarkers::createNewMarkerIfNeeded(OperationContext* opCtx,
-                                                        const RecordId& lastRecord,
+void CollectionTruncateMarkers::createNewMarkerIfNeeded(const RecordId& lastRecord,
                                                         Date_t wallTime) {
     auto logFailedLockAcquisition = [&](const std::string& lock) {
         LOGV2_DEBUG(7393214,
@@ -161,7 +160,7 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
             // When other transactions commit concurrently, an uninitialized wallTime may delay
             // the creation of a new marker. This delay is limited to the number of concurrently
             // running transactions, so the size difference should be inconsequential.
-            collectionMarkers->createNewMarkerIfNeeded(opCtx, recordId, wallTime);
+            collectionMarkers->createNewMarkerIfNeeded(recordId, wallTime);
         }
     });
 }
@@ -490,7 +489,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
             invariant(bytesInserted >= 0);
             invariant(recordId.isValid());
             collectionMarkers->updateCurrentMarker(
-                opCtx, bytesInserted, recordId, wallTime, countInserted);
+                bytesInserted, recordId, wallTime, countInserted);
         });
 }
 
@@ -549,7 +548,6 @@ void CollectionTruncateMarkersWithPartialExpiration::_updateHighestSeenRecordIdA
 }
 
 void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
-    OperationContext* opCtx,
     int64_t bytesAdded,
     const RecordId& highestRecordId,
     Date_t highestWallTime,
@@ -564,7 +562,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
     int64_t newCurrentBytes = _currentBytes.addAndFetch(bytesAdded);
     if (highestWallTime != Date_t() && highestRecordId.isValid() &&
         newCurrentBytes >= _minBytesPerMarker) {
-        createNewMarkerIfNeeded(opCtx, highestRecordId, highestWallTime);
+        createNewMarkerIfNeeded(highestRecordId, highestWallTime);
     }
 }
 

@@ -731,7 +731,7 @@ std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
     BSONObj doc;
     if (backScan->getNext(&doc, &rId) == PlanExecutor::ADVANCED) {
         auto wallTime = doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
-        truncateMarkers->performPostInitialisation(opCtx, rId, wallTime);
+        truncateMarkers->performPostInitialisation(rId, wallTime);
     }
 
     return truncateMarkers;

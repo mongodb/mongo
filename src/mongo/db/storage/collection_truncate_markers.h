@@ -125,9 +125,7 @@ public:
 
     void popOldestMarker();
 
-    void createNewMarkerIfNeeded(OperationContext* opCtx,
-                                 const RecordId& lastRecord,
-                                 Date_t wallTime);
+    void createNewMarkerIfNeeded(const RecordId& lastRecord, Date_t wallTime);
 
     // Updates the current marker with the inserted value if the operation commits the WUOW.
     virtual void updateCurrentMarkerAfterInsertOnCommit(OperationContext* opCtx,
@@ -398,8 +396,7 @@ protected:
         return fn(_lastHighestRecordId, _lastHighestWallTime);
     }
 
-    void updateCurrentMarker(OperationContext* opCtx,
-                             int64_t bytesAdded,
+    void updateCurrentMarker(int64_t bytesAdded,
                              const RecordId& highestRecordId,
                              Date_t highestWallTime,
                              int64_t numRecordsAdded);

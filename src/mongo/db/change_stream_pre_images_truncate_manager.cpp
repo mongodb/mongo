@@ -250,16 +250,13 @@ void distributeUnaccountedBytesAndRecords(
     int64_t recordsAccountedForByMarkers,
     int64_t bytesAccountedForByMarkers,
     PreImagesTruncateManager::TenantTruncateMarkers& tenantTruncateMarkers) {
-    // Use a new snapshot of the pre-images collection's numRecords and dataSize to account for
-    // any concurrent inserts unaccounted for during the initial creation of the
-    // 'tenantTruncateMarkers'.
-    auto updatedNumRecords = rs->numRecords(opCtx);
-    auto updatedDataSize = rs->dataSize(opCtx);
-    auto totalLeftoverRecords = updatedNumRecords - recordsAccountedForByMarkers;
-    auto totalLeftoverBytes = updatedDataSize - bytesAccountedForByMarkers;
+    auto numRecords = rs->numRecords(opCtx);
+    auto dataSize = rs->dataSize(opCtx);
+    auto totalLeftoverRecords = numRecords - recordsAccountedForByMarkers;
+    auto totalLeftoverBytes = dataSize - bytesAccountedForByMarkers;
 
     if (totalLeftoverRecords < 0 || totalLeftoverBytes < 0) {
-        // The 'updatedNumRecords' and 'updatedDataSize' are both retrieved by the SizeStorer, which
+        // The 'numRecords' and 'dataSize' are both retrieved by the SizeStorer, which
         // can be incorrect after startup. If the records/ bytes accounted for were retrieved via
         // scanning, its completely possible they are more accurate than the metrics reported. If
         // they were retrieved from sampling, this scenario should be investigated further.
@@ -270,8 +267,8 @@ void distributeUnaccountedBytesAndRecords(
                    "reported by the size storer",
                    "initialMarkersRecordsAccountedFor"_attr = recordsAccountedForByMarkers,
                    "initialMarkersBytesAccountedFor"_attr = bytesAccountedForByMarkers,
-                   "reportedNumRecords"_attr = updatedNumRecords,
-                   "reportedDataSize"_attr = updatedDataSize);
+                   "reportedNumRecords"_attr = numRecords,
+                   "reportedDataSize"_attr = dataSize);
         return;
     }
 
@@ -284,15 +281,15 @@ void distributeUnaccountedBytesAndRecords(
     auto leftoverBytesPerNsUUID = totalLeftoverBytes / numNsUUIDs;
 
     for (auto& [nsUUID, preImagesTruncateMarkersPerNsUUID] : tenantTruncateMarkers) {
-        preImagesTruncateMarkersPerNsUUID->updatePartialMarkerForInitialisation(
-            opCtx, leftoverBytesPerNsUUID, RecordId{}, Date_t{}, leftoverRecordsPerNsUUID);
+        preImagesTruncateMarkersPerNsUUID->updateMarkers(
+            leftoverBytesPerNsUUID, RecordId{}, Date_t{}, leftoverRecordsPerNsUUID);
     }
 
     // Arbitrarily append the remaining records and bytes to one of the marker sets.
     int64_t remainderRecords = totalLeftoverRecords % numNsUUIDs;
     int64_t remainderBytes = totalLeftoverBytes % numNsUUIDs;
-    tenantTruncateMarkers.begin()->second->updatePartialMarkerForInitialisation(
-        opCtx, remainderBytes, RecordId{}, Date_t{}, remainderRecords);
+    tenantTruncateMarkers.begin()->second->updateMarkers(
+        remainderBytes, RecordId{}, Date_t{}, remainderRecords);
 }
 
 void distributeUnaccountedBytesAndRecords(
@@ -666,40 +663,48 @@ void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
                                                      const ChangeStreamPreImage& preImage,
                                                      int64_t bytesInserted) {
     dassert(bytesInserted != 0);
-    auto tenantTruncateMarkers = _tenantMap.find(tenantId);
-    if (!tenantTruncateMarkers) {
-        return;
-    }
-
     auto nsUuid = preImage.getId().getNsUUID();
-    auto truncateMarkersForNsUUID = tenantTruncateMarkers->find(nsUuid);
-
-    if (!truncateMarkersForNsUUID) {
-        // There are 2 possible scenarios here:
-        //  (1) The 'tenantTruncateMarkers' was created, but isn't done with
-        //  initialisation. In this case, the truncate markers created for 'nsUUID' may or may not
-        //  be overwritten in the initialisation process. This is okay, lazy initialisation is
-        //  performed by the remover thread to avoid blocking writes on startup and is strictly best
-        //  effort.
-        //
-        //  (2) Pre-images were either recently enabled on 'nsUUID' or 'nsUUID' was just created.
-        //  Either way, the first pre-images enabled insert to call 'getOrEmplace()' creates the
-        //  truncate markers for the 'nsUUID'. Any following calls to 'getOrEmplace()' return a
-        //  pointer to the existing truncate markers.
-        truncateMarkersForNsUUID = tenantTruncateMarkers->getOrEmplace(
-            nsUuid,
-            tenantId,
-            std::deque<CollectionTruncateMarkers::Marker>{},
-            0,
-            0,
-            gPreImagesCollectionTruncateMarkersMinBytes,
-            CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
-    }
-
     auto wallTime = preImage.getOperationTime();
     auto recordId = change_stream_pre_image_util::toRecordId(preImage.getId());
-    truncateMarkersForNsUUID->updateCurrentMarkerAfterInsertOnCommit(
-        opCtx, bytesInserted, recordId, wallTime, 1);
+
+    opCtx->recoveryUnit()->onCommit(
+        [this,
+         tenantId = std::move(tenantId),
+         nsUuid = std::move(nsUuid),
+         recordId = std::move(recordId),
+         bytesInserted,
+         wallTime](OperationContext* opCtx, boost::optional<Timestamp>) {
+            auto tenantTruncateMarkers = _tenantMap.find(tenantId);
+            if (!tenantTruncateMarkers) {
+                return;
+            }
+
+            auto truncateMarkersForNsUUID = tenantTruncateMarkers->find(nsUuid);
+
+            if (!truncateMarkersForNsUUID) {
+                // There are 2 possible scenarios here:
+                //  (1) The 'tenantTruncateMarkers' was created, but isn't done with
+                //  initialisation. In this case, the truncate markers created for 'nsUUID' may or
+                //  may not be overwritten in the initialisation process. This is okay, lazy
+                //  initialisation is performed by the remover thread to avoid blocking writes on
+                //  startup and is strictly best effort.
+                //
+                //  (2) Pre-images were either recently enabled on 'nsUUID' or 'nsUUID' was just
+                //  created. Either way, the first pre-images enabled insert to call
+                //  'getOrEmplace()' creates the truncate markers for the 'nsUUID'. Any following
+                //  calls to 'getOrEmplace()' return a pointer to the existing truncate markers.
+                truncateMarkersForNsUUID = tenantTruncateMarkers->getOrEmplace(
+                    nsUuid,
+                    tenantId,
+                    std::deque<CollectionTruncateMarkers::Marker>{},
+                    0,
+                    0,
+                    gPreImagesCollectionTruncateMarkersMinBytes,
+                    CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
+            }
+
+            truncateMarkersForNsUUID->updateMarkers(bytesInserted, recordId, wallTime, 1);
+        });
 }
 
 void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
@@ -786,8 +791,7 @@ void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
             dassert(nsUUIDHighestRidAndWallTime != highestRecordIdAndWallTimeSamples.end());
         }
         auto [highestRid, highestWallTime] = nsUUIDHighestRidAndWallTime->second[0];
-        truncateMarkersForNsUUID->updatePartialMarkerForInitialisation(
-            opCtx, 0, highestRid, highestWallTime, 0);
+        truncateMarkersForNsUUID->updateMarkers(0, highestRid, highestWallTime, 0);
     }
 }
 

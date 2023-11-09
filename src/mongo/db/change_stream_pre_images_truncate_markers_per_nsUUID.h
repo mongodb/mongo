@@ -110,11 +110,14 @@ public:
         return CollectionTruncateMarkers::isEmpty();
     }
 
-    void updatePartialMarkerForInitialisation(OperationContext* opCtx,
-                                              int64_t numBytes,
-                                              RecordId recordId,
-                                              Date_t wallTime,
-                                              int64_t numRecords);
+    /**
+     * Updates the current set of markers to account for the addition of the record with 'recordId'
+     * and its size and expiration metadata.  Unlike the inherited
+     * 'updateCurrentMarkerAfterInsertOnCommit()' method, the update is invoked immediately when
+     * called. Callers are responsible for managing when the call is executed (inside an
+     * 'onCommit()' handler or on its own).
+     */
+    void updateMarkers(int64_t numBytes, RecordId recordId, Date_t wallTime, int64_t numRecords);
 
     CollectionTruncateMarkers::MarkersCreationMethod markersCreationMethod() {
         return _creationMethod;

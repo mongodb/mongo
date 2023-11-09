@@ -217,13 +217,11 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
         CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
 }
 
-void PreImagesTruncateMarkersPerNsUUID::updatePartialMarkerForInitialisation(
-    OperationContext* opCtx,
-    int64_t numBytes,
-    RecordId recordId,
-    Date_t wallTime,
-    int64_t numRecords) {
-    updateCurrentMarker(opCtx, numBytes, recordId, wallTime, numRecords);
+void PreImagesTruncateMarkersPerNsUUID::updateMarkers(int64_t numBytes,
+                                                      RecordId recordId,
+                                                      Date_t wallTime,
+                                                      int64_t numRecords) {
+    updateCurrentMarker(numBytes, recordId, wallTime, numRecords);
 }
 
 bool PreImagesTruncateMarkersPerNsUUID::_hasExcessMarkers(OperationContext* opCtx) const {
