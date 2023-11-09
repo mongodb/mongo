@@ -1246,11 +1246,14 @@ void CreateCollectionCoordinatorLegacy::checkIfOptionsConflict(const BSONObj& do
     const auto otherDoc = CreateCollectionCoordinatorDocumentLegacy::parse(
         IDLParserContext("CreateCollectionCoordinatorDocumentLegacy"), doc);
 
+    const auto& selfReq = _request.toBSON();
+    const auto& otherReq = otherDoc.getShardsvrCreateCollectionRequest().toBSON();
+
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Another create collection with different arguments is already running for the same "
-            "namespace",
-            SimpleBSONObjComparator::kInstance.evaluate(
-                _request.toBSON() == otherDoc.getShardsvrCreateCollectionRequest().toBSON()));
+            str::stream() << "Another create collection with different arguments is already "
+                             "running for the same namespace: "
+                          << selfReq,
+            SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
 ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
@@ -1483,11 +1486,14 @@ void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
     const auto otherDoc = CreateCollectionCoordinatorDocumentLegacy::parse(
         IDLParserContext("CreateCollectionCoordinatorDocument"), doc);
 
+    const auto& selfReq = _request.toBSON();
+    const auto& otherReq = otherDoc.getShardsvrCreateCollectionRequest().toBSON();
+
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Another create collection with different arguments is already running for the same "
-            "namespace",
-            SimpleBSONObjComparator::kInstance.evaluate(
-                _request.toBSON() == otherDoc.getShardsvrCreateCollectionRequest().toBSON()));
+            str::stream() << "Another create collection with different arguments is already "
+                             "running for the same namespace: "
+                          << selfReq,
+            SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
 void CreateCollectionCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const {
