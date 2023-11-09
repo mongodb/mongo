@@ -9,8 +9,7 @@ sets**](https://docs.mongodb.com/manual/replication/).
 Replica sets are a group of nodes with one primary and multiple secondaries. The primary is
 responsible for all writes. Users may specify that reads from secondaries are acceptable via
 [`setSecondaryOk`](https://docs.mongodb.com/manual/reference/method/Mongo.setSecondaryOk/) or through
-[**read preference**](https://docs.mongodb.com/manual/core/read-preference/#secondaryPreferred), but
-they are not by default.
+[**read preference**](#read-preference), but they are not by default.
 
 # Steady State Replication
 
@@ -700,6 +699,55 @@ wait until the committed snapshot is beyond the specified OpTime.
 
 #### Code References
 - [ReadConcernArg is filled in _extractReadConcern()](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/service_entry_point_common.cpp#L261)
+
+## Read Preference
+
+The [read preference](https://www.mongodb.com/docs/manual/core/read-preference/) set on a read
+operation determines which nodes in a replica set are eligible to serve that operation. It allows
+the user to control where and how read operations are directed within a replica set. The accepted
+modes for read preference are `primary`, `primaryPreferred`, `secondary`, `secondaryPreferred`,
+and `nearest`. The formal definitions and additional command format information can be found
+[in the driver specification](https://github.com/mongodb/specifications/blob/master/source/server-selection/server-selection.rst#read-preference).
+
+### Server Selection
+
+Server selection is the process of selecting a node for a command. The client first filters servers
+by specified read preference, and then if there is more than one eligible server, filters the
+remaining servers based on latency. The server selection specification is fulfilled by any MongoDB
+replica set client that can select from multiple servers to execute reads, such as a driver or
+`mongos`. The specification determines the algorithms for filtering servers based on
+`readPreference` mode, formulas for calculating roundtrip times, etc.
+
+### Passing `$readPreference` as a parameter
+
+A client will pass any non-primary read preference to the selected server in the form of a
+`$readPreference` parameter attached to each operation. In this context, a server means either
+a replica set node or `mongos`. If the read preference parameter is omitted, the server will assume
+read preference `primary`. In the case of a replica set, `$readPreference` is passed to the
+targeted node [to validate](https://github.com/mongodb/mongo/blob/r7.1.0/src/mongo/db/service_entry_point_common.cpp#L1642-L1658)
+that the replica set state still aligns with the desired read preference.
+
+For sharded clusters, the client skips filtering servers based on read preference and passes the
+`$readPreference` directly to `mongos`. The `mongos` instance then carries out the read preference
+matching on the appropriate shard and forwards the `$readPreference` to the shard server for
+validation. It’s worth noting that if multiple `mongos` nodes exist in the topology, the driver
+will still filter based on latency.
+
+### Replica Set State and Read Preference
+
+Replica set nodes receive the `$readPreference` in a command invocation for validation purposes.
+This is to ensure that the given `$readPreference` matches the current state of the node, as the
+replica set state may have changed in the time between the client’s server selection and the node
+receiving the command. If it doesn't match, the operation will fail with one of the error codes
+mentioned below.
+
+Commands can define whether or not they can run on a secondary by overriding the
+`[secondaryAllowed](https://github.com/10gen/mongo/blob/r7.1.0/src/mongo/db/commands.h#L502-L509)`
+function. If a secondary node receives an operation it cannot service, it will either fail with a
+`NotWritablePrimary` error if the command is designated as primary-only, or a `NotPrimaryNoSecondaryOk`
+error if the command can be serviced by a secondary but the operation’s`$readPreference` specifies
+primary-only. A primary node that receives a `secondary` read preference operation will service it,
+although this case is rare since it requires the node to step up before it receives the operation.
 
 # enableMajorityReadConcern Flag
 
