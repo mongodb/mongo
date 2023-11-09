@@ -78,6 +78,7 @@ buildvariants:
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=off
+    compile_variant: enterprise-rhel-81-ppc64le-shared
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
