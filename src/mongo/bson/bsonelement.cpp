@@ -447,8 +447,9 @@ std::vector<BSONElement> BSONElement::Array() const {
     for (auto element : Obj()) {
         auto fieldName = element.fieldNameStringData();
         uassert(ErrorCodes::BadValue,
-                fmt::format(
-                    "Invalid array index field name: \"{}\", expected \"{}\"", fieldName, counter),
+                fmt::format("Invalid array index field name: \"{}\", expected \"{}\"",
+                            fieldName,
+                            static_cast<StringData>(counter)),
                 fieldName == counter);
         counter++;
         v.push_back(element);
