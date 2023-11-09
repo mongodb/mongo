@@ -5,6 +5,46 @@ export function getReplicaSetURL(db) {
     return `${rsName}/${rsHosts.join(",")}`;
 }
 
+export function extractReplicaSetNameAndHosts(primary, rsURL) {
+    if (!rsURL) {
+        rsURL = getReplicaSetURL(primary);
+    }
+    const splitURL = rsURL.split("/");
+    const rsName = splitURL[0];
+    const rsHosts = splitURL[1].split(",");
+    const primaryHost = primary.host;
+    const host = rsHosts[0].split(":")[0];
+    return {rsURL, rsName, rsHosts, primaryHost, host};
+}
+
+export function makeReplicaSetConnectionString(
+    rsName, rsHosts, defaultDbName, {authDbName, user} = {}) {
+    if (authDbName && !user.securityToken) {
+        // For tenant users, auth is performed through attaching the security token to each
+        // command.
+        assert(user.userName);
+        assert(user.password);
+        return `mongodb://${
+            user.userName + ":" + user.password +
+            "@"}${rsHosts.join(",")}/${defaultDbName}?authSource=${authDbName}&replicaSet=${
+            rsName}&readPreference=secondary`;
+    }
+    return `mongodb://${rsHosts.join(",")}/${defaultDbName}?replicaSet=${rsName}`;
+}
+
+export function makeStandaloneConnectionString(nodeHost, defaultDbName, {authDbName, user} = {}) {
+    if (authDbName && !user.securityToken) {
+        // For tenant users, auth is performed through attaching the security token to each
+        // command.
+        assert(user.userName);
+        assert(user.password);
+        return `mongodb://${
+            user.userName + ":" + user.password +
+            "@"}${nodeHost}/${defaultDbName}?authSource=${authDbName}`;
+    }
+    return `mongodb://${nodeHost}/${defaultDbName}`;
+}
+
 export function waitForAutoBootstrap(node, keyFile) {
     assert.soon(() => node.adminCommand({hello: 1}).isWritablePrimary);
 
