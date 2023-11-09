@@ -9615,6 +9615,13 @@ task_groups:
   # - compile_all_but_not_unittests
   # - package
 
+- <<: *compile_task_group_template
+  name: compile_and_package_serial_no_unittests_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+
 # SERVER-76006
 # This is a compile stream meant for non-cached and/or underpowered systems.
 # It joins most of the compile tasks together under a single host spread out

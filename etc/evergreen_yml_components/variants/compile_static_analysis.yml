@@ -25,7 +25,7 @@ variables:
     - enterprise
   stepback: false
 
-- &linux-x86-compile-params  # Essential set of compile parameters used for Linux dev variants.
+- &amazon2-x86-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
   - amazon2
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
@@ -44,7 +44,7 @@ variables:
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --link-model=dynamic
 
-- &linux-x86-compile-expansions
+- &amazon2-x86-compile-expansions
   scons_cache_scope: shared
   scons_cache_mode: all
   has_packages: false
@@ -115,14 +115,14 @@ buildvariants:
       distros:
       - rhel80-large
 
-- <<: *linux-x86-compile-params
-  name: &linux-x86-compile linux-x86-compile #static compile
-  display_name: "Linux x86 Static Library"
+- <<: *amazon2-x86-compile-params
+  name: &amazon2-x86-compile amazon2-x86-compile #static compile
+  display_name: "Amazon2 x86 Static Compile"
   expansions:
-    <<: *linux-x86-compile-expansions
-    compile_variant: *linux-x86-compile
+    <<: *amazon2-x86-compile-expansions
+    compile_variant: *amazon2-x86-compile
   tasks:
-    - name: compile_test_parallel_core_stream_TG
+    - name: compile_and_package_serial_no_unittests_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: run_pretty_printer_tests
 
@@ -133,7 +133,7 @@ buildvariants:
     <<: *amazon-linux2-arm64-compile-expansions
     compile_variant: *amazon-linux2-arm64-compile
   tasks:
-    - name: compile_test_parallel_core_stream_TG
+    - name: compile_and_package_serial_no_unittests_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: run_pretty_printer_tests
 

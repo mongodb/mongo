@@ -78,15 +78,15 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
     variant: linux-x86-dynamic-compile
 
-- &linux_x86_compile_variant_dependency
+- &amazon2_x86_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
-    variant: &linux_x86_compile_variant_name linux-x86-compile #static compile
+    variant: &amazon2_x86_compile_variant_name amazon2-x86-compile #static compile
   - name: version_gen
     variant: generate-tasks-for-version
     omit_generated_tasks: true
   - name: generate_buildid_to_debug_symbols_mapping
-    variant: linux-x86-compile
+    variant: amazon2-x86-compile
 
 - &amazon_linux2_arm64_dynamic_compile_variant_dependency
   depends_on:
@@ -155,12 +155,12 @@ variables:
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
-- &linux_x86_expansions
+- &amazon2_x86_expansions
   multiversion_platform: amazon2
   multiversion_edition: enterprise
   repo_edition: enterprise
   num_scons_link_jobs_available: 0.99
-  compile_variant: *linux_x86_compile_variant_name
+  compile_variant: *amazon2_x86_compile_variant_name
 
 - &linux_arm64_generic_expansions
   multiversion_platform: amazon2
@@ -397,14 +397,14 @@ buildvariants:
 ###########################################
 #         Linux buildvariants             #
 ###########################################
-- <<: *linux_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-classic-query-engine.intel.aws.2023-09
   display_name: PERF Standalone (Classic Query Engine) Intel AWS 2023-09
   # cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
   activate: false
   modules: *perf_modules
   expansions:
-    <<: *linux_x86_expansions
+    <<: *amazon2_x86_expansions
     idle_timeout_factor: 1.5
     exec_timeout_factor: 1.5
     mongodb_setup_release: 2022-11
@@ -416,7 +416,7 @@ buildvariants:
     project_dir: *perf_project_dir
     authentication: enabled
     storageEngine: wiredTiger
-    compile_variant: *linux_x86_compile_variant_name
+    compile_variant: *amazon2_x86_compile_variant_name
   run_on:
     - amazon2
   tasks: &classic_engine_tasks
