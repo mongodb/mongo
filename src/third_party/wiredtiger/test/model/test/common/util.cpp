@@ -26,32 +26,40 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_TEST_UTIL_H
-#define MODEL_TEST_UTIL_H
-
-#include <string>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <errno.h>
+#include <iostream>
+#include <stdexcept>
+#include <unistd.h>
 
 extern "C" {
 #include "test_util.h"
 }
 
-/*
- * model_testutil_assert_exception --
- *     Assert that the given exception is thrown.
- */
-#define model_testutil_assert_exception(call, exception)                                        \
-    try {                                                                                       \
-        call;                                                                                   \
-        testutil_die(0, #call " did not throw " #exception);                                    \
-    } catch (exception &) {                                                                     \
-    } catch (...) {                                                                             \
-        testutil_die(0, #call " did not throw " #exception "; it threw a different exception"); \
-    }
+#include "model/test/util.h"
 
 /*
  * create_tmp_file --
  *     Create an empty temporary file and return its name.
  */
-std::string create_tmp_file(const char *dir, const char *prefix, const char *suffix = nullptr);
+std::string
+create_tmp_file(const char *dir, const char *prefix, const char *suffix)
+{
+    size_t dir_len = dir ? strlen(dir) + strlen(DIR_DELIM_STR) : 0;
+    size_t prefix_len = strlen(prefix);
+    size_t suffix_len = suffix ? strlen(suffix) : 0;
+    size_t buf_len = dir_len + prefix_len + 6 + suffix_len + 4;
 
-#endif
+    char *buf = (char *)alloca(buf_len);
+    testutil_snprintf(buf, buf_len, "%s%s%sXXXXXX%s", dir ? dir : "", dir ? DIR_DELIM_STR : "",
+      prefix, suffix ? suffix : "");
+
+    /* This will also create the file - we only care about a name, but this is ok. */
+    int fd = mkstemps(buf, suffix_len);
+    testutil_assert_errno(fd > 0);
+    testutil_check(close(fd));
+
+    return std::string(buf);
+}

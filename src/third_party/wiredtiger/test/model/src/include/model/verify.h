@@ -43,7 +43,7 @@ class kv_table;
  * verify_exception --
  *     The verification exception.
  */
-class verify_exception : std::runtime_error {
+class verify_exception : public std::runtime_error {
 
 public:
     /*

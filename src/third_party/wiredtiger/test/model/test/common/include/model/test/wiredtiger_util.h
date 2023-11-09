@@ -233,4 +233,10 @@ int wt_txn_insert(WT_SESSION *session, const char *uri, const model::data_value 
     testutil_assert(table->insert(txn, key, value, ##__VA_ARGS__) ==        \
       wt_txn_insert(session, uri, key, value, ##__VA_ARGS__));
 
+/*
+ * wt_print_debug_log --
+ *     Print the contents of a debug log to a file.
+ */
+void wt_print_debug_log(WT_CONNECTION *conn, const char *file);
+
 #endif
