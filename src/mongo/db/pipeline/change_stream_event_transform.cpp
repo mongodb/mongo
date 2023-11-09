@@ -108,9 +108,9 @@ ResumeTokenData ChangeStreamEventTransformation::makeResumeToken(Value tsVal,
     auto clusterTime = tsVal.getTimestamp();
 
     // If we have a resume token, we need to match the version with which it was generated until we
-    // have surpassed it, at which point we can begin generating tokens with our default version.
-    // If we have been explicitly instructed to ignore the client's token version, skip this check.
-    auto version = (clusterTime > _resumeToken.clusterTime || _expCtx->ignoreTokenVersionOnResume)
+    // have surpassed all events against which it may have been compared in the original stream, at
+    // which point we can begin generating tokens with our default version.
+    auto version = (clusterTime > _resumeToken.clusterTime || txnOpIndex > _resumeToken.txnOpIndex)
         ? _expCtx->changeStreamTokenVersion
         : _resumeToken.version;
 

@@ -4459,15 +4459,17 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2Token) {
         sameTsResumeToken.eventIdentifier,
         Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
 
-    // The next event has a clusterTime later than the resume point, and should therefore start
-    // using the default token version.
+    // The next event has a clusterTime later than the resume point, but it should not use the
+    // default resume token version if it is below the user's token version.
     next = lastStage->getNext();
     ASSERT(next.isAdvanced());
     const auto afterResumeTsResumeToken =
         ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
     ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
-    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
-    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier, Value(midDocumentKey));
+    ASSERT_EQ(afterResumeTsResumeToken.version, resumeToken.version);
+    ASSERT_VALUE_EQ(
+        afterResumeTsResumeToken.eventIdentifier,
+        Value(Document{{"operationType", "update"_sd}, {"documentKey", midDocumentKey}}));
 
     // Verify that no other events are returned.
     next = lastStage->getNext();
@@ -4586,15 +4588,16 @@ TEST_F(MultiTokenFormatVersionTest, CanResumeFromV2HighWaterMark) {
         sameTsResumeToken2.eventIdentifier,
         Value(Document{{"operationType", "update"_sd}, {"documentKey", higherDocumentKey}}));
 
-    // The resumeToken after the current clusterTime should start using the default version, and
-    // corresponding 'eventIdentifier' format.
+    // The resumeToken after the current clusterTime should keep using the higher version, and
+    // the corresponding 'eventIdentifier' format.
     next = lastStage->getNext();
     ASSERT(next.isAdvanced());
     const auto afterResumeTsResumeToken =
         ResumeToken::parse(next.releaseDocument()["_id"].getDocument()).getData();
     ASSERT_EQ(afterResumeTsResumeToken.clusterTime, afterResumeTs);
-    ASSERT_EQ(afterResumeTsResumeToken.version, ResumeTokenData::kDefaultTokenVersion);
-    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier, Value(documentKey));
+    ASSERT_EQ(afterResumeTsResumeToken.version, resumeToken.version);
+    ASSERT_VALUE_EQ(afterResumeTsResumeToken.eventIdentifier,
+                    Value(Document{{"operationType", "update"_sd}, {"documentKey", documentKey}}));
 
     // Verify that no other events are returned.
     next = lastStage->getNext();

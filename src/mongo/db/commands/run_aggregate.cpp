@@ -949,7 +949,6 @@ Status runAggregate(OperationContext* opCtx,
         // since the 'fragmentNum' field only exists in this version and later.
         if (hasChangeStream && liteParsedPipeline.endsWithChangeStreamSplitLargeEvent()) {
             expCtx->changeStreamTokenVersion = 2;
-            expCtx->ignoreTokenVersionOnResume = true;
         }
 
         expCtx->startExpressionCounters();
