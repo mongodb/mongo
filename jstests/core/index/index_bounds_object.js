@@ -5,7 +5,9 @@
 // ]
 import {
     assertCoveredQueryAndCount,
+    getOptimizer,
     getWinningPlan,
+    isCollscan,
     isIndexOnly
 } from "jstests/libs/analyze_plan.js";
 

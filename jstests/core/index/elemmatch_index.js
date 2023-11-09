@@ -6,7 +6,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getOptimizer, getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.elemMatch_index;
 coll.drop();
@@ -20,7 +20,21 @@ assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
 
 function assertIndexResults(coll, query, useIndex, nReturned) {
     const explainPlan = coll.find(query).explain("executionStats");
-    assert.eq(isIxscan(db, getWinningPlan(explainPlan.queryPlanner)), useIndex);
+
+    // Assert the plan is using an index scan.
+    switch (getOptimizer(explainPlan)) {
+        case "classic":
+            assert.eq(isIxscan(db, getWinningPlan(explainPlan.queryPlanner)), useIndex);
+            break;
+        case "CQF":
+            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
+            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
+            assert(isCollscan(db, getWinningPlan(explainPlan.queryPlanner)));
+            break;
+        default:
+            break
+    }
+
     assert.eq(explainPlan.executionStats.nReturned, nReturned);
 }
 
