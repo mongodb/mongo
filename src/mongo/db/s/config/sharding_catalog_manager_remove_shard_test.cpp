@@ -122,9 +122,16 @@ protected:
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
+
+        // Updating the cluster cardinality parameter requires the primary only services to have
+        // been set up.
+        _skipUpdatingCardinalityParamFP = globalFailPointRegistry().find(
+            "skipUpdatingClusterCardinalityParameterAfterRemoveShard");
+        _skipUpdatingCardinalityParamFP->setMode(FailPoint::alwaysOn);
     }
 
     void tearDown() override {
+        _skipUpdatingCardinalityParamFP->setMode(FailPoint::off);
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
     }
@@ -151,6 +158,7 @@ protected:
     const HostAndPort configHost{"TestHost1"};
     OID _clusterId;
     ReadWriteConcernDefaultsLookupMock _lookupMock;
+    FailPoint* _skipUpdatingCardinalityParamFP;
 };
 
 TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {

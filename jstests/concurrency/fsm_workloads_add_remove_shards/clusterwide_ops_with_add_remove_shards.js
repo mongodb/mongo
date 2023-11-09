@@ -66,7 +66,8 @@ export const $config = (function() {
         addShard: function addShard(db, collName) {
             const shardIdx = randomInt(this.shardList.length);
             const shardEntry = this.shardList[shardIdx];
-            db.adminCommand({addShard: shardEntry.host, name: shardEntry._id});
+            assert.commandWorked(
+                db.adminCommand({addShard: shardEntry.host, name: shardEntry._id}));
         },
 
         init: function(db, collName) {

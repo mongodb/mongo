@@ -675,6 +675,7 @@ ShardingCatalogManager::ShardingCatalogManager(
       _localConfigShard(std::move(localConfigShard)),
       _localCatalogClient(std::move(localCatalogClient)),
       _kShardMembershipLock("shardMembershipLock"),
+      _kClusterCardinalityParameterLock("clusterCardinalityParameterLock"),
       _kChunkOpLock("chunkOpLock"),
       _kZoneOpLock("zoneOpLock"),
       _kPlacementHistoryInitializationLock("placementHistoryInitializationOpLock") {

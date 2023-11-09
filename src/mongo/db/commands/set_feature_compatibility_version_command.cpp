@@ -231,6 +231,26 @@ void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
 }
 
+void _setShardedClusterCardinalityParameter(
+    OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+    // The config.shards collection is stable during FCV changes, so query that to discover the
+    // current number of shards.
+    DBDirectClient client(opCtx);
+    FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
+    findRequest.setLimit(2);
+    auto numShards = client.find(std::move(findRequest))->itcount();
+
+    // Prior to 7.3, the cluster parameter 'hasTwoOrMoreShards' gets set to true when the number
+    // of shards goes from 1 to 2 but doesn't get set to false when the number of shards goes down
+    // to 1.
+    if (numShards >= 2) {
+        return;
+    }
+
+    uassertStatusOK(
+        ShardingCatalogManager::get(opCtx)->updateClusterCardinalityParameter(opCtx, numShards));
+}
+
 void uassertStatusOKIgnoreNSNotFound(Status status) {
     if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
         return;
@@ -712,6 +732,10 @@ private:
             // Delete any possible leftover ShardingStateRecovery document.
             // TODO SERVER-78330 remove this.
             deleteShardingStateRecoveryDoc(opCtx);
+        }
+
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            _setShardedClusterCardinalityParameter(opCtx, requestedVersion);
         }
 
         // TODO SERVER-80490: Remove this once 8.0 is released.

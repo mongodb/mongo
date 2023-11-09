@@ -57,7 +57,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
@@ -70,53 +69,12 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_request_type.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
-
-namespace {
-
-Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
-    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-    auto* clusterCardinalityParam =
-        clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-            "shardedClusterCardinalityForDirectConns");
-
-    auto alreadyHasTwoShards =
-        clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-
-    // If the cluster already has 2 shards or previously had 2 shards, there is nothing to do.
-    if (alreadyHasTwoShards) {
-        return Status::OK();
-    }
-
-    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-    // If this is only the first shard to be added, there is nothing to do.
-    if (shardRegistry->getNumShards(opCtx) < 2) {
-        return Status::OK();
-    }
-
-    // Set the cluster parameter to disallow direct writes to shards
-    ConfigsvrSetClusterParameter configsvrSetClusterParameter(
-        BSON("shardedClusterCardinalityForDirectConns" << BSON("hasTwoOrMoreShards" << true)));
-    configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
-
-    const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        configsvrSetClusterParameter.toBSON({}),
-        Shard::RetryPolicy::kIdempotent);
-
-    return Shard::CommandResponse::getEffectiveStatus(cmdResponse);
-}
-
-}  // namespace
 
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
@@ -192,10 +150,6 @@ public:
             false);
 
         Status status = addShardResult.getStatus();
-
-        if (status.isOK()) {
-            status = notifyShardsOfSecondShardIfNeeded(opCtx);
-        }
 
         if (!status.isOK()) {
             LOGV2(21920,
