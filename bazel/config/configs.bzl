@@ -93,3 +93,18 @@ allocator = rule(
     implementation = allocator_impl,
     build_setting = config.string(flag = True),
 )
+
+
+# =========
+# lldb-server
+# ========= 
+
+use_lldbserver_provider = provider(
+    doc = "Choose if lldbserver should be used",
+    fields = ["type"],
+)
+
+use_lldbserver = rule(
+    implementation = lambda ctx: use_lldbserver_provider(type = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

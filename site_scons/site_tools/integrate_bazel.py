@@ -343,6 +343,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',
             f'--//bazel/config:spider_monkey_dbg={True if env.GetOption("spider-monkey-dbg") == "on" else False}',
             f'--//bazel/config:allocator={allocator}',
+            f'--//bazel/config:use_lldbserver={False if env.GetOption("lldb-server") is None else True}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
             '--dynamic_mode=%s' % ('off' if static_link else 'fully'),
         ]

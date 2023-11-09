@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator", "use_lldbserver")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -292,4 +292,20 @@ config_setting(
     flag_values = {
         "//bazel/config:allocator": "tcmalloc",
     },
+)
+
+# --------------------------------------
+# gdbserver options
+# --------------------------------------
+
+use_lldbserver(
+    name = "use_lldbserver",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_lldbserver_enabled",
+    flag_values = {
+        "//bazel/config:use_lldbserver": "True",
+    }
 )
