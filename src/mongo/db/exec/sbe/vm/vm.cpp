@@ -6486,8 +6486,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggTopBottomNFin
     std::sort(array->values().begin(), array->values().end(), keyLess);
     for (size_t i = 0; i < array->size(); ++i) {
         auto pair = value::getArrayView(array->getAt(i).second);
-        auto [outputTag, outputVal] = pair->swapAt(1, value::TypeTags::Null, 0);
-        outputArray->push_back(outputTag, outputVal);
+        if (isGroupAccum) {
+            auto [outTag, outVal] = pair->swapAt(1, value::TypeTags::Null, 0);
+            outputArray->push_back(outTag, outVal);
+        } else {
+            auto [outTag, outVal] = pair->getAt(1);
+            auto [copyTag, copyVal] = value::copyValue(outTag, outVal);
+            outputArray->push_back(copyTag, copyVal);
+        }
     }
 
     outputArrayGuard.reset();
@@ -8688,43 +8694,42 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     return {true, accSetTag, accSetVal};
 }
 
-static std::tuple<value::Array*, value::ArrayMultiSet*, size_t, int32_t, int32_t> minNmaxNState(
-    value::TypeTags stateTag, value::Value stateVal) {
+static std::tuple<value::Array*, value::TypeTags, value::Value, size_t, int32_t, int32_t>
+accumulatorNState(value::TypeTags stateTag, value::Value stateVal) {
     tassert(
         8178100, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
     auto stateArr = value::getArrayView(stateVal);
 
     tassert(8178101,
             str::stream() << "state array should have "
-                          << static_cast<size_t>(AggMinMaxNElems::kSizeOfArray)
+                          << static_cast<size_t>(AggAccumulatorNElems::kSizeOfArray)
                           << " elements but found " << stateArr->size(),
-            stateArr->size() == static_cast<size_t>(AggMinMaxNElems::kSizeOfArray));
+            stateArr->size() == static_cast<size_t>(AggAccumulatorNElems::kSizeOfArray));
 
     // Read the accumulator from the state.
-    auto [accMultiSetTag, accMultiSetVal] =
-        stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kValues));
-    tassert(8178102,
-            "accumulator should be of type MultiSet",
-            accMultiSetTag == value::TypeTags::ArrayMultiSet);
-    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
+    auto [accumulatorTag, accumulatorVal] =
+        stateArr->getAt(static_cast<size_t>(AggAccumulatorNElems::kValues));
 
     // Read N from the state
-    auto [nTag, nVal] = stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kN));
+    auto [nTag, nVal] = stateArr->getAt(static_cast<size_t>(AggAccumulatorNElems::kN));
     tassert(8178103, "N should be of type NumberInt64", nTag == value::TypeTags::NumberInt64);
 
     // Read memory usage information from state
-    auto [memUsageTag, memUsage] = stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kMemUsage));
+    auto [memUsageTag, memUsage] =
+        stateArr->getAt(static_cast<size_t>(AggAccumulatorNElems::kMemUsage));
     tassert(8178104,
             "MemUsage component should be of type NumberInt32",
             memUsageTag == value::TypeTags::NumberInt32);
 
-    auto [memLimitTag, memLimit] = stateArr->getAt(static_cast<size_t>(AggMinMaxNElems::kMemLimit));
+    auto [memLimitTag, memLimit] =
+        stateArr->getAt(static_cast<size_t>(AggAccumulatorNElems::kMemLimit));
     tassert(8178105,
             "MemLimit component should be of type NumberInt32",
             memLimitTag == value::TypeTags::NumberInt32);
 
     return {stateArr,
-            accMultiSet,
+            accumulatorTag,
+            accumulatorVal,
             value::bitcastTo<size_t>(nVal),
             value::bitcastTo<int32_t>(memUsage),
             value::bitcastTo<int32_t>(memLimit)};
@@ -8789,11 +8794,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
         return {true, stateTag, stateVal};
     }
 
-    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+    auto [stateArr, accMultiSetTag, accMultiSetVal, n, memUsage, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8178102,
+            "accumulator should be of type MultiSet",
+            accMultiSetTag == value::TypeTags::ArrayMultiSet);
+    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
+
     int32_t newElSize = value::getApproximateSize(newElTag, newElVal);
 
-    updateAndCheckMemUsage(
-        stateArr, memUsage, newElSize, memLimit, static_cast<size_t>(AggMinMaxNElems::kMemUsage));
+    updateAndCheckMemUsage(stateArr,
+                           memUsage,
+                           newElSize,
+                           memLimit,
+                           static_cast<size_t>(AggAccumulatorNElems::kMemUsage));
 
     newElGuard.reset();
     accMultiSet->push_back(newElTag, newElVal);
@@ -8814,12 +8828,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
         return {true, stateTag, stateVal};
     }
 
-    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+    auto [stateArr, accMultiSetTag, accMultiSetVal, n, memUsage, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8155723,
+            "accumulator should be of type MultiSet",
+            accMultiSetTag == value::TypeTags::ArrayMultiSet);
+    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
+
     int32_t elSize = value::getApproximateSize(elTag, elVal);
     invariant(elSize <= memUsage);
 
     // remove element
-    stateArr->setAt(static_cast<size_t>(AggMinMaxNElems::kMemUsage),
+    stateArr->setAt(static_cast<size_t>(AggAccumulatorNElems::kMemUsage),
                     value::TypeTags::NumberInt32,
                     value::bitcastFrom<int32_t>(memUsage - elSize));
     elGuard.reset();
@@ -8834,7 +8854,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     ArityType arity) {
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
 
-    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+    auto [stateArr, accMultiSetTag, accMultiSetVal, n, memUsage, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8155724,
+            "accumulator should be of type MultiSet",
+            accMultiSetTag == value::TypeTags::ArrayMultiSet);
+    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
 
     // Create an empty array to fill with the results
     auto [resultArrayTag, resultArrayVal] = value::makeNewArray();
@@ -8865,7 +8890,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     ArityType arity) {
     auto [stateOwned, stateTag, stateVal] = getFromStack(0);
 
-    auto [stateArr, accMultiSet, n, memUsage, memLimit] = minNmaxNState(stateTag, stateVal);
+    auto [stateArr, accMultiSetTag, accMultiSetVal, n, memUsage, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8155725,
+            "accumulator should be of type MultiSet",
+            accMultiSetTag == value::TypeTags::ArrayMultiSet);
+    auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
 
     if (accMultiSet->size() == 0) {
         return {true, value::TypeTags::Null, 0};
@@ -8880,6 +8910,126 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     auto it = accMultiSet->values().crbegin();
     auto [cTag, cValue] = value::copyValue(it->first, it->second);
     return {true, cTag, cValue};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableTopBottomNInit(
+    ArityType arity) {
+    auto [maxSizeOwned, maxSizeTag, maxSizeVal] = getFromStack(0);
+    auto [memLimitOwned, memLimitTag, memLimitVal] = getFromStack(1);
+
+    auto [nOwned, nTag, nVal] =
+        genericNumConvert(maxSizeTag, maxSizeVal, value::TypeTags::NumberInt64);
+    uassert(8155711, "Failed to convert to 64-bit integer", nTag == value::TypeTags::NumberInt64);
+
+    auto n = value::bitcastTo<int64_t>(nVal);
+    uassert(8155708, "Expected 'n' to be positive", n > 0);
+
+    tassert(8155709,
+            "memLimit should be of type NumberInt32",
+            memLimitTag == value::TypeTags::NumberInt32);
+
+    auto [stateTag, stateVal] = value::makeNewArray();
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto stateArr = value::getArrayView(stateVal);
+
+    auto [multiMapTag, multiMapVal] = value::makeNewMultiMap();
+    stateArr->push_back(multiMapTag, multiMapVal);
+
+    stateArr->push_back(nTag, nVal);
+    stateArr->push_back(value::TypeTags::NumberInt32, 0);
+    stateArr->push_back(memLimitTag, memLimitVal);
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableTopBottomNAdd(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [state, multiMapTag, multiMapVal, n, memSize, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8155702, "value should be of type MultiMap", multiMapTag == value::TypeTags::MultiMap);
+    auto multiMap = value::getMultiMapView(multiMapVal);
+
+    auto key = moveOwnedFromStack(1);
+    auto value = moveOwnedFromStack(2);
+
+    multiMap->insert(key, value);
+
+    auto kvSize = value::getApproximateSize(key.first, key.second) +
+        value::getApproximateSize(value.first, value.second);
+    updateAndCheckMemUsage(
+        state, memSize, kvSize, memLimit, static_cast<size_t>(AggAccumulatorNElems::kMemUsage));
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableTopBottomNRemove(
+    ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [state, multiMapTag, multiMapVal, n, memSize, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8155726, "value should be of type MultiMap", multiMapTag == value::TypeTags::MultiMap);
+    auto multiMap = value::getMultiMapView(multiMapVal);
+
+    auto [keyOwned, keyTag, keyVal] = getFromStack(1);
+    auto [outputOwned, outputTag, outputVal] = getFromStack(2);
+
+    auto removed = multiMap->remove({keyTag, keyVal});
+    tassert(8155707, "Failed to remove element from map", removed);
+
+    auto elemSize =
+        value::getApproximateSize(keyTag, keyVal) + value::getApproximateSize(outputTag, outputVal);
+    memSize -= elemSize;
+    state->setAt(static_cast<size_t>(AggAccumulatorNElems::kMemUsage),
+                 value::TypeTags::NumberInt32,
+                 value::bitcastFrom<int32_t>(memSize));
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+template <TopBottomSense sense>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableTopBottomNFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+
+    auto [state, multiMapTag, multiMapVal, n, memSize, memLimit] =
+        accumulatorNState(stateTag, stateVal);
+    tassert(8155727, "value should be of type MultiMap", multiMapTag == value::TypeTags::MultiMap);
+    auto multiMap = value::getMultiMapView(multiMapVal);
+
+    auto& values = multiMap->values();
+    auto begin = values.begin();
+    auto end = values.end();
+
+    if constexpr (sense == TopBottomSense::kBottom) {
+        // If this accumulator is removable there may be more than n elements in the map, so we must
+        // skip elements that shouldn't be in the result.
+        if (static_cast<size_t>(values.size()) > n) {
+            std::advance(begin, values.size() - n);
+        }
+    }
+
+    auto [resTag, resVal] = value::makeNewArray();
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resArr = value::getArrayView(resVal);
+
+    auto it = begin;
+    for (size_t inserted = 0; inserted < n && it != end; ++inserted, ++it) {
+        const auto& keyOutPair = *it;
+        auto output = keyOutPair.second;
+        auto [copyTag, copyVal] = value::copyValue(output.first, output.second);
+        resArr->push_back(copyTag, copyVal);
+    };
+
+    resGuard.reset();
+    return {true, resTag, resVal};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
@@ -9299,6 +9449,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMin>(arity);
         case Builtin::aggRemovableMaxFinalize:
             return builtinAggRemovableMinMaxFinalize<AccumulatorMinMax::Sense::kMax>(arity);
+        case Builtin::aggRemovableTopNInit:
+        case Builtin::aggRemovableBottomNInit:
+            return builtinAggRemovableTopBottomNInit(arity);
+        case Builtin::aggRemovableTopNAdd:
+        case Builtin::aggRemovableBottomNAdd:
+            return builtinAggRemovableTopBottomNAdd(arity);
+        case Builtin::aggRemovableTopNRemove:
+        case Builtin::aggRemovableBottomNRemove:
+            return builtinAggRemovableTopBottomNRemove(arity);
+        case Builtin::aggRemovableTopNFinalize:
+            return builtinAggRemovableTopBottomNFinalize<TopBottomSense::kTop>(arity);
+        case Builtin::aggRemovableBottomNFinalize:
+            return builtinAggRemovableTopBottomNFinalize<TopBottomSense::kBottom>(arity);
         case Builtin::aggLinearFillCanAdd:
             return builtinAggLinearFillCanAdd(arity);
         case Builtin::aggLinearFillAdd:
@@ -9773,6 +9936,22 @@ std::string builtinToString(Builtin b) {
             return "aggRemovableMinFinalize";
         case Builtin::aggRemovableMaxFinalize:
             return "aggRemovableMaxFinalize";
+        case Builtin::aggRemovableTopNInit:
+            return "aggRemovableTopNInit";
+        case Builtin::aggRemovableTopNAdd:
+            return "aggRemovableTopNAdd";
+        case Builtin::aggRemovableTopNRemove:
+            return "aggRemovableTopNRemove";
+        case Builtin::aggRemovableTopNFinalize:
+            return "aggRemovableTopNFinalize";
+        case Builtin::aggRemovableBottomNInit:
+            return "aggRemovableBottomNInit";
+        case Builtin::aggRemovableBottomNAdd:
+            return "aggRemovableBottomNAdd";
+        case Builtin::aggRemovableBottomNRemove:
+            return "aggRemovableBottomNRemove";
+        case Builtin::aggRemovableBottomNFinalize:
+            return "aggRemovableBottomNFinalize";
         case Builtin::valueBlockExists:
             return "valueBlockExists";
         case Builtin::valueBlockFillEmpty:

@@ -182,6 +182,7 @@ enum class TypeTags : uint8_t {
     ArraySet,
     ArrayMultiSet,
     Object,
+    MultiMap,
 
     ObjectId,
     RecordId,
@@ -1182,6 +1183,81 @@ private:
 };
 
 /**
+ * This is SBE representation of std::multimap
+ */
+class MultiMap {
+public:
+    MultiMap(const CollatorInterface* collator = nullptr) : _values(ValueCompare<true>(collator)) {}
+
+    MultiMap(const MultiMap& other) : _values(ValueCompare<true>(other.getCollator())) {
+        for (const auto& [key, value] : other._values) {
+            const auto copyKey = copyValue(key.first, key.second);
+            const auto copyVal = copyValue(value.first, value.second);
+            ValueGuard keyGuard{copyKey.first, copyKey.second};
+            ValueGuard valueGuard{copyVal.first, copyVal.second};
+            _values.insert({copyKey, copyVal});
+            keyGuard.reset();
+            valueGuard.reset();
+        }
+    }
+
+    MultiMap(MultiMap&&) = default;
+
+    ~MultiMap() {
+        for (auto& [key, value] : _values) {
+            releaseValue(key.first, key.second);
+            releaseValue(value.first, value.second);
+        }
+        _values.clear();
+    }
+
+    void insert(std::pair<TypeTags, Value> key, std::pair<TypeTags, Value> value) {
+        ValueGuard keyGuard{key};
+        ValueGuard valueGuard{value};
+        if (key.first != TypeTags::Nothing && value.first != TypeTags::Nothing) {
+            _values.insert({key, value});
+            keyGuard.reset();
+            valueGuard.reset();
+        }
+    }
+
+    // Remove the entry corresponding to the provided key. In case of multiple equivalent keys, the
+    // first entry in the order of insertion will be removed
+    bool remove(std::pair<TypeTags, Value> key) {
+        if (key.first != TypeTags::Nothing) {
+            if (auto it = _values.find(key); it != _values.end()) {
+                it = _values.lower_bound(key);
+                value::releaseValue(it->first.first, it->first.second);
+                value::releaseValue(it->second.first, it->second.second);
+                _values.erase(it);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    auto size() const noexcept {
+        return _values.size();
+    }
+
+    auto& values() const noexcept {
+        return _values;
+    }
+
+    auto& values() noexcept {
+        return _values;
+    }
+
+    const CollatorInterface* getCollator() const {
+        return _values.key_comp().getCollator();
+    }
+
+private:
+    std::multimap<std::pair<TypeTags, Value>, std::pair<TypeTags, Value>, ValueCompare<true>>
+        _values;
+};
+
+/**
  * A vector of values representing a sort key. The values are NOT owned by this object.
  */
 struct SortKeyComponentVector {
@@ -1190,6 +1266,9 @@ struct SortKeyComponentVector {
 
 bool operator==(const ArraySet& lhs, const ArraySet& rhs);
 bool operator!=(const ArraySet& lhs, const ArraySet& rhs);
+
+bool operator==(const MultiMap& lhs, const MultiMap& rhs);
+bool operator!=(const MultiMap& lhs, const MultiMap& rhs);
 
 constexpr size_t kSmallStringMaxLength = 7;
 using ObjectIdType = std::array<uint8_t, 12>;
@@ -1491,6 +1570,20 @@ inline Object* getObjectView(Value val) noexcept {
     return reinterpret_cast<Object*>(val);
 }
 
+inline std::pair<TypeTags, Value> makeNewMultiMap(const CollatorInterface* collator = nullptr) {
+    auto m = new MultiMap(collator);
+    return {TypeTags::MultiMap, reinterpret_cast<Value>(m)};
+}
+
+inline MultiMap* getMultiMapView(Value val) noexcept {
+    return reinterpret_cast<MultiMap*>(val);
+}
+
+inline std::pair<TypeTags, Value> makeCopyMultiMap(const MultiMap& map) {
+    auto m = new MultiMap(map);
+    return {TypeTags::MultiMap, reinterpret_cast<Value>(m)};
+}
+
 inline std::pair<TypeTags, Value> makeNewObjectId() {
     auto o = new ObjectIdType;
     return {TypeTags::ObjectId, reinterpret_cast<Value>(o)};
@@ -1733,6 +1826,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyArrayMultiSet(*getArrayMultiSetView(val));
         case TypeTags::Object:
             return makeCopyObject(*getObjectView(val));
+        case TypeTags::MultiMap:
+            return makeCopyMultiMap(*getMultiMapView(val));
         case TypeTags::StringBig:
             return makeBigString(getStringView(tag, val));
         case TypeTags::bsonString:

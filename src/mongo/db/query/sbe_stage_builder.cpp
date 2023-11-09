@@ -115,6 +115,7 @@
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/pipeline/window_function/window_function_shift.h"
+#include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
@@ -4200,6 +4201,107 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 namespace {
+// Return true iff 'wfStmt' is a $topN or $bottomN operator.
+bool isTopBottomN(const WindowFunctionStatement& wfStmt) {
+    auto opName = wfStmt.expr->getOpName();
+    return opName == AccumulatorTopBottomN<kTop, true>::getName() ||
+        opName == AccumulatorTopBottomN<kBottom, true>::getName() ||
+        opName == AccumulatorTopBottomN<kTop, false>::getName() ||
+        opName == AccumulatorTopBottomN<kBottom, false>::getName();
+}
+
+// Return true iff 'wfStmt' is one of $topN, $bottomN, $minN, $maxN, $firstN or $lastN.
+bool isAccumulatorN(const WindowFunctionStatement& wfStmt) {
+    auto opName = wfStmt.expr->getOpName();
+    return opName == AccumulatorTopBottomN<kTop, true>::getName() ||
+        opName == AccumulatorTopBottomN<kBottom, true>::getName() ||
+        opName == AccumulatorTopBottomN<kTop, false>::getName() ||
+        opName == AccumulatorTopBottomN<kBottom, false>::getName() ||
+        opName == AccumulatorFirstN::getName() || opName == AccumulatorLastN::getName() ||
+        opName == AccumulatorMaxN::getName() || opName == AccumulatorMinN::getName();
+}
+
+const Expression* getNExprFromAccumulatorN(const WindowFunctionStatement& wfStmt) {
+    auto opName = wfStmt.expr->getOpName();
+    if (opName == AccumulatorTopBottomN<kTop, true>::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionTop,
+                                                         AccumulatorTopBottomN<kTop, true>>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorTopBottomN<kBottom, true>::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionBottom,
+                                                         AccumulatorTopBottomN<kBottom, true>>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorTopBottomN<kTop, false>::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionTopN,
+                                                         AccumulatorTopBottomN<kTop, false>>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorTopBottomN<kBottom, false>::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionBottomN,
+                                                         AccumulatorTopBottomN<kBottom, false>>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorFirstN::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionFirstN, AccumulatorFirstN>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorLastN::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionLastN, AccumulatorLastN>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorMaxN::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else if (opName == AccumulatorMinN::getName()) {
+        return dynamic_cast<window_function::ExpressionN<WindowFunctionMinN, AccumulatorMinN>*>(
+                   wfStmt.expr.get())
+            ->nExpr.get();
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
+
+std::unique_ptr<sbe::EExpression> getSortSpecFromSortPattern(SortPattern sortPattern) {
+    auto serialisedSortPattern =
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForExplain).toBson();
+    auto sortSpec = std::make_unique<sbe::SortSpec>(serialisedSortPattern);
+    auto sortSpecExpr = makeConstant(sbe::value::TypeTags::sortSpec,
+                                     sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec.release()));
+    return sortSpecExpr;
+}
+
+std::unique_ptr<sbe::EExpression> getSortSpecFromTopBottomN(const WindowFunctionStatement& wfStmt) {
+    if (wfStmt.expr->getOpName() == AccumulatorTopBottomN<kTop, true>::getName()) {
+        return getSortSpecFromSortPattern(
+            *dynamic_cast<window_function::ExpressionN<WindowFunctionTop,
+                                                       AccumulatorTopBottomN<kTop, true>>*>(
+                 wfStmt.expr.get())
+                 ->sortPattern);
+    } else if (wfStmt.expr->getOpName() == AccumulatorTopBottomN<kBottom, true>::getName()) {
+        return getSortSpecFromSortPattern(
+            *dynamic_cast<window_function::ExpressionN<WindowFunctionBottom,
+                                                       AccumulatorTopBottomN<kBottom, true>>*>(
+                 wfStmt.expr.get())
+                 ->sortPattern);
+    } else if (wfStmt.expr->getOpName() == AccumulatorTopBottomN<kTop, false>::getName()) {
+        return getSortSpecFromSortPattern(
+            *dynamic_cast<window_function::ExpressionN<WindowFunctionTopN,
+                                                       AccumulatorTopBottomN<kTop, false>>*>(
+                 wfStmt.expr.get())
+                 ->sortPattern);
+    } else if (wfStmt.expr->getOpName() == AccumulatorTopBottomN<kBottom, false>::getName()) {
+        return getSortSpecFromSortPattern(
+            *dynamic_cast<window_function::ExpressionN<WindowFunctionBottomN,
+                                                       AccumulatorTopBottomN<kBottom, false>>*>(
+                 wfStmt.expr.get())
+                 ->sortPattern);
+    } else {
+        MONGO_UNREACHABLE;
+    }
+}
 
 std::unique_ptr<sbe::EExpression> getDefaultValueExpr(const WindowFunctionStatement& wfStmt) {
     if (wfStmt.expr->getOpName() == "$shift") {
@@ -4242,6 +4344,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         for (const auto& outputField : windowNode->outputFields) {
             const auto& path = outputField.fieldName;
             if (path.find('.') != std::string::npos && reqFieldSet.count(getTopLevelField(path))) {
+                return true;
+            }
+            if (isTopBottomN(outputField)) {
+                // kResult is required for generating sort-key in $topN/$bottomN
                 return true;
             }
         }
@@ -4418,66 +4524,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     };
 
-    // Create window function input arguments and project them in order to avoid repeated evaluation
-    // for both add and remove expressions.
-    std::vector<StringDataMap<std::unique_ptr<sbe::EExpression>>> windowArgExprs;
-    sbe::SlotExprPairVector windowArgProjects;
-    for (auto& outputField : windowNode->outputFields) {
-        auto accName = outputField.expr->getOpName();
-        StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs;
-        auto getArgExpr = [&](Expression* arg) {
-            auto argExpr =
-                generateExpression(_state, arg, rootSlotOpt, &outputs).extractExpr(_state).expr;
-            if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
-                ensureSlotInBuffer(varExpr->getSlotId());
-                return argExpr;
-            } else if (argExpr->as<sbe::EConstant>()) {
-                return argExpr;
-            } else {
-                auto argSlot = _slotIdGenerator.generate();
-                windowArgProjects.emplace_back(argSlot, std::move(argExpr));
-                ensureSlotInBuffer(argSlot);
-                return makeVariable(argSlot);
-            }
-        };
-        if (accName == "$covarianceSamp" || accName == "$covariancePop") {
-            if (auto expr = dynamic_cast<ExpressionArray*>(outputField.expr->input().get());
-                expr && expr->getChildren().size() == 2) {
-                auto argX = expr->getChildren()[0].get();
-                auto argY = expr->getChildren()[1].get();
-                argExprs.emplace(AccArgs::kCovarianceX, getArgExpr(argX));
-                argExprs.emplace(AccArgs::kCovarianceY, getArgExpr(argY));
-            } else if (auto expr =
-                           dynamic_cast<ExpressionConstant*>(outputField.expr->input().get());
-                       expr && expr->getValue().isArray() &&
-                       expr->getValue().getArray().size() == 2) {
-                auto array = expr->getValue().getArray();
-                auto bson = BSON("x" << array[0] << "y" << array[1]);
-                auto [argXTag, argXVal] =
-                    sbe::bson::convertFrom<false /* View */>(bson.getField("x"));
-                argExprs.emplace(AccArgs::kCovarianceX, makeConstant(argXTag, argXVal));
-                auto [argYTag, argYVal] =
-                    sbe::bson::convertFrom<false /* View */>(bson.getField("y"));
-                argExprs.emplace(AccArgs::kCovarianceY, makeConstant(argYTag, argYVal));
-            } else {
-                argExprs.emplace(AccArgs::kCovarianceX,
-                                 makeConstant(sbe::value::TypeTags::Null, 0));
-                argExprs.emplace(AccArgs::kCovarianceY,
-                                 makeConstant(sbe::value::TypeTags::Null, 0));
-            }
-        } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
-            argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
-            argExprs.emplace(AccArgs::kSortBy, makeVariable(getSortBySlot().first));
-        } else {
-            argExprs.emplace("", getArgExpr(outputField.expr->input().get()));
-        }
-        windowArgExprs.emplace_back(std::move(argExprs));
-    }
-    if (windowArgProjects.size() > 0) {
-        stage = sbe::makeS<sbe::ProjectStage>(
-            std::move(stage), std::move(windowArgProjects), windowNode->nodeId());
-    }
-
     // Creating window definitions, including the slots and expressions for the bounds and
     // accumulators.
     std::vector<sbe::WindowStage::Window> windows;
@@ -4487,6 +4533,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<boost::optional<size_t>> windowFrameFirstSlotIdx;
     std::vector<boost::optional<size_t>> windowFrameLastSlotIdx;
     StringMap<sbe::value::SlotId> outputPathMap;
+
+    // We project window function input arguments in order to avoid repeated evaluation
+    // for both add and remove expressions.
+    sbe::SlotExprPairVector windowArgProjects;
 
     for (size_t i = 0; i < windowNode->outputFields.size(); i++) {
         sbe::WindowStage::Window window{};
@@ -4552,51 +4602,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 initExprArgs.emplace("",
                                      getUnitArg(dynamic_cast<window_function::ExpressionWithUnit*>(
                                          outputField.expr.get())));
-            } else if (outputField.expr->getOpName() == "$firstN") {
-                auto nExprPtr =
-                    dynamic_cast<
-                        window_function::ExpressionN<WindowFunctionFirstN, AccumulatorFirstN>*>(
-                        outputField.expr.get())
-                        ->nExpr.get();
-                initExprArgs.emplace(AccArgs::kMaxSize,
-                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
-                                         .extractExpr(_state)
-                                         .expr);
-                initExprArgs.emplace(AccArgs::kIsGroupAccum,
-                                     makeConstant(sbe::value::TypeTags::Boolean,
-                                                  sbe::value::bitcastFrom<bool>(false)));
-            } else if (outputField.expr->getOpName() == "$lastN") {
-                auto nExprPtr =
-                    dynamic_cast<
-                        window_function::ExpressionN<WindowFunctionLastN, AccumulatorLastN>*>(
-                        outputField.expr.get())
-                        ->nExpr.get();
-                initExprArgs.emplace(AccArgs::kMaxSize,
-                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
-                                         .extractExpr(_state)
-                                         .expr);
-                initExprArgs.emplace(AccArgs::kIsGroupAccum,
-                                     makeConstant(sbe::value::TypeTags::Boolean,
-                                                  sbe::value::bitcastFrom<bool>(false)));
-            } else if (outputField.expr->getOpName() == "$minN") {
-                auto nExprPtr =
-                    dynamic_cast<
-                        window_function::ExpressionN<WindowFunctionMinN, AccumulatorMinN>*>(
-                        outputField.expr.get())
-                        ->nExpr.get();
-                initExprArgs.emplace(AccArgs::kMaxSize,
-                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
-                                         .extractExpr(_state)
-                                         .expr);
-                initExprArgs.emplace(AccArgs::kIsGroupAccum,
-                                     makeConstant(sbe::value::TypeTags::Boolean,
-                                                  sbe::value::bitcastFrom<bool>(false)));
-            } else if (outputField.expr->getOpName() == "$maxN") {
-                auto nExprPtr =
-                    dynamic_cast<
-                        window_function::ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>*>(
-                        outputField.expr.get())
-                        ->nExpr.get();
+            } else if (isAccumulatorN(outputField)) {
+                auto nExprPtr = getNExprFromAccumulatorN(outputField);
                 initExprArgs.emplace(AccArgs::kMaxSize,
                                      generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
                                          .extractExpr(_state)
@@ -4610,8 +4617,126 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             return initExprArgs;
         }();
 
+        StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs;
+        auto accName = outputField.expr->getOpName();
+
+        auto getArgExprFromSBEExpression = [&](std::unique_ptr<sbe::EExpression> argExpr) {
+            if (auto varExpr = argExpr->as<sbe::EVariable>(); varExpr) {
+                ensureSlotInBuffer(varExpr->getSlotId());
+                return argExpr;
+            } else if (argExpr->as<sbe::EConstant>()) {
+                return argExpr;
+            } else {
+                auto argSlot = _slotIdGenerator.generate();
+                windowArgProjects.emplace_back(argSlot, std::move(argExpr));
+                ensureSlotInBuffer(argSlot);
+                return makeVariable(argSlot);
+            }
+        };
+        auto getArgExpr = [&](Expression* arg) {
+            auto argExpr =
+                generateExpression(_state, arg, rootSlotOpt, &outputs).extractExpr(_state).expr;
+            return getArgExprFromSBEExpression(std::move(argExpr));
+        };
+        if (accName == "$covarianceSamp" || accName == "$covariancePop") {
+            if (auto expr = dynamic_cast<ExpressionArray*>(outputField.expr->input().get());
+                expr && expr->getChildren().size() == 2) {
+                auto argX = expr->getChildren()[0].get();
+                auto argY = expr->getChildren()[1].get();
+                argExprs.emplace(AccArgs::kCovarianceX, getArgExpr(argX));
+                argExprs.emplace(AccArgs::kCovarianceY, getArgExpr(argY));
+            } else if (auto expr =
+                           dynamic_cast<ExpressionConstant*>(outputField.expr->input().get());
+                       expr && expr->getValue().isArray() &&
+                       expr->getValue().getArray().size() == 2) {
+                auto array = expr->getValue().getArray();
+                auto bson = BSON("x" << array[0] << "y" << array[1]);
+                auto [argXTag, argXVal] =
+                    sbe::bson::convertFrom<false /* View */>(bson.getField("x"));
+                argExprs.emplace(AccArgs::kCovarianceX, makeConstant(argXTag, argXVal));
+                auto [argYTag, argYVal] =
+                    sbe::bson::convertFrom<false /* View */>(bson.getField("y"));
+                argExprs.emplace(AccArgs::kCovarianceY, makeConstant(argYTag, argYVal));
+            } else {
+                argExprs.emplace(AccArgs::kCovarianceX,
+                                 makeConstant(sbe::value::TypeTags::Null, 0));
+                argExprs.emplace(AccArgs::kCovarianceY,
+                                 makeConstant(sbe::value::TypeTags::Null, 0));
+            }
+        } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
+            argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
+            argExprs.emplace(AccArgs::kSortBy, makeVariable(getSortBySlot().first));
+        } else if (isTopBottomN(outputField)) {
+            tassert(8155715, "Root slot should be set", rootSlotOpt);
+
+            auto sortSpecExpr = getSortSpecFromTopBottomN(outputField);
+            if (removable) {
+                auto key = collatorSlot ? makeFunction("generateSortKey",
+                                                       std::move(sortSpecExpr),
+                                                       makeVariable(rootSlotOpt->slotId),
+                                                       makeVariable(*collatorSlot))
+                                        : makeFunction("generateSortKey",
+                                                       std::move(sortSpecExpr),
+                                                       makeVariable(rootSlotOpt->slotId));
+
+                argExprs.emplace(AccArgs::kTopBottomNKey,
+                                 getArgExprFromSBEExpression(std::move(key)));
+            } else {
+                argExprs.emplace(AccArgs::kTopBottomNSortSpec, sortSpecExpr->clone());
+
+                // Build the key expression
+                auto key = collatorSlot ? makeFunction("generateCheapSortKey",
+                                                       std::move(sortSpecExpr),
+                                                       makeVariable(rootSlotOpt->slotId),
+                                                       makeVariable(*collatorSlot))
+                                        : makeFunction("generateCheapSortKey",
+                                                       std::move(sortSpecExpr),
+                                                       makeVariable(rootSlotOpt->slotId));
+                argExprs.emplace(AccArgs::kTopBottomNKey,
+                                 makeFunction("sortKeyComponentVectorToArray", std::move(key)));
+            }
+
+            if (auto expObj = dynamic_cast<ExpressionObject*>(outputField.expr->input().get())) {
+                for (auto& [key, value] : expObj->getChildExpressions()) {
+                    if (key == AccumulatorN::kFieldNameOutput) {
+                        auto outputExpr =
+                            generateExpression(_state, value.get(), rootSlotOpt, &outputs);
+                        argExprs.emplace(AccArgs::kTopBottomNValue,
+                                         getArgExprFromSBEExpression(makeFillEmptyNull(
+                                             outputExpr.extractExpr(_state).expr)));
+                        break;
+                    }
+                }
+            } else if (auto expConst =
+                           dynamic_cast<ExpressionConstant*>(outputField.expr->input().get())) {
+                auto objConst = expConst->getValue();
+                tassert(8155716,
+                        str::stream() << accName << " window funciton must have an object argument",
+                        objConst.isObject());
+                auto objBson = objConst.getDocument().toBson();
+                auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
+                if (outputField.ok()) {
+                    auto [outputTag, outputVal] =
+                        sbe::bson::convertFrom<false /* View */>(outputField);
+                    auto outputExpr = makeConstant(outputTag, outputVal);
+                    argExprs.emplace(AccArgs::kTopBottomNValue,
+                                     makeFillEmptyNull(std::move(outputExpr)));
+                }
+            } else {
+                tasserted(8155717,
+                          str::stream()
+                              << accName << " window function must have an object argument");
+            }
+            tassert(8155718,
+                    str::stream() << accName
+                                  << " window function must have an output field in the argument",
+                    argExprs.find(AccArgs::kTopBottomNValue) != argExprs.end());
+
+        } else {
+            argExprs.emplace("", getArgExpr(outputField.expr->input().get()));
+        }
+
         // Create init/add/remove expressions.
-        auto argExprs = std::move(windowArgExprs[i]);
         auto cloneExprMap = [](const StringDataMap<std::unique_ptr<sbe::EExpression>>& exprMap) {
             StringDataMap<std::unique_ptr<sbe::EExpression>> exprMapClone;
             for (auto& [argName, argExpr] : exprMap) {
@@ -4872,6 +4997,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto frameFirstInput = getModifiedExpr(inputExpr->clone(), frameFirstSlots);
             finalArgExprs.emplace(AccArgs::kInput, std::move(frameFirstInput));
             finalArgExprs.emplace(AccArgs::kDefaultVal, getDefaultValueExpr(outputField));
+        } else if (isTopBottomN(outputField) && !removable) {
+            finalArgExprs.emplace(AccArgs::kTopBottomNSortSpec,
+                                  getSortSpecFromTopBottomN(outputField));
         }
 
         // Build finalize expressions.
@@ -4929,6 +5057,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (outputField.fieldName.find('.') == std::string::npos) {
             outputPathMap.emplace(outputField.fieldName, finalSlot);
         }
+    }
+
+    if (windowArgProjects.size() > 0) {
+        stage = sbe::makeS<sbe::ProjectStage>(
+            std::move(stage), std::move(windowArgProjects), windowNode->nodeId());
     }
 
     // Assign frame first/last slots to window definitions.

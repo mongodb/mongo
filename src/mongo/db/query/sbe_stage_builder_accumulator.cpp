@@ -782,7 +782,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorTopBottomN(
 
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     aggs.push_back(makeFunction(isAccumulatorTopN(expr) ? "aggTopN" : "aggBottomN",
-                                makeFunction("setToArray", std::move(key)),
+                                std::move(key),
                                 std::move(value),
                                 std::move(sortSpec)));
     return aggs;

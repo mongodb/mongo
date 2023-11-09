@@ -202,6 +202,15 @@ TEST(ValueSerializeForSorter, Serialize) {
         value::makeNewBsonCodeWScope("", BSON("b" << 2 << "c" << BSON_ARRAY(3 << 4)).objdata());
     testData->push_back(cwsTag3, cwsVal3);
 
+    value::MultiMap map{};
+    map.insert({value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)},
+               {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2)});
+    map.insert({value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3)},
+               {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(4)});
+
+    auto [mapTag, mapVal] = value::makeCopyMultiMap(map);
+    testData->push_back(mapTag, mapVal);
+
     value::MaterializedRow originalRow{testData->size()};
     for (size_t i = 0; i < testData->size(); i++) {
         auto [tag, value] = testData->getAt(i);

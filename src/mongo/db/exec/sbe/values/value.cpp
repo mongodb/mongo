@@ -235,6 +235,9 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::Object:
             delete getObjectView(val);
             break;
+        case TypeTags::MultiMap:
+            delete getMultiMapView(val);
+            break;
         case TypeTags::ObjectId:
             delete getObjectIdView(val);
             break;
@@ -481,6 +484,16 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
 
             return res;
         }
+        case TypeTags::MultiMap: {
+            auto multiMap = getMultiMapView(val);
+            auto res = hashInit();
+
+            for (const auto& [key, value] : multiMap->values()) {
+                res = hashCombine(res, hashValue(key.first, key.second, collator));
+                res = hashCombine(res, hashValue(value.first, value.second, collator));
+            }
+            return res;
+        }
         case TypeTags::bsonBinData: {
             auto size = getBSONBinDataSize(tag, val);
             if (size < 8) {
@@ -665,6 +678,14 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         } else {
             return {TypeTags::NumberInt32, bitcastFrom<int32_t>(1)};
         }
+    } else if (lhsTag == TypeTags::MultiMap && rhsTag == TypeTags::MultiMap) {
+        auto lhsMap = getMultiMapView(lhsValue);
+        auto rhsMap = getMultiMapView(rhsValue);
+        if (*lhsMap == *rhsMap) {
+            return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+        }
+        // If they are not equal then we cannot say if one is smaller than the other.
+        return {TypeTags::Nothing, 0};
     } else if (isObject(lhsTag) && isObject(rhsTag)) {
         auto lhsObj = ObjectEnumerator{lhsTag, lhsValue};
         auto rhsObj = ObjectEnumerator{rhsTag, rhsValue};
@@ -972,6 +993,14 @@ bool operator==(const ArraySet& lhs, const ArraySet& rhs) {
 }
 
 bool operator!=(const ArraySet& lhs, const ArraySet& rhs) {
+    return !(lhs == rhs);
+}
+
+bool operator==(const MultiMap& lhs, const MultiMap& rhs) {
+    return lhs.values() == rhs.values();
+}
+
+bool operator!=(const MultiMap& lhs, const MultiMap& rhs) {
     return !(lhs == rhs);
 }
 }  // namespace value

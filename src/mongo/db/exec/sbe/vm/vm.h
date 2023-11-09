@@ -884,6 +884,15 @@ enum class Builtin : uint16_t {
     aggRemovableMaxNFinalize,
     aggRemovableMinFinalize,
     aggRemovableMaxFinalize,
+    aggRemovableTopNInit,
+    aggRemovableTopNAdd,
+    aggRemovableTopNRemove,
+    aggRemovableTopNFinalize,
+    aggRemovableBottomNInit,
+    aggRemovableBottomNAdd,
+    aggRemovableBottomNRemove,
+    aggRemovableBottomNFinalize,
+
 
     // Additional one-byte builtins go here.
 
@@ -1138,14 +1147,14 @@ enum class AggLinearFillElems { kX1, kY1, kX2, kY2, kPrevX, kCount, kSizeOfArray
 enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
 
 /**
- * This enum defines indices into an 'Array' that store state for $minN/$maxN
+ * This enum defines indices into an 'Array' that store state for $minN/$maxN/$topN/$bottomN
  * window functions.
- * Element at `kValues` stores a multiset with the elements
+ * Element at `kValues` stores the accmulator data structure with the elements
  * Element at `kN` stores an integer with the number of values minN/maxN should return
  * Element at `kMemUsage`stores the size of the multiset in bytes
  * Element at `kMemLimit`stores the maximum allowed size of the multiset in bytes
  */
-enum class AggMinMaxNElems { kValues = 0, kN, kMemUsage, kMemLimit, kSizeOfArray };
+enum class AggAccumulatorNElems { kValues = 0, kN, kMemUsage, kMemLimit, kSizeOfArray };
 
 using SmallArityType = uint8_t;
 using ArityType = uint32_t;
@@ -2106,7 +2115,15 @@ private:
         std::pair<value::TypeTags, value::Value> x2,
         std::pair<value::TypeTags, value::Value> y2,
         std::pair<value::TypeTags, value::Value> x);
-
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableTopBottomNInit(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableTopBottomNAdd(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableTopBottomNRemove(
+        ArityType arity);
+    template <TopBottomSense>
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRemovableTopBottomNFinalize(
+        ArityType arity);
 
     // Block builtins
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);

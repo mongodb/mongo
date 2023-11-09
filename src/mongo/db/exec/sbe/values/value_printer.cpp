@@ -109,6 +109,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::Object:
             stream << "Object";
             break;
+        case TypeTags::MultiMap:
+            stream << "MultiMap";
+            break;
         case TypeTags::ObjectId:
             stream << "ObjectId";
             break;
@@ -332,6 +335,51 @@ void ValuePrinter<T>::writeObjectToStream(const BSONObj& obj) {
 }
 
 template <typename T>
+void ValuePrinter<T>::writeMultiMapToStream(TypeTags tag, Value val, size_t depth) {
+    stream << '[';
+
+    auto multiMap = getMultiMapView(val);
+
+    auto first = true;
+    size_t iter = 0;
+    for (const auto& [key, value] : multiMap->values()) {
+        if (first) {
+            first = false;
+        } else {
+            stream << ", ";
+        }
+
+        if (depth > options.arrayObjectOrNestingMaxDepth()) {
+            stream << "...";
+            break;
+        }
+
+        auto keyDepth = depth;
+        auto valueDepth = depth;
+
+        stream << "{k : ";
+        if (value::isArray(key.first) || value::isObject(key.first)) {
+            keyDepth++;
+            depth = keyDepth;
+        }
+        writeValueToStream(key.first, key.second, keyDepth);
+        iter++;
+
+        stream << ", v : ";
+
+        if (value::isArray(value.first) || value::isObject(value.first)) {
+            valueDepth++;
+            depth = valueDepth;
+        }
+        writeValueToStream(value.first, value.second, valueDepth);
+        iter++;
+
+        stream << "}";
+    }
+    stream << ']';
+}
+
+template <typename T>
 void ValuePrinter<T>::writeObjectIdToStream(TypeTags tag, Value val) {
     auto objId =
         tag == TypeTags::ObjectId ? getObjectIdView(val)->data() : bitcastTo<uint8_t*>(val);
@@ -443,6 +491,9 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::Object:
         case TypeTags::bsonObject:
             writeObjectToStream(tag, val, depth);
+            break;
+        case TypeTags::MultiMap:
+            writeMultiMapToStream(tag, val, depth);
             break;
         case TypeTags::ObjectId:
         case TypeTags::bsonObjectId:

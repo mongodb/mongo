@@ -72,6 +72,7 @@ public:
     void writeArrayToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeSortedArraySetToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeObjectToStream(TypeTags tag, Value val, size_t depth = 1);
+    void writeMultiMapToStream(TypeTags tag, Value val, size_t depth = 1);
     void writeObjectToStream(const BSONObj& obj);
     void writeObjectIdToStream(TypeTags tag, Value val);
     void writeCollatorToStream(const CollatorInterface* collator);

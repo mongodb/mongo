@@ -191,6 +191,20 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
             val = objVal;
             break;
         }
+        case TypeTags::MultiMap: {
+            auto collated = buf.read<char>();
+            auto [multiMapTag, multiMapVal] = makeNewMultiMap(collated ? collator : nullptr);
+            auto cnt = buf.read<LittleEndian<size_t>>();
+            auto multiMap = getMultiMapView(multiMapVal);
+            for (size_t idx = 0; idx < cnt; ++idx) {
+                auto key = deserializeValue(buf, collator);
+                auto value = deserializeValue(buf, collator);
+                multiMap->insert(key, value);
+            }
+            tag = multiMapTag;
+            val = multiMapVal;
+            break;
+        }
         case TypeTags::bsonObjectId:
         case TypeTags::ObjectId: {
             auto [objIdTag, objIdVal] = makeNewObjectId();
@@ -347,6 +361,16 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
                 buf.appendStr(obj->field(idx), true /* includeEndingNull */);
                 auto [tag, val] = obj->getAt(idx);
                 serializeValue(buf, tag, val);
+            }
+            break;
+        }
+        case TypeTags::MultiMap: {
+            auto multiMap = getMultiMapView(val);
+            buf.appendChar(multiMap->getCollator() ? 1 : 0);
+            buf.appendNum(multiMap->size());
+            for (auto& [key, value] : multiMap->values()) {
+                serializeValue(buf, key.first, key.second);
+                serializeValue(buf, value.first, value.second);
             }
             break;
         }
@@ -738,6 +762,15 @@ int getApproximateSize(TypeTags tag, Value val) {
                 result += obj->field(idx).size();
                 auto [tag, val] = obj->getAt(idx);
                 result += getApproximateSize(tag, val);
+            }
+            break;
+        }
+        case TypeTags::MultiMap: {
+            auto multiMap = getMultiMapView(val);
+            result += sizeof(*multiMap);
+            for (auto& [key, value] : multiMap->values()) {
+                result += getApproximateSize(key.first, key.second);
+                result += getApproximateSize(value.first, value.second);
             }
             break;
         }
