@@ -46,15 +46,17 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/basic_types.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/max_time_ms_parser.h"
-#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/idl/idl_parser.h"
@@ -64,14 +66,13 @@
 
 namespace mongo {
 
-const char ParsedDistinct::kKeyField[] = "key";
-const char ParsedDistinct::kQueryField[] = "query";
-const char ParsedDistinct::kCollationField[] = "collation";
-const char ParsedDistinct::kUnwoundArrayFieldForViewUnwind[] = "_internalUnwoundArray";
-const char ParsedDistinct::kHintField[] = "hint";
+const char CanonicalDistinct::kKeyField[] = "key";
+const char CanonicalDistinct::kQueryField[] = "query";
+const char CanonicalDistinct::kCollationField[] = "collation";
+const char CanonicalDistinct::kUnwoundArrayFieldForViewUnwind[] = "_internalUnwoundArray";
+const char CanonicalDistinct::kHintField[] = "hint";
 
 namespace {
-
 /**
  * Add the stages that pull all values along a path and puts them into an array. Includes the
  * necessary unwind stage that can turn those into individual documents.
@@ -80,14 +81,14 @@ void addReplaceRootForDistinct(BSONArrayBuilder* pipelineBuilder, const FieldPat
     BSONObjBuilder reshapeStageBuilder(pipelineBuilder->subobjStart());
     reshapeStageBuilder.append(
         DocumentSourceReplaceRoot::kStageName,
-        BSON("newRoot" << BSON(ParsedDistinct::kUnwoundArrayFieldForViewUnwind
+        BSON("newRoot" << BSON(CanonicalDistinct::kUnwoundArrayFieldForViewUnwind
                                << BSON("$_internalFindAllValuesAtPath" << path.fullPath()))));
     reshapeStageBuilder.doneFast();
     BSONObjBuilder unwindStageBuilder(pipelineBuilder->subobjStart());
     {
         BSONObjBuilder unwindBuilder(unwindStageBuilder.subobjStart("$unwind"));
         unwindBuilder.append(
-            "path", str::stream() << "$" << ParsedDistinct::kUnwoundArrayFieldForViewUnwind);
+            "path", str::stream() << "$" << CanonicalDistinct::kUnwoundArrayFieldForViewUnwind);
         unwindBuilder.append("preserveNullAndEmptyArrays", true);
     }
 }
@@ -98,7 +99,7 @@ void addReplaceRootForDistinct(BSONArrayBuilder* pipelineBuilder, const FieldPat
  * traversal happens later on. The $match stage is only added when the path is dotted (e.g. "a.b"
  * but for "xyz").
  *
- * See comments in ParsedDistinct::asAggregationCommand() for more detailed explanation.
+ * See comments in CanonicalDistinct::asAggregationCommand() for more detailed explanation.
  */
 void addMatchRemovingNestedArrays(BSONArrayBuilder* pipelineBuilder, const FieldPath& unwindPath) {
     if (unwindPath.getPathLength() == 1) {
@@ -190,7 +191,7 @@ BSONObj getDistinctProjection(const std::string& field) {
 }
 }  // namespace
 
-StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
+StatusWith<BSONObj> CanonicalDistinct::asAggregationCommand() const {
     BSONObjBuilder aggregationBuilder;
 
     invariant(_query);
@@ -263,96 +264,109 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     return aggregationBuilder.obj();
 }
 
-StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const BSONObj& cmdObj,
-                                                 const ExtensionsCallback& extensionsCallback,
-                                                 bool isExplain,
-                                                 const CollatorInterface* defaultCollator) {
-    SerializationContext sc = SerializationContext::stateCommandRequest();
-    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+CanonicalDistinct CanonicalDistinct::parseFromBSON(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ExtensionsCallback& extensionsCallback,
+    const CollatorInterface* defaultCollator,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
+    auto serializationContext = SerializationContext::stateCommandRequest();
+    serializationContext.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
 
-    IDLParserContext ctx("distinct", false /* apiStrict */, nss.tenantId(), sc);
+    auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        IDLParserContext(
+            "distinctCommandRequest", false /* apiStrict */, nss.tenantId(), serializationContext),
+        cmdObj));
 
-    DistinctCommandRequest parsedDistinct(nss);
-    try {
-        parsedDistinct = DistinctCommandRequest::parse(ctx, cmdObj);
-    } catch (...) {
-        return exceptionToStatus();
+    auto expCtx = CanonicalDistinct::makeExpressionContext(
+        opCtx, nss, *distinctCommand, defaultCollator, verbosity);
+
+    auto parsedDistinct =
+        parsed_distinct_command::parse(expCtx,
+                                       cmdObj,
+                                       std::move(distinctCommand),
+                                       extensionsCallback,
+                                       MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    return CanonicalDistinct::parse(std::move(expCtx), std::move(parsedDistinct));
+}
+
+CanonicalDistinct CanonicalDistinct::parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
+                                           const CollatorInterface* defaultCollator) {
+
+    auto& distinctRequest = *parsedDistinct->distinctCommandRequest;
+    uassert(31032,
+            "Key field cannot contain an embedded null byte",
+            distinctRequest.getKey().find('\0') == std::string::npos);
+
+    auto findRequest = std::make_unique<FindCommandRequest>(expCtx->ns);
+    if (auto query = distinctRequest.getQuery()) {
+        findRequest->setFilter(query->getOwned());
+    }
+    findRequest->setProjection(getDistinctProjection(std::string(distinctRequest.getKey())));
+    findRequest->setHint(distinctRequest.getHint().getOwned());
+    if (auto rc = parsedDistinct->readConcern) {
+        findRequest->setReadConcern(rc->getOwned());
+    }
+    if (parsedDistinct->maxTimeMS) {
+        findRequest->setMaxTimeMS(*parsedDistinct->maxTimeMS);
+    }
+    if (auto collation = distinctRequest.getCollation()) {
+        findRequest->setCollation(collation.get().getOwned());
+    }
+    if (parsedDistinct->queryOptions) {
+        findRequest->setUnwrappedReadPref(*parsedDistinct->queryOptions);
     }
 
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    auto parsedFind =
+        uassertStatusOK(ParsedFindCommand::withExistingFilter(expCtx,
+                                                              std::move(parsedDistinct->collator),
+                                                              std::move(parsedDistinct->query),
+                                                              std::move(findRequest)));
 
-    if (parsedDistinct.getKey().find('\0') != std::string::npos) {
-        return Status(ErrorCodes::Error(31032), "Key field cannot contain an embedded null byte");
+    auto cq = std::make_unique<CanonicalQuery>(
+        CanonicalQueryParams{.expCtx = expCtx,
+                             .parsedFind = std::move(parsedFind),
+                             .explain = expCtx->explain.has_value()});
+
+    if (auto collator = expCtx->getCollator()) {
+        cq->setCollator(collator->clone());
     }
 
-    // Create a projection on the fields needed by the distinct command, so that the query planner
-    // will produce a covered plan if possible.
-    findCommand->setProjection(getDistinctProjection(std::string(parsedDistinct.getKey())));
+    return CanonicalDistinct(std::move(cq),
+                             distinctRequest.getKey().toString(),
+                             distinctRequest.getMirrored().value_or(false),
+                             distinctRequest.getSampleId());
+}
 
-    if (auto query = parsedDistinct.getQuery()) {
-        findCommand->setFilter(query.value().getOwned());
+boost::intrusive_ptr<ExpressionContext> CanonicalDistinct::makeExpressionContext(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const DistinctCommandRequest& distinctCommand,
+    const CollatorInterface* defaultCollator,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
+
+    std::unique_ptr<CollatorInterface> collator;
+    if (auto collationObj = distinctCommand.getCollation().get_value_or(BSONObj());
+        !collationObj.isEmpty()) {
+        collator = uassertStatusOK(
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationObj));
+    } else if (defaultCollator) {
+        // The 'collPtr' will be null for views, but we don't need to worry about views here. The
+        // views will get rewritten into aggregate command and will regenerate the
+        // ExpressionContext.
+        collator = defaultCollator->clone();
     }
-
-    if (auto collation = parsedDistinct.getCollation()) {
-        findCommand->setCollation(collation.value().getOwned());
-    }
-
-    findCommand->setHint(parsedDistinct.getHint());
-
-    // The IDL parser above does not handle generic command arguments. Since the underlying query
-    // request requires the following options, manually parse and verify them here.
-    if (auto readConcernElt = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
-        if (readConcernElt.type() != BSONType::Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
-                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
-                              << ", found " << typeName(readConcernElt.type()));
-        }
-        findCommand->setReadConcern(readConcernElt.embeddedObject().getOwned());
-    }
-
-    if (auto queryOptionsElt = cmdObj[query_request_helper::kUnwrappedReadPrefField]) {
-        if (queryOptionsElt.type() != BSONType::Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream()
-                              << "\"" << query_request_helper::kUnwrappedReadPrefField
-                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
-                              << ", found " << typeName(queryOptionsElt.type()));
-        }
-        findCommand->setUnwrappedReadPref(queryOptionsElt.embeddedObject().getOwned());
-    }
-
-    if (auto maxTimeMSElt = cmdObj[query_request_helper::cmdOptionMaxTimeMS]) {
-        auto maxTimeMS = parseMaxTimeMS(maxTimeMSElt);
-        if (!maxTimeMS.isOK()) {
-            return maxTimeMS.getStatus();
-        }
-        findCommand->setMaxTimeMS(static_cast<unsigned int>(maxTimeMS.getValue()));
-    }
-
-    auto statusWithCQ = CanonicalQuery::make(
-        {.expCtx = makeExpressionContext(opCtx, *findCommand),
-         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
-                                               .extensionsCallback = extensionsCallback,
-                                               .allowedFeatures =
-                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
-         .explain = isExplain});
-    if (!statusWithCQ.isOK()) {
-        return statusWithCQ.getStatus();
-    }
-    auto cq = std::move(statusWithCQ.getValue());
-
-    if (cq->getFindCommandRequest().getCollation().isEmpty() && defaultCollator) {
-        cq->setCollator(defaultCollator->clone());
-    }
-
-    return ParsedDistinct(std::move(cq),
-                          parsedDistinct.getKey().toString(),
-                          parsedDistinct.getMirrored().value_or(false),
-                          parsedDistinct.getSampleId());
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx,
+                                          distinctCommand,
+                                          nss,
+                                          std::move(collator),
+                                          CurOp::get(opCtx)->dbProfileLevel() > 0,  // mayDbProfile
+                                          verbosity);
+    return expCtx;
 }
 
 }  // namespace mongo

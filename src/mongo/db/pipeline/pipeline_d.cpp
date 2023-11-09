@@ -110,12 +110,12 @@
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -654,7 +654,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // uses a DISTINCT_SCAN to scan exactly one document for each group. When that's not
         // possible, we return nullptr, and the caller is responsible for trying again without
         // passing a 'groupIdForDistinctScan' value.
-        ParsedDistinct parsedDistinct(std::move(cq.getValue()), groupForDistinctScan->groupId());
+        CanonicalDistinct canonicalDistinct(std::move(cq.getValue()),
+                                            groupForDistinctScan->groupId());
 
         // If the GroupFromFirst transformation was generated for the $last case, we will need to
         // flip the direction of any generated DISTINCT_SCAN to preserve the semantics of the query.
@@ -670,7 +671,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         auto distinctExecutor =
             getExecutorDistinct(&collections.getMainCollection(),
                                 plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                                &parsedDistinct,
+                                &canonicalDistinct,
                                 flipDistinctScanDirection);
         if (!distinctExecutor.isOK()) {
             return distinctExecutor.getStatus().withContext(

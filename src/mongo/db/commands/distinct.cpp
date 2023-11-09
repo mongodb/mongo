@@ -72,6 +72,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -80,7 +81,6 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -215,13 +215,12 @@ public:
             opCtx, nss, AcquisitionPrerequisites::kRead);
         boost::optional<CollectionOrViewAcquisition> collectionOrView =
             acquireCollectionOrViewMaybeLockFree(opCtx, acquisitionRequest);
-
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const CollatorInterface* defaultCollator = collectionOrView->getCollectionPtr()
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
-        auto parsedDistinct = uassertStatusOK(
-            ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
+
+        auto canonicalDistinct = CanonicalDistinct::parseFromBSON(
+            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollator, verbosity);
 
         SerializationContext serializationCtx = request.getSerializationContext();
 
@@ -229,7 +228,7 @@ public:
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
 
-            auto viewAggregation = parsedDistinct.asAggregationCommand();
+            auto viewAggregation = canonicalDistinct.asAggregationCommand();
             if (!viewAggregation.isOK()) {
                 return viewAggregation.getStatus();
             }
@@ -257,7 +256,7 @@ public:
         const auto& collection = collectionOrView->getCollectionPtr();
 
         auto executor = uassertStatusOK(getExecutorDistinct(
-            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct));
+            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &canonicalDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(executor.get(),
@@ -325,23 +324,22 @@ public:
                         repl::ReadConcernLevel::kSnapshotReadConcern ||
                     !coll.getShardingDescription().isSharded());
         }
-
-        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const CollatorInterface* defaultCollation = collectionOrView->getCollectionPtr()
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
-        auto parsedDistinct = uassertStatusOK(
-            ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false, defaultCollation));
 
-        if (parsedDistinct.isMirrored()) {
+        auto canonicalDistinct = CanonicalDistinct::parseFromBSON(
+            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollation, {});
+
+        if (canonicalDistinct.isMirrored()) {
             const auto& invocation = CommandInvocation::get(opCtx);
             invocation->markMirrored();
         } else if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
                        opCtx,
                        nss,
                        analyze_shard_key::SampledCommandNameEnum::kDistinct,
-                       parsedDistinct)) {
-            auto cq = parsedDistinct.getQuery();
+                       canonicalDistinct)) {
+            auto cq = canonicalDistinct.getQuery();
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
                 ->addDistinctQuery(
                     *sampleId, nss, cq->getQueryObj(), cq->getFindCommandRequest().getCollation())
@@ -352,7 +350,7 @@ public:
             // Relinquish locks. The aggregation command will re-acquire them.
             collectionOrView.reset();
 
-            auto viewAggregation = parsedDistinct.asAggregationCommand();
+            auto viewAggregation = canonicalDistinct.asAggregationCommand();
             uassertStatusOK(viewAggregation.getStatus());
 
             using VTS = auth::ValidatedTenancyScope;
@@ -375,7 +373,7 @@ public:
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
         auto executor = getExecutorDistinct(
-            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct);
+            collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &canonicalDistinct);
         uassertStatusOK(executor.getStatus());
 
         {
@@ -384,7 +382,7 @@ public:
                 executor.getValue()->getPlanExplainer().getPlanSummary());
         }
 
-        const auto key = cmdObj.getStringField(ParsedDistinct::kKeyField);
+        const auto key = cmdObj.getStringField(CanonicalDistinct::kKeyField);
 
         std::vector<BSONObj> distinctValueHolder;
         BSONElementSet values(executor.getValue()->getCanonicalQuery()->getCollator());
