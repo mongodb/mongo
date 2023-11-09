@@ -114,9 +114,37 @@ TEST(TransactionOperationsTest, AddTransactionFailsOnDuplicateStatementIds) {
     std::vector<StmtId> stmtIds2 = {3, 4, 5};
     op2.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds2));
 
+    TransactionOperations::TransactionOperation op3;
+    std::vector<StmtId> stmtIds3 = {3};
+    op3.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds3));
+
+    TransactionOperations::TransactionOperation op4;
+    std::vector<StmtId> stmtIds4 = {4, 5, 7, 8};
+    op4.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds4));
+
+    TransactionOperations::TransactionOperation op5;
+    std::vector<StmtId> stmtIds5 = {6, 7, 8, 9};
+    op5.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds5));
+
+    TransactionOperations::TransactionOperation op6;
+    std::vector<StmtId> stmtIds6 = {6, 9};
+    op6.setStatementIds(stdx::variant<StmtId, std::vector<StmtId>>(stmtIds6));
+
     TransactionOperations ops;
     ASSERT_OK(ops.addOperation(op1));
-    ASSERT_EQ(static_cast<ErrorCodes::Error>(5875600), ops.addOperation(op2));
+    ASSERT_EQ(5875600, ops.addOperation(op2).code());
+
+    // Make sure failing to add 3,4,5 left 3 as in-use.
+    ASSERT_EQ(5875600, ops.addOperation(op3).code());
+
+    // Make sure failing to add 3,4,5 left 4 and 5 as available.
+    ASSERT_OK(ops.addOperation(op4));
+
+    // Make sure we detect a collision in a non-first item in the new statement ID list.
+    ASSERT_EQ(5875600, ops.addOperation(op5).code());
+
+    // Make sure can still add 6 and 9, which weren't added by the failed op5.
+    ASSERT_OK(ops.addOperation(op6));
 }
 
 TEST(TransactionOperationsTest, AddTransactionIncludesPreImageStatistics) {
