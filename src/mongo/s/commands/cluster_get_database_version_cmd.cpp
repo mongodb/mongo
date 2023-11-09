@@ -86,7 +86,7 @@ private:
         return " example: { getDatabaseVersion : 'foo' } ";
     }
 };
-MONGO_REGISTER_COMMAND(ClusterGetDatabaseVersionCommand);
+MONGO_REGISTER_COMMAND(ClusterGetDatabaseVersionCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

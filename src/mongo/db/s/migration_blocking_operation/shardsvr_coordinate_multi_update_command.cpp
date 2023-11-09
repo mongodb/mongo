@@ -90,7 +90,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ShardsvrCoordinateMultiUpdateCommand);
+MONGO_REGISTER_COMMAND(ShardsvrCoordinateMultiUpdateCommand).forShard();
 
 }  // namespace
 }  // namespace mongo
