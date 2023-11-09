@@ -1502,9 +1502,17 @@ tasks:
     exec_timeout_secs: 172800 # 2 days
     commands:
       - func: f_run_dsi_workload
+        timeout_secs: 43200 # 12 hours
         vars:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/sharding/ReshardCollectionWithIndexes.yml
+  - name: resharding-3shard-snapshot-update
+    priority: 5
+    exec_timeout_secs: 216000 # 2.5 days
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "resharding-3shard-snapshot-update.2023-10"
   - name: query_read_commands
     commands:
       - func: f_run_dsi_workload
@@ -4661,6 +4669,7 @@ buildvariants:
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: resharding-3shard.2023-08
       workload_setup: 2022-11
+      snapshotId: snap-0e7434150d05e0e47 # FCV 7.3
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -4673,3 +4682,29 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: genny_resharding_withIndexes
+
+  # Uncomment this to run resharding snapshot FCV updates automatically.
+  # This is only intended to be run in patch builds.
+  # - name: resharding-3shard-snapshot-update
+  #   display_name: Resharding 3-Shard Snapshot Update
+  #   cron: "0 0 * * 4"  # 00:00 on Thursday
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup_release: 2022-11
+  #     mongodb_setup: resharding-3shard-snapshot-update.2023-10
+  #     infrastructure_provisioning_release: 2022-11
+  #     infrastructure_provisioning: resharding-3shard-snapshot-update.2023-10
+  #     # Update this to latest snapshot after each LTS release.
+  #     snapshotId: snap-0ef92078b2edfc612 # FCV 7.2
+  #     platform: linux
+  #     authentication: disabled
+  #     storageEngine: wiredTiger
+  #     project_dir: *project_dir
+  #     compile_variant: "-arm64"
+  #   run_on:
+  #     - "rhel70-perf-shard"
+  #   depends_on: *_compile_amazon_linux2_arm64
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
+  #     - name: resharding-3shard-snapshot-update
