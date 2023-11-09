@@ -13,13 +13,7 @@
  *   tenant_migration_incompatible,
  * ]
  */
-import {
-    getOptimizer,
-    getPlanStages,
-    getWinningPlan,
-    getWinningPlanFromExplain,
-    isCollscan
-} from "jstests/libs/analyze_plan.js";
+import {getPlanStages, getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
 
 const collName = "index_filter_catalog_independent";
 const coll = db[collName];
@@ -35,26 +29,13 @@ function assertOneIndexFilter(query, indexes) {
     assert.eq(res.filters[0].indexes, indexes);
 }
 
-function assertIsIxScanOnIndex(explain, keyPattern) {
-    switch (getOptimizer(explain)) {
-        case "classic": {
-            let winningPlan = getWinningPlan(explain.queryPlanner);
-            const ixScans = getPlanStages(winningPlan, "IXSCAN");
-            assert.gt(ixScans.length, 0);
-            ixScans.every((ixScan) => assert.eq(ixScan.keyPattern, keyPattern));
+function assertIsIxScanOnIndex(winningPlan, keyPattern) {
+    const ixScans = getPlanStages(winningPlan, "IXSCAN");
+    assert.gt(ixScans.length, 0);
+    ixScans.every((ixScan) => assert.eq(ixScan.keyPattern, keyPattern));
 
-            const collScans = getPlanStages(winningPlan, "COLLSCAN");
-            assert.eq(collScans.length, 0);
-            break;
-        }
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert(isCollscan(db, getWinningPlanFromExplain(explain)));
-            break;
-        default:
-            break;
-    }
+    const collScans = getPlanStages(winningPlan, "COLLSCAN");
+    assert.eq(collScans.length, 0);
 }
 
 function checkIndexFilterSet(explain, shouldBeSet) {
@@ -74,7 +55,7 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
 let explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(explain, {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 
 // Drop an index. The filter should not change.
 assert.commandWorked(coll.dropIndex({x: 1, y: 1}));
@@ -104,4 +85,4 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 
 explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
-assertIsIxScanOnIndex(explain, {x: 1, y: 1});
+assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
