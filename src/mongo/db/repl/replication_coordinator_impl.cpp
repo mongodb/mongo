@@ -691,33 +691,11 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         }
     }
 
-    auto opCtx = cc().makeOperationContext();
-    if (!lastOpTime.isNull()) {
-
-        // If we have an oplog, it is still possible that our data is not in a consistent state. For
-        // example, if we are starting up after a crash following a post-rollback RECOVERING state.
-        // To detect this, we see if our last optime is >= the 'minValid' optime, which
-        // should be persistent across node crashes.
-        OpTime minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
-
-        // It is not safe to take stable checkpoints until we reach minValid, so we set our
-        // initialDataTimestamp to prevent this. It is expected that this is only necessary when
-        // enableMajorityReadConcern:false.
-        if (lastOpTime < minValid) {
-            LOGV2_DEBUG(4916700,
-                        2,
-                        "Setting initialDataTimestamp to minValid since our last optime is less "
-                        "than minValid",
-                        "lastOpTime"_attr = lastOpTime,
-                        "minValid"_attr = minValid);
-            _storage->setInitialDataTimestamp(getServiceContext(), minValid.getTimestamp());
-        }
-    }
-
     // Update the global timestamp before setting the last applied opTime forward so the last
     // applied optime is never greater than the latest cluster time in the logical clock.
     _externalState->setGlobalTimestamp(getServiceContext(), lastOpTime.getTimestamp());
 
+    auto opCtx = cc().makeOperationContext();
     stdx::unique_lock<Latch> lock(_mutex);
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
@@ -5531,11 +5509,6 @@ OpTime ReplicationCoordinatorImpl::_recalculateStableOpTime(WithLock lk) {
 MONGO_FAIL_POINT_DEFINE(disableSnapshotting);
 
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
-    if (!_shouldSetStableTimestamp) {
-        LOGV2_DEBUG(21395, 2, "Not setting stable timestamp for storage");
-        return;
-    }
-
     // Don't update the stable optime if we are in initial sync. We advance the oldest timestamp
     // continually to the lastApplied optime during initial sync oplog application, so if we learned
     // about an earlier commit point during this period, we would risk setting the stable timestamp
@@ -5621,37 +5594,6 @@ void ReplicationCoordinatorImpl::finishRecoveryIfEligible(OperationContext* opCt
     // Maintenance mode will force us to remain in RECOVERING state, no matter what.
     if (getMaintenanceMode()) {
         LOGV2_DEBUG(21398, 1, "We cannot transition to SECONDARY state while in maintenance mode");
-        return;
-    }
-
-    // We can't go to SECONDARY state until we reach 'minValid', since the data may be in an
-    // inconsistent state before this point. If our state is inconsistent, we need to disallow reads
-    // from clients, which is why we stay in RECOVERING state.
-    auto lastApplied = getMyLastAppliedOpTime();
-    auto minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx);
-    if (lastApplied < minValid) {
-        LOGV2_DEBUG(21399,
-                    2,
-                    "We cannot transition to SECONDARY state because our 'lastApplied' optime"
-                    " is less than the 'minValid' optime",
-                    "minValid"_attr = minValid,
-                    "lastApplied"_attr = lastApplied);
-        return;
-    }
-
-    // Rolling back with eMRC false, we set initialDataTimestamp to max(local oplog top, source's
-    // oplog top), then rollback via refetch. Data is inconsistent until lastApplied >=
-    // initialDataTimestamp.
-    auto initialTs = opCtx->getServiceContext()->getStorageEngine()->getInitialDataTimestamp();
-    if (lastApplied.getTimestamp() < initialTs) {
-        invariant(!serverGlobalParams.enableMajorityReadConcern);
-        LOGV2_DEBUG(4851800,
-                    2,
-                    "We cannot transition to SECONDARY state because our 'lastApplied' optime is "
-                    "less than the initial data timestamp and enableMajorityReadConcern = false",
-                    "minValid"_attr = minValid,
-                    "lastApplied"_attr = lastApplied,
-                    "initialDataTimestamp"_attr = initialTs);
         return;
     }
 

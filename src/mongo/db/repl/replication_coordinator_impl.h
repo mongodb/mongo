@@ -1844,9 +1844,6 @@ private:
     // When engaged, this must be <= _lastCommittedOpTime.
     boost::optional<OpTime> _currentCommittedSnapshot;  // (M)
 
-    // A flag that enables/disables advancement of the stable timestamp for storage.
-    bool _shouldSetStableTimestamp = true;  // (M)
-
     // Used to signal threads that are waiting for a new value of _currentCommittedSnapshot.
     stdx::condition_variable _currentCommittedSnapshotCond;  // (M)
 

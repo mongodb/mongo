@@ -1292,21 +1292,9 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     LOGV2(21690,
-          "Finished refetching documents",
+          "Finished refetching documents, checking the RollbackID and updating the MinValid if "
+          "necessary",
           "totalSizeOfDocumentsRefetched"_attr = goodVersions.size());
-
-    // We must start taking unstable checkpoints before rolling back oplog entries. Otherwise, a
-    // stable checkpoint could include the fixup write (since it is untimestamped) but not the write
-    // being rolled back (if it is after the stable timestamp), leading to inconsistent state. An
-    // unstable checkpoint will include both writes.
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        LOGV2(21691,
-              "Setting initialDataTimestamp to 0 so that we start taking unstable checkpoints");
-        opCtx->getServiceContext()->getStorageEngine()->setInitialDataTimestamp(
-            Timestamp::kAllowUnstableCheckpointsSentinel);
-    }
-
-    LOGV2(21692, "Checking the RollbackID and updating the MinValid if necessary");
 
     checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
 
@@ -1731,48 +1719,10 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     LOGV2(21714,
-          "Rollback finished deletes and updates",
+          "Rollback finished deletes and updates, truncating the oplog at the common point, "
+          "non-inclusive",
           "deletes"_attr = deletes,
-          "updates"_attr = updates);
-
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        // When majority read concern is disabled, the stable timestamp may be ahead of the common
-        // point. Force the stable timestamp back to the common point, to allow writes after the
-        // common point.
-        const bool force = true;
-        LOGV2(21715,
-              "Forcing the stable timestamp to the common point",
-              "commonPoint"_attr = fixUpInfo.commonPoint.getTimestamp());
-        opCtx->getServiceContext()->getStorageEngine()->setStableTimestamp(
-            fixUpInfo.commonPoint.getTimestamp(), force);
-
-        // We must not take a stable checkpoint until it is guaranteed to include all writes from
-        // before the rollback (i.e. the stable timestamp is at least the local top of oplog). In
-        // addition, we must not take a stable checkpoint until the stable timestamp reaches the
-        // sync source top of oplog (minValid), since we must not take a stable checkpoint until we
-        // are in a consistent state. We control this by seting the initialDataTimestamp to the
-        // maximum of these two values. No checkpoints are taken until stable timestamp >=
-        // initialDataTimestamp.
-        auto syncSourceTopOfOplog = OpTime::parseFromOplogEntry(rollbackSource.getLastOperation())
-                                        .getValue()
-                                        .getTimestamp();
-        LOGV2(21716,
-              "Setting initialDataTimestamp to the max of local top of oplog and sync source "
-              "top of oplog",
-              "localTopOfOplog"_attr = fixUpInfo.localTopOfOplog.getTimestamp(),
-              "syncSourceTopOfOplog"_attr = syncSourceTopOfOplog);
-        opCtx->getServiceContext()->getStorageEngine()->setInitialDataTimestamp(
-            std::max(fixUpInfo.localTopOfOplog.getTimestamp(), syncSourceTopOfOplog));
-
-        // Take an unstable checkpoint to ensure that all of the writes performed during rollback
-        // are persisted to disk before truncating oplog.
-        LOGV2(21717, "Waiting for an unstable checkpoint");
-        const bool stableCheckpoint = false;
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, stableCheckpoint);
-    }
-
-    LOGV2(21718,
-          "Truncating the oplog at the common point, non-inclusive",
+          "updates"_attr = updates,
           "commonPoint"_attr = fixUpInfo.commonPoint.toString(),
           "commonPointOurDiskloc"_attr = fixUpInfo.commonPointOurDiskloc);
 
@@ -1803,29 +1753,6 @@ void syncFixUp(OperationContext* opCtx,
             fixUpInfo.commonPointOurDiskloc,
             false /* inclusive */,
             nullptr /* aboutToDelete callback */);
-    }
-
-    if (!serverGlobalParams.enableMajorityReadConcern) {
-        // If the server crashes and restarts before a stable checkpoint is taken, it will restart
-        // from the unstable checkpoint taken at the end of rollback. To ensure replication recovery
-        // replays all oplog after the common point, we set the appliedThrough to the common point.
-        // This is done using an untimestamped write, since timestamping the write with the common
-        // point TS would be incorrect (since this is equal to the stable timestamp), and this write
-        // will be included in the unstable checkpoint regardless of its timestamp.
-        LOGV2(21719,
-              "Setting appliedThrough to the common point",
-              "commonPoint"_attr = fixUpInfo.commonPoint);
-        replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx,
-                                                                       fixUpInfo.commonPoint);
-
-        // Take an unstable checkpoint to ensure the appliedThrough write is persisted to disk.
-        LOGV2(21720, "Waiting for an unstable checkpoint");
-        const bool stableCheckpoint = false;
-        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx, stableCheckpoint);
-
-        // Ensure that appliedThrough is unset in the next stable checkpoint.
-        LOGV2(21721, "Clearing appliedThrough");
-        replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx);
     }
 
     Status status = AuthorizationManager::get(opCtx->getServiceContext())->initialize(opCtx);
