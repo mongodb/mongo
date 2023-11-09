@@ -592,6 +592,15 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             CatalogCacheLoader::get(serviceContext).shutDown();
         }
 
+        // Shutdown the SessionManager and its sessions and give it a grace period to complete.
+        if (auto mgr = serviceContext->getTransportLayerManager()) {
+            if (!mgr->shutdownSessionManagers(Seconds(10))) {
+                LOGV2_OPTIONS(22844,
+                              {LogComponent::kNetwork},
+                              "SessionManager did not shutdown within the time limit");
+            }
+        }
+
         // Shutdown Full-Time Data Capture
         stopMongoSFTDC(serviceContext);
     }

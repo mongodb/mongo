@@ -79,6 +79,24 @@ void TransportLayerManagerImpl::shutdown() {
     }
 }
 
+bool TransportLayerManagerImpl::shutdownSessionManagers(Milliseconds timeout) {
+    invariant(_state.load() == State::kShutdown);
+    auto deadline = Date_t::now() + timeout;
+    for (auto&& tl : _tls) {
+        auto now = Date_t::now();
+        if (now > deadline) {
+            return false;
+        }
+        if (auto sm = tl->getSessionManager()) {
+            if (!sm->shutdown(deadline - now)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 Status TransportLayerManagerImpl::setup() {
     invariant(_state.swap(State::kSetUp) == State::kNotInitialized);
     for (auto&& tl : _tls) {

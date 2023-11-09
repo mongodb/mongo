@@ -62,6 +62,7 @@ public:
 
     Status start() override;
     void shutdown() override;
+    bool shutdownSessionManagers(Milliseconds timeout) override;
     Status setup() override;
     void appendStatsForServerStatus(BSONObjBuilder* bob) const override;
     void appendStatsForFTDC(BSONObjBuilder& bob) const override;

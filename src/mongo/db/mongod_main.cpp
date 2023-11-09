@@ -1944,6 +1944,17 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
+    // Shutdown the Session Manager and its sessions and give it a grace period to complete.
+    if (auto mgr = serviceContext->getTransportLayerManager()) {
+        LOGV2_OPTIONS(
+            4784923, {LogComponent::kCommand}, "Shutting down the transport SessionManager");
+        if (!mgr->shutdownSessionManagers(Seconds(10))) {
+            LOGV2_OPTIONS(20563,
+                          {LogComponent::kNetwork},
+                          "SessionManager did not shutdown within the time limit");
+        }
+    }
+
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Shut down the health log",

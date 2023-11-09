@@ -47,6 +47,7 @@ public:
     GRPCTransportLayerImpl(ServiceContext* svcCtx,
                            Options options,
                            std::unique_ptr<SessionManager> sessionManager);
+    ~GRPCTransportLayerImpl();
 
     virtual Status registerService(std::unique_ptr<Service> svc) override;
 

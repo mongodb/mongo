@@ -371,7 +371,11 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
             _sessionManager || !_listenerOptions.isIngress());
 }
 
-AsioTransportLayer::~AsioTransportLayer() = default;
+AsioTransportLayer::~AsioTransportLayer() {
+    if (_sessionManager) {
+        _sessionManager->shutdown(kSessionShutdownTimeout);
+    }
+}
 
 struct AsioTransportLayer::AcceptorRecord {
     AcceptorRecord(SockAddr address, GenericAcceptor acceptor)
@@ -1236,12 +1240,6 @@ void AsioTransportLayer::shutdown() {
     }
     lk.unlock();
     _timerService->stop();
-    if (_sessionManager) {
-        LOGV2(4784923, "Shutting down the ASIO transport SessionManager");
-        if (!_sessionManager->shutdown(kSessionShutdownTimeout)) {
-            LOGV2(20563, "SessionManager did not shutdown within the time limit");
-        }
-    }
     lk.lock();
 
     if (!_listenerOptions.isIngress()) {
