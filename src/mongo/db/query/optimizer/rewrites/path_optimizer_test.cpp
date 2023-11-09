@@ -1178,8 +1178,8 @@ TEST(Path, FuseTraverseWithConstant) {
         "Root [{x}]\n"
         "Filter []\n"
         "|   BinaryOp [Eq]\n"
-        "|   |   Const [\"hello\"]\n"
-        "|   Const [2]\n"
+        "|   |   Const [2]\n"
+        "|   Const [\"hello\"]\n"
         "Evaluation [{x}]\n"
         "|   EvalPath []\n"
         "|   |   Variable [root]\n"
@@ -1754,6 +1754,29 @@ TEST(Path, PathCompareEqMemberUnknownTypeLower) {
         "|   EvalPath []\n"
         "|   |   Variable [root]\n"
         "|   PathField [a] PathConstant [] Const [\"hello\"]\n"
+        "Scan [test, {root}]\n",
+        tree);
+}
+
+TEST(Path, FuseConstantAndCompare) {
+    auto tree = NodeBuilder{}
+                    .root("p1")
+                    .filter(_evalf(_get("a", _cmp("Lt", "2"_cint64)), "p1"_var))
+                    .eval("p1", _evalp(_field("a", _pconst("3"_cint64)), "root"_var))
+                    .finish(_scan("root", "test"));
+
+    auto env = VariableEnvironment::build(tree);
+    while (PathFusion{env}.optimize(tree) || ConstEval{env}.optimize(tree))
+        ;
+
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Root [{p1}]\n"
+        "Filter []\n"
+        "|   Const [false]\n"
+        "Evaluation [{p1}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathField [a] PathConstant [] Const [3]\n"
         "Scan [test, {root}]\n",
         tree);
 }
