@@ -1749,6 +1749,8 @@ TEST(Path, PathCompareEqMemberUnknownTypeLower) {
         "|   |   BinaryOp [EqMember]\n"
         "|   |   |   Variable [a]\n"
         "|   |   Const [\"hello\"]\n"
+        "|   BinaryOp [Or]\n"
+        "|   |   FunctionCall [isInListData] Variable [a]\n"
         "|   FunctionCall [isArray] Variable [a]\n"
         "Evaluation [{x}]\n"
         "|   EvalPath []\n"

@@ -242,9 +242,6 @@ std::pair<value::TypeTags, value::Value> genericCompare(
         }
     }
 
-    // TODO: SERVER-82089: Use cmp3w instead of simple comparisons in ABT optimization + lowering of
-    // parameterized constants
-
     return {value::TypeTags::Nothing, 0};
 }
 
@@ -365,6 +362,7 @@ struct Instruction {
         isNull,
         isObject,
         isArray,
+        isInListData,
         isString,
         isNumber,
         isBinData,
@@ -584,6 +582,8 @@ struct Instruction {
                 return "isObject";
             case isArray:
                 return "isArray";
+            case isInListData:
+                return "isInListData";
             case isString:
                 return "isString";
             case isNumber:
@@ -1265,6 +1265,7 @@ public:
     void appendIsNull(Instruction::Parameter input);
     void appendIsObject(Instruction::Parameter input);
     void appendIsArray(Instruction::Parameter input);
+    void appendIsInListData(Instruction::Parameter input);
     void appendIsString(Instruction::Parameter input);
     void appendIsNumber(Instruction::Parameter input);
     void appendIsBinData(Instruction::Parameter input);

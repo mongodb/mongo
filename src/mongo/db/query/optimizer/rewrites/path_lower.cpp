@@ -291,7 +291,9 @@ void EvalFilterLowering::transport(ABT& n, const PathCompare& cmp, ABT& c) {
         // the non-array case in the lowering below.
         n = make<LambdaAbstraction>(
             name,
-            make<If>(make<FunctionCall>("isArray", makeSeq(c)),
+            make<If>(make<BinaryOp>(Operations::Or,
+                                    make<FunctionCall>("isArray", makeSeq(c)),
+                                    make<FunctionCall>("isInListData", makeSeq(c))),
                      make<BinaryOp>(Operations::EqMember, make<Variable>(name), c),
                      make<BinaryOp>(Operations::Eq,
                                     make<BinaryOp>(Operations::Cmp3w, make<Variable>(name), c),

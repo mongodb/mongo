@@ -183,6 +183,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isNull
     0,  // isObject
     0,  // isArray
+    0,  // isInListData
     0,  // isString
     0,  // isNumber
     0,  // isBinData
@@ -848,6 +849,10 @@ void CodeFragment::appendIsObject(Instruction::Parameter input) {
 
 void CodeFragment::appendIsArray(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isArray, input);
+}
+
+void CodeFragment::appendIsInListData(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isInListData, input);
 }
 
 void CodeFragment::appendIsString(Instruction::Parameter input) {
@@ -10897,6 +10902,10 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::isArray: {
                 runTagCheck(pcPointer, value::isArray);
+                break;
+            }
+            case Instruction::isInListData: {
+                runTagCheck(pcPointer, value::isInListData);
                 break;
             }
             case Instruction::isString: {

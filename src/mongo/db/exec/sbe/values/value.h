@@ -273,6 +273,10 @@ inline constexpr bool isArray(TypeTags tag) noexcept {
         tag == TypeTags::bsonArray;
 }
 
+inline constexpr bool isInListData(TypeTags tag) noexcept {
+    return tag == TypeTags::inListData;
+}
+
 inline constexpr bool isNullish(TypeTags tag) noexcept {
     return tag == TypeTags::Nothing || tag == TypeTags::Null || tag == TypeTags::bsonUndefined;
 }
