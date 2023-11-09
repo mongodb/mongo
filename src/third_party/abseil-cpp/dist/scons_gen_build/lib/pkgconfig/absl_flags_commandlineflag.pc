@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_flags_commandlineflag
+Description: Abseil flags_commandlineflag library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_config = 20230802, absl_fast_type_id = 20230802, absl_flags_commandlineflag_internal = 20230802, absl_optional = 20230802, absl_strings = 20230802
+Libs: -L${libdir}  -labsl_flags_commandlineflag 
+Cflags: -I${includedir} -DNOMINMAX

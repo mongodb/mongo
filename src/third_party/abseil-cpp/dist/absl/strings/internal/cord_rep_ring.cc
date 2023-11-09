@@ -129,7 +129,9 @@ class CordRepRing::Filler {
   index_type pos_;
 };
 
-constexpr size_t CordRepRing::kMaxCapacity; // NOLINT: needed for c++11
+#ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
+constexpr size_t CordRepRing::kMaxCapacity;
+#endif
 
 bool CordRepRing::IsValid(std::ostream& output) const {
   if (capacity_ == 0) {
@@ -277,7 +279,7 @@ CordRepRing* CordRepRing::Mutable(CordRepRing* rep, size_t extra) {
   // Get current number of entries, and check for max capacity.
   size_t entries = rep->entries();
 
-  if (!rep->refcount.IsMutable()) {
+  if (!rep->refcount.IsOne()) {
     return Copy(rep, rep->head(), rep->tail(), extra);
   } else if (entries + extra > rep->capacity()) {
     const size_t min_grow = rep->capacity() + rep->capacity() / 2;
@@ -292,10 +294,10 @@ CordRepRing* CordRepRing::Mutable(CordRepRing* rep, size_t extra) {
 }
 
 Span<char> CordRepRing::GetAppendBuffer(size_t size) {
-  assert(refcount.IsMutable());
+  assert(refcount.IsOne());
   index_type back = retreat(tail_);
   CordRep* child = entry_child(back);
-  if (child->tag >= FLAT && child->refcount.IsMutable()) {
+  if (child->tag >= FLAT && child->refcount.IsOne()) {
     size_t capacity = child->flat()->Capacity();
     pos_type end_pos = entry_end_pos(back);
     size_t data_offset = entry_data_offset(back);
@@ -312,10 +314,10 @@ Span<char> CordRepRing::GetAppendBuffer(size_t size) {
 }
 
 Span<char> CordRepRing::GetPrependBuffer(size_t size) {
-  assert(refcount.IsMutable());
+  assert(refcount.IsOne());
   CordRep* child = entry_child(head_);
   size_t data_offset = entry_data_offset(head_);
-  if (data_offset && child->refcount.IsMutable() && child->tag >= FLAT) {
+  if (data_offset && child->refcount.IsOne() && child->tag >= FLAT) {
     size_t n = (std::min)(data_offset, size);
     this->length += n;
     begin_pos_ -= n;
@@ -504,7 +506,7 @@ CordRepRing* CordRepRing::Prepend(CordRepRing* rep, CordRep* child) {
 
 CordRepRing* CordRepRing::Append(CordRepRing* rep, absl::string_view data,
                                  size_t extra) {
-  if (rep->refcount.IsMutable()) {
+  if (rep->refcount.IsOne()) {
     Span<char> avail = rep->GetAppendBuffer(data.length());
     if (!avail.empty()) {
       memcpy(avail.data(), data.data(), avail.length());
@@ -538,7 +540,7 @@ CordRepRing* CordRepRing::Append(CordRepRing* rep, absl::string_view data,
 
 CordRepRing* CordRepRing::Prepend(CordRepRing* rep, absl::string_view data,
                                   size_t extra) {
-  if (rep->refcount.IsMutable()) {
+  if (rep->refcount.IsOne()) {
     Span<char> avail = rep->GetPrependBuffer(data.length());
     if (!avail.empty()) {
       const char* tail = data.data() + data.length() - avail.length();
@@ -678,7 +680,7 @@ CordRepRing* CordRepRing::SubRing(CordRepRing* rep, size_t offset,
   Position tail = rep->FindTail(head.index, offset + len);
   const size_t new_entries = rep->entries(head.index, tail.index);
 
-  if (rep->refcount.IsMutable() && extra <= (rep->capacity() - new_entries)) {
+  if (rep->refcount.IsOne() && extra <= (rep->capacity() - new_entries)) {
     // We adopt a privately owned rep and no extra entries needed.
     if (head.index != rep->head_) UnrefEntries(rep, rep->head_, head.index);
     if (tail.index != rep->tail_) UnrefEntries(rep, tail.index, rep->tail_);
@@ -715,7 +717,7 @@ CordRepRing* CordRepRing::RemovePrefix(CordRepRing* rep, size_t len,
   }
 
   Position head = rep->Find(len);
-  if (rep->refcount.IsMutable()) {
+  if (rep->refcount.IsOne()) {
     if (head.index != rep->head_) UnrefEntries(rep, rep->head_, head.index);
     rep->head_ = head.index;
   } else {
@@ -745,7 +747,7 @@ CordRepRing* CordRepRing::RemoveSuffix(CordRepRing* rep, size_t len,
   }
 
   Position tail = rep->FindTail(rep->length - len);
-  if (rep->refcount.IsMutable()) {
+  if (rep->refcount.IsOne()) {
     // We adopt a privately owned rep, scrub.
     if (tail.index != rep->tail_) UnrefEntries(rep, tail.index, rep->tail_);
     rep->tail_ = tail.index;

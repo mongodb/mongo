@@ -29,6 +29,9 @@ cc_library(
     name = "memory",
     hdrs = ["memory.h"],
     copts = ABSL_DEFAULT_COPTS,
+    defines = select({
+        "//conditions:default": [],
+    }),
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         "//absl/base:core_headers",
@@ -44,21 +47,6 @@ cc_test(
     deps = [
         ":memory",
         "//absl/base:core_headers",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_test(
-    name = "memory_exception_safety_test",
-    srcs = [
-        "memory_exception_safety_test.cc",
-    ],
-    copts = ABSL_TEST_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    deps = [
-        ":memory",
-        "//absl/base:config",
-        "//absl/base:exception_safety_testing",
         "@com_google_googletest//:gtest_main",
     ],
 )

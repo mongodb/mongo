@@ -34,6 +34,14 @@
 #include <sys/sysctl.h>
 #endif
 
+#ifdef __FreeBSD__
+#include <pthread_np.h>
+#endif
+
+#ifdef __NetBSD__
+#include <lwp.h>
+#endif
+
 #if defined(__myriad2__)
 #include <rtems.h>
 #endif
@@ -41,6 +49,7 @@
 #include <string.h>
 
 #include <cassert>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -117,19 +126,18 @@ int Win32NumCPUs() {
     }
   }
   free(info);
-  return logicalProcessorCount;
+  return static_cast<int>(logicalProcessorCount);
 }
 
 #endif
 
 }  // namespace
 
-
 static int GetNumCPUs() {
 #if defined(__myriad2__)
   return 1;
 #elif defined(_WIN32)
-  const unsigned hardware_concurrency = Win32NumCPUs();
+  const int hardware_concurrency = Win32NumCPUs();
   return hardware_concurrency ? hardware_concurrency : 1;
 #elif defined(_AIX)
   return sysconf(_SC_NPROCESSORS_ONLN);
@@ -137,7 +145,7 @@ static int GetNumCPUs() {
   // Other possibilities:
   //  - Read /sys/devices/system/cpu/online and use cpumask_parse()
   //  - sysconf(_SC_NPROCESSORS_ONLN)
-  return std::thread::hardware_concurrency();
+  return static_cast<int>(std::thread::hardware_concurrency());
 #endif
 }
 
@@ -160,7 +168,7 @@ static double GetNominalCPUFrequency() {
     DWORD type = 0;
     DWORD data = 0;
     DWORD data_size = sizeof(data);
-    auto result = RegQueryValueExA(key, "~MHz", 0, &type,
+    auto result = RegQueryValueExA(key, "~MHz", nullptr, &type,
                                    reinterpret_cast<LPBYTE>(&data), &data_size);
     RegCloseKey(key);
     if (result == ERROR_SUCCESS && type == REG_DWORD &&
@@ -190,12 +198,21 @@ static double GetNominalCPUFrequency() {
 // and the memory location pointed to by value is set to the value read.
 static bool ReadLongFromFile(const char *file, long *value) {
   bool ret = false;
-  int fd = open(file, O_RDONLY);
+#if defined(_POSIX_C_SOURCE)
+  const int file_mode = (O_RDONLY | O_CLOEXEC);
+#else
+  const int file_mode = O_RDONLY;
+#endif
+
+  int fd = open(file, file_mode);
   if (fd != -1) {
     char line[1024];
     char *err;
     memset(line, '\0', sizeof(line));
-    int len = read(fd, line, sizeof(line) - 1);
+    ssize_t len;
+    do {
+      len = read(fd, line, sizeof(line) - 1);
+    } while (len < 0 && errno == EINTR);
     if (len <= 0) {
       ret = false;
     } else {
@@ -223,8 +240,8 @@ static int64_t ReadMonotonicClockNanos() {
   int rc = clock_gettime(CLOCK_MONOTONIC, &t);
 #endif
   if (rc != 0) {
-    perror("clock_gettime() failed");
-    abort();
+    ABSL_INTERNAL_LOG(
+        FATAL, "clock_gettime() failed: (" + std::to_string(errno) + ")");
   }
   return int64_t{t.tv_sec} * 1000000000 + t.tv_nsec;
 }
@@ -377,7 +394,7 @@ pid_t GetTID() {
 #endif
 
 pid_t GetTID() {
-  return syscall(SYS_gettid);
+  return static_cast<pid_t>(syscall(SYS_gettid));
 }
 
 #elif defined(__akaros__)
@@ -412,81 +429,45 @@ pid_t GetTID() {
   return tid;
 }
 
+#elif defined(__APPLE__)
+
+pid_t GetTID() {
+  uint64_t tid;
+  // `nullptr` here implies this thread.  This only fails if the specified
+  // thread is invalid or the pointer-to-tid is null, so we needn't worry about
+  // it.
+  pthread_threadid_np(nullptr, &tid);
+  return static_cast<pid_t>(tid);
+}
+
+#elif defined(__FreeBSD__)
+
+pid_t GetTID() { return static_cast<pid_t>(pthread_getthreadid_np()); }
+
+#elif defined(__OpenBSD__)
+
+pid_t GetTID() { return getthrid(); }
+
+#elif defined(__NetBSD__)
+
+pid_t GetTID() { return static_cast<pid_t>(_lwp_self()); }
+
+#elif defined(__native_client__)
+
+pid_t GetTID() {
+  auto* thread = pthread_self();
+  static_assert(sizeof(pid_t) == sizeof(thread),
+                "In NaCL int expected to be the same size as a pointer");
+  return reinterpret_cast<pid_t>(thread);
+}
+
 #else
 
-// Fallback implementation of GetTID using pthread_getspecific.
-ABSL_CONST_INIT static once_flag tid_once;
-ABSL_CONST_INIT static pthread_key_t tid_key;
-ABSL_CONST_INIT static absl::base_internal::SpinLock tid_lock(
-    absl::kConstInit, base_internal::SCHEDULE_KERNEL_ONLY);
-
-// We set a bit per thread in this array to indicate that an ID is in
-// use. ID 0 is unused because it is the default value returned by
-// pthread_getspecific().
-ABSL_CONST_INIT static std::vector<uint32_t> *tid_array
-    ABSL_GUARDED_BY(tid_lock) = nullptr;
-static constexpr int kBitsPerWord = 32;  // tid_array is uint32_t.
-
-// Returns the TID to tid_array.
-static void FreeTID(void *v) {
-  intptr_t tid = reinterpret_cast<intptr_t>(v);
-  int word = tid / kBitsPerWord;
-  uint32_t mask = ~(1u << (tid % kBitsPerWord));
-  absl::base_internal::SpinLockHolder lock(&tid_lock);
-  assert(0 <= word && static_cast<size_t>(word) < tid_array->size());
-  (*tid_array)[word] &= mask;
-}
-
-static void InitGetTID() {
-  if (pthread_key_create(&tid_key, FreeTID) != 0) {
-    // The logging system calls GetTID() so it can't be used here.
-    perror("pthread_key_create failed");
-    abort();
-  }
-
-  // Initialize tid_array.
-  absl::base_internal::SpinLockHolder lock(&tid_lock);
-  tid_array = new std::vector<uint32_t>(1);
-  (*tid_array)[0] = 1;  // ID 0 is never-allocated.
-}
-
-// Return a per-thread small integer ID from pthread's thread-specific data.
+// Fallback implementation of `GetTID` using `pthread_self`.
 pid_t GetTID() {
-  absl::call_once(tid_once, InitGetTID);
-
-  intptr_t tid = reinterpret_cast<intptr_t>(pthread_getspecific(tid_key));
-  if (tid != 0) {
-    return tid;
-  }
-
-  int bit;  // tid_array[word] = 1u << bit;
-  size_t word;
-  {
-    // Search for the first unused ID.
-    absl::base_internal::SpinLockHolder lock(&tid_lock);
-    // First search for a word in the array that is not all ones.
-    word = 0;
-    while (word < tid_array->size() && ~(*tid_array)[word] == 0) {
-      ++word;
-    }
-    if (word == tid_array->size()) {
-      tid_array->push_back(0);  // No space left, add kBitsPerWord more IDs.
-    }
-    // Search for a zero bit in the word.
-    bit = 0;
-    while (bit < kBitsPerWord && (((*tid_array)[word] >> bit) & 1) != 0) {
-      ++bit;
-    }
-    tid = (word * kBitsPerWord) + bit;
-    (*tid_array)[word] |= 1u << bit;  // Mark the TID as allocated.
-  }
-
-  if (pthread_setspecific(tid_key, reinterpret_cast<void *>(tid)) != 0) {
-    perror("pthread_setspecific failed");
-    abort();
-  }
-
-  return static_cast<pid_t>(tid);
+  // `pthread_t` need not be arithmetic per POSIX; platforms where it isn't
+  // should be handled above.
+  return static_cast<pid_t>(pthread_self());
 }
 
 #endif

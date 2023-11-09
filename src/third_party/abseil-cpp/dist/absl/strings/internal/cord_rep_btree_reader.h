@@ -18,6 +18,7 @@
 #include <cassert>
 
 #include "absl/base/config.h"
+#include "absl/strings/internal/cord_data_edge.h"
 #include "absl/strings/internal/cord_internal.h"
 #include "absl/strings/internal/cord_rep_btree.h"
 #include "absl/strings/internal/cord_rep_btree_navigator.h"
@@ -167,7 +168,7 @@ inline absl::string_view CordRepBtreeReader::Init(CordRepBtree* tree) {
   assert(tree != nullptr);
   const CordRep* edge = navigator_.InitFirst(tree);
   remaining_ = tree->length - edge->length;
-  return CordRepBtree::EdgeData(edge);
+  return EdgeData(edge);
 }
 
 inline absl::string_view CordRepBtreeReader::Next() {
@@ -175,7 +176,7 @@ inline absl::string_view CordRepBtreeReader::Next() {
   const CordRep* edge = navigator_.Next();
   assert(edge != nullptr);
   remaining_ -= edge->length;
-  return CordRepBtree::EdgeData(edge);
+  return EdgeData(edge);
 }
 
 inline absl::string_view CordRepBtreeReader::Skip(size_t skip) {
@@ -190,7 +191,7 @@ inline absl::string_view CordRepBtreeReader::Skip(size_t skip) {
   // The combined length of all edges skipped before `pos.edge` is `skip -
   // pos.offset`, all of which are 'consumed', as well as the current edge.
   remaining_ -= skip - pos.offset + pos.edge->length;
-  return CordRepBtree::EdgeData(pos.edge).substr(pos.offset);
+  return EdgeData(pos.edge).substr(pos.offset);
 }
 
 inline absl::string_view CordRepBtreeReader::Seek(size_t offset) {
@@ -199,7 +200,7 @@ inline absl::string_view CordRepBtreeReader::Seek(size_t offset) {
     remaining_ = 0;
     return {};
   }
-  absl::string_view chunk = CordRepBtree::EdgeData(pos.edge).substr(pos.offset);
+  absl::string_view chunk = EdgeData(pos.edge).substr(pos.offset);
   remaining_ = length() - offset - chunk.length();
   return chunk;
 }

@@ -67,10 +67,14 @@ struct FlatHashSetPolicy;
 //
 // By default, `flat_hash_set` uses the `absl::Hash` hashing framework. All
 // fundamental and Abseil types that support the `absl::Hash` framework have a
-// compatible equality operator for comparing insertions into `flat_hash_map`.
+// compatible equality operator for comparing insertions into `flat_hash_set`.
 // If your type is not yet supported by the `absl::Hash` framework, see
 // absl/hash/hash.h for information on extending Abseil hashing to user-defined
 // types.
+//
+// Using `absl::flat_hash_set` at interface boundaries in dynamically loaded
+// libraries (e.g. .dll, .so) is unsupported due to way `absl::Hash` values may
+// be randomized across dynamically loaded libraries.
 //
 // NOTE: A `flat_hash_set` stores its keys directly inside its implementation
 // array to avoid memory indirection. Because a `flat_hash_set` is designed to
@@ -106,7 +110,7 @@ class flat_hash_set
  public:
   // Constructors and Assignment Operators
   //
-  // A flat_hash_set supports the same overload set as `std::unordered_map`
+  // A flat_hash_set supports the same overload set as `std::unordered_set`
   // for construction and assignment:
   //
   // *  Default constructor
@@ -173,7 +177,7 @@ class flat_hash_set
   // available within the `flat_hash_set`.
   //
   // NOTE: this member function is particular to `absl::flat_hash_set` and is
-  // not provided in the `std::unordered_map` API.
+  // not provided in the `std::unordered_set` API.
   using Base::capacity;
 
   // flat_hash_set::empty()
@@ -223,7 +227,11 @@ class flat_hash_set
   // iterator erase(const_iterator first, const_iterator last):
   //
   //   Erases the elements in the open interval [`first`, `last`), returning an
-  //   iterator pointing to `last`.
+  //   iterator pointing to `last`. The special case of calling
+  //   `erase(begin(), end())` resets the reserved growth such that if
+  //   `reserve(N)` has previously been called and there has been no intervening
+  //   call to `clear()`, then after calling `erase(begin(), end())`, it is safe
+  //   to assume that inserting N elements will not cause a rehash.
   //
   // size_type erase(const key_type& key):
   //
@@ -332,15 +340,15 @@ class flat_hash_set
   // flat_hash_set::swap(flat_hash_set& other)
   //
   // Exchanges the contents of this `flat_hash_set` with those of the `other`
-  // flat hash map, avoiding invocation of any move, copy, or swap operations on
+  // flat hash set, avoiding invocation of any move, copy, or swap operations on
   // individual elements.
   //
   // All iterators and references on the `flat_hash_set` remain valid, excepting
   // for the past-the-end iterator, which is invalidated.
   //
   // `swap()` requires that the flat hash set's hashing and key equivalence
-  // functions be Swappable, and are exchaged using unqualified calls to
-  // non-member `swap()`. If the map's allocator has
+  // functions be Swappable, and are exchanged using unqualified calls to
+  // non-member `swap()`. If the set's allocator has
   // `std::allocator_traits<allocator_type>::propagate_on_container_swap::value`
   // set to `true`, the allocators are also exchanged using an unqualified call
   // to non-member `swap()`; otherwise, the allocators are not swapped.
@@ -395,14 +403,14 @@ class flat_hash_set
   // flat_hash_set::bucket_count()
   //
   // Returns the number of "buckets" within the `flat_hash_set`. Note that
-  // because a flat hash map contains all elements within its internal storage,
+  // because a flat hash set contains all elements within its internal storage,
   // this value simply equals the current capacity of the `flat_hash_set`.
   using Base::bucket_count;
 
   // flat_hash_set::load_factor()
   //
   // Returns the current load factor of the `flat_hash_set` (the average number
-  // of slots occupied with a value within the hash map).
+  // of slots occupied with a value within the hash set).
   using Base::load_factor;
 
   // flat_hash_set::max_load_factor()
@@ -443,9 +451,11 @@ class flat_hash_set
 // erase_if(flat_hash_set<>, Pred)
 //
 // Erases all elements that satisfy the predicate `pred` from the container `c`.
+// Returns the number of erased elements.
 template <typename T, typename H, typename E, typename A, typename Predicate>
-void erase_if(flat_hash_set<T, H, E, A>& c, Predicate pred) {
-  container_internal::EraseIf(pred, &c);
+typename flat_hash_set<T, H, E, A>::size_type erase_if(
+    flat_hash_set<T, H, E, A>& c, Predicate pred) {
+  return container_internal::EraseIf(pred, &c);
 }
 
 namespace container_internal {
@@ -466,13 +476,6 @@ struct FlatHashSetPolicy {
   template <class Allocator>
   static void destroy(Allocator* alloc, slot_type* slot) {
     absl::allocator_traits<Allocator>::destroy(*alloc, slot);
-  }
-
-  template <class Allocator>
-  static void transfer(Allocator* alloc, slot_type* new_slot,
-                       slot_type* old_slot) {
-    construct(alloc, new_slot, std::move(*old_slot));
-    destroy(alloc, old_slot);
   }
 
   static T& element(slot_type* slot) { return *slot; }

@@ -50,9 +50,9 @@ using ReadResult = CordRepBtreeReader::ReadResult;
 TEST(CordRepBtreeReaderTest, Next) {
   constexpr size_t kChars = 3;
   const size_t cap = CordRepBtree::kMaxCapacity;
-  int counts[] = {1, 2, cap, cap * cap, cap * cap + 1, cap * cap * 2 + 17};
+  size_t counts[] = {1, 2, cap, cap * cap, cap * cap + 1, cap * cap * 2 + 17};
 
-  for (int count : counts) {
+  for (size_t count : counts) {
     std::string data = CreateRandomString(count * kChars);
     std::vector<CordRep*> flats = CreateFlatsFromString(data, kChars);
     CordRepBtree* node = CordRepBtreeFromFlats(flats);
@@ -74,7 +74,7 @@ TEST(CordRepBtreeReaderTest, Next) {
       EXPECT_THAT(reader.remaining(), Eq(remaining));
     }
 
-    EXPECT_THAT(reader.remaining(), Eq(0));
+    EXPECT_THAT(reader.remaining(), Eq(0u));
 
     // Verify trying to read beyond EOF returns empty string_view
     EXPECT_THAT(reader.Next(), testing::IsEmpty());
@@ -86,9 +86,9 @@ TEST(CordRepBtreeReaderTest, Next) {
 TEST(CordRepBtreeReaderTest, Skip) {
   constexpr size_t kChars = 3;
   const size_t cap = CordRepBtree::kMaxCapacity;
-  int counts[] = {1, 2, cap, cap * cap, cap * cap + 1, cap * cap * 2 + 17};
+  size_t counts[] = {1, 2, cap, cap * cap, cap * cap + 1, cap * cap * 2 + 17};
 
-  for (int count : counts) {
+  for (size_t count : counts) {
     std::string data = CreateRandomString(count * kChars);
     std::vector<CordRep*> flats = CreateFlatsFromString(data, kChars);
     CordRepBtree* node = CordRepBtreeFromFlats(flats);
@@ -125,16 +125,16 @@ TEST(CordRepBtreeReaderTest, SkipBeyondLength) {
   CordRepBtreeReader reader;
   reader.Init(tree);
   EXPECT_THAT(reader.Skip(100), IsEmpty());
-  EXPECT_THAT(reader.remaining(), Eq(0));
+  EXPECT_THAT(reader.remaining(), Eq(0u));
   CordRep::Unref(tree);
 }
 
 TEST(CordRepBtreeReaderTest, Seek) {
   constexpr size_t kChars = 3;
   const size_t cap = CordRepBtree::kMaxCapacity;
-  int counts[] = {1, 2, cap, cap * cap, cap * cap + 1, cap * cap * 2 + 17};
+  size_t counts[] = {1, 2, cap, cap * cap, cap * cap + 1, cap * cap * 2 + 17};
 
-  for (int count : counts) {
+  for (size_t count : counts) {
     std::string data = CreateRandomString(count * kChars);
     std::vector<CordRep*> flats = CreateFlatsFromString(data, kChars);
     CordRepBtree* node = CordRepBtreeFromFlats(flats);
@@ -159,9 +159,9 @@ TEST(CordRepBtreeReaderTest, SeekBeyondLength) {
   CordRepBtreeReader reader;
   reader.Init(tree);
   EXPECT_THAT(reader.Seek(6), IsEmpty());
-  EXPECT_THAT(reader.remaining(), Eq(0));
+  EXPECT_THAT(reader.remaining(), Eq(0u));
   EXPECT_THAT(reader.Seek(100), IsEmpty());
-  EXPECT_THAT(reader.remaining(), Eq(0));
+  EXPECT_THAT(reader.remaining(), Eq(0u));
   CordRep::Unref(tree);
 }
 
@@ -179,7 +179,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   chunk = reader.Read(0, chunk.length(), tree);
   EXPECT_THAT(tree, Eq(nullptr));
   EXPECT_THAT(chunk, Eq("abcde"));
-  EXPECT_THAT(reader.remaining(), Eq(10));
+  EXPECT_THAT(reader.remaining(), Eq(10u));
   EXPECT_THAT(reader.Next(), Eq("fghij"));
 
   // Read in full
@@ -188,7 +188,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   EXPECT_THAT(tree, Ne(nullptr));
   EXPECT_THAT(CordToString(tree), Eq("abcdefghijklmno"));
   EXPECT_THAT(chunk, Eq(""));
-  EXPECT_THAT(reader.remaining(), Eq(0));
+  EXPECT_THAT(reader.remaining(), Eq(0u));
   CordRep::Unref(tree);
 
   // Read < chunk bytes
@@ -197,7 +197,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   ASSERT_THAT(tree, Ne(nullptr));
   EXPECT_THAT(CordToString(tree), Eq("abc"));
   EXPECT_THAT(chunk, Eq("de"));
-  EXPECT_THAT(reader.remaining(), Eq(10));
+  EXPECT_THAT(reader.remaining(), Eq(10u));
   EXPECT_THAT(reader.Next(), Eq("fghij"));
   CordRep::Unref(tree);
 
@@ -207,7 +207,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   ASSERT_THAT(tree, Ne(nullptr));
   EXPECT_THAT(CordToString(tree), Eq("cd"));
   EXPECT_THAT(chunk, Eq("e"));
-  EXPECT_THAT(reader.remaining(), Eq(10));
+  EXPECT_THAT(reader.remaining(), Eq(10u));
   EXPECT_THAT(reader.Next(), Eq("fghij"));
   CordRep::Unref(tree);
 
@@ -217,7 +217,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   ASSERT_THAT(tree, Ne(nullptr));
   EXPECT_THAT(CordToString(tree), Eq("fgh"));
   EXPECT_THAT(chunk, Eq("ij"));
-  EXPECT_THAT(reader.remaining(), Eq(5));
+  EXPECT_THAT(reader.remaining(), Eq(5u));
   EXPECT_THAT(reader.Next(), Eq("klmno"));
   CordRep::Unref(tree);
 
@@ -227,7 +227,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   ASSERT_THAT(tree, Ne(nullptr));
   EXPECT_THAT(CordToString(tree), Eq("cdefghijklmn"));
   EXPECT_THAT(chunk, Eq("o"));
-  EXPECT_THAT(reader.remaining(), Eq(0));
+  EXPECT_THAT(reader.remaining(), Eq(0u));
   CordRep::Unref(tree);
 
   // Read across chunks landing on exact edge boundary
@@ -236,7 +236,7 @@ TEST(CordRepBtreeReaderTest, Read) {
   ASSERT_THAT(tree, Ne(nullptr));
   EXPECT_THAT(CordToString(tree), Eq("cdefghij"));
   EXPECT_THAT(chunk, Eq("klmno"));
-  EXPECT_THAT(reader.remaining(), Eq(0));
+  EXPECT_THAT(reader.remaining(), Eq(0u));
   CordRep::Unref(tree);
 
   CordRep::Unref(node);
@@ -245,9 +245,9 @@ TEST(CordRepBtreeReaderTest, Read) {
 TEST(CordRepBtreeReaderTest, ReadExhaustive) {
   constexpr size_t kChars = 3;
   const size_t cap = CordRepBtree::kMaxCapacity;
-  int counts[] = {1, 2, cap, cap * cap + 1, cap * cap * cap * 2 + 17};
+  size_t counts[] = {1, 2, cap, cap * cap + 1, cap * cap * cap * 2 + 17};
 
-  for (int count : counts) {
+  for (size_t count : counts) {
     std::string data = CreateRandomString(count * kChars);
     std::vector<CordRep*> flats = CreateFlatsFromString(data, kChars);
     CordRepBtree* node = CordRepBtreeFromFlats(flats);

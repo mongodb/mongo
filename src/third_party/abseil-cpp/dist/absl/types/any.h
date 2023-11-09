@@ -53,6 +53,7 @@
 #ifndef ABSL_TYPES_ANY_H_
 #define ABSL_TYPES_ANY_H_
 
+#include "absl/base/attributes.h"
 #include "absl/base/config.h"
 #include "absl/utility/utility.h"
 
@@ -81,17 +82,8 @@ ABSL_NAMESPACE_END
 #include <utility>
 
 #include "absl/base/internal/fast_type_id.h"
-#include "absl/base/macros.h"
 #include "absl/meta/type_traits.h"
 #include "absl/types/bad_any_cast.h"
-
-// NOTE: This macro is an implementation detail that is undefined at the bottom
-// of the file. It is not intended for expansion directly from user code.
-#ifdef ABSL_ANY_DETAIL_HAS_RTTI
-#error ABSL_ANY_DETAIL_HAS_RTTI cannot be directly set
-#elif !defined(__GNUC__) || defined(__GXX_RTTI)
-#define ABSL_ANY_DETAIL_HAS_RTTI 1
-#endif  // !defined(__GNUC__) || defined(__GXX_RTTI)
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -297,7 +289,7 @@ class any {
       typename T, typename... Args, typename VT = absl::decay_t<T>,
       absl::enable_if_t<std::is_copy_constructible<VT>::value &&
                         std::is_constructible<VT, Args...>::value>* = nullptr>
-  VT& emplace(Args&&... args) {
+  VT& emplace(Args&&... args) ABSL_ATTRIBUTE_LIFETIME_BOUND {
     reset();  // NOTE: reset() is required here even in the world of exceptions.
     Obj<VT>* const object_ptr =
         new Obj<VT>(in_place, std::forward<Args>(args)...);
@@ -321,7 +313,8 @@ class any {
       absl::enable_if_t<std::is_copy_constructible<VT>::value &&
                         std::is_constructible<VT, std::initializer_list<U>&,
                                               Args...>::value>* = nullptr>
-  VT& emplace(std::initializer_list<U> ilist, Args&&... args) {
+  VT& emplace(std::initializer_list<U> ilist,
+              Args&&... args) ABSL_ATTRIBUTE_LIFETIME_BOUND {
     reset();  // NOTE: reset() is required here even in the world of exceptions.
     Obj<VT>* const object_ptr =
         new Obj<VT>(in_place, ilist, std::forward<Args>(args)...);
@@ -348,7 +341,7 @@ class any {
   // returns `false`.
   bool has_value() const noexcept { return obj_ != nullptr; }
 
-#if ABSL_ANY_DETAIL_HAS_RTTI
+#ifdef ABSL_INTERNAL_HAS_RTTI
   // Returns: typeid(T) if *this has a contained object of type T, otherwise
   // typeid(void).
   const std::type_info& type() const noexcept {
@@ -358,7 +351,7 @@ class any {
 
     return typeid(void);
   }
-#endif  // ABSL_ANY_DETAIL_HAS_RTTI
+#endif  // ABSL_INTERNAL_HAS_RTTI
 
  private:
   // Tagged type-erased abstraction for holding a cloneable object.
@@ -367,9 +360,9 @@ class any {
     virtual ~ObjInterface() = default;
     virtual std::unique_ptr<ObjInterface> Clone() const = 0;
     virtual const void* ObjTypeId() const noexcept = 0;
-#if ABSL_ANY_DETAIL_HAS_RTTI
+#ifdef ABSL_INTERNAL_HAS_RTTI
     virtual const std::type_info& Type() const noexcept = 0;
-#endif  // ABSL_ANY_DETAIL_HAS_RTTI
+#endif  // ABSL_INTERNAL_HAS_RTTI
   };
 
   // Hold a value of some queryable type, with an ability to Clone it.
@@ -386,9 +379,9 @@ class any {
 
     const void* ObjTypeId() const noexcept final { return IdForType<T>(); }
 
-#if ABSL_ANY_DETAIL_HAS_RTTI
+#ifdef ABSL_INTERNAL_HAS_RTTI
     const std::type_info& Type() const noexcept final { return typeid(T); }
-#endif  // ABSL_ANY_DETAIL_HAS_RTTI
+#endif  // ABSL_INTERNAL_HAS_RTTI
 
     T value;
   };
@@ -520,8 +513,6 @@ T* any_cast(any* operand) noexcept {
 
 ABSL_NAMESPACE_END
 }  // namespace absl
-
-#undef ABSL_ANY_DETAIL_HAS_RTTI
 
 #endif  // ABSL_USES_STD_ANY
 

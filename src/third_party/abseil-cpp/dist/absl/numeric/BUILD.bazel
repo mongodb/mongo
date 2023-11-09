@@ -37,6 +37,20 @@ cc_library(
     ],
 )
 
+cc_binary(
+    name = "bits_benchmark",
+    testonly = 1,
+    srcs = ["bits_benchmark.cc"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":bits",
+        "//absl/base:core_headers",
+        "//absl/random",
+        "@com_github_google_benchmark//:benchmark_main",
+    ],
+)
+
 cc_test(
     name = "bits_test",
     size = "small",
@@ -81,9 +95,9 @@ cc_test(
     deps = [
         ":int128",
         "//absl/base",
-        "//absl/base:core_headers",
         "//absl/hash:hash_testing",
         "//absl/meta:type_traits",
+        "//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

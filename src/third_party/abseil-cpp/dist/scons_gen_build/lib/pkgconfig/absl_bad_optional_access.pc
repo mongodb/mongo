@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_bad_optional_access
+Description: Abseil bad_optional_access library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_config = 20230802, absl_raw_logging_internal = 20230802
+Libs: -L${libdir}  -labsl_bad_optional_access 
+Cflags: -I${includedir} -DNOMINMAX

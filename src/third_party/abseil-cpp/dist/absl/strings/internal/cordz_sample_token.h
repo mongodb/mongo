@@ -16,8 +16,8 @@
 #include "absl/strings/internal/cordz_handle.h"
 #include "absl/strings/internal/cordz_info.h"
 
-#ifndef ABSL_STRINGS_CORDZ_SAMPLE_TOKEN_H_
-#define ABSL_STRINGS_CORDZ_SAMPLE_TOKEN_H_
+#ifndef ABSL_STRINGS_INTERNAL_CORDZ_SAMPLE_TOKEN_H_
+#define ABSL_STRINGS_INTERNAL_CORDZ_SAMPLE_TOKEN_H_
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -33,11 +33,11 @@ namespace cord_internal {
 //   ST1 <- CH1 <- CH2 <- ST2 <- CH3 <- global_delete_queue_tail
 //
 // This list tracks that CH1 and CH2 were created after ST1, so the thread
-// holding ST1 might have a referece to CH1, CH2, ST2, and CH3. However, ST2 was
-// created later, so the thread holding the ST2 token cannot have a reference to
-// ST1, CH1, or CH2. If ST1 is cleaned up first, that thread will delete ST1,
-// CH1, and CH2. If instead ST2 is cleaned up first, that thread will only
-// delete ST2.
+// holding ST1 might have a reference to CH1, CH2, ST2, and CH3. However, ST2
+// was created later, so the thread holding the ST2 token cannot have a
+// reference to ST1, CH1, or CH2. If ST1 is cleaned up first, that thread will
+// delete ST1, CH1, and CH2. If instead ST2 is cleaned up first, that thread
+// will only delete ST2.
 //
 // If ST1 is cleaned up first, the new list will be:
 //   ST2 <- CH3 <- global_delete_queue_tail
@@ -94,4 +94,4 @@ class CordzSampleToken : public CordzSnapshot {
 ABSL_NAMESPACE_END
 }  // namespace absl
 
-#endif  // ABSL_STRINGS_CORDZ_SAMPLE_TOKEN_H_
+#endif  // ABSL_STRINGS_INTERNAL_CORDZ_SAMPLE_TOKEN_H_

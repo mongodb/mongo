@@ -476,7 +476,7 @@ TYPED_TEST_P(ConstructorTest, AssignmentOnSelf) {
 // containers in unspecified state (and in practice in causes memory-leak
 // according to heap-checker!).
 
-REGISTER_TYPED_TEST_CASE_P(
+REGISTER_TYPED_TEST_SUITE_P(
     ConstructorTest, NoArgs, BucketCount, BucketCountHash, BucketCountHashEqual,
     BucketCountHashEqualAlloc, BucketCountAlloc, BucketCountHashAlloc, Alloc,
     InputIteratorBucketHashEqualAlloc, InputIteratorBucketAlloc,

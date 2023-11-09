@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_strings_internal
+Description: Abseil strings_internal library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_config = 20230802, absl_core_headers = 20230802, absl_endian = 20230802, absl_raw_logging_internal = 20230802, absl_type_traits = 20230802
+Libs: -L${libdir}  -labsl_strings_internal 
+Cflags: -I${includedir} -DNOMINMAX

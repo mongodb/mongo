@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_leak_check
+Description: Abseil leak_check library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_config = 20230802, absl_core_headers = 20230802
+Libs: -L${libdir}  -labsl_leak_check 
+Cflags: -I${includedir} -DNOMINMAX

@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_periodic_sampler
+Description: Abseil periodic_sampler library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_core_headers = 20230802, absl_exponential_biased = 20230802
+Libs: -L${libdir}  -labsl_periodic_sampler 
+Cflags: -I${includedir} -DNOMINMAX

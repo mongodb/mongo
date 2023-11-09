@@ -20,6 +20,7 @@
 load(
     "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
+    "ABSL_DEFAULT_LINKOPTS",
     "ABSL_TEST_COPTS",
 )
 
@@ -39,11 +40,12 @@ cc_library(
         "status_payload_printer.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         "//absl/base:atomic_hook",
-        "//absl/base:config",
         "//absl/base:core_headers",
         "//absl/base:raw_logging_internal",
+        "//absl/base:strerror",
         "//absl/container:inlined_vector",
         "//absl/debugging:stacktrace",
         "//absl/debugging:symbolize",
@@ -59,6 +61,7 @@ cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
     copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":status",
         "//absl/strings",
@@ -76,6 +79,7 @@ cc_library(
         "statusor.h",
     ],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":status",
         "//absl/base",

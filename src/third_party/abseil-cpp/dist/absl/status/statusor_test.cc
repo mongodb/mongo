@@ -1521,7 +1521,7 @@ static absl::StatusOr<int> MakeStatus() { return 100; }
 TEST(StatusOr, TestIgnoreError) { MakeStatus().IgnoreError(); }
 
 TEST(StatusOr, EqualityOperator) {
-  constexpr int kNumCases = 4;
+  constexpr size_t kNumCases = 4;
   std::array<absl::StatusOr<int>, kNumCases> group1 = {
       absl::StatusOr<int>(1), absl::StatusOr<int>(2),
       absl::StatusOr<int>(absl::InvalidArgumentError("msg")),
@@ -1530,8 +1530,8 @@ TEST(StatusOr, EqualityOperator) {
       absl::StatusOr<int>(1), absl::StatusOr<int>(2),
       absl::StatusOr<int>(absl::InvalidArgumentError("msg")),
       absl::StatusOr<int>(absl::InternalError("msg"))};
-  for (int i = 0; i < kNumCases; ++i) {
-    for (int j = 0; j < kNumCases; ++j) {
+  for (size_t i = 0; i < kNumCases; ++i) {
+    for (size_t j = 0; j < kNumCases; ++j) {
       if (i == j) {
         EXPECT_TRUE(group1[i] == group2[j]);
         EXPECT_FALSE(group1[i] != group2[j]);
@@ -1842,6 +1842,39 @@ TEST(StatusOr, AssignmentFromTypeConvertibleToStatus) {
     EXPECT_FALSE(statusor.ok());
     EXPECT_EQ(statusor.status(), static_cast<absl::Status>(v));
   }
+}
+
+TEST(StatusOr, StatusAssignmentFromStatusError) {
+  absl::StatusOr<absl::Status> statusor;
+  statusor.AssignStatus(absl::CancelledError());
+
+  EXPECT_FALSE(statusor.ok());
+  EXPECT_EQ(statusor.status(), absl::CancelledError());
+}
+
+#if GTEST_HAS_DEATH_TEST
+TEST(StatusOr, StatusAssignmentFromStatusOk) {
+  EXPECT_DEBUG_DEATH(
+      {
+        absl::StatusOr<absl::Status> statusor;
+        // This will DCHECK.
+        statusor.AssignStatus(absl::OkStatus());
+        // In optimized mode, we are actually going to get error::INTERNAL for
+        // status here, rather than crashing, so check that.
+        EXPECT_FALSE(statusor.ok());
+        EXPECT_EQ(statusor.status().code(), absl::StatusCode::kInternal);
+      },
+      "An OK status is not a valid constructor argument to StatusOr<T>");
+}
+#endif
+
+TEST(StatusOr, StatusAssignmentFromTypeConvertibleToStatus) {
+  CustomType<MyType, kConvToStatus> v;
+  absl::StatusOr<MyType> statusor;
+  statusor.AssignStatus(v);
+
+  EXPECT_FALSE(statusor.ok());
+  EXPECT_EQ(statusor.status(), static_cast<absl::Status>(v));
 }
 
 }  // namespace

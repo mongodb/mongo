@@ -14,7 +14,7 @@
 
 #include "absl/base/internal/thread_identity.h"
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__MINGW32__)
 #include <pthread.h>
 #include <signal.h>
 #endif
@@ -56,19 +56,21 @@ void AllocateThreadIdentityKey(ThreadIdentityReclaimerFunction reclaimer) {
 // *different* instances of this ptr.
 // Apple platforms have the visibility attribute, but issue a compile warning
 // that protected visibility is unsupported.
+ABSL_CONST_INIT  // Must come before __attribute__((visibility("protected")))
 #if ABSL_HAVE_ATTRIBUTE(visibility) && !defined(__APPLE__)
-__attribute__((visibility("protected")))
+    __attribute__((visibility("protected")))
 #endif  // ABSL_HAVE_ATTRIBUTE(visibility) && !defined(__APPLE__)
 #if ABSL_PER_THREAD_TLS
-// Prefer __thread to thread_local as benchmarks indicate it is a bit faster.
-ABSL_PER_THREAD_TLS_KEYWORD ThreadIdentity* thread_identity_ptr = nullptr;
+    // Prefer __thread to thread_local as benchmarks indicate it is a bit
+    // faster.
+    ABSL_PER_THREAD_TLS_KEYWORD ThreadIdentity* thread_identity_ptr = nullptr;
 #elif defined(ABSL_HAVE_THREAD_LOCAL)
-thread_local ThreadIdentity* thread_identity_ptr = nullptr;
+    thread_local ThreadIdentity* thread_identity_ptr = nullptr;
 #endif  // ABSL_PER_THREAD_TLS
 #endif  // TLS or CPP11
 
-void SetCurrentThreadIdentity(
-    ThreadIdentity* identity, ThreadIdentityReclaimerFunction reclaimer) {
+void SetCurrentThreadIdentity(ThreadIdentity* identity,
+                              ThreadIdentityReclaimerFunction reclaimer) {
   assert(CurrentThreadIdentityIfPresent() == nullptr);
   // Associate our destructor.
   // NOTE: This call to pthread_setspecific is currently the only immovable
@@ -78,7 +80,7 @@ void SetCurrentThreadIdentity(
   absl::call_once(init_thread_identity_key_once, AllocateThreadIdentityKey,
                   reclaimer);
 
-#if defined(__EMSCRIPTEN__) || defined(__MINGW32__)
+#if defined(__EMSCRIPTEN__) || defined(__MINGW32__) || defined(__hexagon__)
   // Emscripten and MinGW pthread implementations does not support signals.
   // See https://kripken.github.io/emscripten-site/docs/porting/pthreads.html
   // for more information.
@@ -133,7 +135,7 @@ void ClearCurrentThreadIdentity() {
     ABSL_THREAD_IDENTITY_MODE == ABSL_THREAD_IDENTITY_MODE_USE_CPP11
   thread_identity_ptr = nullptr;
 #elif ABSL_THREAD_IDENTITY_MODE == \
-      ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC
+    ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC
   // pthread_setspecific expected to clear value on destruction
   assert(CurrentThreadIdentityIfPresent() == nullptr);
 #endif

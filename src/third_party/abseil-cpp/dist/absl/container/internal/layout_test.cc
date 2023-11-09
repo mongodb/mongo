@@ -26,7 +26,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/base/config.h"
-#include "absl/base/internal/raw_logging.h"
+#include "absl/log/check.h"
 #include "absl/types/span.h"
 
 namespace absl {
@@ -38,7 +38,7 @@ using ::absl::Span;
 using ::testing::ElementsAre;
 
 size_t Distance(const void* from, const void* to) {
-  ABSL_RAW_CHECK(from <= to, "Distance must be non-negative");
+  CHECK_LE(from, to) << "Distance must be non-negative";
   return static_cast<const char*>(to) - static_cast<const char*>(from);
 }
 
@@ -366,7 +366,7 @@ TEST(Layout, Sizes) {
 }
 
 TEST(Layout, PointerByIndex) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, Distance(p, Type<const int32_t*>(L::Partial().Pointer<0>(p))));
@@ -447,7 +447,7 @@ TEST(Layout, PointerByIndex) {
 }
 
 TEST(Layout, PointerByType) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(
@@ -526,7 +526,7 @@ TEST(Layout, PointerByType) {
 }
 
 TEST(Layout, MutablePointerByIndex) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, Distance(p, Type<int32_t*>(L::Partial().Pointer<0>(p))));
@@ -581,7 +581,7 @@ TEST(Layout, MutablePointerByIndex) {
 }
 
 TEST(Layout, MutablePointerByType) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, Distance(p, Type<int32_t*>(L::Partial().Pointer<int32_t>(p))));
@@ -647,7 +647,7 @@ TEST(Layout, MutablePointerByType) {
 }
 
 TEST(Layout, Pointers) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   using L = Layout<int8_t, int8_t, Int128>;
   {
     const auto x = L::Partial();
@@ -683,7 +683,7 @@ TEST(Layout, Pointers) {
 }
 
 TEST(Layout, MutablePointers) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   using L = Layout<int8_t, int8_t, Int128>;
   {
     const auto x = L::Partial();
@@ -716,7 +716,7 @@ TEST(Layout, MutablePointers) {
 }
 
 TEST(Layout, SliceByIndexSize) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, L::Partial(0).Slice<0>(p).size());
@@ -744,7 +744,7 @@ TEST(Layout, SliceByIndexSize) {
 }
 
 TEST(Layout, SliceByTypeSize) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, L::Partial(0).Slice<int32_t>(p).size());
@@ -766,7 +766,7 @@ TEST(Layout, SliceByTypeSize) {
 }
 
 TEST(Layout, MutableSliceByIndexSize) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, L::Partial(0).Slice<0>(p).size());
@@ -794,7 +794,7 @@ TEST(Layout, MutableSliceByIndexSize) {
 }
 
 TEST(Layout, MutableSliceByTypeSize) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(0, L::Partial(0).Slice<int32_t>(p).size());
@@ -816,7 +816,7 @@ TEST(Layout, MutableSliceByTypeSize) {
 }
 
 TEST(Layout, SliceByIndexData) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(
@@ -939,7 +939,7 @@ TEST(Layout, SliceByIndexData) {
 }
 
 TEST(Layout, SliceByTypeData) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(
@@ -1037,7 +1037,7 @@ TEST(Layout, SliceByTypeData) {
 }
 
 TEST(Layout, MutableSliceByIndexData) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(
@@ -1122,7 +1122,7 @@ TEST(Layout, MutableSliceByIndexData) {
 }
 
 TEST(Layout, MutableSliceByTypeData) {
-  alignas(max_align_t) unsigned char p[100];
+  alignas(max_align_t) unsigned char p[100] = {0};
   {
     using L = Layout<int32_t>;
     EXPECT_EQ(
@@ -1268,7 +1268,7 @@ testing::PolymorphicMatcher<TupleMatcher<M...>> Tuple(M... matchers) {
 }
 
 TEST(Layout, Slices) {
-  alignas(max_align_t) const unsigned char p[100] = {};
+  alignas(max_align_t) const unsigned char p[100] = {0};
   using L = Layout<int8_t, int8_t, Int128>;
   {
     const auto x = L::Partial();
@@ -1302,7 +1302,7 @@ TEST(Layout, Slices) {
 }
 
 TEST(Layout, MutableSlices) {
-  alignas(max_align_t) unsigned char p[100] = {};
+  alignas(max_align_t) unsigned char p[100] = {0};
   using L = Layout<int8_t, int8_t, Int128>;
   {
     const auto x = L::Partial();

@@ -35,17 +35,25 @@ namespace strings_internal {
 // below.
 template <typename T>
 struct StringConstant {
+ private:
+  static constexpr bool TryConstexprEval(absl::string_view view) {
+    return view.empty() || 2 * view[0] != 1;
+  }
+
+ public:
   static constexpr absl::string_view value = T{}();
   constexpr absl::string_view operator()() const { return value; }
 
   // Check to be sure `view` points to constant data.
   // Otherwise, it can't be constant evaluated.
-  static_assert(value.empty() || 2 * value[0] != 1,
+  static_assert(TryConstexprEval(value),
                 "The input string_view must point to constant data.");
 };
 
+#ifdef ABSL_INTERNAL_NEED_REDUNDANT_CONSTEXPR_DECL
 template <typename T>
-constexpr absl::string_view StringConstant<T>::value;  // NOLINT
+constexpr absl::string_view StringConstant<T>::value;
+#endif
 
 // Factory function for `StringConstant` instances.
 // It supports callables that have a constexpr default constructor and a

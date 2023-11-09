@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_random_internal_randen_hwaes_impl
+Description: Abseil random_internal_randen_hwaes_impl library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_random_internal_platform = 20230802, absl_config = 20230802
+Libs: -L${libdir}  -labsl_random_internal_randen_hwaes_impl 
+Cflags: -I${includedir} -DNOMINMAX

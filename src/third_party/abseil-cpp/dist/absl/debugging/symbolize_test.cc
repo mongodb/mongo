@@ -14,6 +14,10 @@
 
 #include "absl/debugging/symbolize.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #ifndef _WIN32
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -29,11 +33,16 @@
 #include "absl/base/casts.h"
 #include "absl/base/config.h"
 #include "absl/base/internal/per_thread_tls.h"
-#include "absl/base/internal/raw_logging.h"
 #include "absl/base/optimization.h"
 #include "absl/debugging/internal/stack_consumption.h"
+#include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
+
+#if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 using testing::Contains;
 
@@ -81,21 +90,13 @@ int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.unlikely) unlikely_func() {
   return 0;
 }
 
-int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.hot) hot_func() {
-  return 0;
-}
+int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.hot) hot_func() { return 0; }
 
-int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.startup) startup_func() {
-  return 0;
-}
+int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.startup) startup_func() { return 0; }
 
-int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.exit) exit_func() {
-  return 0;
-}
+int ABSL_ATTRIBUTE_SECTION_VARIABLE(.text.exit) exit_func() { return 0; }
 
-int /*ABSL_ATTRIBUTE_SECTION_VARIABLE(.text)*/ regular_func() {
-  return 0;
-}
+int /*ABSL_ATTRIBUTE_SECTION_VARIABLE(.text)*/ regular_func() { return 0; }
 
 // Thread-local data may confuse the symbolizer, ensure that it does not.
 // Variable sizes and order are important.
@@ -106,6 +107,8 @@ static ABSL_PER_THREAD_TLS_KEYWORD char
 #endif
 
 #if !defined(__EMSCRIPTEN__)
+static void *GetPCFromFnPtr(void *ptr) { return ptr; }
+
 // Used below to hopefully inhibit some compiler/linker optimizations
 // that may remove kHpageTextPadding, kPadding0, and kPadding1 from
 // the binary.
@@ -114,7 +117,14 @@ static volatile bool volatile_bool = false;
 // Force the binary to be large enough that a THP .text remap will succeed.
 static constexpr size_t kHpageSize = 1 << 21;
 const char kHpageTextPadding[kHpageSize * 4] ABSL_ATTRIBUTE_SECTION_VARIABLE(
-    .text) = "";
+        .text) = "";
+
+#else
+static void *GetPCFromFnPtr(void *ptr) {
+  return EM_ASM_PTR(
+      { return wasmOffsetConverter.convert(wasmTable.get($0).name, 0); }, ptr);
+}
+
 #endif  // !defined(__EMSCRIPTEN__)
 
 static char try_symbolize_buffer[4096];
@@ -124,15 +134,17 @@ static char try_symbolize_buffer[4096];
 // absl::Symbolize() returns false, otherwise returns try_symbolize_buffer with
 // the result of absl::Symbolize().
 static const char *TrySymbolizeWithLimit(void *pc, int limit) {
-  ABSL_RAW_CHECK(limit <= sizeof(try_symbolize_buffer),
-                 "try_symbolize_buffer is too small");
+  CHECK_LE(limit, sizeof(try_symbolize_buffer))
+      << "try_symbolize_buffer is too small";
 
   // Use the heap to facilitate heap and buffer sanitizer tools.
   auto heap_buffer = absl::make_unique<char[]>(sizeof(try_symbolize_buffer));
   bool found = absl::Symbolize(pc, heap_buffer.get(), limit);
   if (found) {
-    ABSL_RAW_CHECK(strnlen(heap_buffer.get(), limit) < limit,
-                   "absl::Symbolize() did not properly terminate the string");
+    CHECK_LT(static_cast<int>(
+                 strnlen(heap_buffer.get(), static_cast<size_t>(limit))),
+             limit)
+        << "absl::Symbolize() did not properly terminate the string";
     strncpy(try_symbolize_buffer, heap_buffer.get(),
             sizeof(try_symbolize_buffer) - 1);
     try_symbolize_buffer[sizeof(try_symbolize_buffer) - 1] = '\0';
@@ -155,21 +167,20 @@ void ABSL_ATTRIBUTE_NOINLINE TestWithReturnAddress() {
 #if defined(ABSL_HAVE_ATTRIBUTE_NOINLINE)
   void *return_address = __builtin_return_address(0);
   const char *symbol = TrySymbolize(return_address);
-  ABSL_RAW_CHECK(symbol != nullptr, "TestWithReturnAddress failed");
-  ABSL_RAW_CHECK(strcmp(symbol, "main") == 0, "TestWithReturnAddress failed");
+  CHECK_NE(symbol, nullptr) << "TestWithReturnAddress failed";
+  CHECK_STREQ(symbol, "main") << "TestWithReturnAddress failed";
   std::cout << "TestWithReturnAddress passed" << std::endl;
 #endif
 }
 
-#ifndef ABSL_INTERNAL_HAVE_EMSCRIPTEN_SYMBOLIZE
-
 TEST(Symbolize, Cached) {
   // Compilers should give us pointers to them.
-  EXPECT_STREQ("nonstatic_func", TrySymbolize((void *)(&nonstatic_func)));
-
+  EXPECT_STREQ("nonstatic_func",
+               TrySymbolize(GetPCFromFnPtr((void *)(&nonstatic_func))));
   // The name of an internal linkage symbol is not specified; allow either a
   // mangled or an unmangled name here.
-  const char *static_func_symbol = TrySymbolize((void *)(&static_func));
+  const char *static_func_symbol =
+      TrySymbolize(GetPCFromFnPtr((void *)(&static_func)));
   EXPECT_TRUE(strcmp("static_func", static_func_symbol) == 0 ||
               strcmp("static_func()", static_func_symbol) == 0);
 
@@ -179,33 +190,50 @@ TEST(Symbolize, Cached) {
 TEST(Symbolize, Truncation) {
   constexpr char kNonStaticFunc[] = "nonstatic_func";
   EXPECT_STREQ("nonstatic_func",
-               TrySymbolizeWithLimit((void *)(&nonstatic_func),
+               TrySymbolizeWithLimit(GetPCFromFnPtr((void *)(&nonstatic_func)),
                                      strlen(kNonStaticFunc) + 1));
   EXPECT_STREQ("nonstatic_...",
-               TrySymbolizeWithLimit((void *)(&nonstatic_func),
+               TrySymbolizeWithLimit(GetPCFromFnPtr((void *)(&nonstatic_func)),
                                      strlen(kNonStaticFunc) + 0));
   EXPECT_STREQ("nonstatic...",
-               TrySymbolizeWithLimit((void *)(&nonstatic_func),
+               TrySymbolizeWithLimit(GetPCFromFnPtr((void *)(&nonstatic_func)),
                                      strlen(kNonStaticFunc) - 1));
-  EXPECT_STREQ("n...", TrySymbolizeWithLimit((void *)(&nonstatic_func), 5));
-  EXPECT_STREQ("...", TrySymbolizeWithLimit((void *)(&nonstatic_func), 4));
-  EXPECT_STREQ("..", TrySymbolizeWithLimit((void *)(&nonstatic_func), 3));
-  EXPECT_STREQ(".", TrySymbolizeWithLimit((void *)(&nonstatic_func), 2));
-  EXPECT_STREQ("", TrySymbolizeWithLimit((void *)(&nonstatic_func), 1));
-  EXPECT_EQ(nullptr, TrySymbolizeWithLimit((void *)(&nonstatic_func), 0));
+  EXPECT_STREQ("n...", TrySymbolizeWithLimit(
+                           GetPCFromFnPtr((void *)(&nonstatic_func)), 5));
+  EXPECT_STREQ("...", TrySymbolizeWithLimit(
+                          GetPCFromFnPtr((void *)(&nonstatic_func)), 4));
+  EXPECT_STREQ("..", TrySymbolizeWithLimit(
+                         GetPCFromFnPtr((void *)(&nonstatic_func)), 3));
+  EXPECT_STREQ(
+      ".", TrySymbolizeWithLimit(GetPCFromFnPtr((void *)(&nonstatic_func)), 2));
+  EXPECT_STREQ(
+      "", TrySymbolizeWithLimit(GetPCFromFnPtr((void *)(&nonstatic_func)), 1));
+  EXPECT_EQ(nullptr, TrySymbolizeWithLimit(
+                         GetPCFromFnPtr((void *)(&nonstatic_func)), 0));
 }
 
 TEST(Symbolize, SymbolizeWithDemangling) {
   Foo::func(100);
-  EXPECT_STREQ("Foo::func()", TrySymbolize((void *)(&Foo::func)));
+#ifdef __EMSCRIPTEN__
+  // Emscripten's online symbolizer is more precise with arguments.
+  EXPECT_STREQ("Foo::func(int)",
+               TrySymbolize(GetPCFromFnPtr((void *)(&Foo::func))));
+#else
+  EXPECT_STREQ("Foo::func()",
+               TrySymbolize(GetPCFromFnPtr((void *)(&Foo::func))));
+#endif
 }
 
 TEST(Symbolize, SymbolizeSplitTextSections) {
-  EXPECT_STREQ("unlikely_func()", TrySymbolize((void *)(&unlikely_func)));
-  EXPECT_STREQ("hot_func()", TrySymbolize((void *)(&hot_func)));
-  EXPECT_STREQ("startup_func()", TrySymbolize((void *)(&startup_func)));
-  EXPECT_STREQ("exit_func()", TrySymbolize((void *)(&exit_func)));
-  EXPECT_STREQ("regular_func()", TrySymbolize((void *)(&regular_func)));
+  EXPECT_STREQ("unlikely_func()",
+               TrySymbolize(GetPCFromFnPtr((void *)(&unlikely_func))));
+  EXPECT_STREQ("hot_func()", TrySymbolize(GetPCFromFnPtr((void *)(&hot_func))));
+  EXPECT_STREQ("startup_func()",
+               TrySymbolize(GetPCFromFnPtr((void *)(&startup_func))));
+  EXPECT_STREQ("exit_func()",
+               TrySymbolize(GetPCFromFnPtr((void *)(&exit_func))));
+  EXPECT_STREQ("regular_func()",
+               TrySymbolize(GetPCFromFnPtr((void *)(&regular_func))));
 }
 
 // Tests that verify that Symbolize stack footprint is within some limit.
@@ -275,15 +303,14 @@ TEST(Symbolize, SymbolizeWithDemanglingStackConsumption) {
 
 #endif  // ABSL_INTERNAL_HAVE_DEBUGGING_STACK_CONSUMPTION
 
-#ifndef ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE
+#if !defined(ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE) && \
+    !defined(ABSL_INTERNAL_HAVE_EMSCRIPTEN_SYMBOLIZE)
 // Use a 64K page size for PPC.
 const size_t kPageSize = 64 << 10;
 // We place a read-only symbols into the .text section and verify that we can
 // symbolize them and other symbols after remapping them.
-const char kPadding0[kPageSize * 4] ABSL_ATTRIBUTE_SECTION_VARIABLE(.text) =
-    "";
-const char kPadding1[kPageSize * 4] ABSL_ATTRIBUTE_SECTION_VARIABLE(.text) =
-    "";
+const char kPadding0[kPageSize * 4] ABSL_ATTRIBUTE_SECTION_VARIABLE(.text) = "";
+const char kPadding1[kPageSize * 4] ABSL_ATTRIBUTE_SECTION_VARIABLE(.text) = "";
 
 static int FilterElfHeader(struct dl_phdr_info *info, size_t size, void *data) {
   for (int i = 0; i < info->dlpi_phnum; i++) {
@@ -314,8 +341,8 @@ static int FilterElfHeader(struct dl_phdr_info *info, size_t size, void *data) {
 TEST(Symbolize, SymbolizeWithMultipleMaps) {
   // Force kPadding0 and kPadding1 to be linked in.
   if (volatile_bool) {
-    ABSL_RAW_LOG(INFO, "%s", kPadding0);
-    ABSL_RAW_LOG(INFO, "%s", kPadding1);
+    LOG(INFO) << kPadding0;
+    LOG(INFO) << kPadding1;
   }
 
   // Verify we can symbolize everything.
@@ -392,12 +419,14 @@ TEST(Symbolize, InstallAndRemoveSymbolDecorators) {
                 DummySymbolDecorator, &c_message),
             0);
 
-  char *address = reinterpret_cast<char *>(1);
-  EXPECT_STREQ("abc", TrySymbolize(address++));
+  // Use addresses 4 and 8 here to ensure that we always use valid addresses
+  // even on systems that require instructions to be 32-bit aligned.
+  char *address = reinterpret_cast<char *>(4);
+  EXPECT_STREQ("abc", TrySymbolize(address));
 
   EXPECT_TRUE(absl::debugging_internal::RemoveSymbolDecorator(ticket_b));
 
-  EXPECT_STREQ("ac", TrySymbolize(address++));
+  EXPECT_STREQ("ac", TrySymbolize(address + 4));
 
   // Cleanup: remove all remaining decorators so other stack traces don't
   // get mystery "ac" decoration.
@@ -431,17 +460,17 @@ TEST(Symbolize, ForEachSection) {
 
   close(fd);
 }
-#endif  // !ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE
-#endif  // !ABSL_INTERNAL_HAVE_EMSCRIPTEN_SYMBOLIZE
+#endif  // !ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE &&
+        // !ABSL_INTERNAL_HAVE_EMSCRIPTEN_SYMBOLIZE
 
 // x86 specific tests.  Uses some inline assembler.
 extern "C" {
 inline void *ABSL_ATTRIBUTE_ALWAYS_INLINE inline_func() {
   void *pc = nullptr;
 #if defined(__i386__)
-  __asm__ __volatile__("call 1f;\n 1: pop %[PC]" : [ PC ] "=r"(pc));
+  __asm__ __volatile__("call 1f;\n 1: pop %[PC]" : [PC] "=r"(pc));
 #elif defined(__x86_64__)
-  __asm__ __volatile__("leaq 0(%%rip),%[PC];\n" : [ PC ] "=r"(pc));
+  __asm__ __volatile__("leaq 0(%%rip),%[PC];\n" : [PC] "=r"(pc));
 #endif
   return pc;
 }
@@ -449,9 +478,9 @@ inline void *ABSL_ATTRIBUTE_ALWAYS_INLINE inline_func() {
 void *ABSL_ATTRIBUTE_NOINLINE non_inline_func() {
   void *pc = nullptr;
 #if defined(__i386__)
-  __asm__ __volatile__("call 1f;\n 1: pop %[PC]" : [ PC ] "=r"(pc));
+  __asm__ __volatile__("call 1f;\n 1: pop %[PC]" : [PC] "=r"(pc));
 #elif defined(__x86_64__)
-  __asm__ __volatile__("leaq 0(%%rip),%[PC];\n" : [ PC ] "=r"(pc));
+  __asm__ __volatile__("leaq 0(%%rip),%[PC];\n" : [PC] "=r"(pc));
 #endif
   return pc;
 }
@@ -461,9 +490,9 @@ void ABSL_ATTRIBUTE_NOINLINE TestWithPCInsideNonInlineFunction() {
     (defined(__i386__) || defined(__x86_64__))
   void *pc = non_inline_func();
   const char *symbol = TrySymbolize(pc);
-  ABSL_RAW_CHECK(symbol != nullptr, "TestWithPCInsideNonInlineFunction failed");
-  ABSL_RAW_CHECK(strcmp(symbol, "non_inline_func") == 0,
-                 "TestWithPCInsideNonInlineFunction failed");
+  CHECK_NE(symbol, nullptr) << "TestWithPCInsideNonInlineFunction failed";
+  CHECK_STREQ(symbol, "non_inline_func")
+      << "TestWithPCInsideNonInlineFunction failed";
   std::cout << "TestWithPCInsideNonInlineFunction passed" << std::endl;
 #endif
 }
@@ -473,15 +502,15 @@ void ABSL_ATTRIBUTE_NOINLINE TestWithPCInsideInlineFunction() {
     (defined(__i386__) || defined(__x86_64__))
   void *pc = inline_func();  // Must be inlined.
   const char *symbol = TrySymbolize(pc);
-  ABSL_RAW_CHECK(symbol != nullptr, "TestWithPCInsideInlineFunction failed");
-  ABSL_RAW_CHECK(strcmp(symbol, __FUNCTION__) == 0,
-                 "TestWithPCInsideInlineFunction failed");
+  CHECK_NE(symbol, nullptr) << "TestWithPCInsideInlineFunction failed";
+  CHECK_STREQ(symbol, __FUNCTION__) << "TestWithPCInsideInlineFunction failed";
   std::cout << "TestWithPCInsideInlineFunction passed" << std::endl;
 #endif
 }
 }
 
-#if defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target)
+#if defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target) && \
+    ((__ARM_ARCH >= 7) || !defined(__ARM_PCS_VFP))
 // Test that we correctly identify bounds of Thumb functions on ARM.
 //
 // Thumb functions have the lowest-order bit set in their addresses in the ELF
@@ -500,6 +529,10 @@ void ABSL_ATTRIBUTE_NOINLINE TestWithPCInsideInlineFunction() {
 // bit in the Thumb function's entry point. It will correctly compute the end of
 // the Thumb function, it will find no overlap between the Thumb and ARM
 // functions, and it will return the name of the ARM function.
+//
+// Unfortunately we cannot perform this test on armv6 or lower systems that use
+// the hard float ABI because gcc refuses to compile thumb functions on such
+// systems with a "sorry, unimplemented: Thumb-1 hard-float VFP ABI" error.
 
 __attribute__((target("thumb"))) int ArmThumbOverlapThumb(int x) {
   return x * x * x;
@@ -512,14 +545,14 @@ __attribute__((target("arm"))) int ArmThumbOverlapArm(int x) {
 void ABSL_ATTRIBUTE_NOINLINE TestArmThumbOverlap() {
 #if defined(ABSL_HAVE_ATTRIBUTE_NOINLINE)
   const char *symbol = TrySymbolize((void *)&ArmThumbOverlapArm);
-  ABSL_RAW_CHECK(symbol != nullptr, "TestArmThumbOverlap failed");
-  ABSL_RAW_CHECK(strcmp("ArmThumbOverlapArm()", symbol) == 0,
-                 "TestArmThumbOverlap failed");
+  CHECK_NE(symbol, nullptr) << "TestArmThumbOverlap failed";
+  CHECK_STREQ("ArmThumbOverlapArm()", symbol) << "TestArmThumbOverlap failed";
   std::cout << "TestArmThumbOverlap passed" << std::endl;
 #endif
 }
 
-#endif  // defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target)
+#endif  // defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target) && ((__ARM_ARCH >= 7)
+        // || !defined(__ARM_PCS_VFP))
 
 #elif defined(_WIN32)
 #if !defined(ABSL_CONSUME_DLL)
@@ -562,7 +595,7 @@ TEST(Symbolize, SymbolizeWithDemangling) {
 }
 
 #endif  // !defined(ABSL_CONSUME_DLL)
-#else  // Symbolizer unimplemented
+#else   // Symbolizer unimplemented
 TEST(Symbolize, Unimplemented) {
   char buf[64];
   EXPECT_FALSE(absl::Symbolize((void *)(&nonstatic_func), buf, sizeof(buf)));
@@ -576,7 +609,7 @@ int main(int argc, char **argv) {
 #if !defined(__EMSCRIPTEN__)
   // Make sure kHpageTextPadding is linked into the binary.
   if (volatile_bool) {
-    ABSL_RAW_LOG(INFO, "%s", kHpageTextPadding);
+    LOG(INFO) << kHpageTextPadding;
   }
 #endif  // !defined(__EMSCRIPTEN__)
 
@@ -589,12 +622,14 @@ int main(int argc, char **argv) {
   absl::InitializeSymbolizer(argv[0]);
   testing::InitGoogleTest(&argc, argv);
 
-#if defined(ABSL_INTERNAL_HAVE_ELF_SYMBOLIZE) || \
+#if defined(ABSL_INTERNAL_HAVE_ELF_SYMBOLIZE) ||        \
+    defined(ABSL_INTERNAL_HAVE_EMSCRIPTEN_SYMBOLIZE) || \
     defined(ABSL_INTERNAL_HAVE_DARWIN_SYMBOLIZE)
   TestWithPCInsideInlineFunction();
   TestWithPCInsideNonInlineFunction();
   TestWithReturnAddress();
-#if defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target)
+#if defined(__arm__) && ABSL_HAVE_ATTRIBUTE(target) && \
+    ((__ARM_ARCH >= 7) || !defined(__ARM_PCS_VFP))
   TestArmThumbOverlap();
 #endif
 #endif

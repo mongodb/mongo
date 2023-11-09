@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_log_structured
+Description: Abseil log_structured library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_config = 20230802, absl_log_internal_structured = 20230802, absl_strings = 20230802
+Libs: -L${libdir}  
+Cflags: -I${includedir} -DNOMINMAX

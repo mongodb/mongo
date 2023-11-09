@@ -52,3 +52,26 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "if_constexpr",
+    hdrs = [
+        "internal/if_constexpr.h",
+    ],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        "//absl/base:config",
+    ],
+)
+
+cc_test(
+    name = "if_constexpr_test",
+    srcs = ["internal/if_constexpr_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":if_constexpr",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

@@ -22,6 +22,7 @@
 #define ABSL_STRINGS_INTERNAL_STR_FORMAT_OUTPUT_H_
 
 #include <cstdio>
+#include <ios>
 #include <ostream>
 #include <string>
 
@@ -71,7 +72,7 @@ inline void AbslFormatFlush(std::string* out, string_view s) {
   out->append(s.data(), s.size());
 }
 inline void AbslFormatFlush(std::ostream* out, string_view s) {
-  out->write(s.data(), s.size());
+  out->write(s.data(), static_cast<std::streamsize>(s.size()));
 }
 
 inline void AbslFormatFlush(FILERawSink* sink, string_view v) {

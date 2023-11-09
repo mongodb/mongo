@@ -373,7 +373,7 @@ RealType Gaussian(URBG&& urbg,  // NOLINT(runtime/references)
 template <typename IntType, typename URBG>
 IntType LogUniform(URBG&& urbg,  // NOLINT(runtime/references)
                    IntType lo, IntType hi, IntType base = 2) {
-  static_assert(std::is_integral<IntType>::value,
+  static_assert(random_internal::IsIntegral<IntType>::value,
                 "Template-argument 'IntType' must be an integral type, in "
                 "absl::LogUniform<IntType, URBG>(...)");
 
@@ -403,7 +403,7 @@ IntType LogUniform(URBG&& urbg,  // NOLINT(runtime/references)
 template <typename IntType, typename URBG>
 IntType Poisson(URBG&& urbg,  // NOLINT(runtime/references)
                 double mean = 1.0) {
-  static_assert(std::is_integral<IntType>::value,
+  static_assert(random_internal::IsIntegral<IntType>::value,
                 "Template-argument 'IntType' must be an integral type, in "
                 "absl::Poisson<IntType, URBG>(...)");
 
@@ -435,7 +435,7 @@ template <typename IntType, typename URBG>
 IntType Zipf(URBG&& urbg,  // NOLINT(runtime/references)
              IntType hi = (std::numeric_limits<IntType>::max)(), double q = 2.0,
              double v = 1.0) {
-  static_assert(std::is_integral<IntType>::value,
+  static_assert(random_internal::IsIntegral<IntType>::value,
                 "Template-argument 'IntType' must be an integral type, in "
                 "absl::Zipf<IntType, URBG>(...)");
 

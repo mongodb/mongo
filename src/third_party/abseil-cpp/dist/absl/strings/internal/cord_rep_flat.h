@@ -20,6 +20,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "absl/base/config.h"
+#include "absl/base/macros.h"
 #include "absl/strings/internal/cord_internal.h"
 
 namespace absl {
@@ -42,23 +44,45 @@ static constexpr size_t kMinFlatSize = 32;
 static constexpr size_t kMaxFlatSize = 4096;
 static constexpr size_t kMaxFlatLength = kMaxFlatSize - kFlatOverhead;
 static constexpr size_t kMinFlatLength = kMinFlatSize - kFlatOverhead;
+static constexpr size_t kMaxLargeFlatSize = 256 * 1024;
+static constexpr size_t kMaxLargeFlatLength = kMaxLargeFlatSize - kFlatOverhead;
 
+// kTagBase should make the Size <--> Tag computation resilient
+// against changes to the value of FLAT when we add a new tag..
+static constexpr uint8_t kTagBase = FLAT - 4;
+
+// Converts the provided rounded size to the corresponding tag
 constexpr uint8_t AllocatedSizeToTagUnchecked(size_t size) {
-  return static_cast<uint8_t>((size <= 1024) ? size / 8 + 1
-                                             : 129 + size / 32 - 1024 / 32);
+  return static_cast<uint8_t>(size <= 512 ? kTagBase + size / 8
+                              : size <= 8192
+                                  ? kTagBase + 512 / 8 + size / 64 - 512 / 64
+                                  : kTagBase + 512 / 8 + ((8192 - 512) / 64) +
+                                        size / 4096 - 8192 / 4096);
 }
 
-static_assert(kMinFlatSize / 8 + 1 >= FLAT, "");
-static_assert(AllocatedSizeToTagUnchecked(kMaxFlatSize) <= MAX_FLAT_TAG, "");
+// Converts the provided tag to the corresponding allocated size
+constexpr size_t TagToAllocatedSize(uint8_t tag) {
+  return (tag <= kTagBase + 512 / 8) ? tag * 8 - kTagBase * 8
+         : (tag <= kTagBase + (512 / 8) + ((8192 - 512) / 64))
+             ? 512 + tag * 64 - kTagBase * 64 - 512 / 8 * 64
+             : 8192 + tag * 4096 - kTagBase * 4096 -
+                   ((512 / 8) + ((8192 - 512) / 64)) * 4096;
+}
 
-// Helper functions for rounded div, and rounding to exact sizes.
-constexpr size_t DivUp(size_t n, size_t m) { return (n + m - 1) / m; }
-constexpr size_t RoundUp(size_t n, size_t m) { return DivUp(n, m) * m; }
+static_assert(AllocatedSizeToTagUnchecked(kMinFlatSize) == FLAT, "");
+static_assert(AllocatedSizeToTagUnchecked(kMaxLargeFlatSize) == MAX_FLAT_TAG,
+              "");
+
+// RoundUp logically performs `((n + m - 1) / m) * m` to round up to the nearest
+// multiple of `m`, optimized for the invariant that `m` is a power of 2.
+constexpr size_t RoundUp(size_t n, size_t m) {
+  return (n + m - 1) & (0 - m);
+}
 
 // Returns the size to the nearest equal or larger value that can be
 // expressed exactly as a tag value.
 inline size_t RoundUpForTag(size_t size) {
-  return RoundUp(size, (size <= 1024) ? 8 : 32);
+  return RoundUp(size, (size <= 512) ? 8 : (size <= 8192 ? 64 : 4096));
 }
 
 // Converts the allocated size to a tag, rounding down if the size
@@ -71,34 +95,48 @@ inline uint8_t AllocatedSizeToTag(size_t size) {
   return tag;
 }
 
-// Converts the provided tag to the corresponding allocated size
-constexpr size_t TagToAllocatedSize(uint8_t tag) {
-  return (tag <= 129) ? ((tag - 1) * 8) : (1024 + (tag - 129) * 32);
-}
-
 // Converts the provided tag to the corresponding available data length
 constexpr size_t TagToLength(uint8_t tag) {
   return TagToAllocatedSize(tag) - kFlatOverhead;
 }
 
 // Enforce that kMaxFlatSize maps to a well-known exact tag value.
-static_assert(TagToAllocatedSize(225) == kMaxFlatSize, "Bad tag logic");
+static_assert(TagToAllocatedSize(MAX_FLAT_TAG) == kMaxLargeFlatSize,
+              "Bad tag logic");
 
 struct CordRepFlat : public CordRep {
+  // Tag for explicit 'large flat' allocation
+  struct Large {};
+
   // Creates a new flat node.
-  static CordRepFlat* New(size_t len) {
+  template <size_t max_flat_size, typename... Args>
+  static CordRepFlat* NewImpl(size_t len, Args... args ABSL_ATTRIBUTE_UNUSED) {
     if (len <= kMinFlatLength) {
       len = kMinFlatLength;
-    } else if (len > kMaxFlatLength) {
-      len = kMaxFlatLength;
+    } else if (len > max_flat_size - kFlatOverhead) {
+      len = max_flat_size - kFlatOverhead;
     }
 
     // Round size up so it matches a size we can exactly express in a tag.
     const size_t size = RoundUpForTag(len + kFlatOverhead);
     void* const raw_rep = ::operator new(size);
+    // GCC 13 has a false-positive -Wstringop-overflow warning here.
+    #if ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(13, 0)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wstringop-overflow"
+    #endif
     CordRepFlat* rep = new (raw_rep) CordRepFlat();
     rep->tag = AllocatedSizeToTag(size);
+    #if ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(13, 0)
+    #pragma GCC diagnostic pop
+    #endif
     return rep;
+  }
+
+  static CordRepFlat* New(size_t len) { return NewImpl<kMaxFlatSize>(len); }
+
+  static CordRepFlat* New(Large, size_t len) {
+    return NewImpl<kMaxLargeFlatSize>(len);
   }
 
   // Deletes a CordRepFlat instance created previously through a call to New().
@@ -115,6 +153,17 @@ struct CordRepFlat : public CordRep {
     rep->~CordRep();
     ::operator delete(rep);
 #endif
+  }
+
+  // Create a CordRepFlat containing `data`, with an optional additional
+  // extra capacity of up to `extra` bytes. Requires that `data.size()`
+  // is less than kMaxFlatLength.
+  static CordRepFlat* Create(absl::string_view data, size_t extra = 0) {
+    assert(data.size() <= kMaxFlatLength);
+    CordRepFlat* flat = New(data.size() + (std::min)(extra, kMaxFlatLength));
+    memcpy(flat->Data(), data.data(), data.size());
+    flat->length = data.size();
+    return flat;
   }
 
   // Returns a pointer to the data inside this flat rep.

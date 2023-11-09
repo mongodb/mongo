@@ -63,6 +63,18 @@ cc_library(
 )
 
 cc_library(
+    name = "nullability",
+    srcs = ["internal/nullability_impl.h"],
+    hdrs = ["nullability.h"],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":core_headers",
+        "//absl/meta:type_traits",
+    ],
+)
+
+cc_library(
     name = "raw_logging_internal",
     srcs = ["internal/raw_logging.cc"],
     hdrs = ["internal/raw_logging.h"],
@@ -75,6 +87,7 @@ cc_library(
         ":atomic_hook",
         ":config",
         ":core_headers",
+        ":errno_saver",
         ":log_severity",
     ],
 )
@@ -110,6 +123,23 @@ cc_library(
     ],
     copts = ABSL_DEFAULT_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
+)
+
+cc_library(
+    name = "cycleclock_internal",
+    hdrs = [
+        "internal/cycleclock_config.h",
+        "internal/unscaledcycleclock_config.h",
+    ],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = [
+        "//absl:__subpackages__",
+    ],
+    deps = [
+        ":base_internal",
+        ":config",
+    ],
 )
 
 cc_library(
@@ -157,7 +187,9 @@ cc_library(
         "internal/direct_mmap.h",
         "internal/low_level_alloc.h",
     ],
-    copts = ABSL_DEFAULT_COPTS,
+    copts = ABSL_DEFAULT_COPTS + select({
+        "//conditions:default": [],
+    }),
     linkopts = select({
         "//absl:msvc_compiler": [],
         "//absl:clang-cl_compiler": [],
@@ -226,6 +258,10 @@ cc_library(
         "//absl:clang-cl_compiler": [
             "-DEFAULTLIB:advapi32.lib",
         ],
+        "//absl:mingw_compiler": [
+            "-DEFAULTLIB:advapi32.lib",
+            "-ladvapi32",
+        ],
         "//absl:wasm": [],
         "//conditions:default": ["-pthread"],
     }) + ABSL_DEFAULT_LINKOPTS,
@@ -234,6 +270,7 @@ cc_library(
         ":base_internal",
         ":config",
         ":core_headers",
+        ":cycleclock_internal",
         ":dynamic_annotations",
         ":log_severity",
         ":raw_logging_internal",
@@ -432,6 +469,9 @@ cc_test(
     srcs = ["spinlock_test_common.cc"],
     copts = ABSL_TEST_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = [
+        "no_test_wasm",
+    ],
     deps = [
         ":base",
         ":base_internal",
@@ -525,6 +565,16 @@ cc_test(
 )
 
 cc_test(
+    name = "nullability_test",
+    srcs = ["nullability_test.cc"],
+    deps = [
+        ":core_headers",
+        ":nullability",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "raw_logging_test",
     srcs = ["raw_logging_test.cc"],
     copts = ABSL_TEST_COPTS,
@@ -557,6 +607,7 @@ cc_test(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     tags = [
         "no_test_ios_x86_64",
+        "no_test_wasm",
     ],
     deps = [
         ":malloc_internal",
@@ -570,6 +621,9 @@ cc_test(
     srcs = ["internal/thread_identity_test.cc"],
     copts = ABSL_TEST_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = [
+        "no_test_wasm",
+    ],
     deps = [
         ":base",
         ":core_headers",
@@ -698,6 +752,35 @@ cc_test(
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         ":fast_type_id",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "prefetch",
+    hdrs = [
+        "internal/prefetch.h",
+        "prefetch.h",
+    ],
+    copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":config",
+        ":core_headers",  # TODO(b/265984188): remove
+    ],
+)
+
+cc_test(
+    name = "prefetch_test",
+    size = "small",
+    srcs = [
+        "internal/prefetch_test.cc",
+        "prefetch_test.cc",
+    ],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    deps = [
+        ":prefetch",
         "@com_google_googletest//:gtest_main",
     ],
 )

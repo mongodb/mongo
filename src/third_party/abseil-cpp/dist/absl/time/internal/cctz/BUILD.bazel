@@ -16,25 +16,6 @@ package(features = ["-parse_headers"])
 
 licenses(["notice"])
 
-filegroup(
-    name = "zoneinfo",
-    srcs = glob(["testdata/zoneinfo/**"]),
-)
-
-config_setting(
-    name = "osx",
-    constraint_values = [
-        "@platforms//os:osx",
-    ],
-)
-
-config_setting(
-    name = "ios",
-    constraint_values = [
-        "@platforms//os:ios",
-    ],
-)
-
 ### libraries
 
 cc_library(
@@ -73,19 +54,19 @@ cc_library(
         "include/cctz/zone_info_source.h",
     ],
     linkopts = select({
-        ":osx": [
-            "-framework Foundation",
-        ],
-        ":ios": [
-            "-framework Foundation",
-        ],
+        "@platforms//os:osx": ["-Wl,-framework,CoreFoundation"],
+        "@platforms//os:ios": ["-Wl,-framework,CoreFoundation"],
         "//conditions:default": [],
     }),
     visibility = ["//visibility:public"],
     deps = [
         ":civil_time",
         "//absl/base:config",
-    ],
+    ] + select(
+        {
+            "//conditions:default": [],
+        },
+    ),
 )
 
 ### tests
@@ -111,10 +92,12 @@ cc_test(
     size = "small",
     srcs = ["src/time_zone_format_test.cc"],
     data = [":zoneinfo"],
+    env = {"TZDIR": "absl/time/internal/cctz/testdata/zoneinfo"},
     tags = [
         "no_test_android_arm",
         "no_test_android_arm64",
         "no_test_android_x86",
+        "no_test_wasm",
     ],
     deps = [
         ":civil_time",
@@ -130,10 +113,12 @@ cc_test(
     timeout = "moderate",
     srcs = ["src/time_zone_lookup_test.cc"],
     data = [":zoneinfo"],
+    env = {"TZDIR": "absl/time/internal/cctz/testdata/zoneinfo"},
     tags = [
         "no_test_android_arm",
         "no_test_android_arm64",
         "no_test_android_x86",
+        "no_test_wasm",
     ],
     deps = [
         ":civil_time",
@@ -162,6 +147,12 @@ cc_test(
         "//absl/base:config",
         "@com_github_google_benchmark//:benchmark_main",
     ],
+)
+
+filegroup(
+    name = "zoneinfo",
+    srcs = glob(["testdata/zoneinfo/**"]),
+    visibility = ["//absl/time:__subpackages__"],
 )
 
 ### examples

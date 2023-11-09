@@ -1,6 +1,6 @@
 # C++ Upgrade Tools
 
-Abseil may occassionally release API-breaking changes. As noted in our
+Abseil may occasionally release API-breaking changes. As noted in our
 [Compatibility Guidelines][compatibility-guide], we will aim to provide a tool
 to do the work of effecting such API-breaking changes, when absolutely
 necessary.

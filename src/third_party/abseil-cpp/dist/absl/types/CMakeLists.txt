@@ -43,6 +43,7 @@ absl_cc_library(
   PUBLIC
 )
 
+# Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
     bad_any_cast_impl
@@ -67,7 +68,7 @@ absl_cc_test(
     absl::any
     absl::config
     absl::exception_testing
-    absl::raw_logging_internal
+    absl::log
     absl::test_instance_tracker
     GTest::gmock_main
 )
@@ -219,7 +220,7 @@ absl_cc_test(
   DEPS
     absl::optional
     absl::config
-    absl::raw_logging_internal
+    absl::log
     absl::strings
     absl::type_traits
     GTest::gmock_main
@@ -239,6 +240,7 @@ absl_cc_test(
     GTest::gmock_main
 )
 
+# Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
     conformance_testing

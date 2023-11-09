@@ -241,10 +241,11 @@ BENCHMARK(BM_ThreadedFindCommandLineFlag)->ThreadRange(1, 16);
 
 }  // namespace
 
+#ifdef __llvm__
+// To view disassembly use: gdb ${BINARY}  -batch -ex "disassemble /s $FUNC"
 #define InvokeGetFlag(T)                                             \
   T AbslInvokeGetFlag##T() { return absl::GetFlag(SINGLE_FLAG(T)); } \
   int odr##T = (benchmark::DoNotOptimize(AbslInvokeGetFlag##T), 1);
 
 BENCHMARKED_TYPES(InvokeGetFlag)
-
-// To veiw disassembly use: gdb ${BINARY}  -batch -ex "disassemble /s $FUNC"
+#endif  // __llvm__

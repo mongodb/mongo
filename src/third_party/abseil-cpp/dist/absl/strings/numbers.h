@@ -23,8 +23,12 @@
 #ifndef ABSL_STRINGS_NUMBERS_H_
 #define ABSL_STRINGS_NUMBERS_H_
 
-#ifdef __SSE4_2__
-#include <x86intrin.h>
+#ifdef __SSSE3__
+#include <tmmintrin.h>
+#endif
+
+#ifdef _MSC_VER
+#include <intrin.h>
 #endif
 
 #include <cstddef>
@@ -36,14 +40,7 @@
 #include <type_traits>
 
 #include "absl/base/config.h"
-#ifdef __SSE4_2__
-// TODO(jorg): Remove this when we figure out the right way
-// to swap bytes on SSE 4.2 that works with the compilers
-// we claim to support.  Also, add tests for the compiler
-// that doesn't support the Intel _bswap64 intrinsic but
-// does support all the SSE 4.2 intrinsics
 #include "absl/base/internal/endian.h"
-#endif
 #include "absl/base/macros.h"
 #include "absl/base/port.h"
 #include "absl/numeric/bits.h"
@@ -128,8 +125,6 @@ namespace numbers_internal {
 ABSL_DLL extern const char kHexChar[17];  // 0123456789abcdef
 ABSL_DLL extern const char
     kHexTable[513];  // 000102030405060708090a0b0c0d0e0f1011...
-ABSL_DLL extern const char
-    two_ASCII_digits[100][2];  // 00, 01, 02, 03...
 
 // Writes a two-character representation of 'i' to 'buf'. 'i' must be in the
 // range 0 <= i < 100, and buf must have space for two characters. Example:
@@ -137,10 +132,7 @@ ABSL_DLL extern const char
 //   PutTwoDigits(42, buf);
 //   // buf[0] == '4'
 //   // buf[1] == '2'
-inline void PutTwoDigits(size_t i, char* buf) {
-  assert(i < 100);
-  memcpy(buf, two_ASCII_digits[i], 2);
-}
+void PutTwoDigits(uint32_t i, char* buf);
 
 // safe_strto?() functions for implementing SimpleAtoi()
 
@@ -181,16 +173,19 @@ char* FastIntToBuffer(int_type i, char* buffer) {
   // TODO(jorg): This signed-ness check is used because it works correctly
   // with enums, and it also serves to check that int_type is not a pointer.
   // If one day something like std::is_signed<enum E> works, switch to it.
-  if (static_cast<int_type>(1) - 2 < 0) {  // Signed
-    if (sizeof(i) > 32 / 8) {           // 33-bit to 64-bit
+  // These conditions are constexpr bools to suppress MSVC warning C4127.
+  constexpr bool kIsSigned = static_cast<int_type>(1) - 2 < 0;
+  constexpr bool kUse64Bit = sizeof(i) > 32 / 8;
+  if (kIsSigned) {
+    if (kUse64Bit) {
       return FastIntToBuffer(static_cast<int64_t>(i), buffer);
-    } else {  // 32-bit or less
+    } else {
       return FastIntToBuffer(static_cast<int32_t>(i), buffer);
     }
-  } else {                     // Unsigned
-    if (sizeof(i) > 32 / 8) {  // 33-bit to 64-bit
+  } else {
+    if (kUse64Bit) {
       return FastIntToBuffer(static_cast<uint64_t>(i), buffer);
-    } else {  // 32-bit or less
+    } else {
       return FastIntToBuffer(static_cast<uint32_t>(i), buffer);
     }
   }
@@ -209,22 +204,25 @@ ABSL_MUST_USE_RESULT bool safe_strtoi_base(absl::string_view s, int_type* out,
   // TODO(jorg): This signed-ness check is used because it works correctly
   // with enums, and it also serves to check that int_type is not a pointer.
   // If one day something like std::is_signed<enum E> works, switch to it.
-  if (static_cast<int_type>(1) - 2 < 0) {  // Signed
-    if (sizeof(*out) == 64 / 8) {       // 64-bit
+  // These conditions are constexpr bools to suppress MSVC warning C4127.
+  constexpr bool kIsSigned = static_cast<int_type>(1) - 2 < 0;
+  constexpr bool kUse64Bit = sizeof(*out) == 64 / 8;
+  if (kIsSigned) {
+    if (kUse64Bit) {
       int64_t val;
       parsed = numbers_internal::safe_strto64_base(s, &val, base);
       *out = static_cast<int_type>(val);
-    } else {  // 32-bit
+    } else {
       int32_t val;
       parsed = numbers_internal::safe_strto32_base(s, &val, base);
       *out = static_cast<int_type>(val);
     }
-  } else {                         // Unsigned
-    if (sizeof(*out) == 64 / 8) {  // 64-bit
+  } else {
+    if (kUse64Bit) {
       uint64_t val;
       parsed = numbers_internal::safe_strtou64_base(s, &val, base);
       *out = static_cast<int_type>(val);
-    } else {  // 32-bit
+    } else {
       uint32_t val;
       parsed = numbers_internal::safe_strtou32_base(s, &val, base);
       *out = static_cast<int_type>(val);
@@ -240,7 +238,7 @@ ABSL_MUST_USE_RESULT bool safe_strtoi_base(absl::string_view s, int_type* out,
 // Returns the number of non-pad digits of the output (it can never be zero
 // since 0 has one digit).
 inline size_t FastHexToBufferZeroPad16(uint64_t val, char* out) {
-#ifdef __SSE4_2__
+#ifdef ABSL_INTERNAL_HAVE_SSSE3
   uint64_t be = absl::big_endian::FromHost64(val);
   const auto kNibbleMask = _mm_set1_epi8(0xf);
   const auto kHexDigits = _mm_setr_epi8('0', '1', '2', '3', '4', '5', '6', '7',
@@ -259,7 +257,7 @@ inline size_t FastHexToBufferZeroPad16(uint64_t val, char* out) {
   }
 #endif
   // | 0x1 so that even 0 has 1 digit.
-  return 16 - countl_zero(val | 0x1) / 4;
+  return 16 - static_cast<size_t>(countl_zero(val | 0x1) / 4);
 }
 
 }  // namespace numbers_internal

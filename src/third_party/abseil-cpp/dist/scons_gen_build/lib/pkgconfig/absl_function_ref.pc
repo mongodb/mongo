@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_function_ref
+Description: Abseil function_ref library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_base_internal = 20230802, absl_core_headers = 20230802, absl_any_invocable = 20230802, absl_meta = 20230802
+Libs: -L${libdir}  
+Cflags: -I${includedir} -DNOMINMAX

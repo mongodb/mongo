@@ -54,10 +54,6 @@ absl_cc_library(
     ${ABSL_DEFAULT_COPTS}
 )
 
-if(APPLE)
-  find_library(CoreFoundation CoreFoundation)
-endif()
-
 absl_cc_library(
   NAME
     time_zone
@@ -84,9 +80,13 @@ absl_cc_library(
   COPTS
     ${ABSL_DEFAULT_COPTS}
   DEPS
-    $<$<PLATFORM_ID:Darwin>:${CoreFoundation}>
+    Threads::Threads
+    # TODO(#1495): Use $<LINK_LIBRARY:FRAMEWORK,CoreFoundation> once our
+    # minimum CMake version >= 3.24
+    $<$<PLATFORM_ID:Darwin>:-Wl,-framework,CoreFoundation>
 )
 
+# Internal-only target, do not depend on directly.
 absl_cc_library(
   NAME
     time_internal_test_util
@@ -94,7 +94,6 @@ absl_cc_library(
     "internal/test_util.h"
   SRCS
     "internal/test_util.cc"
-    "internal/zoneinfo.inc"
   COPTS
     ${ABSL_DEFAULT_COPTS}
   DEPS
@@ -102,7 +101,6 @@ absl_cc_library(
     absl::config
     absl::raw_logging_internal
     absl::time_zone
-    GTest::gmock
   TESTONLY
 )
 
@@ -123,6 +121,21 @@ absl_cc_test(
     absl::time
     absl::config
     absl::core_headers
+    absl::strings
+    absl::str_format
     absl::time_zone
+    GTest::gmock_main
+)
+
+absl_cc_test(
+  NAME
+    flag_test
+  SRCS
+    "flag_test.cc"
+  COPTS
+    ${ABSL_TEST_COPTS}
+  DEPS
+    absl::flags
+    absl::flags_reflection
     GTest::gmock_main
 )

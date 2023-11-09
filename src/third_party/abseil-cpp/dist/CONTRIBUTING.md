@@ -75,9 +75,9 @@ will be expected to conform to the style outlined
 
 ## Guidelines for Pull Requests
 
-*   If you are a Googler, it is preferable to first create an internal CL and
-    have it reviewed and submitted. The code propagation process will deliver
-    the change to GitHub.
+*   If you are a Googler, it is required that you send us a Piper CL instead of
+    using the GitHub pull-request process. The code propagation process will
+    deliver the change to GitHub.
 
 *   Create **small PRs** that are narrowly focused on **addressing a single
     concern**. We often receive PRs that are trying to fix several things at a

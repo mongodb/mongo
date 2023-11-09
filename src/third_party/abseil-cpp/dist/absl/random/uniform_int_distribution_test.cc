@@ -19,11 +19,12 @@
 #include <iterator>
 #include <random>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/base/internal/raw_logging.h"
+#include "absl/log/log.h"
 #include "absl/random/internal/chi_square.h"
 #include "absl/random/internal/distribution_test_util.h"
 #include "absl/random/internal/pcg_engine.h"
@@ -106,8 +107,7 @@ TYPED_TEST(UniformIntDistributionTest, ParamSerializeTest) {
         sample_min = sample;
       }
     }
-    std::string msg = absl::StrCat("Range: ", +sample_min, ", ", +sample_max);
-    ABSL_RAW_LOG(INFO, "%s", msg.c_str());
+    LOG(INFO) << "Range: " << sample_min << ", " << sample_max;
   }
 }
 
@@ -136,7 +136,7 @@ TYPED_TEST(UniformIntDistributionTest, TestMoments) {
       typename absl::uniform_int_distribution<TypeParam>::param_type;
 
   // We use a fixed bit generator for distribution accuracy tests.  This allows
-  // these tests to be deterministic, while still testing the qualify of the
+  // these tests to be deterministic, while still testing the quality of the
   // implementation.
   absl::random_internal::pcg64_2018_engine rng{0x2B7E151628AED2A6};
 
@@ -172,7 +172,7 @@ TYPED_TEST(UniformIntDistributionTest, ChiSquaredTest50) {
   using absl::random_internal::kChiSquared;
 
   constexpr size_t kTrials = 1000;
-  constexpr int kBuckets = 50;  // inclusive, so actally +1
+  constexpr int kBuckets = 50;  // inclusive, so actually +1
   constexpr double kExpected =
       static_cast<double>(kTrials) / static_cast<double>(kBuckets);
 
@@ -184,7 +184,7 @@ TYPED_TEST(UniformIntDistributionTest, ChiSquaredTest50) {
   const TypeParam max = min + kBuckets;
 
   // We use a fixed bit generator for distribution accuracy tests.  This allows
-  // these tests to be deterministic, while still testing the qualify of the
+  // these tests to be deterministic, while still testing the quality of the
   // implementation.
   absl::random_internal::pcg64_2018_engine rng{0x2B7E151628AED2A6};
 
@@ -209,7 +209,7 @@ TYPED_TEST(UniformIntDistributionTest, ChiSquaredTest50) {
     absl::StrAppend(&msg, kChiSquared, " p-value ", p_value, "\n");
     absl::StrAppend(&msg, "High ", kChiSquared, " value: ", chi_square, " > ",
                     kThreshold);
-    ABSL_RAW_LOG(INFO, "%s", msg.c_str());
+    LOG(INFO) << msg;
     FAIL() << msg;
   }
 }

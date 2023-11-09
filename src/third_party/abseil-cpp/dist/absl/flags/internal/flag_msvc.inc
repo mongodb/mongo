@@ -29,7 +29,7 @@
 // second level of protection is a global Mutex, so if two threads attempt to
 // construct the flag concurrently only one wins.
 //
-// This solution is based on a recomendation here:
+// This solution is based on a recommendation here:
 // https://developercommunity.visualstudio.com/content/problem/336946/class-with-constexpr-constructor-not-using-static.html?childToView=648454#comment-648454
 
 namespace flags_internal {

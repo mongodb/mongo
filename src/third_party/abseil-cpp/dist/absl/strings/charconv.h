@@ -22,7 +22,7 @@
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
-// Workalike compatibilty version of std::chars_format from C++17.
+// Workalike compatibility version of std::chars_format from C++17.
 //
 // This is an bitfield enumerator which can be passed to absl::from_chars to
 // configure the string-to-float conversion.
@@ -48,7 +48,7 @@ struct from_chars_result {
   std::errc ec;
 };
 
-// Workalike compatibilty version of std::from_chars from C++17.  Currently
+// Workalike compatibility version of std::from_chars from C++17.  Currently
 // this only supports the `double` and `float` types.
 //
 // This interface incorporates the proposed resolutions for library issues

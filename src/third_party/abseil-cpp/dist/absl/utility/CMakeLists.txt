@@ -42,3 +42,27 @@ absl_cc_test(
     absl::strings
     GTest::gmock_main
 )
+
+absl_cc_library(
+  NAME
+    if_constexpr
+  HDRS
+    "internal/if_constexpr.h"
+  COPTS
+    ${ABSL_DEFAULT_COPTS}
+  DEPS
+    absl::config
+  PUBLIC
+)
+
+absl_cc_test(
+  NAME
+    if_constexpr_test
+  SRCS
+    "internal/if_constexpr_test.cc"
+  COPTS
+    ${ABSL_TEST_COPTS}
+  DEPS
+    absl::if_constexpr
+    GTest::gmock_main
+)

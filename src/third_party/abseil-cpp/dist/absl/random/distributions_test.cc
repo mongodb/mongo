@@ -220,6 +220,7 @@ TEST_F(RandomDistributionsTest, UniformNoBounds) {
   absl::Uniform<uint16_t>(gen);
   absl::Uniform<uint32_t>(gen);
   absl::Uniform<uint64_t>(gen);
+  absl::Uniform<absl::uint128>(gen);
 }
 
 TEST_F(RandomDistributionsTest, UniformNonsenseRanges) {

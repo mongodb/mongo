@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/hash/hash.h"
 #include "absl/random/random.h"
 #include "absl/strings/cord.h"
@@ -107,6 +108,44 @@ absl::Cord FragmentedCord(size_t size) {
   return result;
 }
 
+template <typename T>
+std::vector<T> Vector(size_t count) {
+  std::vector<T> result;
+  for (size_t v = 0; v < count; ++v) {
+    result.push_back(v);
+  }
+  return result;
+}
+
+// Bogus type that replicates an unorderd_set's bit mixing, but with
+// vector-speed iteration. This is intended to measure the overhead of unordered
+// hashing without counting the speed of unordered_set iteration.
+template <typename T>
+struct FastUnorderedSet {
+  explicit FastUnorderedSet(size_t count) {
+    for (size_t v = 0; v < count; ++v) {
+      values.push_back(v);
+    }
+  }
+  std::vector<T> values;
+
+  template <typename H>
+  friend H AbslHashValue(H h, const FastUnorderedSet& fus) {
+    return H::combine(H::combine_unordered(std::move(h), fus.values.begin(),
+                                           fus.values.end()),
+                      fus.values.size());
+  }
+};
+
+template <typename T>
+absl::flat_hash_set<T> FlatHashSet(size_t count) {
+  absl::flat_hash_set<T> result;
+  for (size_t v = 0; v < count; ++v) {
+    result.insert(v);
+  }
+  return result;
+}
+
 // Generates a benchmark and a codegen method for the provided types.  The
 // codegen method provides a well known entrypoint for dumping assembly.
 #define MAKE_BENCHMARK(hash, name, ...)                          \
@@ -145,10 +184,22 @@ MAKE_BENCHMARK(AbslHash, Cord_Flat_200, FlatCord(200));
 MAKE_BENCHMARK(AbslHash, Cord_Flat_5000, FlatCord(5000));
 MAKE_BENCHMARK(AbslHash, Cord_Fragmented_200, FragmentedCord(200));
 MAKE_BENCHMARK(AbslHash, Cord_Fragmented_5000, FragmentedCord(5000));
-MAKE_BENCHMARK(AbslHash, VectorInt64_10, std::vector<int64_t>(10));
-MAKE_BENCHMARK(AbslHash, VectorInt64_100, std::vector<int64_t>(100));
-MAKE_BENCHMARK(AbslHash, VectorDouble_10, std::vector<double>(10, 1.1));
-MAKE_BENCHMARK(AbslHash, VectorDouble_100, std::vector<double>(100, 1.1));
+MAKE_BENCHMARK(AbslHash, VectorInt64_10, Vector<int64_t>(10));
+MAKE_BENCHMARK(AbslHash, VectorInt64_100, Vector<int64_t>(100));
+MAKE_BENCHMARK(AbslHash, VectorInt64_1000, Vector<int64_t>(1000));
+MAKE_BENCHMARK(AbslHash, VectorDouble_10, Vector<double>(10));
+MAKE_BENCHMARK(AbslHash, VectorDouble_100, Vector<double>(100));
+MAKE_BENCHMARK(AbslHash, VectorDouble_1000, Vector<double>(1000));
+MAKE_BENCHMARK(AbslHash, FlatHashSetInt64_10, FlatHashSet<int64_t>(10));
+MAKE_BENCHMARK(AbslHash, FlatHashSetInt64_100, FlatHashSet<int64_t>(100));
+MAKE_BENCHMARK(AbslHash, FlatHashSetInt64_1000, FlatHashSet<int64_t>(1000));
+MAKE_BENCHMARK(AbslHash, FlatHashSetDouble_10, FlatHashSet<double>(10));
+MAKE_BENCHMARK(AbslHash, FlatHashSetDouble_100, FlatHashSet<double>(100));
+MAKE_BENCHMARK(AbslHash, FlatHashSetDouble_1000, FlatHashSet<double>(1000));
+MAKE_BENCHMARK(AbslHash, FastUnorderedSetInt64_1000,
+               FastUnorderedSet<int64_t>(1000));
+MAKE_BENCHMARK(AbslHash, FastUnorderedSetDouble_1000,
+               FastUnorderedSet<double>(1000));
 MAKE_BENCHMARK(AbslHash, PairStringString_0,
                std::make_pair(std::string(), std::string()));
 MAKE_BENCHMARK(AbslHash, PairStringString_10,
@@ -180,6 +231,24 @@ MAKE_BENCHMARK(TypeErasedAbslHash, VectorDouble_10,
                std::vector<double>(10, 1.1));
 MAKE_BENCHMARK(TypeErasedAbslHash, VectorDouble_100,
                std::vector<double>(100, 1.1));
+MAKE_BENCHMARK(TypeErasedAbslHash, VectorDouble_1000,
+               std::vector<double>(1000, 1.1));
+MAKE_BENCHMARK(TypeErasedAbslHash, FlatHashSetInt64_10,
+               FlatHashSet<int64_t>(10));
+MAKE_BENCHMARK(TypeErasedAbslHash, FlatHashSetInt64_100,
+               FlatHashSet<int64_t>(100));
+MAKE_BENCHMARK(TypeErasedAbslHash, FlatHashSetInt64_1000,
+               FlatHashSet<int64_t>(1000));
+MAKE_BENCHMARK(TypeErasedAbslHash, FlatHashSetDouble_10,
+               FlatHashSet<double>(10));
+MAKE_BENCHMARK(TypeErasedAbslHash, FlatHashSetDouble_100,
+               FlatHashSet<double>(100));
+MAKE_BENCHMARK(TypeErasedAbslHash, FlatHashSetDouble_1000,
+               FlatHashSet<double>(1000));
+MAKE_BENCHMARK(TypeErasedAbslHash, FastUnorderedSetInt64_1000,
+               FastUnorderedSet<int64_t>(1000));
+MAKE_BENCHMARK(TypeErasedAbslHash, FastUnorderedSetDouble_1000,
+               FastUnorderedSet<double>(1000));
 
 // The latency benchmark attempts to model the speed of the hash function in
 // production. When a hash function is used for hashtable lookups it is rarely

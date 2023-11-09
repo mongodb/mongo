@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_cordz_info
+Description: Abseil cordz_info library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_base = 20230802, absl_config = 20230802, absl_cord_internal = 20230802, absl_cordz_functions = 20230802, absl_cordz_handle = 20230802, absl_cordz_statistics = 20230802, absl_cordz_update_tracker = 20230802, absl_core_headers = 20230802, absl_inlined_vector = 20230802, absl_span = 20230802, absl_raw_logging_internal = 20230802, absl_stacktrace = 20230802, absl_synchronization = 20230802, absl_time = 20230802
+Libs: -L${libdir}  -labsl_cordz_info 
+Cflags: -I${includedir} -DNOMINMAX

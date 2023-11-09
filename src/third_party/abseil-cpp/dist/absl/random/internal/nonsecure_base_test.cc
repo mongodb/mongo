@@ -15,6 +15,7 @@
 #include "absl/random/internal/nonsecure_base.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -192,54 +193,35 @@ TEST(NonsecureURBGBase, EqualSeedSequencesYieldEqualVariates) {
   }
 }
 
-// This is a PRNG-compatible type specifically designed to test
-// that NonsecureURBGBase::Seeder can correctly handle iterators
-// to arbitrary non-uint32_t size types.
-template <typename T>
-struct SeederTestEngine {
-  using result_type = T;
+TEST(RandenPoolSeedSeqTest, SeederWorksForU32) {
+  absl::random_internal::RandenPoolSeedSeq seeder;
 
-  static constexpr result_type(min)() {
-    return (std::numeric_limits<result_type>::min)();
-  }
-  static constexpr result_type(max)() {
-    return (std::numeric_limits<result_type>::max)();
-  }
-
-  template <class SeedSequence,
-            typename = typename absl::enable_if_t<
-                !std::is_same<SeedSequence, SeederTestEngine>::value>>
-  explicit SeederTestEngine(SeedSequence&& seq) {
-    seed(seq);
-  }
-
-  SeederTestEngine(const SeederTestEngine&) = default;
-  SeederTestEngine& operator=(const SeederTestEngine&) = default;
-  SeederTestEngine(SeederTestEngine&&) = default;
-  SeederTestEngine& operator=(SeederTestEngine&&) = default;
-
-  result_type operator()() { return state[0]; }
-
-  template <class SeedSequence>
-  void seed(SeedSequence&& seq) {
-    std::fill(std::begin(state), std::end(state), T(0));
-    seq.generate(std::begin(state), std::end(state));
-  }
-
-  T state[2];
-};
-
-TEST(NonsecureURBGBase, SeederWorksForU32) {
-  using U32 =
-      absl::random_internal::NonsecureURBGBase<SeederTestEngine<uint32_t>>;
-  U32 x;
-  EXPECT_NE(0, x());
+  uint32_t state[2] = {0, 0};
+  seeder.generate(std::begin(state), std::end(state));
+  EXPECT_FALSE(state[0] == 0 && state[1] == 0);
 }
 
-TEST(NonsecureURBGBase, SeederWorksForU64) {
-  using U64 =
-      absl::random_internal::NonsecureURBGBase<SeederTestEngine<uint64_t>>;
+TEST(RandenPoolSeedSeqTest, SeederWorksForU64) {
+  absl::random_internal::RandenPoolSeedSeq seeder;
 
-  U64 x;
-  EXPECT_NE(0, x());
+  uint64_t state[2] = {0, 0};
+  seeder.generate(std::begin(state), std::end(state));
+  EXPECT_FALSE(state[0] == 0 && state[1] == 0);
+  EXPECT_FALSE((state[0] >> 32) == 0 && (state[1] >> 32) == 0);
+}
+
+TEST(RandenPoolSeedSeqTest, SeederWorksForS32) {
+  absl::random_internal::RandenPoolSeedSeq seeder;
+
+  int32_t state[2] = {0, 0};
+  seeder.generate(std::begin(state), std::end(state));
+  EXPECT_FALSE(state[0] == 0 && state[1] == 0);
+}
+
+TEST(RandenPoolSeedSeqTest, SeederWorksForVector) {
+  absl::random_internal::RandenPoolSeedSeq seeder;
+
+  std::vector<uint32_t> state(2);
+  seeder.generate(std::begin(state), std::end(state));
+  EXPECT_FALSE(state[0] == 0 && state[1] == 0);
 }

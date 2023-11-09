@@ -115,6 +115,57 @@ constexpr absl::LogSeverity NormalizeLogSeverity(int s) {
 // unspecified; do not rely on it.
 std::ostream& operator<<(std::ostream& os, absl::LogSeverity s);
 
+// Enums representing a lower bound for LogSeverity. APIs that only operate on
+// messages of at least a certain level (for example, `SetMinLogLevel()`) use
+// this type to specify that level. absl::LogSeverityAtLeast::kInfinity is
+// a level above all threshold levels and therefore no log message will
+// ever meet this threshold.
+enum class LogSeverityAtLeast : int {
+  kInfo = static_cast<int>(absl::LogSeverity::kInfo),
+  kWarning = static_cast<int>(absl::LogSeverity::kWarning),
+  kError = static_cast<int>(absl::LogSeverity::kError),
+  kFatal = static_cast<int>(absl::LogSeverity::kFatal),
+  kInfinity = 1000,
+};
+
+std::ostream& operator<<(std::ostream& os, absl::LogSeverityAtLeast s);
+
+// Enums representing an upper bound for LogSeverity. APIs that only operate on
+// messages of at most a certain level (for example, buffer all messages at or
+// below a certain level) use this type to specify that level.
+// absl::LogSeverityAtMost::kNegativeInfinity is a level below all threshold
+// levels and therefore will exclude all log messages.
+enum class LogSeverityAtMost : int {
+  kNegativeInfinity = -1000,
+  kInfo = static_cast<int>(absl::LogSeverity::kInfo),
+  kWarning = static_cast<int>(absl::LogSeverity::kWarning),
+  kError = static_cast<int>(absl::LogSeverity::kError),
+  kFatal = static_cast<int>(absl::LogSeverity::kFatal),
+};
+
+std::ostream& operator<<(std::ostream& os, absl::LogSeverityAtMost s);
+
+#define COMPOP(op1, op2, T)                                         \
+  constexpr bool operator op1(absl::T lhs, absl::LogSeverity rhs) { \
+    return static_cast<absl::LogSeverity>(lhs) op1 rhs;             \
+  }                                                                 \
+  constexpr bool operator op2(absl::LogSeverity lhs, absl::T rhs) { \
+    return lhs op2 static_cast<absl::LogSeverity>(rhs);             \
+  }
+
+// Comparisons between `LogSeverity` and `LogSeverityAtLeast`/
+// `LogSeverityAtMost` are only supported in one direction.
+// Valid checks are:
+//   LogSeverity >= LogSeverityAtLeast
+//   LogSeverity < LogSeverityAtLeast
+//   LogSeverity <= LogSeverityAtMost
+//   LogSeverity > LogSeverityAtMost
+COMPOP(>, <, LogSeverityAtLeast)
+COMPOP(<=, >=, LogSeverityAtLeast)
+COMPOP(<, >, LogSeverityAtMost)
+COMPOP(>=, <=, LogSeverityAtMost)
+#undef COMPOP
+
 ABSL_NAMESPACE_END
 }  // namespace absl
 

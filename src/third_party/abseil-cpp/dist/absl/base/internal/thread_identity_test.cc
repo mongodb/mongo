@@ -95,7 +95,7 @@ TEST(ThreadIdentityTest, BasicIdentityWorksThreaded) {
 }
 
 TEST(ThreadIdentityTest, ReusedThreadIdentityMutexTest) {
-  // This test repeatly creates and joins a series of threads, each of
+  // This test repeatedly creates and joins a series of threads, each of
   // which acquires and releases shared Mutex locks. This verifies
   // Mutex operations work correctly under a reused
   // ThreadIdentity. Note that the most likely failure mode of this

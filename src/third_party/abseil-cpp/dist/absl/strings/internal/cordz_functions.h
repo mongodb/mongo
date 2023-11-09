@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ABSL_STRINGS_CORDZ_FUNCTIONS_H_
-#define ABSL_STRINGS_CORDZ_FUNCTIONS_H_
+#ifndef ABSL_STRINGS_INTERNAL_CORDZ_FUNCTIONS_H_
+#define ABSL_STRINGS_INTERNAL_CORDZ_FUNCTIONS_H_
 
 #include <stdint.h>
 
@@ -32,18 +32,10 @@ int32_t get_cordz_mean_interval();
 // Sets the sample rate with the average interval between samples.
 void set_cordz_mean_interval(int32_t mean_interval);
 
-// Enable cordz unless any of the following applies:
-// - no thread local support
-// - MSVC build
-// - Android build
-// - Apple build
-// - DLL build
-// Hashtablez is turned off completely in opensource builds.
-// MSVC's static atomics are dynamically initialized in debug mode, which breaks
-// sampling.
-#if defined(ABSL_HAVE_THREAD_LOCAL) && !defined(_MSC_VER)  && \
-    !defined(ABSL_BUILD_DLL) && !defined(ABSL_CONSUME_DLL) && \
-    !defined(__ANDROID__) && !defined(__APPLE__)
+// Cordz is only enabled on Linux with thread_local support.
+#if defined(ABSL_INTERNAL_CORDZ_ENABLED)
+#error ABSL_INTERNAL_CORDZ_ENABLED cannot be set directly
+#elif defined(__linux__) && defined(ABSL_HAVE_THREAD_LOCAL)
 #define ABSL_INTERNAL_CORDZ_ENABLED 1
 #endif
 
@@ -82,4 +74,4 @@ inline void cordz_set_next_sample_for_testing(int64_t) {}
 ABSL_NAMESPACE_END
 }  // namespace absl
 
-#endif  // ABSL_STRINGS_CORDZ_FUNCTIONS_H_
+#endif  // ABSL_STRINGS_INTERNAL_CORDZ_FUNCTIONS_H_

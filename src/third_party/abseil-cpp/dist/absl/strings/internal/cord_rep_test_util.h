@@ -42,18 +42,6 @@ inline cord_internal::CordRepSubstring* MakeSubstring(
   return sub;
 }
 
-inline cord_internal::CordRepConcat* MakeConcat(cord_internal::CordRep* left,
-                                                cord_internal::CordRep* right,
-                                                int depth = 0) {
-  auto* concat = new cord_internal::CordRepConcat;
-  concat->tag = cord_internal::CONCAT;
-  concat->length = left->length + right->length;
-  concat->left = left;
-  concat->right = right;
-  concat->set_depth(depth);
-  return concat;
-}
-
 inline cord_internal::CordRepFlat* MakeFlat(absl::string_view value) {
   assert(value.length() <= cord_internal::kMaxFlatLength);
   auto* flat = cord_internal::CordRepFlat::New(value.length());
@@ -126,9 +114,6 @@ inline void CordVisitReps(cord_internal::CordRep* rep, Fn&& fn) {
     for (cord_internal::CordRep* edge : rep->btree()->Edges()) {
       CordVisitReps(edge, fn);
     }
-  } else if (rep->tag == cord_internal::CONCAT) {
-    CordVisitReps(rep->concat()->left, fn);
-    CordVisitReps(rep->concat()->right, fn);
   }
 }
 

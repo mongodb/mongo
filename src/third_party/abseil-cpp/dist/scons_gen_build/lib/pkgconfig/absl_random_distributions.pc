@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_random_distributions
+Description: Abseil random_distributions library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_base_internal = 20230802, absl_config = 20230802, absl_core_headers = 20230802, absl_random_internal_generate_real = 20230802, absl_random_internal_distribution_caller = 20230802, absl_random_internal_fast_uniform_bits = 20230802, absl_random_internal_fastmath = 20230802, absl_random_internal_iostream_state_saver = 20230802, absl_random_internal_traits = 20230802, absl_random_internal_uniform_helper = 20230802, absl_random_internal_wide_multiply = 20230802, absl_strings = 20230802, absl_type_traits = 20230802
+Libs: -L${libdir}  -labsl_random_distributions 
+Cflags: -I${includedir} -DNOMINMAX

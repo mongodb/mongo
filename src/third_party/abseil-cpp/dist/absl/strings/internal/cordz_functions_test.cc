@@ -38,7 +38,7 @@ TEST(CordzFunctionsTest, SampleRate) {
 }
 
 // Cordz is disabled when we don't have thread_local. All calls to
-// should_profile will return false when cordz is diabled, so we might want to
+// should_profile will return false when cordz is disabled, so we might want to
 // avoid those tests.
 #ifdef ABSL_INTERNAL_CORDZ_ENABLED
 

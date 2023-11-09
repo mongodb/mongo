@@ -24,6 +24,10 @@
 #include "absl/strings/cord_test_helpers.h"
 #include "absl/strings/string_view.h"
 
+#ifdef ABSL_HAVE_STD_STRING_VIEW
+#include <string_view>
+#endif
+
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace container_internal {
@@ -107,6 +111,168 @@ TYPED_TEST(HashString, Works) {
   EXPECT_EQ(h, hash(std::string("a")));
   EXPECT_NE(h, hash(absl::string_view("b")));
   EXPECT_NE(h, hash(std::string("b")));
+}
+
+TEST(BasicStringViewTest, WStringEqWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_eq<std::wstring> eq;
+  EXPECT_TRUE(eq(L"a", L"a"));
+  EXPECT_TRUE(eq(L"a", std::wstring_view(L"a")));
+  EXPECT_TRUE(eq(L"a", std::wstring(L"a")));
+  EXPECT_FALSE(eq(L"a", L"b"));
+  EXPECT_FALSE(eq(L"a", std::wstring_view(L"b")));
+  EXPECT_FALSE(eq(L"a", std::wstring(L"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, WStringViewEqWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_eq<std::wstring_view> eq;
+  EXPECT_TRUE(eq(L"a", L"a"));
+  EXPECT_TRUE(eq(L"a", std::wstring_view(L"a")));
+  EXPECT_TRUE(eq(L"a", std::wstring(L"a")));
+  EXPECT_FALSE(eq(L"a", L"b"));
+  EXPECT_FALSE(eq(L"a", std::wstring_view(L"b")));
+  EXPECT_FALSE(eq(L"a", std::wstring(L"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U16StringEqWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_eq<std::u16string> eq;
+  EXPECT_TRUE(eq(u"a", u"a"));
+  EXPECT_TRUE(eq(u"a", std::u16string_view(u"a")));
+  EXPECT_TRUE(eq(u"a", std::u16string(u"a")));
+  EXPECT_FALSE(eq(u"a", u"b"));
+  EXPECT_FALSE(eq(u"a", std::u16string_view(u"b")));
+  EXPECT_FALSE(eq(u"a", std::u16string(u"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U16StringViewEqWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_eq<std::u16string_view> eq;
+  EXPECT_TRUE(eq(u"a", u"a"));
+  EXPECT_TRUE(eq(u"a", std::u16string_view(u"a")));
+  EXPECT_TRUE(eq(u"a", std::u16string(u"a")));
+  EXPECT_FALSE(eq(u"a", u"b"));
+  EXPECT_FALSE(eq(u"a", std::u16string_view(u"b")));
+  EXPECT_FALSE(eq(u"a", std::u16string(u"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U32StringEqWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_eq<std::u32string> eq;
+  EXPECT_TRUE(eq(U"a", U"a"));
+  EXPECT_TRUE(eq(U"a", std::u32string_view(U"a")));
+  EXPECT_TRUE(eq(U"a", std::u32string(U"a")));
+  EXPECT_FALSE(eq(U"a", U"b"));
+  EXPECT_FALSE(eq(U"a", std::u32string_view(U"b")));
+  EXPECT_FALSE(eq(U"a", std::u32string(U"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U32StringViewEqWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_eq<std::u32string_view> eq;
+  EXPECT_TRUE(eq(U"a", U"a"));
+  EXPECT_TRUE(eq(U"a", std::u32string_view(U"a")));
+  EXPECT_TRUE(eq(U"a", std::u32string(U"a")));
+  EXPECT_FALSE(eq(U"a", U"b"));
+  EXPECT_FALSE(eq(U"a", std::u32string_view(U"b")));
+  EXPECT_FALSE(eq(U"a", std::u32string(U"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, WStringHashWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_hash<std::wstring> hash;
+  auto h = hash(L"a");
+  EXPECT_EQ(h, hash(std::wstring_view(L"a")));
+  EXPECT_EQ(h, hash(std::wstring(L"a")));
+  EXPECT_NE(h, hash(std::wstring_view(L"b")));
+  EXPECT_NE(h, hash(std::wstring(L"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, WStringViewHashWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_hash<std::wstring_view> hash;
+  auto h = hash(L"a");
+  EXPECT_EQ(h, hash(std::wstring_view(L"a")));
+  EXPECT_EQ(h, hash(std::wstring(L"a")));
+  EXPECT_NE(h, hash(std::wstring_view(L"b")));
+  EXPECT_NE(h, hash(std::wstring(L"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U16StringHashWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_hash<std::u16string> hash;
+  auto h = hash(u"a");
+  EXPECT_EQ(h, hash(std::u16string_view(u"a")));
+  EXPECT_EQ(h, hash(std::u16string(u"a")));
+  EXPECT_NE(h, hash(std::u16string_view(u"b")));
+  EXPECT_NE(h, hash(std::u16string(u"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U16StringViewHashWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_hash<std::u16string_view> hash;
+  auto h = hash(u"a");
+  EXPECT_EQ(h, hash(std::u16string_view(u"a")));
+  EXPECT_EQ(h, hash(std::u16string(u"a")));
+  EXPECT_NE(h, hash(std::u16string_view(u"b")));
+  EXPECT_NE(h, hash(std::u16string(u"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U32StringHashWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_hash<std::u32string> hash;
+  auto h = hash(U"a");
+  EXPECT_EQ(h, hash(std::u32string_view(U"a")));
+  EXPECT_EQ(h, hash(std::u32string(U"a")));
+  EXPECT_NE(h, hash(std::u32string_view(U"b")));
+  EXPECT_NE(h, hash(std::u32string(U"b")));
+#endif
+}
+
+TEST(BasicStringViewTest, U32StringViewHashWorks) {
+#ifndef ABSL_HAVE_STD_STRING_VIEW
+  GTEST_SKIP();
+#else
+  hash_default_hash<std::u32string_view> hash;
+  auto h = hash(U"a");
+  EXPECT_EQ(h, hash(std::u32string_view(U"a")));
+  EXPECT_EQ(h, hash(std::u32string(U"a")));
+  EXPECT_NE(h, hash(std::u32string_view(U"b")));
+  EXPECT_NE(h, hash(std::u32string(U"b")));
+#endif
 }
 
 struct NoDeleter {
@@ -310,7 +476,7 @@ struct StringLikeTest : public ::testing::Test {
   hash_default_hash<typename T::first_type> hash;
 };
 
-TYPED_TEST_CASE_P(StringLikeTest);
+TYPED_TEST_SUITE_P(StringLikeTest);
 
 TYPED_TEST_P(StringLikeTest, Eq) {
   EXPECT_TRUE(this->eq(this->a1, this->b1));

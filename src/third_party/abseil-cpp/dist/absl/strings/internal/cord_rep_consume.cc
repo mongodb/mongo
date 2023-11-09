@@ -40,88 +40,23 @@ CordRep* ClipSubstring(CordRepSubstring* substring) {
   return child;
 }
 
-// Unrefs the provided `concat`, and returns `{concat->left, concat->right}`
-// Adds or assumes a reference on `concat->left` and `concat->right`.
-// Returns an array of 2 elements containing the left and right nodes.
-std::array<CordRep*, 2> ClipConcat(CordRepConcat* concat) {
-  std::array<CordRep*, 2> result{concat->left, concat->right};
-  if (concat->refcount.IsOne()) {
-    delete concat;
-  } else {
-    CordRep::Ref(result[0]);
-    CordRep::Ref(result[1]);
-    CordRep::Unref(concat);
-  }
-  return result;
-}
-
-void Consume(bool forward, CordRep* rep, ConsumeFn consume_fn) {
-  size_t offset = 0;
-  size_t length = rep->length;
-  struct Entry {
-    CordRep* rep;
-    size_t offset;
-    size_t length;
-  };
-  absl::InlinedVector<Entry, 40> stack;
-
-  for (;;) {
-    if (rep->tag == CONCAT) {
-      std::array<CordRep*, 2> res = ClipConcat(rep->concat());
-      CordRep* left = res[0];
-      CordRep* right = res[1];
-
-      if (left->length <= offset) {
-        // Don't need left node
-        offset -= left->length;
-        CordRep::Unref(left);
-        rep = right;
-        continue;
-      }
-
-      size_t length_left = left->length - offset;
-      if (length_left >= length) {
-        // Don't need right node
-        CordRep::Unref(right);
-        rep = left;
-        continue;
-      }
-
-      // Need both nodes
-      size_t length_right = length - length_left;
-      if (forward) {
-        stack.push_back({right, 0, length_right});
-        rep = left;
-        length = length_left;
-      } else {
-        stack.push_back({left, offset, length_left});
-        rep = right;
-        offset = 0;
-        length = length_right;
-      }
-    } else if (rep->tag == SUBSTRING) {
-      offset += rep->substring()->start;
-      rep = ClipSubstring(rep->substring());
-    } else {
-      consume_fn(rep, offset, length);
-      if (stack.empty()) return;
-
-      rep = stack.back().rep;
-      offset = stack.back().offset;
-      length = stack.back().length;
-      stack.pop_back();
-    }
-  }
-}
-
 }  // namespace
 
-void Consume(CordRep* rep, ConsumeFn consume_fn) {
-  return Consume(true, rep, std::move(consume_fn));
+void Consume(CordRep* rep,
+             FunctionRef<void(CordRep*, size_t, size_t)> consume_fn) {
+  size_t offset = 0;
+  size_t length = rep->length;
+
+  if (rep->tag == SUBSTRING) {
+    offset += rep->substring()->start;
+    rep = ClipSubstring(rep->substring());
+  }
+  consume_fn(rep, offset, length);
 }
 
-void ReverseConsume(CordRep* rep, ConsumeFn consume_fn) {
-  return Consume(false, rep, std::move(consume_fn));
+void ReverseConsume(CordRep* rep,
+                    FunctionRef<void(CordRep*, size_t, size_t)> consume_fn) {
+  return Consume(rep, consume_fn);
 }
 
 }  // namespace cord_internal

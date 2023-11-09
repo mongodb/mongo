@@ -31,6 +31,14 @@ namespace {
 
 int Function(int a, int b) { return a - b; }
 
+void VoidFunction(int& a, int& b) {
+  a += b;
+  b = a - b;
+  a -= b;
+}
+
+int ZeroArgFunction() { return -1937; }
+
 int Sink(std::unique_ptr<int> p) {
   return *p;
 }
@@ -221,6 +229,100 @@ TEST(InvokeTest, FlipFlop) {
 TEST(InvokeTest, SfinaeFriendly) {
   CallMaybeWithArg(NoOp);
   EXPECT_THAT(CallMaybeWithArg(Factory), ::testing::Pointee(42));
+}
+
+TEST(IsInvocableRTest, CallableExactMatch) {
+  static_assert(
+      base_internal::is_invocable_r<int, decltype(Function), int, int>::value,
+      "Should be true for exact match of types on a free function");
+}
+
+TEST(IsInvocableRTest, CallableArgumentConversionMatch) {
+  static_assert(
+      base_internal::is_invocable_r<int, decltype(Function), char, int>::value,
+      "Should be true for convertible argument type");
+}
+
+TEST(IsInvocableRTest, CallableReturnConversionMatch) {
+  static_assert(base_internal::is_invocable_r<double, decltype(Function), int,
+                                              int>::value,
+                "Should be true for convertible return type");
+}
+
+TEST(IsInvocableRTest, CallableReturnVoid) {
+  static_assert(base_internal::is_invocable_r<void, decltype(VoidFunction),
+                                              int&, int&>::value,
+                "Should be true for void expected and actual return types");
+  static_assert(
+      base_internal::is_invocable_r<void, decltype(Function), int, int>::value,
+      "Should be true for void expected and non-void actual return types");
+}
+
+TEST(IsInvocableRTest, CallableRefQualifierMismatch) {
+  static_assert(!base_internal::is_invocable_r<void, decltype(VoidFunction),
+                                               int&, const int&>::value,
+                "Should be false for reference constness mismatch");
+  static_assert(!base_internal::is_invocable_r<void, decltype(VoidFunction),
+                                               int&&, int&>::value,
+                "Should be false for reference value category mismatch");
+}
+
+TEST(IsInvocableRTest, CallableArgumentTypeMismatch) {
+  static_assert(!base_internal::is_invocable_r<int, decltype(Function),
+                                               std::string, int>::value,
+                "Should be false for argument type mismatch");
+}
+
+TEST(IsInvocableRTest, CallableReturnTypeMismatch) {
+  static_assert(!base_internal::is_invocable_r<std::string, decltype(Function),
+                                               int, int>::value,
+                "Should be false for return type mismatch");
+}
+
+TEST(IsInvocableRTest, CallableTooFewArgs) {
+  static_assert(
+      !base_internal::is_invocable_r<int, decltype(Function), int>::value,
+      "Should be false for too few arguments");
+}
+
+TEST(IsInvocableRTest, CallableTooManyArgs) {
+  static_assert(!base_internal::is_invocable_r<int, decltype(Function), int,
+                                               int, int>::value,
+                "Should be false for too many arguments");
+}
+
+TEST(IsInvocableRTest, MemberFunctionAndReference) {
+  static_assert(base_internal::is_invocable_r<int, decltype(&Class::Method),
+                                              Class&, int, int>::value,
+                "Should be true for exact match of types on a member function "
+                "and class reference");
+}
+
+TEST(IsInvocableRTest, MemberFunctionAndPointer) {
+  static_assert(base_internal::is_invocable_r<int, decltype(&Class::Method),
+                                              Class*, int, int>::value,
+                "Should be true for exact match of types on a member function "
+                "and class pointer");
+}
+
+TEST(IsInvocableRTest, DataMemberAndReference) {
+  static_assert(base_internal::is_invocable_r<int, decltype(&Class::member),
+                                              Class&>::value,
+                "Should be true for exact match of types on a data member and "
+                "class reference");
+}
+
+TEST(IsInvocableRTest, DataMemberAndPointer) {
+  static_assert(base_internal::is_invocable_r<int, decltype(&Class::member),
+                                              Class*>::value,
+                "Should be true for exact match of types on a data member and "
+                "class pointer");
+}
+
+TEST(IsInvocableRTest, CallableZeroArgs) {
+  static_assert(
+      base_internal::is_invocable_r<int, decltype(ZeroArgFunction)>::value,
+      "Should be true for exact match for a zero-arg free function");
 }
 
 }  // namespace

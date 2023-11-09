@@ -46,6 +46,7 @@ struct Sample {
   absl::Mutex init_mu;
   T* next = nullptr;
   T* dead ABSL_GUARDED_BY(init_mu) = nullptr;
+  int64_t weight;  // How many sampling events were required to sample this one.
 };
 
 // Holds samples and their associated stack traces with a soft limit of
@@ -59,7 +60,8 @@ class SampleRecorder {
   ~SampleRecorder();
 
   // Registers for sampling.  Returns an opaque registration info.
-  T* Register();
+  template <typename... Targs>
+  T* Register(Targs&&... args);
 
   // Unregisters the sample.
   void Unregister(T* sample);
@@ -75,16 +77,18 @@ class SampleRecorder {
   // samples that have been dropped.
   int64_t Iterate(const std::function<void(const T& stack)>& f);
 
-  void SetMaxSamples(int32_t max);
+  size_t GetMaxSamples() const;
+  void SetMaxSamples(size_t max);
 
  private:
   void PushNew(T* sample);
   void PushDead(T* sample);
-  T* PopDead();
+  template <typename... Targs>
+  T* PopDead(Targs... args);
 
   std::atomic<size_t> dropped_samples_;
   std::atomic<size_t> size_estimate_;
-  std::atomic<int32_t> max_samples_{1 << 20};
+  std::atomic<size_t> max_samples_{1 << 20};
 
   // Intrusive lock free linked lists for tracking samples.
   //
@@ -162,7 +166,8 @@ void SampleRecorder<T>::PushDead(T* sample) {
 }
 
 template <typename T>
-T* SampleRecorder<T>::PopDead() {
+template <typename... Targs>
+T* SampleRecorder<T>::PopDead(Targs... args) {
   absl::MutexLock graveyard_lock(&graveyard_.init_mu);
 
   // The list is circular, so eventually it collapses down to
@@ -174,23 +179,36 @@ T* SampleRecorder<T>::PopDead() {
   absl::MutexLock sample_lock(&sample->init_mu);
   graveyard_.dead = sample->dead;
   sample->dead = nullptr;
-  sample->PrepareForSampling();
+  sample->PrepareForSampling(std::forward<Targs>(args)...);
   return sample;
 }
 
 template <typename T>
-T* SampleRecorder<T>::Register() {
-  int64_t size = size_estimate_.fetch_add(1, std::memory_order_relaxed);
+template <typename... Targs>
+T* SampleRecorder<T>::Register(Targs&&... args) {
+  size_t size = size_estimate_.fetch_add(1, std::memory_order_relaxed);
   if (size > max_samples_.load(std::memory_order_relaxed)) {
     size_estimate_.fetch_sub(1, std::memory_order_relaxed);
     dropped_samples_.fetch_add(1, std::memory_order_relaxed);
     return nullptr;
   }
 
-  T* sample = PopDead();
+  T* sample = PopDead(args...);
   if (sample == nullptr) {
     // Resurrection failed.  Hire a new warlock.
     sample = new T();
+    {
+      absl::MutexLock sample_lock(&sample->init_mu);
+      // If flag initialization happens to occur (perhaps in another thread)
+      // while in this block, it will lock `graveyard_` which is usually always
+      // locked before any sample. This will appear as a lock inversion.
+      // However, this code is run exactly once per sample, and this sample
+      // cannot be accessed until after it is returned from this method.  This
+      // means that this lock state can never be recreated, so we can safely
+      // inform the deadlock detector to ignore it.
+      sample->init_mu.ForgetDeadlockInfo();
+      sample->PrepareForSampling(std::forward<Targs>(args)...);
+    }
     PushNew(sample);
   }
 
@@ -219,8 +237,13 @@ int64_t SampleRecorder<T>::Iterate(
 }
 
 template <typename T>
-void SampleRecorder<T>::SetMaxSamples(int32_t max) {
+void SampleRecorder<T>::SetMaxSamples(size_t max) {
   max_samples_.store(max, std::memory_order_release);
+}
+
+template <typename T>
+size_t SampleRecorder<T>::GetMaxSamples() const {
+  return max_samples_.load(std::memory_order_acquire);
 }
 
 }  // namespace profiling_internal

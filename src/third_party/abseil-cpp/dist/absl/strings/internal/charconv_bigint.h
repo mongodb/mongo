@@ -92,7 +92,7 @@ class BigUnsigned {
   // numbers with this many decimal digits or fewer are representable by this
   // type.
   //
-  // Analagous to std::numeric_limits<BigUnsigned>::digits10.
+  // Analogous to std::numeric_limits<BigUnsigned>::digits10.
   static constexpr int Digits10() {
     // 9975007/1035508 is very slightly less than log10(2**32).
     return static_cast<uint64_t>(max_words) * 9975007 / 1035508;
@@ -121,7 +121,7 @@ class BigUnsigned {
           ++size_;
         }
       }
-      std::fill(words_, words_ + word_shift, 0u);
+      std::fill_n(words_, word_shift, 0u);
     }
   }
 
@@ -197,7 +197,7 @@ class BigUnsigned {
   }
 
   void SetToZero() {
-    std::fill(words_, words_ + size_, 0u);
+    std::fill_n(words_, size_, 0u);
     size_ = 0;
   }
 

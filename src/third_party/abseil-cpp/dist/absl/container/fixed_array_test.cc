@@ -768,6 +768,22 @@ TEST(AllocatorSupportTest, SizeValAllocConstructor) {
   }
 }
 
+TEST(AllocatorSupportTest, PropagatesStatefulAllocator) {
+  constexpr size_t inlined_size = 4;
+  using Alloc = absl::container_internal::CountingAllocator<int>;
+  using AllocFxdArr = absl::FixedArray<int, inlined_size, Alloc>;
+
+  auto len = inlined_size * 2;
+  auto val = 0;
+  int64_t allocated = 0;
+  AllocFxdArr arr(len, val, Alloc(&allocated));
+
+  EXPECT_EQ(allocated, len * sizeof(int));
+
+  AllocFxdArr copy = arr;
+  EXPECT_EQ(allocated, len * sizeof(int) * 2);
+}
+
 #ifdef ABSL_HAVE_ADDRESS_SANITIZER
 TEST(FixedArrayTest, AddressSanitizerAnnotations1) {
   absl::FixedArray<int, 32> a(10);

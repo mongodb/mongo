@@ -72,6 +72,15 @@ inline bool EndsWith(absl::string_view text,
           memcmp(text.data() + (text.size() - suffix.size()), suffix.data(),
                  suffix.size()) == 0);
 }
+// StrContainsIgnoreCase()
+//
+// Returns whether a given ASCII string `haystack` contains the ASCII substring
+// `needle`, ignoring case in the comparison.
+bool StrContainsIgnoreCase(absl::string_view haystack,
+                           absl::string_view needle) noexcept;
+
+bool StrContainsIgnoreCase(absl::string_view haystack,
+                           char needle) noexcept;
 
 // EqualsIgnoreCase()
 //
@@ -93,6 +102,16 @@ bool StartsWithIgnoreCase(absl::string_view text,
 // case in the comparison.
 bool EndsWithIgnoreCase(absl::string_view text,
                         absl::string_view suffix) noexcept;
+
+// Yields the longest prefix in common between both input strings.
+// Pointer-wise, the returned result is a subset of input "a".
+absl::string_view FindLongestCommonPrefix(absl::string_view a,
+                                          absl::string_view b);
+
+// Yields the longest suffix in common between both input strings.
+// Pointer-wise, the returned result is a subset of input "a".
+absl::string_view FindLongestCommonSuffix(absl::string_view a,
+                                          absl::string_view b);
 
 ABSL_NAMESPACE_END
 }  // namespace absl

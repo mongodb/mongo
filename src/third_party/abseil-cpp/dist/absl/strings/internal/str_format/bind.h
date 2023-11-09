@@ -21,10 +21,12 @@
 #include <string>
 
 #include "absl/base/port.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/internal/str_format/arg.h"
 #include "absl/strings/internal/str_format/checker.h"
 #include "absl/strings/internal/str_format/parser.h"
 #include "absl/types/span.h"
+#include "absl/utility/utility.h"
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -87,6 +89,36 @@ class FormatSpecTemplate
     : public MakeDependent<UntypedFormatSpec, Args...>::type {
   using Base = typename MakeDependent<UntypedFormatSpec, Args...>::type;
 
+  template <bool res>
+  struct ErrorMaker {
+    constexpr bool operator()(int) const { return res; }
+  };
+
+  template <int i, int j>
+  static constexpr bool CheckArity(ErrorMaker<true> SpecifierCount = {},
+                                   ErrorMaker<i == j> ParametersPassed = {}) {
+    static_assert(SpecifierCount(i) == ParametersPassed(j),
+                  "Number of arguments passed must match the number of "
+                  "conversion specifiers.");
+    return true;
+  }
+
+  template <FormatConversionCharSet specified, FormatConversionCharSet passed,
+            int arg>
+  static constexpr bool CheckMatch(
+      ErrorMaker<Contains(specified, passed)> MismatchedArgumentNumber = {}) {
+    static_assert(MismatchedArgumentNumber(arg),
+                  "Passed argument must match specified format.");
+    return true;
+  }
+
+  template <FormatConversionCharSet... C, size_t... I>
+  static bool CheckMatches(absl::index_sequence<I...>) {
+    bool res[] = {true, CheckMatch<Args, C, I + 1>()...};
+    (void)res;
+    return true;
+  }
+
  public:
 #ifdef ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
 
@@ -112,7 +144,8 @@ class FormatSpecTemplate
   template <typename T = void>
   FormatSpecTemplate(string_view s)  // NOLINT
       __attribute__((enable_if(str_format_internal::EnsureConstexpr(s),
-                               "constexpr trap"))) {
+                               "constexpr trap")))
+      : Base("to avoid noise in the compiler error") {
     static_assert(sizeof(T*) == 0,
                   "Format specified does not match the arguments passed.");
   }
@@ -133,30 +166,19 @@ class FormatSpecTemplate
 
 #endif  // ABSL_INTERNAL_ENABLE_FORMAT_CHECKER
 
-  template <
-      FormatConversionCharSet... C,
-      typename = typename std::enable_if<sizeof...(C) == sizeof...(Args)>::type,
-      typename = typename std::enable_if<AllOf(Contains(Args,
-                                                        C)...)>::type>
+  template <FormatConversionCharSet... C>
   FormatSpecTemplate(const ExtendedParsedFormat<C...>& pc)  // NOLINT
-      : Base(&pc) {}
+      : Base(&pc) {
+    CheckArity<sizeof...(C), sizeof...(Args)>();
+    CheckMatches<C...>(absl::make_index_sequence<sizeof...(C)>{});
+  }
 };
 
 class Streamable {
  public:
   Streamable(const UntypedFormatSpecImpl& format,
              absl::Span<const FormatArgImpl> args)
-      : format_(format) {
-    if (args.size() <= ABSL_ARRAYSIZE(few_args_)) {
-      for (size_t i = 0; i < args.size(); ++i) {
-        few_args_[i] = args[i];
-      }
-      args_ = absl::MakeSpan(few_args_, args.size());
-    } else {
-      many_args_.assign(args.begin(), args.end());
-      args_ = many_args_;
-    }
-  }
+      : format_(format), args_(args.begin(), args.end()) {}
 
   std::ostream& Print(std::ostream& os) const;
 
@@ -166,12 +188,7 @@ class Streamable {
 
  private:
   const UntypedFormatSpecImpl& format_;
-  absl::Span<const FormatArgImpl> args_;
-  // if args_.size() is 4 or less:
-  FormatArgImpl few_args_[4] = {FormatArgImpl(0), FormatArgImpl(0),
-                                FormatArgImpl(0), FormatArgImpl(0)};
-  // if args_.size() is more than 4:
-  std::vector<FormatArgImpl> many_args_;
+  absl::InlinedVector<FormatArgImpl, 4> args_;
 };
 
 // for testing
@@ -180,8 +197,7 @@ std::string Summarize(UntypedFormatSpecImpl format,
 bool BindWithPack(const UnboundConversion* props,
                   absl::Span<const FormatArgImpl> pack, BoundConversion* bound);
 
-bool FormatUntyped(FormatRawSinkImpl raw_sink,
-                   UntypedFormatSpecImpl format,
+bool FormatUntyped(FormatRawSinkImpl raw_sink, UntypedFormatSpecImpl format,
                    absl::Span<const FormatArgImpl> args);
 
 std::string& AppendPack(std::string* out, UntypedFormatSpecImpl format,
@@ -200,13 +216,14 @@ int SnprintF(char* output, size_t size, UntypedFormatSpecImpl format,
 template <typename T>
 class StreamedWrapper {
  public:
-  explicit StreamedWrapper(const T& v) : v_(v) { }
+  explicit StreamedWrapper(const T& v) : v_(v) {}
 
  private:
   template <typename S>
-  friend ArgConvertResult<FormatConversionCharSetInternal::s> FormatConvertImpl(
-      const StreamedWrapper<S>& v, FormatConversionSpecImpl conv,
-      FormatSinkImpl* out);
+  friend ArgConvertResult<FormatConversionCharSetUnion(
+      FormatConversionCharSetInternal::s, FormatConversionCharSetInternal::v)>
+  FormatConvertImpl(const StreamedWrapper<S>& v, FormatConversionSpecImpl conv,
+                    FormatSinkImpl* out);
   const T& v_;
 };
 

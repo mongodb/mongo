@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_random_random
+Description: Abseil random_random library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_random_distributions = 20230802, absl_random_internal_nonsecure_base = 20230802, absl_random_internal_pcg_engine = 20230802, absl_random_internal_pool_urbg = 20230802, absl_random_internal_randen_engine = 20230802, absl_random_seed_sequences = 20230802
+Libs: -L${libdir}  
+Cflags: -I${includedir} -DNOMINMAX

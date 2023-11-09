@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_string_view
+Description: Abseil string_view library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_base = 20230802, absl_config = 20230802, absl_core_headers = 20230802, absl_throw_delegate = 20230802
+Libs: -L${libdir}  -labsl_string_view 
+Cflags: -I${includedir} -DNOMINMAX

@@ -1,0 +1,12 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=/usr/local/lib
+includedir=/usr/local/include
+
+Name: absl_die_if_null
+Description: Abseil die_if_null library
+URL: https://abseil.io/
+Version: 20230802
+Requires: absl_config = 20230802, absl_core_headers = 20230802, absl_log = 20230802, absl_strings = 20230802
+Libs: -L${libdir}  -labsl_die_if_null 
+Cflags: -I${includedir} -DNOMINMAX

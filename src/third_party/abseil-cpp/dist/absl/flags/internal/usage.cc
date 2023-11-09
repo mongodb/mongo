@@ -17,7 +17,10 @@
 
 #include <stdint.h>
 
+#include <algorithm>
+#include <cstdlib>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <ostream>
 #include <string>
@@ -33,6 +36,7 @@
 #include "absl/flags/internal/program_name.h"
 #include "absl/flags/internal/registry.h"
 #include "absl/flags/usage_config.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -88,8 +92,16 @@ class XMLElement {
         case '>':
           out << "&gt;";
           break;
+        case '\n':
+        case '\v':
+        case '\f':
+        case '\t':
+          out << " ";
+          break;
         default:
-          out << c;
+          if (IsValidXmlCharacter(static_cast<unsigned char>(c))) {
+            out << c;
+          }
           break;
       }
     }
@@ -98,6 +110,7 @@ class XMLElement {
   }
 
  private:
+  static bool IsValidXmlCharacter(unsigned char c) { return c >= 0x20; }
   absl::string_view tag_;
   absl::string_view txt_;
 };
@@ -127,7 +140,7 @@ class FlagHelpPrettyPrinter {
       for (auto line : absl::StrSplit(str, absl::ByAnyChar("\n\r"))) {
         if (!tokens.empty()) {
           // Keep line separators in the input string.
-          tokens.push_back("\n");
+          tokens.emplace_back("\n");
         }
         for (auto token :
              absl::StrSplit(line, absl::ByAnyChar(" \t"), absl::SkipEmpty())) {
@@ -148,8 +161,7 @@ class FlagHelpPrettyPrinter {
       }
 
       // Write the token, ending the string first if necessary/possible.
-      if (!new_line &&
-          (line_len_ + static_cast<int>(token.size()) >= max_line_len_)) {
+      if (!new_line && (line_len_ + token.size() >= max_line_len_)) {
         EndLine();
         new_line = true;
       }
@@ -344,7 +356,7 @@ void FlagHelp(std::ostream& out, const CommandLineFlag& flag,
 void FlagsHelp(std::ostream& out, absl::string_view filter, HelpFormat format,
                absl::string_view program_usage_message) {
   flags_internal::FlagKindFilter filter_cb = [&](absl::string_view filename) {
-    return filter.empty() || filename.find(filter) != absl::string_view::npos;
+    return filter.empty() || absl::StrContains(filename, filter);
   };
   flags_internal::FlagsHelpImpl(out, filter_cb, format, program_usage_message);
 }
@@ -352,8 +364,8 @@ void FlagsHelp(std::ostream& out, absl::string_view filter, HelpFormat format,
 // --------------------------------------------------------------------
 // Checks all the 'usage' command line flags to see if any have been set.
 // If so, handles them appropriately.
-int HandleUsageFlags(std::ostream& out,
-                     absl::string_view program_usage_message) {
+HelpMode HandleUsageFlags(std::ostream& out,
+                          absl::string_view program_usage_message) {
   switch (GetFlagsHelpMode()) {
     case HelpMode::kNone:
       break;
@@ -361,25 +373,24 @@ int HandleUsageFlags(std::ostream& out,
       flags_internal::FlagsHelpImpl(
           out, flags_internal::GetUsageConfig().contains_help_flags,
           GetFlagsHelpFormat(), program_usage_message);
-      return 1;
+      break;
 
     case HelpMode::kShort:
       flags_internal::FlagsHelpImpl(
           out, flags_internal::GetUsageConfig().contains_helpshort_flags,
           GetFlagsHelpFormat(), program_usage_message);
-      return 1;
+      break;
 
     case HelpMode::kFull:
       flags_internal::FlagsHelp(out, "", GetFlagsHelpFormat(),
                                 program_usage_message);
-      return 1;
+      break;
 
     case HelpMode::kPackage:
       flags_internal::FlagsHelpImpl(
           out, flags_internal::GetUsageConfig().contains_helppackage_flags,
           GetFlagsHelpFormat(), program_usage_message);
-
-      return 1;
+      break;
 
     case HelpMode::kMatch: {
       std::string substr = GetFlagsHelpMatchSubstr();
@@ -398,20 +409,19 @@ int HandleUsageFlags(std::ostream& out,
         flags_internal::FlagsHelpImpl(
             out, filter_cb, HelpFormat::kHumanReadable, program_usage_message);
       }
-
-      return 1;
+      break;
     }
     case HelpMode::kVersion:
       if (flags_internal::GetUsageConfig().version_string)
         out << flags_internal::GetUsageConfig().version_string();
       // Unlike help, we may be asking for version in a script, so return 0
-      return 0;
+      break;
 
     case HelpMode::kOnlyCheckArgs:
-      return 0;
+      break;
   }
 
-  return -1;
+  return GetFlagsHelpMode();
 }
 
 // --------------------------------------------------------------------
@@ -466,7 +476,7 @@ void SetFlagsHelpFormat(HelpFormat format) {
 // function.
 bool DeduceUsageFlags(absl::string_view name, absl::string_view value) {
   if (absl::ConsumePrefix(&name, "help")) {
-    if (name == "") {
+    if (name.empty()) {
       if (value.empty()) {
         SetFlagsHelpMode(HelpMode::kImportant);
       } else {
@@ -518,6 +528,22 @@ bool DeduceUsageFlags(absl::string_view name, absl::string_view value) {
 
   return false;
 }
+
+// --------------------------------------------------------------------
+
+void MaybeExit(HelpMode mode) {
+  switch (mode) {
+    case flags_internal::HelpMode::kNone:
+      return;
+    case flags_internal::HelpMode::kOnlyCheckArgs:
+    case flags_internal::HelpMode::kVersion:
+      std::exit(0);
+    default:  // For all the other modes we exit with 1
+      std::exit(1);
+  }
+}
+
+// --------------------------------------------------------------------
 
 }  // namespace flags_internal
 ABSL_NAMESPACE_END

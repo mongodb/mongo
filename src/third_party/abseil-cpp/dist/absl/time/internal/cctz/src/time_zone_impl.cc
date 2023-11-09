@@ -99,11 +99,13 @@ void time_zone::Impl::ClearTimeZoneMapTestOnly() {
   }
 }
 
+time_zone::Impl::Impl() : name_("UTC"), zone_(TimeZoneIf::UTC()) {}
+
 time_zone::Impl::Impl(const std::string& name)
-    : name_(name), zone_(TimeZoneIf::Load(name_)) {}
+    : name_(name), zone_(TimeZoneIf::Make(name_)) {}
 
 const time_zone::Impl* time_zone::Impl::UTCImpl() {
-  static const Impl* utc_impl = new Impl("UTC");  // never fails
+  static const Impl* utc_impl = new Impl;
   return utc_impl;
 }
 

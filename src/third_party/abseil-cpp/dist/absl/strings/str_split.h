@@ -461,8 +461,7 @@ using EnableSplitIfString =
 // first two split strings become the `std::pair` `.first` and `.second`
 // members, respectively. The remaining split substrings are discarded. If there
 // are less than two split substrings, the empty string is used for the
-// corresponding
-// `std::pair` member.
+// corresponding `std::pair` member.
 //
 // Example:
 //

@@ -77,8 +77,8 @@ cc_test(
         ":any",
         "//absl/base:config",
         "//absl/base:exception_testing",
-        "//absl/base:raw_logging_internal",
         "//absl/container:test_instance_tracker",
+        "//absl/log",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -185,7 +185,7 @@ cc_test(
     deps = [
         ":optional",
         "//absl/base:config",
-        "//absl/base:raw_logging_internal",
+        "//absl/log",
         "//absl/meta:type_traits",
         "//absl/strings",
         "@com_google_googletest//:gtest_main",
@@ -314,6 +314,7 @@ cc_library(
     name = "compare",
     hdrs = ["compare.h"],
     copts = ABSL_DEFAULT_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [
         "//absl/base:core_headers",
         "//absl/meta:type_traits",
