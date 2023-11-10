@@ -490,6 +490,11 @@ void Balancer::report(OperationContext* opCtx, BSONObjBuilder* builder) {
 
 void Balancer::_consumeActionStreamLoop() {
     Client::initThread("BalancerSecondary");
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationKillableByStepdown(lk);
+    }
+
     auto opCtx = cc().makeOperationContext();
     // This thread never refreshes balancerConfig - instead, it relies on the requests
     // performed by _mainThread() on each round to eventually see updated information.
@@ -914,6 +919,11 @@ void Balancer::_applyDefragmentationActionResponseToPolicy(
     ActionsStreamPolicy* policy) {
     invariant(_outstandingStreamingOps.addAndFetch(-1) >= 0);
     ThreadClient tc("BalancerSecondaryThread::applyActionResponse", getGlobalServiceContext());
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationKillableByStepdown(lk);
+    }
+
     auto opCtx = tc->makeOperationContext();
     policy->applyActionResult(opCtx.get(), action, response);
 };
