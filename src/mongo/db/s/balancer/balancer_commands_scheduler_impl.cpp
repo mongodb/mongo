@@ -371,6 +371,11 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     });
 
     Client::initThread("BalancerCommandsScheduler");
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationKillableByStepdown(lk);
+    }
+
     bool stopWorkerRequested = false;
     LOGV2(5847205, "Balancer scheduler thread started");
 
