@@ -322,6 +322,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
 
     auto res = internal::rehydrateBucket(_opCtx,
                                          _bucketCatalog->bucketStateRegistry,
+                                         stats,
                                          ns,
                                          coll->getDefaultCollator(),
                                          *options,
@@ -1374,6 +1375,32 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
         BSONObj badDataObj = bucketDoc.addFields(BSON("data" << 123));
         ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), badDataObj));
     }
+}
+
+TEST_F(BucketCatalogTest, ReopenMixedSchemaDataBucket) {
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"02091c2c050b7495eaef4581"},
+            "control":{"version":1,
+                       "min":{"_id":{"$oid":"63091c30138e9261fd70a903"},
+                              "time":{"$date":"2022-08-26T19:19:00Z"},
+                              "x":1},
+                       "max":{"_id":{"$oid":"63091c30138e9261fd70a905"},
+                       "time":{"$date":"2022-08-26T19:19:30Z"},
+                       "x":{"y":"z"}}},
+            "data":{"_id":{"0":{"$oid":"63091c30138e9261fd70a903"},
+                           "1":{"$oid":"63091c30138e9261fd70a904"},
+                           "2":{"$oid":"63091c30138e9261fd70a905"}},
+                    "time":{"0":{"$date":"2022-08-26T19:19:30Z"},
+                            "1":{"$date":"2022-08-26T19:19:30Z"},
+                            "2":{"$date":"2022-08-26T19:19:30Z"}},
+                    "x":{"0":1,"1":{"y":"z"},"2":"abc"}}})");
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    ASSERT_NOT_OK(_reopenBucket(autoColl.getCollection(), bucketDoc));
+
+    auto stats = internal::getExecutionStats(*_bucketCatalog, _ns1);
+    ASSERT_EQ(1, stats->numBucketReopeningsFailed.load());
 }
 
 TEST_F(BucketCatalogTest, ReopenClosedBuckets) {

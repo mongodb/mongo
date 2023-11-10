@@ -172,6 +172,7 @@ Bucket* useAlternateBucket(Stripe& stripe, WithLock stripeLock, const CreationIn
  */
 StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                                                     BucketStateRegistry& registry,
+                                                    ExecutionStatsController& stats,
                                                     const NamespaceString& ns,
                                                     const StringDataComparator* comparator,
                                                     const TimeseriesOptions& options,
