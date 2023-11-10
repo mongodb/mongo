@@ -146,7 +146,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
                                          },
                                          protocol) {
         const db = new Mongo(host);
-        return db.adminCommand({
+        const res = executeNoThrowNetworkError(() => db.adminCommand({
             recipientForgetMigration: 1,
             migrationId: UUID(migrationIdString),
             donorConnectionString,
@@ -154,7 +154,13 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
             protocol,
             decision: "committed",
             readPreference,
-        });
+        }));
+
+        // We need to handle network errors as this thread might race with rollback.
+        assert.commandFailedWithCode(
+            res,
+            [ErrorCodes.InterruptedDueToReplStateChange, ErrorCodes.HostUnreachable],
+            tojson(res.code));
     }
 
     const recipientForgetMigrationThread =
@@ -191,8 +197,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand() {
     jsTestLog("Stepping up one of the secondaries.");
     recipientRst.stepUp(newPrimary, {awaitReplicationBeforeStepUp: false});
 
-    assert.commandFailedWithCode(recipientForgetMigrationThread.returnData(),
-                                 ErrorCodes.InterruptedDueToReplStateChange);
+    recipientForgetMigrationThread.join();
 
     // It should be possible to read from new recipient primary.
     assert.eq(1, newPrimary.getDB(dbName)[collName].find().itcount());
