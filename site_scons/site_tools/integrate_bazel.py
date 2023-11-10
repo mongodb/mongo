@@ -11,10 +11,18 @@ import threading
 import time
 from typing import List, Dict, Set, Tuple
 import urllib.request
+import sys
 
 import SCons
 
+import mongo.platform as mongo_platform
 import mongo.generators as mongo_generators
+
+_SUPPORTED_PLATFORM_MATRIX = [
+    "windows:amd64:msvc",
+    "linux:arm64:gcc",
+    "linux:arm64:clang",
+]
 
 
 class Globals:
@@ -58,8 +66,8 @@ def convert_scons_node_to_bazel_target(scons_node: SCons.Node.FS.File) -> str:
 
     # convert to the source path i.e.: src/mongo/db/libcommands.so
     bazel_path = scons_node.srcnode().path
-    # bazel uses source paths in the output i.e.: src/mongo/db
-    bazel_dir = os.path.dirname(bazel_path)
+    # bazel uses source paths in the output i.e.: src/mongo/db, replace backslashes on windows
+    bazel_dir = os.path.dirname(bazel_path).replace("\\", "/")
 
     # extract the platform prefix for a given file so we can remove it i.e.: libcommands.so -> 'lib'
     prefix = env.subst(scons_node.get_builder().get_prefix(env), target=[scons_node],
@@ -298,32 +306,27 @@ def generate(env: SCons.Environment.Environment) -> None:
         # === Architecture/platform ===
 
         # Bail if current architecture not supported for Bazel:
-        current_architecture = platform.machine()
-        supported_architectures = ['aarch64']
-        if current_architecture not in supported_architectures:
+        normalized_arch = platform.machine().lower().replace("aarch64", "arm64")
+        normalized_os = sys.platform.replace("win32", "windows")
+        current_platform = f"{normalized_os}:{normalized_arch}:{env.ToolchainName()}"
+        if current_platform not in _SUPPORTED_PLATFORM_MATRIX:
             raise Exception(
-                f'Bazel not supported on this architecture ({current_architecture}); supported architectures are: [{supported_architectures}]'
-            )
-
-        if not env.ToolchainIs('gcc', 'clang'):
-            raise Exception(
-                f"Unsupported Bazel c++ toolchain: {env.ToolchainName()} is neither `gcc` nor `clang`"
+                f'Bazel not supported on this platform ({current_platform}); supported platforms are: [{", ".join(_SUPPORTED_PLATFORM_MATRIX)}]'
             )
 
         # === Bazelisk ===
 
         # TODO(SERVER-81038): remove once bazel/bazelisk is self-hosted.
         if not os.path.exists("bazelisk"):
+            ext = ".exe" if normalized_os == "windows" else ""
             urllib.request.urlretrieve(
-                "https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64",
+                f"https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-{normalized_os}-{normalized_arch}{ext}",
                 "bazelisk")
             os.chmod("bazelisk", stat.S_IXUSR)
 
         # === Build settings ===
 
         static_link = env.GetOption("link-model") in ["auto", "static"]
-        if not env.ToolchainIs('gcc', 'clang'):
-            raise Exception(f"Toolchain {env.ToolchainName()} is neither `gcc` nor `clang`")
 
         if env.GetOption("release") is not None:
             build_mode = "release"
@@ -346,8 +349,10 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:use_lldbserver={False if env.GetOption("lldb-server") is None else True}',
             f'--//bazel/config:use_wait_for_debugger={False if env.GetOption("wait-for-debugger") is None else True}',
             f'--//bazel/config:use_disable_ref_track={False if env.GetOption("disable-ref-track") is None else True}',
+            f'--dynamic_mode={"off" if static_link else "fully"}',
+            f'--platforms=@mongo_toolchain//:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
+            f'--host_platform=@mongo_toolchain//:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
-            '--dynamic_mode=%s' % ('off' if static_link else 'fully'),
         ]
 
         Globals.bazel_base_build_command = [
@@ -360,7 +365,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         env['BAZEL_FLAGS_STR'] = str(bazel_internal_flags) + env.get("BAZEL_FLAGS", "")
 
         # We always use --compilation_mode debug for now as we always want -g, so assume -dbg location
-        env["BAZEL_OUT_DIR"] = env.Dir("#/bazel-out/$TARGET_ARCH-dbg/bin/")
+        out_dir_platform = "x64_windows" if normalized_os == "windows" else "$TARGET_ARCH"
+        env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/")
 
         # === Builders ===
         create_library_builder(env)

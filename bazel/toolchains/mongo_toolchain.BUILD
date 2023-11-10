@@ -4,19 +4,30 @@ load("@//bazel/toolchains:mongo_cc_toolchain_config.bzl", "mongo_cc_toolchain_co
 
 package(default_visibility = ["//visibility:public"])
 
-# Establish a "platform" target so Bazel can pick the right platform for building:
+[
+    platform(
+        name = "linux_arm64_" + compiler,
+        constraint_values = [
+            "@platforms//os:linux",
+            "@platforms//cpu:arm64",
+            "@bazel_tools//tools/cpp:" + compiler,
+        ],
+        exec_properties = {
+            # debian gcc based image contains the base our toolchain needs (glibc version and build-essentials)
+            # https://hub.docker.com/layers/library/gcc/12.3-bookworm/images/sha256-6a3a5694d10299dbfb8747b98621abf4593bb54a5396999caa013cba0e17dd4f?context=explore
+            "container-image": "docker://docker.io/library/gcc@sha256:6a3a5694d10299dbfb8747b98621abf4593bb54a5396999caa013cba0e17dd4f",
+        }
+    )
+    for compiler in ["clang", "gcc"]
+]
+
 platform(
-    name = "platform",
+    name = "windows_amd64_msvc",
     constraint_values = [
-        "@platforms//os:linux",
-        "@platforms//cpu:arm64",
-        "@bazel_tools//tools/cpp:gcc",
-    ],
-    exec_properties = {
-        # debian gcc based image contains the base our toolchain needs (glibc version and build-essentials)
-        # https://hub.docker.com/layers/library/gcc/12.3-bookworm/images/sha256-6a3a5694d10299dbfb8747b98621abf4593bb54a5396999caa013cba0e17dd4f?context=explore
-        "container-image": "docker://docker.io/library/gcc@sha256:6a3a5694d10299dbfb8747b98621abf4593bb54a5396999caa013cba0e17dd4f",
-    }
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+        "@bazel_tools//tools/cpp:msvc",
+    ]
 )
 
 # Helper target for the toolchain (see below):
@@ -156,6 +167,8 @@ cc_toolchain(
 
 toolchain(
     name = "mongo_toolchain",
+    toolchain = ":cc_mongo_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
     exec_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:arm64",
@@ -165,8 +178,6 @@ toolchain(
         "@platforms//os:linux",
         "@platforms//cpu:arm64",
     ],
-    toolchain = ":cc_mongo_toolchain",
-    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )
 
 cc_toolchain_suite(

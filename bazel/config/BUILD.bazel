@@ -25,6 +25,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "compiler_type_msvc",
+    flag_values = {
+        "//bazel/config:compiler_type": "msvc",
+    },
+)
+
 # --------------------------------------
 # Architecture + OS combinations
 # --------------------------------------

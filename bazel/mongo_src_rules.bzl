@@ -90,7 +90,8 @@ def mongo_cc_library(
       tags: Tags to add to the rule.
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
-      linkstatic: Whether or not linkstatic should be passed to the native bazel cc_library rule.
+      linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
+        is ignored on windows since linking into DLLs is not currently supported.
       local_defines: macro definitions passed to all source and header files.
     """
 
@@ -109,7 +110,10 @@ def mongo_cc_library(
         copts = MONGO_GLOBAL_COPTS + copts,
         data = data,
         tags = tags,
-        linkstatic = linkstatic,
+        linkstatic = select({
+            "@platforms//os:windows": True,
+            "//conditions:default": linkstatic,
+        }),
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         includes = [],
     )
@@ -138,7 +142,8 @@ def mongo_cc_binary(
       tags: Tags to add to the rule.
       copts: Any extra compiler options to pass in.
       linkopts: Any extra link options to pass in.
-      linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule.
+      linkstatic: Whether or not linkstatic should be passed to the native bazel cc_test rule. This argument
+        is ignored on windows since linking into DLLs is not currently supported.
       local_defines: macro definitions passed to all source and header files.
     """
 
@@ -151,7 +156,10 @@ def mongo_cc_binary(
         copts = MONGO_GLOBAL_COPTS + copts,
         data = data,
         tags = tags,
-        linkstatic = linkstatic,
+        linkstatic = select({
+            "@platforms//os:windows": True,
+            "//conditions:default": linkstatic,
+        }),
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
         malloc = select({
           "//bazel/config:tcmalloc_allocator": "//src/third_party/gperftools:tcmalloc_minimal",

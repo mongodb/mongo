@@ -278,6 +278,30 @@ buildvariants:
   tasks:
     - name: compile_bazel_TG
 
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &windows-bazel-compile windows-bazel-compile
+  display_name: "Windows Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - windows-vsCurrent-xlarge
+  stepback: false
+  expansions:
+    exe: ".exe"
+    ext: zip
+    content_type: application/zip
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
+      --win-version-min=win10
+    python: '/cygdrive/c/python/python39/python.exe'
+    compile_variant: *windows-bazel-compile
+  tasks:
+    - name: compile_bazel_windows_TG
+
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
   display_name: "! Amazon Linux 2 arm64 Shared Library Compile & Static Analysis"

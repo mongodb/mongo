@@ -2852,6 +2852,32 @@ tasks:
       targets: src/mongo/db/commands:fsync_locked
       compiler: clang
 
+- name: compile_bazel_dist_test_windows
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "scons compile"
+    vars:
+      targets: >-
+        build/fast/mongo/db/commands/fsync_locked.lib
+      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
+      task_compile_flags: >-
+        BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
+        BAZEL_FLAGS=--config=local
+        ICECC=
+        --build-profile=fast
+        --ninja=disabled
+        --link-model=static
+        --modules=
+  - func: "verify build output present"
+    vars:
+      output: build/fast/mongo/db/commands/fsync_locked.lib
+
 # Validates that the bazel mongo toolchain can be used to compile targets that
 # contain C and asssembly source code files.
 # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
@@ -2941,6 +2967,30 @@ tasks:
       # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
       args: >-
         --config=local
+
+- name: run_bazel_program_windows
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "bazel run"
+    vars:
+      target: >-
+        //src/mongo/platform:visibility_test1
+      # TODO SERVER-79852 remove "BAZEL_FLAGS=--config=local" flag
+      # TODO DEVPROD-2508 remove dbg flags when compilation_mode is synced with build_mode automatically
+      # TODO DEVPROD-2513 remove "--copt /std:c++20" flag when toolchain sets this automatically
+      args: >-
+        --config=local
+        --host_platform=@mongo_toolchain//:windows_amd64_msvc
+        --platforms=@mongo_toolchain//:windows_amd64_msvc
+        --//bazel/config:compiler_type=msvc
+        --compilation_mode=dbg
+        --//bazel/config:build_mode=dbg
+        --copt /std:c++20
 
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test_half
@@ -9400,6 +9450,12 @@ task_groups:
   - compile_bazel_libunwind
   - compile_bazel_program
   - run_bazel_program
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_windows_TG
+  tasks:
+  - compile_bazel_dist_test_windows
+  - run_bazel_program_windows
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

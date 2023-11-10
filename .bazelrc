@@ -1,13 +1,18 @@
 # Reference docs: https://bazel.build/run/bazelrc
 
+# This automatically sets a config based on host platform, ex: --config=macos if the host is macos
+build --enable_platform_specific_config=true
+
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 build --incompatible_strict_action_env=true
 
 # Configure default values for platforms, host_platform, and crosstool_top.
 # This supports the "crosstool" feature (aka building from our toolchain).
-build --platforms=@mongo_toolchain//:platform
-build --host_platform=@mongo_toolchain//:platform
-build --crosstool_top=@mongo_toolchain//:toolchain_suite
+# Currently the only platform with a custom toolchain config is linux, use the default
+# toolchain_suite elsewhere.
+build --platforms=@mongo_toolchain//:linux_arm64_gcc
+build --host_platform=@mongo_toolchain//:linux_arm64_gcc
+build:linux --crosstool_top=@mongo_toolchain//:toolchain_suite
 
 # remote execution is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the local option below

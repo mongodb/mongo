@@ -45,7 +45,6 @@ mongo_cc_library(
         "dist/src/thread_cache.cc",
     ] + select({
         "@platforms//os:windows": [
-            "dist/src/tcmalloc.cc",
             "dist/src/windows/port.cc",
             "dist/src/windows/system-alloc.cc",
             "dist/src/fake_stacktrace_scope.cc",
@@ -56,8 +55,9 @@ mongo_cc_library(
             "dist/src/system-alloc.cc",
         ],
     }) + select({
-        "@//bazel/config:dbg": ["dist/src/debugallocation.cc"],
-        "//conditions:default": ["dist/src/tcmalloc.cc"],
+        "@//bazel/config:linux_dbg": ["dist/src/debugallocation.cc"],
+        "@platforms//os:linux": ["dist/src/tcmalloc.cc"],
+        "//conditions:default": [],
     }),
     copts = ["-Isrc/third_party/gperftools/dist/src"] + select({
             "@//bazel/config:linux_aarch64": [
