@@ -85,7 +85,7 @@ with open(pathlib.Path(__file__).parent.parent / 'SConscript', 'w') as sconscrip
     sconscript.write("""\
 # Generated from parse_lib_from_ninja.py   
 Import("env")
-env = env.Clone()
+env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 env.InjectThirdParty(libraries=['abseil-cpp'])
 if env.ToolchainIs('msvc'):
     env.Append(
