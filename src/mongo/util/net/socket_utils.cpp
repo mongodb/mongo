@@ -238,8 +238,13 @@ void setSocketKeepAliveParams(int sock,
 #endif  // _WIN32
 }
 
-std::string makeUnixSockPath(int port) {
-    return str::stream() << serverGlobalParams.socket << "/mongodb-" << port << ".sock";
+std::string makeUnixSockPath(int port, StringData label) {
+    str::stream stream;
+    stream << serverGlobalParams.socket << "/mongodb-";
+    if (!label.empty()) {
+        stream << label << "-";
+    }
+    return stream << port << ".sock";
 }
 
 #ifndef _WIN32

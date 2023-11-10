@@ -47,6 +47,8 @@
 
 namespace mongo::transport::test {
 
+constexpr auto kLetKernelChoosePort = 0;
+
 template <typename T>
 class BlockingQueue {
 public:
