@@ -321,6 +321,7 @@ env.Clone().InjectModule("enterprise").Library(
         'server_options_base',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         'server_base',
     ],

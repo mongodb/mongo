@@ -82,6 +82,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
@@ -256,10 +257,14 @@ Status validateMongodOptions(const moe::Environment& params) {
 
     bool setRouterPort = params.count("routerPort") || params.count("net.routerPort");
 
-    // TODO (SERVER-79008): Make `--configdb` mandatory when the embedded router is enabled.
     if (setRouterPort && !setConfigRole && !setShardRole) {
         return Status(ErrorCodes::BadValue,
                       "The embedded router requires the node to act as a shard or config server");
+    }
+
+    bool setConfigDBs = params.count("sharding.configDB");
+    if (setConfigDBs && !setRouterPort) {
+        return Status(ErrorCodes::BadValue, "--configdb is only supported in embedded router mode");
     }
 
     if (params.count("maintenanceMode")) {
