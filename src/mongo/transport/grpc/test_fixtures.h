@@ -56,6 +56,7 @@
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/grpc/service.h"
 #include "mongo/transport/grpc/util.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/util/assert_util.h"
@@ -168,7 +169,6 @@ private:
 class CommandServiceTestFixtures : public ServiceContextTest {
 public:
     static constexpr auto kBindAddress = "localhost";
-    static constexpr auto kBindPort = 1234;
     static constexpr auto kMaxThreads = 100;
     static constexpr auto kServerCertificateKeyFile = "jstests/libs/server_SAN.pem";
     static constexpr auto kClientCertificateKeyFile = "jstests/libs/client.pem";
@@ -223,13 +223,13 @@ public:
         ::grpc::internal::RpcMethod _authenticatedCommandStreamMethod;
     };
 
-    static HostAndPort defaultServerAddress() {
-        return HostAndPort(kBindAddress, kBindPort);
+    static HostAndPort defaultServerAddress(int port) {
+        return HostAndPort(kBindAddress, port);
     }
 
     static Server::Options makeServerOptions() {
         Server::Options options;
-        options.addresses = {HostAndPort(kBindAddress, kBindPort)};
+        options.addresses = {HostAndPort(kBindAddress, test::kLetKernelChoosePort)};
         options.maxThreads = kMaxThreads;
         options.tlsCAFile = kCAFile;
         options.tlsPEMKeyFile = kServerCertificateKeyFile;
@@ -248,7 +248,7 @@ public:
     static GRPCTransportLayer::Options makeTLOptions() {
         GRPCTransportLayer::Options options{};
         options.bindIpList = {};
-        options.bindPort = kBindPort;
+        options.bindPort = test::kLetKernelChoosePort;
         options.maxServerThreads = kMaxThreads;
         options.useUnixDomainSockets = false;
         options.unixDomainSocketPermissions = DEFAULT_UNIX_PERMS;
@@ -313,6 +313,7 @@ public:
                 };
                 auto server = makeServer(handler, options);
                 server->start();
+                options.addresses = server->getListeningAddresses();
                 servers.push_back(std::move(server));
             }
             ON_BLOCK_EXIT([&servers] {
@@ -379,15 +380,18 @@ public:
         });
     }
 
-    static Stub makeStub(boost::optional<Stub::Options> options = boost::none) {
-        return makeStub("localhost:{}"_format(kBindPort), options);
+    static Stub makeStub(const HostAndPort& addr,
+                         boost::optional<Stub::Options> options = boost::none) {
+        return makeStub(fmt::format("{}:{}", addr.host(), addr.port()), options);
     }
 
-    static Stub makeStubWithCerts(std::string caFile, std::string clientCertFile) {
+    static Stub makeStubWithCerts(const HostAndPort& addr,
+                                  std::string caFile,
+                                  std::string clientCertFile) {
         auto stubOptions = CommandServiceTestFixtures::Stub::Options{};
         stubOptions.tlsCAFile = caFile;
         stubOptions.tlsCertificateKeyFile = clientCertFile;
-        return makeStub(stubOptions);
+        return makeStub(addr, stubOptions);
     }
 
     static CommandService::RPCHandler makeEchoHandler() {
@@ -444,9 +448,8 @@ public:
     }
 };
 
-inline std::shared_ptr<EgressSession> makeEgressSession(
-    GRPCTransportLayer& tl,
-    const HostAndPort& addr = CommandServiceTestFixtures::defaultServerAddress()) {
+inline std::shared_ptr<EgressSession> makeEgressSession(GRPCTransportLayer& tl,
+                                                        const HostAndPort& addr) {
     auto swSession = tl.connect(
         addr, ConnectSSLMode::kGlobalSSLMode, CommandServiceTestFixtures::kDefaultConnectTimeout);
     return std::dynamic_pointer_cast<EgressSession>(uassertStatusOK(swSession));

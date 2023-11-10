@@ -36,18 +36,17 @@
 #include <grpcpp/support/sync_stream.h>
 
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/server.h"
 #include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/transport/grpc/util.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/notification.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/socket_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -60,25 +59,38 @@ public:
                                       ::grpc::StatusCode validCertResult,
                                       ::grpc::StatusCode noClientCertResult,
                                       ::grpc::StatusCode selfSignedClientCertResult) {
-        auto clientThread = [&](Server&, unittest::ThreadAssertionMonitor& monitor) {
+        auto clientThread = [&](Server& s, unittest::ThreadAssertionMonitor& monitor) {
+            auto addr = s.getListeningAddresses().at(0);
+
+            // For connection attempts that are expected to fail, use a shorter timeout to speed up
+            // the test.
+            auto getTimeout = [](::grpc::StatusCode expected) {
+                if (expected == ::grpc::StatusCode::OK) {
+                    return CommandServiceTestFixtures::kDefaultConnectTimeout;
+                } else {
+                    return Milliseconds(50);
+                }
+            };
             {
-                auto stub = CommandServiceTestFixtures::makeStub();
-                ASSERT_EQ(stub.connect().error_code(), validCertResult);
+                auto stub = CommandServiceTestFixtures::makeStub(addr);
+                ASSERT_EQ(stub.connect(getTimeout(validCertResult)).error_code(), validCertResult);
             }
             {
                 CommandServiceTestFixtures::Stub::Options options;
                 options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
-                auto stub = CommandServiceTestFixtures::makeStub(options);
+                auto stub = CommandServiceTestFixtures::makeStub(addr, options);
 
-                ASSERT_EQ(stub.connect().error_code(), noClientCertResult);
+                ASSERT_EQ(stub.connect(getTimeout(noClientCertResult)).error_code(),
+                          noClientCertResult);
             }
             {
                 CommandServiceTestFixtures::Stub::Options options;
                 options.tlsCertificateKeyFile =
                     CommandServiceTestFixtures::kClientSelfSignedCertificateKeyFile;
                 options.tlsCAFile = CommandServiceTestFixtures::kCAFile;
-                auto stub = CommandServiceTestFixtures::makeStub(options);
-                ASSERT_EQ(stub.connect().error_code(), selfSignedClientCertResult);
+                auto stub = CommandServiceTestFixtures::makeStub(addr, options);
+                ASSERT_EQ(stub.connect(getTimeout(selfSignedClientCertResult)).error_code(),
+                          selfSignedClientCertResult);
             }
         };
 
@@ -98,8 +110,8 @@ TEST_F(ServerTest, MaxThreads) {
         okayToReturn.get();
     };
 
-    auto clientThread = [&](Server&, unittest::ThreadAssertionMonitor& monitor) {
-        auto stub = CommandServiceTestFixtures::makeStub();
+    auto clientThread = [&](Server& s, unittest::ThreadAssertionMonitor& monitor) {
+        auto stub = CommandServiceTestFixtures::makeStub(s.getListeningAddresses().at(0));
         std::vector<stdx::thread> threads;
 
         // A minimum of one thread is reserved for the completion queue, so we can only create
@@ -146,12 +158,13 @@ TEST_F(ServerTest, ECDSACertificates) {
 
     CommandServiceTestFixtures::runWithServer(
         [](auto) {},
-        [&](auto&, auto&) {
+        [&](auto& s, auto&) {
             auto stubOptions = CommandServiceTestFixtures::Stub::Options{};
             stubOptions.tlsCAFile = kECDSACAFile;
             stubOptions.tlsCertificateKeyFile = "jstests/libs/ecdsa-client.pem";
 
-            auto stub = CommandServiceTestFixtures::makeStub(stubOptions);
+            auto stub =
+                CommandServiceTestFixtures::makeStub(s.getListeningAddresses().at(0), stubOptions);
             ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK);
         },
         options);
@@ -163,8 +176,8 @@ TEST_F(ServerTest, IntermediateCA) {
 
     CommandServiceTestFixtures::runWithServer(
         [](auto) {},
-        [&](auto&, auto&) {
-            auto stub = CommandServiceTestFixtures::makeStub();
+        [&](Server& s, auto&) {
+            auto stub = CommandServiceTestFixtures::makeStub(s.getListeningAddresses().at(0));
             ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK);
         },
         options);
@@ -238,19 +251,21 @@ TEST_F(ServerTest, DisableCertificateValidation) {
 }
 
 TEST_F(ServerTest, MultipleAddresses) {
-    std::vector<HostAndPort> addresses{
-        HostAndPort("localhost", CommandServiceTestFixtures::kBindPort),
-        HostAndPort("127.0.0.1", CommandServiceTestFixtures::kBindPort),
-        HostAndPort("::1", CommandServiceTestFixtures::kBindPort),
-        HostAndPort(makeUnixSockPath(CommandServiceTestFixtures::kBindPort))};
+    std::vector<HostAndPort> addresses{HostAndPort("localhost", test::kLetKernelChoosePort),
+                                       HostAndPort("127.0.0.1", test::kLetKernelChoosePort),
+                                       HostAndPort("::1", test::kLetKernelChoosePort),
+                                       HostAndPort(makeUnixSockPath(test::kLetKernelChoosePort))};
 
     Server::Options options = CommandServiceTestFixtures::makeServerOptions();
     options.addresses = addresses;
 
     CommandServiceTestFixtures::runWithServer(
         [](auto) {},
-        [&addresses](auto&, auto&) {
-            for (auto& address : addresses) {
+        [&addresses](auto& server, auto&) {
+            auto boundAddresses = server.getListeningAddresses();
+            ASSERT_EQ(boundAddresses.size(), addresses.size())
+                << "not all provided addresses were bound to";
+            for (auto& address : boundAddresses) {
                 auto stub =
                     CommandServiceTestFixtures::makeStub(util::formatHostAndPortForGRPC(address));
                 ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK)

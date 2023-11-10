@@ -32,9 +32,9 @@
 #include <memory>
 
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/grpc/mock_client.h"
-#include "mongo/transport/grpc/test_fixtures.h"
 
 namespace mongo::transport::grpc {
 
@@ -42,6 +42,9 @@ class Service;
 
 /**
  * Currently only mocks the egress portion of GRPCTransportLayer.
+ *
+ * setup() must be called exactly once before start(), which also can only be called exactly once.
+ * Neither of these methods are thread-safe.
  */
 class GRPCTransportLayerMock : public GRPCTransportLayer {
 public:
@@ -50,37 +53,43 @@ public:
                            MockClient::MockResolver resolver,
                            const HostAndPort& mockClientAddress);
 
-    virtual Status registerService(std::unique_ptr<Service> svc);
+    Status registerService(std::unique_ptr<Service> svc) override;
 
-    virtual Status setup() override;
+    Status setup() override;
 
-    virtual Status start() override;
+    Status start() override;
 
-    virtual void shutdown() override;
+    void shutdown() override;
 
-    virtual StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
+    StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
         Milliseconds timeout,
         boost::optional<std::string> authToken = boost::none) override;
 
-    virtual StatusWith<std::shared_ptr<Session>> connect(
+    StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
         boost::optional<TransientSSLParams> transientSSLParams) override;
 
 #ifdef MONGO_CONFIG_SSL
-    virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
-                                      bool asyncOCSPStaple) {
+    Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager, bool asyncOCSPStaple) {
         MONGO_UNIMPLEMENTED;
     };
 #endif
+
+    const std::vector<HostAndPort>& getListeningAddresses() const override;
 
     SessionManager* getSessionManager() const {
         return nullptr;
     }
 
 private:
+    enum class StartupState { kNotStarted, kSetup, kStarted, kShutDown };
+
+    AtomicWord<StartupState> _startupState;
+
+    std::vector<HostAndPort> _listenAddresses;
     std::shared_ptr<Client> _client;
     ServiceContext* const _svcCtx;
     Options _options;

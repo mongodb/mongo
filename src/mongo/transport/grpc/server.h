@@ -78,6 +78,12 @@ public:
     void start();
 
     /**
+     * Return the list of addresses this server is bound to and listening on.
+     * This must not be called before the server has been started.
+     */
+    const std::vector<HostAndPort>& getListeningAddresses() const;
+
+    /**
      * Initiates shutting down of the gRPC server, blocking until all pending RPCs and their
      * associated handlers have been completed.
      */

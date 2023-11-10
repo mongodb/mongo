@@ -45,7 +45,12 @@
 
 namespace mongo::transport::grpc {
 
-class MockClientTest : public ServiceContextTest {};
+class MockClientTest : public ServiceContextTest {
+public:
+    static HostAndPort defaultServerAddress() {
+        return HostAndPort("localhost", 1234);
+    }
+};
 
 TEST_F(MockClientTest, MockConnect) {
     std::vector<HostAndPort> addresses = {HostAndPort("localhost", 27017),
@@ -99,14 +104,13 @@ TEST_F(MockClientTest, MockAuthToken) {
         client.start(getServiceContext());
         Client::ConnectOptions options;
         options.authToken = kAuthToken;
-        auto session = client.connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                      options);
+        auto session = client.connect(
+            defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, options);
         ASSERT_OK(session->finish());
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {CommandServiceTestFixtures::defaultServerAddress()}, serverHandler, clientThreadBody);
+        {defaultServerAddress()}, serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockNoAuthToken) {
@@ -116,14 +120,13 @@ TEST_F(MockClientTest, MockNoAuthToken) {
 
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
         client.start(getServiceContext());
-        auto session = client.connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                      {});
+        auto session = client.connect(
+            defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
         ASSERT_OK(session->finish());
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {CommandServiceTestFixtures::defaultServerAddress()}, serverHandler, clientThreadBody);
+        {defaultServerAddress()}, serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockClientShutdown) {
@@ -146,9 +149,8 @@ TEST_F(MockClientTest, MockClientShutdown) {
 
         std::vector<std::shared_ptr<EgressSession>> sessions;
         for (int i = 0; i < kNumRpcs; i++) {
-            sessions.push_back(client.connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                              CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                              {}));
+            sessions.push_back(client.connect(
+                defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {}));
         }
 
         Notification<void> shutdownFinished;
@@ -175,7 +177,7 @@ TEST_F(MockClientTest, MockClientShutdown) {
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {CommandServiceTestFixtures::defaultServerAddress()}, serverHandler, clientThreadBody);
+        {defaultServerAddress()}, serverHandler, clientThreadBody);
 }
 
 TEST_F(MockClientTest, MockClientMetadata) {
@@ -192,17 +194,13 @@ TEST_F(MockClientTest, MockClientMetadata) {
     auto clientThreadBody = [&](MockClient& client, auto& monitor) {
         client.start(getServiceContext());
         clientId.set(client.id());
-        auto session = client.connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                      CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                      {});
+        auto session = client.connect(
+            defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
         ASSERT_OK(session->finish());
     };
 
     CommandServiceTestFixtures::runWithMockServers(
-        {CommandServiceTestFixtures::defaultServerAddress()},
-        serverHandler,
-        clientThreadBody,
-        metadataDoc);
+        {defaultServerAddress()}, serverHandler, clientThreadBody, metadataDoc);
 }
 
 TEST_F(MockClientTest, WireVersionGossipping) {
@@ -223,9 +221,8 @@ TEST_F(MockClientTest, WireVersionGossipping) {
         ASSERT_EQ(client.getClusterMaxWireVersion(), util::constants::kMinimumWireVersion);
 
         auto runTest = [&](int initialWireVersion, int updatedWireVersion) {
-            auto session = client.connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                          CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                          {});
+            auto session = client.connect(
+                defaultServerAddress(), CommandServiceTestFixtures::kDefaultConnectTimeout, {});
             ASSERT_EQ(client.getClusterMaxWireVersion(), initialWireVersion);
             ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
             ASSERT_EQ(client.getClusterMaxWireVersion(), initialWireVersion);
@@ -239,12 +236,11 @@ TEST_F(MockClientTest, WireVersionGossipping) {
         runTest(kServerMaxWireVersion, kServerMaxWireVersion + 1);
     };
 
-    CommandServiceTestFixtures::runWithMockServers(
-        {CommandServiceTestFixtures::defaultServerAddress()},
-        serverHandler,
-        clientThreadBody,
-        makeClientMetadataDocument(),
-        wvProvider);
+    CommandServiceTestFixtures::runWithMockServers({defaultServerAddress()},
+                                                   serverHandler,
+                                                   clientThreadBody,
+                                                   makeClientMetadataDocument(),
+                                                   wvProvider);
 }
 
 }  // namespace mongo::transport::grpc

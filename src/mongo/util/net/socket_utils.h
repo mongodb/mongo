@@ -46,7 +46,7 @@ void setSocketKeepAliveParams(int sock,
                               Seconds maxKeepIdleSecs = kMaxKeepIdleSecs,
                               Seconds maxKeepIntvlSecs = kMaxKeepIntvlSecs);
 
-std::string makeUnixSockPath(int port);
+std::string makeUnixSockPath(int port, StringData label = "");
 
 inline bool isUnixDomainSocket(const StringData& hostname) {
     return hostname.find('/') != std::string::npos;

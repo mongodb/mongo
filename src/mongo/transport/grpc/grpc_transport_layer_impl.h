@@ -49,20 +49,20 @@ public:
                            std::unique_ptr<SessionManager> sessionManager);
     ~GRPCTransportLayerImpl();
 
-    virtual Status registerService(std::unique_ptr<Service> svc) override;
+    Status registerService(std::unique_ptr<Service> svc) override;
 
-    virtual Status setup() override;
+    Status setup() override;
 
-    virtual Status start() override;
+    Status start() override;
 
-    virtual void shutdown() override;
+    void shutdown() override;
 
-    virtual StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
+    StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,
         Milliseconds timeout,
         boost::optional<std::string> authToken = boost::none) override;
 
-    virtual StatusWith<std::shared_ptr<Session>> connect(
+    StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
@@ -72,6 +72,8 @@ public:
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                               bool asyncOCSPStaple) override;
 #endif
+
+    const std::vector<HostAndPort>& getListeningAddresses() const override;
 
     SessionManager* getSessionManager() const override {
         return _sessionManager.get();

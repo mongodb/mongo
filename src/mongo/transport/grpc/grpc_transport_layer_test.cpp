@@ -249,18 +249,12 @@ TEST_F(GRPCTransportLayerTest, ConnectAndListen) {
     unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
         auto options = CommandServiceTestFixtures::makeTLOptions();
         options.bindIpList = {"localhost", "127.0.0.1", "::1"};
-        options.bindPort = CommandServiceTestFixtures::kBindPort;
         options.useUnixDomainSockets = true;
-
-        std::vector<HostAndPort> addrs;
-        for (auto& ip : options.bindIpList) {
-            addrs.push_back(HostAndPort(ip, options.bindPort));
-            addrs.push_back(HostAndPort(makeUnixSockPath(options.bindPort)));
-        }
 
         runWithTL(
             makeNoopRPCHandler(),
             [&](auto& tl) {
+                auto addrs = tl.getListeningAddresses();
                 std::vector<stdx::thread> threads;
                 for (size_t i = 0; i < addrs.size() * 5; i++) {
                     threads.push_back(monitor.spawn(
@@ -283,10 +277,15 @@ TEST_F(GRPCTransportLayerTest, UnixDomainSocketPermissions) {
 
     runWithTL(
         makeNoopRPCHandler(),
-        [&](auto& tl) {
+        [&](GRPCTransportLayer& tl) {
+            auto addrs = tl.getListeningAddresses();
+            auto socketPath = std::find_if(addrs.begin(), addrs.end(), [](const HostAndPort& hp) {
+                return isUnixDomainSocket(hp.host());
+            });
+            ASSERT_NE(socketPath, addrs.end());
+
             struct stat st;
-            ASSERT_EQ(::stat(makeUnixSockPath(options.bindPort).c_str(), &st), 0)
-                << errorMessage(lastPosixError());
+            ASSERT_EQ(::stat(socketPath->host().c_str(), &st), 0) << errorMessage(lastPosixError());
             ASSERT_EQ(st.st_mode & permissions, permissions);
         },
         std::move(options));
@@ -300,15 +299,14 @@ TEST_F(GRPCTransportLayerTest, DefaultIPList) {
     noIPListOptions.clientMetadata = makeClientMetadataDocument();
     noIPListOptions.bindIpList = {};
     noIPListOptions.useUnixDomainSockets = true;
-
-    std::vector<HostAndPort> addrs;
-    addrs.push_back(HostAndPort("127.0.0.1", noIPListOptions.bindPort));
-    addrs.push_back(HostAndPort(makeUnixSockPath(noIPListOptions.bindPort)));
+    noIPListOptions.bindPort = 0;
 
     runWithTL(
         makeNoopRPCHandler(),
-        [&](auto& tl) {
-            for (auto& addr : addrs) {
+        [&](GRPCTransportLayer& tl) {
+            for (auto& addr : tl.getListeningAddresses()) {
+                ASSERT(addr.isLocalHost() || isUnixDomainSocket(addr.host()))
+                    << "unexpected default address: " << addr;
                 assertConnectSucceeds(tl, addr);
             }
         },
@@ -340,33 +338,29 @@ TEST_F(GRPCTransportLayerTest, GRPCTransportLayerShutdown) {
     client->start(getServiceContext());
     ON_BLOCK_EXIT([&] { client->shutdown(); });
 
+    HostAndPort addr;
     {
         uassertStatusOK(tl->setup());
         uassertStatusOK(tl->start());
         ON_BLOCK_EXIT([&] { tl->shutdown(); });
+        addr = tl->getListeningAddresses().at(0);
 
-
-        auto session = client->connect(CommandServiceTestFixtures::defaultServerAddress(),
-                                       CommandServiceTestFixtures::kDefaultConnectTimeout,
-                                       {});
+        auto session =
+            client->connect(addr, CommandServiceTestFixtures::kDefaultConnectTimeout, {});
         ASSERT_OK(session->finish());
         session.reset();
     }
 
     ASSERT_THROWS_CODE(
-        client->connect(CommandServiceTestFixtures::defaultServerAddress(), Milliseconds(50), {}),
-        DBException,
-        ErrorCodes::NetworkTimeout);
-    ASSERT_NOT_OK(tl->connect(CommandServiceTestFixtures::defaultServerAddress(),
-                              ConnectSSLMode::kGlobalSSLMode,
-                              Milliseconds(50)));
+        client->connect(addr, Milliseconds(50), {}), DBException, ErrorCodes::NetworkTimeout);
+    ASSERT_NOT_OK(tl->connect(addr, ConnectSSLMode::kGlobalSSLMode, Milliseconds(50)));
 }
 
 TEST_F(GRPCTransportLayerTest, Unary) {
     runWithTL(
         CommandServiceTestFixtures::makeEchoHandler(),
         [&](auto& tl) {
-            auto session = makeEgressSession(tl);
+            auto session = makeEgressSession(tl, tl.getListeningAddresses().at(0));
             assertEchoSucceeds(*session);
             ASSERT_OK(session->finish());
         },
@@ -396,7 +390,7 @@ TEST_F(GRPCTransportLayerTest, Exhaust) {
     runWithTL(
         streamingHandler,
         [&](auto& tl) {
-            auto session = makeEgressSession(tl);
+            auto session = makeEgressSession(tl, tl.getListeningAddresses().at(0));
             ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
             for (auto i = 0;; i++) {
                 auto swMsg = session->sourceMessage();
@@ -441,7 +435,7 @@ TEST_F(GRPCTransportLayerTest, Awaitable) {
     runWithTL(
         streamingHandler,
         [&](auto& tl) {
-            auto session = makeEgressSession(tl);
+            auto session = makeEgressSession(tl, tl.getListeningAddresses().at(0));
             ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
             for (auto i = 0; i < kMessageCount; i++) {
                 auto swMsg = session->sourceMessage();
@@ -476,7 +470,7 @@ TEST_F(GRPCTransportLayerTest, Unacknowledged) {
     runWithTL(
         serverHandler,
         [&](auto& tl) {
-            auto session = makeEgressSession(tl);
+            auto session = makeEgressSession(tl, tl.getListeningAddresses().at(0));
             assertEchoSucceeds(*session);
 
             auto unacknowledgedMsg = makeUniqueMessage();
@@ -524,11 +518,13 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceeds) {
     runWithTL(
         makeNoopRPCHandler(),
         [&](auto& tl) {
+            auto addr = tl.getListeningAddresses().at(0);
             auto initialGoodStub = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
-            auto initialBadStub =
-                CommandServiceTestFixtures::makeStubWithCerts(kTrustedCAFile, kTrustedClientFile);
+            auto initialBadStub = CommandServiceTestFixtures::makeStubWithCerts(
+                addr, kTrustedCAFile, kTrustedClientFile);
 
             ASSERT_GRPC_STUB_CONNECTED(initialGoodStub);
             ASSERT_GRPC_STUB_NOT_CONNECTED(initialBadStub);
@@ -553,8 +549,10 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceedsWhenU
     runWithTL(
         makeNoopRPCHandler(),
         [&](auto& tl) {
+            auto addr = tl.getListeningAddresses().at(0);
             // Connect using the existing certs.
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub);
@@ -562,6 +560,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesSucceedsWhenU
             ASSERT_OK(tl.rotateCertificates(SSLManagerCoordinator::get()->getSSLManager(), false));
 
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub2);
@@ -573,8 +572,11 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesThrowsAndUses
     runWithTL(
         makeNoopRPCHandler(),
         [&](auto& tl) {
+            auto addr = tl.getListeningAddresses().at(0);
+
             // Connect using the existing certs.
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub);
@@ -586,6 +588,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest, RotateCertificatesThrowsAndUses
                 ErrorCodes::InvalidSSLConfiguration);
 
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub2);
@@ -600,8 +603,11 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
     runWithTL(
         makeNoopRPCHandler(),
         [&](auto& tl) {
+            auto addr = tl.getListeningAddresses().at(0);
+
             // Connect using the existing certs.
             auto stub = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub);
@@ -617,6 +623,7 @@ TEST_F(RotateCertificatesGRPCTransportLayerTest,
 
             // Make sure we can still connect with the initial certs used before the bad rotation.
             auto stub2 = CommandServiceTestFixtures::makeStubWithCerts(
+                addr,
                 CommandServiceTestFixtures::kCAFile,
                 CommandServiceTestFixtures::kClientCertificateKeyFile);
             ASSERT_GRPC_STUB_CONNECTED(stub2);

@@ -60,6 +60,11 @@ public:
 
         bool enableEgress = false;
         std::vector<std::string> bindIpList;
+        /**
+         * If set to 0, the transport layer will bind to an arbitrary unused port.
+         * This port can be accessed via getListeningAddresses() after the transport layer has been
+         * started.
+         */
         int bindPort;
         bool useUnixDomainSockets;
         int unixDomainSocketPermissions;
@@ -105,6 +110,13 @@ public:
     ReactorHandle getReactor(WhichReactor) override {
         MONGO_UNIMPLEMENTED;
     }
+
+    /**
+     * The addresses the gRPC server is listening to, if any.
+     *
+     * This must only be invoked after the transport layer has been started.
+     */
+    virtual const std::vector<HostAndPort>& getListeningAddresses() const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     /**

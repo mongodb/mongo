@@ -98,7 +98,11 @@ public:
             CommandServiceTestFixtures::runWithServer(
                 serverStreamHandler,
                 [&](Server& server, unittest::ThreadAssertionMonitor& monitor) {
-                    callback(server, CommandServiceTestFixtures::makeStub(), factory, monitor);
+                    callback(
+                        server,
+                        CommandServiceTestFixtures::makeStub(server.getListeningAddresses().at(0)),
+                        factory,
+                        monitor);
                 });
         }
     }
@@ -469,41 +473,52 @@ TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
 }
 
 TEST_F(CommandServiceTest, AuthTokenHandling) {
-    auto makeStream = [&](bool useAuth, boost::optional<std::string> authToken) {
-        ::grpc::ClientContext ctx;
-        auto stub = CommandServiceTestFixtures::makeStub();
-        ctx.AddMetadata(util::constants::kWireVersionKey.toString(),
-                        std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
-        if (authToken) {
-            ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), *authToken);
-        }
-        auto stream = useAuth ? stub.authenticatedCommandStream(&ctx)
-                              : stub.unauthenticatedCommandStream(&ctx);
-        return stream->Finish();
-    };
+    auto makeStream =
+        [&](const HostAndPort& addr, bool useAuth, boost::optional<std::string> authToken) {
+            ::grpc::ClientContext ctx;
+            auto stub = CommandServiceTestFixtures::makeStub(addr);
+            ctx.AddMetadata(util::constants::kWireVersionKey.toString(),
+                            std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
+            if (authToken) {
+                ctx.AddMetadata(util::constants::kAuthenticationTokenKey.toString(), *authToken);
+            }
+            auto stream = useAuth ? stub.authenticatedCommandStream(&ctx)
+                                  : stub.unauthenticatedCommandStream(&ctx);
+            return stream->Finish();
+        };
 
     CommandServiceTestFixtures::runWithServer(
         [](auto session) { ASSERT_FALSE(session->authToken()); },
-        [&](auto&, auto&) {
-            ASSERT_TRUE(makeStream(false /* Don't use Auth */, boost::none).ok());
+        [&](auto& server, auto&) {
+            ASSERT_TRUE(makeStream(server.getListeningAddresses().at(0),
+                                   false /* Don't use Auth */,
+                                   boost::none)
+                            .ok());
         });
     CommandServiceTestFixtures::runWithServer(
         [](auto) { FAIL("RPC should fail before invoking handler"); },
-        [&](auto&, auto&) {
-            ASSERT_EQ(makeStream(true /* Use Auth */, boost::none).error_code(),
-                      ::grpc::StatusCode::UNAUTHENTICATED);
+        [&](auto& server, auto&) {
+            ASSERT_EQ(
+                makeStream(server.getListeningAddresses().at(0), true /* Use Auth */, boost::none)
+                    .error_code(),
+                ::grpc::StatusCode::UNAUTHENTICATED);
         });
     const std::string kAuthToken = "my-auth-token";
     CommandServiceTestFixtures::runWithServer(
         [&](auto session) { ASSERT_EQ(session->authToken(), kAuthToken); },
-        [&](auto&, auto&) {
-            ASSERT_EQ(makeStream(true /* Use Auth */, kAuthToken).error_code(),
-                      ::grpc::StatusCode::OK);
+        [&](auto& server, auto&) {
+            ASSERT_EQ(
+                makeStream(server.getListeningAddresses().at(0), true /* Use Auth */, kAuthToken)
+                    .error_code(),
+                ::grpc::StatusCode::OK);
         });
     CommandServiceTestFixtures::runWithServer(
         [](auto session) { ASSERT_FALSE(session->authToken()); },
-        [&](auto&, auto&) {
-            ASSERT_EQ(makeStream(false /* Don't use Auth */, kAuthToken).error_code(),
+        [&](auto& server, auto&) {
+            ASSERT_EQ(makeStream(server.getListeningAddresses().at(0),
+                                 false /* Don't use Auth */,
+                                 kAuthToken)
+                          .error_code(),
                       ::grpc::StatusCode::OK);
         });
 }
@@ -595,7 +610,7 @@ TEST_F(CommandServiceTest, ServerHandlerThrows) {
         }
     });
 
-    auto stub = CommandServiceTestFixtures::makeStub();
+    auto stub = CommandServiceTestFixtures::makeStub(server->getListeningAddresses().at(0));
     ::grpc::ClientContext ctx;
     CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
     ASSERT_NE(stub.connect().error_code(), ::grpc::StatusCode::OK);

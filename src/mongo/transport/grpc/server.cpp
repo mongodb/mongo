@@ -212,9 +212,11 @@ void Server::start() {
 
     ::grpc::ServerBuilder builder;
 
-    for (auto& address : _options.addresses) {
-        auto credentials = _makeServerCredentialsWithFetcher();
-        builder.AddListeningPort(util::formatHostAndPortForGRPC(address), credentials);
+    std::vector<int> boundPorts(_options.addresses.size());
+    for (size_t i = 0; i < _options.addresses.size(); i++) {
+        builder.AddListeningPort(util::formatHostAndPortForGRPC(_options.addresses[i]),
+                                 _makeServerCredentialsWithFetcher(),
+                                 &boundPorts[i]);
     }
     for (auto& service : _services) {
         builder.RegisterService(service.get());
@@ -236,6 +238,14 @@ void Server::start() {
                             "services"_attr = _services);
     }
 
+    for (size_t i = 0; i < boundPorts.size(); i++) {
+        auto& hostAndPort = _options.addresses[i];
+        if (isUnixDomainSocket(hostAndPort.host())) {
+            continue;
+        }
+        hostAndPort = HostAndPort(hostAndPort.host(), boundPorts[i]);
+    }
+
     LOGV2_INFO(7401305,
                "Started gRPC server",
                "addresses"_attr = _options.addresses,
@@ -245,6 +255,11 @@ void Server::start() {
 bool Server::isRunning() const {
     stdx::lock_guard lk(_mutex);
     return _server && !_shutdown;
+}
+
+const std::vector<HostAndPort>& Server::getListeningAddresses() const {
+    invariant(_server);
+    return _options.addresses;
 }
 
 void Server::shutdown() {
