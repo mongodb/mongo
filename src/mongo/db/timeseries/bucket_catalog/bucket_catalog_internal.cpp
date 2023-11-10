@@ -73,7 +73,6 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_global_options.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
@@ -144,7 +143,7 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
     batch.promise.setError(status);
 }
 
-void updateCompressionStatistics(OperationContext* opCtx, const Bucket& bucket) {
+void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
     // Bucket is not compressed, likely because compression failed.
     // TODO SERVER-80653: This should no longer be possible with a retry mechanism on bucket
     // compression failure.
@@ -152,16 +151,9 @@ void updateCompressionStatistics(OperationContext* opCtx, const Bucket& bucket) 
         return;
     }
 
-    // TODO SERVER-82152: remove CollectionCatalog usage.
-    // Hold reference to the catalog for collection lookup without locks to be safe.
-    auto catalog = CollectionCatalog::get(opCtx);
-    auto coll = catalog->lookupCollectionByNamespace(
-        opCtx, bucket.bucketId.ns.makeTimeseriesBucketsNamespace());
-    if (coll) {
-        const auto& stats = TimeseriesStats::get(coll);
-        stats.onBucketClosedForAlwaysCompressed(bucket.decompressed->after.objsize(),
-                                                bucket.decompressed->before.objsize());
-    }
+    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, bucket.key.ns);
+    stats.incNumBytesUncompressed(bucket.decompressed->after.objsize());
+    stats.incNumBytesCompressed(bucket.decompressed->before.objsize());
 }
 
 /**
@@ -1213,7 +1205,7 @@ void expireIdleBuckets(OperationContext* opCtx,
         invariant(!archivedSet.empty());
 
         auto& [timestamp, bucket] = *archivedSet.begin();
-        closeArchivedBucket(catalog.bucketStateRegistry, bucket, closedBuckets);
+        closeArchivedBucket(catalog, bucket, closedBuckets);
         long long memory = marginalMemoryUsageForArchivedBucket(
             bucket,
             (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
@@ -1504,7 +1496,7 @@ void closeOpenBucket(OperationContext* opCtx,
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-        updateCompressionStatistics(opCtx, bucket);
+        updateCompressionStatistics(catalog, bucket);
         removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
         return;
     }
@@ -1514,7 +1506,8 @@ void closeOpenBucket(OperationContext* opCtx,
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
                                    bucket.bucketId,
                                    bucket.timeField,
-                                   bucket.numMeasurements);
+                                   bucket.numMeasurements,
+                                   getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
     } catch (...) {
         error = true;
     }
@@ -1533,7 +1526,7 @@ void closeOpenBucket(OperationContext* opCtx,
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-        updateCompressionStatistics(opCtx, bucket);
+        updateCompressionStatistics(catalog, bucket);
         removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
         return;
     }
@@ -1543,7 +1536,8 @@ void closeOpenBucket(OperationContext* opCtx,
         closedBucket = boost::in_place(&catalog.bucketStateRegistry,
                                        bucket.bucketId,
                                        bucket.timeField,
-                                       bucket.numMeasurements);
+                                       bucket.numMeasurements,
+                                       getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
     } catch (...) {
         closedBucket = boost::none;
         error = true;
@@ -1552,18 +1546,22 @@ void closeOpenBucket(OperationContext* opCtx,
         catalog, stripe, stripeLock, bucket, error ? RemovalMode::kAbort : RemovalMode::kClose);
 }
 
-void closeArchivedBucket(BucketStateRegistry& registry,
+void closeArchivedBucket(BucketCatalog& catalog,
                          ArchivedBucket& bucket,
                          ClosedBuckets& closedBuckets) {
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Remove the bucket from the bucket state registry.
-        stopTrackingBucketState(registry, bucket.bucketId);
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
         return;
     }
 
     try {
-        closedBuckets.emplace_back(&registry, bucket.bucketId, bucket.timeField, boost::none);
+        closedBuckets.emplace_back(&catalog.bucketStateRegistry,
+                                   bucket.bucketId,
+                                   bucket.timeField,
+                                   boost::none,
+                                   getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
     } catch (...) {
     }
 }

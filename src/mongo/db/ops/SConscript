@@ -74,7 +74,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_compression',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_stats',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_write_util',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/db/transaction/transaction_api',

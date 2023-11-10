@@ -36,6 +36,7 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -52,7 +53,8 @@ public:
     ClosedBucket(BucketStateRegistry*,
                  const BucketId&,
                  const std::string&,
-                 boost::optional<uint32_t>);
+                 boost::optional<uint32_t>,
+                 const ExecutionStatsController&);
     ClosedBucket(ClosedBucket&&);
     ClosedBucket& operator=(ClosedBucket&&);
     ClosedBucket(const ClosedBucket&) = delete;
@@ -61,6 +63,7 @@ public:
     BucketId bucketId;
     std::string timeField;
     boost::optional<uint32_t> numMeasurements;
+    ExecutionStatsController stats;
 
 private:
     BucketStateRegistry* _bucketStateRegistry = nullptr;

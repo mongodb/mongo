@@ -130,6 +130,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
@@ -137,7 +138,6 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
@@ -2257,10 +2257,9 @@ TimeseriesSingleWriteResult performTimeseriesUpdate(
  * Attempts to perform bucket compression on time-series bucket. It will surpress any error caused
  * by the write and silently leave the bucket uncompressed when any type of error is encountered.
  */
-void tryPerformTimeseriesBucketCompression(
-    OperationContext* opCtx,
-    const timeseries::bucket_catalog::ClosedBucket& closedBucket,
-    const write_ops::InsertCommandRequest& request) {
+void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
+                                           timeseries::bucket_catalog::ClosedBucket& closedBucket,
+                                           const write_ops::InsertCommandRequest& request) {
     // When enabled, we skip constructing ClosedBuckets which results in skipping compression.
     invariant(!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
@@ -2272,8 +2271,12 @@ void tryPerformTimeseriesBucketCompression(
 
     bool validateCompression = gValidateTimeseriesCompression.load();
 
-    boost::optional<int> beforeSize;
-    TimeseriesStats::CompressedBucketInfo compressionStats;
+    struct {
+        int uncompressedSize = 0;
+        int compressedSize = 0;
+        int numInterleavedRestarts = 0;
+        bool decompressionFailed = false;
+    } compressionStats;
 
     auto bucketCompressionFunc = [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
         // Skip compression if the bucket is already compressed.
@@ -2281,30 +2284,29 @@ void tryPerformTimeseriesBucketCompression(
             return boost::none;
         }
 
-        beforeSize = bucketDoc.objsize();
         // Reset every time we run to ensure we never use a stale value
         compressionStats = {};
+        compressionStats.uncompressedSize = bucketDoc.objsize();
+
         auto compressed = timeseries::compressBucket(
             bucketDoc, closedBucket.timeField, ns(request), validateCompression);
         if (compressed.compressedBucket) {
-            // If compressed object size is larger than uncompressed, skip compression
-            // update.
-            if (compressed.compressedBucket->objsize() >= *beforeSize) {
+            // If compressed object size is larger than uncompressed, skip compression update.
+            if (compressed.compressedBucket->objsize() >= compressionStats.uncompressedSize) {
                 LOGV2_DEBUG(5857802,
                             1,
                             "Skipping time-series bucket compression, compressed object is "
                             "larger than original",
-                            "originalSize"_attr = bucketDoc.objsize(),
+                            "originalSize"_attr = compressionStats.uncompressedSize,
                             "compressedSize"_attr = compressed.compressedBucket->objsize());
                 return boost::none;
             }
 
-            compressionStats.size = compressed.compressedBucket->objsize();
-            compressionStats.numInterleaveRestarts = compressed.numInterleavedRestarts;
-        } else if (compressed.decompressionFailed) {
-            compressionStats.decompressionFailed = true;
+            compressionStats.compressedSize = compressed.compressedBucket->objsize();
+            compressionStats.numInterleavedRestarts = compressed.numInterleavedRestarts;
         }
 
+        compressionStats.decompressionFailed = compressed.decompressionFailed;
         return compressed.compressedBucket;
     };
 
@@ -2315,18 +2317,17 @@ void tryPerformTimeseriesBucketCompression(
             opCtx, compressionOp, OperationSource::kTimeseriesBucketCompression),
         request);
 
-    // Report stats, if we fail before running the transform function then just skip
-    // reporting.
-    if (beforeSize) {
-        compressionStats.result = result.result.getStatus();
+    closedBucket.stats.incNumBytesUncompressed(compressionStats.uncompressedSize);
+    if (result.result.isOK() && compressionStats.compressedSize > 0) {
+        closedBucket.stats.incNumBytesCompressed(compressionStats.compressedSize);
+        closedBucket.stats.incNumSubObjCompressionRestart(compressionStats.numInterleavedRestarts);
+        closedBucket.stats.incNumCompressedBuckets();
+    } else {
+        closedBucket.stats.incNumBytesCompressed(compressionStats.uncompressedSize);
+        closedBucket.stats.incNumUncompressedBuckets();
 
-        // Report stats for the bucket collection
-        // Hold reference to the catalog for collection lookup without locks to be safe.
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto coll = catalog->lookupCollectionByNamespace(opCtx, compressionOp.getNamespace());
-        if (coll) {
-            const auto& stats = TimeseriesStats::get(coll);
-            stats.onBucketClosed(*beforeSize, compressionStats);
+        if (compressionStats.decompressionFailed) {
+            closedBucket.stats.incNumFailedDecompressBuckets();
         }
     }
 }
@@ -2645,7 +2646,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
 
         // If this insert closed buckets, rewrite to be a compressed column. If we cannot
         // perform write operations at this point the bucket will be left uncompressed.
-        for (const auto& closedBucket : insertResult->closedBuckets) {
+        for (auto& closedBucket : insertResult->closedBuckets) {
             tryPerformTimeseriesBucketCompression(opCtx, closedBucket, request);
         }
 

@@ -42,17 +42,6 @@ env.Library(
 )
 
 env.Library(
-    target='timeseries_stats',
-    source=[
-        'timeseries_stats.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-    ],
-)
-
-env.Library(
     target='catalog_helper',
     source=[
         'catalog_helper.cpp',

@@ -42,11 +42,11 @@ const clearCollection = function() {
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     expectedStats.bucketCount = 0;
-    if (!alwaysUseCompressedBuckets) {
-        expectedStats.numCompressedBuckets = 0;
-        expectedStats.numSubObjCompressionRestart = 0;
-    }
     if (!initialized) {
+        if (!alwaysUseCompressedBuckets) {
+            expectedStats.numCompressedBuckets = 0;
+            expectedStats.numSubObjCompressionRestart = 0;
+        }
         expectedStats.numBucketInserts = 0;
         expectedStats.numBucketUpdates = 0;
         expectedStats.numBucketsOpenedDueToMetadata = 0;

@@ -33,10 +33,9 @@ const timeseriesBucketMaxSize = (() => {
 
 const checkAverageBucketSize = (() => {
     const timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
-    const averageBucketSize = timeseriesStats.numBytesUncompressed / timeseriesStats.bucketCount;
 
-    jsTestLog("Average bucket size: " + averageBucketSize);
-    assert.lte(averageBucketSize, timeseriesBucketMaxSize);
+    jsTestLog("Average bucket size: " + timeseriesStats.avgBucketSize);
+    assert.lte(timeseriesStats.avgBucketSize, timeseriesBucketMaxSize);
 
     const firstBucket = bucketColl.find().sort({'control.min._id': 1}).toArray()[0];
     assert.eq(0, firstBucket.control.min._id);

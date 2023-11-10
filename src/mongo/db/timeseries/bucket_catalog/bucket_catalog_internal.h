@@ -433,7 +433,7 @@ void closeOpenBucket(OperationContext* opCtx,
 /**
  * Close an archived bucket, setting the state appropriately and removing it from the catalog.
  */
-void closeArchivedBucket(BucketStateRegistry& registry,
+void closeArchivedBucket(BucketCatalog& catalog,
                          ArchivedBucket& bucket,
                          ClosedBuckets& closedBuckets);
 

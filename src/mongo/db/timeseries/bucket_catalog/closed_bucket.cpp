@@ -49,8 +49,13 @@ ClosedBucket::~ClosedBucket() {
 ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
                            const BucketId& bucketId,
                            const std::string& tf,
-                           boost::optional<uint32_t> nm)
-    : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateRegistry{bsr} {
+                           boost::optional<uint32_t> nm,
+                           const ExecutionStatsController& stats)
+    : bucketId{bucketId},
+      timeField{tf},
+      numMeasurements{nm},
+      stats{stats},
+      _bucketStateRegistry{bsr} {
     invariant(_bucketStateRegistry);
 
     // When enabled, we skip constructing ClosedBuckets as we don't need to compress the bucket.
@@ -64,6 +69,7 @@ ClosedBucket::ClosedBucket(ClosedBucket&& other)
     : bucketId{std::move(other.bucketId)},
       timeField{std::move(other.timeField)},
       numMeasurements{other.numMeasurements},
+      stats{std::move(other.stats)},
       _bucketStateRegistry{other._bucketStateRegistry} {
     other._bucketStateRegistry = nullptr;
 }
@@ -73,6 +79,7 @@ ClosedBucket& ClosedBucket::operator=(ClosedBucket&& other) {
         bucketId = std::move(other.bucketId);
         timeField = std::move(other.timeField);
         numMeasurements = other.numMeasurements;
+        stats = other.stats;
         _bucketStateRegistry = other._bucketStateRegistry;
         other._bucketStateRegistry = nullptr;
     }

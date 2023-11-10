@@ -62,7 +62,6 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -131,7 +130,6 @@ void _appendRecordStats(OperationContext* opCtx,
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
         timeseries::bucket_catalog::appendExecutionStats(
             bucketCatalog, collNss.getTimeseriesViewNamespace(), bob);
-        TimeseriesStats::get(collection.get()).append(opCtx, &bob);
     } else {
         result->appendNumber("count", numRecords);
         if (numRecords) {
