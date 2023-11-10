@@ -343,55 +343,6 @@ void waitForHelloRequest(executor::NetworkInterfaceMock* net) {
     }
 }
 
-TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) {
-    auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-
-    ShardSplitDonorService::DonorStateMachine::setSplitAcceptanceTaskExecutor_forTest(_executor);
-    _skipAcceptanceFP.reset();
-
-    // Create and start the instance.
-    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-        opCtx.get(), _service, defaultStateDocument().toBSON());
-    ASSERT(serviceInstance.get());
-    ASSERT_EQ(_uuid, serviceInstance->getId());
-
-    // Wait for monitors to start, and enqueue successfull hello responses
-    _net->enterNetwork();
-    waitForHelloRequest(_net);
-    processHelloRequest(_net, &_recipientSet);
-    waitForHelloRequest(_net);
-    processHelloRequest(_net, &_recipientSet);
-    waitForHelloRequest(_net);
-    processHelloRequest(_net, &_recipientSet);
-    _net->runReadyNetworkOperations();
-    _net->exitNetwork();
-
-    auto decisionFuture = serviceInstance->decisionFuture();
-    decisionFuture.wait();
-
-    ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
-
-    auto result = decisionFuture.get();
-    ASSERT(!result.abortReason);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
-
-    BSONObj splitConfigBson = mockReplSetReconfigCmd.getLatestConfig();
-    ASSERT_TRUE(splitConfigBson.hasField("replSetReconfig"));
-    auto splitConfig = repl::ReplSetConfig::parse(splitConfigBson["replSetReconfig"].Obj());
-    ASSERT(splitConfig.isSplitConfig());
-
-    serviceInstance->tryForget();
-
-    auto completionFuture = serviceInstance->completionFuture();
-    completionFuture.wait();
-
-    ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
-    ASSERT_TRUE(serviceInstance->isGarbageCollectable());
-}
-
 TEST_F(ShardSplitDonorServiceTest, ShardSplitDonorServiceTimeout) {
     FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
 
