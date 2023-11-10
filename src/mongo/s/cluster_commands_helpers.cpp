@@ -283,6 +283,12 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
                                   << response.shardId << " at host "
                                   << response.shardHostAndPort->toString()));
             }
+            if (ErrorCodes::CannotImplicitlyCreateCollection == status) {
+                uassertStatusOK(status.withContext(
+                    str::stream() << "got cannotImplicitlyCreateCollection response from shard "
+                                  << response.shardId << " at host "
+                                  << response.shardHostAndPort->toString()));
+            }
 
             // In the case a read is performed against a view, the server can return an error
             // indicating that the underlying collection may be sharded. When this occurs the return

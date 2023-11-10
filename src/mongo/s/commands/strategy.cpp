@@ -100,7 +100,9 @@
 #include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
@@ -482,6 +484,7 @@ private:
     void _onSnapshotError(Status& status);
     void _onShardCannotRefreshDueToLocksHeldError(Status& status);
     void _onTenantMigrationAborted(Status& status);
+    void _onCannotImplicitlyCreateCollection(Status& status);
 
     ParseAndRunCommand* const _parc;
 
@@ -1122,6 +1125,17 @@ void ParseAndRunCommand::RunAndRetry::_onTenantMigrationAborted(Status& status) 
         iassert(status);
 }
 
+void ParseAndRunCommand::RunAndRetry::_onCannotImplicitlyCreateCollection(Status& status) {
+    invariant(status.code() == ErrorCodes::CannotImplicitlyCreateCollection);
+
+    auto opCtx = _parc->_rec->getOpCtx();
+
+    auto extraInfo = status.extraInfo<CannotImplicitlyCreateCollectionInfo>();
+    invariant(extraInfo);
+
+    cluster::createLegacyUnshardedCollection(opCtx, extraInfo->getNss());
+}
+
 Future<void> ParseAndRunCommand::RunAndRetry::run() {
     return makeReadyFutureWith([&] {
                // Try kMaxNumStaleVersionRetries times. On the last try, exceptions are
@@ -1153,6 +1167,10 @@ Future<void> ParseAndRunCommand::RunAndRetry::run() {
         })
         .onError<ErrorCodes::TenantMigrationAborted>([this](Status status) {
             _onTenantMigrationAborted(status);
+            return run();  // Retry
+        })
+        .onError<ErrorCodes::CannotImplicitlyCreateCollection>([this](Status status) {
+            _onCannotImplicitlyCreateCollection(status);
             return run();  // Retry
         });
 }

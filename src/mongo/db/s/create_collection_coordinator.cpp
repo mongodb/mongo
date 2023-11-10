@@ -124,6 +124,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -1029,6 +1030,15 @@ boost::optional<UUID> createCollectionAndIndexes(
         } else {
             uassertStatusOK(createStatus);
         }
+    }
+
+    // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+    boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
+        allowCollectionCreation;
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (!fcvSnapshot.isVersionInitialized() ||
+        feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(fcvSnapshot)) {
+        allowCollectionCreation.emplace(opCtx);
     }
 
     shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, nss, shardKeyPattern);

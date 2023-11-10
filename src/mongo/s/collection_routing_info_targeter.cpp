@@ -847,6 +847,21 @@ void CollectionRoutingInfoTargeter::noteStaleDbResponse(OperationContext* opCtx,
     _lastError = LastErrorType::kStaleDbVersion;
 }
 
+void CollectionRoutingInfoTargeter::noteCannotImplicitlyCreateCollectionResponse(
+    OperationContext* opCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) {
+    dassert(!_lastError || _lastError.value() == LastErrorType::kCannotImplicitlyCreateCollection);
+
+    // TODO (SERVER-82939) Remove this check once the namespaces are guaranteed to match.
+    //
+    // In the case that a bulk write is performing operations on two different namespaces, a
+    // CannotImplicitlyCreateCollection error for one namespace can be duplicated to operations on
+    // the other namespace. In this case, we only need to create the collection for the namespace
+    // the error actually refers to.
+    if (createInfo.getNss() == getNS()) {
+        _lastError = LastErrorType::kCannotImplicitlyCreateCollection;
+    }
+}
+
 bool CollectionRoutingInfoTargeter::hasStaleShardResponse() {
     return _lastError &&
         (_lastError.value() == LastErrorType::kStaleShardVersion ||
@@ -881,6 +896,24 @@ bool CollectionRoutingInfoTargeter::refreshIfNeeded(OperationContext* opCtx) {
     }
 
     return metadataChanged;
+}
+
+bool CollectionRoutingInfoTargeter::createCollectionIfNeeded(OperationContext* opCtx) {
+    if (!_lastError || _lastError != LastErrorType::kCannotImplicitlyCreateCollection) {
+        return false;
+    }
+
+    try {
+        cluster::createLegacyUnshardedCollection(opCtx, getNS());
+        LOGV2_DEBUG(8037201, 3, "Successfully created collection", "nss"_attr = getNS());
+    } catch (const DBException& ex) {
+        LOGV2(8037200, "Could not create collection", "error"_attr = redact(ex.toStatus()));
+        _lastError = boost::none;
+        return false;
+    }
+    // Ensure the routing info is refreshed before the command is retried to avoid StaleConfig
+    _lastError = LastErrorType::kStaleShardVersion;
+    return true;
 }
 
 int CollectionRoutingInfoTargeter::getNShardsOwningChunks() const {

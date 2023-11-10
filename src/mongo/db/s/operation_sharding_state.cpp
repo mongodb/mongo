@@ -200,14 +200,18 @@ ScopedAllowImplicitCollectionCreate_UNSAFE::ScopedAllowImplicitCollectionCreate_
     OperationContext* opCtx, bool forceCSRAsUnknownAfterCollectionCreation)
     : _opCtx(opCtx) {
     auto& oss = get(_opCtx);
-    invariant(!oss._allowCollectionCreation);
+    // TODO (SERVER-82066): Re-enable invariant if possible after updating direct connection
+    // handling.
+    // invariant(!oss._allowCollectionCreation);
     oss._allowCollectionCreation = true;
     oss._forceCSRAsUnknownAfterCollectionCreation = forceCSRAsUnknownAfterCollectionCreation;
 }
 
 ScopedAllowImplicitCollectionCreate_UNSAFE::~ScopedAllowImplicitCollectionCreate_UNSAFE() {
     auto& oss = get(_opCtx);
-    invariant(oss._allowCollectionCreation);
+    // TODO (SERVER-82066): Re-enable invariant if possible after updating direct connection
+    // handling.
+    // invariant(oss._allowCollectionCreation);
     oss._allowCollectionCreation = false;
     oss._forceCSRAsUnknownAfterCollectionCreation = false;
 }

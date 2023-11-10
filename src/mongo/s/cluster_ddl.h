@@ -55,5 +55,10 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
  */
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request);
 
+/**
+ * Creates the specified unsharded collection without registering it on the config server.
+ */
+void createLegacyUnshardedCollection(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace cluster
 }  // namespace mongo

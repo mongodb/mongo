@@ -57,7 +57,8 @@ namespace {
 bool isRetryErrCode(int errCode) {
     return errCode == ErrorCodes::StaleConfig || errCode == ErrorCodes::StaleDbVersion ||
         errCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
-        errCode == ErrorCodes::TenantMigrationAborted;
+        errCode == ErrorCodes::TenantMigrationAborted ||
+        errCode == ErrorCodes::CannotImplicitlyCreateCollection;
 }
 
 bool errorsAllSame(const std::vector<ChildWriteOp const*>& errOps) {

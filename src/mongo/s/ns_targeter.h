@@ -147,6 +147,16 @@ public:
     virtual bool hasStaleShardResponse() = 0;
 
     /**
+     * Informs the targeter of CannotImplicitlyCreateCollection responses for this collection from
+     * an endpoint, with further information available in the returned createInfo.
+     *
+     * Any cannotImplicitlyCreateCollection errors noted here will be taken into account on the next
+     * create.
+     */
+    virtual void noteCannotImplicitlyCreateCollectionResponse(
+        OperationContext* optCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) = 0;
+
+    /**
      * Refreshes the targeting metadata for the namespace if needed, based on previously-noted
      * stale responses and targeting failures.
      *
@@ -159,6 +169,19 @@ public:
      * NOTE: This function may block for shared resources or network calls.
      */
     virtual bool refreshIfNeeded(OperationContext* opCtx) = 0;
+
+    /**
+     * Creates a collection if there were previously noted cannotImplicitlyCreateCollection
+     * failures.
+     *
+     * After this function is called, the targeter should be in a state such that the noted
+     * cannotImplicitlyCreateCollection responses are not seen again.
+     *
+     * Returns if the collection was created.
+     *
+     * NOTE: This function may block for shared resources or network calls.
+     */
+    virtual bool createCollectionIfNeeded(OperationContext* opCtx) = 0;
 
     /**
      * Returns the number of shards that own one or more chunks for the targeted collection.

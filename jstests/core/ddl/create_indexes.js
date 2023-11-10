@@ -1,9 +1,12 @@
 /**
  * @tags: [
  *   assumes_superuser_permissions,
+ *   # TODO (SERVER-82067) re-enable on upgrade/downgrade
+ *   cannot_run_during_upgrade_downgrade
  * ]
  * fcv49 for the change to error code in createIndexes invalid field reply.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const kUnknownIDLFieldError = 40415;
@@ -38,8 +41,14 @@ const extractResult = function(obj) {
     return result;
 };
 
-const checkImplicitCreate = function(createIndexResult) {
-    assert.eq(true, createIndexResult.createdCollectionAutomatically);
+const checkImplicitCreate = function(admin, createIndexResult) {
+    // TODO SERVER-82067 remove or fix this field for track unsharded
+    const isMultiversion = jsTest.options().shardMixedBinVersions ||
+        jsTest.options().useRandomBinVersionsWithinReplicaSet;
+    if (!isMultiversion &&
+        !FeatureFlagUtil.isPresentAndEnabled(admin, "TrackUnshardedCollectionsOnShardingCatalog")) {
+        assert.eq(true, createIndexResult.createdCollectionAutomatically);
+    }
 };
 
 const assertIndexes = function(coll, expectedIndexNames) {
@@ -56,7 +65,7 @@ const collDbNotExist = dbTest.create_indexes_no_db;
 let res = assert.commandWorked(
     collDbNotExist.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
-checkImplicitCreate(res);
+checkImplicitCreate(dbTest.getSiblingDB('config'), res);
 assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
 assert.isnull(
     res.note,
@@ -66,7 +75,7 @@ assert.isnull(
 const t = dbTest.create_indexes;
 res = assert.commandWorked(t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
-checkImplicitCreate(res);
+checkImplicitCreate(dbTest.getSiblingDB('config'), res);
 assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
 assert.isnull(
     res.note,

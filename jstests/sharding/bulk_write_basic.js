@@ -29,9 +29,9 @@ function bulkWriteBasicTest(ordered) {
     const staleDbTest2Log = /7279202.*Noting stale database response.*test2/;
 
     jsTestLog("Case 1: Collection does't exist yet.");
-    // Case 1: The collection doesn't exist yet. This results in a StaleConfig error on the
-    // shards and consequently mongos and the shards must all refresh. Then mongos needs to
-    // retry the bulk operation.
+    // Case 1: The collection doesn't exist yet. This results in a CannotImplicitlyCreateCollection
+    // error on the shards and consequently mongos and the shards must all refresh. Then mongos
+    // needs to retry the bulk operation.
 
     // Connect via the first mongos. We do this so that the second mongos remains unused until
     // a later test case.
@@ -130,12 +130,13 @@ function bulkWriteBasicTest(ordered) {
         // the erroring operation.
         // So overall, we expect:
         // 1) bulkWrite command sent
-        // 2) Collection mango doesn't exist yet. StaleConfig error returned.
-        // 3) StaleConfig error duplicated for all operations.
-        // 4) Retry operation after refreshing
-        // 5) Operations 0, 1 (DuplicateKeyError), and 2 go through. Operation 3 hits
-        // a StaleConfig error, but no error duplication occurs. And finally the operation is
-        // retried and succeeds.
+        // 2) Collection mango doesn't exist yet. CannotImplicitlyCreateCollection error returned.
+        // 3) CannotImplicitlyCreateCollection error duplicated for all operations.
+        // 4) Retry operation after creating collection and refreshing
+        // 5) Operations 0, 1 (DuplicateKeyError), and 2 go through. Operation 3 hits a
+        // CannotImplicitlyCreateCollection error.
+        // 6) Retry operation after creating second collection and refreshing
+        // 7) And finally the operation is retried and succeeds.
         const mango = 'test3.mango';
         const strawberry = 'test3.strawberry';
         assert.commandWorked(db_s0.adminCommand({
@@ -157,14 +158,17 @@ function bulkWriteBasicTest(ordered) {
         insertedDocs = getCollection(strawberry).find({}).toArray();
         assert.eq(2, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
 
-        // The StaleConfig error on op 0 should have been duplicated to all operations.
+        // The CannotImplicitlyCreateCollection error on op 0 should have been duplicated to all
+        // operations.
         for (let i = 1; i < 5; i++) {
             assert(checkLog.checkContainsOnce(
                 st.s0, new RegExp(`7695304.*Duplicating the error.*opIdx":${i}.*mango`)));
         }
 
-        // The StaleConfig error on op 3 should have been duplicated to op 4.
+        // The CannotImplicitlyCreateCollection error on op 3 should have been duplicated to op 4.
         assert(
+            checkLog.checkContainsOnce(
+                st.s0, /8037206.*Noting cannotImplicitlyCreateCollection response.*strawberry/) ||
             checkLog.checkContainsOnce(st.s0, /7279201.*Noting stale config response.*strawberry/));
         assert(checkLog.checkContainsOnce(st.s0,
                                           /7695304.*Duplicating the error.*opIdx":4.*strawberry/));

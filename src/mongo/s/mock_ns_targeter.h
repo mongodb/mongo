@@ -137,12 +137,22 @@ public:
         // No-op
     }
 
+    void noteCannotImplicitlyCreateCollectionResponse(
+        OperationContext* opCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override {
+        // No-op
+    }
+
     bool hasStaleShardResponse() override {
         // No-op
         return false;
     }
 
     bool refreshIfNeeded(OperationContext* opCtx) override {
+        // No-op
+        return false;
+    }
+
+    bool createCollectionIfNeeded(OperationContext* opCtx) override {
         // No-op
         return false;
     }

@@ -99,6 +99,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -407,8 +408,18 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
             hangBeforeCreateIndexesCollectionCreate.pauseWhileSet();
         }
 
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
+        // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+        // TODO (SERVER-82066): Update handling for direct connections.
+        // TODO (SERVER-81937): Update handling for transactions.
+        boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
+            allowCollectionCreation;
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (!fcvSnapshot.isVersionInitialized() ||
+            !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(fcvSnapshot) ||
+            !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
+            (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
+            allowCollectionCreation.emplace(opCtx);
+        }
         auto createStatus =
             createCollection(opCtx, ns.dbName(), builder.obj().getOwned(), idIndexSpec);
 

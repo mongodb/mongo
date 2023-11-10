@@ -66,6 +66,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
@@ -121,6 +122,20 @@ void noteStaleDbResponses(OperationContext* opCtx,
         auto extraInfo = error.error.getStatus().extraInfo<StaleDbRoutingVersion>();
         invariant(extraInfo);
         targeter->noteStaleDbResponse(opCtx, error.endpoint, *extraInfo);
+    }
+}
+
+void noteCannotImplicitlyCreateCollectionResponses(OperationContext* opCtx,
+                                                   const std::vector<ShardError>& createErrors,
+                                                   NSTargeter* targeter) {
+    for (const auto& error : createErrors) {
+        LOGV2_DEBUG(8037202,
+                    4,
+                    "Noting cannot implicitly create collection response",
+                    "status"_attr = error.error.getStatus());
+        auto extraInfo = error.error.getStatus().extraInfo<CannotImplicitlyCreateCollectionInfo>();
+        invariant(extraInfo);
+        targeter->noteCannotImplicitlyCreateCollectionResponse(opCtx, *extraInfo);
     }
 }
 
@@ -209,6 +224,7 @@ bool processResponseFromRemote(OperationContext* opCtx,
     trackedErrors.startTracking(ErrorCodes::StaleConfig);
     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
     trackedErrors.startTracking(ErrorCodes::TenantMigrationAborted);
+    trackedErrors.startTracking(ErrorCodes::CannotImplicitlyCreateCollection);
 
     LOGV2_DEBUG(22907,
                 4,
@@ -242,6 +258,8 @@ bool processResponseFromRemote(OperationContext* opCtx,
     const auto& staleDbErrors = trackedErrors.getErrors(ErrorCodes::StaleDbVersion);
     const auto& tenantMigrationAbortedErrors =
         trackedErrors.getErrors(ErrorCodes::TenantMigrationAborted);
+    const auto& cannotImplicitlyCreateCollectionErrors =
+        trackedErrors.getErrors(ErrorCodes::CannotImplicitlyCreateCollection);
 
     if (!staleConfigErrors.empty()) {
         invariant(staleDbErrors.empty());
@@ -257,6 +275,11 @@ bool processResponseFromRemote(OperationContext* opCtx,
 
     if (!tenantMigrationAbortedErrors.empty()) {
         ++stats->numTenantMigrationAbortedErrors;
+    }
+
+    if (!cannotImplicitlyCreateCollectionErrors.empty()) {
+        noteCannotImplicitlyCreateCollectionResponses(
+            opCtx, cannotImplicitlyCreateCollectionErrors, &targeter);
     }
 
     return false;
@@ -865,11 +888,12 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         bool targeterChanged = false;
         try {
+            targeterChanged = targeter.createCollectionIfNeeded(opCtx);
             LOGV2_DEBUG_OPTIONS(4817406,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},
                                 "Starting post-migration commit refresh on the router");
-            targeterChanged = targeter.refreshIfNeeded(opCtx);
+            targeterChanged = targeterChanged || targeter.refreshIfNeeded(opCtx);
             LOGV2_DEBUG_OPTIONS(4817407,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},

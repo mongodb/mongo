@@ -68,6 +68,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
@@ -600,9 +601,12 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
         // Refresh the targeter(s) if we received a target error or a stale config/db error.
         bool targeterChanged = false;
         try {
+            for (auto& targeter : targeters) {
+                targeterChanged = targeterChanged || targeter->createCollectionIfNeeded(opCtx);
+            }
             LOGV2_DEBUG(7298200, 2, "Refreshing all targeters for bulkWrite");
             for (auto& targeter : targeters) {
-                targeterChanged = targeter->refreshIfNeeded(opCtx);
+                targeterChanged = targeterChanged || targeter->refreshIfNeeded(opCtx);
             }
             LOGV2_DEBUG(7298201,
                         2,
@@ -958,7 +962,8 @@ void BulkWriteOp::noteChildBatchResponse(
         // replyItem as having failed with a staleness error.
         if (!ordered && lastError &&
             (lastError->getStatus().code() == ErrorCodes::StaleDbVersion ||
-             ErrorCodes::isStaleShardVersionError(lastError->getStatus())) &&
+             ErrorCodes::isStaleShardVersionError(lastError->getStatus()) ||
+             lastError->getStatus() == ErrorCodes::CannotImplicitlyCreateCollection) &&
             (index == (int)replyItems.size())) {
             // Decrement the index so it keeps pointing to the same error (i.e. the
             // last error, which is a staleness error).
@@ -987,6 +992,7 @@ void BulkWriteOp::noteChildBatchResponse(
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleConfig);
                     trackedErrors.startTracking(ErrorCodes::StaleDbVersion);
+                    trackedErrors.startTracking(ErrorCodes::CannotImplicitlyCreateCollection);
                     errorsPerNamespace->emplace(nss, trackedErrors);
                 }
 
@@ -1267,6 +1273,16 @@ void BulkWriteOp::noteStaleResponses(
                     _opCtx,
                     error.endpoint,
                     *error.error.getStatus().extraInfo<StaleDbRoutingVersion>());
+            }
+            for (const auto& error :
+                 errors->second.getErrors(ErrorCodes::CannotImplicitlyCreateCollection)) {
+                LOGV2_DEBUG(8037203,
+                            0,
+                            "Noting cannotImplicitlyCreateCollection response.",
+                            "status"_attr = error.error.getStatus());
+                targeter->noteCannotImplicitlyCreateCollectionResponse(
+                    _opCtx,
+                    *error.error.getStatus().extraInfo<CannotImplicitlyCreateCollectionInfo>());
             }
         }
     }

@@ -49,6 +49,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
@@ -68,7 +69,12 @@ namespace mongo {
  */
 class CollectionRoutingInfoTargeter : public NSTargeter {
 public:
-    enum class LastErrorType { kCouldNotTarget, kStaleShardVersion, kStaleDbVersion };
+    enum class LastErrorType {
+        kCouldNotTarget,
+        kStaleShardVersion,
+        kStaleDbVersion,
+        kCannotImplicitlyCreateCollection
+    };
     /**
      * Initializes the targeter with the latest routing information for the namespace, which means
      * it may have to block and load information from the config server.
@@ -135,6 +141,10 @@ public:
                              const ShardEndpoint& endpoint,
                              const StaleDbRoutingVersion& staleInfo) override;
 
+
+    void noteCannotImplicitlyCreateCollectionResponse(
+        OperationContext* optCtx, const CannotImplicitlyCreateCollectionInfo& createInfo) override;
+
     /**
      * Returns if _lastError is StaleConfig type.
      */
@@ -150,6 +160,16 @@ public:
      * Also see NSTargeter::refreshIfNeeded().
      */
     bool refreshIfNeeded(OperationContext* opCtx) override;
+
+    /**
+     * Creates a collection if there was a prior CannotImplicitlyCreateCollection error thrown.
+     *
+     * Return true if a collection was created and false if the collection already existed, throwing
+     * on any errors.
+     *
+     * Also see NSTargeter::createCollectionIfNeeded().
+     */
+    bool createCollectionIfNeeded(OperationContext* opCtx) override;
 
     /**
      * Returns the number of shards on which the collection has any chunks.

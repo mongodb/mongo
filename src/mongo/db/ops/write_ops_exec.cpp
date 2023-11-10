@@ -160,6 +160,7 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -327,8 +328,19 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx, ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(opCtx, ns));
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
+            // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+            // TODO (SERVER-82066): Update handling for direct connections.
+            // TODO (SERVER-81937): Update handling for transactions.
+            boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
+                allowCollectionCreation;
+            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+            if (!fcvSnapshot.isVersionInitialized() ||
+                !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+                    fcvSnapshot) ||
+                !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
+                (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
+                allowCollectionCreation.emplace(opCtx);
+            }
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
             if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault");
@@ -497,8 +509,10 @@ bool handleError(OperationContext* opCtx,
         return false;
     }
 
-    if (ex.code() == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(ex)) {
-        if (!opCtx->getClient()->isInDirectClient()) {
+    if (ex.code() == ErrorCodes::StaleDbVersion || ErrorCodes::isStaleShardVersionError(ex) ||
+        ex.code() == ErrorCodes::CannotImplicitlyCreateCollection) {
+        if (!opCtx->getClient()->isInDirectClient() &&
+            ex.code() != ErrorCodes::CannotImplicitlyCreateCollection) {
             auto& oss = OperationShardingState::get(opCtx);
             oss.setShardingOperationFailedStatus(ex.toStatus());
         }
@@ -808,8 +822,18 @@ UpdateResult performUpdate(OperationContext* opCtx,
     if (!collection.exists() && upsert) {
         CollectionWriter collectionWriter(opCtx, &collection);
         uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
+        // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
+        // TODO (SERVER-82066): Update handling for direct connections.
+        // TODO (SERVER-81937): Update handling for transactions.
+        boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
+            allowCollectionCreation;
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (!fcvSnapshot.isVersionInitialized() ||
+            !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(fcvSnapshot) ||
+            !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
+            (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
+            allowCollectionCreation.emplace(opCtx);
+        }
         WriteUnitOfWork wuow(opCtx);
         ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &collection);
         CollectionOptions defaultCollectionOptions;

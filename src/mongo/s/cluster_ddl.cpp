@@ -55,6 +55,7 @@
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/read_through_cache.h"
@@ -202,6 +203,40 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, createCollResp.getCollectionVersion(), dbInfo->getPrimary());
+}
+
+void createLegacyUnshardedCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    auto dbName = nss.dbName();
+    cluster::createDatabase(opCtx, dbName);
+
+    sharding::router::CollectionRouter router(opCtx->getServiceContext(), nss);
+    router.route(
+        opCtx,
+        "cluster::createLegacyUnshardedCollection",
+        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            const BSONObj cmd = BSON("create" << nss.coll());
+
+            // TODO (SERVER-82956) Remove call to getDatabase once
+            // executeCommandAgainstDatabasePrimary is compatible with the cri.
+            const auto dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+            auto response = uassertStatusOK(
+                executeCommandAgainstDatabasePrimary(
+                    opCtx,
+                    dbName,
+                    dbInfo,
+                    applyReadWriteConcern(
+                        opCtx, true, true, CommandHelpers::filterCommandRequestForPassthrough(cmd)),
+                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                    Shard::RetryPolicy::kIdempotent)
+                    .swResponse);
+
+            const auto createStatus = mongo::getStatusFromCommandResult(response.data);
+            if (createStatus != ErrorCodes::NamespaceExists) {
+                uassertStatusOK(createStatus);
+            }
+            uassertStatusOK(getWriteConcernStatusFromCommandResult(response.data));
+        });
 }
 
 }  // namespace cluster
