@@ -90,6 +90,20 @@ struct ArchivedBucket {
 long long marginalMemoryUsageForArchivedBucket(
     const ArchivedBucket& bucket, IncludeMemoryOverheadFromMap includeMemoryOverheadFromMap);
 
+
+/**
+ * A light wrapper around a promise type to allow potentially conflicting operations to ensure
+ * orderly waiting and observability. Equivalent functionality exists in 'WriteBatch'.
+ */
+struct ReopeningRequest {
+    ReopeningRequest() = delete;
+    ReopeningRequest(ExecutionStatsController&& stats, boost::optional<OID> oid);
+
+    ExecutionStatsController stats;
+    boost::optional<OID> oid;
+    SharedPromise<void> promise;
+};
+
 /**
  * RAII type that tracks the state needed to coordinate the reopening of closed buckets between
  * reentrant 'tryInsert'/'insert' calls.
@@ -132,11 +146,11 @@ public:
     void clear(WithLock stripeLock);
 
     // Set by the bucket catalog to ensure proper synchronization of reopening attempt.
-    const uint64_t catalogEra;
+    uint64_t catalogEra;
 
     // Information needed for the caller to locate a candidate bucket to reopen from disk, populated
     // by the bucket catalog.
-    const CandidateType candidate;
+    CandidateType candidate;
 
     // Communicates to the BucketCatalog whether an attempt was made to fetch a query or bucket, and
     // the resulting bucket document that was found, if any. Populated by the caller.
@@ -147,21 +161,10 @@ public:
 private:
     Stripe* _stripe;
     BucketKey _key;
+    boost::optional<OID> _oid;
     bool _cleared;
 
     void clear();
-};
-
-/**
- * A light wrapper around a promise type to allow potentially conflicting operations to ensure
- * orderly waiting and observability. Equivalent functionality exists in 'WriteBatch'.
- */
-struct ReopeningRequest {
-    ReopeningRequest() = delete;
-    explicit ReopeningRequest(ExecutionStatsController&& stats);
-
-    ExecutionStatsController stats;
-    SharedPromise<void> promise;
 };
 
 /**

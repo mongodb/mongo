@@ -283,13 +283,13 @@ std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSi
  * represented by 'info', if one exists. Otherwise returns a pipeline to use for query-based
  * reopening if allowed.
  */
-ReopeningContext getReopeningContext(OperationContext* opCtx,
-                                     BucketCatalog& catalog,
-                                     Stripe& stripe,
-                                     WithLock stripeLock,
-                                     const CreationInfo& info,
-                                     uint64_t catalogEra,
-                                     AllowQueryBasedReopening allowQueryBasedReopening);
+InsertResult getReopeningContext(OperationContext* opCtx,
+                                 BucketCatalog& catalog,
+                                 Stripe& stripe,
+                                 WithLock stripeLock,
+                                 const CreationInfo& info,
+                                 uint64_t catalogEra,
+                                 AllowQueryBasedReopening allowQueryBasedReopening);
 
 /**
  * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other

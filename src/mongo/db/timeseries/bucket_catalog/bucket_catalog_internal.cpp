@@ -162,7 +162,8 @@ void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
  */
 std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
                                               WithLock stripeLock,
-                                              const BucketKey& key) {
+                                              const BucketKey& key,
+                                              boost::optional<OID> oid) {
     auto it = stripe.openBucketsByKey.find(key);
     if (it == stripe.openBucketsByKey.end()) {
         // No open bucket for this metadata.
@@ -171,7 +172,8 @@ std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
 
     auto& openSet = it->second;
     for (Bucket* potentialBucket : openSet) {
-        if (potentialBucket->preparedBatch) {
+        if (potentialBucket->preparedBatch &&
+            (!oid.has_value() || oid.value() == potentialBucket->bucketId.oid)) {
             return potentialBucket->preparedBatch;
         }
     }
@@ -185,13 +187,33 @@ std::shared_ptr<WriteBatch> findPreparedBatch(const Stripe& stripe,
  */
 boost::optional<InsertWaiter> checkForWait(const Stripe& stripe,
                                            WithLock stripeLock,
-                                           const BucketKey& key) {
-    if (auto it = stripe.outstandingReopeningRequests.find(key);
-        it != stripe.outstandingReopeningRequests.end()) {
-        return InsertWaiter{it->second};
-    } else if (auto batch = findPreparedBatch(stripe, stripeLock, key)) {
+                                           const BucketKey& key,
+                                           boost::optional<OID> oid) {
+    if (auto batch = findPreparedBatch(stripe, stripeLock, key, oid)) {
         return InsertWaiter{batch};
     }
+
+    if (auto it = stripe.outstandingReopeningRequests.find(key);
+        it != stripe.outstandingReopeningRequests.end()) {
+        auto& requests = it->second;
+        invariant(!requests.empty());
+
+        if (!oid.has_value()) {
+            // We are trying to perform a query-based reopening. This conflicts with any reopening
+            // for the key.
+            return InsertWaiter{requests.front()};
+        }
+
+        // We are about to attempt an archive-based reopening. This conflicts with any query-based
+        // reopening for the key, or another archive-based reopening for this bucket.
+        for (auto&& request : requests) {
+            if (!request->oid.has_value() ||
+                (request->oid.has_value() && request->oid.value() == oid.value())) {
+                return InsertWaiter{request};
+            }
+        }
+    }
+
     return boost::none;
 }
 }  // namespace
@@ -790,14 +812,6 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
     Bucket* bucket = useBucket(opCtx, catalog, stripe, stripeLock, info, mode);
     if (!bucket) {
         invariant(mode == AllowBucketCreation::kNo);
-
-        // Synchronize concurrent disk accesses. An outstanding reopening request or prepared batch
-        // for the same series would potentially conflict with our choice to reopen here, so we must
-        // wait for any such operation to finish and retry.
-        if (auto waiter = checkForWait(stripe, stripeLock, key)) {
-            return waiter.value();
-        }
-
         return getReopeningContext(
             opCtx, catalog, stripe, stripeLock, info, catalogEra, AllowQueryBasedReopening::kAllow);
     }
@@ -838,13 +852,6 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
         }
     }
 
-    // Synchronize concurrent disk accesses. An outstanding reopening request or prepared batch for
-    // the same series would potentially conflict with our choice to reopen here, so we must wait
-    // for any such operation to finish and retry.
-    if (auto waiter = checkForWait(stripe, stripeLock, key)) {
-        return waiter.value();
-    }
-
     return getReopeningContext(opCtx,
                                catalog,
                                stripe,
@@ -861,7 +868,6 @@ void waitToCommitBatch(BucketStateRegistry& registry,
                        const std::shared_ptr<WriteBatch>& batch) {
     while (true) {
         boost::optional<InsertWaiter> waiter;
-
         {
             stdx::lock_guard stripeLock{stripe.mutex};
             Bucket* bucket = useBucket(
@@ -870,14 +876,24 @@ void waitToCommitBatch(BucketStateRegistry& registry,
                 return;
             }
 
-            if (auto it = stripe.outstandingReopeningRequests.find(batch->bucketKey);
-                it != stripe.outstandingReopeningRequests.end()) {
-                // Conflict with any reopening request on this series (metaField value).
-                waiter = it->second;
-            } else if (bucket->preparedBatch) {
+            if (bucket->preparedBatch) {
                 // Conflict with other prepared batch on this bucket.
                 waiter = bucket->preparedBatch;
-            } else {
+            } else if (auto it = stripe.outstandingReopeningRequests.find(batch->bucketKey);
+                       it != stripe.outstandingReopeningRequests.end()) {
+                // Conflict with any query-based reopening request on this series (metaField value)
+                // or an archive-based request on this bucket.
+                auto& list = it->second;
+                for (auto&& request : list) {
+                    if (!request->oid.has_value() ||
+                        request->oid.value() == batch->bucketHandle.bucketId.oid) {
+                        waiter = request;
+                        break;
+                    }
+                }
+            }
+
+            if (!waiter.has_value()) {
                 // No other batches for this bucket are currently committing, so we can proceed.
                 bucket->preparedBatch = batch;
                 bucket->batches.erase(batch->opId);
@@ -891,6 +907,7 @@ void waitToCommitBatch(BucketStateRegistry& registry,
 
         // We have to wait for someone else to finish.
         waitToInsert(&waiter.value());  // We don't care about the result.
+        waiter = boost::none;
     }
 }
 
@@ -1053,19 +1070,35 @@ std::pair<int32_t, int32_t> getCacheDerivedBucketMaxSize(uint64_t storageCacheSi
     return {std::min(gTimeseriesBucketMaxSize, derivedMaxSize), derivedMaxSize};
 }
 
-ReopeningContext getReopeningContext(OperationContext* opCtx,
-                                     BucketCatalog& catalog,
-                                     Stripe& stripe,
-                                     WithLock stripeLock,
-                                     const CreationInfo& info,
-                                     uint64_t catalogEra,
-                                     AllowQueryBasedReopening allowQueryBasedReopening) {
+InsertResult getReopeningContext(OperationContext* opCtx,
+                                 BucketCatalog& catalog,
+                                 Stripe& stripe,
+                                 WithLock stripeLock,
+                                 const CreationInfo& info,
+                                 uint64_t catalogEra,
+                                 AllowQueryBasedReopening allowQueryBasedReopening) {
     if (auto archived = findArchivedCandidate(catalog, stripe, stripeLock, info)) {
-        return {catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
+        // Synchronize concurrent disk accesses. An outstanding query-based reopening request for
+        // this series or an outstanding archived-based reopening request or prepared batch for this
+        // bucket would potentially conflict with our choice to reopen here, so we must wait for any
+        // such operation to finish and retry.
+        if (auto waiter = checkForWait(stripe, stripeLock, info.key, archived.value())) {
+            return waiter.value();
+        }
+
+        return ReopeningContext{
+            catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
     }
 
     if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
-        return {catalog, stripe, stripeLock, info.key, catalogEra, {}};
+        return ReopeningContext{catalog, stripe, stripeLock, info.key, catalogEra, {}};
+    }
+
+    // Synchronize concurrent disk accesses. An outstanding reopening request or prepared batch for
+    // this series would potentially conflict with our choice to reopen here, so we must wait for
+    // any such operation to finish and retry.
+    if (auto waiter = checkForWait(stripe, stripeLock, info.key, boost::none)) {
+        return waiter.value();
     }
 
     boost::optional<BSONElement> metaElement;
@@ -1084,18 +1117,18 @@ ReopeningContext getReopeningContext(OperationContext* opCtx,
     auto [bucketMaxSize, _] =
         getCacheDerivedBucketMaxSize(storageCacheSize, catalog.numberOfActiveBuckets.load());
 
-    return {catalog,
-            stripe,
-            stripeLock,
-            info.key,
-            catalogEra,
-            generateReopeningPipeline(opCtx,
-                                      info.time,
-                                      metaElement,
-                                      controlMinTimePath,
-                                      maxDataTimeFieldPath,
-                                      *info.options.getBucketMaxSpanSeconds(),
-                                      bucketMaxSize)};
+    return ReopeningContext{catalog,
+                            stripe,
+                            stripeLock,
+                            info.key,
+                            catalogEra,
+                            generateReopeningPipeline(opCtx,
+                                                      info.time,
+                                                      metaElement,
+                                                      controlMinTimePath,
+                                                      maxDataTimeFieldPath,
+                                                      *info.options.getBucketMaxSpanSeconds(),
+                                                      bucketMaxSize)};
 }
 
 void abort(BucketCatalog& catalog,

@@ -158,7 +158,9 @@ struct Stripe {
 
     // All series currently with outstanding reopening operations. Used to coordinate disk access
     // between reopenings and regular writes to prevent stale reads and corrupted updates.
-    stdx::unordered_map<BucketKey, std::shared_ptr<ReopeningRequest>, BucketHasher>
+    stdx::unordered_map<BucketKey,
+                        boost::container::small_vector<std::shared_ptr<ReopeningRequest>, 4>,
+                        BucketHasher>
         outstandingReopeningRequests;
 };
 
