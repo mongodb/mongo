@@ -202,6 +202,12 @@ void BucketCatalog::ExecutionStatsController::incNumMeasurementsCommitted(long l
     _globalStats->numMeasurementsCommitted.fetchAndAddRelaxed(increment);
 }
 
+void BucketCatalog::ExecutionStatsController::incNumMeasurementsGroupCommitted(
+    long long increment) {
+    _collectionStats->numMeasurementsGroupCommitted.fetchAndAddRelaxed(increment);
+    _globalStats->numMeasurementsGroupCommitted.fetchAndAddRelaxed(increment);
+}
+
 class BucketCatalog::Bucket {
 public:
     friend class BucketCatalog;
@@ -847,6 +853,8 @@ void BucketCatalog::_appendExecutionStatsToBuilder(const ExecutionStats* stats,
     if (commits) {
         builder->appendNumber("avgNumMeasurementsPerCommit", measurementsCommitted / commits);
     }
+    builder->appendNumber("numMeasurementsGroupCommitted",
+                          stats->numMeasurementsGroupCommitted.load());
 }
 
 
@@ -862,6 +870,11 @@ void BucketCatalog::appendGlobalExecutionStats(BSONObjBuilder* builder) const {
 void BucketCatalog::resetBucketOIDCounter() {
     stdx::lock_guard lk{_bucketIdGenLock};
     _bucketIdGenCounter.store(static_cast<uint64_t>(_bucketIdGenPRNG.nextInt64()));
+}
+
+void BucketCatalog::reportMeasurementsGroupCommitted(const NamespaceString& ns, int64_t count) {
+    auto stats = _getExecutionStats(ns);
+    stats.incNumMeasurementsGroupCommitted(count);
 }
 
 BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,

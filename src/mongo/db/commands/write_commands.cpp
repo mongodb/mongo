@@ -1201,10 +1201,22 @@ public:
 
             bool canContinue = true;
 
+
+            stdx::unordered_set<BucketCatalog::WriteBatch*> handledHere;
+            int64_t handledElsewhere = 0;
+            auto guard = ScopeGuard([this, &handledElsewhere, opCtx]() {
+                if (handledElsewhere > 0) {
+                    auto& bucketCatalog = BucketCatalog::get(opCtx);
+                    bucketCatalog.reportMeasurementsGroupCommitted(request().getNamespace(),
+                                                                   handledElsewhere);
+                }
+            });
+
             size_t itr = 0;
             for (; itr < batches.size(); ++itr) {
                 auto& [batch, index] = batches[itr];
                 if (batch->claimCommitRights()) {
+                    handledHere.insert(batch.get());
                     auto stmtIds = isTimeseriesWriteRetryable(opCtx)
                         ? std::move(bucketStmtIds[batch->bucket().id])
                         : std::vector<StmtId>{};
@@ -1222,6 +1234,8 @@ public:
                     if (!canContinue) {
                         break;
                     }
+                } else if (!handledHere.contains(batch.get())) {
+                    ++handledElsewhere;
                 }
             }
 

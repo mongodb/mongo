@@ -70,6 +70,7 @@ class BucketCatalog {
         AtomicWord<long long> numCommits;
         AtomicWord<long long> numWaits;
         AtomicWord<long long> numMeasurementsCommitted;
+        AtomicWord<long long> numMeasurementsGroupCommitted;
     };
 
     class ExecutionStatsController {
@@ -90,6 +91,7 @@ class BucketCatalog {
         void incNumCommits(long long increment = 1);
         void incNumWaits(long long increment = 1);
         void incNumMeasurementsCommitted(long long increment = 1);
+        void incNumMeasurementsGroupCommitted(long long increment = 1);
 
     private:
         std::shared_ptr<ExecutionStats> _collectionStats;
@@ -309,6 +311,13 @@ public:
      * collision.
      */
     void resetBucketOIDCounter();
+
+    /**
+     * Reports a number of measurements inserted that were committed by a different thread than the
+     * one that initially staged them. These measurements are considered to have benefitted from
+     * "group commit".
+     */
+    void reportMeasurementsGroupCommitted(const NamespaceString& ns, int64_t count);
 
 private:
     enum class BucketState {
