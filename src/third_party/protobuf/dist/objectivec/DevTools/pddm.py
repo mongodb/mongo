@@ -1,34 +1,11 @@
-#! /usr/bin/python
+#! /usr/bin/env python3
 #
 # Protocol Buffers - Google's data interchange format
 # Copyright 2015 Google Inc.  All rights reserved.
-# https://developers.google.com/protocol-buffers/
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-#     * Redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above
-# copyright notice, this list of conditions and the following disclaimer
-# in the documentation and/or other materials provided with the
-# distribution.
-#     * Neither the name of Google Inc. nor the names of its
-# contributors may be used to endorse or promote products derived from
-# this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
 
 """PDDM - Poor Developers' Debug-able Macros
 
@@ -134,7 +111,10 @@ def _MacroArgRefRe(macro_arg_names):
 
 class PDDMError(Exception):
   """Error thrown by pddm."""
-  pass
+
+  def __init__(self, message="Error"):
+    self.message = message
+    super().__init__(self.message)
 
 
 class MacroCollection(object):
@@ -318,7 +298,7 @@ class MacroCollection(object):
       # Nothing to do
       return macro.body
     assert len(arg_values) == len(macro.args)
-    args = dict(zip(macro.args, arg_values))
+    args = dict(list(zip(macro.args, arg_values)))
 
     def _lookupArg(match):
       val = args[match.group('name')]
@@ -351,7 +331,7 @@ class MacroCollection(object):
     return macro_arg_ref_re.sub(_lookupArg, macro.body)
 
   def _EvalMacrosRefs(self, text, macro_stack):
-    macro_ref_re = _MacroRefRe(self._macros.keys())
+    macro_ref_re = _MacroRefRe(list(self._macros.keys()))
 
     def _resolveMacro(match):
       return self._Expand(match, macro_stack)
@@ -482,14 +462,13 @@ class SourceFile(object):
         if self._macro_collection:
           # Always add a blank line, seems to read better. (If need be, add an
           # option to the EXPAND to indicate if this should be done.)
-          result.extend([_GENERATED_CODE_LINE, '// clang-format off', ''])
+          result.extend([_GENERATED_CODE_LINE, ''])
           macro = line[directive_len:].strip()
           try:
             expand_result = self._macro_collection.Expand(macro)
             # Since expansions are line oriented, strip trailing whitespace
             # from the lines.
             lines = [x.rstrip() for x in expand_result.split('\n')]
-            lines.append('// clang-format on')
             result.append('\n'.join(lines))
           except PDDMError as e:
             raise PDDMError('%s\n...while expanding "%s" from the section'

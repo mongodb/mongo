@@ -1,48 +1,26 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
+import static com.google.protobuf.FieldInfo.forExplicitPresenceField;
 import static com.google.protobuf.FieldInfo.forField;
 import static com.google.protobuf.FieldInfo.forFieldWithEnumVerifier;
+import static com.google.protobuf.FieldInfo.forLegacyRequiredField;
 import static com.google.protobuf.FieldInfo.forMapField;
 import static com.google.protobuf.FieldInfo.forOneofMemberField;
 import static com.google.protobuf.FieldInfo.forPackedField;
 import static com.google.protobuf.FieldInfo.forPackedFieldWithEnumVerifier;
-import static com.google.protobuf.FieldInfo.forProto2OptionalField;
-import static com.google.protobuf.FieldInfo.forProto2RequiredField;
 import static com.google.protobuf.FieldInfo.forRepeatedMessageField;
 
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor.Type;
+import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.Descriptors.OneofDescriptor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -61,8 +39,31 @@ import java.util.concurrent.ConcurrentHashMap;
 final class DescriptorMessageInfoFactory implements MessageInfoFactory {
   private static final String GET_DEFAULT_INSTANCE_METHOD_NAME = "getDefaultInstance";
   private static final DescriptorMessageInfoFactory instance = new DescriptorMessageInfoFactory();
+
+  /**
+   * Names that should be avoided (in UpperCamelCase format). Using them causes the compiler to
+   * generate accessors whose names collide with methods defined in base classes.
+   *
+   * <p>Keep this list in sync with kForbiddenWordList in
+   * src/google/protobuf/compiler/java/java_helpers.cc
+   */
   private static final Set<String> specialFieldNames =
-      new HashSet<>(Arrays.asList("cached_size", "serialized_size", "class"));
+      new HashSet<>(
+          Arrays.asList(
+              // java.lang.Object:
+              "Class",
+              // com.google.protobuf.MessageLiteOrBuilder:
+              "DefaultInstanceForType",
+              // com.google.protobuf.MessageLite:
+              "ParserForType",
+              "SerializedSize",
+              // com.google.protobuf.MessageOrBuilder:
+              "AllFields",
+              "DescriptorForType",
+              "InitializationErrorString",
+              "UnknownFields",
+              // obsolete. kept for backwards compatibility of generated code
+              "CachedSize"));
 
   // Disallow construction - it's a singleton.
   private DescriptorMessageInfoFactory() {}
@@ -99,16 +100,155 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
     return getDefaultInstance(messageType).getDescriptorForType();
   }
 
-  private static MessageInfo convert(Class<?> messageType, Descriptor messageDescriptor) {
-    switch (messageDescriptor.getFile().getSyntax()) {
+  private static ProtoSyntax convertSyntax(FileDescriptor.Syntax syntax) {
+    switch (syntax) {
       case PROTO2:
-        return convertProto2(messageType, messageDescriptor);
+        return ProtoSyntax.PROTO2;
       case PROTO3:
-        return convertProto3(messageType, messageDescriptor);
+        return ProtoSyntax.PROTO3;
+      case EDITIONS:
+        return ProtoSyntax.EDITIONS;
       default:
-        throw new IllegalArgumentException(
-            "Unsupported syntax: " + messageDescriptor.getFile().getSyntax());
+        throw new IllegalArgumentException("Unsupported syntax: " + syntax);
     }
+  }
+
+  private static MessageInfo convert(Class<?> messageType, Descriptor messageDescriptor) {
+    List<FieldDescriptor> fieldDescriptors = messageDescriptor.getFields();
+    StructuralMessageInfo.Builder builder =
+        StructuralMessageInfo.newBuilder(fieldDescriptors.size());
+    builder.withDefaultInstance(getDefaultInstance(messageType));
+    builder.withSyntax(convertSyntax(messageDescriptor.getFile().getSyntax()));
+    builder.withMessageSetWireFormat(messageDescriptor.getOptions().getMessageSetWireFormat());
+
+    OneofState oneofState = new OneofState();
+    // Performance optimization to cache presence bits across field iterations.
+    int bitFieldIndex = 0;
+    int presenceMask = 1;
+    Field bitField = null;
+
+    // Fields in the descriptor are ordered by the index position in which they appear in the
+    // proto file. This is the same order used to determine the presence mask used in the
+    // bitFields. So to determine the appropriate presence mask to be used for a field, we simply
+    // need to shift the presence mask whenever a presence-checked field is encountered.
+    for (int i = 0; i < fieldDescriptors.size(); ++i) {
+      final FieldDescriptor fd = fieldDescriptors.get(i);
+      boolean enforceUtf8 = fd.needsUtf8Check();
+      Internal.EnumVerifier enumVerifier = null;
+      // Enum verifier for closed enums.
+      if (fd.getJavaType() == Descriptors.FieldDescriptor.JavaType.ENUM
+          && fd.legacyEnumFieldTreatedAsClosed()) {
+        enumVerifier =
+            new Internal.EnumVerifier() {
+              @Override
+              public boolean isInRange(int number) {
+                return fd.getEnumType().findValueByNumber(number) != null;
+              }
+            };
+      }
+      if (fd.getRealContainingOneof() != null) {
+        // Build a oneof member field for non-synthetic oneofs.
+        builder.withField(buildOneofMember(messageType, fd, oneofState, enforceUtf8, enumVerifier));
+        continue;
+      }
+
+      Field field = field(messageType, fd);
+      int number = fd.getNumber();
+      FieldType type = getFieldType(fd);
+
+      // Handle field with implicit presence.
+      if (!fd.hasPresence()) {
+        FieldInfo fieldImplicitPresence;
+        if (fd.isMapField()) {
+          // Map field points to an auto-generated message entry type with the definition:
+          //   message MapEntry {
+          //     K key = 1;
+          //     V value = 2;
+          //   }
+          final FieldDescriptor valueField = fd.getMessageType().findFieldByNumber(2);
+          if (valueField.getJavaType() == Descriptors.FieldDescriptor.JavaType.ENUM
+              && valueField.legacyEnumFieldTreatedAsClosed()) {
+            enumVerifier =
+                new Internal.EnumVerifier() {
+                  @Override
+                  public boolean isInRange(int number) {
+                    return valueField.getEnumType().findValueByNumber(number) != null;
+                  }
+                };
+          }
+          fieldImplicitPresence =
+              forMapField(
+                  field,
+                  number,
+                  SchemaUtil.getMapDefaultEntry(messageType, fd.getName()),
+                  enumVerifier);
+        } else if (fd.isRepeated() && fd.getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
+          fieldImplicitPresence =
+              forRepeatedMessageField(
+                  field, number, type, getTypeForRepeatedMessageField(messageType, fd));
+        } else if (fd.isPacked()) {
+          if (enumVerifier != null) {
+            fieldImplicitPresence =
+                forPackedFieldWithEnumVerifier(
+                    field, number, type, enumVerifier, cachedSizeField(messageType, fd));
+          } else {
+            fieldImplicitPresence =
+                forPackedField(field, number, type, cachedSizeField(messageType, fd));
+          }
+        } else {
+          if (enumVerifier != null) {
+            fieldImplicitPresence = forFieldWithEnumVerifier(field, number, type, enumVerifier);
+          } else {
+            fieldImplicitPresence = forField(field, number, type, enforceUtf8);
+          }
+        }
+        builder.withField(fieldImplicitPresence);
+        continue;
+      }
+
+      // Handle field with explicit presence.
+      FieldInfo fieldExplicitPresence;
+      if (bitField == null) {
+        // Lazy-create the next bitfield since we know it must exist.
+        bitField = bitField(messageType, bitFieldIndex);
+      }
+      if (fd.isRequired()) {
+        fieldExplicitPresence =
+            forLegacyRequiredField(
+                field, number, type, bitField, presenceMask, enforceUtf8, enumVerifier);
+      } else {
+        fieldExplicitPresence =
+            forExplicitPresenceField(
+                field, number, type, bitField, presenceMask, enforceUtf8, enumVerifier);
+      }
+      builder.withField(fieldExplicitPresence);
+      // Update the presence mask for the next iteration. If the shift clears out the mask, we
+      // will go to the next bitField.
+      presenceMask <<= 1;
+      if (presenceMask == 0) {
+        bitField = null;
+        presenceMask = 1;
+        bitFieldIndex++;
+      }
+    }
+
+    List<Integer> fieldsToCheckIsInitialized = new ArrayList<>();
+    for (int i = 0; i < fieldDescriptors.size(); ++i) {
+      FieldDescriptor fd = fieldDescriptors.get(i);
+      if (fd.isRequired()
+          || (fd.getJavaType() == FieldDescriptor.JavaType.MESSAGE
+              && needsIsInitializedCheck(fd.getMessageType()))) {
+        fieldsToCheckIsInitialized.add(fd.getNumber());
+      }
+    }
+    int[] numbers = new int[fieldsToCheckIsInitialized.size()];
+    for (int i = 0; i < fieldsToCheckIsInitialized.size(); i++) {
+      numbers[i] = fieldsToCheckIsInitialized.get(i);
+    }
+    if (numbers.length > 0) {
+      builder.withCheckInitialized(numbers);
+    }
+    return builder.build();
   }
 
   /**
@@ -125,6 +265,8 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
    *
    * <p>This class is thread-safe.
    */
+  // <p>The code is adapted from the C++ implementation:
+  // https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/compiler/java/java_helpers.h
   static class IsInitializedCheckAnalyzer {
 
     private final Map<Descriptor, Boolean> resultCache =
@@ -254,191 +396,6 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
 
   private static boolean needsIsInitializedCheck(Descriptor descriptor) {
     return isInitializedCheckAnalyzer.needsIsInitializedCheck(descriptor);
-  }
-
-  private static StructuralMessageInfo convertProto2(
-      Class<?> messageType, Descriptor messageDescriptor) {
-    List<FieldDescriptor> fieldDescriptors = messageDescriptor.getFields();
-    StructuralMessageInfo.Builder builder =
-        StructuralMessageInfo.newBuilder(fieldDescriptors.size());
-    builder.withDefaultInstance(getDefaultInstance(messageType));
-    builder.withSyntax(ProtoSyntax.PROTO2);
-    builder.withMessageSetWireFormat(messageDescriptor.getOptions().getMessageSetWireFormat());
-
-    OneofState oneofState = new OneofState();
-    int bitFieldIndex = 0;
-    int presenceMask = 1;
-    Field bitField = null;
-
-    // Fields in the descriptor are ordered by the index position in which they appear in the
-    // proto file. This is the same order used to determine the presence mask used in the
-    // bitFields. So to determine the appropriate presence mask to be used for a field, we simply
-    // need to shift the presence mask whenever a presence-checked field is encountered.
-    for (int i = 0; i < fieldDescriptors.size(); ++i) {
-      final FieldDescriptor fd = fieldDescriptors.get(i);
-      boolean enforceUtf8 = fd.getFile().getOptions().getJavaStringCheckUtf8();
-      Internal.EnumVerifier enumVerifier = null;
-      if (fd.getJavaType() == Descriptors.FieldDescriptor.JavaType.ENUM) {
-        enumVerifier =
-            new Internal.EnumVerifier() {
-              @Override
-              public boolean isInRange(int number) {
-                return fd.getEnumType().findValueByNumber(number) != null;
-              }
-            };
-      }
-      if (fd.getContainingOneof() != null) {
-        // Build a oneof member field.
-        builder.withField(buildOneofMember(messageType, fd, oneofState, enforceUtf8, enumVerifier));
-      } else {
-        Field field = field(messageType, fd);
-        int number = fd.getNumber();
-        FieldType type = getFieldType(fd);
-
-        if (fd.isMapField()) {
-          // Map field points to an auto-generated message entry type with the definition:
-          //   message MapEntry {
-          //     K key = 1;
-          //     V value = 2;
-          //   }
-          final FieldDescriptor valueField = fd.getMessageType().findFieldByNumber(2);
-          if (valueField.getJavaType() == Descriptors.FieldDescriptor.JavaType.ENUM) {
-            enumVerifier =
-                new Internal.EnumVerifier() {
-                  @Override
-                  public boolean isInRange(int number) {
-                    return valueField.getEnumType().findValueByNumber(number) != null;
-                  }
-                };
-          }
-          builder.withField(
-              forMapField(
-                  field,
-                  number,
-                  SchemaUtil.getMapDefaultEntry(messageType, fd.getName()),
-                  enumVerifier));
-          continue;
-        }
-
-        if (fd.isRepeated()) {
-          // Repeated fields are not presence-checked.
-          if (enumVerifier != null) {
-            if (fd.isPacked()) {
-              builder.withField(
-                  forPackedFieldWithEnumVerifier(
-                      field, number, type, enumVerifier, cachedSizeField(messageType, fd)));
-            } else {
-              builder.withField(forFieldWithEnumVerifier(field, number, type, enumVerifier));
-            }
-          } else if (fd.getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
-            builder.withField(
-                forRepeatedMessageField(
-                    field, number, type, getTypeForRepeatedMessageField(messageType, fd)));
-          } else {
-            if (fd.isPacked()) {
-              builder.withField(
-                  forPackedField(field, number, type, cachedSizeField(messageType, fd)));
-            } else {
-              builder.withField(forField(field, number, type, enforceUtf8));
-            }
-          }
-          continue;
-        }
-
-        if (bitField == null) {
-          // Lazy-create the next bitfield since we know it must exist.
-          bitField = bitField(messageType, bitFieldIndex);
-        }
-
-        // It's a presence-checked field.
-        if (fd.isRequired()) {
-          builder.withField(
-              forProto2RequiredField(
-                  field, number, type, bitField, presenceMask, enforceUtf8, enumVerifier));
-        } else {
-          builder.withField(
-              forProto2OptionalField(
-                  field, number, type, bitField, presenceMask, enforceUtf8, enumVerifier));
-        }
-      }
-
-      // Update the presence mask for the next iteration. If the shift clears out the mask, we will
-      // go to the next bitField.
-      presenceMask <<= 1;
-      if (presenceMask == 0) {
-        bitField = null;
-        presenceMask = 1;
-        bitFieldIndex++;
-      }
-    }
-
-    List<Integer> fieldsToCheckIsInitialized = new ArrayList<Integer>();
-    for (int i = 0; i < fieldDescriptors.size(); ++i) {
-      FieldDescriptor fd = fieldDescriptors.get(i);
-      if (fd.isRequired()
-          || (fd.getJavaType() == FieldDescriptor.JavaType.MESSAGE
-              && needsIsInitializedCheck(fd.getMessageType()))) {
-        fieldsToCheckIsInitialized.add(fd.getNumber());
-      }
-    }
-    int[] numbers = new int[fieldsToCheckIsInitialized.size()];
-    for (int i = 0; i < fieldsToCheckIsInitialized.size(); i++) {
-      numbers[i] = fieldsToCheckIsInitialized.get(i);
-    }
-    builder.withCheckInitialized(numbers);
-
-    return builder.build();
-  }
-
-  private static StructuralMessageInfo convertProto3(
-      Class<?> messageType, Descriptor messageDescriptor) {
-    List<FieldDescriptor> fieldDescriptors = messageDescriptor.getFields();
-    StructuralMessageInfo.Builder builder =
-        StructuralMessageInfo.newBuilder(fieldDescriptors.size());
-    builder.withDefaultInstance(getDefaultInstance(messageType));
-    builder.withSyntax(ProtoSyntax.PROTO3);
-
-    OneofState oneofState = new OneofState();
-    boolean enforceUtf8 = true;
-    for (int i = 0; i < fieldDescriptors.size(); ++i) {
-      FieldDescriptor fd = fieldDescriptors.get(i);
-      if (fd.getContainingOneof() != null) {
-        // Build a oneof member field.
-        builder.withField(buildOneofMember(messageType, fd, oneofState, enforceUtf8, null));
-        continue;
-      }
-      if (fd.isMapField()) {
-        builder.withField(
-            forMapField(
-                field(messageType, fd),
-                fd.getNumber(),
-                SchemaUtil.getMapDefaultEntry(messageType, fd.getName()),
-                null));
-        continue;
-      }
-      if (fd.isRepeated() && fd.getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
-        builder.withField(
-            forRepeatedMessageField(
-                field(messageType, fd),
-                fd.getNumber(),
-                getFieldType(fd),
-                getTypeForRepeatedMessageField(messageType, fd)));
-        continue;
-      }
-      if (fd.isPacked()) {
-        builder.withField(
-            forPackedField(
-                field(messageType, fd),
-                fd.getNumber(),
-                getFieldType(fd),
-                cachedSizeField(messageType, fd)));
-      } else {
-        builder.withField(
-            forField(field(messageType, fd), fd.getNumber(), getFieldType(fd), enforceUtf8));
-      }
-    }
-
-    return builder.build();
   }
 
   /** Builds info for a oneof member field. */
@@ -593,21 +550,104 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
     String name = (fd.getType() == FieldDescriptor.Type.GROUP)
                   ? fd.getMessageType().getName()
                   : fd.getName();
-    String suffix = specialFieldNames.contains(name) ? "__" : "_";
-    return snakeCaseToCamelCase(name) + suffix;
+
+    // convert to UpperCamelCase for comparison to the specialFieldNames
+    // (which are in UpperCamelCase)
+    String upperCamelCaseName = snakeCaseToUpperCamelCase(name);
+
+    // Append underscores to match the behavior of the protoc java compiler
+    final String suffix;
+    if (specialFieldNames.contains(upperCamelCaseName)) {
+      // For proto field names that match the specialFieldNames,
+      // the protoc java compiler appends "__" to the java field name
+      // to prevent the field's accessor method names from clashing with other methods.
+      // For example:
+      //     proto field name = "class"
+      //     java field name = "class__"
+      //     accessor method name = "getClass_()"  (so that it does not clash with
+      // Object.getClass())
+      suffix = "__";
+    } else {
+      // For other proto field names,
+      // the protoc java compiler appends "_" to the java field name
+      // to prevent field names from clashing with java keywords.
+      // For example:
+      //     proto field name = "int"
+      //     java field name = "int_" (so that it does not clash with int keyword)
+      //     accessor method name = "getInt()"
+      suffix = "_";
+    }
+    return snakeCaseToLowerCamelCase(name) + suffix;
   }
 
   private static String getCachedSizeFieldName(FieldDescriptor fd) {
-    return snakeCaseToCamelCase(fd.getName()) + "MemoizedSerializedSize";
+    return snakeCaseToLowerCamelCase(fd.getName()) + "MemoizedSerializedSize";
   }
 
   /**
-   * This method must match exactly with the corresponding function in protocol compiler. See:
-   * https://github.com/google/protobuf/blob/v3.0.0/src/google/protobuf/compiler/java/java_helpers.cc#L153
+   * Converts a snake case string into lower camel case.
+   *
+   * <p>Some examples:
+   *
+   * <pre>
+   *     snakeCaseToLowerCamelCase("foo_bar") => "fooBar"
+   *     snakeCaseToLowerCamelCase("foo") => "foo"
+   * </pre>
+   *
+   * @param snakeCase the string in snake case to convert
+   * @return the string converted to camel case, with a lowercase first character
    */
-  private static String snakeCaseToCamelCase(String snakeCase) {
+  private static String snakeCaseToLowerCamelCase(String snakeCase) {
+    return snakeCaseToCamelCase(snakeCase, false);
+  }
+
+  /**
+   * Converts a snake case string into upper camel case.
+   *
+   * <p>Some examples:
+   *
+   * <pre>
+   *     snakeCaseToUpperCamelCase("foo_bar") => "FooBar"
+   *     snakeCaseToUpperCamelCase("foo") => "Foo"
+   * </pre>
+   *
+   * @param snakeCase the string in snake case to convert
+   * @return the string converted to camel case, with an uppercase first character
+   */
+  private static String snakeCaseToUpperCamelCase(String snakeCase) {
+    return snakeCaseToCamelCase(snakeCase, true);
+  }
+
+  /**
+   * Converts a snake case string into camel case.
+   *
+   * <p>For better readability, prefer calling either {@link #snakeCaseToLowerCamelCase(String)} or
+   * {@link #snakeCaseToUpperCamelCase(String)}.
+   *
+   * <p>Some examples:
+   *
+   * <pre>
+   *     snakeCaseToCamelCase("foo_bar", false) => "fooBar"
+   *     snakeCaseToCamelCase("foo_bar", true) => "FooBar"
+   *     snakeCaseToCamelCase("foo", false) => "foo"
+   *     snakeCaseToCamelCase("foo", true) => "Foo"
+   *     snakeCaseToCamelCase("Foo", false) => "foo"
+   *     snakeCaseToCamelCase("fooBar", false) => "fooBar"
+   * </pre>
+   *
+   * <p>This implementation of this method must exactly match the corresponding function in the
+   * protocol compiler. Specifically, the {@code UnderscoresToCamelCase} function in {@code
+   * src/google/protobuf/compiler/java/java_helpers.cc}.
+   *
+   * @param snakeCase the string in snake case to convert
+   * @param capFirst true if the first letter of the returned string should be uppercase. false if
+   *     the first letter of the returned string should be lowercase.
+   * @return the string converted to camel case, with an uppercase or lowercase first character
+   *     depending on if {@code capFirst} is true or false, respectively
+   */
+  private static String snakeCaseToCamelCase(String snakeCase, boolean capFirst) {
     StringBuilder sb = new StringBuilder(snakeCase.length() + 1);
-    boolean capNext = false;
+    boolean capNext = capFirst;
     for (int ctr = 0; ctr < snakeCase.length(); ctr++) {
       char next = snakeCase.charAt(ctr);
       if (next == '_') {
@@ -653,7 +693,7 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
 
   /** Constructs the name of the get method for the given field in the proto. */
   private static String getterForField(String snakeCase) {
-    String camelCase = snakeCaseToCamelCase(snakeCase);
+    String camelCase = snakeCaseToLowerCamelCase(snakeCase);
     StringBuilder builder = new StringBuilder("get");
     // Capitalize the first character in the field name.
     builder.append(Character.toUpperCase(camelCase.charAt(0)));
@@ -679,7 +719,7 @@ final class DescriptorMessageInfoFactory implements MessageInfoFactory {
     }
 
     private static OneofInfo newInfo(Class<?> messageType, OneofDescriptor desc) {
-      String camelCase = snakeCaseToCamelCase(desc.getName());
+      String camelCase = snakeCaseToLowerCamelCase(desc.getName());
       String valueFieldName = camelCase + "_";
       String caseFieldName = camelCase + "Case_";
 

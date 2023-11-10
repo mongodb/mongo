@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
@@ -34,6 +11,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
 import static java.lang.Math.min;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,52 +26,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class SmallSortedMapTest {
-  // java.util.AbstractMap.SimpleEntry is private in JDK 1.5. We re-implement it
-  // here for JDK 1.5 users.
-  private static class SimpleEntry<K, V> implements Map.Entry<K, V> {
-    private final K key;
-    private V value;
-
-    SimpleEntry(K key, V value) {
-      this.key = key;
-      this.value = value;
-    }
-
-    @Override
-    public K getKey() {
-      return key;
-    }
-
-    @Override
-    public V getValue() {
-      return value;
-    }
-
-    @Override
-    public V setValue(V value) {
-      V oldValue = this.value;
-      this.value = value;
-      return oldValue;
-    }
-
-    private static boolean eq(Object o1, Object o2) {
-      return o1 == null ? o2 == null : o1.equals(o2);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof Map.Entry)) {
-        return false;
-      }
-      Map.Entry<?, ?> e = (Map.Entry<?, ?>) o;
-      return eq(key, e.getKey()) && eq(value, e.getValue());
-    }
-
-    @Override
-    public int hashCode() {
-      return ((key == null) ? 0 : key.hashCode()) ^ ((value == null) ? 0 : value.hashCode());
-    }
-  }
 
   @Test
   public void testPutAndGetArrayEntriesOnly() {
@@ -242,8 +174,8 @@ public class SmallSortedMapTest {
     }
     Set<Map.Entry<Integer, Integer>> entrySet = map.entrySet();
     for (int i = 0; i < 6; i++) {
-      assertThat(entrySet).contains(new SimpleEntry<Integer, Integer>(i, i + 1));
-      assertThat(entrySet).doesNotContain(new SimpleEntry<Integer, Integer>(i, i));
+      assertThat(entrySet).contains(new AbstractMap.SimpleEntry<Integer, Integer>(i, i + 1));
+      assertThat(entrySet).doesNotContain(new AbstractMap.SimpleEntry<Integer, Integer>(i, i));
     }
   }
 
@@ -252,7 +184,7 @@ public class SmallSortedMapTest {
     SmallSortedMap<Integer, Integer> map = SmallSortedMap.newInstanceForTest(3);
     Set<Map.Entry<Integer, Integer>> entrySet = map.entrySet();
     for (int i = 0; i < 6; i++) {
-      Map.Entry<Integer, Integer> entry = new SimpleEntry<>(i, i + 1);
+      Map.Entry<Integer, Integer> entry = new AbstractMap.SimpleEntry<>(i, i + 1);
       assertThat(entrySet.add(entry)).isTrue();
       assertThat(entrySet.add(entry)).isFalse();
     }
@@ -272,7 +204,7 @@ public class SmallSortedMapTest {
       assertThat(map.put(i, i + 1)).isNull();
     }
     for (int i = 0; i < 6; i++) {
-      Map.Entry<Integer, Integer> entry = new SimpleEntry<>(i, i + 1);
+      Map.Entry<Integer, Integer> entry = new AbstractMap.SimpleEntry<>(i, i + 1);
       assertThat(entrySet.remove(entry)).isTrue();
       assertThat(entrySet.remove(entry)).isFalse();
     }

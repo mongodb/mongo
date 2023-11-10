@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #import "GPBExtensionRegistry.h"
 
@@ -40,8 +17,8 @@
 - (instancetype)init {
   if ((self = [super init])) {
     // The keys are ObjC classes, so straight up ptr comparisons are fine.
-    mutableClassMap_ = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, NULL,
-                                             &kCFTypeDictionaryValueCallBacks);
+    mutableClassMap_ =
+        CFDictionaryCreateMutable(kCFAllocatorDefault, 0, NULL, &kCFTypeDictionaryValueCallBacks);
   }
   return self;
 }
@@ -69,13 +46,13 @@
   }
 
   Class containingMessageClass = extension.containingMessageClass;
-  CFMutableDictionaryRef extensionMap = (CFMutableDictionaryRef)
-      CFDictionaryGetValue(mutableClassMap_, containingMessageClass);
+  CFMutableDictionaryRef extensionMap =
+      (CFMutableDictionaryRef)CFDictionaryGetValue(mutableClassMap_, containingMessageClass);
   if (extensionMap == nil) {
     // Use a custom dictionary here because the keys are numbers and conversion
     // back and forth from NSNumber isn't worth the cost.
-    extensionMap = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, NULL,
-                                             &kCFTypeDictionaryValueCallBacks);
+    extensionMap =
+        CFDictionaryCreateMutable(kCFAllocatorDefault, 0, NULL, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue(mutableClassMap_, containingMessageClass, extensionMap);
     CFRelease(extensionMap);
   }
@@ -87,13 +64,11 @@
 - (GPBExtensionDescriptor *)extensionForDescriptor:(GPBDescriptor *)descriptor
                                        fieldNumber:(NSInteger)fieldNumber {
   Class messageClass = descriptor.messageClass;
-  CFMutableDictionaryRef extensionMap = (CFMutableDictionaryRef)
-      CFDictionaryGetValue(mutableClassMap_, messageClass);
+  CFMutableDictionaryRef extensionMap =
+      (CFMutableDictionaryRef)CFDictionaryGetValue(mutableClassMap_, messageClass);
   ssize_t key = fieldNumber;
   GPBExtensionDescriptor *result =
-      (extensionMap
-       ? CFDictionaryGetValue(extensionMap, (const void *)key)
-       : nil);
+      (extensionMap ? CFDictionaryGetValue(extensionMap, (const void *)key) : nil);
   return result;
 }
 
@@ -107,8 +82,8 @@ static void CopySubDictionary(const void *key, const void *value, void *context)
   Class containingMessageClass = key;
   CFMutableDictionaryRef otherExtensionMap = (CFMutableDictionaryRef)value;
 
-  CFMutableDictionaryRef extensionMap = (CFMutableDictionaryRef)
-      CFDictionaryGetValue(mutableClassMap, containingMessageClass);
+  CFMutableDictionaryRef extensionMap =
+      (CFMutableDictionaryRef)CFDictionaryGetValue(mutableClassMap, containingMessageClass);
   if (extensionMap == nil) {
     extensionMap = CFDictionaryCreateMutableCopy(kCFAllocatorDefault, 0, otherExtensionMap);
     CFDictionarySetValue(mutableClassMap, containingMessageClass, extensionMap);

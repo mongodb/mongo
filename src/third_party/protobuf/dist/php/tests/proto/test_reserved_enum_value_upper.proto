@@ -53,13 +53,16 @@ enum NotAllowed {
   NAMESPACE = 47;
   NEW = 48;
   OR = 49;
+  PARENT = 77;
   PRINT = 50;
   PRIVATE = 51;
   PROTECTED = 52;
   PUBLIC = 53;
+  READONLY = 79;
   REQUIRE = 54;
   REQUIRE_ONCE = 55;
   RETURN = 56;
+  SELF = 78;
   STATIC = 57;
   SWITCH = 58;
   THROW = 59;

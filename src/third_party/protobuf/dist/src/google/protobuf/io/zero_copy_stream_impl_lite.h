@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -44,18 +21,22 @@
 #ifndef GOOGLE_PROTOBUF_IO_ZERO_COPY_STREAM_IMPL_LITE_H__
 #define GOOGLE_PROTOBUF_IO_ZERO_COPY_STREAM_IMPL_LITE_H__
 
-
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include <google/protobuf/stubs/callback.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/stubs/stl_util.h>
+#include "google/protobuf/stubs/callback.h"
+#include "google/protobuf/stubs/common.h"
+#include "absl/base/attributes.h"
+#include "absl/strings/cord.h"
+#include "absl/strings/cord_buffer.h"
+#include "google/protobuf/io/zero_copy_stream.h"
+#include "google/protobuf/port.h"
 
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -64,7 +45,7 @@ namespace io {
 // ===================================================================
 
 // A ZeroCopyInputStream backed by an in-memory array of bytes.
-class PROTOBUF_EXPORT ArrayInputStream : public ZeroCopyInputStream {
+class PROTOBUF_EXPORT ArrayInputStream final : public ZeroCopyInputStream {
  public:
   // Create an InputStream that returns the bytes pointed to by "data".
   // "data" remains the property of the caller but must remain valid until
@@ -75,6 +56,10 @@ class PROTOBUF_EXPORT ArrayInputStream : public ZeroCopyInputStream {
   // it.
   ArrayInputStream(const void* data, int size, int block_size = -1);
   ~ArrayInputStream() override = default;
+
+  // `ArrayInputStream` is neither copiable nor assignable
+  ArrayInputStream(const ArrayInputStream&) = delete;
+  ArrayInputStream& operator=(const ArrayInputStream&) = delete;
 
   // implements ZeroCopyInputStream ----------------------------------
   bool Next(const void** data, int* size) override;
@@ -91,14 +76,12 @@ class PROTOBUF_EXPORT ArrayInputStream : public ZeroCopyInputStream {
   int position_;
   int last_returned_size_;  // How many bytes we returned last time Next()
                             // was called (used for error checking only).
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ArrayInputStream);
 };
 
 // ===================================================================
 
 // A ZeroCopyOutputStream backed by an in-memory array of bytes.
-class PROTOBUF_EXPORT ArrayOutputStream : public ZeroCopyOutputStream {
+class PROTOBUF_EXPORT ArrayOutputStream final : public ZeroCopyOutputStream {
  public:
   // Create an OutputStream that writes to the bytes pointed to by "data".
   // "data" remains the property of the caller but must remain valid until
@@ -109,6 +92,10 @@ class PROTOBUF_EXPORT ArrayOutputStream : public ZeroCopyOutputStream {
   // it.
   ArrayOutputStream(void* data, int size, int block_size = -1);
   ~ArrayOutputStream() override = default;
+
+  // `ArrayOutputStream` is neither copiable nor assignable
+  ArrayOutputStream(const ArrayOutputStream&) = delete;
+  ArrayOutputStream& operator=(const ArrayOutputStream&) = delete;
 
   // implements ZeroCopyOutputStream ---------------------------------
   bool Next(void** data, int* size) override;
@@ -123,14 +110,12 @@ class PROTOBUF_EXPORT ArrayOutputStream : public ZeroCopyOutputStream {
   int position_;
   int last_returned_size_;  // How many bytes we returned last time Next()
                             // was called (used for error checking only).
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(ArrayOutputStream);
 };
 
 // ===================================================================
 
 // A ZeroCopyOutputStream which appends bytes to a string.
-class PROTOBUF_EXPORT StringOutputStream : public ZeroCopyOutputStream {
+class PROTOBUF_EXPORT StringOutputStream final : public ZeroCopyOutputStream {
  public:
   // Create a StringOutputStream which appends bytes to the given string.
   // The string remains property of the caller, but it is mutated in arbitrary
@@ -144,6 +129,10 @@ class PROTOBUF_EXPORT StringOutputStream : public ZeroCopyOutputStream {
   explicit StringOutputStream(std::string* target);
   ~StringOutputStream() override = default;
 
+  // `StringOutputStream` is neither copiable nor assignable
+  StringOutputStream(const StringOutputStream&) = delete;
+  StringOutputStream& operator=(const StringOutputStream&) = delete;
+
   // implements ZeroCopyOutputStream ---------------------------------
   bool Next(void** data, int* size) override;
   void BackUp(int count) override;
@@ -153,8 +142,6 @@ class PROTOBUF_EXPORT StringOutputStream : public ZeroCopyOutputStream {
   static constexpr size_t kMinimumSize = 16;
 
   std::string* target_;
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(StringOutputStream);
 };
 
 // Note:  There is no StringInputStream.  Instead, just create an
@@ -211,6 +198,10 @@ class PROTOBUF_EXPORT CopyingInputStreamAdaptor : public ZeroCopyInputStream {
                                      int block_size = -1);
   ~CopyingInputStreamAdaptor() override;
 
+  // `CopyingInputStreamAdaptor` is neither copiable nor assignable
+  CopyingInputStreamAdaptor(const CopyingInputStreamAdaptor&) = delete;
+  CopyingInputStreamAdaptor& operator=(const CopyingInputStreamAdaptor&) = delete;
+
   // Call SetOwnsCopyingStream(true) to tell the CopyingInputStreamAdaptor to
   // delete the underlying CopyingInputStream when it is destroyed.
   void SetOwnsCopyingStream(bool value) { owns_copying_stream_ = value; }
@@ -251,8 +242,6 @@ class PROTOBUF_EXPORT CopyingInputStreamAdaptor : public ZeroCopyInputStream {
   // BackUp().  These need to be returned again.
   // 0 <= backup_bytes_ <= buffer_used_
   int backup_bytes_;
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(CopyingInputStreamAdaptor);
 };
 
 // ===================================================================
@@ -294,6 +283,10 @@ class PROTOBUF_EXPORT CopyingOutputStreamAdaptor : public ZeroCopyOutputStream {
                                       int block_size = -1);
   ~CopyingOutputStreamAdaptor() override;
 
+  // `CopyingOutputStreamAdaptor` is neither copiable nor assignable
+  CopyingOutputStreamAdaptor(const CopyingOutputStreamAdaptor&) = delete;
+  CopyingOutputStreamAdaptor& operator=(const CopyingOutputStreamAdaptor&) = delete;
+
   // Writes all pending data to the underlying stream.  Returns false if a
   // write error occurred on the underlying stream.  (The underlying
   // stream itself is not necessarily flushed.)
@@ -309,6 +302,7 @@ class PROTOBUF_EXPORT CopyingOutputStreamAdaptor : public ZeroCopyOutputStream {
   int64_t ByteCount() const override;
   bool WriteAliasedRaw(const void* data, int size) override;
   bool AllowsAliasing() const override { return true; }
+  bool WriteCord(const absl::Cord& cord) override;
 
  private:
   // Write the current buffer, if it is present.
@@ -338,55 +332,170 @@ class PROTOBUF_EXPORT CopyingOutputStreamAdaptor : public ZeroCopyOutputStream {
   // returned by Next()).  When BackUp() is called, we just reduce this.
   // 0 <= buffer_used_ <= buffer_size_.
   int buffer_used_;
-
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(CopyingOutputStreamAdaptor);
 };
 
 // ===================================================================
 
 // A ZeroCopyInputStream which wraps some other stream and limits it to
 // a particular byte count.
-class PROTOBUF_EXPORT LimitingInputStream : public ZeroCopyInputStream {
+class PROTOBUF_EXPORT LimitingInputStream final : public ZeroCopyInputStream {
  public:
   LimitingInputStream(ZeroCopyInputStream* input, int64_t limit);
   ~LimitingInputStream() override;
+
+  // `LimitingInputStream` is neither copiable nor assignable
+  LimitingInputStream(const LimitingInputStream&) = delete;
+  LimitingInputStream& operator=(const LimitingInputStream&) = delete;
 
   // implements ZeroCopyInputStream ----------------------------------
   bool Next(const void** data, int* size) override;
   void BackUp(int count) override;
   bool Skip(int count) override;
   int64_t ByteCount() const override;
+  bool ReadCord(absl::Cord* cord, int count) override;
 
 
  private:
   ZeroCopyInputStream* input_;
   int64_t limit_;  // Decreases as we go, becomes negative if we overshoot.
   int64_t prior_bytes_read_;  // Bytes read on underlying stream at construction
+};
 
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(LimitingInputStream);
+// ===================================================================
+
+// A ZeroCopyInputStream backed by a Cord.  This stream implements ReadCord()
+// in a way that can share memory between the source and destination cords
+// rather than copying.
+class PROTOBUF_EXPORT CordInputStream final : public ZeroCopyInputStream {
+ public:
+  // Creates an InputStream that reads from the given Cord. `cord` must
+  // not be null and must outlive this CordInputStream instance. `cord` must
+  // not be modified while this instance is actively being used: any change
+  // to `cord` will lead to undefined behavior on any subsequent call into
+  // this instance.
+  explicit CordInputStream(
+      const absl::Cord* cord ABSL_ATTRIBUTE_LIFETIME_BOUND);
+
+
+  // `CordInputStream` is neither copiable nor assignable
+  CordInputStream(const CordInputStream&) = delete;
+  CordInputStream& operator=(const CordInputStream&) = delete;
+
+  // implements ZeroCopyInputStream ----------------------------------
+  bool Next(const void** data, int* size) override;
+  void BackUp(int count) override;
+  bool Skip(int count) override;
+  int64_t ByteCount() const override;
+  bool ReadCord(absl::Cord* cord, int count) override;
+
+
+ private:
+  // Moves `it_` to the next available chunk skipping `skip` extra bytes
+  // and updates the chunk data pointers.
+  bool NextChunk(size_t skip);
+
+  // Updates the current chunk data context `data_`, `size_` and `available_`.
+  // If `bytes_remaining_` is zero, sets `size_` and `available_` to zero.
+  // Returns true if more data is available, false otherwise.
+  bool LoadChunkData();
+
+  absl::Cord::CharIterator it_;
+  size_t length_;
+  size_t bytes_remaining_;
+  const char* data_;
+  size_t size_;
+  size_t available_;
+};
+
+// ===================================================================
+
+// A ZeroCopyOutputStream that writes to a Cord.  This stream implements
+// WriteCord() in a way that can share memory between the source and
+// destination cords rather than copying.
+class PROTOBUF_EXPORT CordOutputStream final : public ZeroCopyOutputStream {
+ public:
+  // Creates an OutputStream streaming serialized data into a Cord. `size_hint`,
+  // if given, is the expected total size of the resulting Cord. This is a hint
+  // only, used for optimization. Callers can obtain the generated Cord value by
+  // invoking `Consume()`.
+  explicit CordOutputStream(size_t size_hint = 0);
+
+  // Creates an OutputStream with an initial Cord value. This constructor can be
+  // used by applications wanting to directly append serialization data to a
+  // given cord. In such cases, donating the existing value as in:
+  //
+  //   CordOutputStream stream(std::move(cord));
+  //   message.SerializeToZeroCopyStream(&stream);
+  //   cord = std::move(stream.Consume());
+  //
+  // is more efficient then appending the serialized cord in application code:
+  //
+  //   CordOutputStream stream;
+  //   message.SerializeToZeroCopyStream(&stream);
+  //   cord.Append(stream.Consume());
+  //
+  // The former allows `CordOutputStream` to utilize pre-existing privately
+  // owned Cord buffers from the donated cord where the latter does not, which
+  // may lead to more memory usage when serialuzing data into existing cords.
+  explicit CordOutputStream(absl::Cord cord, size_t size_hint = 0);
+
+  // Creates an OutputStream with an initial Cord value and initial buffer.
+  // This donates both the preexisting cord in `cord`, as well as any
+  // pre-existing data and additional capacity in `buffer`.
+  // This function is mainly intended to be used in internal serialization logic
+  // using eager buffer initialization in EpsCopyOutputStream.
+  // The donated buffer can be empty, partially empty or full: the outputstream
+  // will DTRT in all cases and preserve any pre-existing data.
+  explicit CordOutputStream(absl::Cord cord, absl::CordBuffer buffer,
+                            size_t size_hint = 0);
+
+  // Creates an OutputStream with an initial buffer.
+  // This method is logically identical to, but more efficient than:
+  //   `CordOutputStream(absl::Cord(), std::move(buffer), size_hint)`
+  explicit CordOutputStream(absl::CordBuffer buffer, size_t size_hint = 0);
+
+  // `CordOutputStream` is neither copiable nor assignable
+  CordOutputStream(const CordOutputStream&) = delete;
+  CordOutputStream& operator=(const CordOutputStream&) = delete;
+
+  // implements `ZeroCopyOutputStream` ---------------------------------
+  bool Next(void** data, int* size) final;
+  void BackUp(int count) final;
+  int64_t ByteCount() const final;
+  bool WriteCord(const absl::Cord& cord) final;
+
+  // Consumes the serialized data as a cord value. `Consume()` internally
+  // flushes any pending state 'as if' BackUp(0) was called. While a final call
+  // to BackUp() is generally required by the `ZeroCopyOutputStream` contract,
+  // applications using `CordOutputStream` directly can call `Consume()` without
+  // a preceding call to `BackUp()`.
+  //
+  // While it will rarely be useful in practice (and especially in the presence
+  // of size hints) an instance is safe to be used after a call to `Consume()`.
+  // The only logical change in state is that all serialized data is extracted,
+  // and any new serialization calls will serialize into new cord data.
+  absl::Cord Consume();
+
+ private:
+  // State of `buffer_` and 'cord_. As a default CordBuffer instance always has
+  // inlined capacity, we track state explicitly to avoid returning 'existing
+  // capacity' from the default or 'moved from' CordBuffer. 'kSteal' indicates
+  // we should (attempt to) steal the next buffer from the cord.
+  enum class State { kEmpty, kFull, kPartial, kSteal };
+
+  absl::Cord cord_;
+  size_t size_hint_;
+  State state_ = State::kEmpty;
+  absl::CordBuffer buffer_;
 };
 
 
 // ===================================================================
 
-// mutable_string_data() and as_string_data() are workarounds to improve
-// the performance of writing new data to an existing string.  Unfortunately
-// the methods provided by the string class are suboptimal, and using memcpy()
-// is mildly annoying because it requires its pointer args to be non-NULL even
-// if we ask it to copy 0 bytes.  Furthermore, string_as_array() has the
-// property that it always returns NULL if its arg is the empty string, exactly
-// what we want to avoid if we're using it in conjunction with memcpy()!
-// With C++11, the desired memcpy() boils down to memcpy(..., &(*s)[0], size),
-// where s is a string*.  Without C++11, &(*s)[0] is not guaranteed to be safe,
-// so we use string_as_array(), and live with the extra logic that tests whether
-// *s is empty.
-
 // Return a pointer to mutable characters underlying the given string.  The
 // return value is valid until the next time the string is resized.  We
 // trust the caller to treat the return value as an array of length s->size().
 inline char* mutable_string_data(std::string* s) {
-  // This should be simpler & faster than string_as_array() because the latter
-  // is guaranteed to return NULL when *s is empty, so it has to check for that.
   return &(*s)[0];
 }
 
@@ -403,6 +512,6 @@ inline std::pair<char*, bool> as_string_data(std::string* s) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 
 #endif  // GOOGLE_PROTOBUF_IO_ZERO_COPY_STREAM_IMPL_LITE_H__

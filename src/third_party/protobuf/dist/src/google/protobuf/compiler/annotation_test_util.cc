@@ -1,48 +1,27 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
-#include <google/protobuf/compiler/annotation_test_util.h>
+#include "google/protobuf/compiler/annotation_test_util.h"
 
 #include <cstdint>
 #include <memory>
 
-#include <google/protobuf/testing/file.h>
-#include <google/protobuf/testing/file.h>
-#include <google/protobuf/compiler/code_generator.h>
-#include <google/protobuf/compiler/command_line_interface.h>
-#include <google/protobuf/io/printer.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/testing/file.h"
+#include "google/protobuf/testing/file.h"
+#include "google/protobuf/compiler/code_generator.h"
+#include "google/protobuf/compiler/command_line_interface.h"
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
+#include "absl/log/absl_check.h"
+#include "absl/strings/string_view.h"
+#include "google/protobuf/io/printer.h"
+#include "google/protobuf/io/zero_copy_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
 namespace google {
 namespace protobuf {
@@ -58,9 +37,8 @@ class DescriptorCapturingGenerator : public CodeGenerator {
   explicit DescriptorCapturingGenerator(FileDescriptorProto* file)
       : file_(file) {}
 
-  virtual bool Generate(const FileDescriptor* file,
-                        const std::string& parameter, GeneratorContext* context,
-                        std::string* error) const {
+  bool Generate(const FileDescriptor* file, const std::string& parameter,
+                GeneratorContext* context, std::string* error) const override {
     file->CopyTo(file_);
     return true;
   }
@@ -70,9 +48,9 @@ class DescriptorCapturingGenerator : public CodeGenerator {
 };
 }  // namespace
 
-void AddFile(const std::string& filename, const std::string& data) {
-  GOOGLE_CHECK_OK(File::SetContents(TestTempDir() + "/" + filename, data,
-                             true));
+void AddFile(absl::string_view filename, absl::string_view data) {
+  ABSL_CHECK_OK(File::SetContents(
+      absl::StrCat(TestTempDir(), "/", filename), data, true));
 }
 
 bool RunProtoCompiler(const std::string& filename,
@@ -83,8 +61,8 @@ bool RunProtoCompiler(const std::string& filename,
   DescriptorCapturingGenerator capturing_generator(file);
   cli->RegisterGenerator("--capture_out", &capturing_generator, "");
 
-  std::string proto_path = "-I" + TestTempDir();
-  std::string capture_out = "--capture_out=" + TestTempDir();
+  std::string proto_path = absl::StrCat("-I", TestTempDir());
+  std::string capture_out = absl::StrCat("--capture_out=", TestTempDir());
 
   const char* argv[] = {"protoc", proto_path.c_str(),
                         plugin_specific_args.c_str(), capture_out.c_str(),
@@ -95,7 +73,7 @@ bool RunProtoCompiler(const std::string& filename,
 
 bool DecodeMetadata(const std::string& path, GeneratedCodeInfo* info) {
   std::string data;
-  GOOGLE_CHECK_OK(File::GetContents(path, &data, true));
+  ABSL_CHECK_OK(File::GetContents(path, &data, true));
   io::ArrayInputStream input(data.data(), data.size());
   return info->ParseFromZeroCopyStream(&input);
 }
@@ -128,7 +106,7 @@ const GeneratedCodeInfo::Annotation* FindAnnotationOnPath(
   std::vector<const GeneratedCodeInfo::Annotation*> annotations;
   FindAnnotationsOnPath(info, source_file, path, &annotations);
   if (annotations.empty()) {
-    return NULL;
+    return nullptr;
   }
   return annotations[0];
 }
@@ -136,7 +114,8 @@ const GeneratedCodeInfo::Annotation* FindAnnotationOnPath(
 bool AtLeastOneAnnotationMatchesSubstring(
     const std::string& file_content,
     const std::vector<const GeneratedCodeInfo::Annotation*>& annotations,
-    const std::string& expected_text) {
+    const std::string& expected_text,
+    absl::optional<GeneratedCodeInfo::Annotation::Semantic> semantic) {
   for (std::vector<const GeneratedCodeInfo::Annotation*>::const_iterator
            i = annotations.begin(),
            e = annotations.end();
@@ -148,7 +127,7 @@ bool AtLeastOneAnnotationMatchesSubstring(
       return false;
     }
     if (file_content.substr(begin, end - begin) == expected_text) {
-      return true;
+      return !semantic || annotation->semantic() == *semantic;
     }
   }
   return false;
@@ -161,6 +140,17 @@ bool AnnotationMatchesSubstring(const std::string& file_content,
   annotations.push_back(annotation);
   return AtLeastOneAnnotationMatchesSubstring(file_content, annotations,
                                               expected_text);
+}
+
+absl::optional<absl::string_view> GetAnnotationSubstring(
+    absl::string_view file_content,
+    const GeneratedCodeInfo::Annotation& annotation) {
+  auto begin = annotation.begin();
+  auto end = annotation.end();
+  if (begin < 0 || end < begin || end > file_content.size()) {
+    return absl::nullopt;
+  }
+  return file_content.substr(begin, end - begin);
 }
 }  // namespace annotation_test_util
 }  // namespace compiler

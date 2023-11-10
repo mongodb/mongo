@@ -1,40 +1,21 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_MAP_TYPE_HANDLER_H__
 #define GOOGLE_PROTOBUF_MAP_TYPE_HANDLER_H__
 
-#include <google/protobuf/parse_context.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/arena.h>
-#include <google/protobuf/wire_format_lite.h>
+#include <cstdint>
+#include <type_traits>
+
+#include "google/protobuf/arena.h"
+#include "google/protobuf/arenastring.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/parse_context.h"
+#include "google/protobuf/wire_format_lite.h"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -44,81 +25,46 @@ namespace google {
 namespace protobuf {
 namespace internal {
 
-// Used for compile time type selection. MapIf::type will be TrueType if Flag is
-// true and FalseType otherwise.
-template <bool Flag, typename TrueType, typename FalseType>
-struct MapIf;
-
-template <typename TrueType, typename FalseType>
-struct MapIf<true, TrueType, FalseType> {
-  typedef TrueType type;
-};
-
-template <typename TrueType, typename FalseType>
-struct MapIf<false, TrueType, FalseType> {
-  typedef FalseType type;
-};
-
-template <typename Type, bool is_arena_constructable>
-class MapArenaMessageCreator {
- public:
-  // Use arena to create message if Type is arena constructable. Otherwise,
-  // create the message on heap.
-  static inline Type* CreateMessage(Arena* arena);
-};
-template <typename Type>
-class MapArenaMessageCreator<Type, true> {
- public:
-  static inline Type* CreateMessage(Arena* arena) {
-    return Arena::CreateMessage<Type>(arena);
-  }
-};
-template <typename Type>
-class MapArenaMessageCreator<Type, false> {
- public:
-  static inline Type* CreateMessage(Arena* arena) {
-    return Arena::Create<Type>(arena);
-  }
-};
-
 // Define constants for given wire field type
 template <WireFormatLite::FieldType field_type, typename Type>
 class MapWireFieldTypeTraits {};
 
-#define TYPE_TRAITS(FieldType, CType, WireFormatType, IsMessage, IsEnum)   \
-  template <typename Type>                                                 \
-  class MapWireFieldTypeTraits<WireFormatLite::TYPE_##FieldType, Type> {   \
-   public:                                                                 \
-    static const bool kIsMessage = IsMessage;                              \
-    static const bool kIsEnum = IsEnum;                                    \
-    typedef typename MapIf<kIsMessage, Type*, CType>::type TypeOnMemory;   \
-    typedef typename MapIf<kIsEnum, int, Type>::type MapEntryAccessorType; \
-    static const WireFormatLite::WireType kWireType =                      \
-        WireFormatLite::WIRETYPE_##WireFormatType;                         \
+#define TYPE_TRAITS(FieldType, CType, WireFormatType)                    \
+  template <typename Type>                                               \
+  class MapWireFieldTypeTraits<WireFormatLite::TYPE_##FieldType, Type> { \
+   public:                                                               \
+    using TypeOnMemory =                                                 \
+        std::conditional_t<WireFormatLite::TYPE_##FieldType ==           \
+                               WireFormatLite::TYPE_MESSAGE,             \
+                           Type*, CType>;                                \
+    using MapEntryAccessorType =                                         \
+        std::conditional_t<std::is_enum<Type>::value, int, Type>;        \
+    static const WireFormatLite::WireType kWireType =                    \
+        WireFormatLite::WIRETYPE_##WireFormatType;                       \
   };
 
-TYPE_TRAITS(MESSAGE, Type, LENGTH_DELIMITED, true, false)
-TYPE_TRAITS(STRING, ArenaStringPtr, LENGTH_DELIMITED, false, false)
-TYPE_TRAITS(BYTES, ArenaStringPtr, LENGTH_DELIMITED, false, false)
-TYPE_TRAITS(INT64, int64_t, VARINT, false, false)
-TYPE_TRAITS(UINT64, uint64_t, VARINT, false, false)
-TYPE_TRAITS(INT32, int32_t, VARINT, false, false)
-TYPE_TRAITS(UINT32, uint32_t, VARINT, false, false)
-TYPE_TRAITS(SINT64, int64_t, VARINT, false, false)
-TYPE_TRAITS(SINT32, int32_t, VARINT, false, false)
-TYPE_TRAITS(ENUM, int, VARINT, false, true)
-TYPE_TRAITS(DOUBLE, double, FIXED64, false, false)
-TYPE_TRAITS(FLOAT, float, FIXED32, false, false)
-TYPE_TRAITS(FIXED64, uint64_t, FIXED64, false, false)
-TYPE_TRAITS(FIXED32, uint32_t, FIXED32, false, false)
-TYPE_TRAITS(SFIXED64, int64_t, FIXED64, false, false)
-TYPE_TRAITS(SFIXED32, int32_t, FIXED32, false, false)
-TYPE_TRAITS(BOOL, bool, VARINT, false, false)
+TYPE_TRAITS(MESSAGE, Type, LENGTH_DELIMITED)
+TYPE_TRAITS(STRING, ArenaStringPtr, LENGTH_DELIMITED)
+TYPE_TRAITS(BYTES, ArenaStringPtr, LENGTH_DELIMITED)
+TYPE_TRAITS(INT64, int64_t, VARINT)
+TYPE_TRAITS(UINT64, uint64_t, VARINT)
+TYPE_TRAITS(INT32, int32_t, VARINT)
+TYPE_TRAITS(UINT32, uint32_t, VARINT)
+TYPE_TRAITS(SINT64, int64_t, VARINT)
+TYPE_TRAITS(SINT32, int32_t, VARINT)
+TYPE_TRAITS(ENUM, int, VARINT)
+TYPE_TRAITS(DOUBLE, double, FIXED64)
+TYPE_TRAITS(FLOAT, float, FIXED32)
+TYPE_TRAITS(FIXED64, uint64_t, FIXED64)
+TYPE_TRAITS(FIXED32, uint32_t, FIXED32)
+TYPE_TRAITS(SFIXED64, int64_t, FIXED64)
+TYPE_TRAITS(SFIXED32, int32_t, FIXED32)
+TYPE_TRAITS(BOOL, bool, VARINT)
 
 #undef TYPE_TRAITS
 
 template <WireFormatLite::FieldType field_type, typename Type>
-class MapTypeHandler {};
+class MapTypeHandler;
 
 template <typename Type>
 class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
@@ -134,12 +80,6 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
   // Corresponding wire type for field type.
   static constexpr WireFormatLite::WireType kWireType =
       MapWireFieldTypeTraits<WireFormatLite::TYPE_MESSAGE, Type>::kWireType;
-  // Whether wire type is for message.
-  static constexpr bool kIsMessage =
-      MapWireFieldTypeTraits<WireFormatLite::TYPE_MESSAGE, Type>::kIsMessage;
-  // Whether wire type is for enum.
-  static constexpr bool kIsEnum =
-      MapWireFieldTypeTraits<WireFormatLite::TYPE_MESSAGE, Type>::kIsEnum;
 
   // Functions used in parsing and serialization. ===================
   static inline size_t ByteSize(const MapEntryAccessorType& value);
@@ -155,14 +95,9 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
   // Functions to manipulate data on memory. ========================
   static inline const Type& GetExternalReference(const Type* value);
   static inline void DeleteNoArena(const Type* x);
-  static inline void Merge(const Type& from, Type** to, Arena* arena);
-  static inline void Clear(Type** value, Arena* arena);
   static constexpr TypeOnMemory Constinit();
 
   static inline Type* EnsureMutable(Type** value, Arena* arena);
-  // SpaceUsedInMapEntry: Return bytes used by value in MapEntry, excluding
-  // those already calculate in sizeof(MapField).
-  static inline size_t SpaceUsedInMapEntryLong(const Type* value);
   // Return default instance if value is not initialized when calling const
   // reference accessor.
   static inline const Type& DefaultIfNotInitialized(const Type* value);
@@ -182,12 +117,6 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
     static const WireFormatLite::WireType kWireType =                          \
         MapWireFieldTypeTraits<WireFormatLite::TYPE_##FieldType,               \
                                Type>::kWireType;                               \
-    static const bool kIsMessage =                                             \
-        MapWireFieldTypeTraits<WireFormatLite::TYPE_##FieldType,               \
-                               Type>::kIsMessage;                              \
-    static const bool kIsEnum =                                                \
-        MapWireFieldTypeTraits<WireFormatLite::TYPE_##FieldType,               \
-                               Type>::kIsEnum;                                 \
     static inline int ByteSize(const MapEntryAccessorType& value);             \
     static inline int GetCachedSize(const MapEntryAccessorType& value);        \
     static inline bool Read(io::CodedInputStream* input,                       \
@@ -200,10 +129,6 @@ class MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type> {
     static inline const MapEntryAccessorType& GetExternalReference(            \
         const TypeOnMemory& value);                                            \
     static inline void DeleteNoArena(const TypeOnMemory& x);                   \
-    static inline void Merge(const MapEntryAccessorType& from,                 \
-                             TypeOnMemory* to, Arena* arena);                  \
-    static inline void Clear(TypeOnMemory* value, Arena* arena);               \
-    static inline size_t SpaceUsedInMapEntryLong(const TypeOnMemory& value);   \
     static inline const MapEntryAccessorType& DefaultIfNotInitialized(         \
         const TypeOnMemory& value);                                            \
     static inline bool IsInitialized(const TypeOnMemory& value);               \
@@ -322,7 +247,8 @@ inline uint8_t* MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::Write(
     int field, const MapEntryAccessorType& value, uint8_t* ptr,
     io::EpsCopyOutputStream* stream) {
   ptr = stream->EnsureSpace(ptr);
-  return WireFormatLite::InternalWriteMessage(field, value, ptr, stream);
+  return WireFormatLite::InternalWriteMessage(
+      field, value, value.GetCachedSize(), ptr, stream);
 }
 
 #define WRITE_METHOD(FieldType, DeclaredType)                     \
@@ -432,7 +358,7 @@ inline const char* ReadENUM(const char* ptr, E* value) {
   return ptr;
 }
 inline const char* ReadBOOL(const char* ptr, bool* value) {
-  *value = static_cast<bool>(ReadVarint32(&ptr));
+  *value = static_cast<bool>(ReadVarint64(&ptr));
   return ptr;
 }
 
@@ -502,23 +428,6 @@ MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::GetExternalReference(
 }
 
 template <typename Type>
-inline size_t MapTypeHandler<WireFormatLite::TYPE_MESSAGE,
-                             Type>::SpaceUsedInMapEntryLong(const Type* value) {
-  return value->SpaceUsedLong();
-}
-
-template <typename Type>
-inline void MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::Clear(
-    Type** value, Arena* /* arena */) {
-  if (*value != nullptr) (*value)->Clear();
-}
-template <typename Type>
-inline void MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::Merge(
-    const Type& from, Type** to, Arena* /* arena */) {
-  (*to)->MergeFrom(from);
-}
-
-template <typename Type>
 void MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::DeleteNoArena(
     const Type* ptr) {
   delete ptr;
@@ -534,9 +443,7 @@ template <typename Type>
 inline Type* MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::EnsureMutable(
     Type** value, Arena* arena) {
   if (*value == nullptr) {
-    *value = MapArenaMessageCreator<
-        Type,
-        Arena::is_arena_constructable<Type>::type::value>::CreateMessage(arena);
+    *value = Arena::CreateMessage<Type>(arena);
   }
   return *value;
 }
@@ -565,38 +472,23 @@ inline bool MapTypeHandler<WireFormatLite::TYPE_MESSAGE, Type>::IsInitialized(
     return value.Get();                                                       \
   }                                                                           \
   template <typename Type>                                                    \
-  inline size_t                                                               \
-  MapTypeHandler<WireFormatLite::TYPE_##FieldType,                            \
-                 Type>::SpaceUsedInMapEntryLong(const TypeOnMemory& value) {  \
-    return sizeof(value);                                                     \
-  }                                                                           \
-  template <typename Type>                                                    \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Clear(  \
-      TypeOnMemory* value, Arena* /* arena */) {                              \
-    value->ClearToEmpty();                                                    \
-  }                                                                           \
-  template <typename Type>                                                    \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Merge(  \
-      const MapEntryAccessorType& from, TypeOnMemory* to, Arena* arena) {     \
-    to->Set(&internal::GetEmptyStringAlreadyInited(), from, arena);           \
-  }                                                                           \
-  template <typename Type>                                                    \
   void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::DeleteNoArena( \
       TypeOnMemory& value) {                                                  \
-    value.DestroyNoArena(&internal::GetEmptyStringAlreadyInited());           \
+    value.Destroy();                                                          \
   }                                                                           \
   template <typename Type>                                                    \
   constexpr auto                                                              \
   MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Constinit()         \
       ->TypeOnMemory {                                                        \
-    return TypeOnMemory(&internal::fixed_address_empty_string);               \
+    return TypeOnMemory(&internal::fixed_address_empty_string,                \
+                        ConstantInitialized{});                               \
   }                                                                           \
   template <typename Type>                                                    \
   inline typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,            \
                                  Type>::MapEntryAccessorType*                 \
   MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::EnsureMutable(      \
       TypeOnMemory* value, Arena* arena) {                                    \
-    return value->Mutable(ArenaStringPtr::EmptyDefault{}, arena);             \
+    return value->Mutable(arena);                                             \
   }                                                                           \
   template <typename Type>                                                    \
   inline const typename MapTypeHandler<WireFormatLite::TYPE_##FieldType,      \
@@ -622,22 +514,6 @@ STRING_OR_BYTES_HANDLER_FUNCTIONS(BYTES)
   MapTypeHandler<WireFormatLite::TYPE_##FieldType,                           \
                  Type>::GetExternalReference(const TypeOnMemory& value) {    \
     return value;                                                            \
-  }                                                                          \
-  template <typename Type>                                                   \
-  inline size_t MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::     \
-      SpaceUsedInMapEntryLong(const TypeOnMemory& /* value */) {             \
-    return 0;                                                                \
-  }                                                                          \
-  template <typename Type>                                                   \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Clear( \
-      TypeOnMemory* value, Arena* /* arena */) {                             \
-    *value = 0;                                                              \
-  }                                                                          \
-  template <typename Type>                                                   \
-  inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType, Type>::Merge( \
-      const MapEntryAccessorType& from, TypeOnMemory* to,                    \
-      Arena* /* arena */) {                                                  \
-    *to = from;                                                              \
   }                                                                          \
   template <typename Type>                                                   \
   inline void MapTypeHandler<WireFormatLite::TYPE_##FieldType,               \
@@ -683,6 +559,48 @@ PRIMITIVE_HANDLER_FUNCTIONS(SFIXED64)
 PRIMITIVE_HANDLER_FUNCTIONS(SFIXED32)
 PRIMITIVE_HANDLER_FUNCTIONS(BOOL)
 #undef PRIMITIVE_HANDLER_FUNCTIONS
+
+// Functions for operating on a map entry using type handlers.
+//
+// Does not contain any representation (this class is not intended to be
+// instantiated).
+template <typename Key, typename Value, WireFormatLite::FieldType kKeyFieldType,
+          WireFormatLite::FieldType kValueFieldType>
+struct MapEntryFuncs {
+  typedef MapTypeHandler<kKeyFieldType, Key> KeyTypeHandler;
+  typedef MapTypeHandler<kValueFieldType, Value> ValueTypeHandler;
+  enum : int {
+    kKeyFieldNumber = 1,
+    kValueFieldNumber = 2
+  };
+
+  static uint8_t* InternalSerialize(int field_number, const Key& key,
+                                    const Value& value, uint8_t* ptr,
+                                    io::EpsCopyOutputStream* stream) {
+    ptr = stream->EnsureSpace(ptr);
+    ptr = WireFormatLite::WriteTagToArray(
+        field_number, WireFormatLite::WIRETYPE_LENGTH_DELIMITED, ptr);
+    ptr = io::CodedOutputStream::WriteVarint32ToArray(GetCachedSize(key, value),
+                                                      ptr);
+
+    ptr = KeyTypeHandler::Write(kKeyFieldNumber, key, ptr, stream);
+    return ValueTypeHandler::Write(kValueFieldNumber, value, ptr, stream);
+  }
+
+  static size_t ByteSizeLong(const Key& key, const Value& value) {
+    // Tags for key and value will both be one byte (field numbers 1 and 2).
+    size_t inner_length =
+        2 + KeyTypeHandler::ByteSize(key) + ValueTypeHandler::ByteSize(value);
+    return inner_length + io::CodedOutputStream::VarintSize32(
+                              static_cast<uint32_t>(inner_length));
+  }
+
+  static int GetCachedSize(const Key& key, const Value& value) {
+    // Tags for key and value will both be one byte (field numbers 1 and 2).
+    return 2 + KeyTypeHandler::GetCachedSize(key) +
+           ValueTypeHandler::GetCachedSize(value);
+  }
+};
 
 }  // namespace internal
 }  // namespace protobuf

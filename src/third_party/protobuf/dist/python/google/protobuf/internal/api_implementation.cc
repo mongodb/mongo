@@ -1,34 +1,10 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
-#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 namespace google {
@@ -70,40 +46,59 @@ static const char* kImplVersionName = "api_version";
 
 static const char* kModuleName = "_api_implementation";
 static const char kModuleDocstring[] =
-    "_api_implementation is a module that exposes compile-time constants that\n"
-    "determine the default API implementation to use for Python proto2.\n"
-    "\n"
-    "It complements api_implementation.py by setting defaults using "
-    "compile-time\n"
-    "constants defined in C, such that one can set defaults at compilation\n"
-    "(e.g. with blaze flag --copt=-DPYTHON_PROTO2_CPP_IMPL_V2).";
+"_api_implementation is a module that exposes compile-time constants that\n"
+"determine the default API implementation to use for Python proto2.\n"
+"\n"
+"It complements api_implementation.py by setting defaults using compile-time\n"
+"constants defined in C, such that one can set defaults at compilation\n"
+"(e.g. with blaze flag --copt=-DPYTHON_PROTO2_CPP_IMPL_V2).";
 
-static struct PyModuleDef _module = {PyModuleDef_HEAD_INIT,
-                                     kModuleName,
-                                     kModuleDocstring,
-                                     -1,
-                                     NULL,
-                                     NULL,
-                                     NULL,
-                                     NULL,
-                                     NULL};
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef _module = {
+  PyModuleDef_HEAD_INIT,
+  kModuleName,
+  kModuleDocstring,
+  -1,
+  NULL,
+  NULL,
+  NULL,
+  NULL,
+  NULL
+};
+#define INITFUNC PyInit__api_implementation
+#define INITFUNC_ERRORVAL NULL
+#else
+#define INITFUNC init_api_implementation
+#define INITFUNC_ERRORVAL
+#endif
 
 extern "C" {
-PyMODINIT_FUNC PyInit__api_implementation() {
-  PyObject* module = PyModule_Create(&_module);
-  if (module == NULL) {
-    return NULL;
-  }
+  PyMODINIT_FUNC INITFUNC() {
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&_module);
+#else
+    PyObject *module = Py_InitModule3(
+        const_cast<char*>(kModuleName),
+        NULL,
+        const_cast<char*>(kModuleDocstring));
+#endif
+    if (module == NULL) {
+      return INITFUNC_ERRORVAL;
+    }
 
-  // Adds the module variable "api_version".
-  if (PyModule_AddIntConstant(module, const_cast<char*>(kImplVersionName),
-                              kImplVersion)) {
-    Py_DECREF(module);
-    return NULL;
-  }
+    // Adds the module variable "api_version".
+    if (PyModule_AddIntConstant(
+        module,
+        const_cast<char*>(kImplVersionName),
+        kImplVersion))
+#if PY_MAJOR_VERSION < 3
+      return;
+#else
+      { Py_DECREF(module); return NULL; }
 
-  return module;
-}
+    return module;
+#endif
+  }
 }
 
 }  // namespace python

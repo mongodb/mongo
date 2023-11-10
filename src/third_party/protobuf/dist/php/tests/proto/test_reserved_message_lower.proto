@@ -52,13 +52,16 @@ message match {}
 message namespace {}
 message new {}
 message or {}
+message parent {}
 message print {}
 message private {}
 message protected {}
 message public {}
+message readonly {}
 message require {}
 message require_once {}
 message return {}
+message self {}
 message static {}
 message switch {}
 message throw {}

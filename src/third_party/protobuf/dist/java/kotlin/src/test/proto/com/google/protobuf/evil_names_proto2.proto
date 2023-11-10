@@ -33,7 +33,8 @@ syntax = "proto2";
 
 package protobuf.kotlin.generator;
 
-option java_package = "com.google.protobuf.kotlin.generator";
+option java_package = "in.com.google.protobuf.kotlin.generator";
+option java_multiple_files = true;
 
 message EvilNamesProto2 {
   optional bool initialized = 1;
@@ -61,12 +62,13 @@ message EvilNamesProto2 {
   optional int64 boolean = 18;
   optional string sealed = 19;
   optional float interface = 20;
-  optional int32 in = 21;
   optional string object = 22;
   optional string cached_size = 23;
   optional bool serialized_size = 24;
   optional string by = 25;
 }
+
+message List {}
 
 message HardKeywordsAllTypesProto2 {
   message NestedMessage {
@@ -79,7 +81,6 @@ message HardKeywordsAllTypesProto2 {
   }
 
   optional int32 as = 1;
-  optional string in = 2;
   optional NestedEnum break = 3;
   map<int32, int32> continue = 4;
   optional NestedMessage do = 5;

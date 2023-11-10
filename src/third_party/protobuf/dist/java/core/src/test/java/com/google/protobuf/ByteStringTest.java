@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
@@ -69,16 +46,16 @@ public class ByteStringTest {
     return result;
   }
 
-  private byte[] getTestBytes(int size) {
+  private static byte[] getTestBytes(int size) {
     return getTestBytes(size, 445566L);
   }
 
-  private byte[] getTestBytes() {
+  private static byte[] getTestBytes() {
     return getTestBytes(1000);
   }
 
   // Compare the entire left array with a subset of the right array.
-  private boolean isArrayRange(byte[] left, byte[] right, int rightOffset, int length) {
+  private static boolean isArrayRange(byte[] left, byte[] right, int rightOffset, int length) {
     boolean stillEqual = (left.length == length);
     for (int i = 0; (stillEqual && i < length); ++i) {
       stillEqual = (left[i] == right[rightOffset + i]);
@@ -87,7 +64,7 @@ public class ByteStringTest {
   }
 
   // Returns true only if the given two arrays have identical contents.
-  private boolean isArray(byte[] left, byte[] right) {
+  private static boolean isArray(byte[] left, byte[] right) {
     return left.length == right.length && isArrayRange(left, right, 0, left.length);
   }
 
@@ -134,7 +111,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testSubstring_BeginIndex() {
+  public void testSubstring_beginIndex() {
     byte[] bytes = getTestBytes();
     ByteString substring = ByteString.copyFrom(bytes).substring(500);
     assertWithMessage("substring must contain the tail of the string")
@@ -143,7 +120,66 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_BytesOffsetSize() {
+  public void testEmpty_isEmpty() {
+    ByteString byteString = ByteString.empty();
+    assertThat(byteString.isEmpty()).isTrue();
+    assertWithMessage("ByteString.empty() must return empty byte array")
+        .that(isArray(byteString.toByteArray(), new byte[] {}))
+        .isTrue();
+  }
+
+  @Test
+  public void testEmpty_referenceEquality() {
+    assertThat(ByteString.empty()).isSameInstanceAs(ByteString.EMPTY);
+    assertThat(ByteString.empty()).isSameInstanceAs(ByteString.empty());
+  }
+
+  @Test
+  public void testFromHex_hexString() {
+    ByteString byteString;
+    byteString = ByteString.fromHex("0a0b0c");
+    assertWithMessage("fromHex must contain the expected bytes")
+        .that(isArray(byteString.toByteArray(), new byte[] {0x0a, 0x0b, 0x0c}))
+        .isTrue();
+
+    byteString = ByteString.fromHex("0A0B0C");
+    assertWithMessage("fromHex must contain the expected bytes")
+        .that(isArray(byteString.toByteArray(), new byte[] {0x0a, 0x0b, 0x0c}))
+        .isTrue();
+
+    byteString = ByteString.fromHex("0a0b0c0d0e0f");
+    assertWithMessage("fromHex must contain the expected bytes")
+        .that(isArray(byteString.toByteArray(), new byte[] {0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}))
+        .isTrue();
+  }
+
+  @Test
+  @SuppressWarnings("AlwaysThrows") // Verifying that indeed these calls do throw.
+  public void testFromHex_invalidHexString() {
+    try {
+      ByteString.fromHex("a0b0c");
+      assertWithMessage("Should throw").fail();
+    } catch (NumberFormatException expected) {
+      assertThat(expected).hasMessageThat().contains("even");
+    }
+
+    try {
+      ByteString.fromHex("0x0y0z");
+      assertWithMessage("Should throw").fail();
+    } catch (NumberFormatException expected) {
+      assertThat(expected).hasMessageThat().contains("[0-9a-fA-F]");
+    }
+
+    try {
+      ByteString.fromHex("0૫");
+      assertWithMessage("Should throw").fail();
+    } catch (NumberFormatException expected) {
+      assertThat(expected).hasMessageThat().contains("[0-9a-fA-F]");
+    }
+  }
+
+  @Test
+  public void testCopyFrom_bytesOffsetSize() {
     byte[] bytes = getTestBytes();
     ByteString byteString = ByteString.copyFrom(bytes, 500, 200);
     assertWithMessage("copyFrom sub-range must contain the expected bytes")
@@ -152,7 +188,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_Bytes() {
+  public void testCopyFrom_bytes() {
     byte[] bytes = getTestBytes();
     ByteString byteString = ByteString.copyFrom(bytes);
     assertWithMessage("copyFrom must contain the expected bytes")
@@ -161,7 +197,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_ByteBufferSize() {
+  public void testCopyFrom_byteBufferSize() {
     byte[] bytes = getTestBytes();
     ByteBuffer byteBuffer = ByteBuffer.allocate(bytes.length);
     byteBuffer.put(bytes);
@@ -173,7 +209,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_ByteBuffer() {
+  public void testCopyFrom_byteBuffer() {
     byte[] bytes = getTestBytes();
     ByteBuffer byteBuffer = ByteBuffer.allocate(bytes.length);
     byteBuffer.put(bytes);
@@ -185,7 +221,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_StringEncoding() {
+  public void testCopyFrom_stringEncoding() {
     String testString = "I love unicode \u1234\u5678 characters";
     ByteString byteString = ByteString.copyFrom(testString, UTF_16);
     byte[] testBytes = testString.getBytes(UTF_16);
@@ -195,7 +231,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_Utf8() {
+  public void testCopyFrom_utf8() {
     String testString = "I love unicode \u1234\u5678 characters";
     ByteString byteString = ByteString.copyFromUtf8(testString);
     byte[] testBytes = testString.getBytes(Internal.UTF_8);
@@ -205,7 +241,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_Iterable() {
+  public void testCopyFrom_iterable() {
     byte[] testBytes = getTestBytes(77777, 113344L);
     final List<ByteString> pieces = makeConcretePieces(testBytes);
     // Call copyFrom() on a Collection
@@ -228,7 +264,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyFrom_LengthTooBig() {
+  public void testCopyFrom_lengthTooBig() {
     byte[] testBytes = getTestBytes(100);
     try {
       ByteString.copyFrom(testBytes, 0, 200);
@@ -257,7 +293,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testCopyTo_TargetOffset() {
+  public void testCopyTo_targetOffset() {
     byte[] bytes = getTestBytes();
     ByteString byteString = ByteString.copyFrom(bytes);
     byte[] target = new byte[bytes.length + 1000];
@@ -353,7 +389,7 @@ public class ByteStringTest {
 
   // Tests that IOExceptions propagate through ByteString.readFrom().
   @Test
-  public void testReadFrom_IOExceptions() {
+  public void testReadFrom_iOExceptions() {
     try {
       ByteString.readFrom(new FailStream());
       assertWithMessage("readFrom must throw the underlying IOException").fail();
@@ -547,7 +583,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testNewOutput_InitialCapacity() throws IOException {
+  public void testNewOutput_initialCapacity() throws IOException {
     byte[] bytes = getTestBytes();
     ByteString.Output output = ByteString.newOutput(bytes.length + 100);
     output.write(bytes);
@@ -560,7 +596,7 @@ public class ByteStringTest {
   // Test newOutput() using a variety of buffer sizes and a variety of (fixed)
   // write sizes
   @Test
-  public void testNewOutput_ArrayWrite() {
+  public void testNewOutput_arrayWrite() {
     byte[] bytes = getTestBytes();
     int length = bytes.length;
     int[] bufferSizes = {
@@ -586,7 +622,7 @@ public class ByteStringTest {
   // Test newOutput() using a variety of buffer sizes, but writing all the
   // characters using write(byte);
   @Test
-  public void testNewOutput_WriteChar() {
+  public void testNewOutput_writeChar() {
     byte[] bytes = getTestBytes();
     int length = bytes.length;
     int[] bufferSizes = {
@@ -607,7 +643,7 @@ public class ByteStringTest {
   // Test newOutput() in which we write the bytes using a variety of methods
   // and sizes, and in which we repeatedly call toByteString() in the middle.
   @Test
-  public void testNewOutput_Mixed() {
+  public void testNewOutput_mixed() {
     Random rng = new Random(1);
     byte[] bytes = getTestBytes();
     int length = bytes.length;
@@ -649,7 +685,7 @@ public class ByteStringTest {
   }
 
   @Test
-  public void testNewOutput_Mutating() throws IOException {
+  public void testNewOutput_mutating() throws IOException {
     Output os = ByteString.newOutput(5);
     os.write(new byte[] {1, 2, 3, 4, 5});
     EvilOutputStream eos = new EvilOutputStream();

@@ -1,32 +1,9 @@
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# https://developers.google.com/protocol-buffers/
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-#     * Redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above
-# copyright notice, this list of conditions and the following disclaimer
-# in the documentation and/or other materials provided with the
-# distribution.
-#     * Neither the name of Google Inc. nor the names of its
-# contributors may be used to endorse or promote products derived from
-# this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
 
 """Provides type checking routines.
 
@@ -48,7 +25,6 @@ __author__ = 'robinson@google.com (Will Robinson)'
 import ctypes
 import numbers
 
-from google.protobuf.internal import api_implementation
 from google.protobuf.internal import decoder
 from google.protobuf.internal import encoder
 from google.protobuf.internal import wire_format
@@ -76,9 +52,6 @@ def ToShortestFloat(original):
   return rounded
 
 
-def SupportsOpenEnums(field_descriptor):
-  return field_descriptor.containing_type.syntax == "proto3"
-
 def GetTypeChecker(field):
   """Returns a type checker for a message field of the specified types.
 
@@ -93,11 +66,11 @@ def GetTypeChecker(field):
       field.type == _FieldDescriptor.TYPE_STRING):
     return UnicodeValueChecker()
   if field.cpp_type == _FieldDescriptor.CPPTYPE_ENUM:
-    if SupportsOpenEnums(field):
+    if field.enum_type.is_closed:
+      return EnumValueChecker(field.enum_type)
+    else:
       # When open enums are supported, any int32 can be assigned.
       return _VALUE_CHECKERS[_FieldDescriptor.CPPTYPE_INT32]
-    else:
-      return EnumValueChecker(field.enum_type)
   return _VALUE_CHECKERS[field.cpp_type]
 
 
@@ -105,7 +78,6 @@ def GetTypeChecker(field):
 # subclassing builtin types and doing weird things.  We're not trying to
 # protect against malicious clients here, just people accidentally shooting
 # themselves in the foot in obvious ways.
-
 class TypeChecker(object):
 
   """Type checker used to catch type errors as early as possible
@@ -124,11 +96,6 @@ class TypeChecker(object):
       message = ('%.1024r has type %s, but expected one of: %s' %
                  (proposed_value, type(proposed_value), self._acceptable_types))
       raise TypeError(message)
-    # Some field types(float, double and bool) accept other types, must
-    # convert to the correct type in such cases.
-    if self._acceptable_types:
-      if self._acceptable_types[0] in (bool, float):
-        return self._acceptable_types[0](proposed_value)
     return proposed_value
 
 
@@ -142,6 +109,22 @@ class TypeCheckerWithDefault(TypeChecker):
     return self._default_value
 
 
+class BoolValueChecker(object):
+  """Type checker used for bool fields."""
+
+  def CheckValue(self, proposed_value):
+    if not hasattr(proposed_value, '__index__') or (
+        type(proposed_value).__module__ == 'numpy' and
+        type(proposed_value).__name__ == 'ndarray'):
+      message = ('%.1024r has type %s, but expected one of: %s' %
+                 (proposed_value, type(proposed_value), (bool, int)))
+      raise TypeError(message)
+    return bool(proposed_value)
+
+  def DefaultValue(self):
+    return False
+
+
 # IntValueChecker and its subclasses perform integer type-checks
 # and bounds-checks.
 class IntValueChecker(object):
@@ -149,10 +132,13 @@ class IntValueChecker(object):
   """Checker used for integer fields.  Performs type-check and range check."""
 
   def CheckValue(self, proposed_value):
-    if not isinstance(proposed_value, numbers.Integral):
+    if not hasattr(proposed_value, '__index__') or (
+        type(proposed_value).__module__ == 'numpy' and
+        type(proposed_value).__name__ == 'ndarray'):
       message = ('%.1024r has type %s, but expected one of: %s' %
                  (proposed_value, type(proposed_value), (int,)))
       raise TypeError(message)
+
     if not self._MIN <= int(proposed_value) <= self._MAX:
       raise ValueError('Value out of range: %d' % proposed_value)
     # We force all values to int to make alternate implementations where the
@@ -249,20 +235,38 @@ _INF = float('inf')
 _NEG_INF = float('-inf')
 
 
-class FloatValueChecker(object):
+class DoubleValueChecker(object):
+  """Checker used for double fields.
 
-  """Checker used for float fields.  Performs type-check and range check.
+  Performs type-check and range check.
+  """
+
+  def CheckValue(self, proposed_value):
+    """Check and convert proposed_value to float."""
+    if (not hasattr(proposed_value, '__float__') and
+        not hasattr(proposed_value, '__index__')) or (
+            type(proposed_value).__module__ == 'numpy' and
+            type(proposed_value).__name__ == 'ndarray'):
+      message = ('%.1024r has type %s, but expected one of: int, float' %
+                 (proposed_value, type(proposed_value)))
+      raise TypeError(message)
+    return float(proposed_value)
+
+  def DefaultValue(self):
+    return 0.0
+
+
+class FloatValueChecker(DoubleValueChecker):
+  """Checker used for float fields.
+
+  Performs type-check and range check.
 
   Values exceeding a 32-bit float will be converted to inf/-inf.
   """
 
   def CheckValue(self, proposed_value):
     """Check and convert proposed_value to float."""
-    if not isinstance(proposed_value, numbers.Real):
-      message = ('%.1024r has type %s, but expected one of: numbers.Real' %
-                 (proposed_value, type(proposed_value)))
-      raise TypeError(message)
-    converted_value = float(proposed_value)
+    converted_value = super().CheckValue(proposed_value)
     # This inf rounding matches the C++ proto SafeDoubleToFloat logic.
     if converted_value > _FLOAT_MAX:
       return _INF
@@ -271,23 +275,17 @@ class FloatValueChecker(object):
 
     return TruncateToFourByteFloat(converted_value)
 
-  def DefaultValue(self):
-    return 0.0
-
-
 # Type-checkers for all scalar CPPTYPEs.
 _VALUE_CHECKERS = {
     _FieldDescriptor.CPPTYPE_INT32: Int32ValueChecker(),
     _FieldDescriptor.CPPTYPE_INT64: Int64ValueChecker(),
     _FieldDescriptor.CPPTYPE_UINT32: Uint32ValueChecker(),
     _FieldDescriptor.CPPTYPE_UINT64: Uint64ValueChecker(),
-    _FieldDescriptor.CPPTYPE_DOUBLE: TypeCheckerWithDefault(
-        0.0, float, numbers.Real),
+    _FieldDescriptor.CPPTYPE_DOUBLE: DoubleValueChecker(),
     _FieldDescriptor.CPPTYPE_FLOAT: FloatValueChecker(),
-    _FieldDescriptor.CPPTYPE_BOOL: TypeCheckerWithDefault(
-        False, bool, numbers.Integral),
+    _FieldDescriptor.CPPTYPE_BOOL: BoolValueChecker(),
     _FieldDescriptor.CPPTYPE_STRING: TypeCheckerWithDefault(b'', bytes),
-    }
+}
 
 
 # Map from field type to a function F, such that F(field_num, value)

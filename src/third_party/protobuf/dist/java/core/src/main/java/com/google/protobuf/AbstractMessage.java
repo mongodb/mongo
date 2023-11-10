@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
@@ -50,7 +27,7 @@ import java.util.Map;
  * @author kenton@google.com Kenton Varda
  */
 public abstract class AbstractMessage
-    // TODO(dweis): Update GeneratedMessage to parameterize with MessageType and BuilderType.
+    // TODO: Update GeneratedMessage to parameterize with MessageType and BuilderType.
     extends AbstractMessageLite implements Message {
 
   @Override
@@ -83,7 +60,6 @@ public abstract class AbstractMessage
     throw new UnsupportedOperationException("Nested builder is not supported for this type.");
   }
 
-
   @Override
   public List<String> findInitializationErrors() {
     return MessageReflection.findMissingFields(this);
@@ -94,13 +70,13 @@ public abstract class AbstractMessage
     return MessageReflection.delimitWithCommas(findInitializationErrors());
   }
 
-  /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+  // TODO: Clear it when all subclasses have implemented this method.
   @Override
   public boolean hasOneof(OneofDescriptor oneof) {
     throw new UnsupportedOperationException("hasOneof() is not implemented.");
   }
 
-  /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+  // TODO: Clear it when all subclasses have implemented this method.
   @Override
   public FieldDescriptor getOneofFieldDescriptor(OneofDescriptor oneof) {
     throw new UnsupportedOperationException("getOneofFieldDescriptor() is not implemented.");
@@ -224,7 +200,7 @@ public abstract class AbstractMessage
   }
 
   /**
-   * Compares two set of fields. This method is used to implement {@link
+   * Compares two sets of fields. This method is used to implement {@link
    * AbstractMessage#equals(Object)} and {@link AbstractMutableMessage#equals(Object)}. It takes
    * special care of bytes fields because immutable messages and mutable messages use different Java
    * type to represent a bytes field and this method should be able to compare immutable messages,
@@ -242,8 +218,8 @@ public abstract class AbstractMessage
       Object value2 = b.get(descriptor);
       if (descriptor.getType() == FieldDescriptor.Type.BYTES) {
         if (descriptor.isRepeated()) {
-          List list1 = (List) value1;
-          List list2 = (List) value2;
+          List<?> list1 = (List) value1;
+          List<?> list2 = (List) value2;
           if (list1.size() != list2.size()) {
             return false;
           }
@@ -325,19 +301,19 @@ public abstract class AbstractMessage
       throw new UnsupportedOperationException("clone() should be implemented in subclasses.");
     }
 
-    /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+    /** TODO: Clear it when all subclasses have implemented this method. */
     @Override
     public boolean hasOneof(OneofDescriptor oneof) {
       throw new UnsupportedOperationException("hasOneof() is not implemented.");
     }
 
-    /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+    /** TODO: Clear it when all subclasses have implemented this method. */
     @Override
     public FieldDescriptor getOneofFieldDescriptor(OneofDescriptor oneof) {
       throw new UnsupportedOperationException("getOneofFieldDescriptor() is not implemented.");
     }
 
-    /** TODO(jieluo): Clear it when all subclasses have implemented this method. */
+    /** TODO: Clear it when all subclasses have implemented this method. */
     @Override
     public BuilderType clearOneof(OneofDescriptor oneof) {
       throw new UnsupportedOperationException("clearOneof() is not implemented.");
@@ -383,8 +359,6 @@ public abstract class AbstractMessage
       //   them to insure that they don't change after verification (since
       //   the Message interface itself cannot enforce immutability of
       //   implementations).
-      // TODO(kenton):  Provide a function somewhere called makeDeepCopy()
-      //   which allows people to make secure deep copies of messages.
 
       for (final Map.Entry<FieldDescriptor, Object> entry : allFields.entrySet()) {
         final FieldDescriptor field = entry.getKey();
@@ -426,25 +400,20 @@ public abstract class AbstractMessage
         throws IOException {
       boolean discardUnknown = input.shouldDiscardUnknownFields();
       final UnknownFieldSet.Builder unknownFields =
-          discardUnknown ? null : UnknownFieldSet.newBuilder(getUnknownFields());
-      while (true) {
-        final int tag = input.readTag();
-        if (tag == 0) {
-          break;
-        }
-
-        MessageReflection.BuilderAdapter builderAdapter =
-            new MessageReflection.BuilderAdapter(this);
-        if (!MessageReflection.mergeFieldFrom(
-            input, unknownFields, extensionRegistry, getDescriptorForType(), builderAdapter, tag)) {
-          // end group tag
-          break;
-        }
-      }
+          discardUnknown ? null : getUnknownFieldSetBuilder();
+      MessageReflection.mergeMessageFrom(this, unknownFields, input, extensionRegistry);
       if (unknownFields != null) {
-        setUnknownFields(unknownFields.build());
+        setUnknownFieldSetBuilder(unknownFields);
       }
       return (BuilderType) this;
+    }
+
+    protected UnknownFieldSet.Builder getUnknownFieldSetBuilder() {
+      return UnknownFieldSet.newBuilder(getUnknownFields());
+    }
+
+    protected void setUnknownFieldSetBuilder(final UnknownFieldSet.Builder builder) {
+      setUnknownFields(builder.build());
     }
 
     @Override
@@ -568,17 +537,6 @@ public abstract class AbstractMessage
         final InputStream input, final ExtensionRegistryLite extensionRegistry) throws IOException {
       return (BuilderType) super.mergeFrom(input, extensionRegistry);
     }
-
-    @Override
-    public boolean mergeDelimitedFrom(final InputStream input) throws IOException {
-      return super.mergeDelimitedFrom(input);
-    }
-
-    @Override
-    public boolean mergeDelimitedFrom(
-        final InputStream input, final ExtensionRegistryLite extensionRegistry) throws IOException {
-      return super.mergeDelimitedFrom(input, extensionRegistry);
-    }
   }
 
   /**
@@ -589,7 +547,7 @@ public abstract class AbstractMessage
   protected static int hashLong(long n) {
     return (int) (n ^ (n >>> 32));
   }
-  //
+
   /**
    * @deprecated from v3.0.0-beta-3+, for compatibility with v2.5.0 and v2.6.1
    * generated code.
@@ -598,7 +556,7 @@ public abstract class AbstractMessage
   protected static int hashBoolean(boolean b) {
     return b ? 1231 : 1237;
   }
-  //
+
   /**
    * @deprecated from v3.0.0-beta-3+, for compatibility with v2.5.0 and v2.6.1
    * generated code.
@@ -607,7 +565,7 @@ public abstract class AbstractMessage
   protected static int hashEnum(EnumLite e) {
     return e.getNumber();
   }
-  //
+
   /**
    * @deprecated from v3.0.0-beta-3+, for compatibility with v2.5.0 and v2.6.1
    * generated code.

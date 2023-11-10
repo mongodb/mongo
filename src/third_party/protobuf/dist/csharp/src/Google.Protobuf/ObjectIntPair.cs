@@ -1,4 +1,13 @@
-﻿using System;
+#region Copyright notice and license
+// Protocol Buffers - Google's data interchange format
+// Copyright 2015 Google Inc.  All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+#endregion
+
+using System;
 
 namespace Google.Protobuf
 {
@@ -23,14 +32,7 @@ namespace Google.Protobuf
                    && number == other.number;
         }
 
-        public override bool Equals(object obj)
-        {
-            if (obj is ObjectIntPair<T>)
-            {
-                return Equals((ObjectIntPair<T>)obj);
-            }
-            return false;
-        }
+        public override bool Equals(object obj) => obj is ObjectIntPair<T> pair && Equals(pair);
 
         public override int GetHashCode()
         {

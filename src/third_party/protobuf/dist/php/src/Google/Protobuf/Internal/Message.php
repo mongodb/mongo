@@ -2,33 +2,10 @@
 
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 /**
  * Defines Message, the parent class extended by all protocol message classes.
@@ -54,6 +31,7 @@ use Google\Protobuf\NullValue;
  * or extend this class or its child classes by their own.  See the comment of
  * specific functions for more details.
  */
+#[\AllowDynamicProperties]
 class Message
 {
 
@@ -416,14 +394,14 @@ class Message
                 }
                 break;
             case GPBType::STRING:
-                // TODO(teboring): Add utf-8 check.
+                // TODO: Add utf-8 check.
                 if (!GPBWire::readString($input, $value)) {
                     throw new GPBDecodeException(
                         "Unexpected EOF inside string field.");
                 }
                 break;
             case GPBType::GROUP:
-                trigger_error("Not implemented.", E_ERROR);
+                trigger_error("Not implemented.", E_USER_ERROR);
                 break;
             case GPBType::MESSAGE:
                 if ($field->isMap()) {
@@ -450,7 +428,7 @@ class Message
                 }
                 break;
             case GPBType::ENUM:
-                // TODO(teboring): Check unknown enum value.
+                // TODO: Check unknown enum value.
                 if (!GPBWire::readInt32($input, $value)) {
                     throw new GPBDecodeException(
                         "Unexpected EOF inside enum field.");
@@ -543,7 +521,7 @@ class Message
 
     /**
      * Clear all containing fields.
-     * @return null.
+     * @return null
      */
     public function clear()
     {
@@ -653,7 +631,7 @@ class Message
 
     /**
      * Clear all unknown fields previously parsed.
-     * @return null.
+     * @return null
      */
     public function discardUnknownFields()
     {
@@ -699,7 +677,7 @@ class Message
      * sub-messages are deep-copied.
      *
      * @param object $msg Protobuf message to be merged from.
-     * @return null.
+     * @return null
      */
     public function mergeFrom($msg)
     {
@@ -766,7 +744,7 @@ class Message
      * specified message.
      *
      * @param string $data Binary protobuf data.
-     * @return null.
+     * @return null
      * @throws \Exception Invalid data.
      */
     public function mergeFromString($data)
@@ -784,7 +762,8 @@ class Message
      * specified message.
      *
      * @param string $data Json protobuf data.
-     * @return null.
+     * @param bool $ignore_unknown
+     * @return null
      * @throws \Exception Invalid data.
      */
     public function mergeFromJsonString($data, $ignore_unknown = false)
@@ -1052,7 +1031,7 @@ class Message
      * must receive data that is either a string or a StringValue object.
      *
      * @param array $array An array containing message properties and values.
-     * @return null.
+     * @return null
      */
     protected function mergeFromArray(array $array)
     {
@@ -1669,7 +1648,7 @@ class Message
                 $size += GPBWire::varint32Size($size);
                 break;
             case GPBType::GROUP:
-                // TODO(teboring): Add support.
+                // TODO: Add support.
                 user_error("Unsupported type.");
                 break;
             default:
@@ -1774,7 +1753,7 @@ class Message
                 $size += $value->jsonByteSize();
                 break;
 #             case GPBType::GROUP:
-#                 // TODO(teboring): Add support.
+#                 // TODO: Add support.
 #                 user_error("Unsupported type.");
 #                 break;
             default:
@@ -1980,8 +1959,12 @@ class Message
                 $size += 9;
                 $size += $value_msg->jsonByteSize();
             } else {
-                // Size for value. +1 for comma, -2 for "{}".
-                $size += $value_msg->jsonByteSize() -1;
+                $value_size = $value_msg->jsonByteSize();
+                // size === 2 it's empty message {} which is not serialized inside any
+                if ($value_size !== 2) {
+                    // Size for value. +1 for comma, -2 for "{}".
+                    $size += $value_size -1;
+                }
             }
         } elseif (get_class($this) === 'Google\Protobuf\FieldMask') {
             $field_mask = GPBUtil::formatFieldMask($this);

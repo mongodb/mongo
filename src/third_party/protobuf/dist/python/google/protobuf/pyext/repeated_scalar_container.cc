@@ -1,50 +1,27 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: anuraag@google.com (Anuraag Agrawal)
 // Author: tibell@google.com (Johan Tibell)
 
-#include <google/protobuf/pyext/repeated_scalar_container.h>
+#include "google/protobuf/pyext/repeated_scalar_container.h"
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/dynamic_message.h>
-#include <google/protobuf/message.h>
-#include <google/protobuf/pyext/descriptor.h>
-#include <google/protobuf/pyext/descriptor_pool.h>
-#include <google/protobuf/pyext/message.h>
-#include <google/protobuf/pyext/scoped_pyobject_ptr.h>
+#include "google/protobuf/stubs/common.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/dynamic_message.h"
+#include "google/protobuf/message.h"
+#include "google/protobuf/pyext/descriptor.h"
+#include "google/protobuf/pyext/descriptor_pool.h"
+#include "google/protobuf/pyext/message.h"
+#include "google/protobuf/pyext/scoped_pyobject_ptr.h"
 
 #define PyString_AsString(ob) \
   (PyUnicode_Check(ob) ? PyUnicode_AsUTF8(ob) : PyBytes_AsString(ob))
@@ -57,6 +34,7 @@ namespace repeated_scalar_container {
 
 static int InternalAssignRepeatedField(RepeatedScalarContainer* self,
                                        PyObject* list) {
+  cmessage::AssureWritable(self->parent);
   Message* message = self->parent->message;
   message->GetReflection()->ClearField(message, self->parent_field_descriptor);
   for (Py_ssize_t i = 0; i < PyList_GET_SIZE(list); ++i) {
@@ -108,37 +86,37 @@ static int AssignItem(PyObject* pself, Py_ssize_t index, PyObject* arg) {
 
   switch (field_descriptor->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32: {
-      GOOGLE_CHECK_GET_INT32(arg, value, -1);
+      PROTOBUF_CHECK_GET_INT32(arg, value, -1);
       reflection->SetRepeatedInt32(message, field_descriptor, index, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_INT64: {
-      GOOGLE_CHECK_GET_INT64(arg, value, -1);
+      PROTOBUF_CHECK_GET_INT64(arg, value, -1);
       reflection->SetRepeatedInt64(message, field_descriptor, index, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_UINT32: {
-      GOOGLE_CHECK_GET_UINT32(arg, value, -1);
+      PROTOBUF_CHECK_GET_UINT32(arg, value, -1);
       reflection->SetRepeatedUInt32(message, field_descriptor, index, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_UINT64: {
-      GOOGLE_CHECK_GET_UINT64(arg, value, -1);
+      PROTOBUF_CHECK_GET_UINT64(arg, value, -1);
       reflection->SetRepeatedUInt64(message, field_descriptor, index, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_FLOAT: {
-      GOOGLE_CHECK_GET_FLOAT(arg, value, -1);
+      PROTOBUF_CHECK_GET_FLOAT(arg, value, -1);
       reflection->SetRepeatedFloat(message, field_descriptor, index, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_DOUBLE: {
-      GOOGLE_CHECK_GET_DOUBLE(arg, value, -1);
+      PROTOBUF_CHECK_GET_DOUBLE(arg, value, -1);
       reflection->SetRepeatedDouble(message, field_descriptor, index, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_BOOL: {
-      GOOGLE_CHECK_GET_BOOL(arg, value, -1);
+      PROTOBUF_CHECK_GET_BOOL(arg, value, -1);
       reflection->SetRepeatedBool(message, field_descriptor, index, value);
       break;
     }
@@ -150,8 +128,8 @@ static int AssignItem(PyObject* pself, Py_ssize_t index, PyObject* arg) {
       break;
     }
     case FieldDescriptor::CPPTYPE_ENUM: {
-      GOOGLE_CHECK_GET_INT32(arg, value, -1);
-      if (reflection->SupportsUnknownEnumValues()) {
+      PROTOBUF_CHECK_GET_INT32(arg, value, -1);
+      if (!field_descriptor->legacy_enum_field_treated_as_closed()) {
         reflection->SetRepeatedEnumValue(message, field_descriptor, index,
                                          value);
       } else {
@@ -274,6 +252,11 @@ static PyObject* Subscript(PyObject* pself, PyObject* slice) {
   bool return_list = false;
   if (PyLong_Check(slice)) {
     from = to = PyLong_AsLong(slice);
+  } else if (PyIndex_Check(slice)) {
+    from = to = PyNumber_AsSsize_t(slice, PyExc_ValueError);
+    if (from == -1 && PyErr_Occurred()) {
+      return nullptr;
+    }
   } else if (PySlice_Check(slice)) {
     length = Len(pself);
     if (PySlice_GetIndicesEx(slice, length, &from, &to, &step, &slicelength) ==
@@ -328,37 +311,37 @@ PyObject* Append(RepeatedScalarContainer* self, PyObject* item) {
   const Reflection* reflection = message->GetReflection();
   switch (field_descriptor->cpp_type()) {
     case FieldDescriptor::CPPTYPE_INT32: {
-      GOOGLE_CHECK_GET_INT32(item, value, nullptr);
+      PROTOBUF_CHECK_GET_INT32(item, value, nullptr);
       reflection->AddInt32(message, field_descriptor, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_INT64: {
-      GOOGLE_CHECK_GET_INT64(item, value, nullptr);
+      PROTOBUF_CHECK_GET_INT64(item, value, nullptr);
       reflection->AddInt64(message, field_descriptor, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_UINT32: {
-      GOOGLE_CHECK_GET_UINT32(item, value, nullptr);
+      PROTOBUF_CHECK_GET_UINT32(item, value, nullptr);
       reflection->AddUInt32(message, field_descriptor, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_UINT64: {
-      GOOGLE_CHECK_GET_UINT64(item, value, nullptr);
+      PROTOBUF_CHECK_GET_UINT64(item, value, nullptr);
       reflection->AddUInt64(message, field_descriptor, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_FLOAT: {
-      GOOGLE_CHECK_GET_FLOAT(item, value, nullptr);
+      PROTOBUF_CHECK_GET_FLOAT(item, value, nullptr);
       reflection->AddFloat(message, field_descriptor, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_DOUBLE: {
-      GOOGLE_CHECK_GET_DOUBLE(item, value, nullptr);
+      PROTOBUF_CHECK_GET_DOUBLE(item, value, nullptr);
       reflection->AddDouble(message, field_descriptor, value);
       break;
     }
     case FieldDescriptor::CPPTYPE_BOOL: {
-      GOOGLE_CHECK_GET_BOOL(item, value, nullptr);
+      PROTOBUF_CHECK_GET_BOOL(item, value, nullptr);
       reflection->AddBool(message, field_descriptor, value);
       break;
     }
@@ -370,8 +353,8 @@ PyObject* Append(RepeatedScalarContainer* self, PyObject* item) {
       break;
     }
     case FieldDescriptor::CPPTYPE_ENUM: {
-      GOOGLE_CHECK_GET_INT32(item, value, nullptr);
-      if (reflection->SupportsUnknownEnumValues()) {
+      PROTOBUF_CHECK_GET_INT32(item, value, nullptr);
+      if (!field_descriptor->legacy_enum_field_treated_as_closed()) {
         reflection->AddEnumValue(message, field_descriptor, value);
       } else {
         const EnumDescriptor* enum_descriptor = field_descriptor->enum_type();
@@ -460,11 +443,17 @@ static int AssSubscript(PyObject* pself, PyObject* slice, PyObject* value) {
 PyObject* Extend(RepeatedScalarContainer* self, PyObject* value) {
   cmessage::AssureWritable(self->parent);
 
-  // TODO(ptucker): Deprecate this behavior. b/18413862
+  // TODO: Remove this in OSS
   if (value == Py_None) {
+    PyErr_Warn(nullptr,
+               "Value is not iterable. Please remove the wrong usage."
+               " This will be changed to raise TypeError soon.");
     Py_RETURN_NONE;
   }
   if ((Py_TYPE(value)->tp_as_sequence == nullptr) && PyObject_Not(value)) {
+    PyErr_Warn(nullptr,
+               "Value is not iterable. Please remove the wrong usage."
+               " This will be changed to raise TypeError soon.");
     Py_RETURN_NONE;
   }
 
@@ -583,6 +572,9 @@ static PyObject* Sort(PyObject* pself, PyObject* args, PyObject* kwds) {
   ScopedPyObjectPtr list(Subscript(pself, full_slice.get()));
   if (list == nullptr) {
     return nullptr;
+  }
+  if (PyList_GET_SIZE(list.get()) == 0) {
+    Py_RETURN_NONE;
   }
   ScopedPyObjectPtr m(PyObject_GetAttrString(list.get(), "sort"));
   if (m == nullptr) {
@@ -723,29 +715,33 @@ static PyMethodDef Methods[] = {
 
 PyTypeObject RepeatedScalarContainer_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0) FULL_MODULE_NAME
-    ".RepeatedScalarContainer",              // tp_name
-    sizeof(RepeatedScalarContainer),         // tp_basicsize
-    0,                                       //  tp_itemsize
-    repeated_scalar_container::Dealloc,      //  tp_dealloc
+    ".RepeatedScalarContainer",          // tp_name
+    sizeof(RepeatedScalarContainer),     // tp_basicsize
+    0,                                   //  tp_itemsize
+    repeated_scalar_container::Dealloc,  //  tp_dealloc
 #if PY_VERSION_HEX >= 0x03080000
-    0,                                       //  tp_vectorcall_offset
+    0,  //  tp_vectorcall_offset
 #else
-    nullptr,                                 //  tp_print
+    nullptr,             //  tp_print
 #endif
-    nullptr,                                 //  tp_getattr
-    nullptr,                                 //  tp_setattr
-    nullptr,                                 //  tp_compare
-    repeated_scalar_container::ToStr,        //  tp_repr
-    nullptr,                                 //  tp_as_number
-    &repeated_scalar_container::SqMethods,   //  tp_as_sequence
-    &repeated_scalar_container::MpMethods,   //  tp_as_mapping
-    PyObject_HashNotImplemented,             //  tp_hash
-    nullptr,                                 //  tp_call
-    nullptr,                                 //  tp_str
-    nullptr,                                 //  tp_getattro
-    nullptr,                                 //  tp_setattro
-    nullptr,                                 //  tp_as_buffer
-    Py_TPFLAGS_DEFAULT,                      //  tp_flags
+    nullptr,                                //  tp_getattr
+    nullptr,                                //  tp_setattr
+    nullptr,                                //  tp_compare
+    repeated_scalar_container::ToStr,       //  tp_repr
+    nullptr,                                //  tp_as_number
+    &repeated_scalar_container::SqMethods,  //  tp_as_sequence
+    &repeated_scalar_container::MpMethods,  //  tp_as_mapping
+    PyObject_HashNotImplemented,            //  tp_hash
+    nullptr,                                //  tp_call
+    nullptr,                                //  tp_str
+    nullptr,                                //  tp_getattro
+    nullptr,                                //  tp_setattro
+    nullptr,                                //  tp_as_buffer
+#if PY_VERSION_HEX >= 0x030A0000
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_SEQUENCE,  //  tp_flags
+#else
+    Py_TPFLAGS_DEFAULT,  //  tp_flags
+#endif
     "A Repeated scalar container",           //  tp_doc
     nullptr,                                 //  tp_traverse
     nullptr,                                 //  tp_clear

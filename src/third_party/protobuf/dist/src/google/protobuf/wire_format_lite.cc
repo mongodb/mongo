@@ -1,53 +1,31 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
-#include <google/protobuf/wire_format_lite.h>
+#include "google/protobuf/wire_format_lite.h"
 
 #include <limits>
 #include <stack>
 #include <string>
 #include <vector>
 
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/stringprintf.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/io/zero_copy_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
+#include "absl/strings/cord.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "utf8_validity.h"
 
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 namespace google {
 namespace protobuf {
@@ -62,6 +40,14 @@ const int WireFormatLite::kMessageSetTypeIdTag;
 const int WireFormatLite::kMessageSetMessageTag;
 
 #endif
+
+constexpr size_t WireFormatLite::kFixed32Size;
+constexpr size_t WireFormatLite::kFixed64Size;
+constexpr size_t WireFormatLite::kSFixed32Size;
+constexpr size_t WireFormatLite::kSFixed64Size;
+constexpr size_t WireFormatLite::kFloatSize;
+constexpr size_t WireFormatLite::kDoubleSize;
+constexpr size_t WireFormatLite::kBoolSize;
 
 // IBM xlC requires prefixing constants with WireFormatLite::
 const size_t WireFormatLite::kMessageSetItemTagsSize =
@@ -191,7 +177,7 @@ bool WireFormatLite::SkipField(io::CodedInputStream* input, uint32_t tag,
       if (!input->ReadVarint32(&length)) return false;
       output->WriteVarint32(tag);
       output->WriteVarint32(length);
-      // TODO(mkilavuz): Provide API to prevent extra string copying.
+      // TODO: Provide API to prevent extra string copying.
       std::string temp;
       if (!input->ReadString(&temp, length)) return false;
       output->WriteString(temp);
@@ -482,7 +468,7 @@ void WireFormatLite::WriteString(int field_number, const std::string& value,
                                  io::CodedOutputStream* output) {
   // String is for UTF-8 text only
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
-  GOOGLE_CHECK_LE(value.size(), kInt32MaxSize);
+  ABSL_CHECK_LE(value.size(), kInt32MaxSize);
   output->WriteVarint32(value.size());
   output->WriteString(value);
 }
@@ -491,14 +477,14 @@ void WireFormatLite::WriteStringMaybeAliased(int field_number,
                                              io::CodedOutputStream* output) {
   // String is for UTF-8 text only
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
-  GOOGLE_CHECK_LE(value.size(), kInt32MaxSize);
+  ABSL_CHECK_LE(value.size(), kInt32MaxSize);
   output->WriteVarint32(value.size());
   output->WriteRawMaybeAliased(value.data(), value.size());
 }
 void WireFormatLite::WriteBytes(int field_number, const std::string& value,
                                 io::CodedOutputStream* output) {
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
-  GOOGLE_CHECK_LE(value.size(), kInt32MaxSize);
+  ABSL_CHECK_LE(value.size(), kInt32MaxSize);
   output->WriteVarint32(value.size());
   output->WriteString(value);
 }
@@ -506,7 +492,7 @@ void WireFormatLite::WriteBytesMaybeAliased(int field_number,
                                             const std::string& value,
                                             io::CodedOutputStream* output) {
   WriteTag(field_number, WIRETYPE_LENGTH_DELIMITED, output);
-  GOOGLE_CHECK_LE(value.size(), kInt32MaxSize);
+  ABSL_CHECK_LE(value.size(), kInt32MaxSize);
   output->WriteVarint32(value.size());
   output->WriteRawMaybeAliased(value.data(), value.size());
 }
@@ -525,6 +511,28 @@ void WireFormatLite::WriteMessage(int field_number, const MessageLite& value,
   const int size = value.GetCachedSize();
   output->WriteVarint32(size);
   value.SerializeWithCachedSizes(output);
+}
+
+uint8_t* WireFormatLite::InternalWriteGroup(int field_number,
+                                            const MessageLite& value,
+                                            uint8_t* target,
+                                            io::EpsCopyOutputStream* stream) {
+  target = stream->EnsureSpace(target);
+  target = WriteTagToArray(field_number, WIRETYPE_START_GROUP, target);
+  target = value._InternalSerialize(target, stream);
+  target = stream->EnsureSpace(target);
+  return WriteTagToArray(field_number, WIRETYPE_END_GROUP, target);
+}
+
+uint8_t* WireFormatLite::InternalWriteMessage(int field_number,
+                                              const MessageLite& value,
+                                              int cached_size, uint8_t* target,
+                                              io::EpsCopyOutputStream* stream) {
+  target = stream->EnsureSpace(target);
+  target = WriteTagToArray(field_number, WIRETYPE_LENGTH_DELIMITED, target);
+  target = io::CodedOutputStream::WriteVarint32ToArray(
+      static_cast<uint32_t>(cached_size), target);
+  return value._InternalSerialize(target, stream);
 }
 
 void WireFormatLite::WriteSubMessageMaybeToArray(
@@ -570,23 +578,34 @@ bool WireFormatLite::ReadBytes(io::CodedInputStream* input, std::string** p) {
   return ReadBytesToString(input, *p);
 }
 
-void PrintUTF8ErrorLog(const char* field_name, const char* operation_str,
+void PrintUTF8ErrorLog(absl::string_view message_name,
+                       absl::string_view field_name, const char* operation_str,
                        bool emit_stacktrace) {
   std::string stacktrace;
   (void)emit_stacktrace;  // Parameter is used by Google-internal code.
   std::string quoted_field_name = "";
-  if (field_name != nullptr) {
-    quoted_field_name = StringPrintf(" '%s'", field_name);
+  if (!field_name.empty()) {
+    if (!message_name.empty()) {
+      quoted_field_name =
+          absl::StrCat(" '", message_name, ".", field_name, "'");
+    } else {
+      quoted_field_name = absl::StrCat(" '", field_name, "'");
+    }
   }
-  GOOGLE_LOG(ERROR) << "String field" << quoted_field_name << " contains invalid "
-             << "UTF-8 data when " << operation_str << " a protocol "
-             << "buffer. Use the 'bytes' type if you intend to send raw "
-             << "bytes. " << stacktrace;
+  std::string error_message =
+      absl::StrCat("String field", quoted_field_name,
+                   " contains invalid UTF-8 data "
+                   "when ",
+                   operation_str,
+                   " a protocol buffer. Use the 'bytes' type if you intend to "
+                   "send raw bytes. ",
+                   stacktrace);
+  ABSL_LOG(ERROR) << error_message;
 }
 
 bool WireFormatLite::VerifyUtf8String(const char* data, int size, Operation op,
                                       const char* field_name) {
-  if (!IsStructurallyValidUTF8(data, size)) {
+  if (!utf8_range::IsStructurallyValid({data, static_cast<size_t>(size)})) {
     const char* operation_str = nullptr;
     switch (op) {
       case PARSE:
@@ -597,7 +616,7 @@ bool WireFormatLite::VerifyUtf8String(const char* data, int size, Operation op,
         break;
         // no default case: have the compiler warn if a case is not covered.
     }
-    PrintUTF8ErrorLog(field_name, operation_str, false);
+    PrintUTF8ErrorLog("", field_name, operation_str, false);
     return false;
   }
   return true;
@@ -627,7 +646,7 @@ static size_t VarintSize(const T* data, const int n) {
     } else if (SignExtended) {
       msb_sum += x >> 31;
     }
-    // clang is so smart that it produces optimal SSE sequence unrolling
+    // clang is so smart that it produces optimal SIMD sequence unrolling
     // the loop 8 ints at a time. With a sequence of 4
     // cmpres = cmpgt x, sizeclass  ( -1 or 0)
     // sum = sum - cmpres
@@ -670,7 +689,7 @@ static size_t VarintSize64(const T* data, const int n) {
 // and other platforms are untested, in those cases using the optimized
 // varint size routine for each element is faster.
 // Hence we enable it only for clang
-#if defined(__SSE__) && defined(__clang__)
+#if (defined(__SSE__) || defined(__aarch64__)) && defined(__clang__)
 size_t WireFormatLite::Int32Size(const RepeatedField<int32_t>& value) {
   return VarintSize<false, true>(value.data(), value.size());
 }
@@ -688,7 +707,7 @@ size_t WireFormatLite::EnumSize(const RepeatedField<int>& value) {
   return VarintSize<false, true>(value.data(), value.size());
 }
 
-#else  // !(defined(__SSE4_1__) && defined(__clang__))
+#else  // !((defined(__SSE__) || defined(__aarch64__) && defined(__clang__))
 
 size_t WireFormatLite::Int32Size(const RepeatedField<int32_t>& value) {
   size_t out = 0;
@@ -781,4 +800,4 @@ size_t WireFormatLite::SInt64Size(const RepeatedField<int64_t>& value) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"

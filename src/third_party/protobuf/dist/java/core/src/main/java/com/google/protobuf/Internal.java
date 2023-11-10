@@ -1,36 +1,14 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
 import java.lang.reflect.Method;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.AbstractList;
@@ -139,10 +117,12 @@ public final class Internal {
     ByteBuffer temp = source.duplicate();
     // We want to copy all the data in the source ByteBuffer, not just the
     // remaining bytes.
-    temp.clear();
+    // View ByteBuffer as Buffer to avoid issue with covariant return types
+    // See https://issues.apache.org/jira/browse/MRESOLVER-85
+    ((Buffer) temp).clear();
     ByteBuffer result = ByteBuffer.allocate(temp.capacity());
     result.put(temp);
-    result.clear();
+    ((Buffer) result).clear();
     return result;
   }
 
@@ -256,7 +236,9 @@ public final class Internal {
 
   /** Helper method for implementing {@link Message#equals(Object)} for bytes field. */
   public static boolean equals(List<byte[]> a, List<byte[]> b) {
-    if (a.size() != b.size()) return false;
+    if (a.size() != b.size()) {
+      return false;
+    }
     for (int i = 0; i < a.size(); ++i) {
       if (!Arrays.equals(a.get(i), b.get(i))) {
         return false;
@@ -308,7 +290,11 @@ public final class Internal {
     }
     // ByteBuffer.equals() will only compare the remaining bytes, but we want to
     // compare all the content.
-    return a.duplicate().clear().equals(b.duplicate().clear());
+    ByteBuffer aDuplicate = a.duplicate();
+    Java8Compatibility.clear(aDuplicate);
+    ByteBuffer bDuplicate = b.duplicate();
+    Java8Compatibility.clear(bDuplicate);
+    return aDuplicate.equals(bDuplicate);
   }
 
   /** Helper method for implementing {@link Message#equals(Object)} for bytes field. */
@@ -348,7 +334,7 @@ public final class Internal {
           bytes.capacity() > DEFAULT_BUFFER_SIZE ? DEFAULT_BUFFER_SIZE : bytes.capacity();
       final byte[] buffer = new byte[bufferSize];
       final ByteBuffer duplicated = bytes.duplicate();
-      duplicated.clear();
+      Java8Compatibility.clear(duplicated);
       int h = bytes.capacity();
       while (duplicated.remaining() > 0) {
         final int length =
@@ -370,7 +356,6 @@ public final class Internal {
     }
   }
 
-
   /** An empty byte array constant used in generated code. */
   public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
@@ -380,7 +365,6 @@ public final class Internal {
   /** An empty coded input stream constant used in generated code. */
   public static final CodedInputStream EMPTY_CODED_INPUT_STREAM =
       CodedInputStream.newInstance(EMPTY_BYTE_ARRAY);
-
 
   /** Helper method to merge two MessageLite instances. */
   static Object mergeMessage(Object destination, Object source) {
@@ -450,7 +434,6 @@ public final class Internal {
       this.valueConverter = valueConverter;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public V get(Object key) {
       RealValue result = realMap.get(key);
@@ -549,7 +532,6 @@ public final class Internal {
         if (!(o instanceof Map.Entry)) {
           return false;
         }
-        @SuppressWarnings("unchecked")
         Map.Entry<?, ?> other = (Map.Entry<?, ?>) o;
         return getKey().equals(other.getKey()) && getValue().equals(getValue());
       }
@@ -597,6 +579,7 @@ public final class Internal {
     void addInt(int element);
 
     /** Like {@link #set(int, Object)} but more efficient in that it doesn't box the element. */
+    @CanIgnoreReturnValue
     int setInt(int index, int element);
 
     /** Returns a mutable clone of this list with the specified capacity. */
@@ -617,6 +600,7 @@ public final class Internal {
     void addBoolean(boolean element);
 
     /** Like {@link #set(int, Object)} but more efficient in that it doesn't box the element. */
+    @CanIgnoreReturnValue
     boolean setBoolean(int index, boolean element);
 
     /** Returns a mutable clone of this list with the specified capacity. */
@@ -637,6 +621,7 @@ public final class Internal {
     void addLong(long element);
 
     /** Like {@link #set(int, Object)} but more efficient in that it doesn't box the element. */
+    @CanIgnoreReturnValue
     long setLong(int index, long element);
 
     /** Returns a mutable clone of this list with the specified capacity. */
@@ -657,6 +642,7 @@ public final class Internal {
     void addDouble(double element);
 
     /** Like {@link #set(int, Object)} but more efficient in that it doesn't box the element. */
+    @CanIgnoreReturnValue
     double setDouble(int index, double element);
 
     /** Returns a mutable clone of this list with the specified capacity. */
@@ -677,11 +663,11 @@ public final class Internal {
     void addFloat(float element);
 
     /** Like {@link #set(int, Object)} but more efficient in that it doesn't box the element. */
+    @CanIgnoreReturnValue
     float setFloat(int index, float element);
 
     /** Returns a mutable clone of this list with the specified capacity. */
     @Override
     FloatList mutableCopyWithCapacity(int capacity);
   }
-
 }

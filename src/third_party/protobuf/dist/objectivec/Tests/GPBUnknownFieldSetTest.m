@@ -1,38 +1,15 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #import "GPBTestUtilities.h"
 
-#import "GPBUnknownField_PackagePrivate.h"
 #import "GPBUnknownFieldSet_PackagePrivate.h"
-#import "google/protobuf/Unittest.pbobjc.h"
+#import "GPBUnknownField_PackagePrivate.h"
+#import "objectivec/Tests/Unittest.pbobjc.h"
 
 @interface GPBUnknownFieldSet (GPBUnknownFieldSetTest)
 - (void)getTags:(int32_t*)tags;
@@ -61,7 +38,7 @@
 }
 
 - (void)testInvalidFieldNumber {
-  GPBUnknownFieldSet *set = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* set = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* field = [[[GPBUnknownField alloc] initWithNumber:0] autorelease];
   XCTAssertThrowsSpecificNamed([set addField:field], NSException, NSInvalidArgumentException);
 }
@@ -69,10 +46,10 @@
 - (void)testEqualityAndHash {
   // Empty
 
-  GPBUnknownFieldSet *set1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* set1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   XCTAssertTrue([set1 isEqual:set1]);
   XCTAssertFalse([set1 isEqual:@"foo"]);
-  GPBUnknownFieldSet *set2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* set2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   XCTAssertEqualObjects(set1, set2);
   XCTAssertEqual([set1 hash], [set2 hash]);
 
@@ -126,11 +103,11 @@
 
   // Group
 
-  GPBUnknownFieldSet *group1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup1 = [[[GPBUnknownField alloc] initWithNumber:10] autorelease];
   [fieldGroup1 addVarint:1];
   [group1 addField:fieldGroup1];
-  GPBUnknownFieldSet *group2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup2 = [[[GPBUnknownField alloc] initWithNumber:10] autorelease];
   [fieldGroup2 addVarint:1];
   [group2 addField:fieldGroup2];
@@ -153,10 +130,9 @@
 // numbers as allFieldsData except that each field is some other wire
 // type.
 - (NSData*)getBizarroData {
-  GPBUnknownFieldSet* bizarroFields =
-      [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* bizarroFields = [[[GPBUnknownFieldSet alloc] init] autorelease];
   NSUInteger count = [unknownFields_ countOfFields];
-  int32_t *tags = malloc(count * sizeof(int32_t));
+  int32_t* tags = malloc(count * sizeof(int32_t));
   if (!tags) {
     XCTFail(@"Failed to make scratch buffer for testing");
     return [NSData data];
@@ -168,20 +144,17 @@
       GPBUnknownField* field = [unknownFields_ getField:tag];
       if (field.varintList.count == 0) {
         // Original field is not a varint, so use a varint.
-        GPBUnknownField* varintField =
-            [[[GPBUnknownField alloc] initWithNumber:tag] autorelease];
+        GPBUnknownField* varintField = [[[GPBUnknownField alloc] initWithNumber:tag] autorelease];
         [varintField addVarint:1];
         [bizarroFields addField:varintField];
       } else {
         // Original field *is* a varint, so use something else.
-        GPBUnknownField* fixed32Field =
-            [[[GPBUnknownField alloc] initWithNumber:tag] autorelease];
+        GPBUnknownField* fixed32Field = [[[GPBUnknownField alloc] initWithNumber:tag] autorelease];
         [fixed32Field addFixed32:1];
         [bizarroFields addField:fixed32Field];
       }
     }
-  }
-  @finally {
+  } @finally {
     free(tags);
   }
 
@@ -220,7 +193,7 @@
   [field addLengthDelimited:DataFromCStr("data1")];
   [set1 addField:field];
 
-  GPBUnknownFieldSet *group1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group1 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup1 = [[[GPBUnknownField alloc] initWithNumber:200] autorelease];
   [fieldGroup1 addVarint:100];
   [group1 addField:fieldGroup1];
@@ -246,7 +219,7 @@
   [field addLengthDelimited:DataFromCStr("data2")];
   [set2 addField:field];
 
-  GPBUnknownFieldSet *group2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group2 = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup2 = [[[GPBUnknownField alloc] initWithNumber:201] autorelease];
   [fieldGroup2 addVarint:99];
   [group2 addField:fieldGroup2];
@@ -280,11 +253,11 @@
   [field addLengthDelimited:DataFromCStr("data2")];
   [set3 addField:field];
 
-  GPBUnknownFieldSet *group3a = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group3a = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup3a1 = [[[GPBUnknownField alloc] initWithNumber:200] autorelease];
   [fieldGroup3a1 addVarint:100];
   [group3a addField:fieldGroup3a1];
-  GPBUnknownFieldSet *group3b = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group3b = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup3b2 = [[[GPBUnknownField alloc] initWithNumber:201] autorelease];
   [fieldGroup3b2 addVarint:99];
   [group3b addField:fieldGroup3b2];
@@ -314,7 +287,7 @@
 }
 
 - (void)testClearMessage {
-  TestEmptyMessage *message = [TestEmptyMessage message];
+  TestEmptyMessage* message = [TestEmptyMessage message];
   [message mergeFrom:emptyMessage_];
   [message clear];
   XCTAssertEqual(message.serializedSize, (size_t)0);
@@ -322,9 +295,8 @@
 
 - (void)testParseKnownAndUnknown {
   // Test mixing known and unknown fields when parsing.
-  GPBUnknownFieldSet *fields = [[unknownFields_ copy] autorelease];
-  GPBUnknownField *field =
-    [[[GPBUnknownField alloc] initWithNumber:123456] autorelease];
+  GPBUnknownFieldSet* fields = [[unknownFields_ copy] autorelease];
+  GPBUnknownField* field = [[[GPBUnknownField alloc] initWithNumber:123456] autorelease];
   [field addVarint:654321];
   [fields addField:field];
 
@@ -344,10 +316,8 @@
   // when parsing.
 
   NSData* bizarroData = [self getBizarroData];
-  TestAllTypes* allTypesMessage =
-      [TestAllTypes parseFromData:bizarroData error:NULL];
-  TestEmptyMessage* emptyMessage =
-      [TestEmptyMessage parseFromData:bizarroData error:NULL];
+  TestAllTypes* allTypesMessage = [TestAllTypes parseFromData:bizarroData error:NULL];
+  TestEmptyMessage* emptyMessage = [TestEmptyMessage parseFromData:bizarroData error:NULL];
 
   // All fields should have been interpreted as unknown, so the debug strings
   // should be the same.
@@ -361,8 +331,7 @@
   TestEmptyMessageWithExtensions* message =
       [TestEmptyMessageWithExtensions parseFromData:allFieldsData_ error:NULL];
 
-  XCTAssertEqual(unknownFields_.countOfFields,
-                 message.unknownFields.countOfFields);
+  XCTAssertEqual(unknownFields_.countOfFields, message.unknownFields.countOfFields);
   XCTAssertEqualObjects(allFieldsData_, message.data);
 }
 
@@ -371,10 +340,9 @@
   // when parsing extensions.
 
   NSData* bizarroData = [self getBizarroData];
-  TestAllExtensions* allExtensionsMessage =
-      [TestAllExtensions parseFromData:bizarroData error:NULL];
-  TestEmptyMessage* emptyMessage =
-      [TestEmptyMessage parseFromData:bizarroData error:NULL];
+  TestAllExtensions* allExtensionsMessage = [TestAllExtensions parseFromData:bizarroData
+                                                                       error:NULL];
+  TestEmptyMessage* emptyMessage = [TestEmptyMessage parseFromData:bizarroData error:NULL];
 
   // All fields should have been interpreted as unknown, so the debug strings
   // should be the same.
@@ -390,7 +358,8 @@
   NSData* data = [fields data];
 
   GPBUnknownFieldSet* parsed = [[[GPBUnknownFieldSet alloc] init] autorelease];
-  [parsed mergeFromData:data];
+  GPBCodedInputStream* input = [[[GPBCodedInputStream alloc] initWithData:data] autorelease];
+  [parsed mergeFromCodedInputStream:input];
   GPBUnknownField* field2 = [parsed getField:1];
   XCTAssertEqual(field2.varintList.count, (NSUInteger)1);
   XCTAssertEqual(0x7FFFFFFFFFFFFFFFULL, [field2.varintList valueAtIndex:0]);
@@ -465,7 +434,7 @@
 
   // Group
 
-  GPBUnknownFieldSet *group = [[[GPBUnknownFieldSet alloc] init] autorelease];
+  GPBUnknownFieldSet* group = [[[GPBUnknownFieldSet alloc] init] autorelease];
   GPBUnknownField* fieldGroup = [[[GPBUnknownField alloc] initWithNumber:100] autorelease];
   [fieldGroup addVarint:100];
   [group addField:fieldGroup];

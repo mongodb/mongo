@@ -1,38 +1,16 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
 import static com.google.protobuf.Internal.checkNotNull;
 
 import com.google.protobuf.DescriptorProtos.DescriptorProto;
+import com.google.protobuf.DescriptorProtos.Edition;
 import com.google.protobuf.DescriptorProtos.EnumDescriptorProto;
 import com.google.protobuf.DescriptorProtos.EnumOptions;
 import com.google.protobuf.DescriptorProtos.EnumValueDescriptorProto;
@@ -78,6 +56,7 @@ import java.util.logging.Logger;
  *
  * @author kenton@google.com Kenton Varda
  */
+@CheckReturnValue
 public final class Descriptors {
   private static final Logger logger = Logger.getLogger(Descriptors.class.getName());
   private static final int[] EMPTY_INT_ARRAY = new int[0];
@@ -161,10 +140,13 @@ public final class Descriptors {
     }
 
     /** The syntax of the .proto file. */
-    public enum Syntax {
+    @Deprecated
+    public
+    enum Syntax {
       UNKNOWN("unknown"),
       PROTO2("proto2"),
-      PROTO3("proto3");
+      PROTO3("proto3"),
+      EDITIONS("editions");
 
       Syntax(String name) {
         this.name = name;
@@ -174,11 +156,43 @@ public final class Descriptors {
     }
 
     /** Get the syntax of the .proto file. */
-    public Syntax getSyntax() {
+    @Deprecated
+    public
+    Syntax getSyntax() {
       if (Syntax.PROTO3.name.equals(proto.getSyntax())) {
         return Syntax.PROTO3;
+      } else if (Syntax.EDITIONS.name.equals(proto.getSyntax())) {
+        return Syntax.EDITIONS;
       }
       return Syntax.PROTO2;
+    }
+
+    /** Get the edition of the .proto file. */
+    public Edition getEdition() {
+      return proto.getEdition();
+    }
+
+    /** Gets the name of the edition as specified in the .proto file. */
+    public String getEditionName() {
+      if (proto.getEdition().equals(Edition.EDITION_UNKNOWN)) {
+        return "";
+      }
+      return proto.getEdition().name().substring("EDITION_".length());
+    }
+
+    public void copyHeadingTo(FileDescriptorProto.Builder protoBuilder) {
+      protoBuilder.setName(getName()).setSyntax(getSyntax().name);
+      if (!getPackage().isEmpty()) {
+        protoBuilder.setPackage(getPackage());
+      }
+
+      if (getSyntax().equals(Syntax.EDITIONS)) {
+        protoBuilder.setEdition(getEdition());
+      }
+
+      if (!getOptions().equals(FileOptions.getDefaultInstance())) {
+        protoBuilder.setOptions(getOptions());
+      }
     }
 
     /**
@@ -278,14 +292,13 @@ public final class Descriptors {
     /**
      * Construct a {@code FileDescriptor}.
      *
-     * @param proto The protocol message form of the FileDescriptor.
-     * @param dependencies {@code FileDescriptor}s corresponding to all of the file's dependencies.
+     * @param proto the protocol message form of the FileDescriptort
+     * @param dependencies {@code FileDescriptor}s corresponding to all of the file's dependencies
      * @throws DescriptorValidationException {@code proto} is not a valid descriptor. This can occur
-     *     for a number of reasons, e.g. because a field has an undefined type or because two
-     *     messages were defined with the same name.
+     *     for a number of reasons; for instance, because a field has an undefined type or because
+     *     two messages were defined with the same name.
      */
-    public static FileDescriptor buildFrom(
-        final FileDescriptorProto proto, final FileDescriptor[] dependencies)
+    public static FileDescriptor buildFrom(FileDescriptorProto proto, FileDescriptor[] dependencies)
         throws DescriptorValidationException {
       return buildFrom(proto, dependencies, false);
     }
@@ -293,18 +306,17 @@ public final class Descriptors {
     /**
      * Construct a {@code FileDescriptor}.
      *
-     * @param proto The protocol message form of the FileDescriptor.
-     * @param dependencies {@code FileDescriptor}s corresponding to all of the file's dependencies.
-     * @param allowUnknownDependencies If true, non-exist dependenncies will be ignored and
-     *     undefined message types will be replaced with a placeholder type.
+     * @param proto the protocol message form of the FileDescriptor
+     * @param dependencies {@code FileDescriptor}s corresponding to all of the file's dependencies
+     * @param allowUnknownDependencies if true, non-existing dependencies will be ignored and
+     *     undefined message types will be replaced with a placeholder type. Undefined enum types
+     *     still cause a DescriptorValidationException.
      * @throws DescriptorValidationException {@code proto} is not a valid descriptor. This can occur
-     *     for a number of reasons, e.g. because a field has an undefined type or because two
-     *     messages were defined with the same name.
+     *     for a number of reasons; for instance, because a field has an undefined type or because
+     *     two messages were defined with the same name.
      */
     public static FileDescriptor buildFrom(
-        final FileDescriptorProto proto,
-        final FileDescriptor[] dependencies,
-        final boolean allowUnknownDependencies)
+        FileDescriptorProto proto, FileDescriptor[] dependencies, boolean allowUnknownDependencies)
         throws DescriptorValidationException {
       // Building descriptors involves two steps:  translating and linking.
       // In the translation step (implemented by FileDescriptor's
@@ -315,8 +327,8 @@ public final class Descriptors {
       // FieldDescriptor for an embedded message contains a pointer directly
       // to the Descriptor for that message's type.  We also detect undefined
       // types in the linking step.
-      final DescriptorPool pool = new DescriptorPool(dependencies, allowUnknownDependencies);
-      final FileDescriptor result =
+      DescriptorPool pool = new DescriptorPool(dependencies, allowUnknownDependencies);
+      FileDescriptor result =
           new FileDescriptor(proto, dependencies, pool, allowUnknownDependencies);
       result.crossLink();
       return result;
@@ -461,21 +473,20 @@ public final class Descriptors {
     }
 
     /**
-     * This method is to be called by generated code only. It is used to update the
-     * FileDescriptorProto associated with the descriptor by parsing it again with the given
-     * ExtensionRegistry. This is needed to recognize custom options.
+     * This method is to be called by generated code only. It updates the FileDescriptorProto
+     * associated with the descriptor by parsing it again with the given ExtensionRegistry. This is
+     * needed to recognize custom options.
      */
     public static void internalUpdateFileDescriptor(
-        final FileDescriptor descriptor, final ExtensionRegistry registry) {
+        FileDescriptor descriptor, ExtensionRegistry registry) {
       ByteString bytes = descriptor.proto.toByteString();
-      FileDescriptorProto proto;
       try {
-        proto = FileDescriptorProto.parseFrom(bytes, registry);
+        FileDescriptorProto proto = FileDescriptorProto.parseFrom(bytes, registry);
+        descriptor.setProto(proto);
       } catch (InvalidProtocolBufferException e) {
         throw new IllegalArgumentException(
             "Failed to parse protocol buffer descriptor for generated code.", e);
       }
-      descriptor.setProto(proto);
     }
 
     /**
@@ -635,10 +646,6 @@ public final class Descriptors {
       for (int i = 0; i < extensions.length; i++) {
         extensions[i].setProto(proto.getExtension(i));
       }
-    }
-
-    boolean supportsUnknownEnumValue() {
-      return getSyntax() == Syntax.PROTO3;
     }
   }
 
@@ -814,7 +821,7 @@ public final class Descriptors {
     /**
      * Finds a nested message type by name.
      *
-     * @param name The unqualified name of the nested type (e.g. "Foo").
+     * @param name The unqualified name of the nested type such as "Foo"
      * @return The types's descriptor, or {@code null} if not found.
      */
     public Descriptor findNestedTypeByName(final String name) {
@@ -829,7 +836,7 @@ public final class Descriptors {
     /**
      * Finds a nested enum type by name.
      *
-     * @param name The unqualified name of the nested type (e.g. "Foo").
+     * @param name The unqualified name of the nested type such as "Foo"
      * @return The types's descriptor, or {@code null} if not found.
      */
     public EnumDescriptor findEnumTypeByName(final String name) {
@@ -1202,7 +1209,7 @@ public final class Descriptors {
       }
     }
 
-    /** Can this field be packed? i.e. is it a repeated primitive field? */
+    /** Can this field be packed? That is, is it a repeated primitive field? */
     public boolean isPackable() {
       return isRepeated() && getLiteType().isPackable();
     }
@@ -1257,7 +1264,9 @@ public final class Descriptors {
      * Returns true if this field was syntactically written with "optional" in the .proto file.
      * Excludes singular proto3 fields that do not have a label.
      */
-    public boolean hasOptionalKeyword() {
+    @Deprecated
+    public
+    boolean hasOptionalKeyword() {
       return isProto3Optional
           || (file.getSyntax() == Syntax.PROTO2 && isOptional() && getContainingOneof() == null);
     }
@@ -1295,13 +1304,13 @@ public final class Descriptors {
      *   }
      *   message Bar {
      *     extend Foo {
-     *       optional int32 qux = 4321;
+     *       optional int32 moo = 4321;
      *     }
      *   }
      * </pre>
      *
-     * Both {@code baz}'s and {@code qux}'s containing type is {@code Foo}. However, {@code baz}'s
-     * extension scope is {@code null} while {@code qux}'s extension scope is {@code Bar}.
+     * Both {@code baz}'s and {@code moo}'s containing type is {@code Foo}. However, {@code baz}'s
+     * extension scope is {@code null} while {@code moo}'s extension scope is {@code Bar}.
      */
     public Descriptor getExtensionScope() {
       if (!isExtension()) {
@@ -1331,12 +1340,36 @@ public final class Descriptors {
     }
 
     /**
+     * Determines if the given enum field is treated as closed based on legacy non-conformant
+     * behavior.
+     *
+     * <p>Conformant behavior determines closedness based on the enum and can be queried using
+     * {@code EnumDescriptor.isClosed()}.
+     *
+     * <p>Some runtimes currently have a quirk where non-closed enums are treated as closed when
+     * used as the type of fields defined in a `syntax = proto2;` file. This quirk is not present in
+     * all runtimes; as of writing, we know that:
+     *
+     * <ul>
+     *   <li>C++, Java, and C++-based Python share this quirk.
+     *   <li>UPB and UPB-based Python do not.
+     *   <li>PHP and Ruby treat all enums as open regardless of declaration.
+     * </ul>
+     *
+     * <p>Care should be taken when using this function to respect the target runtime's enum
+     * handling quirks.
+     */
+    public boolean legacyEnumFieldTreatedAsClosed() {
+      return getType() == Type.ENUM && getFile().getSyntax() == Syntax.PROTO2;
+    }
+
+    /**
      * Compare with another {@code FieldDescriptor}. This orders fields in "canonical" order, which
-     * simply means ascending order by field number. {@code other} must be a field of the same type
-     * -- i.e. {@code getContainingType()} must return the same {@code Descriptor} for both fields.
+     * simply means ascending order by field number. {@code other} must be a field of the same type.
+     * That is, {@code getContainingType()} must return the same {@code Descriptor} for both fields.
      *
      * @return negative, zero, or positive if {@code this} is less than, equal to, or greater than
-     *     {@code other}, respectively.
+     *     {@code other}, respectively
      */
     @Override
     public int compareTo(final FieldDescriptor other) {
@@ -1728,7 +1761,6 @@ public final class Descriptors {
       // down-cast and call mergeFrom directly.
       return ((Message.Builder) to).mergeFrom((Message) from);
     }
-
   }
 
   // =================================================================
@@ -1773,6 +1805,34 @@ public final class Descriptors {
       return file;
     }
 
+    /**
+     * Determines if the given enum is closed.
+     *
+     * <p>Closed enum means that it:
+     *
+     * <ul>
+     *   <li>Has a fixed set of values, rather than being equivalent to an int32.
+     *   <li>Encountering values not in this set causes them to be treated as unknown fields.
+     *   <li>The first value (i.e., the default) may be nonzero.
+     * </ul>
+     *
+     * <p>WARNING: Some runtimes currently have a quirk where non-closed enums are treated as closed
+     * when used as the type of fields defined in a `syntax = proto2;` file. This quirk is not
+     * present in all runtimes; as of writing, we know that:
+     *
+     * <ul>
+     *   <li> C++, Java, and C++-based Python share this quirk.
+     *   <li> UPB and UPB-based Python do not.
+     *   <li> PHP and Ruby treat all enums as open regardless of declaration.
+     * </ul>
+     *
+     * <p>Care should be taken when using this function to respect the target runtime's enum
+     * handling quirks.
+     */
+    public boolean isClosed() {
+      return getFile().getSyntax() != Syntax.PROTO3;
+    }
+
     /** If this is a nested type, get the outer descriptor, otherwise null. */
     public Descriptor getContainingType() {
       return containingType;
@@ -1788,11 +1848,32 @@ public final class Descriptors {
       return Collections.unmodifiableList(Arrays.asList(values));
     }
 
+    /** Determines if the given field number is reserved. */
+    public boolean isReservedNumber(final int number) {
+      for (final EnumDescriptorProto.EnumReservedRange range : proto.getReservedRangeList()) {
+        if (range.getStart() <= number && number <= range.getEnd()) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /** Determines if the given field name is reserved. */
+    public boolean isReservedName(final String name) {
+      checkNotNull(name);
+      for (final String reservedName : proto.getReservedNameList()) {
+        if (reservedName.equals(name)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     /**
      * Find an enum value by name.
      *
-     * @param name The unqualified name of the value (e.g. "FOO").
-     * @return the value's descriptor, or {@code null} if not found.
+     * @param name the unqualified name of the value such as "FOO"
+     * @return the value's descriptor, or {@code null} if not found
      */
     public EnumValueDescriptor findValueByName(final String name) {
       final GenericDescriptor result = file.pool.findSymbol(fullName + '.' + name);
@@ -1837,8 +1918,8 @@ public final class Descriptors {
       // The number represents an unknown enum value.
       synchronized (this) {
         if (cleanupQueue == null) {
-          cleanupQueue = new ReferenceQueue<EnumValueDescriptor>();
-          unknownValues = new HashMap<Integer, WeakReference<EnumValueDescriptor>>();
+          cleanupQueue = new ReferenceQueue<>();
+          unknownValues = new HashMap<>();
         } else {
           while (true) {
             UnknownEnumValueReference toClean = (UnknownEnumValueReference) cleanupQueue.poll();
@@ -1941,7 +2022,7 @@ public final class Descriptors {
         new Comparator<EnumValueDescriptor>() {
           @Override
           public int compare(EnumValueDescriptor o1, EnumValueDescriptor o2) {
-            return Integer.compare(o1.getNumber(), o2.getNumber());
+            return Integer.valueOf(o1.getNumber()).compareTo(o2.getNumber());
           }
         };
 
@@ -2102,8 +2183,8 @@ public final class Descriptors {
     /**
      * Find a method by name.
      *
-     * @param name The unqualified name of the method (e.g. "Foo").
-     * @return the method's descriptor, or {@code null} if not found.
+     * @param name the unqualified name of the method such as "Foo"
+     * @return the method's descriptor, or {@code null} if not found
      */
     public MethodDescriptor findMethodByName(final String name) {
       final GenericDescriptor result = file.pool.findSymbol(fullName + '.' + name);
@@ -2415,7 +2496,7 @@ public final class Descriptors {
     }
 
     private final Set<FileDescriptor> dependencies;
-    private boolean allowUnknownDependencies;
+    private final boolean allowUnknownDependencies;
 
     private final Map<String, GenericDescriptor> descriptorsByName = new HashMap<>();
 
@@ -2475,7 +2556,6 @@ public final class Descriptors {
         final GenericDescriptor relativeTo,
         final DescriptorPool.SearchFilter filter)
         throws DescriptorValidationException {
-      // TODO(kenton):  This could be optimized in a number of ways.
 
       GenericDescriptor result;
       String fullname;
@@ -2547,11 +2627,11 @@ public final class Descriptors {
           logger.warning(
               "The descriptor for message type \""
                   + name
-                  + "\" can not be found and a placeholder is created for it");
+                  + "\" cannot be found and a placeholder is created for it");
           // We create a dummy message descriptor here regardless of the
           // expected type. If the type should be message, this dummy
           // descriptor will work well and if the type should be enum, a
-          // DescriptorValidationException will be thrown latter. In either
+          // DescriptorValidationException will be thrown later. In either
           // case, the code works as expected: we allow unknown message types
           // but not unknown enum types.
           result = new Descriptor(fullname);
@@ -2677,8 +2757,8 @@ public final class Descriptors {
     }
 
     /**
-     * Verifies that the descriptor's name is valid (i.e. it contains only letters, digits, and
-     * underscores, and does not start with a digit).
+     * Verifies that the descriptor's name is valid. That is, it contains only letters, digits, and
+     * underscores, and does not start with a digit.
      */
     static void validateSymbolName(final GenericDescriptor descriptor)
         throws DescriptorValidationException {
@@ -2706,7 +2786,7 @@ public final class Descriptors {
     }
   }
 
-  /** Describes an oneof of a message type. */
+  /** Describes a oneof of a message type. */
   public static final class OneofDescriptor extends GenericDescriptor {
     /** Get the index of this descriptor within its parent. */
     public int getIndex() {
@@ -2740,10 +2820,6 @@ public final class Descriptors {
       return proto.getOptions();
     }
 
-    public boolean isSynthetic() {
-      return fields.length == 1 && fields[0].isProto3Optional;
-    }
-
     /** Get a list of this message type's fields. */
     public List<FieldDescriptor> getFields() {
       return Collections.unmodifiableList(Arrays.asList(fields));
@@ -2758,6 +2834,12 @@ public final class Descriptors {
       return proto;
     }
 
+    @Deprecated
+    public
+    boolean isSynthetic() {
+      return fields.length == 1 && fields[0].isProto3Optional;
+    }
+
     private void setProto(final OneofDescriptorProto proto) {
       this.proto = proto;
     }
@@ -2766,8 +2848,7 @@ public final class Descriptors {
         final OneofDescriptorProto proto,
         final FileDescriptor file,
         final Descriptor parent,
-        final int index)
-        throws DescriptorValidationException {
+        final int index) {
       this.proto = proto;
       fullName = computeFullName(file, parent, proto.getName());
       this.file = file;

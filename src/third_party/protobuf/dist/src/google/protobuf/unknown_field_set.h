@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -43,15 +20,16 @@
 #include <string>
 #include <vector>
 
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/parse_context.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
-#include <google/protobuf/message_lite.h>
-#include <google/protobuf/port.h>
+#include "google/protobuf/stubs/common.h"
+#include "absl/log/absl_check.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "google/protobuf/message_lite.h"
+#include "google/protobuf/parse_context.h"
+#include "google/protobuf/port.h"
 
-#include <google/protobuf/port_def.inc>
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 
 #ifdef SWIG
 #error "You cannot SWIG proto headers"
@@ -84,6 +62,8 @@ class UnknownField;  // below
 class PROTOBUF_EXPORT UnknownFieldSet {
  public:
   UnknownFieldSet();
+  UnknownFieldSet(const UnknownFieldSet&) = delete;
+  UnknownFieldSet& operator=(const UnknownFieldSet&) = delete;
   ~UnknownFieldSet();
 
   // Remove all fields.
@@ -172,6 +152,10 @@ class PROTOBUF_EXPORT UnknownFieldSet {
   template <typename MessageType>
   bool MergeFromMessage(const MessageType& message);
 
+  // Serialization.
+  bool SerializeToString(std::string* output) const;
+  bool SerializeToCord(absl::Cord* output) const;
+  bool SerializeToCodedStream(io::CodedOutputStream* output) const;
   static const UnknownFieldSet& default_instance();
 
  private:
@@ -204,7 +188,6 @@ class PROTOBUF_EXPORT UnknownFieldSet {
   }
 
   std::vector<UnknownField> fields_;
-  GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(UnknownFieldSet);
 };
 
 namespace internal {
@@ -212,7 +195,7 @@ namespace internal {
 inline void WriteVarint(uint32_t num, uint64_t val, UnknownFieldSet* unknown) {
   unknown->AddVarint(num, val);
 }
-inline void WriteLengthDelimited(uint32_t num, StringPiece val,
+inline void WriteLengthDelimited(uint32_t num, absl::string_view val,
                                  UnknownFieldSet* unknown) {
   unknown->AddLengthDelimited(num)->assign(val.data(), val.size());
 }
@@ -258,15 +241,6 @@ class PROTOBUF_EXPORT UnknownField {
   inline void set_length_delimited(const std::string& value);
   inline std::string* mutable_length_delimited();
   inline UnknownFieldSet* mutable_group();
-
-  // Serialization API.
-  // These methods can take advantage of the underlying implementation and may
-  // archieve a better performance than using getters to retrieve the data and
-  // do the serialization yourself.
-  void SerializeLengthDelimitedNoTag(io::CodedOutputStream* output) const {
-    output->SetCur(InternalSerializeLengthDelimitedNoTag(output->Cur(),
-                                                         output->EpsCopy()));
-  }
 
   inline size_t GetLengthDelimitedSize() const;
   uint8_t* InternalSerializeLengthDelimitedNoTag(
@@ -395,7 +369,7 @@ bool UnknownFieldSet::MergeFromMessage(const MessageType& message) {
 
 
 inline size_t UnknownField::GetLengthDelimitedSize() const {
-  GOOGLE_DCHECK_EQ(TYPE_LENGTH_DELIMITED, type());
+  ABSL_DCHECK_EQ(TYPE_LENGTH_DELIMITED, type());
   return data_.length_delimited_.string_value->size();
 }
 
@@ -407,5 +381,5 @@ inline void UnknownField::SetType(Type type) {
 }  // namespace protobuf
 }  // namespace google
 
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"
 #endif  // GOOGLE_PROTOBUF_UNKNOWN_FIELD_SET_H__

@@ -1,39 +1,18 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #ifndef GOOGLE_PROTOBUF_COMPILER_ANNOTATION_TEST_UTIL_H__
 #define GOOGLE_PROTOBUF_COMPILER_ANNOTATION_TEST_UTIL_H__
 
-#include <google/protobuf/descriptor.pb.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/descriptor.pb.h"
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 // Utilities that assist in writing tests for generator annotations.
 // See java/internal/annotation_unittest.cc for an example.
@@ -58,7 +37,7 @@ struct ExpectedOutput {
 
 // Creates a file with name `filename` and content `data` in temp test
 // directory.
-void AddFile(const std::string& filename, const std::string& data);
+void AddFile(absl::string_view filename, absl::string_view data);
 
 // Runs proto compiler. Captures proto file structure in FileDescriptorProto.
 // Files will be generated in TestTempDir() folder. Callers of this
@@ -78,7 +57,7 @@ bool RunProtoCompiler(const std::string& filename,
 bool DecodeMetadata(const std::string& path, GeneratedCodeInfo* info);
 
 // Finds all of the Annotations for a given source file and path.
-// See Location.path in https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/descriptor.proto for
+// See Location.path in https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/descriptor.proto for
 // explanation of what path vector is.
 void FindAnnotationsOnPath(
     const GeneratedCodeInfo& info, const std::string& source_file,
@@ -88,24 +67,32 @@ void FindAnnotationsOnPath(
 // Finds the Annotation for a given source file and path (or returns null if it
 // couldn't). If there are several annotations for given path, returns the first
 // one. See Location.path in
-// https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/descriptor.proto for explanation of what path
+// https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/descriptor.proto for explanation of what path
 // vector is.
 const GeneratedCodeInfo::Annotation* FindAnnotationOnPath(
     const GeneratedCodeInfo& info, const std::string& source_file,
     const std::vector<int>& path);
 
 // Returns true if at least one of the provided annotations covers a given
-// substring in file_content.
+// substring with the given semantic in file_content.
 bool AtLeastOneAnnotationMatchesSubstring(
     const std::string& file_content,
     const std::vector<const GeneratedCodeInfo::Annotation*>& annotations,
-    const std::string& expected_text);
+    const std::string& expected_text,
+    absl::optional<GeneratedCodeInfo::Annotation::Semantic> expected_semantic =
+        absl::nullopt);
 
 // Returns true if the provided annotation covers a given substring in
 // file_content.
 bool AnnotationMatchesSubstring(const std::string& file_content,
                                 const GeneratedCodeInfo::Annotation* annotation,
                                 const std::string& expected_text);
+
+// Returns the text spanned by the annotation if the span is valid; otherwise
+// returns nullopt.
+absl::optional<absl::string_view> GetAnnotationSubstring(
+    absl::string_view file_content,
+    const GeneratedCodeInfo::Annotation& annotation);
 
 }  // namespace annotation_test_util
 }  // namespace compiler

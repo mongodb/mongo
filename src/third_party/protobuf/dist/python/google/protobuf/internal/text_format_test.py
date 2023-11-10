@@ -1,33 +1,10 @@
 # -*- coding: utf-8 -*-
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# https://developers.google.com/protocol-buffers/
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-#     * Redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above
-# copyright notice, this list of conditions and the following disclaimer
-# in the documentation and/or other materials provided with the
-# distribution.
-#     * Neither the name of Google Inc. nor the names of its
-# contributors may be used to endorse or promote products derived from
-# this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
 
 """Test for google.protobuf.text_format."""
 
@@ -40,20 +17,22 @@ import textwrap
 import unittest
 
 from google.protobuf import any_pb2
-from google.protobuf import any_test_pb2
-from google.protobuf import map_unittest_pb2
-from google.protobuf import unittest_custom_options_pb2
-from google.protobuf import unittest_mset_pb2
-from google.protobuf import unittest_pb2
-from google.protobuf import unittest_proto3_arena_pb2
+from google.protobuf import struct_pb2
 from google.protobuf import descriptor_pb2
 from google.protobuf.internal import any_test_pb2 as test_extend_any
+from google.protobuf.internal import api_implementation
 from google.protobuf.internal import message_set_extensions_pb2
 from google.protobuf.internal import test_proto3_optional_pb2
 from google.protobuf.internal import test_util
 from google.protobuf import descriptor_pool
 from google.protobuf import text_format
 from google.protobuf.internal import _parameterized
+from google.protobuf import any_test_pb2
+from google.protobuf import map_unittest_pb2
+from google.protobuf import unittest_mset_pb2
+from google.protobuf import unittest_custom_options_pb2
+from google.protobuf import unittest_pb2
+from google.protobuf import unittest_proto3_arena_pb2
 # pylint: enable=g-import-not-at-top
 
 
@@ -74,8 +53,7 @@ class TextFormatBase(unittest.TestCase):
 
   def ReadGolden(self, golden_filename):
     with test_util.GoldenFile(golden_filename) as f:
-      return (f.readlines() if str is bytes else  # PY3
-              [golden_line.decode('utf-8') for golden_line in f])
+      return [golden_line.decode('utf-8') for golden_line in f]
 
   def CompareToGoldenFile(self, text, golden_filename):
     golden_lines = self.ReadGolden(golden_filename)
@@ -582,6 +560,10 @@ class TextFormatMessageToStringTests(TextFormatBase):
     text_format.Parse(expected_text, parsed_proto)
     self.assertEqual(message_proto, parsed_proto)
 
+  @unittest.skipIf(
+      api_implementation.Type() == 'upb',
+      "upb API doesn't support old UnknownField API. The TextFormat library "
+      "needs to convert to the new API.")
   def testPrintUnknownFieldsEmbeddedMessageInBytes(self, message_module):
     inner_msg = message_module.TestAllTypes()
     inner_msg.optional_int32 = 101
@@ -780,6 +762,12 @@ class TextFormatParserTests(TextFormatBase):
     self.assertEqual(message_module.TestAllTypes(), message)
 
   def testParseInvalidUtf8(self, message_module):
+    message = message_module.TestAllTypes()
+    text = b'invalid<\xc3\xc3>'
+    with self.assertRaises(text_format.ParseError):
+      text_format.Parse(text, message)
+
+  def testParseInvalidUtf8Value(self, message_module):
     message = message_module.TestAllTypes()
     text = 'repeated_string: "\\xc3\\xc3"'
     with self.assertRaises(text_format.ParseError) as e:
@@ -1273,7 +1261,7 @@ class OnlyWorksWithProto2RightNowTests(TextFormatBase):
                       % (letter,) for letter in string.ascii_uppercase))
     self.CompareToGoldenText(text_format.MessageToString(message), golden)
 
-  # TODO(teboring): In c/137553523, not serializing default value for map entry
+  # TODO: In c/137553523, not serializing default value for map entry
   # message has been fixed. This test needs to be disabled in order to submit
   # that cl. Add this back when c/137553523 has been submitted.
   # def testMapOrderSemantics(self):
@@ -1470,9 +1458,11 @@ class Proto2Tests(TextFormatBase):
     text = ('message_set {\n'
             '  [unknown_extension] {\n'
             '    i: 23\n'
-            '    bin: "\xe0"'
+            '    repeated_i: []\n'
+            '    bin: "\xe0"\n'
             '    [nested_unknown_ext]: {\n'
             '      i: 23\n'
+            '      repeated_i: [1, 2]\n'
             '      x: x\n'
             '      test: "test_string"\n'
             '      floaty_float: -0.315\n'
@@ -1485,6 +1475,7 @@ class Proto2Tests(TextFormatBase):
             '        i: 24\n'
             '        pointfloat: .3\n'
             '        test: "test_string"\n'
+            '        repeated_test: ["test_string1", "test_string2"]\n'
             '        floaty_float: -0.315\n'
             '        num: -inf\n'
             '        long_string: "test" "test2" \n'
@@ -1588,6 +1579,47 @@ class Proto2Tests(TextFormatBase):
     ext2 = unittest_mset_pb2.TestMessageSetExtension2.message_set_extension
     self.assertEqual(23, message.message_set.Extensions[ext1].i)
     self.assertEqual('foo', message.message_set.Extensions[ext2].str)
+
+    # Handle Any messages inside unknown extensions.
+    message = any_test_pb2.TestAny()
+    text = ('any_value {\n'
+            '  [type.googleapis.com/google.protobuf.internal.TestAny] {\n'
+            '    [unknown_extension] {\n'
+            '      str: "string"\n'
+            '      any_value {\n'
+            '        [type.googleapis.com/protobuf_unittest.OneString] {\n'
+            '          data: "string"\n'
+            '        }\n'
+            '      }\n'
+            '    }\n'
+            '  }\n'
+            '}\n'
+            'int32_value: 123')
+    text_format.Parse(text, message, allow_unknown_extension=True)
+    self.assertEqual(123, message.int32_value)
+
+    # Fail if invalid Any message type url inside unknown extensions.
+    message = any_test_pb2.TestAny()
+    text = ('any_value {\n'
+            '  [type.googleapis.com.invalid/google.protobuf.internal.TestAny] {\n'
+            '    [unknown_extension] {\n'
+            '      str: "string"\n'
+            '      any_value {\n'
+            '        [type.googleapis.com/protobuf_unittest.OneString] {\n'
+            '          data: "string"\n'
+            '        }\n'
+            '      }\n'
+            '    }\n'
+            '  }\n'
+            '}\n'
+            'int32_value: 123')
+    self.assertRaisesRegex(
+        text_format.ParseError,
+        '[type.googleapis.com.invalid/google.protobuf.internal.TestAny]',
+        text_format.Parse,
+        text,
+        message,
+        allow_unknown_extension=True)
 
   def testParseBadIdentifier(self):
     message = unittest_pb2.TestAllTypes()
@@ -1930,6 +1962,16 @@ class Proto3Tests(unittest.TestCase):
     with self.assertRaises(text_format.ParseError) as e:
       text_format.Merge(text, message)
     self.assertEqual(str(e.exception), '3:11 : Expected "}".')
+
+  def testParseExpandedAnyListValue(self):
+    any_msg = any_pb2.Any()
+    any_msg.Pack(struct_pb2.ListValue())
+    msg = any_test_pb2.TestAny(any_value=any_msg)
+    text = ('any_value {\n'
+            '  [type.googleapis.com/google.protobuf.ListValue] {}\n'
+            '}\n')
+    parsed_msg = text_format.Parse(text, any_test_pb2.TestAny())
+    self.assertEqual(msg, parsed_msg)
 
   def testProto3Optional(self):
     msg = test_proto3_optional_pb2.TestProto3Optional()
@@ -2422,7 +2464,6 @@ class OptionalColonMessageToStringTest(unittest.TestCase):
     output = text_format.MessageToString(
         message, use_short_repeated_primitives=True, force_colon=True)
     self.assertEqual('repeated_int32: [1]\n', output)
-
 
 if __name__ == '__main__':
   unittest.main()

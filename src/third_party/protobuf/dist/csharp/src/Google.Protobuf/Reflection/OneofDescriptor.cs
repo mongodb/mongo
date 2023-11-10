@@ -1,33 +1,10 @@
 ﻿#region Copyright notice and license
 // Protocol Buffers - Google's data interchange format
 // Copyright 2015 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 #endregion
 
 using System;
@@ -45,7 +22,6 @@ namespace Google.Protobuf.Reflection
     /// </summary>
     public sealed class OneofDescriptor : DescriptorBase
     {
-        private readonly OneofDescriptorProto proto;
         private MessageDescriptor containingType;
         private IList<FieldDescriptor> fields;
         private readonly OneofAccessor accessor;
@@ -53,7 +29,7 @@ namespace Google.Protobuf.Reflection
         internal OneofDescriptor(OneofDescriptorProto proto, FileDescriptor file, MessageDescriptor parent, int index, string clrName)
             : base(file, file.ComputeFullName(parent, proto.Name), index)
         {
-            this.proto = proto;
+            this.Proto = proto;
             containingType = parent;
             file.DescriptorPool.AddSymbol(this);
 
@@ -68,7 +44,18 @@ namespace Google.Protobuf.Reflection
         /// <summary>
         /// The brief name of the descriptor's target.
         /// </summary>
-        public override string Name { get { return proto.Name; } }
+        public override string Name => Proto.Name;
+
+        // Visible for testing
+        internal OneofDescriptorProto Proto { get; }
+
+        /// <summary>
+        /// Returns a clone of the underlying <see cref="OneofDescriptorProto"/> describing this oneof.
+        /// Note that a copy is taken every time this method is called, so clients using it frequently
+        /// (and not modifying it) may want to cache the returned value.
+        /// </summary>
+        /// <returns>A protobuf representation of this oneof descriptor.</returns>
+        public OneofDescriptorProto ToProto() => Proto.Clone();
 
         /// <summary>
         /// Gets the message type containing this oneof.
@@ -118,7 +105,7 @@ namespace Google.Protobuf.Reflection
         /// The (possibly empty) set of custom options for this oneof.
         /// </summary>
         [Obsolete("CustomOptions are obsolete. Use the GetOptions method.")]
-        public CustomOptions CustomOptions => new CustomOptions(proto.Options?._extensions?.ValuesByNumber);
+        public CustomOptions CustomOptions => new CustomOptions(Proto.Options?._extensions?.ValuesByNumber);
 
         /// <summary>
         /// The <c>OneofOptions</c>, defined in <c>descriptor.proto</c>.
@@ -126,7 +113,7 @@ namespace Google.Protobuf.Reflection
         /// Custom options can be retrieved as extensions of the returned message.
         /// NOTE: A defensive copy is created each time this property is retrieved.
         /// </summary>
-        public OneofOptions GetOptions() => proto.Options?.Clone();
+        public OneofOptions GetOptions() => Proto.Options?.Clone();
 
         /// <summary>
         /// Gets a single value oneof option for this descriptor
@@ -134,7 +121,7 @@ namespace Google.Protobuf.Reflection
         [Obsolete("GetOption is obsolete. Use the GetOptions() method.")]
         public T GetOption<T>(Extension<OneofOptions, T> extension)
         {
-            var value = proto.Options.GetExtension(extension);
+            var value = Proto.Options.GetExtension(extension);
             return value is IDeepCloneable<T> ? (value as IDeepCloneable<T>).Clone() : value;
         }
 
@@ -144,7 +131,7 @@ namespace Google.Protobuf.Reflection
         [Obsolete("GetOption is obsolete. Use the GetOptions() method.")]
         public RepeatedField<T> GetOption<T>(RepeatedExtension<OneofOptions, T> extension)
         {
-            return proto.Options.GetExtension(extension).Clone();
+            return Proto.Options.GetExtension(extension).Clone();
         }
 
         internal void CrossLink()

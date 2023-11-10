@@ -1,42 +1,19 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
 import com.google.protobuf.GeneratedMessageLite.ExtensionDescriptor;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@CheckReturnValue
 @SuppressWarnings("unchecked")
 final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
 
@@ -67,6 +44,7 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
 
   @Override
   <UT, UB> UB parseExtension(
+      Object containerMessage,
       Reader reader,
       Object extensionObject,
       ExtensionRegistryLite extensionRegistry,
@@ -178,6 +156,7 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
             reader.readEnumList(list);
             unknownFields =
                 SchemaUtil.filterUnknownEnumList(
+                    containerMessage,
                     fieldNumber,
                     list,
                     extension.descriptor.getEnumType(),
@@ -199,7 +178,7 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
         Object enumValue = extension.descriptor.getEnumType().findValueByNumber(number);
         if (enumValue == null) {
           return SchemaUtil.storeUnknownEnum(
-              fieldNumber, number, unknownFields, unknownFieldSchema);
+              containerMessage, fieldNumber, number, unknownFields, unknownFieldSchema);
         }
         // Note, we store the integer value instead of the actual enum object in FieldSet.
         // This is also different from full-runtime where we store EnumValueDescriptor.
@@ -253,12 +232,46 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
             value = reader.readString();
             break;
           case GROUP:
+            // Special case handling for non-repeated sub-messages: merge in-place rather than
+            // building up new sub-messages and merging those, which is too slow.
+            // TODO: clean this up
+            if (!extension.isRepeated()) {
+              Object oldValue = extensions.getField(extension.descriptor);
+              if (oldValue instanceof GeneratedMessageLite) {
+                Schema extSchema = Protobuf.getInstance().schemaFor(oldValue);
+                if (!((GeneratedMessageLite<?, ?>) oldValue).isMutable()) {
+                  Object newValue = extSchema.newInstance();
+                  extSchema.mergeFrom(newValue, oldValue);
+                  extensions.setField(extension.descriptor, newValue);
+                  oldValue = newValue;
+                }
+                reader.mergeGroupField(oldValue, extSchema, extensionRegistry);
+                return unknownFields;
+              }
+            }
             value =
                 reader.readGroup(
                     extension.getMessageDefaultInstance().getClass(), extensionRegistry);
             break;
 
           case MESSAGE:
+            // Special case handling for non-repeated sub-messages: merge in-place rather than
+            // building up new sub-messages and merging those, which is too slow.
+            // TODO: clean this up
+            if (!extension.isRepeated()) {
+              Object oldValue = extensions.getField(extension.descriptor);
+              if (oldValue instanceof GeneratedMessageLite) {
+                Schema extSchema = Protobuf.getInstance().schemaFor(oldValue);
+                if (!((GeneratedMessageLite<?, ?>) oldValue).isMutable()) {
+                  Object newValue = extSchema.newInstance();
+                  extSchema.mergeFrom(newValue, oldValue);
+                  extensions.setField(extension.descriptor, newValue);
+                  oldValue = newValue;
+                }
+                reader.mergeMessageField(oldValue, extSchema, extensionRegistry);
+                return unknownFields;
+              }
+            }
             value =
                 reader.readMessage(
                     extension.getMessageDefaultInstance().getClass(), extensionRegistry);
@@ -274,6 +287,7 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
         switch (extension.getLiteType()) {
           case MESSAGE:
           case GROUP:
+            // TODO: this shouldn't be reachable, clean this up
             Object oldValue = extensions.getField(extension.descriptor);
             if (oldValue != null) {
               value = Internal.mergeMessage(oldValue, value);
@@ -527,15 +541,13 @@ final class ExtensionSchemaLite extends ExtensionSchema<ExtensionDescriptor> {
       throws IOException {
     GeneratedMessageLite.GeneratedExtension<?, ?> extension =
         (GeneratedMessageLite.GeneratedExtension<?, ?>) extensionObject;
-    Object value = extension.getMessageDefaultInstance().newBuilderForType().buildPartial();
 
-    Reader reader = BinaryReader.newInstance(ByteBuffer.wrap(data.toByteArray()), true);
+    MessageLite.Builder builder = extension.getMessageDefaultInstance().newBuilderForType();
 
-    Protobuf.getInstance().mergeFrom(value, reader, extensionRegistry);
-    extensions.setField(extension.descriptor, value);
+    final CodedInputStream input = data.newCodedInput();
 
-    if (reader.getFieldNumber() != Reader.READ_DONE) {
-      throw InvalidProtocolBufferException.invalidEndTag();
-    }
+    builder.mergeFrom(input, extensionRegistry);
+    extensions.setField(extension.descriptor, builder.buildPartial());
+    input.checkLastTagWas(0);
   }
 }

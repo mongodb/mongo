@@ -1,35 +1,13 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
+import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -323,6 +301,34 @@ class MessageReflection {
         Message defaultInstance)
         throws IOException;
 
+    /**
+     * Read the given group field from the wire, merging with the existing field if it is already
+     * present.
+     *
+     * <p>For extensions, defaultInstance must be specified. For regular fields, defaultInstance can
+     * be null.
+     */
+    void mergeGroup(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException;
+
+    /**
+     * Read the given message field from the wire, merging with the existing field if it is already
+     * present.
+     *
+     * <p>For extensions, defaultInstance must be specified. For regular fields, defaultInstance can
+     * be null.
+     */
+    void mergeMessage(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException;
+
     /** Returns the UTF8 validation level for the field. */
     WireFormat.Utf8Validation getUtf8Validation(Descriptors.FieldDescriptor descriptor);
 
@@ -349,6 +355,7 @@ class MessageReflection {
   static class BuilderAdapter implements MergeTarget {
 
     private final Message.Builder builder;
+    private boolean hasNestedBuilders = true;
 
     @Override
     public Descriptors.Descriptor getDescriptorForType() {
@@ -364,6 +371,17 @@ class MessageReflection {
       return builder.getField(field);
     }
 
+    private Message.Builder getFieldBuilder(Descriptors.FieldDescriptor field) {
+      if (hasNestedBuilders) {
+        try {
+          return builder.getFieldBuilder(field);
+        } catch (UnsupportedOperationException e) {
+          hasNestedBuilders = false;
+        }
+      }
+      return null;
+    }
+
     @Override
     public boolean hasField(Descriptors.FieldDescriptor field) {
       return builder.hasField(field);
@@ -371,6 +389,12 @@ class MessageReflection {
 
     @Override
     public MergeTarget setField(Descriptors.FieldDescriptor field, Object value) {
+      if (!field.isRepeated() && value instanceof MessageLite.Builder) {
+        if (value != getFieldBuilder(field)) {
+          builder.setField(field, ((MessageLite.Builder) value).buildPartial());
+        }
+        return this;
+      }
       builder.setField(field, value);
       return this;
     }
@@ -384,12 +408,18 @@ class MessageReflection {
     @Override
     public MergeTarget setRepeatedField(
         Descriptors.FieldDescriptor field, int index, Object value) {
+      if (value instanceof MessageLite.Builder) {
+        value = ((MessageLite.Builder) value).buildPartial();
+      }
       builder.setRepeatedField(field, index, value);
       return this;
     }
 
     @Override
     public MergeTarget addRepeatedField(Descriptors.FieldDescriptor field, Object value) {
+      if (value instanceof MessageLite.Builder) {
+        value = ((MessageLite.Builder) value).buildPartial();
+      }
       builder.addRepeatedField(field, value);
       return this;
     }
@@ -500,14 +530,87 @@ class MessageReflection {
     }
 
     @Override
+    public void mergeGroup(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      if (!field.isRepeated()) {
+        Message.Builder subBuilder;
+        if (hasField(field)) {
+          subBuilder = getFieldBuilder(field);
+          if (subBuilder != null) {
+            input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+            return;
+          } else {
+            subBuilder = newMessageFieldInstance(field, defaultInstance);
+            subBuilder.mergeFrom((Message) getField(field));
+          }
+        } else {
+          subBuilder = newMessageFieldInstance(field, defaultInstance);
+        }
+        input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+        Object unused = setField(field, subBuilder.buildPartial());
+      } else {
+        Message.Builder subBuilder = newMessageFieldInstance(field, defaultInstance);
+        input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+        Object unused = addRepeatedField(field, subBuilder.buildPartial());
+      }
+    }
+
+    @Override
+    public void mergeMessage(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        Descriptors.FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      if (!field.isRepeated()) {
+        Message.Builder subBuilder;
+        if (hasField(field)) {
+          subBuilder = getFieldBuilder(field);
+          if (subBuilder != null) {
+            input.readMessage(subBuilder, extensionRegistry);
+            return;
+          } else {
+            subBuilder = newMessageFieldInstance(field, defaultInstance);
+            subBuilder.mergeFrom((Message) getField(field));
+          }
+        } else {
+          subBuilder = newMessageFieldInstance(field, defaultInstance);
+        }
+        input.readMessage(subBuilder, extensionRegistry);
+        Object unused = setField(field, subBuilder.buildPartial());
+      } else {
+        Message.Builder subBuilder = newMessageFieldInstance(field, defaultInstance);
+        input.readMessage(subBuilder, extensionRegistry);
+        Object unused = addRepeatedField(field, subBuilder.buildPartial());
+      }
+    }
+
+    private Message.Builder newMessageFieldInstance(
+        FieldDescriptor field, Message defaultInstance) {
+      // When default instance is not null. The field is an extension field.
+      if (defaultInstance != null) {
+        return defaultInstance.newBuilderForType();
+      } else {
+        return builder.newBuilderForField(field);
+      }
+    }
+
+    @Override
     public MergeTarget newMergeTargetForField(
         Descriptors.FieldDescriptor field, Message defaultInstance) {
       Message.Builder subBuilder;
-      if (defaultInstance != null) {
-        subBuilder = defaultInstance.newBuilderForType();
-      } else {
-        subBuilder = builder.newBuilderForField(field);
+      if (!field.isRepeated() && hasField(field)) {
+        subBuilder = getFieldBuilder(field);
+        if (subBuilder != null) {
+          return new BuilderAdapter(subBuilder);
+        }
       }
+
+      subBuilder = newMessageFieldInstance(field, defaultInstance);
       if (!field.isRepeated()) {
         Message originalMessage = (Message) getField(field);
         if (originalMessage != null) {
@@ -534,7 +637,7 @@ class MessageReflection {
       if (descriptor.needsUtf8Check()) {
         return WireFormat.Utf8Validation.STRICT;
       }
-      // TODO(liujisi): support lazy strings for repeated fields.
+      // TODO: support lazy strings for repeated fields.
       if (!descriptor.isRepeated() && builder instanceof GeneratedMessage.Builder) {
         return WireFormat.Utf8Validation.LAZY;
       }
@@ -543,10 +646,9 @@ class MessageReflection {
 
     @Override
     public Object finish() {
-      return builder.buildPartial();
+      return builder;
     }
   }
-
 
   static class ExtensionAdapter implements MergeTarget {
 
@@ -666,6 +768,54 @@ class MessageReflection {
     }
 
     @Override
+    public void mergeGroup(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      if (!field.isRepeated()) {
+        if (hasField(field)) {
+          MessageLite.Builder current = ((MessageLite) getField(field)).toBuilder();
+          input.readGroup(field.getNumber(), current, extensionRegistry);
+          Object unused = setField(field, current.buildPartial());
+          return;
+        }
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+        Object unused = setField(field, subBuilder.buildPartial());
+      } else {
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+        Object unused = addRepeatedField(field, subBuilder.buildPartial());
+      }
+    }
+
+    @Override
+    public void mergeMessage(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      if (!field.isRepeated()) {
+        if (hasField(field)) {
+          MessageLite.Builder current = ((MessageLite) getField(field)).toBuilder();
+          input.readMessage(current, extensionRegistry);
+          Object unused = setField(field, current.buildPartial());
+          return;
+        }
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readMessage(subBuilder, extensionRegistry);
+        Object unused = setField(field, subBuilder.buildPartial());
+      } else {
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readMessage(subBuilder, extensionRegistry);
+        Object unused = addRepeatedField(field, subBuilder.buildPartial());
+      }
+    }
+
+    @Override
     public Object parseMessageFromBytes(
         ByteString bytes,
         ExtensionRegistryLite registry,
@@ -700,7 +850,234 @@ class MessageReflection {
       if (descriptor.needsUtf8Check()) {
         return WireFormat.Utf8Validation.STRICT;
       }
-      // TODO(liujisi): support lazy strings for ExtesnsionSet.
+      // TODO: support lazy strings for ExtesnsionSet.
+      return WireFormat.Utf8Validation.LOOSE;
+    }
+
+    @Override
+    public Object finish() {
+      throw new UnsupportedOperationException("finish() called on FieldSet object");
+    }
+  }
+
+  static class ExtensionBuilderAdapter implements MergeTarget {
+
+    private final FieldSet.Builder<Descriptors.FieldDescriptor> extensions;
+
+    ExtensionBuilderAdapter(FieldSet.Builder<Descriptors.FieldDescriptor> extensions) {
+      this.extensions = extensions;
+    }
+
+    @Override
+    public Descriptors.Descriptor getDescriptorForType() {
+      throw new UnsupportedOperationException("getDescriptorForType() called on FieldSet object");
+    }
+
+    @Override
+    public Object getField(Descriptors.FieldDescriptor field) {
+      return extensions.getField(field);
+    }
+
+    @Override
+    public boolean hasField(Descriptors.FieldDescriptor field) {
+      return extensions.hasField(field);
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public MergeTarget setField(Descriptors.FieldDescriptor field, Object value) {
+      extensions.setField(field, value);
+      return this;
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public MergeTarget clearField(Descriptors.FieldDescriptor field) {
+      extensions.clearField(field);
+      return this;
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public MergeTarget setRepeatedField(
+        Descriptors.FieldDescriptor field, int index, Object value) {
+      extensions.setRepeatedField(field, index, value);
+      return this;
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public MergeTarget addRepeatedField(Descriptors.FieldDescriptor field, Object value) {
+      extensions.addRepeatedField(field, value);
+      return this;
+    }
+
+    @Override
+    public boolean hasOneof(Descriptors.OneofDescriptor oneof) {
+      return false;
+    }
+
+    @Override
+    @CanIgnoreReturnValue
+    public MergeTarget clearOneof(Descriptors.OneofDescriptor oneof) {
+      // Nothing to clear.
+      return this;
+    }
+
+    @Override
+    public Descriptors.FieldDescriptor getOneofFieldDescriptor(Descriptors.OneofDescriptor oneof) {
+      return null;
+    }
+
+    @Override
+    public ContainerType getContainerType() {
+      return ContainerType.EXTENSION_SET;
+    }
+
+    @Override
+    public ExtensionRegistry.ExtensionInfo findExtensionByName(
+        ExtensionRegistry registry, String name) {
+      return registry.findImmutableExtensionByName(name);
+    }
+
+    @Override
+    public ExtensionRegistry.ExtensionInfo findExtensionByNumber(
+        ExtensionRegistry registry, Descriptors.Descriptor containingType, int fieldNumber) {
+      return registry.findImmutableExtensionByNumber(containingType, fieldNumber);
+    }
+
+    @Override
+    public Object parseGroup(
+        CodedInputStream input,
+        ExtensionRegistryLite registry,
+        Descriptors.FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      Message.Builder subBuilder = defaultInstance.newBuilderForType();
+      if (!field.isRepeated()) {
+        Message originalMessage = (Message) getField(field);
+        if (originalMessage != null) {
+          subBuilder.mergeFrom(originalMessage);
+        }
+      }
+      input.readGroup(field.getNumber(), subBuilder, registry);
+      return subBuilder.buildPartial();
+    }
+
+    @Override
+    public Object parseMessage(
+        CodedInputStream input,
+        ExtensionRegistryLite registry,
+        Descriptors.FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      Message.Builder subBuilder = defaultInstance.newBuilderForType();
+      if (!field.isRepeated()) {
+        Message originalMessage = (Message) getField(field);
+        if (originalMessage != null) {
+          subBuilder.mergeFrom(originalMessage);
+        }
+      }
+      input.readMessage(subBuilder, registry);
+      return subBuilder.buildPartial();
+    }
+
+    @Override
+    public void mergeGroup(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      if (!field.isRepeated()) {
+        if (hasField(field)) {
+          Object fieldOrBuilder = extensions.getFieldAllowBuilders(field);
+          MessageLite.Builder subBuilder;
+          if (fieldOrBuilder instanceof MessageLite.Builder) {
+            subBuilder = (MessageLite.Builder) fieldOrBuilder;
+          } else {
+            subBuilder = ((MessageLite) fieldOrBuilder).toBuilder();
+            extensions.setField(field, subBuilder);
+          }
+          input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+          return;
+        }
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+        Object unused = setField(field, subBuilder);
+      } else {
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readGroup(field.getNumber(), subBuilder, extensionRegistry);
+        Object unused = addRepeatedField(field, subBuilder.buildPartial());
+      }
+    }
+
+    @Override
+    public void mergeMessage(
+        CodedInputStream input,
+        ExtensionRegistryLite extensionRegistry,
+        FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      if (!field.isRepeated()) {
+        if (hasField(field)) {
+          Object fieldOrBuilder = extensions.getFieldAllowBuilders(field);
+          MessageLite.Builder subBuilder;
+          if (fieldOrBuilder instanceof MessageLite.Builder) {
+            subBuilder = (MessageLite.Builder) fieldOrBuilder;
+          } else {
+            subBuilder = ((MessageLite) fieldOrBuilder).toBuilder();
+            extensions.setField(field, subBuilder);
+          }
+          input.readMessage(subBuilder, extensionRegistry);
+          return;
+        }
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readMessage(subBuilder, extensionRegistry);
+        Object unused = setField(field, subBuilder);
+      } else {
+        Message.Builder subBuilder = defaultInstance.newBuilderForType();
+        input.readMessage(subBuilder, extensionRegistry);
+        Object unused = addRepeatedField(field, subBuilder.buildPartial());
+      }
+    }
+
+    @Override
+    public Object parseMessageFromBytes(
+        ByteString bytes,
+        ExtensionRegistryLite registry,
+        Descriptors.FieldDescriptor field,
+        Message defaultInstance)
+        throws IOException {
+      Message.Builder subBuilder = defaultInstance.newBuilderForType();
+      if (!field.isRepeated()) {
+        Message originalMessage = (Message) getField(field);
+        if (originalMessage != null) {
+          subBuilder.mergeFrom(originalMessage);
+        }
+      }
+      subBuilder.mergeFrom(bytes, registry);
+      return subBuilder.buildPartial();
+    }
+
+    @Override
+    public MergeTarget newMergeTargetForField(
+        Descriptors.FieldDescriptor descriptor, Message defaultInstance) {
+      throw new UnsupportedOperationException("newMergeTargetForField() called on FieldSet object");
+    }
+
+    @Override
+    public MergeTarget newEmptyTargetForField(
+        Descriptors.FieldDescriptor descriptor, Message defaultInstance) {
+      throw new UnsupportedOperationException("newEmptyTargetForField() called on FieldSet object");
+    }
+
+    @Override
+    public WireFormat.Utf8Validation getUtf8Validation(Descriptors.FieldDescriptor descriptor) {
+      if (descriptor.needsUtf8Check()) {
+        return WireFormat.Utf8Validation.STRICT;
+      }
+      // TODO: support lazy strings for ExtesnsionSet.
       return WireFormat.Utf8Validation.LOOSE;
     }
 
@@ -799,10 +1176,7 @@ class MessageReflection {
       if (field.getLiteType() == WireFormat.FieldType.ENUM) {
         while (input.getBytesUntilLimit() > 0) {
           final int rawValue = input.readEnum();
-          if (field.getFile().supportsUnknownEnumValue()) {
-            target.addRepeatedField(
-                field, field.getEnumType().findValueByNumberCreatingIfUnknown(rawValue));
-          } else {
+          if (field.legacyEnumFieldTreatedAsClosed()) {
             final Object value = field.getEnumType().findValueByNumber(rawValue);
             // If the number isn't recognized as a valid value for this enum,
             // add it to the unknown fields.
@@ -813,6 +1187,9 @@ class MessageReflection {
             } else {
               target.addRepeatedField(field, value);
             }
+          } else {
+            target.addRepeatedField(
+                field, field.getEnumType().findValueByNumberCreatingIfUnknown(rawValue));
           }
         }
       } else {
@@ -829,19 +1206,17 @@ class MessageReflection {
       switch (field.getType()) {
         case GROUP:
           {
-            value = target.parseGroup(input, extensionRegistry, field, defaultInstance);
-            break;
+            target.mergeGroup(input, extensionRegistry, field, defaultInstance);
+            return true;
           }
         case MESSAGE:
           {
-            value = target.parseMessage(input, extensionRegistry, field, defaultInstance);
-            break;
+            target.mergeMessage(input, extensionRegistry, field, defaultInstance);
+            return true;
           }
         case ENUM:
           final int rawValue = input.readEnum();
-          if (field.getFile().supportsUnknownEnumValue()) {
-            value = field.getEnumType().findValueByNumberCreatingIfUnknown(rawValue);
-          } else {
+          if (field.legacyEnumFieldTreatedAsClosed()) {
             value = field.getEnumType().findValueByNumber(rawValue);
             // If the number isn't recognized as a valid value for this enum,
             // add it to the unknown fields.
@@ -851,6 +1226,8 @@ class MessageReflection {
               }
               return true;
             }
+          } else {
+            value = field.getEnumType().findValueByNumberCreatingIfUnknown(rawValue);
           }
           break;
         default:
@@ -870,6 +1247,29 @@ class MessageReflection {
     return true;
   }
 
+  /** Read a message from the given input stream into the provided target and UnknownFieldSet. */
+  static void mergeMessageFrom(
+      Message.Builder target,
+      UnknownFieldSet.Builder unknownFields,
+      CodedInputStream input,
+      ExtensionRegistryLite extensionRegistry)
+      throws IOException {
+    BuilderAdapter builderAdapter = new BuilderAdapter(target);
+    Descriptor descriptorForType = target.getDescriptorForType();
+    while (true) {
+      final int tag = input.readTag();
+      if (tag == 0) {
+        break;
+      }
+
+      if (!mergeFieldFrom(
+          input, unknownFields, extensionRegistry, descriptorForType, builderAdapter, tag)) {
+        // end group tag
+        break;
+      }
+    }
+  }
+
   /** Called by {@code #mergeFieldFrom()} to parse a MessageSet extension into MergeTarget. */
   private static void mergeMessageSetExtensionFromCodedStream(
       CodedInputStream input,
@@ -882,7 +1282,7 @@ class MessageReflection {
     // The wire format for MessageSet is:
     //   message MessageSet {
     //     repeated group Item = 1 {
-    //       required int32 typeId = 2;
+    //       required uint32 typeId = 2;
     //       required bytes message = 3;
     //     }
     //   }

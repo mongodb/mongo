@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2015 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
@@ -34,7 +11,10 @@
 #import "GPBDictionary.h"
 
 #import "GPBTestUtilities.h"
-#import "google/protobuf/UnittestRuntimeProto2.pbobjc.h"
+#import "objectivec/Tests/UnittestRuntimeProto2.pbobjc.h"
+
+// Disable clang-format for the macros.
+// clang-format off
 
 // Pull in the macros (using an external file because expanding all tests
 // in a single file makes a file that is failing to work with within Xcode.
@@ -42,7 +22,6 @@
 
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(UInt32, uint32_t, 100U, 101U)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> UInt32
 
@@ -56,8 +35,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getUInt32:NULL forKey:YES]);
-  [dict enumerateKeysAndUInt32sUsingBlock:^(BOOL aKey, uint32_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndUInt32sUsingBlock:^(__unused BOOL aKey, __unused uint32_t aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -123,8 +101,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndUInt32sUsingBlock:^(BOOL aKey, uint32_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndUInt32sUsingBlock:^(__unused BOOL aKey, __unused uint32_t aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -346,10 +323,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(Int32, int32_t, 200, 201)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> Int32
 
@@ -363,8 +338,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getInt32:NULL forKey:YES]);
-  [dict enumerateKeysAndInt32sUsingBlock:^(BOOL aKey, int32_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndInt32sUsingBlock:^(__unused BOOL aKey, __unused int32_t aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -430,8 +404,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndInt32sUsingBlock:^(BOOL aKey, int32_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndInt32sUsingBlock:^(__unused BOOL aKey, __unused int32_t aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -653,10 +626,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(UInt64, uint64_t, 300U, 301U)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> UInt64
 
@@ -670,8 +641,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getUInt64:NULL forKey:YES]);
-  [dict enumerateKeysAndUInt64sUsingBlock:^(BOOL aKey, uint64_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndUInt64sUsingBlock:^(__unused BOOL aKey, __unused uint64_t aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -737,8 +707,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndUInt64sUsingBlock:^(BOOL aKey, uint64_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndUInt64sUsingBlock:^(__unused BOOL aKey, __unused uint64_t aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -960,10 +929,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(Int64, int64_t, 400, 401)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> Int64
 
@@ -977,8 +944,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getInt64:NULL forKey:YES]);
-  [dict enumerateKeysAndInt64sUsingBlock:^(BOOL aKey, int64_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndInt64sUsingBlock:^(__unused BOOL aKey, __unused int64_t aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -1044,8 +1010,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndInt64sUsingBlock:^(BOOL aKey, int64_t aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndInt64sUsingBlock:^(__unused BOOL aKey, __unused int64_t aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -1267,10 +1232,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(Bool, BOOL, NO, YES)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> Bool
 
@@ -1284,8 +1247,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getBool:NULL forKey:YES]);
-  [dict enumerateKeysAndBoolsUsingBlock:^(BOOL aKey, BOOL aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndBoolsUsingBlock:^(__unused BOOL aKey, __unused BOOL aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -1351,8 +1313,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndBoolsUsingBlock:^(BOOL aKey, BOOL aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndBoolsUsingBlock:^(__unused BOOL aKey, __unused BOOL aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -1574,10 +1535,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(Float, float, 500.f, 501.f)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> Float
 
@@ -1591,8 +1550,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getFloat:NULL forKey:YES]);
-  [dict enumerateKeysAndFloatsUsingBlock:^(BOOL aKey, float aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndFloatsUsingBlock:^(__unused BOOL aKey, __unused float aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -1658,8 +1616,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndFloatsUsingBlock:^(BOOL aKey, float aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndFloatsUsingBlock:^(__unused BOOL aKey, __unused float aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -1881,10 +1838,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND BOOL_TESTS_FOR_POD_VALUE(Double, double, 600., 601.)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> Double
 
@@ -1898,8 +1853,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertFalse([dict getDouble:NULL forKey:YES]);
-  [dict enumerateKeysAndDoublesUsingBlock:^(BOOL aKey, double aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue, stop)
+  [dict enumerateKeysAndDoublesUsingBlock:^(__unused BOOL aKey, __unused double aValue, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -1965,8 +1919,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndDoublesUsingBlock:^(BOOL aKey, double aValue, BOOL *stop) {
-    #pragma unused(aKey, aValue)
+  [dict enumerateKeysAndDoublesUsingBlock:^(__unused BOOL aKey, __unused double aValue, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -2188,10 +2141,8 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND TESTS_FOR_BOOL_KEY_OBJECT_VALUE(Object, NSString*, @"abc", @"def")
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Bool -> Object
 
@@ -2205,8 +2156,7 @@
   XCTAssertNotNil(dict);
   XCTAssertEqual(dict.count, 0U);
   XCTAssertNil([dict objectForKey:YES]);
-  [dict enumerateKeysAndObjectsUsingBlock:^(BOOL aKey, NSString* aObject, BOOL *stop) {
-    #pragma unused(aKey, aObject, stop)
+  [dict enumerateKeysAndObjectsUsingBlock:^(__unused BOOL aKey, __unused NSString* aObject, __unused BOOL *stop) {
     XCTFail(@"Shouldn't get here!");
   }];
   [dict release];
@@ -2264,8 +2214,7 @@
 
   // Stopping the enumeration.
   idx = 0;
-  [dict enumerateKeysAndObjectsUsingBlock:^(BOOL aKey, NSString* aObject, BOOL *stop) {
-    #pragma unused(aKey, aObject)
+  [dict enumerateKeysAndObjectsUsingBlock:^(__unused BOOL aKey, __unused NSString* aObject, BOOL *stop) {
     if (idx == 0) *stop = YES;
     XCTAssertNotEqual(idx, 2U);
     ++idx;
@@ -2460,7 +2409,6 @@
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND-END (8 expansions)
 
 

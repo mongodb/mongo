@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Author: kenton@google.com (Kenton Varda)
 //  Based on original Protocol Buffers design by
@@ -35,34 +12,41 @@
 // This test is testing a lot more than just the UnknownFieldSet class.  It
 // tests handling of unknown fields throughout the system.
 
-#include <google/protobuf/unknown_field_set.h>
+#include "google/protobuf/unknown_field_set.h"
 
-#include <unordered_set>
+#include <string>
+#include <vector>
 
-#include <google/protobuf/stubs/callback.h>
-#include <google/protobuf/stubs/common.h>
-#include <google/protobuf/stubs/logging.h>
-#include <google/protobuf/test_util.h>
-#include <google/protobuf/unittest.pb.h>
-#include <google/protobuf/unittest_lite.pb.h>
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/stubs/mutex.h>
-#include <google/protobuf/wire_format.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/stubs/callback.h"
+#include "google/protobuf/stubs/common.h"
+#include <gmock/gmock.h>
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
-#include <google/protobuf/stubs/time.h>
-#include <google/protobuf/stubs/stl_util.h>
+#include "absl/container/flat_hash_set.h"
+#include "absl/functional/bind_front.h"
+#include "absl/strings/cord.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/test_util.h"
+#include "google/protobuf/text_format.h"
+#include "google/protobuf/unittest.pb.h"
+#include "google/protobuf/unittest_lite.pb.h"
+#include "google/protobuf/wire_format.h"
+
 
 namespace google {
 namespace protobuf {
 
 using internal::WireFormat;
+using ::testing::ElementsAre;
 
 class UnknownFieldSetTest : public testing::Test {
  protected:
-  virtual void SetUp() {
+  void SetUp() override {
     descriptor_ = unittest::TestAllTypes::descriptor();
     TestUtil::SetAllFields(&all_fields_);
     all_fields_.SerializeToString(&all_fields_data_);
@@ -130,12 +114,12 @@ TEST_F(UnknownFieldSetTest, AllFieldsPresent) {
     }
   }
 
-  std::unordered_set<uint32> unknown_tags;
+  absl::flat_hash_set<uint32_t> unknown_tags;
   for (int i = 0; i < unknown_fields_->field_count(); i++) {
     unknown_tags.insert(unknown_fields_->field(i).number());
   }
 
-  for (uint32 t : unknown_tags) {
+  for (uint32_t t : unknown_tags) {
     EXPECT_NE(descriptor_->FindFieldByNumber(t), nullptr);
   }
 
@@ -200,14 +184,13 @@ TEST_F(UnknownFieldSetTest, SerializeFastAndSlowAreEquivalent) {
   slow_buffer.resize(size);
   fast_buffer.resize(size);
 
-  uint8* target = reinterpret_cast<uint8*>(::google::protobuf::string_as_array(&fast_buffer));
-  uint8* result = WireFormat::SerializeUnknownFieldsToArray(
+  uint8_t* target = reinterpret_cast<uint8_t*>(&fast_buffer[0]);
+  uint8_t* result = WireFormat::SerializeUnknownFieldsToArray(
       empty_message_.unknown_fields(), target);
   EXPECT_EQ(size, result - target);
 
   {
-    io::ArrayOutputStream raw_stream(::google::protobuf::string_as_array(&slow_buffer), size,
-                                     1);
+    io::ArrayOutputStream raw_stream(&slow_buffer[0], size, 1);
     io::CodedOutputStream output_stream(&raw_stream);
     WireFormat::SerializeUnknownFields(empty_message_.unknown_fields(),
                                        &output_stream);
@@ -302,6 +285,8 @@ TEST_F(UnknownFieldSetTest, MergeFrom) {
 
   destination.MergeFrom(source);
 
+  std::string destination_text;
+  TextFormat::PrintToString(destination, &destination_text);
   EXPECT_EQ(
       // Note:  The ordering of fields here depends on the ordering of adds
       //   and merging, above.
@@ -309,7 +294,7 @@ TEST_F(UnknownFieldSetTest, MergeFrom) {
       "3: 2\n"
       "2: 3\n"
       "3: 4\n",
-      destination.DebugString());
+      destination_text);
 }
 
 TEST_F(UnknownFieldSetTest, MergeFromMessage) {
@@ -322,6 +307,8 @@ TEST_F(UnknownFieldSetTest, MergeFromMessage) {
 
   destination.mutable_unknown_fields()->MergeFromMessage(source);
 
+  std::string destination_text;
+  TextFormat::PrintToString(destination, &destination_text);
   EXPECT_EQ(
       // Note:  The ordering of fields here depends on the ordering of adds
       //   and merging, above.
@@ -329,7 +316,7 @@ TEST_F(UnknownFieldSetTest, MergeFromMessage) {
       "3: 2\n"
       "2: 3\n"
       "3: 4\n",
-      destination.DebugString());
+      destination_text);
 }
 
 TEST_F(UnknownFieldSetTest, MergeFromMessageLite) {
@@ -531,38 +518,61 @@ TEST_F(UnknownFieldSetTest, UnknownEnumValue) {
 TEST_F(UnknownFieldSetTest, SpaceUsedExcludingSelf) {
   UnknownFieldSet empty;
   empty.AddVarint(1, 0);
-  EXPECT_EQ(sizeof(std::vector<UnknownField>) + sizeof(UnknownField),
-            empty.SpaceUsedExcludingSelf());
+  EXPECT_EQ(sizeof(UnknownField), empty.SpaceUsedExcludingSelf());
 }
 
 TEST_F(UnknownFieldSetTest, SpaceUsed) {
+  // Keep shadow vectors to avoid making assumptions about its capacity growth.
+  // We imitate the push back calls here to determine the expected capacity.
+  std::vector<UnknownField> shadow_vector, shadow_vector_group;
   unittest::TestEmptyMessage empty_message;
 
   // Make sure an unknown field set has zero space used until a field is
   // actually added.
-  size_t base_size = empty_message.SpaceUsedLong();
+  const size_t base = empty_message.SpaceUsedLong();
+  std::string* str = nullptr;
+  UnknownFieldSet* group = nullptr;
+  const auto total = [&] {
+    size_t result = base;
+    result += shadow_vector.capacity() * sizeof(UnknownField);
+    result += shadow_vector_group.capacity() * sizeof(UnknownField);
+    if (str != nullptr) {
+      result += sizeof(std::string);
+      static const size_t sso_capacity = std::string().capacity();
+      if (str->capacity() > sso_capacity) result += str->capacity();
+    }
+    if (group != nullptr) {
+      result += sizeof(UnknownFieldSet);
+    }
+    return result;
+  };
+
   UnknownFieldSet* unknown_fields = empty_message.mutable_unknown_fields();
-  EXPECT_EQ(base_size, empty_message.SpaceUsedLong());
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong());
 
   // Make sure each thing we add to the set increases the SpaceUsedLong().
   unknown_fields->AddVarint(1, 0);
-  EXPECT_LT(base_size, empty_message.SpaceUsedLong());
-  base_size = empty_message.SpaceUsedLong();
+  shadow_vector.emplace_back();
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong()) << "Var";
 
-  std::string* str = unknown_fields->AddLengthDelimited(1);
-  EXPECT_LT(base_size, empty_message.SpaceUsedLong());
-  base_size = empty_message.SpaceUsedLong();
+  str = unknown_fields->AddLengthDelimited(1);
+  shadow_vector.emplace_back();
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong()) << "Str";
 
   str->assign(sizeof(std::string) + 1, 'x');
-  EXPECT_LT(base_size, empty_message.SpaceUsedLong());
-  base_size = empty_message.SpaceUsedLong();
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong()) << "Str2";
 
-  UnknownFieldSet* group = unknown_fields->AddGroup(1);
-  EXPECT_LT(base_size, empty_message.SpaceUsedLong());
-  base_size = empty_message.SpaceUsedLong();
+  group = unknown_fields->AddGroup(1);
+  shadow_vector.emplace_back();
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong()) << "Group";
 
   group->AddVarint(1, 0);
-  EXPECT_LT(base_size, empty_message.SpaceUsedLong());
+  shadow_vector_group.emplace_back();
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong()) << "Group2";
+
+  unknown_fields->AddVarint(1, 0);
+  shadow_vector.emplace_back();
+  EXPECT_EQ(total(), empty_message.SpaceUsedLong()) << "Var2";
 }
 
 
@@ -616,7 +626,7 @@ void CheckDeleteByNumber(const std::vector<int>& field_numbers,
   }
 }
 
-#define MAKE_VECTOR(x) std::vector<int>(x, x + GOOGLE_ARRAYSIZE(x))
+#define MAKE_VECTOR(x) std::vector<int>(x, x + ABSL_ARRAYSIZE(x))
 TEST_F(UnknownFieldSetTest, DeleteByNumber) {
   CheckDeleteByNumber(std::vector<int>(), 1, std::vector<int>());
   static const int kTestFieldNumbers1[] = {1, 2, 3};
@@ -646,6 +656,81 @@ TEST_F(UnknownFieldSetTest, DeleteByNumber) {
                       MAKE_VECTOR(kExpectedFieldNumbers5));
 }
 #undef MAKE_VECTOR
+
+TEST_F(UnknownFieldSetTest, SerializeToString) {
+  UnknownFieldSet field_set;
+  field_set.AddVarint(3, 3);
+  field_set.AddVarint(4, 4);
+  field_set.AddVarint(1, -1);
+  field_set.AddVarint(2, -2);
+  field_set.AddLengthDelimited(44, "str");
+  field_set.AddLengthDelimited(44, "byv");
+  field_set.AddFixed32(7, 7);
+  field_set.AddFixed64(8, 8);
+
+  UnknownFieldSet* group_field_set = field_set.AddGroup(46);
+  group_field_set->AddVarint(47, 1024);
+  group_field_set = field_set.AddGroup(46);
+  group_field_set->AddVarint(47, 2048);
+
+  unittest::TestAllTypes message;
+  std::string serialized_message;
+  ASSERT_TRUE(field_set.SerializeToString(&serialized_message));
+  ASSERT_TRUE(message.ParseFromString(serialized_message));
+
+  EXPECT_EQ(message.optional_int32(), -1);
+  EXPECT_EQ(message.optional_int64(), -2);
+  EXPECT_EQ(message.optional_uint32(), 3);
+  EXPECT_EQ(message.optional_uint64(), 4);
+  EXPECT_EQ(message.optional_fixed32(), 7);
+  EXPECT_EQ(message.optional_fixed64(), 8);
+  EXPECT_EQ(message.repeated_string(0), "str");
+  EXPECT_EQ(message.repeated_string(1), "byv");
+  EXPECT_EQ(message.repeatedgroup(0).a(), 1024);
+  EXPECT_EQ(message.repeatedgroup(1).a(), 2048);
+}
+
+TEST_F(UnknownFieldSetTest, SerializeToCodedStream_TestPackedTypes) {
+  UnknownFieldSet field_set;
+  field_set.AddVarint(90, -1);
+  field_set.AddVarint(90, -2);
+  field_set.AddVarint(90, -3);
+  field_set.AddVarint(90, -4);
+  field_set.AddVarint(93, 5);
+  field_set.AddVarint(93, 6);
+  field_set.AddVarint(93, 7);
+
+  unittest::TestPackedTypes message;
+  std::string serialized_message;
+  {
+    io::StringOutputStream string_output(&serialized_message);
+    io::CodedOutputStream coded_output(&string_output);
+    ASSERT_TRUE(field_set.SerializeToCodedStream(&coded_output));
+  }
+  ASSERT_TRUE(message.ParseFromString(serialized_message));
+  EXPECT_THAT(message.packed_int32(), ElementsAre(-1, -2, -3, -4));
+  EXPECT_THAT(message.packed_uint64(), ElementsAre(5, 6, 7));
+}
+
+TEST_F(UnknownFieldSetTest, SerializeToCord_TestPackedTypes) {
+  UnknownFieldSet field_set;
+  field_set.AddVarint(90, -1);
+  field_set.AddVarint(90, -2);
+  field_set.AddVarint(90, -3);
+  field_set.AddVarint(90, -4);
+  field_set.AddVarint(93, 5);
+  field_set.AddVarint(93, 6);
+  field_set.AddVarint(93, 7);
+
+  absl::Cord cord;
+  ASSERT_TRUE(field_set.SerializeToCord(&cord));
+
+  unittest::TestPackedTypes message;
+  ASSERT_TRUE(message.ParseFromCord(cord));
+  EXPECT_THAT(message.packed_int32(), ElementsAre(-1, -2, -3, -4));
+  EXPECT_THAT(message.packed_uint64(), ElementsAre(5, 6, 7));
+}
+
 }  // namespace
 
 }  // namespace protobuf

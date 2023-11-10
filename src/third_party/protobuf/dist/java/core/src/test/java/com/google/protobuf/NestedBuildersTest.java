@@ -1,38 +1,16 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
 import static com.google.common.truth.Truth.assertThat;
 
 import protobuf_unittest.Engine;
+import protobuf_unittest.TimingBelt;
 import protobuf_unittest.Vehicle;
 import protobuf_unittest.Wheel;
 import java.util.ArrayList;
@@ -47,6 +25,27 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class NestedBuildersTest {
+
+  @Test
+  public void test3LayerPropagationWithIntermediateClear() {
+    Vehicle.Builder vehicleBuilder = Vehicle.newBuilder();
+    vehicleBuilder.getEngineBuilder().getTimingBeltBuilder();
+
+    // This step detaches the TimingBelt.Builder (though it leaves a SingleFieldBuilder in place)
+    vehicleBuilder.getEngineBuilder().clear();
+
+    // These steps build the middle and top level messages, it used to leave the vestigial
+    // TimingBelt.Builder in a state where further changes didn't propagate anymore
+    Object unused = vehicleBuilder.getEngineBuilder().build();
+    unused = vehicleBuilder.build();
+
+    TimingBelt expected = TimingBelt.newBuilder().setNumberOfTeeth(124).build();
+    vehicleBuilder.getEngineBuilder().setTimingBelt(expected);
+    // Testing that b/254158939 is fixed. It used to be that the setTimingBelt call above didn't
+    // propagate a change notification and the call below would return a stale version of the timing
+    // belt.
+    assertThat(vehicleBuilder.getEngine().getTimingBelt()).isEqualTo(expected);
+  }
 
   @Test
   public void testMessagesAndBuilders() {

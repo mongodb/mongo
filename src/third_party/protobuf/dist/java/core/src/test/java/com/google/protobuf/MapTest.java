@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
@@ -40,6 +17,7 @@ import com.google.protobuf.Descriptors.EnumDescriptor;
 import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import map_test.MapTestProto.BizarroTestMap;
+import map_test.MapTestProto.MapContainer;
 import map_test.MapTestProto.ReservedAsMapField;
 import map_test.MapTestProto.ReservedAsMapFieldWithEnumValue;
 import map_test.MapTestProto.TestMap;
@@ -65,26 +43,26 @@ public class MapTest {
     builder.getMutableInt32ToInt32Field().put(1, 11);
     builder.getMutableInt32ToInt32Field().put(2, 22);
     builder.getMutableInt32ToInt32Field().put(3, 33);
-  //
+
     builder.getMutableInt32ToStringField().put(1, "11");
     builder.getMutableInt32ToStringField().put(2, "22");
     builder.getMutableInt32ToStringField().put(3, "33");
-  //
+
     builder.getMutableInt32ToBytesField().put(1, TestUtil.toBytes("11"));
     builder.getMutableInt32ToBytesField().put(2, TestUtil.toBytes("22"));
     builder.getMutableInt32ToBytesField().put(3, TestUtil.toBytes("33"));
-  //
+
     builder.getMutableInt32ToEnumField().put(1, TestMap.EnumValue.FOO);
     builder.getMutableInt32ToEnumField().put(2, TestMap.EnumValue.BAR);
     builder.getMutableInt32ToEnumField().put(3, TestMap.EnumValue.BAZ);
-  //
+
     builder.getMutableInt32ToMessageField().put(
         1, MessageValue.newBuilder().setValue(11).build());
     builder.getMutableInt32ToMessageField().put(
         2, MessageValue.newBuilder().setValue(22).build());
     builder.getMutableInt32ToMessageField().put(
         3, MessageValue.newBuilder().setValue(33).build());
-  //
+
     builder.getMutableStringToInt32Field().put("1", 11);
     builder.getMutableStringToInt32Field().put("2", 22);
     builder.getMutableStringToInt32Field().put("3", 33);
@@ -173,25 +151,25 @@ public class MapTest {
     builder.getMutableInt32ToInt32Field().put(1, 111);
     builder.getMutableInt32ToInt32Field().remove(2);
     builder.getMutableInt32ToInt32Field().put(4, 44);
-  //
+
     builder.getMutableInt32ToStringField().put(1, "111");
     builder.getMutableInt32ToStringField().remove(2);
     builder.getMutableInt32ToStringField().put(4, "44");
-  //
+
     builder.getMutableInt32ToBytesField().put(1, TestUtil.toBytes("111"));
     builder.getMutableInt32ToBytesField().remove(2);
     builder.getMutableInt32ToBytesField().put(4, TestUtil.toBytes("44"));
-  //
+
     builder.getMutableInt32ToEnumField().put(1, TestMap.EnumValue.BAR);
     builder.getMutableInt32ToEnumField().remove(2);
     builder.getMutableInt32ToEnumField().put(4, TestMap.EnumValue.QUX);
-  //
+
     builder.getMutableInt32ToMessageField().put(
         1, MessageValue.newBuilder().setValue(111).build());
     builder.getMutableInt32ToMessageField().remove(2);
     builder.getMutableInt32ToMessageField().put(
         4, MessageValue.newBuilder().setValue(44).build());
-  //
+
     builder.getMutableStringToInt32Field().put("1", 111);
     builder.getMutableStringToInt32Field().remove("2");
     builder.getMutableStringToInt32Field().put("4", 44);
@@ -232,7 +210,7 @@ public class MapTest {
     assertMapValuesSet(usingAccessors);
 
     assertThat(usingAccessors).isEqualTo(usingMutableMap);
-    //
+
     usingMutableMapBuilder = usingMutableMap.toBuilder();
     updateMapValuesUsingMutableMap(usingMutableMapBuilder);
     usingMutableMap = usingMutableMapBuilder.build();
@@ -331,21 +309,21 @@ public class MapTest {
     assertThat(builder.build().getInt32ToInt32Field()).isEqualTo(newMap(1, 2));
     try {
       intMap.put(2, 3);
-      assertWithMessage("expected exception").fail();
+      assertWithMessage("expected exception intMap").fail();
     } catch (UnsupportedOperationException e) {
       // expected
     }
     assertThat(builder.getInt32ToInt32Field()).isEqualTo(newMap(1, 2));
     builder.getMutableInt32ToInt32Field().put(2, 3);
     assertThat(builder.getInt32ToInt32Field()).isEqualTo(newMap(1, 2, 2, 3));
-  //
+
     Map<Integer, TestMap.EnumValue> enumMap = builder.getMutableInt32ToEnumField();
     enumMap.put(1, TestMap.EnumValue.BAR);
     assertThat(builder.build().getInt32ToEnumField())
         .isEqualTo(newMap(1, TestMap.EnumValue.BAR));
     try {
       enumMap.put(2, TestMap.EnumValue.FOO);
-      assertWithMessage("expected exception").fail();
+      assertWithMessage("expected exception enumMap").fail();
     } catch (UnsupportedOperationException e) {
       // expected
     }
@@ -353,38 +331,35 @@ public class MapTest {
     builder.getMutableInt32ToEnumField().put(2, TestMap.EnumValue.FOO);
     assertThat(builder.getInt32ToEnumField()).isEqualTo(
         newMap(1, TestMap.EnumValue.BAR, 2, TestMap.EnumValue.FOO));
-  //
+
     Map<Integer, String> stringMap = builder.getMutableInt32ToStringField();
     stringMap.put(1, "1");
     assertThat(builder.build().getInt32ToStringField()).isEqualTo(newMap(1, "1"));
     try {
       stringMap.put(2, "2");
-      assertWithMessage("expected exception").fail();
+      assertWithMessage("expected exception stringMap").fail();
     } catch (UnsupportedOperationException e) {
       // expected
     }
     assertThat(builder.getInt32ToStringField()).isEqualTo(newMap(1, "1"));
     builder.putInt32ToStringField(2, "2");
     assertThat(builder.getInt32ToStringField()).isEqualTo(newMap(1, "1", 2, "2"));
-  //
+
+    // Message maps are handled differently, and don't freeze old mutable collections.
     Map<Integer, TestMap.MessageValue> messageMap = builder.getMutableInt32ToMessageField();
     messageMap.put(1, TestMap.MessageValue.getDefaultInstance());
-    assertThat( builder.build().getInt32ToMessageField())
+    assertThat(builder.build().getInt32ToMessageField())
         .isEqualTo(newMap(1, TestMap.MessageValue.getDefaultInstance()));
-    try {
-      messageMap.put(2, TestMap.MessageValue.getDefaultInstance());
-      assertWithMessage("expected exception").fail();
-    } catch (UnsupportedOperationException e) {
-      // expected
-    }
-    assertThat(builder.getInt32ToMessageField())
-        .isEqualTo(newMap(1, TestMap.MessageValue.getDefaultInstance()));
+    // Mutations on old mutable maps don't affect the builder state.
+    messageMap.put(2, TestMap.MessageValue.getDefaultInstance());
+    assertThat(builder.getInt32ToMessageField()).isEqualTo(
+        newMap(1, TestMap.MessageValue.getDefaultInstance()));
     builder.putInt32ToMessageField(2, TestMap.MessageValue.getDefaultInstance());
     assertThat(builder.getInt32ToMessageField()).isEqualTo(
         newMap(1, TestMap.MessageValue.getDefaultInstance(),
             2, TestMap.MessageValue.getDefaultInstance()));
   }
-  //
+
   @Test
   public void testMutableMapLifecycle_collections() {
     TestMap.Builder builder = TestMap.newBuilder();
@@ -575,26 +550,42 @@ public class MapTest {
   }
 
   @Test
+  public void testPutBuilderIfAbsent() {
+    TestMap.Builder builder = TestMap.newBuilder();
+    MessageValue.Builder subBuilder = builder.putInt32ToMessageFieldBuilderIfAbsent(1);
+
+    assertThat(builder.putInt32ToMessageFieldBuilderIfAbsent(1)).isSameInstanceAs(subBuilder);
+
+    subBuilder.setValue(11);
+    assertThat(builder.getInt32ToMessageFieldOrThrow(1).getValue()).isEqualTo(11);
+    builder.putInt32ToMessageFieldBuilderIfAbsent(1).setValue(22);
+    assertThat(builder.getInt32ToMessageFieldOrThrow(1).getValue()).isEqualTo(22);
+
+    builder.putInt32ToMessageField(2, MessageValue.newBuilder().setValue(33).build());
+    assertThat(builder.putInt32ToMessageFieldBuilderIfAbsent(2).getValue()).isEqualTo(33);
+  }
+
+  @Test
   public void testSerializeAndParse() throws Exception {
     TestMap.Builder builder = TestMap.newBuilder();
     setMapValuesUsingAccessors(builder);
     TestMap message = builder.build();
     assertThat(message.toByteString().size()).isEqualTo(message.getSerializedSize());
-    message = TestMap.parser().parseFrom(message.toByteString());
+    message = TestMap.parseFrom(message.toByteString());
     assertMapValuesSet(message);
 
     builder = message.toBuilder();
     updateMapValuesUsingAccessors(builder);
     message = builder.build();
     assertThat(message.toByteString().size()).isEqualTo(message.getSerializedSize());
-    message = TestMap.parser().parseFrom(message.toByteString());
+    message = TestMap.parseFrom(message.toByteString());
     assertMapValuesUpdated(message);
 
     builder = message.toBuilder();
     builder.clear();
     message = builder.build();
     assertThat(message.toByteString().size()).isEqualTo(message.getSerializedSize());
-    message = TestMap.parser().parseFrom(message.toByteString());
+    message = TestMap.parseFrom(message.toByteString());
     assertMapValuesCleared(message);
   }
 
@@ -603,7 +594,7 @@ public class MapTest {
     CodedOutputStream output = CodedOutputStream.newInstance(byteArrayOutputStream);
     bizarroMap.writeTo(output);
     output.flush();
-    return TestMap.parser().parseFrom(ByteString.copyFrom(byteArrayOutputStream.toByteArray()));
+    return TestMap.parseFrom(ByteString.copyFrom(byteArrayOutputStream.toByteArray()));
   }
 
   @Test
@@ -992,6 +983,7 @@ public class MapTest {
   }
 
   @Test
+  @SuppressWarnings("ProtoNewBuilderMergeFrom")
   public void testUnknownEnumValues() throws Exception {
     TestMap.Builder builder =
         TestMap.newBuilder()
@@ -1584,5 +1576,20 @@ public class MapTest {
     }
 
     assertThat(builder.build().toByteArray()).isEqualTo(new byte[0]);
+  }
+
+  @Test
+  // https://github.com/protocolbuffers/protobuf/issues/9785
+  public void testContainer() {
+    FieldDescriptor field = MapContainer.getDescriptor().findFieldByName("my_map");
+    Descriptor entryDescriptor = field.getMessageType();
+    FieldDescriptor valueDescriptor = entryDescriptor.findFieldByName("value");
+    Message.Builder builder = MapContainer.newBuilder().newBuilderForField(field);
+    try {
+      builder.setField(valueDescriptor, null);
+      fail("Allowed null field value");
+    } catch (NullPointerException expected) {
+      assertThat(expected).hasMessageThat().isNotNull();
+    }
   }
 }

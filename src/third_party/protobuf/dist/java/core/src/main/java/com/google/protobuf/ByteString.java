@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
@@ -75,6 +52,7 @@ import java.util.NoSuchElementException;
  */
 @CheckReturnValue
 public abstract class ByteString implements Iterable<Byte>, Serializable {
+  private static final long serialVersionUID = 1L;
 
   /**
    * When two strings to be concatenated have a combined length shorter than this, we just copy
@@ -236,6 +214,11 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
     return size() == 0;
   }
 
+  /** Returns an empty {@code ByteString} of size {@code 0}. */
+  public static final ByteString empty() {
+    return EMPTY;
+  }
+
   // =================================================================
   // Comparison
 
@@ -253,6 +236,38 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
     return value & UNSIGNED_BYTE_MASK;
   }
 
+  /** Returns the numeric value of the given character in hex, or -1 if invalid. */
+  private static int hexDigit(char c) {
+    if (c >= '0' && c <= '9') {
+      return c - '0';
+    } else if (c >= 'A' && c <= 'F') {
+      return c - 'A' + 10;
+    } else if (c >= 'a' && c <= 'f') {
+      return c - 'a' + 10;
+    } else {
+      return -1;
+    }
+  }
+
+  /**
+   * Returns the numeric value of the given character at index in hexString.
+   *
+   * @throws NumberFormatException if the hexString character is invalid.
+   */
+  private static int extractHexDigit(String hexString, int index) {
+    int digit = hexDigit(hexString.charAt(index));
+    if (digit == -1) {
+      throw new NumberFormatException(
+          "Invalid hexString "
+              + hexString
+              + " must only contain [0-9a-fA-F] but contained "
+              + hexString.charAt(index)
+              + " at index "
+              + index);
+    }
+    return digit;
+  }
+
   /**
    * Compares two {@link ByteString}s lexicographically, treating their contents as unsigned byte
    * values between 0 and 255 (inclusive).
@@ -268,22 +283,20 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
           ByteIterator latterBytes = latter.iterator();
 
           while (formerBytes.hasNext() && latterBytes.hasNext()) {
-            // Note: This code was copied from com.google.common.primitives.UnsignedBytes#compare,
-            // as Guava libraries cannot be used in the {@code com.google.protobuf} package.
             int result =
-                Integer.compare(toInt(formerBytes.nextByte()), toInt(latterBytes.nextByte()));
+                Integer.valueOf(toInt(formerBytes.nextByte()))
+                    .compareTo(toInt(latterBytes.nextByte()));
             if (result != 0) {
               return result;
             }
           }
-
-          return Integer.compare(former.size(), latter.size());
+          return Integer.valueOf(former.size()).compareTo(Integer.valueOf(latter.size()));
         }
       };
 
   /**
-   * Returns a {@link Comparator} which compares {@link ByteString}-s lexicographically
-   * as sequences of unsigned bytes (i.e. values between 0 and 255, inclusive).
+   * Returns a {@link Comparator} which compares {@link ByteString}-s lexicographically as sequences
+   * of unsigned bytes (i.e. values between 0 and 255, inclusive).
    *
    * <p>For example, {@code (byte) -1} is considered to be greater than {@code (byte) 1} because it
    * is interpreted as an unsigned value, {@code 255}:
@@ -347,6 +360,29 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
   }
 
   // =================================================================
+  // String -> ByteString
+
+  /**
+   * Returns a {@code ByteString} from a hexadecimal String.
+   *
+   * @param hexString String of hexadecimal digits to create {@code ByteString} from.
+   * @throws NumberFormatException if the hexString does not contain a parsable hex String.
+   */
+  public static ByteString fromHex(@CompileTimeConstant String hexString) {
+    if (hexString.length() % 2 != 0) {
+      throw new NumberFormatException(
+          "Invalid hexString " + hexString + " of length " + hexString.length() + " must be even.");
+    }
+    byte[] bytes = new byte[hexString.length() / 2];
+    for (int i = 0; i < bytes.length; i++) {
+      int d1 = extractHexDigit(hexString, 2 * i);
+      int d2 = extractHexDigit(hexString, 2 * i + 1);
+      bytes[i] = (byte) (d1 << 4 | d2);
+    }
+    return new LiteralByteString(bytes);
+  }
+
+  // =================================================================
   // byte[] -> ByteString
 
   /**
@@ -373,7 +409,10 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
     return copyFrom(bytes, 0, bytes.length);
   }
 
-  /** Wraps the given bytes into a {@code ByteString}. Intended for internal only usage. */
+  /**
+   * Wraps the given bytes into a {@code ByteString}. Intended for internal usage within the
+   * library.
+   */
   static ByteString wrap(ByteBuffer buffer) {
     if (buffer.hasArray()) {
       final int offset = buffer.arrayOffset();
@@ -384,17 +423,17 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
   }
 
   /**
-   * Wraps the given bytes into a {@code ByteString}. Intended for internal only usage to force a
-   * classload of ByteString before LiteralByteString.
+   * Wraps the given bytes into a {@code ByteString}. Intended for internal usage within the library
+   * to force a classload of ByteString before LiteralByteString.
    */
   static ByteString wrap(byte[] bytes) {
-    // TODO(dweis): Return EMPTY when bytes are empty to reduce allocations?
+    // TODO: Return EMPTY when bytes are empty to reduce allocations?
     return new LiteralByteString(bytes);
   }
 
   /**
-   * Wraps the given bytes into a {@code ByteString}. Intended for internal only usage to force a
-   * classload of ByteString before BoundedByteString and LiteralByteString.
+   * Wraps the given bytes into a {@code ByteString}. Intended for internal usage within the library
+   * to force a classload of ByteString before BoundedByteString and LiteralByteString.
    */
   static ByteString wrap(byte[] bytes, int offset, int length) {
     return new BoundedByteString(bytes, offset, length);
@@ -887,6 +926,8 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
 
   /** Base class for leaf {@link ByteString}s (i.e. non-ropes). */
   abstract static class LeafByteString extends ByteString {
+    private static final long serialVersionUID = 1L;
+
     @Override
     protected final int getTreeDepth() {
       return 0;
@@ -1071,13 +1112,6 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
       return ByteString.copyFrom(flushedBuffers);
     }
 
-    /** Implement java.util.Arrays.copyOf() for jdk 1.5. */
-    private byte[] copyArray(byte[] buffer, int length) {
-      byte[] result = new byte[length];
-      System.arraycopy(buffer, 0, result, 0, Math.min(buffer.length, length));
-      return result;
-    }
-
     /**
      * Writes the complete contents of this byte array output stream to the specified output stream
      * argument.
@@ -1092,7 +1126,7 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
       synchronized (this) {
         // Copy the information we need into local variables so as to hold
         // the lock for as short a time as possible.
-        cachedFlushBuffers = flushedBuffers.toArray(new ByteString[flushedBuffers.size()]);
+        cachedFlushBuffers = flushedBuffers.toArray(new ByteString[0]);
         cachedBuffer = buffer;
         cachedBufferPos = bufferPos;
       }
@@ -1100,7 +1134,7 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
         byteString.writeTo(out);
       }
 
-      out.write(copyArray(cachedBuffer, cachedBufferPos));
+      out.write(Arrays.copyOf(cachedBuffer, cachedBufferPos));
     }
 
     /**
@@ -1151,7 +1185,7 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
     private void flushLastBuffer() {
       if (bufferPos < buffer.length) {
         if (bufferPos > 0) {
-          byte[] bufferCopy = copyArray(buffer, bufferPos);
+          byte[] bufferCopy = Arrays.copyOf(buffer, bufferPos);
           flushedBuffers.add(new LiteralByteString(bufferCopy));
         }
         // We reuse this buffer for further writes.
@@ -1376,7 +1410,7 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
         byte[] target, int sourceOffset, int targetOffset, int numberToCopy) {
       // Optimized form, not for subclasses, since we don't call
       // getOffsetIntoBytes() or check the 'numberToCopy' parameter.
-      // TODO(nathanmittler): Is not calling getOffsetIntoBytes really saving that much?
+      // TODO: Is not calling getOffsetIntoBytes really saving that much?
       System.arraycopy(bytes, sourceOffset, target, targetOffset, numberToCopy);
     }
 
@@ -1552,7 +1586,6 @@ public abstract class ByteString implements Iterable<Byte>, Serializable {
   // Keep this class private to avoid deadlocks in classloading across threads as ByteString's
   // static initializer loads LiteralByteString and another thread loads BoundedByteString.
   private static final class BoundedByteString extends LiteralByteString {
-
     private final int bytesOffset;
     private final int bytesLength;
 

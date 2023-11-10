@@ -1,32 +1,9 @@
 # Protocol Buffers - Google's data interchange format
 # Copyright 2008 Google Inc.  All rights reserved.
-# https://developers.google.com/protocol-buffers/
 #
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-#     * Redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above
-# copyright notice, this list of conditions and the following disclaimer
-# in the documentation and/or other materials provided with the
-# distribution.
-#     * Neither the name of Google Inc. nor the names of its
-# contributors may be used to endorse or promote products derived from
-# this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://developers.google.com/open-source/licenses/bsd
 
 """Unittest for google.protobuf.internal.descriptor."""
 
@@ -35,9 +12,6 @@ __author__ = 'robinson@google.com (Will Robinson)'
 import unittest
 import warnings
 
-from google.protobuf import unittest_custom_options_pb2
-from google.protobuf import unittest_import_pb2
-from google.protobuf import unittest_pb2
 from google.protobuf import descriptor_pb2
 from google.protobuf.internal import api_implementation
 from google.protobuf.internal import test_util
@@ -45,10 +19,36 @@ from google.protobuf import descriptor
 from google.protobuf import descriptor_pool
 from google.protobuf import symbol_database
 from google.protobuf import text_format
+from google.protobuf import unittest_custom_options_pb2
+from google.protobuf import unittest_import_pb2
+from google.protobuf import unittest_pb2
 
 
 TEST_EMPTY_MESSAGE_DESCRIPTOR_ASCII = """
 name: 'TestEmptyMessage'
+"""
+
+TEST_FILE_DESCRIPTOR_DEBUG = """syntax = "proto2";
+
+package protobuf_unittest;
+
+message NestedMessage {
+  enum ForeignEnum {
+    FOREIGN_FOO = 4;
+    FOREIGN_BAR = 5;
+    FOREIGN_BAZ = 6;
+    FOREIGN_BAX = 32;
+  }
+  optional int32 bb = 1;
+}
+
+message ResponseMessage {
+}
+
+service DescriptorTestService {
+  rpc CallMethod(.protobuf_unittest.NestedMessage) returns (.protobuf_unittest.ResponseMessage);
+}
+
 """
 
 
@@ -73,10 +73,10 @@ class DescriptorTest(unittest.TestCase):
     enum_proto.value.add(name='FOREIGN_FOO', number=4)
     enum_proto.value.add(name='FOREIGN_BAR', number=5)
     enum_proto.value.add(name='FOREIGN_BAZ', number=6)
+    enum_proto.value.add(name='FOREIGN_BAX', number=32)
 
     file_proto.message_type.add(name='ResponseMessage')
-    service_proto = file_proto.service.add(
-        name='Service')
+    service_proto = file_proto.service.add(name='DescriptorTestService')
     method_proto = service_proto.method.add(
         name='CallMethod',
         input_type='.protobuf_unittest.NestedMessage',
@@ -95,6 +95,112 @@ class DescriptorTest(unittest.TestCase):
 
   def GetDescriptorPool(self):
     return symbol_database.Default().pool
+
+  def testMissingPackage(self):
+    file_proto = descriptor_pb2.FileDescriptorProto(
+        name='some/filename/some.proto')
+    serialized = file_proto.SerializeToString()
+    pool = descriptor_pool.DescriptorPool()
+    file_descriptor = pool.AddSerializedFile(serialized)
+    self.assertEqual('', file_descriptor.package)
+
+  def testEmptyPackage(self):
+    file_proto = descriptor_pb2.FileDescriptorProto(
+        name='some/filename/some.proto', package='')
+    serialized = file_proto.SerializeToString()
+    pool = descriptor_pool.DescriptorPool()
+    file_descriptor = pool.AddSerializedFile(serialized)
+    self.assertEqual('', file_descriptor.package)
+
+  def testReservedName(self):
+    text = """
+      name: "foo.proto"
+      message_type {
+        name: "BrokenMessageFoo"
+        reserved_name: "is_deprecated"
+      }
+      """
+
+    fdp = text_format.Parse(text, descriptor_pb2.FileDescriptorProto())
+    serialized = fdp.SerializeToString()
+    # AddSerializedFile() will allow duplicate adds but only if the descriptors
+    # are identical and can round-trip through a FileDescriptor losslessly.
+    desc1 = descriptor_pool.Default().AddSerializedFile(serialized)
+    desc2 = descriptor_pool.Default().AddSerializedFile(serialized)
+    self.assertEqual(desc1, desc2)
+
+  def testReservedRange(self):
+    text = """
+      name: "bar.proto"
+      message_type {
+        name: "BrokenMessageBar"
+        reserved_range {
+          start: 101
+          end: 102
+        }
+      }
+      """
+
+    fdp = text_format.Parse(text, descriptor_pb2.FileDescriptorProto())
+    serialized = fdp.SerializeToString()
+    # AddSerializedFile() will allow duplicate adds but only if the descriptors
+    # are identical and can round-trip through a FileDescriptor losslessly.
+    desc1 = descriptor_pool.Default().AddSerializedFile(serialized)
+    desc2 = descriptor_pool.Default().AddSerializedFile(serialized)
+    self.assertEqual(desc1, desc2)
+
+  def testReservedNameEnum(self):
+    text = """
+      name: "baz.proto"
+      enum_type {
+        name: "BrokenMessageBaz"
+        value: <
+          name: 'ENUM_BAZ'
+          number: 114
+        >
+        reserved_name: "is_deprecated"
+      }
+      """
+
+    fdp = text_format.Parse(text, descriptor_pb2.FileDescriptorProto())
+    serialized = fdp.SerializeToString()
+    # AddSerializedFile() will allow duplicate adds but only if the descriptors
+    # are identical and can round-trip through a FileDescriptor losslessly.
+    desc1 = descriptor_pool.Default().AddSerializedFile(serialized)
+    desc2 = descriptor_pool.Default().AddSerializedFile(serialized)
+    self.assertEqual(desc1, desc2)
+
+  def testReservedRangeEnum(self):
+    text = """
+      name: "bat.proto"
+      enum_type {
+        name: "BrokenMessageBat"
+        value: <
+          name: 'ENUM_BAT'
+          number: 115
+        >
+        reserved_range {
+          start: 1001
+          end: 1002
+        }
+      }
+      """
+
+    fdp = text_format.Parse(text, descriptor_pb2.FileDescriptorProto())
+    serialized = fdp.SerializeToString()
+    # AddSerializedFile() will allow duplicate adds but only if the descriptors
+    # are identical and can round-trip through a FileDescriptor losslessly.
+    desc1 = descriptor_pool.Default().AddSerializedFile(serialized)
+    desc2 = descriptor_pool.Default().AddSerializedFile(serialized)
+    self.assertEqual(desc1, desc2)
+
+  def testFindMethodByName(self):
+    service_descriptor = (unittest_custom_options_pb2.
+                          TestServiceWithCustomOptions.DESCRIPTOR)
+    method_descriptor = service_descriptor.FindMethodByName('Foo')
+    self.assertEqual(method_descriptor.name, 'Foo')
+    with self.assertRaises(KeyError):
+      service_descriptor.FindMethodByName('MethodDoesNotExist')
 
   def testEnumValueName(self):
     self.assertEqual(self.my_message.EnumValueName('ForeignEnum', 4),
@@ -120,6 +226,13 @@ class DescriptorTest(unittest.TestCase):
 
   def testContainingServiceFixups(self):
     self.assertEqual(self.my_service, self.my_method.containing_service)
+
+  @unittest.skipIf(
+      api_implementation.Type() == 'python',
+      'GetDebugString is only available with the cpp implementation',
+  )
+  def testGetDebugString(self):
+    self.assertEqual(self.my_file.GetDebugString(), TEST_FILE_DESCRIPTOR_DEBUG)
 
   def testGetOptions(self):
     self.assertEqual(self.my_enum.GetOptions(),
@@ -299,10 +412,10 @@ class DescriptorTest(unittest.TestCase):
         unittest_custom_options_pb2.complex_opt1].foo)
     self.assertEqual(324, options.Extensions[
         unittest_custom_options_pb2.complex_opt1].Extensions[
-            unittest_custom_options_pb2.quux])
+            unittest_custom_options_pb2.mooo])
     self.assertEqual(876, options.Extensions[
         unittest_custom_options_pb2.complex_opt1].Extensions[
-            unittest_custom_options_pb2.corge].qux)
+            unittest_custom_options_pb2.corge].moo)
     self.assertEqual(987, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].baz)
     self.assertEqual(654, options.Extensions[
@@ -312,28 +425,28 @@ class DescriptorTest(unittest.TestCase):
         unittest_custom_options_pb2.complex_opt2].bar.foo)
     self.assertEqual(1999, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].bar.Extensions[
-            unittest_custom_options_pb2.quux])
+            unittest_custom_options_pb2.mooo])
     self.assertEqual(2008, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].bar.Extensions[
-            unittest_custom_options_pb2.corge].qux)
+            unittest_custom_options_pb2.corge].moo)
     self.assertEqual(741, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].Extensions[
             unittest_custom_options_pb2.garply].foo)
     self.assertEqual(1998, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].Extensions[
             unittest_custom_options_pb2.garply].Extensions[
-                unittest_custom_options_pb2.quux])
+                unittest_custom_options_pb2.mooo])
     self.assertEqual(2121, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].Extensions[
             unittest_custom_options_pb2.garply].Extensions[
-                unittest_custom_options_pb2.corge].qux)
+                unittest_custom_options_pb2.corge].moo)
     self.assertEqual(1971, options.Extensions[
         unittest_custom_options_pb2.ComplexOptionType2
         .ComplexOptionType4.complex_opt4].waldo)
     self.assertEqual(321, options.Extensions[
         unittest_custom_options_pb2.complex_opt2].fred.waldo)
     self.assertEqual(9, options.Extensions[
-        unittest_custom_options_pb2.complex_opt3].qux)
+        unittest_custom_options_pb2.complex_opt3].moo)
     self.assertEqual(22, options.Extensions[
         unittest_custom_options_pb2.complex_opt3].complexoptiontype5.plugh)
     self.assertEqual(24, options.Extensions[
@@ -419,7 +532,7 @@ class DescriptorTest(unittest.TestCase):
     self.assertEqual(self.my_file.package, 'protobuf_unittest')
     self.assertEqual(self.my_file.pool, self.pool)
     self.assertFalse(self.my_file.has_options)
-    self.assertEqual('proto2', self.my_file.syntax)
+    self.assertEqual(self.my_file.syntax, 'proto2')
     file_proto = descriptor_pb2.FileDescriptorProto()
     self.my_file.CopyToProto(file_proto)
     self.assertEqual(self.my_file.serialized_pb,
@@ -428,7 +541,7 @@ class DescriptorTest(unittest.TestCase):
     self.assertEqual(unittest_pb2.DESCRIPTOR.pool, descriptor_pool.Default())
 
   @unittest.skipIf(
-      api_implementation.Type() != 'cpp' or api_implementation.Version() != 2,
+      api_implementation.Type() == 'python',
       'Immutability of descriptors is only enforced in v2 implementation')
   def testImmutableCppDescriptor(self):
     file_descriptor = unittest_pb2.DESCRIPTOR
@@ -523,6 +636,7 @@ class GeneratedDescriptorTest(unittest.TestCase):
     self.assertIn(field_descriptor, {field_descriptor: None})
     self.assertEqual(None, field_descriptor.extension_scope)
     self.assertEqual(None, field_descriptor.enum_type)
+    self.assertTrue(field_descriptor.has_presence)
     if api_implementation.Type() == 'cpp':
       # For test coverage only
       self.assertEqual(field_descriptor.id, field_descriptor.id)
@@ -556,7 +670,7 @@ class GeneratedDescriptorTest(unittest.TestCase):
     self.assertRaises(StopIteration, next, reversed_iterator)
     expected_list[0] = 'change value'
     self.assertNotEqual(expected_list, sequence)
-    # TODO(jieluo): Change __repr__ support for DescriptorSequence.
+    # TODO: Change __repr__ support for DescriptorSequence.
     if api_implementation.Type() == 'python':
       self.assertEqual(str(list(sequence)), str(sequence))
     else:
@@ -565,6 +679,12 @@ class GeneratedDescriptorTest(unittest.TestCase):
   def CheckDescriptorMapping(self, mapping):
     # Verifies that a property like 'messageDescriptor.fields' has all the
     # properties of an immutable abc.Mapping.
+    iterated_keys = []
+    for key in mapping:
+      iterated_keys.append(key)
+    self.assertEqual(len(iterated_keys), len(mapping))
+    self.assertEqual(set(iterated_keys), set(mapping.keys()))
+
     self.assertNotEqual(
         mapping, unittest_pb2.TestAllExtensions.DESCRIPTOR.fields_by_name)
     self.assertNotEqual(mapping, {})
@@ -580,11 +700,16 @@ class GeneratedDescriptorTest(unittest.TestCase):
     self.assertEqual(mapping.get(key), item)
     with self.assertRaises(TypeError):
       mapping.get()
-    # TODO(jieluo): Fix python and cpp extension diff.
-    if api_implementation.Type() == 'python':
-      self.assertRaises(TypeError, mapping.get, [])
-    else:
+    # TODO: Fix python and cpp extension diff.
+    if api_implementation.Type() == 'cpp':
       self.assertEqual(None, mapping.get([]))
+    else:
+      self.assertRaises(TypeError, mapping.get, [])
+      with self.assertRaises(TypeError):
+        if [] in mapping:
+          pass
+      with self.assertRaises(TypeError):
+        _ = mapping[[]]
     # keys(), iterkeys() &co
     item = (next(iter(mapping.keys())), next(iter(mapping.values())))
     self.assertEqual(item, next(iter(mapping.items())))
@@ -595,11 +720,13 @@ class GeneratedDescriptorTest(unittest.TestCase):
     self.assertNotEqual(mapping, excepted_dict)
     self.assertRaises(KeyError, mapping.__getitem__, 'key_error')
     self.assertRaises(KeyError, mapping.__getitem__, len(mapping) + 1)
-    # TODO(jieluo): Add __repr__ support for DescriptorMapping.
-    if api_implementation.Type() == 'python':
-      self.assertEqual(len(str(dict(mapping.items()))), len(str(mapping)))
-    else:
+    # TODO: Add __repr__ support for DescriptorMapping.
+    if api_implementation.Type() == 'cpp':
       self.assertEqual(str(mapping)[0], '<')
+    else:
+      print(str(dict(mapping.items()))[:100])
+      print(str(mapping)[:100])
+      self.assertEqual(len(str(dict(mapping.items()))), len(str(mapping)))
 
   def testDescriptor(self):
     message_descriptor = unittest_pb2.TestAllTypes.DESCRIPTOR
@@ -663,6 +790,15 @@ class GeneratedDescriptorTest(unittest.TestCase):
                      oneof_descriptor.full_name)
     self.assertEqual(0, oneof_descriptor.index)
 
+  def testDescriptorSlice(self):
+    message_descriptor = unittest_pb2.TestAllTypes.DESCRIPTOR
+    nested = message_descriptor.nested_types[:]
+    self.assertEqual(message_descriptor.nested_types, nested)
+    fields = message_descriptor.fields
+    fields_list = list(fields)
+    self.assertEqual(fields_list[:], fields[:])
+    self.assertEqual(fields_list[2::2], fields[2::2])
+    self.assertEqual(fields_list[3:19:3], fields[3:19:3])
 
 class DescriptorCopyToProtoTest(unittest.TestCase):
   """Tests for CopyTo functions of Descriptor."""
@@ -737,6 +873,10 @@ class DescriptorCopyToProtoTest(unittest.TestCase):
         name: 'FOREIGN_BAZ'
         number: 6
       >
+      value: <
+        name: 'FOREIGN_BAX'
+        number: 32
+      >
       """
 
     self._InternalTestCopyToProto(
@@ -756,6 +896,25 @@ class DescriptorCopyToProtoTest(unittest.TestCase):
           deprecated: true
         >
       >
+      field: {
+        name: 'deprecated_repeated_string'
+        number: 4
+        label: LABEL_REPEATED
+        type: TYPE_STRING
+        options: {
+          deprecated: true
+        }
+      }
+      field {
+        name: "deprecated_message"
+        number: 3
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".protobuf_unittest.TestAllTypes.NestedMessage"
+        options {
+          deprecated: true
+        }
+      }
       field {
         name: "deprecated_int32_in_oneof"
         number: 2
@@ -765,6 +924,13 @@ class DescriptorCopyToProtoTest(unittest.TestCase):
           deprecated: true
         }
         oneof_index: 0
+      }
+      field {
+        name: "nested"
+        number: 5
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".protobuf_unittest.TestDeprecatedFields"
       }
       oneof_decl {
         name: "oneof_fields"
@@ -906,7 +1072,7 @@ class DescriptorCopyToProtoTest(unittest.TestCase):
   @unittest.skipIf(
       api_implementation.Type() == 'python',
       'Pure python does not raise error.')
-  # TODO(jieluo): Fix pure python to check with the proto type.
+  # TODO: Fix pure python to check with the proto type.
   def testCopyToProto_TypeError(self):
     file_proto = descriptor_pb2.FileDescriptorProto()
     self.assertRaises(TypeError,
@@ -959,8 +1125,12 @@ class MakeDescriptorTest(unittest.TestCase):
     result = descriptor.MakeDescriptor(message_type)
     self.assertEqual(result.fields[0].cpp_type,
                      descriptor.FieldDescriptor.CPPTYPE_UINT64)
+    self.assertEqual(result.fields[0].cpp_type,
+                     result.fields[0].CPPTYPE_UINT64)
     self.assertEqual(result.fields[1].cpp_type,
                      descriptor.FieldDescriptor.CPPTYPE_MESSAGE)
+    self.assertEqual(result.fields[1].cpp_type,
+                     result.fields[1].CPPTYPE_MESSAGE)
     self.assertEqual(result.fields[1].message_type.containing_type,
                      result)
     self.assertEqual(result.nested_types[0].fields[0].full_name,
@@ -1012,6 +1182,7 @@ class MakeDescriptorTest(unittest.TestCase):
 
   def testCamelcaseName(self):
     descriptor_proto = descriptor_pb2.DescriptorProto()
+    descriptor_proto.options.deprecated_legacy_json_field_conflicts = True
     descriptor_proto.name = 'Bar'
     names = ['foo_foo', 'FooBar', 'fooBaz', 'fooFoo', 'foobar']
     camelcase_names = ['fooFoo', 'fooBar', 'fooBaz', 'fooFoo', 'foobar']
@@ -1026,6 +1197,7 @@ class MakeDescriptorTest(unittest.TestCase):
 
   def testJsonName(self):
     descriptor_proto = descriptor_pb2.DescriptorProto()
+    descriptor_proto.options.deprecated_legacy_json_field_conflicts = True
     descriptor_proto.name = 'TestJsonName'
     names = ['field_name', 'fieldName', 'FieldName',
              '_field_name', 'FIELD_NAME', 'json_name']

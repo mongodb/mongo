@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2015 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #import <Foundation/Foundation.h>
 
@@ -34,9 +11,11 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// Disable clang-format for the macros.
+// clang-format off
+
 //%PDDM-EXPAND DECLARE_ARRAYS()
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 #pragma mark - Int32
 
@@ -46,6 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBInt32Array : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -135,7 +115,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -147,7 +128,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -218,6 +200,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBUInt32Array : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -307,7 +290,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(uint32_t value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(uint32_t value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -319,7 +303,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(uint32_t value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(uint32_t value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -390,6 +375,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBInt64Array : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -479,7 +465,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int64_t value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int64_t value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -491,7 +478,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(int64_t value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(int64_t value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -562,6 +550,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBUInt64Array : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -651,7 +640,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(uint64_t value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(uint64_t value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -663,7 +653,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(uint64_t value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(uint64_t value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -734,6 +725,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBFloatArray : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -823,7 +815,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(float value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(float value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -835,7 +828,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(float value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(float value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -906,6 +900,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBDoubleArray : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -995,7 +990,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(double value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(double value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -1007,7 +1003,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(double value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(double value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -1078,6 +1075,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBBoolArray : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -1167,7 +1165,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(BOOL value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(BOOL value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -1179,7 +1178,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(BOOL value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(BOOL value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 /**
  * Adds a value to this array.
@@ -1250,6 +1250,7 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @note This class is not meant to be subclassed.
  **/
+__attribute__((objc_subclassing_restricted))
 @interface GPBEnumArray : NSObject <NSCopying>
 
 /** The number of elements contained in the array. */
@@ -1370,7 +1371,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx,
+                                                       BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -1382,7 +1384,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-                        usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block;
+                        usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx,
+                                                         BOOL *stop))block;
 
 // These methods bypass the validationFunc to provide access to values that were not
 // known at the time the binary was compiled.
@@ -1404,7 +1407,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **idx**:   The index of the current value.
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
-- (void)enumerateRawValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block;
+- (void)enumerateRawValuesWithBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx,
+                                                          BOOL *stop))block;
 
 /**
  * Enumerates the values on this array with the given block.
@@ -1416,7 +1420,8 @@ NS_ASSUME_NONNULL_BEGIN
  *   **stop**:  A pointer to a boolean that when set stops the enumeration.
  **/
 - (void)enumerateRawValuesWithOptions:(NSEnumerationOptions)opts
-                           usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx, BOOL *stop))block;
+                           usingBlock:(void (NS_NOESCAPE ^)(int32_t value, NSUInteger idx,
+                                                          BOOL *stop))block;
 
 // If value is not a valid enumerator as defined by validationFunc, these
 // methods will assert in debug, and will log in release and assign the value
@@ -1536,7 +1541,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-// clang-format on
 //%PDDM-EXPAND-END DECLARE_ARRAYS()
 
 NS_ASSUME_NONNULL_END
@@ -1564,6 +1568,7 @@ NS_ASSUME_NONNULL_END
 //% *
 //% * @note This class is not meant to be subclassed.
 //% **/
+//%__attribute__((objc_subclassing_restricted))
 //%@interface GPB##NAME##Array : NSObject <NSCopying>
 //%
 //%/** The number of elements contained in the array. */
@@ -1656,6 +1661,7 @@ NS_ASSUME_NONNULL_END
 //% *
 //% * @note This class is not meant to be subclassed.
 //% **/
+//%__attribute__((objc_subclassing_restricted))
 //%@interface GPB##NAME##Array : NSObject <NSCopying>
 //%
 //%/** The number of elements contained in the array. */
@@ -1781,7 +1787,8 @@ NS_ASSUME_NONNULL_END
 //% *   **idx**:   The index of the current value.
 //% *   **stop**:  A pointer to a boolean that when set stops the enumeration.
 //% **/
-//%- (void)enumerateRawValuesWithBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx, BOOL *stop))block;
+//%- (void)enumerateRawValuesWithBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx,
+//%                                                          BOOL *stop))block;
 //%
 //%/**
 //% * Enumerates the values on this array with the given block.
@@ -1793,7 +1800,8 @@ NS_ASSUME_NONNULL_END
 //% *   **stop**:  A pointer to a boolean that when set stops the enumeration.
 //% **/
 //%- (void)enumerateRawValuesWithOptions:(NSEnumerationOptions)opts
-//%                           usingBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx, BOOL *stop))block;
+//%                           usingBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx,
+//%                                                          BOOL *stop))block;
 //%
 //%// If value is not a valid enumerator as defined by validationFunc, these
 //%// methods will assert in debug, and will log in release and assign the value
@@ -1823,7 +1831,8 @@ NS_ASSUME_NONNULL_END
 //% *   **idx**:   The index of the current value.
 //% *   **stop**:  A pointer to a boolean that when set stops the enumeration.
 //% **/
-//%- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx, BOOL *stop))block;
+//%- (void)enumerateValuesWithBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx,
+//%                                                       BOOL *stop))block;
 //%
 //%/**
 //% * Enumerates the values on this array with the given block.
@@ -1835,7 +1844,8 @@ NS_ASSUME_NONNULL_END
 //% *   **stop**:  A pointer to a boolean that when set stops the enumeration.
 //% **/
 //%- (void)enumerateValuesWithOptions:(NSEnumerationOptions)opts
-//%                        usingBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx, BOOL *stop))block;
+//%                        usingBlock:(void (NS_NOESCAPE ^)(TYPE value, NSUInteger idx,
+//%                                                         BOOL *stop))block;
 
 //%PDDM-DEFINE ARRAY_MUTABLE_INTERFACE(NAME, TYPE, HELPER_NAME)
 //%/**
@@ -1967,3 +1977,5 @@ NS_ASSUME_NONNULL_END
 //%
 //%// No validation applies to these methods.
 //%
+
+// clang-format on

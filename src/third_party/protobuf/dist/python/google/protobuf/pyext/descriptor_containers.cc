@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 // Mappings and Sequences of descriptors.
 // Used by Descriptor.fields_by_name, EnumDescriptor.values...
@@ -49,21 +26,29 @@
 // because the Python API is based on C, and does not play well with C++
 // inheritance.
 
+// clang-format off
 #define PY_SSIZE_T_CLEAN
+// This inclusion must appear before all the others.
 #include <Python.h>
 
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/pyext/descriptor_containers.h>
-#include <google/protobuf/pyext/descriptor_pool.h>
-#include <google/protobuf/pyext/descriptor.h>
-#include <google/protobuf/pyext/scoped_pyobject_ptr.h>
+#include <string>
 
-#define PyString_AsStringAndSize(ob, charpp, sizep)                           \
-  (PyUnicode_Check(ob) ? ((*(charpp) = const_cast<char*>(                     \
-                               PyUnicode_AsUTF8AndSize(ob, (sizep)))) == NULL \
-                              ? -1                                            \
-                              : 0)                                            \
-                       : PyBytes_AsStringAndSize(ob, (charpp), (sizep)))
+#include "google/protobuf/pyext/descriptor_containers.h"
+// clang-format on
+
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/pyext/descriptor.h"
+#include "google/protobuf/pyext/descriptor_pool.h"
+#include "google/protobuf/pyext/scoped_pyobject_ptr.h"
+#include "absl/strings/string_view.h"
+
+#define PyString_AsStringAndSize(ob, charpp, sizep)              \
+  (PyUnicode_Check(ob)                                           \
+       ? ((*(charpp) = const_cast<char*>(                        \
+               PyUnicode_AsUTF8AndSize(ob, (sizep)))) == nullptr \
+              ? -1                                               \
+              : 0)                                               \
+       : PyBytes_AsStringAndSize(ob, (charpp), (sizep)))
 
 namespace google {
 namespace protobuf {
@@ -74,9 +59,9 @@ struct PyContainer;
 typedef int (*CountMethod)(PyContainer* self);
 typedef const void* (*GetByIndexMethod)(PyContainer* self, int index);
 typedef const void* (*GetByNameMethod)(PyContainer* self,
-                                       ConstStringParam name);
+                                       absl::string_view name);
 typedef const void* (*GetByCamelcaseNameMethod)(PyContainer* self,
-                                                ConstStringParam name);
+                                                absl::string_view name);
 typedef const void* (*GetByNumberMethod)(PyContainer* self, int index);
 typedef PyObject* (*NewObjectFromItemMethod)(const void* descriptor);
 typedef const std::string& (*GetItemNameMethod)(const void* descriptor);
@@ -158,59 +143,56 @@ namespace descriptor {
 
 // Returns the C++ item descriptor for a given Python key.
 // When the descriptor is found, return true and set *item.
-// When the descriptor is not found, return true, but set *item to NULL.
+// When the descriptor is not found, return true, but set *item to null.
 // On error, returns false with an exception set.
 static bool _GetItemByKey(PyContainer* self, PyObject* key, const void** item) {
   switch (self->kind) {
-    case PyContainer::KIND_BYNAME:
-      {
-        char* name;
-        Py_ssize_t name_size;
-        if (PyString_AsStringAndSize(key, &name, &name_size) < 0) {
-          if (PyErr_ExceptionMatches(PyExc_TypeError)) {
-            // Not a string, cannot be in the container.
-            PyErr_Clear();
-            *item = NULL;
-            return true;
-          }
-          return false;
+    case PyContainer::KIND_BYNAME: {
+      char* name;
+      Py_ssize_t name_size;
+      if (PyString_AsStringAndSize(key, &name, &name_size) < 0) {
+        if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+          // Not a string, cannot be in the container.
+          PyErr_Clear();
+          *item = nullptr;
+          return true;
         }
-        *item = self->container_def->get_by_name_fn(
-            self, StringParam(name, name_size));
-        return true;
+        return false;
       }
-    case PyContainer::KIND_BYCAMELCASENAME:
-      {
-        char* camelcase_name;
-        Py_ssize_t name_size;
-        if (PyString_AsStringAndSize(key, &camelcase_name, &name_size) < 0) {
-          if (PyErr_ExceptionMatches(PyExc_TypeError)) {
-            // Not a string, cannot be in the container.
-            PyErr_Clear();
-            *item = NULL;
-            return true;
-          }
-          return false;
+      *item = self->container_def->get_by_name_fn(
+          self, absl::string_view(name, name_size));
+      return true;
+    }
+    case PyContainer::KIND_BYCAMELCASENAME: {
+      char* camelcase_name;
+      Py_ssize_t name_size;
+      if (PyString_AsStringAndSize(key, &camelcase_name, &name_size) < 0) {
+        if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+          // Not a string, cannot be in the container.
+          PyErr_Clear();
+          *item = nullptr;
+          return true;
         }
-        *item = self->container_def->get_by_camelcase_name_fn(
-            self, StringParam(camelcase_name, name_size));
-        return true;
+        return false;
       }
-    case PyContainer::KIND_BYNUMBER:
-      {
-        Py_ssize_t number = PyNumber_AsSsize_t(key, NULL);
-        if (number == -1 && PyErr_Occurred()) {
-          if (PyErr_ExceptionMatches(PyExc_TypeError)) {
-            // Not a number, cannot be in the container.
-            PyErr_Clear();
-            *item = NULL;
-            return true;
-          }
-          return false;
+      *item = self->container_def->get_by_camelcase_name_fn(
+          self, absl::string_view(camelcase_name, name_size));
+      return true;
+    }
+    case PyContainer::KIND_BYNUMBER: {
+      Py_ssize_t number = PyNumber_AsSsize_t(key, nullptr);
+      if (number == -1 && PyErr_Occurred()) {
+        if (PyErr_ExceptionMatches(PyExc_TypeError)) {
+          // Not a number, cannot be in the container.
+          PyErr_Clear();
+          *item = nullptr;
+          return true;
         }
-        *item = self->container_def->get_by_number_fn(self, number);
-        return true;
+        return false;
       }
+      *item = self->container_def->get_by_number_fn(self, number);
+      return true;
+    }
     default:
       PyErr_SetNone(PyExc_NotImplementedError);
       return false;
@@ -222,25 +204,22 @@ static bool _GetItemByKey(PyContainer* self, PyObject* key, const void** item) {
 static PyObject* _NewKey_ByIndex(PyContainer* self, Py_ssize_t index) {
   const void* item = self->container_def->get_by_index_fn(self, index);
   switch (self->kind) {
-    case PyContainer::KIND_BYNAME:
-      {
+    case PyContainer::KIND_BYNAME: {
       const std::string& name(self->container_def->get_item_name_fn(item));
       return PyUnicode_FromStringAndSize(name.c_str(), name.size());
-      }
-    case PyContainer::KIND_BYCAMELCASENAME:
-      {
+    }
+    case PyContainer::KIND_BYCAMELCASENAME: {
       const std::string& name(
           self->container_def->get_item_camelcase_name_fn(item));
       return PyUnicode_FromStringAndSize(name.c_str(), name.size());
-      }
-    case PyContainer::KIND_BYNUMBER:
-      {
-        int value = self->container_def->get_item_number_fn(item);
-        return PyLong_FromLong(value);
-      }
+    }
+    case PyContainer::KIND_BYNUMBER: {
+      int value = self->container_def->get_item_number_fn(item);
+      return PyLong_FromLong(value);
+    }
     default:
       PyErr_SetNone(PyExc_NotImplementedError);
-      return NULL;
+      return nullptr;
   }
 }
 
@@ -258,13 +237,13 @@ static Py_ssize_t Length(PyContainer* self) {
 // The DescriptorMapping type.
 
 static PyObject* Subscript(PyContainer* self, PyObject* key) {
-  const void* item = NULL;
+  const void* item = nullptr;
   if (!_GetItemByKey(self, key, &item)) {
-    return NULL;
+    return nullptr;
   }
   if (!item) {
     PyErr_SetObject(PyExc_KeyError, key);
-    return NULL;
+    return nullptr;
   }
   return self->container_def->new_object_from_item_fn(item);
 }
@@ -286,7 +265,7 @@ static PyMappingMethods MappingMappingMethods = {
 };
 
 static int Contains(PyContainer* self, PyObject* key) {
-  const void* item = NULL;
+  const void* item = nullptr;
   if (!_GetItemByKey(self, key, &item)) {
     return -1;
   }
@@ -345,11 +324,11 @@ static int DescriptorSequence_Equal(PyContainer* self, PyObject* other) {
     }
     for (int index = 0; index < size; index++) {
       ScopedPyObjectPtr value1(_NewObj_ByIndex(self, index));
-      if (value1 == NULL) {
+      if (value1 == nullptr) {
         return -1;
       }
       PyObject* value2 = PyList_GetItem(other, index);
-      if (value2 == NULL) {
+      if (value2 == nullptr) {
         return -1;
       }
       int cmp = PyObject_RichCompareBool(value1.get(), value2, Py_EQ);
@@ -389,15 +368,15 @@ static int DescriptorMapping_Equal(PyContainer* self, PyObject* other) {
     }
     for (int index = 0; index < size; index++) {
       ScopedPyObjectPtr key(_NewKey_ByIndex(self, index));
-      if (key == NULL) {
+      if (key == nullptr) {
         return -1;
       }
       ScopedPyObjectPtr value1(_NewObj_ByIndex(self, index));
-      if (value1 == NULL) {
+      if (value1 == nullptr) {
         return -1;
       }
       PyObject* value2 = PyDict_GetItem(other, key.get());
-      if (value2 == NULL) {
+      if (value2 == nullptr) {
         // Not found in the other dictionary
         return 0;
       }
@@ -427,7 +406,7 @@ static PyObject* RichCompare(PyContainer* self, PyObject* other, int opid) {
     result = DescriptorMapping_Equal(self, other);
   }
   if (result < 0) {
-    return NULL;
+    return nullptr;
   }
   if (result ^ (opid == Py_NE)) {
     Py_RETURN_TRUE;
@@ -437,28 +416,28 @@ static PyObject* RichCompare(PyContainer* self, PyObject* other, int opid) {
 }
 
 static PySequenceMethods MappingSequenceMethods = {
-    0,                      // sq_length
-    0,                      // sq_concat
-    0,                      // sq_repeat
-    0,                      // sq_item
-    0,                      // sq_slice
-    0,                      // sq_ass_item
-    0,                      // sq_ass_slice
-    (objobjproc)Contains,   // sq_contains
+    nullptr,               // sq_length
+    nullptr,               // sq_concat
+    nullptr,               // sq_repeat
+    nullptr,               // sq_item
+    nullptr,               // sq_slice
+    nullptr,               // sq_ass_item
+    nullptr,               // sq_ass_slice
+    (objobjproc)Contains,  // sq_contains
 };
 
 static PyObject* Get(PyContainer* self, PyObject* args) {
   PyObject* key;
   PyObject* default_value = Py_None;
   if (!PyArg_UnpackTuple(args, "get", 1, 2, &key, &default_value)) {
-    return NULL;
+    return nullptr;
   }
 
   const void* item;
   if (!_GetItemByKey(self, key, &item)) {
-    return NULL;
+    return nullptr;
   }
-  if (item == NULL) {
+  if (item == nullptr) {
     Py_INCREF(default_value);
     return default_value;
   }
@@ -468,13 +447,13 @@ static PyObject* Get(PyContainer* self, PyObject* args) {
 static PyObject* Keys(PyContainer* self, PyObject* args) {
   Py_ssize_t count = Length(self);
   ScopedPyObjectPtr list(PyList_New(count));
-  if (list == NULL) {
-    return NULL;
+  if (list == nullptr) {
+    return nullptr;
   }
   for (Py_ssize_t index = 0; index < count; ++index) {
     PyObject* key = _NewKey_ByIndex(self, index);
-    if (key == NULL) {
-      return NULL;
+    if (key == nullptr) {
+      return nullptr;
     }
     PyList_SET_ITEM(list.get(), index, key);
   }
@@ -484,13 +463,13 @@ static PyObject* Keys(PyContainer* self, PyObject* args) {
 static PyObject* Values(PyContainer* self, PyObject* args) {
   Py_ssize_t count = Length(self);
   ScopedPyObjectPtr list(PyList_New(count));
-  if (list == NULL) {
-    return NULL;
+  if (list == nullptr) {
+    return nullptr;
   }
   for (Py_ssize_t index = 0; index < count; ++index) {
     PyObject* value = _NewObj_ByIndex(self, index);
-    if (value == NULL) {
-      return NULL;
+    if (value == nullptr) {
+      return nullptr;
     }
     PyList_SET_ITEM(list.get(), index, value);
   }
@@ -500,22 +479,22 @@ static PyObject* Values(PyContainer* self, PyObject* args) {
 static PyObject* Items(PyContainer* self, PyObject* args) {
   Py_ssize_t count = Length(self);
   ScopedPyObjectPtr list(PyList_New(count));
-  if (list == NULL) {
-    return NULL;
+  if (list == nullptr) {
+    return nullptr;
   }
   for (Py_ssize_t index = 0; index < count; ++index) {
     ScopedPyObjectPtr obj(PyTuple_New(2));
-    if (obj == NULL) {
-      return NULL;
+    if (obj == nullptr) {
+      return nullptr;
     }
     PyObject* key = _NewKey_ByIndex(self, index);
-    if (key == NULL) {
-      return NULL;
+    if (key == nullptr) {
+      return nullptr;
     }
     PyTuple_SET_ITEM(obj.get(), 0, key);
     PyObject* value = _NewObj_ByIndex(self, index);
-    if (value == NULL) {
-      return NULL;
+    if (value == nullptr) {
+      return nullptr;
     }
     PyTuple_SET_ITEM(obj.get(), 1, value);
     PyList_SET_ITEM(list.get(), index, obj.release());
@@ -540,56 +519,59 @@ static PyObject* IterItems(PyContainer* self, PyObject* args) {
 }
 
 static PyMethodDef MappingMethods[] = {
-  { "get", (PyCFunction)Get, METH_VARARGS, },
-  { "keys", (PyCFunction)Keys, METH_NOARGS, },
-  { "values", (PyCFunction)Values, METH_NOARGS, },
-  { "items", (PyCFunction)Items, METH_NOARGS, },
-  { "iterkeys", (PyCFunction)IterKeys, METH_NOARGS, },
-  { "itervalues", (PyCFunction)IterValues, METH_NOARGS, },
-  { "iteritems", (PyCFunction)IterItems, METH_NOARGS, },
-  {NULL}
+    {"get", (PyCFunction)Get, METH_VARARGS},
+    {"keys", (PyCFunction)Keys, METH_NOARGS},
+    {"values", (PyCFunction)Values, METH_NOARGS},
+    {"items", (PyCFunction)Items, METH_NOARGS},
+    {"iterkeys", (PyCFunction)IterKeys, METH_NOARGS},
+    {"itervalues", (PyCFunction)IterValues, METH_NOARGS},
+    {"iteritems", (PyCFunction)IterItems, METH_NOARGS},
+    {nullptr},
 };
 
 PyTypeObject DescriptorMapping_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  "DescriptorMapping",                  // tp_name
-  sizeof(PyContainer),                  // tp_basicsize
-  0,                                    // tp_itemsize
-  0,                                    // tp_dealloc
-  0,                                    // tp_print
-  0,                                    // tp_getattr
-  0,                                    // tp_setattr
-  0,                                    // tp_compare
-  (reprfunc)ContainerRepr,              // tp_repr
-  0,                                    // tp_as_number
-  &MappingSequenceMethods,              // tp_as_sequence
-  &MappingMappingMethods,               // tp_as_mapping
-  0,                                    // tp_hash
-  0,                                    // tp_call
-  0,                                    // tp_str
-  0,                                    // tp_getattro
-  0,                                    // tp_setattro
-  0,                                    // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                   // tp_flags
-  0,                                    // tp_doc
-  0,                                    // tp_traverse
-  0,                                    // tp_clear
-  (richcmpfunc)RichCompare,             // tp_richcompare
-  0,                                    // tp_weaklistoffset
-  (getiterfunc)Iter,                    // tp_iter
-  0,                                    // tp_iternext
-  MappingMethods,                       // tp_methods
-  0,                                    // tp_members
-  0,                                    // tp_getset
-  0,                                    // tp_base
-  0,                                    // tp_dict
-  0,                                    // tp_descr_get
-  0,                                    // tp_descr_set
-  0,                                    // tp_dictoffset
-  0,                                    // tp_init
-  0,                                    // tp_alloc
-  0,                                    // tp_new
-  0,                                    // tp_free
+    PyVarObject_HEAD_INIT(&PyType_Type, 0) "DescriptorMapping",  // tp_name
+    sizeof(PyContainer),                                         // tp_basicsize
+    0,                                                           // tp_itemsize
+    nullptr,                                                     // tp_dealloc
+#if PY_VERSION_HEX < 0x03080000
+    nullptr,  // tp_print
+#else
+    0,  // tp_vectorcall_offset
+#endif
+    nullptr,                   // tp_getattr
+    nullptr,                   // tp_setattr
+    nullptr,                   // tp_compare
+    (reprfunc)ContainerRepr,   // tp_repr
+    nullptr,                   // tp_as_number
+    &MappingSequenceMethods,   // tp_as_sequence
+    &MappingMappingMethods,    // tp_as_mapping
+    nullptr,                   // tp_hash
+    nullptr,                   // tp_call
+    nullptr,                   // tp_str
+    nullptr,                   // tp_getattro
+    nullptr,                   // tp_setattro
+    nullptr,                   // tp_as_buffer
+    Py_TPFLAGS_DEFAULT,        // tp_flags
+    nullptr,                   // tp_doc
+    nullptr,                   // tp_traverse
+    nullptr,                   // tp_clear
+    (richcmpfunc)RichCompare,  // tp_richcompare
+    0,                         // tp_weaklistoffset
+    (getiterfunc)Iter,         // tp_iter
+    nullptr,                   // tp_iternext
+    MappingMethods,            // tp_methods
+    nullptr,                   // tp_members
+    nullptr,                   // tp_getset
+    nullptr,                   // tp_base
+    nullptr,                   // tp_dict
+    nullptr,                   // tp_descr_get
+    nullptr,                   // tp_descr_set
+    0,                         // tp_dictoffset
+    nullptr,                   // tp_init
+    nullptr,                   // tp_alloc
+    nullptr,                   // tp_new
+    nullptr,                   // tp_free
 };
 
 // The DescriptorSequence type.
@@ -600,7 +582,7 @@ static PyObject* GetItem(PyContainer* self, Py_ssize_t index) {
   }
   if (index < 0 || index >= Length(self)) {
     PyErr_SetString(PyExc_IndexError, "index out of range");
-    return NULL;
+    return nullptr;
   }
   return _NewObj_ByIndex(self, index);
 }
@@ -610,15 +592,14 @@ SeqSubscript(PyContainer* self, PyObject* item) {
   if (PyIndex_Check(item)) {
       Py_ssize_t index;
       index = PyNumber_AsSsize_t(item, PyExc_IndexError);
-      if (index == -1 && PyErr_Occurred())
-          return NULL;
+      if (index == -1 && PyErr_Occurred()) return nullptr;
       return GetItem(self, index);
   }
   // Materialize the list and delegate the operation to it.
   ScopedPyObjectPtr list(PyObject_CallFunctionObjArgs(
-      reinterpret_cast<PyObject*>(&PyList_Type), self, NULL));
-  if (list == NULL) {
-    return NULL;
+      reinterpret_cast<PyObject*>(&PyList_Type), self, nullptr));
+  if (list == nullptr) {
+    return nullptr;
   }
   return Py_TYPE(list.get())->tp_as_mapping->mp_subscript(list.get(), item);
 }
@@ -633,7 +614,7 @@ int Find(PyContainer* self, PyObject* item) {
   // a specific item belongs to only one sequence, depending on its position in
   // the .proto file definition.
   const void* descriptor_ptr = PyDescriptor_AsVoidPtr(item);
-  if (descriptor_ptr == NULL) {
+  if (descriptor_ptr == nullptr) {
     PyErr_Clear();
     // Not a descriptor, it cannot be in the list.
     return -1;
@@ -669,7 +650,7 @@ static PyObject* Index(PyContainer* self, PyObject* item) {
   if (position < 0) {
     // Not found
     PyErr_SetNone(PyExc_ValueError);
-    return NULL;
+    return nullptr;
   } else {
     return PyLong_FromLong(position);
   }
@@ -702,7 +683,7 @@ static PyObject* Append(PyContainer* self, PyObject* args) {
   PyErr_Format(PyExc_TypeError,
                "'%.200s' object is not a mutable sequence",
                Py_TYPE(self)->tp_name);
-  return NULL;
+  return nullptr;
 }
 
 static PyObject* Reversed(PyContainer* self, PyObject* args) {
@@ -711,77 +692,80 @@ static PyObject* Reversed(PyContainer* self, PyObject* args) {
 }
 
 static PyMethodDef SeqMethods[] = {
-  { "index", (PyCFunction)Index, METH_O, },
-  { "count", (PyCFunction)Count, METH_O, },
-  { "append", (PyCFunction)Append, METH_O, },
-  { "__reversed__", (PyCFunction)Reversed, METH_NOARGS, },
-  {NULL}
+    {"index", (PyCFunction)Index, METH_O},
+    {"count", (PyCFunction)Count, METH_O},
+    {"append", (PyCFunction)Append, METH_O},
+    {"__reversed__", (PyCFunction)Reversed, METH_NOARGS},
+    {nullptr},
 };
 
 static PySequenceMethods SeqSequenceMethods = {
-  (lenfunc)Length,          // sq_length
-  0,                        // sq_concat
-  0,                        // sq_repeat
-  (ssizeargfunc)GetItem,    // sq_item
-  0,                        // sq_slice
-  0,                        // sq_ass_item
-  0,                        // sq_ass_slice
-  (objobjproc)SeqContains,  // sq_contains
+    (lenfunc)Length,          // sq_length
+    nullptr,                  // sq_concat
+    nullptr,                  // sq_repeat
+    (ssizeargfunc)GetItem,    // sq_item
+    nullptr,                  // sq_slice
+    nullptr,                  // sq_ass_item
+    nullptr,                  // sq_ass_slice
+    (objobjproc)SeqContains,  // sq_contains
 };
 
 static PyMappingMethods SeqMappingMethods = {
-  (lenfunc)Length,           // mp_length
-  (binaryfunc)SeqSubscript,  // mp_subscript
-  0,                         // mp_ass_subscript
+    (lenfunc)Length,           // mp_length
+    (binaryfunc)SeqSubscript,  // mp_subscript
+    nullptr,                   // mp_ass_subscript
 };
 
 PyTypeObject DescriptorSequence_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  "DescriptorSequence",                 // tp_name
-  sizeof(PyContainer),                  // tp_basicsize
-  0,                                    // tp_itemsize
-  0,                                    // tp_dealloc
-  0,                                    // tp_print
-  0,                                    // tp_getattr
-  0,                                    // tp_setattr
-  0,                                    // tp_compare
-  (reprfunc)ContainerRepr,              // tp_repr
-  0,                                    // tp_as_number
-  &SeqSequenceMethods,                  // tp_as_sequence
-  &SeqMappingMethods,                   // tp_as_mapping
-  0,                                    // tp_hash
-  0,                                    // tp_call
-  0,                                    // tp_str
-  0,                                    // tp_getattro
-  0,                                    // tp_setattro
-  0,                                    // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                   // tp_flags
-  0,                                    // tp_doc
-  0,                                    // tp_traverse
-  0,                                    // tp_clear
-  (richcmpfunc)RichCompare,             // tp_richcompare
-  0,                                    // tp_weaklistoffset
-  0,                                    // tp_iter
-  0,                                    // tp_iternext
-  SeqMethods,                           // tp_methods
-  0,                                    // tp_members
-  0,                                    // tp_getset
-  0,                                    // tp_base
-  0,                                    // tp_dict
-  0,                                    // tp_descr_get
-  0,                                    // tp_descr_set
-  0,                                    // tp_dictoffset
-  0,                                    // tp_init
-  0,                                    // tp_alloc
-  0,                                    // tp_new
-  0,                                    // tp_free
+    PyVarObject_HEAD_INIT(&PyType_Type, 0) "DescriptorSequence",  // tp_name
+    sizeof(PyContainer),  // tp_basicsize
+    0,                    // tp_itemsize
+    nullptr,              // tp_dealloc
+#if PY_VERSION_HEX < 0x03080000
+    nullptr,  // tp_print
+#else
+    0,  // tp_vectorcall_offset
+#endif
+    nullptr,                   // tp_getattr
+    nullptr,                   // tp_setattr
+    nullptr,                   // tp_compare
+    (reprfunc)ContainerRepr,   // tp_repr
+    nullptr,                   // tp_as_number
+    &SeqSequenceMethods,       // tp_as_sequence
+    &SeqMappingMethods,        // tp_as_mapping
+    nullptr,                   // tp_hash
+    nullptr,                   // tp_call
+    nullptr,                   // tp_str
+    nullptr,                   // tp_getattro
+    nullptr,                   // tp_setattro
+    nullptr,                   // tp_as_buffer
+    Py_TPFLAGS_DEFAULT,        // tp_flags
+    nullptr,                   // tp_doc
+    nullptr,                   // tp_traverse
+    nullptr,                   // tp_clear
+    (richcmpfunc)RichCompare,  // tp_richcompare
+    0,                         // tp_weaklistoffset
+    nullptr,                   // tp_iter
+    nullptr,                   // tp_iternext
+    SeqMethods,                // tp_methods
+    nullptr,                   // tp_members
+    nullptr,                   // tp_getset
+    nullptr,                   // tp_base
+    nullptr,                   // tp_dict
+    nullptr,                   // tp_descr_get
+    nullptr,                   // tp_descr_set
+    0,                         // tp_dictoffset
+    nullptr,                   // tp_init
+    nullptr,                   // tp_alloc
+    nullptr,                   // tp_new
+    nullptr,                   // tp_free
 };
 
 static PyObject* NewMappingByName(
     DescriptorContainerDef* container_def, const void* descriptor) {
   PyContainer* self = PyObject_New(PyContainer, &DescriptorMapping_Type);
-  if (self == NULL) {
-    return NULL;
+  if (self == nullptr) {
+    return nullptr;
   }
   self->descriptor = descriptor;
   self->container_def = container_def;
@@ -792,8 +776,8 @@ static PyObject* NewMappingByName(
 static PyObject* NewMappingByCamelcaseName(
     DescriptorContainerDef* container_def, const void* descriptor) {
   PyContainer* self = PyObject_New(PyContainer, &DescriptorMapping_Type);
-  if (self == NULL) {
-    return NULL;
+  if (self == nullptr) {
+    return nullptr;
   }
   self->descriptor = descriptor;
   self->container_def = container_def;
@@ -803,14 +787,14 @@ static PyObject* NewMappingByCamelcaseName(
 
 static PyObject* NewMappingByNumber(
     DescriptorContainerDef* container_def, const void* descriptor) {
-  if (container_def->get_by_number_fn == NULL ||
-      container_def->get_item_number_fn == NULL) {
+  if (container_def->get_by_number_fn == nullptr ||
+      container_def->get_item_number_fn == nullptr) {
     PyErr_SetNone(PyExc_NotImplementedError);
-    return NULL;
+    return nullptr;
   }
   PyContainer* self = PyObject_New(PyContainer, &DescriptorMapping_Type);
-  if (self == NULL) {
-    return NULL;
+  if (self == nullptr) {
+    return nullptr;
   }
   self->descriptor = descriptor;
   self->container_def = container_def;
@@ -821,8 +805,8 @@ static PyObject* NewMappingByNumber(
 static PyObject* NewSequence(
     DescriptorContainerDef* container_def, const void* descriptor) {
   PyContainer* self = PyObject_New(PyContainer, &DescriptorSequence_Type);
-  if (self == NULL) {
-    return NULL;
+  if (self == nullptr) {
+    return nullptr;
   }
   self->descriptor = descriptor;
   self->container_def = container_def;
@@ -840,8 +824,8 @@ static void Iterator_Dealloc(PyContainerIterator* self) {
 static PyObject* Iterator_Next(PyContainerIterator* self) {
   int count = self->container->container_def->count_fn(self->container);
   if (self->index >= count) {
-    // Return NULL with no exception to indicate the end.
-    return NULL;
+    // Return null with no exception to indicate the end.
+    return nullptr;
   }
   int index = self->index;
   self->index += 1;
@@ -852,80 +836,83 @@ static PyObject* Iterator_Next(PyContainerIterator* self) {
       return _NewObj_ByIndex(self->container, index);
     case PyContainerIterator::KIND_ITERVALUE_REVERSED:
       return _NewObj_ByIndex(self->container, count - index - 1);
-    case PyContainerIterator::KIND_ITERITEM:
-      {
-        PyObject* obj = PyTuple_New(2);
-        if (obj == NULL) {
-          return NULL;
-        }
-        PyObject* key = _NewKey_ByIndex(self->container, index);
-        if (key == NULL) {
-          Py_DECREF(obj);
-          return NULL;
-        }
-        PyTuple_SET_ITEM(obj, 0, key);
-        PyObject* value = _NewObj_ByIndex(self->container, index);
-        if (value == NULL) {
-          Py_DECREF(obj);
-          return NULL;
-        }
-        PyTuple_SET_ITEM(obj, 1, value);
-        return obj;
+    case PyContainerIterator::KIND_ITERITEM: {
+      PyObject* obj = PyTuple_New(2);
+      if (obj == nullptr) {
+        return nullptr;
       }
+      PyObject* key = _NewKey_ByIndex(self->container, index);
+      if (key == nullptr) {
+        Py_DECREF(obj);
+        return nullptr;
+      }
+      PyTuple_SET_ITEM(obj, 0, key);
+      PyObject* value = _NewObj_ByIndex(self->container, index);
+      if (value == nullptr) {
+        Py_DECREF(obj);
+        return nullptr;
+      }
+      PyTuple_SET_ITEM(obj, 1, value);
+      return obj;
+    }
     default:
       PyErr_SetNone(PyExc_NotImplementedError);
-      return NULL;
+      return nullptr;
   }
 }
 
 static PyTypeObject ContainerIterator_Type = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0)
-  "DescriptorContainerIterator",        // tp_name
-  sizeof(PyContainerIterator),          // tp_basicsize
-  0,                                    // tp_itemsize
-  (destructor)Iterator_Dealloc,         // tp_dealloc
-  0,                                    // tp_print
-  0,                                    // tp_getattr
-  0,                                    // tp_setattr
-  0,                                    // tp_compare
-  0,                                    // tp_repr
-  0,                                    // tp_as_number
-  0,                                    // tp_as_sequence
-  0,                                    // tp_as_mapping
-  0,                                    // tp_hash
-  0,                                    // tp_call
-  0,                                    // tp_str
-  0,                                    // tp_getattro
-  0,                                    // tp_setattro
-  0,                                    // tp_as_buffer
-  Py_TPFLAGS_DEFAULT,                   // tp_flags
-  0,                                    // tp_doc
-  0,                                    // tp_traverse
-  0,                                    // tp_clear
-  0,                                    // tp_richcompare
-  0,                                    // tp_weaklistoffset
-  PyObject_SelfIter,                    // tp_iter
-  (iternextfunc)Iterator_Next,          // tp_iternext
-  0,                                    // tp_methods
-  0,                                    // tp_members
-  0,                                    // tp_getset
-  0,                                    // tp_base
-  0,                                    // tp_dict
-  0,                                    // tp_descr_get
-  0,                                    // tp_descr_set
-  0,                                    // tp_dictoffset
-  0,                                    // tp_init
-  0,                                    // tp_alloc
-  0,                                    // tp_new
-  0,                                    // tp_free
+    PyVarObject_HEAD_INIT(&PyType_Type,
+                          0) "DescriptorContainerIterator",  // tp_name
+    sizeof(PyContainerIterator),                             // tp_basicsize
+    0,                                                       // tp_itemsize
+    (destructor)Iterator_Dealloc,                            // tp_dealloc
+#if PY_VERSION_HEX < 0x03080000
+    nullptr,  // tp_print
+#else
+    0,  // tp_vectorcall_offset
+#endif
+    nullptr,                      // tp_getattr
+    nullptr,                      // tp_setattr
+    nullptr,                      // tp_compare
+    nullptr,                      // tp_repr
+    nullptr,                      // tp_as_number
+    nullptr,                      // tp_as_sequence
+    nullptr,                      // tp_as_mapping
+    nullptr,                      // tp_hash
+    nullptr,                      // tp_call
+    nullptr,                      // tp_str
+    nullptr,                      // tp_getattro
+    nullptr,                      // tp_setattro
+    nullptr,                      // tp_as_buffer
+    Py_TPFLAGS_DEFAULT,           // tp_flags
+    nullptr,                      // tp_doc
+    nullptr,                      // tp_traverse
+    nullptr,                      // tp_clear
+    nullptr,                      // tp_richcompare
+    0,                            // tp_weaklistoffset
+    PyObject_SelfIter,            // tp_iter
+    (iternextfunc)Iterator_Next,  // tp_iternext
+    nullptr,                      // tp_methods
+    nullptr,                      // tp_members
+    nullptr,                      // tp_getset
+    nullptr,                      // tp_base
+    nullptr,                      // tp_dict
+    nullptr,                      // tp_descr_get
+    nullptr,                      // tp_descr_set
+    0,                            // tp_dictoffset
+    nullptr,                      // tp_init
+    nullptr,                      // tp_alloc
+    nullptr,                      // tp_new
+    nullptr,                      // tp_free
 };
 
 static PyObject* NewContainerIterator(PyContainer* container,
                                       PyContainerIterator::IterKind kind) {
   PyContainerIterator* self = PyObject_New(PyContainerIterator,
                                            &ContainerIterator_Type);
-  if (self == NULL) {
-    return NULL;
+  if (self == nullptr) {
+    return nullptr;
   }
   Py_INCREF(container);
   self->container = container;
@@ -955,12 +942,12 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->field_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindFieldByName(name);
 }
 
 static const void* GetByCamelcaseName(PyContainer* self,
-                                      ConstStringParam name) {
+                                      absl::string_view name) {
   return GetDescriptor(self)->FindFieldByCamelcaseName(name);
 }
 
@@ -993,17 +980,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "MessageFields",
-  Count,
-  GetByIndex,
-  GetByName,
-  GetByCamelcaseName,
-  GetByNumber,
-  NewObjectFromItem,
-  GetItemName,
-  GetItemCamelcaseName,
-  GetItemNumber,
-  GetItemIndex,
+    "MessageFields",      Count,         GetByIndex,        GetByName,
+    GetByCamelcaseName,   GetByNumber,   NewObjectFromItem, GetItemName,
+    GetItemCamelcaseName, GetItemNumber, GetItemIndex,
 };
 
 }  // namespace fields
@@ -1033,7 +1012,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->nested_type_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindNestedTypeByName(name);
 }
 
@@ -1054,17 +1033,17 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "MessageNestedTypes",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "MessageNestedTypes",
+    Count,
+    GetByIndex,
+    GetByName,
+    nullptr,
+    nullptr,
+    NewObjectFromItem,
+    GetItemName,
+    nullptr,
+    nullptr,
+    GetItemIndex,
 };
 
 }  // namespace nested_types
@@ -1085,7 +1064,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->enum_type_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindEnumTypeByName(name);
 }
 
@@ -1106,17 +1085,17 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "MessageNestedEnums",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "MessageNestedEnums",
+    Count,
+    GetByIndex,
+    GetByName,
+    nullptr,
+    nullptr,
+    NewObjectFromItem,
+    GetItemName,
+    nullptr,
+    nullptr,
+    GetItemIndex,
 };
 
 }  // namespace enums
@@ -1148,14 +1127,14 @@ static int Count(PyContainer* self) {
   return count;
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindEnumValueByName(name);
 }
 
 static const void* GetByIndex(PyContainer* self, int index) {
   // This is not optimal, but the number of enums *types* in a given message
   // is small.  This function is only used when iterating over the mapping.
-  const EnumDescriptor* enum_type = NULL;
+  const EnumDescriptor* enum_type = nullptr;
   int enum_type_count = GetDescriptor(self)->enum_type_count();
   for (int i = 0; i < enum_type_count; ++i) {
     enum_type = GetDescriptor(self)->enum_type(i);
@@ -1181,17 +1160,8 @@ static const std::string& GetItemName(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "MessageEnumValues",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  NULL,
+    "MessageEnumValues", Count,       GetByIndex, GetByName, nullptr, nullptr,
+    NewObjectFromItem,   GetItemName, nullptr,    nullptr,   nullptr,
 };
 
 }  // namespace enumvalues
@@ -1208,7 +1178,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->extension_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindExtensionByName(name);
 }
 
@@ -1229,17 +1199,17 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "MessageExtensions",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "MessageExtensions",
+    Count,
+    GetByIndex,
+    GetByName,
+    nullptr,
+    nullptr,
+    NewObjectFromItem,
+    GetItemName,
+    nullptr,
+    nullptr,
+    GetItemIndex,
 };
 
 }  // namespace extensions
@@ -1260,7 +1230,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->oneof_decl_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindOneofByName(name);
 }
 
@@ -1281,17 +1251,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "MessageOneofs",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "MessageOneofs", Count,   GetByIndex,        GetByName,
+    nullptr,         nullptr, NewObjectFromItem, GetItemName,
+    nullptr,         nullptr, GetItemIndex,
 };
 
 }  // namespace oneofs
@@ -1326,7 +1288,7 @@ static const void* GetByIndex(PyContainer* self, int index) {
   return GetDescriptor(self)->value(index);
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindValueByName(name);
 }
 
@@ -1352,17 +1314,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "EnumValues",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  GetByNumber,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  GetItemNumber,
-  GetItemIndex,
+    "EnumValues", Count,         GetByIndex,        GetByName,
+    nullptr,      GetByNumber,   NewObjectFromItem, GetItemName,
+    nullptr,      GetItemNumber, GetItemIndex,
 };
 
 }  // namespace enumvalues
@@ -1410,17 +1364,8 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "OneofFields",
-  Count,
-  GetByIndex,
-  NULL,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  NULL,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "OneofFields",     Count,   GetByIndex, nullptr, nullptr,      nullptr,
+    NewObjectFromItem, nullptr, nullptr,    nullptr, GetItemIndex,
 };
 
 }  // namespace fields
@@ -1447,7 +1392,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->method_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindMethodByName(name);
 }
 
@@ -1468,17 +1413,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "ServiceMethods",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "ServiceMethods", Count,   GetByIndex,        GetByName,
+    nullptr,          nullptr, NewObjectFromItem, GetItemName,
+    nullptr,          nullptr, GetItemIndex,
 };
 
 }  // namespace methods
@@ -1509,7 +1446,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->message_type_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindMessageTypeByName(name);
 }
 
@@ -1530,17 +1467,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "FileMessages",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "FileMessages", Count,   GetByIndex,        GetByName,
+    nullptr,        nullptr, NewObjectFromItem, GetItemName,
+    nullptr,        nullptr, GetItemIndex,
 };
 
 }  // namespace messages
@@ -1557,7 +1486,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->enum_type_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindEnumTypeByName(name);
 }
 
@@ -1578,17 +1507,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "FileEnums",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "FileEnums", Count,   GetByIndex,        GetByName,
+    nullptr,     nullptr, NewObjectFromItem, GetItemName,
+    nullptr,     nullptr, GetItemIndex,
 };
 
 }  // namespace enums
@@ -1605,7 +1526,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->extension_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindExtensionByName(name);
 }
 
@@ -1626,17 +1547,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "FileExtensions",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "FileExtensions", Count,   GetByIndex,        GetByName,
+    nullptr,          nullptr, NewObjectFromItem, GetItemName,
+    nullptr,          nullptr, GetItemIndex,
 };
 
 }  // namespace extensions
@@ -1653,7 +1566,7 @@ static int Count(PyContainer* self) {
   return GetDescriptor(self)->service_count();
 }
 
-static const void* GetByName(PyContainer* self, ConstStringParam name) {
+static const void* GetByName(PyContainer* self, absl::string_view name) {
   return GetDescriptor(self)->FindServiceByName(name);
 }
 
@@ -1674,17 +1587,9 @@ static int GetItemIndex(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "FileServices",
-  Count,
-  GetByIndex,
-  GetByName,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  GetItemName,
-  NULL,
-  NULL,
-  GetItemIndex,
+    "FileServices", Count,   GetByIndex,        GetByName,
+    nullptr,        nullptr, NewObjectFromItem, GetItemName,
+    nullptr,        nullptr, GetItemIndex,
 };
 
 }  // namespace services
@@ -1710,17 +1615,8 @@ static PyObject* NewObjectFromItem(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "FileDependencies",
-  Count,
-  GetByIndex,
-  NULL,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
+    "FileDependencies", Count,   GetByIndex, nullptr, nullptr, nullptr,
+    NewObjectFromItem,  nullptr, nullptr,    nullptr, nullptr,
 };
 
 }  // namespace dependencies
@@ -1746,17 +1642,8 @@ static PyObject* NewObjectFromItem(const void* item) {
 }
 
 static DescriptorContainerDef ContainerDef = {
-  "FilePublicDependencies",
-  Count,
-  GetByIndex,
-  NULL,
-  NULL,
-  NULL,
-  NewObjectFromItem,
-  NULL,
-  NULL,
-  NULL,
-  NULL,
+    "FilePublicDependencies", Count,   GetByIndex, nullptr, nullptr, nullptr,
+    NewObjectFromItem,        nullptr, nullptr,    nullptr, nullptr,
 };
 
 }  // namespace public_dependencies

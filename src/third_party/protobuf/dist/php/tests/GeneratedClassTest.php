@@ -291,6 +291,10 @@ class GeneratedClassTest extends TestBase
         // Test Enum methods
         $this->assertEquals('ONE', TestEnum::name(1));
         $this->assertEquals(1, TestEnum::value('ONE'));
+        $this->assertEquals('ECHO', TestEnum::name(3));
+        $this->assertEquals(3, TestEnum::value('ECHO'));
+        // Backwards compat value lookup by prefixed-name.
+        $this->assertEquals(3, TestEnum::value('PBECHO'));
     }
 
     public function testInvalidEnumValueThrowsException()
@@ -328,6 +332,19 @@ class GeneratedClassTest extends TestBase
     public function testLegacyTypehintWithNestedEnums()
     {
         $this->legacyEnum(new TestLegacyMessage\NestedEnum);
+    }
+
+    public function testLegacyReadOnlyMessage()
+    {
+        $this->assertTrue(class_exists('\Upper\READONLY'));
+        $this->assertTrue(class_exists('\Lower\readonly'));
+        $this->assertTrue(class_exists('\Php\Test\TestNamespace\PBEmpty\ReadOnly'));
+    }
+
+    public function testLegacyReadOnlyEnum()
+    {
+        $this->assertTrue(class_exists('\Upper_enum\READONLY'));
+        $this->assertTrue(class_exists('\Lower_enum\readonly'));
     }
 
     private function legacyEnum(TestLegacyMessage_NestedEnum $enum)
@@ -934,13 +951,16 @@ class GeneratedClassTest extends TestBase
         $m = new \Lower\PBnamespace();
         $m = new \Lower\PBnew();
         $m = new \Lower\PBor();
+        $m = new \Lower\PBparent();
         $m = new \Lower\PBprint();
         $m = new \Lower\PBprivate();
         $m = new \Lower\PBprotected();
         $m = new \Lower\PBpublic();
+        $m = new \Lower\PBreadonly();
         $m = new \Lower\PBrequire();
         $m = new \Lower\PBrequire_once();
         $m = new \Lower\PBreturn();
+        $m = new \Lower\PBself();
         $m = new \Lower\PBstatic();
         $m = new \Lower\PBswitch();
         $m = new \Lower\PBthrow();
@@ -1012,13 +1032,16 @@ class GeneratedClassTest extends TestBase
         $m = new \Upper\PBNAMESPACE();
         $m = new \Upper\PBNEW();
         $m = new \Upper\PBOR();
+        $m = new \Upper\PBPARENT();
         $m = new \Upper\PBPRINT();
         $m = new \Upper\PBPRIVATE();
         $m = new \Upper\PBPROTECTED();
         $m = new \Upper\PBPUBLIC();
+        $m = new \Upper\PBREADONLY();
         $m = new \Upper\PBREQUIRE();
         $m = new \Upper\PBREQUIRE_ONCE();
         $m = new \Upper\PBRETURN();
+        $m = new \Upper\PBSELF();
         $m = new \Upper\PBSTATIC();
         $m = new \Upper\PBSWITCH();
         $m = new \Upper\PBTHROW();
@@ -1090,13 +1113,16 @@ class GeneratedClassTest extends TestBase
         $m = new \Lower_enum\PBnamespace();
         $m = new \Lower_enum\PBnew();
         $m = new \Lower_enum\PBor();
+        $m = new \Lower_enum\PBparent();
         $m = new \Lower_enum\PBprint();
         $m = new \Lower_enum\PBprivate();
         $m = new \Lower_enum\PBprotected();
         $m = new \Lower_enum\PBpublic();
         $m = new \Lower_enum\PBrequire();
+        $m = new \Lower_enum\PBreadonly();
         $m = new \Lower_enum\PBrequire_once();
         $m = new \Lower_enum\PBreturn();
+        $m = new \Lower_enum\PBself();
         $m = new \Lower_enum\PBstatic();
         $m = new \Lower_enum\PBswitch();
         $m = new \Lower_enum\PBthrow();
@@ -1168,13 +1194,16 @@ class GeneratedClassTest extends TestBase
         $m = new \Upper_enum\PBNAMESPACE();
         $m = new \Upper_enum\PBNEW();
         $m = new \Upper_enum\PBOR();
+        $m = new \Upper_enum\PBPARENT();
         $m = new \Upper_enum\PBPRINT();
         $m = new \Upper_enum\PBPRIVATE();
         $m = new \Upper_enum\PBPROTECTED();
         $m = new \Upper_enum\PBPUBLIC();
+        $m = new \Upper_enum\PBREADONLY();
         $m = new \Upper_enum\PBREQUIRE();
         $m = new \Upper_enum\PBREQUIRE_ONCE();
         $m = new \Upper_enum\PBRETURN();
+        $m = new \Upper_enum\PBSELF();
         $m = new \Upper_enum\PBSTATIC();
         $m = new \Upper_enum\PBSWITCH();
         $m = new \Upper_enum\PBTHROW();
@@ -1273,6 +1302,9 @@ class GeneratedClassTest extends TestBase
         $m = \Lower_enum_value\NotAllowed::null;
         $m = \Lower_enum_value\NotAllowed::void;
         $m = \Lower_enum_value\NotAllowed::iterable;
+        $m = \Lower_enum_value\NotAllowed::parent;
+        $m = \Lower_enum_value\NotAllowed::self;
+        $m = \Lower_enum_value\NotAllowed::readonly;
 
         $m = \Upper_enum_value\NotAllowed::PBABSTRACT;
         $m = \Upper_enum_value\NotAllowed::PBAND;
@@ -1351,6 +1383,9 @@ class GeneratedClassTest extends TestBase
         $m = \Upper_enum_value\NotAllowed::NULL;
         $m = \Upper_enum_value\NotAllowed::VOID;
         $m = \Upper_enum_value\NotAllowed::ITERABLE;
+        $m = \Upper_enum_value\NotAllowed::PARENT;
+        $m = \Upper_enum_value\NotAllowed::SELF;
+        $m = \Upper_enum_value\NotAllowed::READONLY;
 
         $this->assertTrue(true);
     }

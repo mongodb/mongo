@@ -1,38 +1,16 @@
 ﻿#region Copyright notice and license
 // Protocol Buffers - Google's data interchange format
 // Copyright 2016 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 #endregion
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using Google.Protobuf.Reflection;
@@ -62,12 +40,7 @@ namespace Google.Protobuf.WellKnownTypes
             if (firstInvalid == null)
             {
                 var writer = new StringWriter();
-#if NET35
-                var query = paths.Select(JsonFormatter.ToJsonName);
-                JsonFormatter.WriteString(writer, string.Join(",", query.ToArray()));
-#else
                 JsonFormatter.WriteString(writer, string.Join(",", paths.Select(JsonFormatter.ToJsonName)));
-#endif
                 return writer.ToString();
             }
             else
@@ -115,7 +88,7 @@ namespace Google.Protobuf.WellKnownTypes
         /// Parses from a string to a FieldMask and validates all field paths.
         /// </summary>
         /// <typeparam name="T">The type to validate the field paths against.</typeparam>
-        public static FieldMask FromString<T>(string value) where T : IMessage
+        public static FieldMask FromString<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]T>(string value) where T : IMessage
         {
             return FromStringEnumerable<T>(new List<string>(value.Split(FIELD_PATH_SEPARATOR)));
         }
@@ -124,7 +97,7 @@ namespace Google.Protobuf.WellKnownTypes
         /// Constructs a FieldMask for a list of field paths in a certain type.
         /// </summary>
         /// <typeparam name="T">The type to validate the field paths against.</typeparam>
-        public static FieldMask FromStringEnumerable<T>(IEnumerable<string> paths) where T : IMessage
+        public static FieldMask FromStringEnumerable<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]T>(IEnumerable<string> paths) where T : IMessage
         {
             var mask = new FieldMask();
             foreach (var path in paths)
@@ -151,7 +124,7 @@ namespace Google.Protobuf.WellKnownTypes
         /// Constructs a FieldMask from the passed field numbers.
         /// </summary>
         /// <typeparam name="T">The type to validate the field paths against.</typeparam>
-        public static FieldMask FromFieldNumbers<T>(params int[] fieldNumbers) where T : IMessage
+        public static FieldMask FromFieldNumbers<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]T>(params int[] fieldNumbers) where T : IMessage
         {
             return FromFieldNumbers<T>((IEnumerable<int>)fieldNumbers);
         }
@@ -160,7 +133,7 @@ namespace Google.Protobuf.WellKnownTypes
         /// Constructs a FieldMask from the passed field numbers.
         /// </summary>
         /// <typeparam name="T">The type to validate the field paths against.</typeparam>
-        public static FieldMask FromFieldNumbers<T>(IEnumerable<int> fieldNumbers) where T : IMessage
+        public static FieldMask FromFieldNumbers<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]T>(IEnumerable<int> fieldNumbers) where T : IMessage
         {
             var descriptor = Activator.CreateInstance<T>().Descriptor;
 
@@ -208,7 +181,7 @@ namespace Google.Protobuf.WellKnownTypes
         /// Checks whether paths in a given fields mask are valid.
         /// </summary>
         /// <typeparam name="T">The type to validate the field paths against.</typeparam>
-        public static bool IsValid<T>(FieldMask fieldMask) where T : IMessage
+        public static bool IsValid<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]T>(FieldMask fieldMask) where T : IMessage
         {
             var descriptor = Activator.CreateInstance<T>().Descriptor;
 
@@ -235,7 +208,7 @@ namespace Google.Protobuf.WellKnownTypes
         /// Checks whether a given field path is valid.
         /// </summary>
         /// <typeparam name="T">The type to validate the field paths against.</typeparam>
-        public static bool IsValid<T>(string path) where T : IMessage
+        public static bool IsValid<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]T>(string path) where T : IMessage
         {
             var descriptor = Activator.CreateInstance<T>().Descriptor;
 

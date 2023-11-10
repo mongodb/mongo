@@ -4,19 +4,19 @@
   <parent>
     <groupId>com.google.protobuf</groupId>
     <artifactId>protobuf-parent</artifactId>
-    <version>3.19.5</version>
+    <version>3.25.0</version>
   </parent>
 
   <artifactId>protobuf-kotlin-lite</artifactId>
 
-  <name>Protocol Buffers [Lite]</name>
+  <name>Protocol Buffers [Kotlin-Lite]</name>
   <description>
-    Lite version of Protocol Buffers library. This version is optimized for code size, but does
+    Lite version of Kotlin Protocol Buffers library. This version is optimized for code size, but does
     not guarantee API/ABI stability.
   </description>
 
   <properties>
-    <kotlin.version>1.5.0</kotlin.version>
+    <kotlin.version>1.6.0</kotlin.version>
   </properties>
 
   <dependencies>
@@ -31,8 +31,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.easymock</groupId>
-      <artifactId>easymock</artifactId>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -59,6 +59,7 @@
       <groupId>org.jetbrains.kotlin</groupId>
       <artifactId>kotlin-test</artifactId>
       <version>${kotlin.version}</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -94,7 +95,6 @@
                     <include>DslList.kt</include>
                     <include>DslMap.kt</include>
                     <include>DslProxy.kt</include>
-                    <include>ExtendableMessageLiteExtensions.kt</include>
                     <include>ExtensionList.kt</include>
                     <include>OnlyForUseByGeneratedProtoCode.kt</include>
                     <include>ProtoDslMarker.kt</include>
@@ -118,14 +118,6 @@
                   <includes>
                     <include>TestUtilLite.java</include>
                   </includes>
-                </resource>
-                <resource>
-                  <directory>${basedir}/../kotlin/src/test/kotlin/com/google/protobuf</directory>
-                  <excludes>
-                    <exclude>ExtendableMessageExtensionsTest.kt</exclude>
-                    <exclude>Proto2Test.kt</exclude>
-                    <exclude>ProtoUtil.java</exclude>
-                  </excludes>
                 </resource>
               </resources>
             </configuration>
@@ -223,8 +215,8 @@
             <goals> <goal>compile</goal> </goals>
             <configuration>
               <sourceDirs>
-                <sourceDir>${generated.sources.dir}</sourceDir>
                 <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+                <sourceDir>${generated.sources.dir}</sourceDir>
               </sourceDirs>
             </configuration>
           </execution>

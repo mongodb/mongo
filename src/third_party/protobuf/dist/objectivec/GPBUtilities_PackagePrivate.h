@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #import <Foundation/Foundation.h>
 
@@ -40,17 +17,15 @@
 #define GPBStringify(S) #S
 #define GPBStringifySymbol(S) GPBStringify(S)
 
-#define GPBNSStringify(S) @#S
+#define GPBNSStringify(S) @ #S
 #define GPBNSStringifySymbol(S) GPBNSStringify(S)
 
 // Macros for generating a Class from a class name. These are used in
 // the generated GPB descriptor classes wherever an Objective C class
 // reference is needed for a generated class.
 #define GPBObjCClassSymbol(name) OBJC_CLASS_$_##name
-#define GPBObjCClass(name) \
-    ((__bridge Class)&(GPBObjCClassSymbol(name)))
-#define GPBObjCClassDeclaration(name) \
-    extern const GPBObjcClass_t GPBObjCClassSymbol(name)
+#define GPBObjCClass(name) ((__bridge Class) & (GPBObjCClassSymbol(name)))
+#define GPBObjCClassDeclaration(name) extern const GPBObjcClass_t GPBObjCClassSymbol(name)
 
 // Constant to internally mark when there is no has bit.
 #define GPBNoHasBit INT32_MAX
@@ -60,7 +35,7 @@ CF_EXTERN_C_BEGIN
 // These two are used to inject a runtime check for version mismatch into the
 // generated sources to make sure they are linked with a supporting runtime.
 void GPBCheckRuntimeVersionSupport(int32_t objcRuntimeVersion);
-GPB_INLINE void GPB_DEBUG_CHECK_RUNTIME_VERSIONS() {
+GPB_INLINE void GPB_DEBUG_CHECK_RUNTIME_VERSIONS(void) {
   // NOTE: By being inline here, this captures the value from the library's
   // headers at the time the generated code was compiled.
 #if defined(DEBUG) && DEBUG
@@ -68,10 +43,16 @@ GPB_INLINE void GPB_DEBUG_CHECK_RUNTIME_VERSIONS() {
 #endif
 }
 
+// Helper called within the library when the runtime detects something that
+// indicates a older runtime is being used with newer generated code. Normally
+// GPB_DEBUG_CHECK_RUNTIME_VERSIONS() gates this with a better message; this
+// is just a final safety net to prevent otherwise hard to diagnose errors.
+void GPBRuntimeMatchFailure(void);
+
 // Legacy version of the checks, remove when GOOGLE_PROTOBUF_OBJC_GEN_VERSION
 // goes away (see more info in GPBBootstrap.h).
 void GPBCheckRuntimeVersionInternal(int32_t version);
-GPB_INLINE void GPBDebugCheckRuntimeVersion() {
+GPB_INLINE void GPBDebugCheckRuntimeVersion(void) {
 #if defined(DEBUG) && DEBUG
   GPBCheckRuntimeVersionInternal(GOOGLE_PROTOBUF_OBJC_GEN_VERSION);
 #endif
@@ -197,17 +178,18 @@ GPB_INLINE BOOL GPBFieldStoresObject(GPBFieldDescriptor *field) {
 }
 
 BOOL GPBGetHasIvar(GPBMessage *self, int32_t index, uint32_t fieldNumber);
-void GPBSetHasIvar(GPBMessage *self, int32_t idx, uint32_t fieldNumber,
-                   BOOL value);
+void GPBSetHasIvar(GPBMessage *self, int32_t idx, uint32_t fieldNumber, BOOL value);
 uint32_t GPBGetHasOneof(GPBMessage *self, int32_t index);
 
-GPB_INLINE BOOL
-GPBGetHasIvarField(GPBMessage *self, GPBFieldDescriptor *field) {
+GPB_INLINE BOOL GPBGetHasIvarField(GPBMessage *self, GPBFieldDescriptor *field) {
   GPBMessageFieldDescription *fieldDesc = field->description_;
   return GPBGetHasIvar(self, fieldDesc->hasIndex, fieldDesc->number);
 }
 
 #pragma clang diagnostic pop
+
+// Disable clang-format for the macros.
+// clang-format off
 
 //%PDDM-DEFINE GPB_IVAR_SET_DECL(NAME, TYPE)
 //%void GPBSet##NAME##IvarWithFieldPrivate(GPBMessage *self,
@@ -215,84 +197,65 @@ GPBGetHasIvarField(GPBMessage *self, GPBFieldDescriptor *field) {
 //%            NAME$S                    TYPE value);
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(Bool, BOOL)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetBoolIvarWithFieldPrivate(GPBMessage *self,
                                     GPBFieldDescriptor *field,
                                     BOOL value);
-// clang-format on
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(Int32, int32_t)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetInt32IvarWithFieldPrivate(GPBMessage *self,
                                      GPBFieldDescriptor *field,
                                      int32_t value);
-// clang-format on
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(UInt32, uint32_t)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetUInt32IvarWithFieldPrivate(GPBMessage *self,
                                       GPBFieldDescriptor *field,
                                       uint32_t value);
-// clang-format on
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(Int64, int64_t)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetInt64IvarWithFieldPrivate(GPBMessage *self,
                                      GPBFieldDescriptor *field,
                                      int64_t value);
-// clang-format on
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(UInt64, uint64_t)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetUInt64IvarWithFieldPrivate(GPBMessage *self,
                                       GPBFieldDescriptor *field,
                                       uint64_t value);
-// clang-format on
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(Float, float)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetFloatIvarWithFieldPrivate(GPBMessage *self,
                                      GPBFieldDescriptor *field,
                                      float value);
-// clang-format on
 //%PDDM-EXPAND GPB_IVAR_SET_DECL(Double, double)
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
 void GPBSetDoubleIvarWithFieldPrivate(GPBMessage *self,
                                       GPBFieldDescriptor *field,
                                       double value);
-// clang-format on
 //%PDDM-EXPAND-END (7 expansions)
 
-void GPBSetEnumIvarWithFieldPrivate(GPBMessage *self,
-                                    GPBFieldDescriptor *field,
-                                    int32_t value);
+// clang-format on
+
+void GPBSetEnumIvarWithFieldPrivate(GPBMessage *self, GPBFieldDescriptor *field, int32_t value);
 
 id GPBGetObjectIvarWithField(GPBMessage *self, GPBFieldDescriptor *field);
 
-void GPBSetObjectIvarWithFieldPrivate(GPBMessage *self,
-                                      GPBFieldDescriptor *field, id value);
-void GPBSetRetainedObjectIvarWithFieldPrivate(GPBMessage *self,
-                                              GPBFieldDescriptor *field,
-                                              id __attribute__((ns_consumed))
-                                              value);
+void GPBSetObjectIvarWithFieldPrivate(GPBMessage *self, GPBFieldDescriptor *field, id value);
+void GPBSetRetainedObjectIvarWithFieldPrivate(GPBMessage *self, GPBFieldDescriptor *field,
+                                              id __attribute__((ns_consumed)) value);
 
 // GPBGetObjectIvarWithField will automatically create the field (message) if
 // it doesn't exist. GPBGetObjectIvarWithFieldNoAutocreate will return nil.
-id GPBGetObjectIvarWithFieldNoAutocreate(GPBMessage *self,
-                                         GPBFieldDescriptor *field);
+id GPBGetObjectIvarWithFieldNoAutocreate(GPBMessage *self, GPBFieldDescriptor *field);
 
 // Clears and releases the autocreated message ivar, if it's autocreated. If
 // it's not set as autocreated, this method does nothing.
-void GPBClearAutocreatedMessageIvarWithField(GPBMessage *self,
-                                             GPBFieldDescriptor *field);
+void GPBClearAutocreatedMessageIvarWithField(GPBMessage *self, GPBFieldDescriptor *field);
 
 // Returns an Objective C encoding for |selector|. |instanceSel| should be
 // YES if it's an instance selector (as opposed to a class selector).
@@ -302,17 +265,13 @@ const char *GPBMessageEncodingForSelector(SEL selector, BOOL instanceSel);
 // Helper for text format name encoding.
 // decodeData is the data describing the special decodes.
 // key and inputString are the input that needs decoding.
-NSString *GPBDecodeTextFormatName(const uint8_t *decodeData, int32_t key,
-                                  NSString *inputString);
-
+NSString *GPBDecodeTextFormatName(const uint8_t *decodeData, int32_t key, NSString *inputString);
 
 // Shims from the older generated code into the runtime.
-void GPBSetInt32IvarWithFieldInternal(GPBMessage *self,
-                                      GPBFieldDescriptor *field,
-                                      int32_t value,
+void GPBSetInt32IvarWithFieldInternal(GPBMessage *self, GPBFieldDescriptor *field, int32_t value,
                                       GPBFileSyntax syntax);
-void GPBMaybeClearOneof(GPBMessage *self, GPBOneofDescriptor *oneof,
-                        int32_t oneofHasIndex, uint32_t fieldNumberNotToClear);
+void GPBMaybeClearOneof(GPBMessage *self, GPBOneofDescriptor *oneof, int32_t oneofHasIndex,
+                        uint32_t fieldNumberNotToClear);
 
 // A series of selectors that are used solely to get @encoding values
 // for them by the dynamic protobuf runtime code. See

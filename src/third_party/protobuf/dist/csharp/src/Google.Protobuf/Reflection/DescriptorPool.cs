@@ -1,39 +1,15 @@
 #region Copyright notice and license
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 #endregion
 
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 
 namespace Google.Protobuf.Reflection
 {
@@ -51,12 +27,11 @@ namespace Google.Protobuf.Reflection
         private readonly IDictionary<ObjectIntPair<IDescriptor>, EnumValueDescriptor> enumValuesByNumber =
             new Dictionary<ObjectIntPair<IDescriptor>, EnumValueDescriptor>();
 
-        private readonly HashSet<FileDescriptor> dependencies;
+        private readonly HashSet<FileDescriptor> dependencies = new HashSet<FileDescriptor>();
 
         internal DescriptorPool(IEnumerable<FileDescriptor> dependencyFiles)
         {
-            dependencies = new HashSet<FileDescriptor>();
-            foreach (var dependencyFile in dependencyFiles)
+            foreach (FileDescriptor dependencyFile in dependencyFiles)
             {
                 dependencies.Add(dependencyFile);
                 ImportPublicDependencies(dependencyFile);
@@ -88,10 +63,8 @@ namespace Google.Protobuf.Reflection
         /// or null if the symbol doesn't exist or has the wrong type</returns>
         internal T FindSymbol<T>(string fullName) where T : class
         {
-            IDescriptor result;
-            descriptorsByName.TryGetValue(fullName, out result);
-            T descriptor = result as T;
-            if (descriptor != null)
+            descriptorsByName.TryGetValue(fullName, out IDescriptor result);
+            if (result is T descriptor)
             {
                 return descriptor;
             }
@@ -131,10 +104,9 @@ namespace Google.Protobuf.Reflection
                 name = fullName;
             }
 
-            IDescriptor old;
-            if (descriptorsByName.TryGetValue(fullName, out old))
+            if (descriptorsByName.TryGetValue(fullName, out IDescriptor old))
             {
-                if (!(old is PackageDescriptor))
+                if (old is not PackageDescriptor)
                 {
                     throw new DescriptorValidationException(file,
                                                             "\"" + name +
@@ -153,10 +125,9 @@ namespace Google.Protobuf.Reflection
         internal void AddSymbol(IDescriptor descriptor)
         {
             ValidateSymbolName(descriptor);
-            String fullName = descriptor.FullName;
+            string fullName = descriptor.FullName;
 
-            IDescriptor old;
-            if (descriptorsByName.TryGetValue(fullName, out old))
+            if (descriptorsByName.TryGetValue(fullName, out IDescriptor old))
             {
                 int dotPos = fullName.LastIndexOf('.');
                 string message;
@@ -181,9 +152,6 @@ namespace Google.Protobuf.Reflection
             descriptorsByName[fullName] = descriptor;
         }
 
-        private static readonly Regex ValidationRegex = new Regex("^[_A-Za-z][_A-Za-z0-9]*$",
-                                                                  FrameworkPortability.CompiledRegexWhereAvailable);
-
         /// <summary>
         /// Verifies that the descriptor's name is valid (i.e. it contains
         /// only letters, digits and underscores, and does not start with a digit).
@@ -191,15 +159,28 @@ namespace Google.Protobuf.Reflection
         /// <param name="descriptor"></param>
         private static void ValidateSymbolName(IDescriptor descriptor)
         {
-            if (descriptor.Name == "")
+            if (descriptor.Name.Length == 0)
             {
                 throw new DescriptorValidationException(descriptor, "Missing name.");
             }
-            if (!ValidationRegex.IsMatch(descriptor.Name))
-            {
-                throw new DescriptorValidationException(descriptor,
-                                                        "\"" + descriptor.Name + "\" is not a valid identifier.");
+
+            // Symbol name must start with a letter or underscore, and it can contain letters,
+            // numbers and underscores.
+            string name = descriptor.Name;
+            if (!IsAsciiLetter(name[0]) && name[0] != '_') {
+                ThrowInvalidSymbolNameException(descriptor);
             }
+            for (int i = 1; i < name.Length; i++) {
+                if (!IsAsciiLetter(name[i]) && !IsAsciiDigit(name[i]) && name[i] != '_') {
+                    ThrowInvalidSymbolNameException(descriptor);
+                }
+            }
+
+            static bool IsAsciiLetter(char c) => (uint)((c | 0x20) - 'a') <= 'z' - 'a';
+            static bool IsAsciiDigit(char c) => (uint)(c - '0') <= '9' - '0';
+            static void ThrowInvalidSymbolNameException(IDescriptor descriptor) =>
+                throw new DescriptorValidationException(
+                    descriptor, "\"" + descriptor.Name + "\" is not a valid identifier.");
         }
 
         /// <summary>
@@ -208,15 +189,13 @@ namespace Google.Protobuf.Reflection
         /// </summary>
         internal FieldDescriptor FindFieldByNumber(MessageDescriptor messageDescriptor, int number)
         {
-            FieldDescriptor ret;
-            fieldsByNumber.TryGetValue(new ObjectIntPair<IDescriptor>(messageDescriptor, number), out ret);
+            fieldsByNumber.TryGetValue(new ObjectIntPair<IDescriptor>(messageDescriptor, number), out FieldDescriptor ret);
             return ret;
         }
 
         internal EnumValueDescriptor FindEnumValueByNumber(EnumDescriptor enumDescriptor, int number)
         {
-            EnumValueDescriptor ret;
-            enumValuesByNumber.TryGetValue(new ObjectIntPair<IDescriptor>(enumDescriptor, number), out ret);
+            enumValuesByNumber.TryGetValue(new ObjectIntPair<IDescriptor>(enumDescriptor, number), out EnumValueDescriptor ret);
             return ret;
         }
 
@@ -229,8 +208,7 @@ namespace Google.Protobuf.Reflection
         {
             // for extensions, we use the extended type, otherwise we use the containing type
             ObjectIntPair<IDescriptor> key = new ObjectIntPair<IDescriptor>(field.Proto.HasExtendee ? field.ExtendeeType : field.ContainingType, field.FieldNumber);
-            FieldDescriptor old;
-            if (fieldsByNumber.TryGetValue(key, out old))
+            if (fieldsByNumber.TryGetValue(key, out FieldDescriptor old))
             {
                 throw new DescriptorValidationException(field, "Field number " + field.FieldNumber +
                                                                "has already been used in \"" +

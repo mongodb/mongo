@@ -2,33 +2,10 @@
 
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 namespace Google\Protobuf\Internal;
 
@@ -37,6 +14,7 @@ use Google\Protobuf\FieldMask;
 use Google\Protobuf\Internal\GPBType;
 use Google\Protobuf\Internal\RepeatedField;
 use Google\Protobuf\Internal\MapField;
+use function bccomp;
 
 function camel2underscore($input) {
     preg_match_all(
@@ -283,12 +261,13 @@ class GPBUtil
             "function"=>0, "global"=>0, "goto"=>0, "if"=>0, "implements"=>0,
             "include"=>0, "include_once"=>0, "instanceof"=>0, "insteadof"=>0,
             "interface"=>0, "isset"=>0, "list"=>0, "match"=>0, "namespace"=>0,
-            "new"=>0, "or"=>0, "print"=>0, "private"=>0, "protected"=>0,
-            "public"=>0, "require"=>0, "require_once"=>0, "return"=>0,
-            "static"=>0, "switch"=>0, "throw"=>0, "trait"=>0, "try"=>0,
-            "unset"=>0, "use"=>0, "var"=>0, "while"=>0, "xor"=>0, "yield"=>0,
-            "int"=>0, "float"=>0, "bool"=>0, "string"=>0, "true"=>0, "false"=>0,
-            "null"=>0, "void"=>0, "iterable"=>0
+            "new"=>0, "or"=>0, "parent"=>0, "print"=>0, "private"=>0,
+            "protected"=>0,"public"=>0, "readonly" => 0,"require"=>0,
+            "require_once"=>0,"return"=>0, "self"=>0, "static"=>0, "switch"=>0,
+            "throw"=>0,"trait"=>0, "try"=>0,"unset"=>0, "use"=>0, "var"=>0,
+            "while"=>0,"xor"=>0, "yield"=>0, "int"=>0, "float"=>0, "bool"=>0,
+            "string"=>0,"true"=>0, "false"=>0, "null"=>0, "void"=>0,
+            "iterable"=>0
         );
 
         if (array_key_exists(strtolower($classname), $reserved_words)) {
@@ -300,6 +279,27 @@ class GPBUtil
         }
 
         return "";
+    }
+
+    private static function getPreviouslyUnreservedClassNamePrefix(
+        $classname,
+        $file_proto)
+    {
+        $previously_unreserved_words = array(
+            "readonly"=>0
+        );
+
+        if (array_key_exists(strtolower($classname), $previously_unreserved_words)) {
+            $option = $file_proto->getOptions();
+            $prefix = is_null($option) ? "" : $option->getPhpClassPrefix();
+            if ($prefix !== "") {
+                return $prefix;
+            }
+
+            return "";
+        }
+
+        return self::getClassNamePrefix($classname, $file_proto);
     }
 
     public static function getLegacyClassNameWithoutPackage(
@@ -321,6 +321,17 @@ class GPBUtil
         return implode('\\', $parts);
     }
 
+    private static function getPreviouslyUnreservedClassNameWithoutPackage(
+        $name,
+        $file_proto)
+    {
+        $parts = explode('.', $name);
+        foreach ($parts as $i => $part) {
+            $parts[$i] = static::getPreviouslyUnreservedClassNamePrefix($parts[$i], $file_proto) . $parts[$i];
+        }
+        return implode('\\', $parts);
+    }
+
     public static function getFullClassName(
         $proto,
         $containing,
@@ -328,7 +339,8 @@ class GPBUtil
         &$message_name_without_package,
         &$classname,
         &$legacy_classname,
-        &$fullname)
+        &$fullname,
+        &$previous_classname)
     {
         // Full name needs to start with '.'.
         $message_name_without_package = $proto->getName();
@@ -349,6 +361,9 @@ class GPBUtil
         $legacy_class_name_without_package =
             static::getLegacyClassNameWithoutPackage(
                 $message_name_without_package, $file_proto);
+        $previous_class_name_without_package =
+            static::getPreviouslyUnreservedClassNameWithoutPackage(
+                $message_name_without_package, $file_proto);
 
         $option = $file_proto->getOptions();
         if (!is_null($option) && $option->hasPhpNamespace()) {
@@ -357,10 +372,13 @@ class GPBUtil
                 $classname = $namespace . "\\" . $class_name_without_package;
                 $legacy_classname =
                     $namespace . "\\" . $legacy_class_name_without_package;
+                $previous_classname =
+                    $namespace . "\\" . $previous_class_name_without_package;
                 return;
             } else {
                 $classname = $class_name_without_package;
                 $legacy_classname = $legacy_class_name_without_package;
+                $previous_classname = $previous_class_name_without_package;
                 return;
             }
         }
@@ -368,6 +386,7 @@ class GPBUtil
         if ($package === "") {
             $classname = $class_name_without_package;
             $legacy_classname = $legacy_class_name_without_package;
+            $previous_classname = $previous_class_name_without_package;
         } else {
             $parts = array_map('ucwords', explode('.', $package));
             foreach ($parts as $i => $part) {
@@ -380,6 +399,11 @@ class GPBUtil
             $legacy_classname =
                 implode('\\', array_map('ucwords', explode('.', $package))).
                 "\\".$legacy_class_name_without_package;
+            $previous_classname =
+                implode('\\', array_map('ucwords', explode('.', $package))).
+                "\\".self::getPreviouslyUnreservedClassNamePrefix(
+                    $previous_class_name_without_package, $file_proto).
+                    $previous_class_name_without_package;
         }
     }
 

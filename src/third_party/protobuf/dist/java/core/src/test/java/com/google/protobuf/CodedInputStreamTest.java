@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 package com.google.protobuf;
 
@@ -424,7 +401,6 @@ public class CodedInputStreamTest {
     }
   }
 
-
   /**
    * Test that a bug in skipRawBytes() has been fixed: if the skip skips exactly up to a limit, this
    * should not break things.
@@ -540,8 +516,8 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(0x7FFFFFFF);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(0x7FFFFFFF);
     output.writeRawBytes(new byte[32]); // Pad with a few random bytes.
     output.flush();
 
@@ -573,7 +549,7 @@ public class CodedInputStreamTest {
     // returning our big serialized message 'count' times.
     InputStream is = new RepeatingInputStream(serializedMessage, count);
     // Parse should succeed!
-    TestAllTypes.parseFrom(is);
+    TestAllTypes unused = TestAllTypes.parseFrom(is);
   }
 
   /**
@@ -672,7 +648,6 @@ public class CodedInputStreamTest {
         // success.
       }
 
-
       CodedInputStream input = inputType.newDecoder(data100);
       input.setRecursionLimit(8);
       try {
@@ -747,11 +722,11 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput, bytes.length);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
     output.writeRawByte(4);
     output.flush();
@@ -796,8 +771,8 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput, bytes.length);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
     output.flush();
 
@@ -851,8 +826,8 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput, bytes.length);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
     output.flush();
 
@@ -878,8 +853,8 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput, bytes.length);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
     output.flush();
 
@@ -902,8 +877,8 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 0x80});
     output.flush();
 
@@ -926,8 +901,8 @@ public class CodedInputStreamTest {
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
 
     int tag = WireFormat.makeTag(1, WireFormat.WIRETYPE_LENGTH_DELIMITED);
-    output.writeRawVarint32(tag);
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(tag);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 0x80});
     output.flush();
 
@@ -985,19 +960,19 @@ public class CodedInputStreamTest {
     ByteString.Output rawOutput = ByteString.newOutput();
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
     // Zero-sized bytes field.
-    output.writeRawVarint32(0);
+    output.writeUInt32NoTag(0);
     // One one-byte bytes field
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 23});
     // Another one-byte bytes field
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 45});
     // A bytes field large enough that won't fit into the 4K buffer.
     final int bytesLength = 16 * 1024;
     byte[] bytes = new byte[bytesLength];
     bytes[0] = (byte) 67;
     bytes[bytesLength - 1] = (byte) 89;
-    output.writeRawVarint32(bytesLength);
+    output.writeUInt32NoTag(bytesLength);
     output.writeRawBytes(bytes);
 
     output.flush();
@@ -1029,7 +1004,7 @@ public class CodedInputStreamTest {
     }
     ByteString.Output rawOutput = ByteString.newOutput();
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
     output.flush();
     byte[] data = rawOutput.toByteString().toByteArray();
@@ -1054,7 +1029,7 @@ public class CodedInputStreamTest {
     }
     ByteString.Output rawOutput = ByteString.newOutput();
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
-    output.writeRawVarint32(bytes.length);
+    output.writeUInt32NoTag(bytes.length);
     output.writeRawBytes(bytes);
     output.flush();
     byte[] data = rawOutput.toByteString().toByteArray();
@@ -1076,19 +1051,19 @@ public class CodedInputStreamTest {
     ByteString.Output rawOutput = ByteString.newOutput();
     CodedOutputStream output = CodedOutputStream.newInstance(rawOutput);
     // Zero-sized bytes field.
-    output.writeRawVarint32(0);
+    output.writeUInt32NoTag(0);
     // One one-byte bytes field
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 23});
     // Another one-byte bytes field
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 45});
     // A bytes field large enough that won't fit into the 4K buffer.
     final int bytesLength = 16 * 1024;
     byte[] bytes = new byte[bytesLength];
     bytes[0] = (byte) 67;
     bytes[bytesLength - 1] = (byte) 89;
-    output.writeRawVarint32(bytesLength);
+    output.writeUInt32NoTag(bytesLength);
     output.writeRawBytes(bytes);
 
     output.flush();
@@ -1118,19 +1093,19 @@ public class CodedInputStreamTest {
     ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
     CodedOutputStream output = CodedOutputStream.newInstance(byteArrayStream);
     // Zero-sized bytes field.
-    output.writeRawVarint32(0);
+    output.writeUInt32NoTag(0);
     // One one-byte bytes field
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 23});
     // Another one-byte bytes field
-    output.writeRawVarint32(1);
+    output.writeUInt32NoTag(1);
     output.writeRawBytes(new byte[] {(byte) 45});
     // A bytes field large enough that won't fit into the 4K buffer.
     final int bytesLength = 16 * 1024;
     byte[] bytes = new byte[bytesLength];
     bytes[0] = (byte) 67;
     bytes[bytesLength - 1] = (byte) 89;
-    output.writeRawVarint32(bytesLength);
+    output.writeUInt32NoTag(bytesLength);
     output.writeRawBytes(bytes);
     output.flush();
 

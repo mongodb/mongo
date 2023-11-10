@@ -1,41 +1,18 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
-#include <google/protobuf/util/time_util.h>
+#include "google/protobuf/util/time_util.h"
 
 #include <cstdint>
 #include <ctime>
 
-#include <google/protobuf/duration.pb.h>
-#include <google/protobuf/timestamp.pb.h>
-#include <google/protobuf/testing/googletest.h>
+#include "google/protobuf/duration.pb.h"
+#include "google/protobuf/timestamp.pb.h"
+#include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
 
 namespace google {
@@ -48,15 +25,18 @@ using google::protobuf::Timestamp;
 namespace {
 
 TEST(TimeUtilTest, TimestampStringFormat) {
-  Timestamp begin, end;
-  EXPECT_TRUE(TimeUtil::FromString("0001-01-01T00:00:00Z", &begin));
-  EXPECT_EQ(TimeUtil::kTimestampMinSeconds, begin.seconds());
-  EXPECT_EQ(0, begin.nanos());
-  EXPECT_TRUE(TimeUtil::FromString("9999-12-31T23:59:59.999999999Z", &end));
-  EXPECT_EQ(TimeUtil::kTimestampMaxSeconds, end.seconds());
-  EXPECT_EQ(999999999, end.nanos());
-  EXPECT_EQ("0001-01-01T00:00:00Z", TimeUtil::ToString(begin));
-  EXPECT_EQ("9999-12-31T23:59:59.999999999Z", TimeUtil::ToString(end));
+  // These these are out of bounds for 32-bit architectures.
+  if(sizeof(time_t) >= sizeof(uint64_t)) {
+    Timestamp begin, end;
+    EXPECT_TRUE(TimeUtil::FromString("0001-01-01T00:00:00Z", &begin));
+    EXPECT_EQ(TimeUtil::kTimestampMinSeconds, begin.seconds());
+    EXPECT_EQ(0, begin.nanos());
+    EXPECT_TRUE(TimeUtil::FromString("9999-12-31T23:59:59.999999999Z", &end));
+    EXPECT_EQ(TimeUtil::kTimestampMaxSeconds, end.seconds());
+    EXPECT_EQ(999999999, end.nanos());
+    EXPECT_EQ("0001-01-01T00:00:00Z", TimeUtil::ToString(begin));
+    EXPECT_EQ("9999-12-31T23:59:59.999999999Z", TimeUtil::ToString(end));
+  }
 
   // Test negative timestamps.
   Timestamp time = TimeUtil::NanosecondsToTimestamp(-1);
@@ -94,9 +74,12 @@ TEST(TimeUtilTest, DurationStringFormat) {
   EXPECT_TRUE(TimeUtil::FromString("0001-01-01T00:00:00Z", &begin));
   EXPECT_TRUE(TimeUtil::FromString("9999-12-31T23:59:59.999999999Z", &end));
 
-  EXPECT_EQ("315537897599.999999999s", TimeUtil::ToString(end - begin));
+  // These these are out of bounds for 32-bit architectures.
+  if(sizeof(time_t) >= sizeof(uint64_t)) {
+    EXPECT_EQ("315537897599.999999999s", TimeUtil::ToString(end - begin));
+    EXPECT_EQ("-315537897599.999999999s", TimeUtil::ToString(begin - end));
+  }
   EXPECT_EQ(999999999, (end - begin).nanos());
-  EXPECT_EQ("-315537897599.999999999s", TimeUtil::ToString(begin - end));
   EXPECT_EQ(-999999999, (begin - end).nanos());
 
   // Generated output should contain 3, 6, or 9 fractional digits.
@@ -222,7 +205,7 @@ TEST(TestUtilTest, TimestampIntegerConversion) {
 }
 
 TEST(TimeUtilTest, TimeTConversion) {
-  time_t value = time(NULL);
+  time_t value = time(nullptr);
   EXPECT_EQ(value,
             TimeUtil::TimestampToTimeT(TimeUtil::TimeTToTimestamp(value)));
   EXPECT_EQ(
@@ -377,6 +360,147 @@ TEST(TimeUtilTest, TimestampOperators) {
   EXPECT_FALSE(t1 != t1);
   EXPECT_TRUE(t2 != t1);
 }
+
+TEST(TimeUtilTest, IsDurationValid) {
+  Duration valid;
+  Duration overflow;
+  overflow.set_seconds(TimeUtil::kDurationMaxSeconds + 1);
+  Duration underflow;
+  underflow.set_seconds(TimeUtil::kDurationMinSeconds - 1);
+  Duration overflow_nanos;
+  overflow_nanos.set_nanos(TimeUtil::kDurationMaxNanoseconds + 1);
+  Duration underflow_nanos;
+  underflow_nanos.set_nanos(TimeUtil::kDurationMinNanoseconds - 1);
+  Duration positive_seconds_negative_nanos;
+  positive_seconds_negative_nanos.set_seconds(1);
+  positive_seconds_negative_nanos.set_nanos(-1);
+  Duration negative_seconds_positive_nanos;
+  negative_seconds_positive_nanos.set_seconds(-1);
+  negative_seconds_positive_nanos.set_nanos(1);
+
+  EXPECT_TRUE(TimeUtil::IsDurationValid(valid));
+  EXPECT_FALSE(TimeUtil::IsDurationValid(overflow));
+  EXPECT_FALSE(TimeUtil::IsDurationValid(underflow));
+  EXPECT_FALSE(TimeUtil::IsDurationValid(overflow_nanos));
+  EXPECT_FALSE(TimeUtil::IsDurationValid(underflow_nanos));
+  EXPECT_FALSE(TimeUtil::IsDurationValid(positive_seconds_negative_nanos));
+  EXPECT_FALSE(TimeUtil::IsDurationValid(negative_seconds_positive_nanos));
+}
+
+TEST(TimeUtilTest, IsTimestampValid) {
+  Timestamp valid;
+  Timestamp overflow;
+  overflow.set_seconds(TimeUtil::kTimestampMaxSeconds + 1);
+  Timestamp underflow;
+  underflow.set_seconds(TimeUtil::kTimestampMinSeconds - 1);
+  Timestamp overflow_nanos;
+  overflow_nanos.set_nanos(TimeUtil::kTimestampMaxNanoseconds + 1);
+  Timestamp underflow_nanos;
+  underflow_nanos.set_nanos(TimeUtil::kTimestampMinNanoseconds - 1);
+
+  EXPECT_TRUE(TimeUtil::IsTimestampValid(valid));
+  EXPECT_FALSE(TimeUtil::IsTimestampValid(overflow));
+  EXPECT_FALSE(TimeUtil::IsTimestampValid(underflow));
+  EXPECT_FALSE(TimeUtil::IsTimestampValid(overflow_nanos));
+  EXPECT_FALSE(TimeUtil::IsTimestampValid(underflow_nanos));
+}
+
+#if GTEST_HAS_DEATH_TEST  // death tests do not work on Windows yet.
+#ifndef NDEBUG
+
+TEST(TimeUtilTest, DurationBounds) {
+  Duration overflow;
+  overflow.set_seconds(TimeUtil::kDurationMaxSeconds + 1);
+  Duration underflow;
+  underflow.set_seconds(TimeUtil::kDurationMinSeconds - 1);
+  Duration overflow_nanos;
+  overflow_nanos.set_nanos(TimeUtil::kDurationMaxNanoseconds + 1);
+  Duration underflow_nanos;
+  underflow_nanos.set_nanos(TimeUtil::kDurationMinNanoseconds - 1);
+
+  EXPECT_DEATH({ TimeUtil::SecondsToDuration(overflow.seconds()); },
+                     "Duration seconds");
+  EXPECT_DEATH({ TimeUtil::SecondsToDuration(underflow.seconds()); },
+                     "Duration seconds");
+  EXPECT_DEATH(
+      { TimeUtil::MinutesToDuration(overflow.seconds() / 60 + 1); },
+      "Duration minutes");
+  EXPECT_DEATH(
+      { TimeUtil::MinutesToDuration(underflow.seconds() / 60 - 1); },
+      "Duration minutes");
+  EXPECT_DEATH(
+      { TimeUtil::HoursToDuration(overflow.seconds() / 60 + 1); },
+      "Duration hours");
+  EXPECT_DEATH(
+      { TimeUtil::HoursToDuration(underflow.seconds() / 60 - 1); },
+      "Duration hours");
+
+  EXPECT_DEATH({ TimeUtil::DurationToNanoseconds(overflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToNanoseconds(underflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToNanoseconds(overflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToNanoseconds(underflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToSeconds(overflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToSeconds(underflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToSeconds(overflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::DurationToSeconds(underflow_nanos); },
+                     "outside of the valid range");
+}
+
+TEST(TimeUtilTest, TimestampBounds) {
+  Timestamp overflow;
+  overflow.set_seconds(TimeUtil::kDurationMaxSeconds + 1);
+  Timestamp underflow;
+  underflow.set_seconds(TimeUtil::kDurationMinSeconds - 1);
+  Timestamp overflow_nanos;
+  overflow_nanos.set_nanos(TimeUtil::kDurationMaxNanoseconds + 1);
+  Timestamp underflow_nanos;
+  underflow_nanos.set_nanos(TimeUtil::kDurationMinNanoseconds - 1);
+
+  EXPECT_DEATH({ TimeUtil::TimestampToNanoseconds(overflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToNanoseconds(underflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToNanoseconds(overflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToNanoseconds(underflow_nanos); },
+                     "outside of the valid range");
+
+  EXPECT_DEATH({ TimeUtil::TimestampToMicroseconds(overflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToMicroseconds(underflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToMicroseconds(overflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToMicroseconds(underflow_nanos); },
+                     "outside of the valid range");
+
+  EXPECT_DEATH({ TimeUtil::TimestampToMilliseconds(overflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToMilliseconds(underflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToMilliseconds(overflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToMilliseconds(underflow_nanos); },
+                     "outside of the valid range");
+
+  EXPECT_DEATH({ TimeUtil::TimestampToSeconds(overflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToSeconds(underflow); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToSeconds(overflow_nanos); },
+                     "outside of the valid range");
+  EXPECT_DEATH({ TimeUtil::TimestampToSeconds(underflow_nanos); },
+                     "outside of the valid range");
+}
+#endif  // !NDEBUG
+#endif  // GTEST_HAS_DEATH_TEST
 
 }  // namespace
 }  // namespace util

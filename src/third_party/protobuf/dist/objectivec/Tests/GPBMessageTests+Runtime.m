@@ -1,32 +1,9 @@
 // Protocol Buffers - Google's data interchange format
 // Copyright 2015 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
 
 #import "GPBTestUtilities.h"
 
@@ -34,19 +11,19 @@
 
 #import "GPBMessage.h"
 
-#import "google/protobuf/MapUnittest.pbobjc.h"
-#import "google/protobuf/Unittest.pbobjc.h"
-#import "google/protobuf/UnittestCycle.pbobjc.h"
-#import "google/protobuf/UnittestObjcStartup.pbobjc.h"
-#import "google/protobuf/UnittestRuntimeProto2.pbobjc.h"
-#import "google/protobuf/UnittestRuntimeProto3.pbobjc.h"
+#import "objectivec/Tests/MapUnittest.pbobjc.h"
+#import "objectivec/Tests/Unittest.pbobjc.h"
+#import "objectivec/Tests/UnittestCycle.pbobjc.h"
+#import "objectivec/Tests/UnittestObjcStartup.pbobjc.h"
+#import "objectivec/Tests/UnittestRuntimeProto2.pbobjc.h"
+#import "objectivec/Tests/UnittestRuntimeProto3.pbobjc.h"
 
 @interface MessageRuntimeTests : GPBTestCase
 @end
 
 @implementation MessageRuntimeTests
 
-// TODO(thomasvl): Pull tests over from GPBMessageTests that are runtime
+// TODO: Pull tests over from GPBMessageTests that are runtime
 // specific.
 
 - (void)testStartupOrdering {
@@ -98,14 +75,10 @@
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOptionalInt32/setHasOptionalInt32:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasOptional%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasOptional%@:", name]);
-    XCTAssertTrue([Message2 instancesRespondToSelector:hasSel], @"field: %@",
-                  name);
-    XCTAssertTrue([Message2 instancesRespondToSelector:setHasSel], @"field: %@",
-                  name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasOptional%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasOptional%@:", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertTrue([Message2 instancesRespondToSelector:setHasSel], @"field: %@", name);
   }
 
   // Repeated fields
@@ -114,33 +87,24 @@
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasRepeatedInt32Array/setHasRepeatedInt32Array:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasRepeated%@Array", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasRepeated%@Array:", name]);
-    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@",
-                   name);
-    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
-                   @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasRepeated%@Array", name]);
+    SEL setHasSel =
+        NSSelectorFromString([NSString stringWithFormat:@"setHasRepeated%@Array:", name]);
+    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel], @"field: %@", name);
     // build the selector, i.e. - repeatedInt32Array_Count
-    SEL countSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"repeated%@Array_Count", name]);
-    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@",
-                   name);
+    SEL countSel = NSSelectorFromString([NSString stringWithFormat:@"repeated%@Array_Count", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@", name);
   }
 
   // OneOf fields - no has*/setHas*
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOneofInt32/setHasOneofInt32:
-    SEL hasSel =
-        NSSelectorFromString([NSString stringWithFormat:@"hasOneof%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasOneof%@:", name]);
-    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@",
-                   name);
-    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
-                   @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasOneof%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasOneof%@:", name]);
+    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel], @"field: %@", name);
   }
 
   // map<> fields
@@ -148,44 +112,23 @@
   //  - *Count
 
   NSArray *mapNames = @[
-    @"Int32Int32",
-    @"Int64Int64",
-    @"Uint32Uint32",
-    @"Uint64Uint64",
-    @"Sint32Sint32",
-    @"Sint64Sint64",
-    @"Fixed32Fixed32",
-    @"Fixed64Fixed64",
-    @"Sfixed32Sfixed32",
-    @"Sfixed64Sfixed64",
-    @"Int32Float",
-    @"Int32Double",
-    @"BoolBool",
-    @"StringString",
-    @"StringBytes",
-    @"StringMessage",
-    @"Int32Bytes",
-    @"Int32Enum",
-    @"Int32Message",
+    @"Int32Int32",       @"Int64Int64",       @"Uint32Uint32",   @"Uint64Uint64",
+    @"Sint32Sint32",     @"Sint64Sint64",     @"Fixed32Fixed32", @"Fixed64Fixed64",
+    @"Sfixed32Sfixed32", @"Sfixed64Sfixed64", @"Int32Float",     @"Int32Double",
+    @"BoolBool",         @"StringString",     @"StringBytes",    @"StringMessage",
+    @"Int32Bytes",       @"Int32Enum",        @"Int32Message",
   ];
 
   for (NSString *name in mapNames) {
     // build the selector, i.e. - hasMapInt32Int32/setHasMapInt32Int32:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasMap%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasMap%@:", name]);
-    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@",
-                   name);
-    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel],
-                   @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasMap%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasMap%@:", name]);
+    XCTAssertFalse([Message2 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertFalse([Message2 instancesRespondToSelector:setHasSel], @"field: %@", name);
     // build the selector, i.e. - mapInt32Int32Count
-    SEL countSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"map%@_Count", name]);
-    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@",
-                   name);
+    SEL countSel = NSSelectorFromString([NSString stringWithFormat:@"map%@_Count", name]);
+    XCTAssertTrue([Message2 instancesRespondToSelector:countSel], @"field: %@", name);
   }
-
 }
 
 - (void)testProto3HasMethodSupport {
@@ -217,21 +160,15 @@
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOptionalInt32/setHasOptionalInt32:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasOptional%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasOptional%@:", name]);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasOptional%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasOptional%@:", name]);
     if ([name isEqual:@"Message"]) {
       // Sub messages/groups are the exception.
-      XCTAssertTrue([Message3 instancesRespondToSelector:hasSel], @"field: %@",
-                    name);
-      XCTAssertTrue([Message3 instancesRespondToSelector:setHasSel],
-                    @"field: %@", name);
+      XCTAssertTrue([Message3 instancesRespondToSelector:hasSel], @"field: %@", name);
+      XCTAssertTrue([Message3 instancesRespondToSelector:setHasSel], @"field: %@", name);
     } else {
-      XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@",
-                     name);
-      XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel],
-                     @"field: %@", name);
+      XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@", name);
+      XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel], @"field: %@", name);
     }
   }
 
@@ -241,33 +178,24 @@
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasRepeatedInt32Array/setHasRepeatedInt32Array:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasRepeated%@Array", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasRepeated%@Array:", name]);
-    XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@",
-                   name);
-    XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel],
-                   @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasRepeated%@Array", name]);
+    SEL setHasSel =
+        NSSelectorFromString([NSString stringWithFormat:@"setHasRepeated%@Array:", name]);
+    XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel], @"field: %@", name);
     // build the selector, i.e. - repeatedInt32Array_Count
-    SEL countSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"repeated%@Array_Count", name]);
-    XCTAssertTrue([Message3 instancesRespondToSelector:countSel], @"field: %@",
-                  name);
+    SEL countSel = NSSelectorFromString([NSString stringWithFormat:@"repeated%@Array_Count", name]);
+    XCTAssertTrue([Message3 instancesRespondToSelector:countSel], @"field: %@", name);
   }
 
   // OneOf fields - no has*/setHas*
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOneofInt32/setHasOneofInt32:
-    SEL hasSel =
-        NSSelectorFromString([NSString stringWithFormat:@"hasOneof%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasOneof%@:", name]);
-    XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@",
-                   name);
-    XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel],
-                   @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasOneof%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasOneof%@:", name]);
+    XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel], @"field: %@", name);
   }
 
   // Single Optional fields
@@ -277,14 +205,10 @@
 
   for (NSString *name in names) {
     // build the selector, i.e. - hasOptionalInt32/setHasOptionalInt32:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasOptional%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasOptional%@:", name]);
-    XCTAssertTrue([Message3Optional instancesRespondToSelector:hasSel], @"field: %@",
-                  name);
-    XCTAssertTrue([Message3Optional instancesRespondToSelector:setHasSel],
-                  @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasOptional%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasOptional%@:", name]);
+    XCTAssertTrue([Message3Optional instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertTrue([Message3Optional instancesRespondToSelector:setHasSel], @"field: %@", name);
   }
 
   // map<> fields
@@ -292,42 +216,22 @@
   //  - *Count
 
   NSArray *mapNames = @[
-    @"Int32Int32",
-    @"Int64Int64",
-    @"Uint32Uint32",
-    @"Uint64Uint64",
-    @"Sint32Sint32",
-    @"Sint64Sint64",
-    @"Fixed32Fixed32",
-    @"Fixed64Fixed64",
-    @"Sfixed32Sfixed32",
-    @"Sfixed64Sfixed64",
-    @"Int32Float",
-    @"Int32Double",
-    @"BoolBool",
-    @"StringString",
-    @"StringBytes",
-    @"StringMessage",
-    @"Int32Bytes",
-    @"Int32Enum",
-    @"Int32Message",
+    @"Int32Int32",       @"Int64Int64",       @"Uint32Uint32",   @"Uint64Uint64",
+    @"Sint32Sint32",     @"Sint64Sint64",     @"Fixed32Fixed32", @"Fixed64Fixed64",
+    @"Sfixed32Sfixed32", @"Sfixed64Sfixed64", @"Int32Float",     @"Int32Double",
+    @"BoolBool",         @"StringString",     @"StringBytes",    @"StringMessage",
+    @"Int32Bytes",       @"Int32Enum",        @"Int32Message",
   ];
 
   for (NSString *name in mapNames) {
     // build the selector, i.e. - hasMapInt32Int32/setHasMapInt32Int32:
-    SEL hasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"hasMap%@", name]);
-    SEL setHasSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"setHasMap%@:", name]);
-    XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@",
-                   name);
-    XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel],
-                   @"field: %@", name);
+    SEL hasSel = NSSelectorFromString([NSString stringWithFormat:@"hasMap%@", name]);
+    SEL setHasSel = NSSelectorFromString([NSString stringWithFormat:@"setHasMap%@:", name]);
+    XCTAssertFalse([Message3 instancesRespondToSelector:hasSel], @"field: %@", name);
+    XCTAssertFalse([Message3 instancesRespondToSelector:setHasSel], @"field: %@", name);
     // build the selector, i.e. - mapInt32Int32Count
-    SEL countSel = NSSelectorFromString(
-        [NSString stringWithFormat:@"map%@_Count", name]);
-    XCTAssertTrue([Message3 instancesRespondToSelector:countSel], @"field: %@",
-                   name);
+    SEL countSel = NSSelectorFromString([NSString stringWithFormat:@"map%@_Count", name]);
+    XCTAssertTrue([Message3 instancesRespondToSelector:countSel], @"field: %@", name);
   }
 }
 
@@ -336,6 +240,9 @@
   // Setting to any value including the default value (0) should result has*
   // being true.
   //
+
+  // Disable clang-format for the macros.
+  // clang-format off
 
 //%PDDM-DEFINE PROTO2_TEST_HAS_FIELD(FIELD, NON_ZERO_VALUE, ZERO_VALUE)
 //%  {  // optional##FIELD :: NON_ZERO_VALUE
@@ -399,7 +306,6 @@
 //%PROTO2_TEST_CLEAR_FIELD_WITH_NIL(Message, [Message2 message])
 //%PDDM-EXPAND PROTO2_TEST_HAS_FIELDS()
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
   {  // optionalInt32 :: 1
     Message2 *msg = [[Message2 alloc] init];
@@ -753,8 +659,9 @@
     [msg release];
   }
 
-// clang-format on
 //%PDDM-EXPAND-END PROTO2_TEST_HAS_FIELDS()
+
+  // clang-format on
 }
 
 - (void)testProto3SingleFieldHasBehavior {
@@ -762,6 +669,9 @@
   // Setting to any value but the default value (0) should result has*
   // being true.  When set to the default, shouldn't be true.
   //
+
+  // Disable clang-format for the macros.
+  // clang-format off
 
 //%PDDM-DEFINE PROTO3_TEST_HAS_FIELD(FIELD, NON_ZERO_VALUE, ZERO_VALUE)
 //%  {  // optional##FIELD
@@ -815,7 +725,6 @@
 //%PROTO3_TEST_CLEAR_FIELD_WITH_NIL(Message, [Message3 message])
 //%PDDM-EXPAND PROTO3_TEST_HAS_FIELDS()
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
   {  // optionalInt32
     Message3 *msg = [[Message3 alloc] init];
@@ -1015,14 +924,18 @@
     [msg release];
   }
 
-// clang-format on
 //%PDDM-EXPAND-END PROTO3_TEST_HAS_FIELDS()
+
+  // clang-format on
 }
 
 - (void)testProto3SingleOptionalFieldHasBehavior {
   //
   // Setting to any value including the default (0) should result in true.
   //
+
+  // Disable clang-format for the macros.
+  // clang-format off
 
 //%PDDM-DEFINE PROTO3_TEST_OPTIONAL_HAS_FIELD(FIELD, NON_ZERO_VALUE, ZERO_VALUE)
 //%  {  // optional##FIELD
@@ -1060,7 +973,6 @@
 //%PROTO3_TEST_OPTIONAL_HAS_FIELD(Enum, Message3Optional_Enum_Bar, Message3Optional_Enum_Foo)
 //%PDDM-EXPAND PROTO3_TEST_OPTIONAL_HAS_FIELDS()
 // This block of code is generated, do not edit it directly.
-// clang-format off
 
   {  // optionalInt32
     Message3Optional *msg = [[Message3Optional alloc] init];
@@ -1258,8 +1170,9 @@
     [msg release];
   }
 
-// clang-format on
 //%PDDM-EXPAND-END PROTO3_TEST_OPTIONAL_HAS_FIELDS()
+
+  // clang-format on
 }
 
 - (void)testAccessingProto2UnknownEnumValues {
@@ -1268,13 +1181,11 @@
   // Set it to something non zero, try and confirm it doesn't change.
 
   msg.optionalEnum = Message2_Enum_Bar;
-  XCTAssertThrowsSpecificNamed(msg.optionalEnum = 666, NSException,
-                               NSInvalidArgumentException);
+  XCTAssertThrowsSpecificNamed(msg.optionalEnum = 666, NSException, NSInvalidArgumentException);
   XCTAssertEqual(msg.optionalEnum, Message2_Enum_Bar);
 
   msg.oneofEnum = Message2_Enum_Bar;
-  XCTAssertThrowsSpecificNamed(msg.oneofEnum = 666, NSException,
-                               NSInvalidArgumentException);
+  XCTAssertThrowsSpecificNamed(msg.oneofEnum = 666, NSException, NSInvalidArgumentException);
   XCTAssertEqual(msg.oneofEnum, Message2_Enum_Bar);
 
   [msg release];
@@ -1286,20 +1197,17 @@
   // Set it to something non zero, try and confirm it doesn't change.
 
   msg.optionalEnum = Message3_Enum_Bar;
-  XCTAssertThrowsSpecificNamed(msg.optionalEnum = 666, NSException,
-                               NSInvalidArgumentException);
+  XCTAssertThrowsSpecificNamed(msg.optionalEnum = 666, NSException, NSInvalidArgumentException);
   XCTAssertEqual(msg.optionalEnum, Message3_Enum_Bar);
 
   msg.oneofEnum = Message3_Enum_Bar;
-  XCTAssertThrowsSpecificNamed(msg.oneofEnum = 666, NSException,
-                               NSInvalidArgumentException);
+  XCTAssertThrowsSpecificNamed(msg.oneofEnum = 666, NSException, NSInvalidArgumentException);
   XCTAssertEqual(msg.oneofEnum, Message3_Enum_Bar);
 
   // Set via raw api to confirm it works.
 
   SetMessage3_OptionalEnum_RawValue(msg, 666);
-  XCTAssertEqual(msg.optionalEnum,
-                 Message3_Enum_GPBUnrecognizedEnumeratorValue);
+  XCTAssertEqual(msg.optionalEnum, Message3_Enum_GPBUnrecognizedEnumeratorValue);
   XCTAssertEqual(Message3_OptionalEnum_RawValue(msg), 666);
 
   SetMessage3_OneofEnum_RawValue(msg, 666);
@@ -1663,8 +1571,7 @@
   XCTAssertEqual(msg.oneofDouble, 111.0);
   XCTAssertEqual(msg.oneofBool, YES);
   XCTAssertEqualObjects(msg.oneofString, oneofStringDefault);
-  XCTAssertEqualObjects(msg.oneofBytes,
-                        [@"bar" dataUsingEncoding:NSUTF8StringEncoding]);
+  XCTAssertEqualObjects(msg.oneofBytes, [@"bar" dataUsingEncoding:NSUTF8StringEncoding]);
   XCTAssertNotNil(msg.oneofGroup);
   XCTAssertNotNil(msg.oneofMessage);
   XCTAssertEqual(msg.oneofEnum, Message2_Enum_Baz);
@@ -1747,24 +1654,15 @@
   msg = [[Message2 alloc] init];
 
   int32_t values[] = {
-    Message2_O_OneOfCase_OneofInt32,
-    Message2_O_OneOfCase_OneofInt64,
-    Message2_O_OneOfCase_OneofUint32,
-    Message2_O_OneOfCase_OneofUint64,
-    Message2_O_OneOfCase_OneofSint32,
-    Message2_O_OneOfCase_OneofSint64,
-    Message2_O_OneOfCase_OneofFixed32,
-    Message2_O_OneOfCase_OneofFixed64,
-    Message2_O_OneOfCase_OneofSfixed32,
-    Message2_O_OneOfCase_OneofSfixed64,
-    Message2_O_OneOfCase_OneofFloat,
-    Message2_O_OneOfCase_OneofDouble,
-    Message2_O_OneOfCase_OneofBool,
-    Message2_O_OneOfCase_OneofString,
-    Message2_O_OneOfCase_OneofBytes,
-    Message2_O_OneOfCase_OneofGroup,
-    Message2_O_OneOfCase_OneofMessage,
-    Message2_O_OneOfCase_OneofEnum,
+      Message2_O_OneOfCase_OneofInt32,    Message2_O_OneOfCase_OneofInt64,
+      Message2_O_OneOfCase_OneofUint32,   Message2_O_OneOfCase_OneofUint64,
+      Message2_O_OneOfCase_OneofSint32,   Message2_O_OneOfCase_OneofSint64,
+      Message2_O_OneOfCase_OneofFixed32,  Message2_O_OneOfCase_OneofFixed64,
+      Message2_O_OneOfCase_OneofSfixed32, Message2_O_OneOfCase_OneofSfixed64,
+      Message2_O_OneOfCase_OneofFloat,    Message2_O_OneOfCase_OneofDouble,
+      Message2_O_OneOfCase_OneofBool,     Message2_O_OneOfCase_OneofString,
+      Message2_O_OneOfCase_OneofBytes,    Message2_O_OneOfCase_OneofGroup,
+      Message2_O_OneOfCase_OneofMessage,  Message2_O_OneOfCase_OneofEnum,
   };
 
   for (size_t i = 0; i < GPBARRAYSIZE(values); ++i) {
@@ -1832,8 +1730,7 @@
     // No need to check the value was set, the above tests did that.
     Message2_ClearOOneOfCase(msg);
     // Nothing in the case.
-    XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_GPBUnsetOneOfCase,
-                   "Loop: %zd", i);
+    XCTAssertEqual(msg.oOneOfCase, Message2_O_OneOfCase_GPBUnsetOneOfCase, "Loop: %zd", i);
     // Confirm everything is back to defaults after a clear.
     XCTAssertEqual(msg.oneofInt32, 100, "Loop: %zd", i);
     XCTAssertEqual(msg.oneofInt64, 101, "Loop: %zd", i);
@@ -2201,8 +2098,7 @@
   XCTAssertEqual(msg.oneofDouble, 0.0);
   XCTAssertEqual(msg.oneofBool, NO);
   XCTAssertEqualObjects(msg.oneofString, oneofStringDefault);
-  XCTAssertEqualObjects(msg.oneofBytes,
-                        [@"bar" dataUsingEncoding:NSUTF8StringEncoding]);
+  XCTAssertEqualObjects(msg.oneofBytes, [@"bar" dataUsingEncoding:NSUTF8StringEncoding]);
   XCTAssertNotNil(msg.oneofMessage);
   XCTAssertEqual(msg.oneofEnum, Message3_Enum_Foo);
   XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_OneofBytes);
@@ -2257,23 +2153,15 @@
   msg = [[Message3 alloc] init];
 
   int32_t values[] = {
-    Message3_O_OneOfCase_OneofInt32,
-    Message3_O_OneOfCase_OneofInt64,
-    Message3_O_OneOfCase_OneofUint32,
-    Message3_O_OneOfCase_OneofUint64,
-    Message3_O_OneOfCase_OneofSint32,
-    Message3_O_OneOfCase_OneofSint64,
-    Message3_O_OneOfCase_OneofFixed32,
-    Message3_O_OneOfCase_OneofFixed64,
-    Message3_O_OneOfCase_OneofSfixed32,
-    Message3_O_OneOfCase_OneofSfixed64,
-    Message3_O_OneOfCase_OneofFloat,
-    Message3_O_OneOfCase_OneofDouble,
-    Message3_O_OneOfCase_OneofBool,
-    Message3_O_OneOfCase_OneofString,
-    Message3_O_OneOfCase_OneofBytes,
-    Message3_O_OneOfCase_OneofMessage,
-    Message3_O_OneOfCase_OneofEnum,
+      Message3_O_OneOfCase_OneofInt32,    Message3_O_OneOfCase_OneofInt64,
+      Message3_O_OneOfCase_OneofUint32,   Message3_O_OneOfCase_OneofUint64,
+      Message3_O_OneOfCase_OneofSint32,   Message3_O_OneOfCase_OneofSint64,
+      Message3_O_OneOfCase_OneofFixed32,  Message3_O_OneOfCase_OneofFixed64,
+      Message3_O_OneOfCase_OneofSfixed32, Message3_O_OneOfCase_OneofSfixed64,
+      Message3_O_OneOfCase_OneofFloat,    Message3_O_OneOfCase_OneofDouble,
+      Message3_O_OneOfCase_OneofBool,     Message3_O_OneOfCase_OneofString,
+      Message3_O_OneOfCase_OneofBytes,    Message3_O_OneOfCase_OneofMessage,
+      Message3_O_OneOfCase_OneofEnum,
   };
 
   for (size_t i = 0; i < GPBARRAYSIZE(values); ++i) {
@@ -2338,8 +2226,7 @@
     // No need to check the value was set, the above tests did that.
     Message3_ClearOOneOfCase(msg);
     // Nothing in the case.
-    XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_GPBUnsetOneOfCase,
-                   "Loop: %zd", i);
+    XCTAssertEqual(msg.oOneOfCase, Message3_O_OneOfCase_GPBUnsetOneOfCase, "Loop: %zd", i);
     // Confirm everything is back to defaults after a clear.
     XCTAssertEqual(msg.oneofInt32, 0, "Loop: %zd", i);
     XCTAssertEqual(msg.oneofInt64, 0, "Loop: %zd", i);
@@ -2366,7 +2253,6 @@
 }
 
 - (void)testProto2OneofSetToDefault {
-
   // proto3 doesn't normally write out zero (default) fields, but if they are
   // in a oneof it does.  proto2 doesn't have this special behavior, but we
   // still confirm setting to the explicit default does set the case to be
@@ -2378,24 +2264,24 @@
   Message2 *msg = [[Message2 alloc] init];
 
   int32_t values[] = {
-    Message2_O_OneOfCase_OneofInt32,
-    Message2_O_OneOfCase_OneofInt64,
-    Message2_O_OneOfCase_OneofUint32,
-    Message2_O_OneOfCase_OneofUint64,
-    Message2_O_OneOfCase_OneofSint32,
-    Message2_O_OneOfCase_OneofSint64,
-    Message2_O_OneOfCase_OneofFixed32,
-    Message2_O_OneOfCase_OneofFixed64,
-    Message2_O_OneOfCase_OneofSfixed32,
-    Message2_O_OneOfCase_OneofSfixed64,
-    Message2_O_OneOfCase_OneofFloat,
-    Message2_O_OneOfCase_OneofDouble,
-    Message2_O_OneOfCase_OneofBool,
-    Message2_O_OneOfCase_OneofString,
-    Message2_O_OneOfCase_OneofBytes,
-    // Skip group
-    // Skip message
-    Message2_O_OneOfCase_OneofEnum,
+      Message2_O_OneOfCase_OneofInt32,
+      Message2_O_OneOfCase_OneofInt64,
+      Message2_O_OneOfCase_OneofUint32,
+      Message2_O_OneOfCase_OneofUint64,
+      Message2_O_OneOfCase_OneofSint32,
+      Message2_O_OneOfCase_OneofSint64,
+      Message2_O_OneOfCase_OneofFixed32,
+      Message2_O_OneOfCase_OneofFixed64,
+      Message2_O_OneOfCase_OneofSfixed32,
+      Message2_O_OneOfCase_OneofSfixed64,
+      Message2_O_OneOfCase_OneofFloat,
+      Message2_O_OneOfCase_OneofDouble,
+      Message2_O_OneOfCase_OneofBool,
+      Message2_O_OneOfCase_OneofString,
+      Message2_O_OneOfCase_OneofBytes,
+      // Skip group
+      // Skip message
+      Message2_O_OneOfCase_OneofEnum,
   };
 
   for (size_t i = 0; i < GPBARRAYSIZE(values); ++i) {
@@ -2496,7 +2382,6 @@
 }
 
 - (void)testProto3OneofSetToZero {
-
   // Normally setting a proto3 field to the zero value should result in it being
   // reset/cleared.  But in a oneof, it still gets recorded so it can go out
   // over the wire and the other side can see what was set in the oneof.
@@ -2507,23 +2392,15 @@
   Message3 *msg = [[Message3 alloc] init];
 
   int32_t values[] = {
-    Message3_O_OneOfCase_OneofInt32,
-    Message3_O_OneOfCase_OneofInt64,
-    Message3_O_OneOfCase_OneofUint32,
-    Message3_O_OneOfCase_OneofUint64,
-    Message3_O_OneOfCase_OneofSint32,
-    Message3_O_OneOfCase_OneofSint64,
-    Message3_O_OneOfCase_OneofFixed32,
-    Message3_O_OneOfCase_OneofFixed64,
-    Message3_O_OneOfCase_OneofSfixed32,
-    Message3_O_OneOfCase_OneofSfixed64,
-    Message3_O_OneOfCase_OneofFloat,
-    Message3_O_OneOfCase_OneofDouble,
-    Message3_O_OneOfCase_OneofBool,
-    Message3_O_OneOfCase_OneofString,
-    Message3_O_OneOfCase_OneofBytes,
-    Message3_O_OneOfCase_OneofMessage,
-    Message3_O_OneOfCase_OneofEnum,
+      Message3_O_OneOfCase_OneofInt32,    Message3_O_OneOfCase_OneofInt64,
+      Message3_O_OneOfCase_OneofUint32,   Message3_O_OneOfCase_OneofUint64,
+      Message3_O_OneOfCase_OneofSint32,   Message3_O_OneOfCase_OneofSint64,
+      Message3_O_OneOfCase_OneofFixed32,  Message3_O_OneOfCase_OneofFixed64,
+      Message3_O_OneOfCase_OneofSfixed32, Message3_O_OneOfCase_OneofSfixed64,
+      Message3_O_OneOfCase_OneofFloat,    Message3_O_OneOfCase_OneofDouble,
+      Message3_O_OneOfCase_OneofBool,     Message3_O_OneOfCase_OneofString,
+      Message3_O_OneOfCase_OneofBytes,    Message3_O_OneOfCase_OneofMessage,
+      Message3_O_OneOfCase_OneofEnum,
   };
 
   for (size_t i = 0; i < GPBARRAYSIZE(values); ++i) {
@@ -2654,27 +2531,19 @@
   XCTAssertNotEqual(msg1.repeatedStringArray, msg2.repeatedStringArray);
   XCTAssertNotEqual(msg1.repeatedBytesArray, msg2.repeatedBytesArray);
   XCTAssertNotEqual(msg1.repeatedGroupArray, msg2.repeatedGroupArray);
-  XCTAssertNotEqual(msg1.repeatedNestedMessageArray,
-                    msg2.repeatedNestedMessageArray);
-  XCTAssertNotEqual(msg1.repeatedForeignMessageArray,
-                    msg2.repeatedForeignMessageArray);
-  XCTAssertNotEqual(msg1.repeatedImportMessageArray,
-                    msg2.repeatedImportMessageArray);
+  XCTAssertNotEqual(msg1.repeatedNestedMessageArray, msg2.repeatedNestedMessageArray);
+  XCTAssertNotEqual(msg1.repeatedForeignMessageArray, msg2.repeatedForeignMessageArray);
+  XCTAssertNotEqual(msg1.repeatedImportMessageArray, msg2.repeatedImportMessageArray);
   XCTAssertNotEqual(msg1.repeatedNestedEnumArray, msg2.repeatedNestedEnumArray);
-  XCTAssertNotEqual(msg1.repeatedForeignEnumArray,
-                    msg2.repeatedForeignEnumArray);
+  XCTAssertNotEqual(msg1.repeatedForeignEnumArray, msg2.repeatedForeignEnumArray);
   XCTAssertNotEqual(msg1.repeatedImportEnumArray, msg2.repeatedImportEnumArray);
-  XCTAssertNotEqual(msg1.repeatedStringPieceArray,
-                    msg2.repeatedStringPieceArray);
+  XCTAssertNotEqual(msg1.repeatedStringPieceArray, msg2.repeatedStringPieceArray);
   XCTAssertNotEqual(msg1.repeatedCordArray, msg2.repeatedCordArray);
 
   for (int i = 0; i < repeatCount; i++) {
-    XCTAssertNotEqual(msg1.repeatedNestedMessageArray[i],
-                      msg2.repeatedNestedMessageArray[i]);
-    XCTAssertNotEqual(msg1.repeatedForeignMessageArray[i],
-                      msg2.repeatedForeignMessageArray[i]);
-    XCTAssertNotEqual(msg1.repeatedImportMessageArray[i],
-                      msg2.repeatedImportMessageArray[i]);
+    XCTAssertNotEqual(msg1.repeatedNestedMessageArray[i], msg2.repeatedNestedMessageArray[i]);
+    XCTAssertNotEqual(msg1.repeatedForeignMessageArray[i], msg2.repeatedForeignMessageArray[i]);
+    XCTAssertNotEqual(msg1.repeatedImportMessageArray[i], msg2.repeatedImportMessageArray[i]);
   }
 }
 
@@ -2708,8 +2577,7 @@
 
   // Ensure the messages are unique per map.
   [msg1.mapInt32ForeignMessage
-      enumerateKeysAndObjectsUsingBlock:^(int32_t key, id value, BOOL *stop) {
-#pragma unused(stop)
+      enumerateKeysAndObjectsUsingBlock:^(int32_t key, id value, __unused BOOL *stop) {
         ForeignMessage *subMsg2 = [msg2.mapInt32ForeignMessage objectForKey:key];
         XCTAssertNotEqual(value, subMsg2);  // Ptr compare, new object.
       }];
@@ -2720,7 +2588,7 @@
   GPBFieldDescriptor *fieldDescriptor = [[message descriptor] fieldWithName:@"repeatedStringArray"];
   XCTAssertNotNil(fieldDescriptor);
   NSMutableArray *fieldArray = GPBGetMessageRepeatedField(message, fieldDescriptor);
-  XCTAssertNotNil(fieldArray);  // Should have autocreated.
+  XCTAssertNotNil(fieldArray);                               // Should have autocreated.
   XCTAssertTrue(fieldArray == message.repeatedStringArray);  // Same pointer
 }
 
@@ -2740,7 +2608,7 @@
   GPBFieldDescriptor *fieldDescriptor = [[message descriptor] fieldWithName:@"mapStringString"];
   XCTAssertNotNil(fieldDescriptor);
   NSMutableDictionary *fieldMap = GPBGetMessageMapField(message, fieldDescriptor);
-  XCTAssertNotNil(fieldMap);  // Should have autocreated.
+  XCTAssertNotNil(fieldMap);                           // Should have autocreated.
   XCTAssertTrue(fieldMap == message.mapStringString);  // Same pointer
 }
 
