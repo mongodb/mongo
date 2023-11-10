@@ -304,10 +304,6 @@ double ReplicationCoordinatorExternalStateMock::getElectionTimeoutOffsetLimitFra
     return _electionTimeoutOffsetLimitFraction;
 }
 
-bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageEngine(
-    OperationContext* opCtx) const {
-    return _isReadCommittedSupported;
-}
 
 bool ReplicationCoordinatorExternalStateMock::isReadConcernSnapshotSupportedByStorageEngine(
     OperationContext* opCtx) const {

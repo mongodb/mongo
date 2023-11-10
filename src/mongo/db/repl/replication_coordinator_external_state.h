@@ -299,10 +299,6 @@ public:
      */
     virtual double getElectionTimeoutOffsetLimitFraction() const = 0;
 
-    /**
-     * Returns true if the current storage engine supports read committed.
-     */
-    virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const = 0;
 
     /**
      * Returns true if the current storage engine supports snapshot read concern.

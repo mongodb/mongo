@@ -1245,13 +1245,6 @@ double ReplicationCoordinatorExternalStateImpl::getElectionTimeoutOffsetLimitFra
     return replElectionTimeoutOffsetLimitFraction;
 }
 
-bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageEngine(
-    OperationContext* opCtx) const {
-    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    // This should never be called if the storage engine has not been initialized.
-    invariant(storageEngine);
-    return storageEngine->supportsReadConcernMajority();
-}
 
 bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedByStorageEngine(
     OperationContext* opCtx) const {

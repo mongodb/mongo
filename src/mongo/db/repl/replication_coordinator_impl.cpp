@@ -959,8 +959,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
             stdx::lock_guard<Latch> lk(_mutex);
             fassert(18822, !_inShutdown);
             _setConfigState_inlock(kConfigStartingUp);
-            _topCoord->setStorageEngineSupportsReadCommitted(
-                _externalState->isReadCommittedSupportedByStorageEngine(opCtx));
+            _topCoord->setStorageEngineSupportsReadCommitted(true);
         }
 
         _replExecutor->startup();
@@ -1637,17 +1636,6 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                 "readConcern level 'snapshot' is required when specifying atClusterTime"};
     }
 
-    // We cannot support read concern 'majority' by means of reading from a historical snapshot if
-    // the storage layer doesn't support it. In this case, we can support it by using "speculative"
-    // majority reads instead.
-    if (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
-        readConcern.getMajorityReadMechanism() ==
-            ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot &&
-        !_externalState->isReadCommittedSupportedByStorageEngine(opCtx)) {
-        return {ErrorCodes::ReadConcernMajorityNotEnabled,
-                str::stream() << "Storage engine does not support read concern: "
-                              << readConcern.toString()};
-    }
 
     if (readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern &&
         !_externalState->isReadConcernSnapshotSupportedByStorageEngine(opCtx)) {
@@ -1834,16 +1822,9 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     // We don't set isMajorityCommittedRead for transactions because snapshots are always
     // speculative; we wait for majority when the transaction commits.
     //
-    // Speculative majority reads do not need to wait for the commit point to advance to satisfy
-    // afterClusterTime reads. Waiting for the lastApplied to advance past the given target optime
-    // ensures the recency guarantee for the afterClusterTime read. At the end of the command, we
-    // will wait for the lastApplied optime to become majority committed, which then satisfies the
-    // durability guarantee.
-    //
     // Majority and snapshot reads outside of transactions should non-speculatively wait for the
     // majority committed snapshot.
-    const bool isMajorityCommittedRead = !readConcern.isSpeculativeMajority() &&
-        !opCtx->inMultiDocumentTransaction() &&
+    const bool isMajorityCommittedRead = !opCtx->inMultiDocumentTransaction() &&
         (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
          readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern);
 
