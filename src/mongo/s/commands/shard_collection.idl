@@ -85,7 +85,7 @@ structs:
             Same as the previous field, but refers to the deprecated version of this command's name.
           optional: true
       collation:
-        type: object
+        type: Collation
         description: "The collation to use for the shard key index."
         optional: true
       timeseries:

@@ -81,11 +81,7 @@ CreateCommand makeCreateCommand(OperationContext* opCtx,
     createRequest.setSize(request.getSize());
     createRequest.setAutoIndexId(request.getAutoIndexId());
     createRequest.setClusteredIndex(request.getClusteredIndex());
-    if (request.getCollation()) {
-        auto collation =
-            Collation::parse(IDLParserContext("shardsvrCreateCollection"), *request.getCollation());
-        createRequest.setCollation(collation);
-    }
+    createRequest.setCollation(request.getCollation());
     createRequest.setEncryptedFields(request.getEncryptedFields());
     createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
     createRequest.setMax(request.getMax());
