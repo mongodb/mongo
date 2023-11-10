@@ -1,6 +1,6 @@
 # Generated from parse_lib_from_ninja.py   
 Import("env")
-env = env.Clone()
+env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 env.InjectThirdParty(libraries=['abseil-cpp'])
 if env.ToolchainIs('msvc'):
     env.Append(
