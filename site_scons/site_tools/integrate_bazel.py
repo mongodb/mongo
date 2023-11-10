@@ -345,6 +345,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:allocator={allocator}',
             f'--//bazel/config:use_lldbserver={False if env.GetOption("lldb-server") is None else True}',
             f'--//bazel/config:use_wait_for_debugger={False if env.GetOption("wait-for-debugger") is None else True}',
+            f'--//bazel/config:use_disable_ref_track={False if env.GetOption("disable-ref-track") is None else True}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
             '--dynamic_mode=%s' % ('off' if static_link else 'fully'),
         ]

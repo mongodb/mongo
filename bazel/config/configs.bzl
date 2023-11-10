@@ -121,3 +121,18 @@ use_wait_for_debugger = rule(
     implementation = lambda ctx: use_wait_for_debugger_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# disable-ref-track
+# =========
+
+use_disable_ref_track_provider = provider(
+    doc = "Disables runtime tracking of REF state changes for pages within wiredtiger. "
+    "Tracking the REF state changes is useful for debugging but there is a small performance cost.",
+    fields = ["enabled"],
+)
+
+use_disable_ref_track = rule(
+    implementation = lambda ctx: use_disable_ref_track_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True)
+)

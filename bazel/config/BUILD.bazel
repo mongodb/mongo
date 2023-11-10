@@ -1,4 +1,4 @@
-load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator", "use_lldbserver", "use_wait_for_debugger")
+load("//bazel/config:configs.bzl", "build_mode", "compiler_type", "use_libunwind", "use_gdbserver", "spider_monkey_dbg", "allocator", "use_lldbserver", "use_wait_for_debugger", "use_disable_ref_track")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -324,4 +324,20 @@ config_setting(
     flag_values = {
         "//bazel/config:use_wait_for_debugger": "True",
     }
+)
+
+# --------------------------------------
+# wait-for-debugger options
+# --------------------------------------
+
+use_disable_ref_track(
+    name = "use_disable_ref_track",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "use_disable_ref_track_enabled",
+    flag_values = {
+        "//bazel/config:use_disable_ref_track": "True",
+    },
 )
