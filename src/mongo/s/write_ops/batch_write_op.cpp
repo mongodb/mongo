@@ -398,9 +398,10 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
             break;
         }
 
-        if (targeter.isTrackedTimeSeriesBucketsNamespace() &&
+        auto isTimeseriesRetryableUpdate = targeter.isTrackedTimeSeriesBucketsNamespace() &&
             writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update &&
-            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction()) {
+            opCtx->isRetryableWrite() && !opCtx->inMultiDocumentTransaction();
+        if (isTimeseriesRetryableUpdate) {
             if (!batchMap.empty()) {
                 writeOp.resetWriteToReady();
                 break;
@@ -426,7 +427,13 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
                 }
             }();
 
-            if (!isMultiWrite && useTwoPhaseWriteProtocol) {
+            auto writeWithoutShardKeyOrId = !isMultiWrite && useTwoPhaseWriteProtocol;
+            // Handle time-series retryable updates using the two phase write protocol only when
+            // there is more than one shard that owns chunks.
+            if (isTimeseriesRetryableUpdate) {
+                writeWithoutShardKeyOrId &= targeter.getNShardsOwningChunks() > 1;
+            }
+            if (writeWithoutShardKeyOrId) {
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {
                     writeOp.resetWriteToReady();
