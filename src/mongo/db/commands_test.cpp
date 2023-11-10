@@ -50,6 +50,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands_test_example.h"
 #include "mongo/db/commands_test_example_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -226,210 +227,15 @@ TEST_F(ParseNsOrUUID, ParseValidUUID) {
     ASSERT_EQUALS(uuid, parsedNsOrUUID.uuid());
 }
 
-/**
- * TypedCommand test
- */
-class ExampleIncrementCommand final : public TypedCommand<ExampleIncrementCommand> {
-private:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return Command::AllowedOnSecondary::kNever;
-    }
+MONGO_REGISTER_COMMAND(commands_test_example::ExampleIncrementCommand).forShard();
 
-    std::string help() const override {
-        return "Return an incremented request.i. Example of a simple TypedCommand.";
-    }
+MONGO_REGISTER_COMMAND(commands_test_example::ExampleMinimalCommand).forShard();
 
-public:
-    using Request = commands_test_example::ExampleIncrement;
+MONGO_REGISTER_COMMAND(commands_test_example::ExampleVoidCommand).forShard();
 
-    class Invocation final : public InvocationBase {
-    public:
-        using InvocationBase::InvocationBase;
+MONGO_REGISTER_COMMAND(commands_test_example::ThrowsStatusCommand).forShard();
 
-        /**
-         * Reply with an incremented 'request.i'.
-         */
-        auto typedRun(OperationContext* opCtx) {
-            commands_test_example::ExampleIncrementReply r;
-            r.setIPlusOne(request().getI() + 1);
-            return r;
-        }
-
-    private:
-        bool supportsWriteConcern() const override {
-            return true;
-        }
-
-        void doCheckAuthorization(OperationContext*) const override {}
-
-        /**
-         * The ns() for when Request's IDL specifies "namespace: concatenate_with_db".
-         */
-        NamespaceString ns() const override {
-            return request().getNamespace();
-        }
-    };
-};
-MONGO_REGISTER_COMMAND(ExampleIncrementCommand).forShard();
-
-// Just like ExampleIncrementCommand, but using the MinimalInvocationBase.
-class ExampleMinimalCommand final : public TypedCommand<ExampleMinimalCommand> {
-private:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return Command::AllowedOnSecondary::kNever;
-    }
-
-    std::string help() const override {
-        return "Return an incremented request.i. Example of a simple TypedCommand.";
-    }
-
-public:
-    using Request = commands_test_example::ExampleMinimal;
-
-    class Invocation final : public MinimalInvocationBase {
-    public:
-        using MinimalInvocationBase::MinimalInvocationBase;
-
-        /**
-         * Reply with an incremented 'request.i'.
-         */
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
-            commands_test_example::ExampleIncrementReply r;
-            r.setIPlusOne(request().getI() + 1);
-            reply->fillFrom(r);
-        }
-
-    private:
-        bool supportsWriteConcern() const override {
-            return true;
-        }
-
-        void explain(OperationContext* opCtx,
-                     ExplainOptions::Verbosity verbosity,
-                     rpc::ReplyBuilderInterface* result) override {}
-
-        void doCheckAuthorization(OperationContext*) const override {}
-
-        /**
-         * The ns() for when Request's IDL specifies "namespace: concatenate_with_db".
-         */
-        NamespaceString ns() const override {
-            return request().getNamespace();
-        }
-    };
-};
-MONGO_REGISTER_COMMAND(ExampleMinimalCommand).forShard();
-
-// Just like ExampleIncrementCommand, but with a void typedRun.
-class ExampleVoidCommand final : public TypedCommand<ExampleVoidCommand> {
-private:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return Command::AllowedOnSecondary::kNever;
-    }
-
-    std::string help() const override {
-        return "Accepts Request and returns void.";
-    }
-
-public:
-    using Request = commands_test_example::ExampleVoid;
-
-    class Invocation final : public InvocationBase {
-    public:
-        using InvocationBase::InvocationBase;
-
-        /**
-         * Have some testable side-effect.
-         */
-        void typedRun(OperationContext*) {
-            static_cast<const ExampleVoidCommand*>(definition())->iCapture = request().getI() + 1;
-        }
-
-    private:
-        bool supportsWriteConcern() const override {
-            return true;
-        }
-
-        void explain(OperationContext* opCtx,
-                     ExplainOptions::Verbosity verbosity,
-                     rpc::ReplyBuilderInterface* result) override {}
-
-        void doCheckAuthorization(OperationContext*) const override {}
-
-        /**
-         * The ns() for when Request's IDL specifies "namespace: concatenate_with_db".
-         */
-        NamespaceString ns() const override {
-            return request().getNamespace();
-        }
-    };
-
-    mutable std::int32_t iCapture = 0;
-};
-MONGO_REGISTER_COMMAND(ExampleVoidCommand).forShard();
-
-template <typename Derived>
-class MyCommand : public TypedCommand<MyCommand<Derived>> {
-public:
-    class Invocation final : public TypedCommand<MyCommand>::InvocationBase {
-    public:
-        using Base = typename TypedCommand<MyCommand>::InvocationBase;
-        using Base::Base;
-
-        auto typedRun(OperationContext*) const {
-            return _command()->doRun();
-        }
-
-    private:
-        NamespaceString ns() const override {
-            return Base::request().getNamespace();
-        }
-        bool supportsWriteConcern() const override {
-            return false;
-        }
-        void doCheckAuthorization(OperationContext* opCtx) const override {
-            return _command()->doAuth();
-        }
-
-        const Derived* _command() const {
-            return static_cast<const Derived*>(Base::definition());
-        }
-    };
-
-    using Request = commands_test_example::ExampleVoid;
-
-    explicit MyCommand(StringData name) : TypedCommand<MyCommand>(name) {}
-
-    void doRun() const {}
-    void doAuth() const {}
-
-private:
-    Command::AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return Command::AllowedOnSecondary::kAlways;
-    }
-
-    std::string help() const override {
-        return "Accepts Request and returns void.";
-    }
-};
-
-class ThrowsStatusCommand : public MyCommand<ThrowsStatusCommand> {
-public:
-    ThrowsStatusCommand() : MyCommand<ThrowsStatusCommand>{"throwsStatus"} {}
-    void doRun() const {
-        uasserted(ErrorCodes::UnknownError, "some error");
-    }
-};
-MONGO_REGISTER_COMMAND(ThrowsStatusCommand).forShard();
-
-class UnauthorizedCommand : public MyCommand<UnauthorizedCommand> {
-public:
-    UnauthorizedCommand() : MyCommand<UnauthorizedCommand>{"unauthorizedCmd"} {}
-    void doAuth() const {
-        uasserted(ErrorCodes::Unauthorized, "Not authorized");
-    }
-};
-MONGO_REGISTER_COMMAND(UnauthorizedCommand).forShard();
+MONGO_REGISTER_COMMAND(commands_test_example::UnauthorizedCommand).forShard();
 
 class TypedCommandTest : public ServiceContextMongoDTest {
 public:
@@ -485,23 +291,23 @@ public:
     }
 
     auto& throwsStatusCommand() {
-        return fetchCommandAs<ThrowsStatusCommand>("throwsStatus");
+        return fetchCommandAs<commands_test_example::ThrowsStatusCommand>("throwsStatus");
     }
 
     auto& unauthorizedCommand() {
-        return fetchCommandAs<UnauthorizedCommand>("unauthorizedCmd");
+        return fetchCommandAs<commands_test_example::UnauthorizedCommand>("unauthorizedCmd");
     }
 
     auto& exampleIncrementCommand() {
-        return fetchCommandAs<ExampleIncrementCommand>("exampleIncrement");
+        return fetchCommandAs<commands_test_example::ExampleIncrementCommand>("exampleIncrement");
     }
 
     auto& exampleMinimalCommand() {
-        return fetchCommandAs<ExampleMinimalCommand>("exampleMinimal");
+        return fetchCommandAs<commands_test_example::ExampleMinimalCommand>("exampleMinimal");
     }
 
     auto& exampleVoidCommand() {
-        return fetchCommandAs<ExampleVoidCommand>("exampleVoid");
+        return fetchCommandAs<commands_test_example::ExampleVoidCommand>("exampleVoid");
     }
 
 protected:

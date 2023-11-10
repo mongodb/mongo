@@ -2711,6 +2711,20 @@ env.CppUnitTest(
 envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=['asio'])
 
+env.Library(
+    target='commands_test_example',
+    source=[
+        'commands_test_example.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'commands',
+        'server_base',
+    ],
+)
+
 if wiredtiger:
     envWithAsio.CppUnitTest(
         target='db_unittest_test',
@@ -2722,7 +2736,6 @@ if wiredtiger:
             'client_context_test.cpp',
             'client_strand_test.cpp',
             'collection_index_usage_tracker_test.cpp',
-            'commands_test_example.idl',
             'commands_test.cpp',
             'curop_test.cpp',
             'database_name_test.cpp',
@@ -2810,6 +2823,7 @@ if wiredtiger:
             'collection_index_usage_tracker',
             'commands',
             'commands/bulk_write_command',
+            'commands_test_example',
             'common',
             'dbmessage',
             'fle_crud',
