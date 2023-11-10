@@ -67,9 +67,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
       _sortSpecSlot(sortSpecSlot),
       _limitSlot(limitSlot),
       _sortKeySlot(sortKeySlot),
-      _collatorSlot(collatorSlot) {
-    _docsReturnedStats = getCommonStats();
-}
+      _collatorSlot(collatorSlot) {}
 
 std::unique_ptr<PlanStage> SearchCursorStage::clone() const {
     return std::make_unique<SearchCursorStage>(_namespace,
@@ -189,7 +187,7 @@ void SearchCursorStage::open(bool reOpen) {
     if (_cursor && _limit != 0) {
         _cursor->updateGetMoreFunc(
             getSearchHelpers(_opCtx->getServiceContext())->buildSearchGetMoreFunc([this] {
-                return calcDocsNeeded();
+                return _limit;
             }));
     }
 
@@ -323,18 +321,6 @@ PlanState SearchCursorStage::getNext() {
     }
 
     return trackPlanState(PlanState::ADVANCED);
-}
-
-boost::optional<long long> SearchCursorStage::calcDocsNeeded() {
-    if (_limit == 0) {
-        return boost::none;
-    }
-    // The return value will start at _limit and will decrease by one for each document that gets
-    // returned. If a document gets filtered out, _docsReturnedStats->advances will not change and
-    // so docsNeeded will stay the same. In the stored source case, _docsReturnedStats ptr points to
-    // current stage, otherwise _docsReturnedStats points to the idx scan stage.
-    // TODO: SERVER-80648 to have a better way to track count of idx scan stage.
-    return _limit - _docsReturnedStats->advances;
 }
 
 void SearchCursorStage::close() {

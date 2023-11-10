@@ -5252,8 +5252,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return {std::move(searchCursorStage), std::move(outputs)};
     }
 
-    auto searchCursorStagePtr = dynamic_cast<sbe::SearchCursorStage*>(searchCursorStage.get());
-
     // Make a project stage to convert '_id' field value into keystring.
     auto catalog = collection->getIndexCatalog();
     auto indexDescriptor = catalog->findIndexByName(_state.opCtx, kIdIndexName);
@@ -5328,10 +5326,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sbe::makeSV(fieldSlots[0]),
         nullptr /* predicate */,
         sn->nodeId());
-
-    // Use the most outer nlj stage stats to track how many documents is returned.
-    // TODO: SERVER-80648 for a better solution.
-    searchCursorStagePtr->setDocsReturnedStats(stage->getCommonStats());
 
     return {std::move(stage), std::move(outputs)};
 }

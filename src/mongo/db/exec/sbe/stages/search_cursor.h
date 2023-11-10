@@ -86,16 +86,6 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final override;
     size_t estimateCompileTimeSize() const final;
 
-    /**
-     * Calculate the number of documents needed to satisfy a user-defined limit. This information
-     * can be used in a getMore sent to mongot.
-     */
-    boost::optional<long long> calcDocsNeeded();
-
-    void setDocsReturnedStats(const CommonStats* docsReturnedStats) {
-        _docsReturnedStats = docsReturnedStats;
-    }
-
 private:
     bool shouldReturnEOF();
 
@@ -141,11 +131,6 @@ private:
     boost::optional<SortKeyGenerator> _sortKeyGen;
     executor::TaskExecutorCursor* _cursor{nullptr};
     SearchStats _specificStats;
-    // A CommonStats that tracks how many documents is returned for $search, in the stored source
-    // case, _docsReturnedStats ptr points to current stage, otherwise it points to another stage to
-    // skip the docs that been filtered out.
-    // TODO: SERVER-80648 to have a better way to track count of idx scan stage.
-    const CommonStats* _docsReturnedStats;
     // Store the cursorId for logging purpose. We need to store it because the id on the
     // TaskExecutorCursor will be set to zero after the final getMore after the cursor is exhausted.
     boost::optional<CursorId> _cursorId;
