@@ -173,8 +173,12 @@ private:
                              OperationLatencyHistogram* histogram,
                              Command::ReadWriteType readWriteType);
 
-    Mutex _lock = MONGO_MAKE_LATCH("Top::_lock");
+    // _lockGlobal should always be acquired before using _globalHistogramStats.
+    Mutex _lockGlobal = MONGO_MAKE_LATCH("Top::_lockGlobal");
     OperationLatencyHistogram _globalHistogramStats;
+
+    // _lockUsage should always be acquired before using _usage.
+    Mutex _lockUsage = MONGO_MAKE_LATCH("Top::_lockUsage");
     UsageMap _usage;
 };
 

@@ -112,7 +112,7 @@ void Top::record(OperationContext* opCtx,
         return;
 
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<Latch> lk(_lockUsage);
 
     CollectionData& coll = _usage[hashedNs];
     _record(opCtx, coll, logicalOp, lockType, micros, readWriteType);
@@ -182,12 +182,12 @@ void Top::_record(OperationContext* opCtx,
 
 void Top::collectionDropped(const NamespaceString& nss) {
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<Latch> lk(_lockUsage);
     _usage.erase(nssStr);
 }
 
 void Top::append(BSONObjBuilder& b) {
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<Latch> lk(_lockUsage);
     _appendToUsageMap(b, _usage);
 }
 
@@ -236,7 +236,7 @@ void Top::appendLatencyStats(const NamespaceString& nss,
                              BSONObjBuilder* builder) {
     const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
     auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<Latch> lk(_lockUsage);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, false, &latencyStatsBuilder);
     builder->append("ns", nssStr);
@@ -249,19 +249,19 @@ void Top::incrementGlobalLatencyStats(OperationContext* opCtx,
     if (!opCtx->shouldIncrementLatencyStats())
         return;
 
-    stdx::lock_guard<Latch> guard(_lock);
+    stdx::lock_guard<Latch> guard(_lockGlobal);
     _incrementHistogram(opCtx, latency, &_globalHistogramStats, readWriteType);
 }
 
 void Top::appendGlobalLatencyStats(bool includeHistograms,
                                    bool slowMSBucketsOnly,
                                    BSONObjBuilder* builder) {
-    stdx::lock_guard<Latch> guard(_lock);
+    stdx::lock_guard<Latch> guard(_lockGlobal);
     _globalHistogramStats.append(includeHistograms, slowMSBucketsOnly, builder);
 }
 
 void Top::incrementGlobalTransactionLatencyStats(OperationContext* opCtx, uint64_t latency) {
-    stdx::lock_guard<Latch> guard(_lock);
+    stdx::lock_guard<Latch> guard(_lockGlobal);
     _globalHistogramStats.increment(
         latency, Command::ReadWriteType::kTransaction, isQuerableEncryptionOperation(opCtx));
 }
