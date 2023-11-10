@@ -57,6 +57,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/variant.h"
@@ -2044,7 +2045,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::WriteConflict);
 }
 
-TEST_F(BucketCatalogTest, ReopeningConflictsWithReopening) {
+TEST_F(BucketCatalogTest, QueryBasedReopeningConflictsWithQueryBasedReopening) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // First attempt to insert to a series should trigger a reopening request to check for a bucket
@@ -2058,7 +2059,9 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithReopening) {
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"a"})"),
                   CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result1.getStatus());
-    ASSERT(stdx::holds_alternative<ReopeningContext>(result1.getValue()));
+    auto* context = stdx::get_if<ReopeningContext>(&result1.getValue());
+    ASSERT(context);
+    ASSERT(stdx::holds_alternative<std::vector<BSONObj>>(context->candidate));
 
     // A subsequent attempt while the first one is still outstanding should conflict and yield a
     // InsertWaiter.
@@ -2122,7 +2125,7 @@ TEST_F(BucketCatalogTest, ReopeningConflictsWithPreparedBatch) {
     ASSERT(stdx::holds_alternative<InsertWaiter>(result3.getValue()));
 }
 
-TEST_F(BucketCatalogTest, PreparingBatchConflictsWithReopening) {
+TEST_F(BucketCatalogTest, PreparingBatchConflictsWithQueryBasedReopening) {
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
     // First attempt to insert to a series should trigger a reopening request to check for a bucket
@@ -2136,7 +2139,9 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithReopening) {
                   ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})"),
                   CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result1->getStatus());
-    ASSERT(stdx::holds_alternative<ReopeningContext>(result1->getValue()));
+    auto* context = stdx::get_if<ReopeningContext>(&result1->getValue());
+    ASSERT(context);
+    ASSERT(stdx::holds_alternative<std::vector<BSONObj>>(context->candidate));
 
     // Stage an insert for the same series, but a different bucket.
     auto result2 =
@@ -2158,6 +2163,123 @@ TEST_F(BucketCatalogTest, PreparingBatchConflictsWithReopening) {
             ASSERT_OK(prepareCommit(*_bucketCatalog, batch));
         }};
     result1 = boost::none;
+}
+
+TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopeningOnSameBucket) {
+    // Simplify test by restricting to a single stripe.
+    setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
+                       BSON("mode"
+                            << "alwaysOn"));
+    ScopeGuard guard{[] {
+        setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
+                           BSON("mode"
+                                << "off"));
+    }};
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Inject an archived record.
+    auto options = _getTimeseriesOptions(_ns1);
+    BSONObj doc = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
+    BucketKey key{_ns1, BucketMetadata{doc["tag"], nullptr, options.getMetaField()}};
+    auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
+    BucketId id{_ns1, OID::gen()};
+    ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
+    _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
+        minTime, ArchivedBucket{id, options.getTimeField().toString()});
+
+    // Should try to reopen archived bucket.
+    boost::optional<StatusWith<InsertResult>> result1 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  options,
+                  doc,
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1->getStatus());
+    auto* context = stdx::get_if<ReopeningContext>(&result1->getValue());
+    ASSERT(context);
+    auto* oid = stdx::get_if<OID>(&context->candidate);
+    ASSERT(oid);
+    ASSERT_EQ(*oid, id.oid);
+
+    // A second attempt should block.
+    boost::optional<StatusWith<InsertResult>> result2 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  options,
+                  doc,
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2->getStatus());
+    ASSERT(stdx::holds_alternative<InsertWaiter>(result2->getValue()));
+}
+
+TEST_F(BucketCatalogTest,
+       ArchiveBasedReopeningDoesNotConflictWithArchiveBasedReopeningOnDifferentBucket) {
+    // Simplify test by restricting to a single stripe.
+    setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
+                       BSON("mode"
+                            << "alwaysOn"));
+    ScopeGuard guard{[] {
+        setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
+                           BSON("mode"
+                                << "off"));
+    }};
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Inject an archived record.
+    auto options = _getTimeseriesOptions(_ns1);
+    BSONObj doc1 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
+    BucketKey key{_ns1, BucketMetadata{doc1["tag"], nullptr, options.getMetaField()}};
+    auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
+    BucketId id1{_ns1, OID::gen()};
+    ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
+    _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
+        minTime1, ArchivedBucket{id1, options.getTimeField().toString()});
+
+    // Should try to reopen archived bucket.
+    boost::optional<StatusWith<InsertResult>> result1 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  options,
+                  doc1,
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result1->getStatus());
+    auto* context1 = stdx::get_if<ReopeningContext>(&result1->getValue());
+    ASSERT(context1);
+    auto* oid1 = stdx::get_if<OID>(&context1->candidate);
+    ASSERT(oid1);
+    ASSERT_EQ(*oid1, id1.oid);
+
+    // Inject another archived record on the same series, but a different bucket.
+    BSONObj doc2 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:34:40.000Z"},"tag":"c"})");
+    auto minTime2 = roundTimestampToGranularity(doc2["time"].Date(), options);
+    BucketId id2{_ns1, OID::gen()};
+    ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id2));
+    _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
+        minTime2, ArchivedBucket{id2, options.getTimeField().toString()});
+
+    // A second attempt should block.
+    boost::optional<StatusWith<InsertResult>> result2 =
+        tryInsert(_opCtx,
+                  *_bucketCatalog,
+                  _ns1,
+                  _getCollator(_ns1),
+                  options,
+                  doc2,
+                  CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result2->getStatus());
+    auto* context2 = stdx::get_if<ReopeningContext>(&result2->getValue());
+    ASSERT(context2);
+    auto* oid2 = stdx::get_if<OID>(&context2->candidate);
+    ASSERT(oid2);
+    ASSERT_EQ(*oid2, id2.oid);
 }
 
 TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressure) {
