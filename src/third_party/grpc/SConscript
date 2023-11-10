@@ -42,10 +42,26 @@ if grpc_env.ToolchainIs('msvc'):
 
 grpc_root = grpc_env.Dir(".").srcnode()
 
+utf8_range_env = grpc_env.Clone()
+utf8_range_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/utf8_range'),
+    ]
+)
+utf8_range_env.Library(
+    target="utf8_range",
+    source=[
+        "dist/third_party/utf8_range/naive.c",
+        "dist/third_party/utf8_range/range2-neon.c",
+        "dist/third_party/utf8_range/range2-sse.c",
+    ],
+)
+
 upb_env = grpc_env.Clone()
 upb_env.Append(
     CPPPATH=[
         grpc_root.Dir('dist/third_party/upb'),
+        grpc_root.Dir('dist/third_party/utf8_range'),
         grpc_root.Dir('dist/src/core/ext/upb-generated'),
         grpc_root.Dir('dist/src/core/ext/upbdefs-generated'),
     ], )
@@ -74,6 +90,113 @@ upb_env.Library(
         "dist/third_party/upb/upb/wire/eps_copy_input_stream.c",
         "dist/third_party/upb/upb/wire/reader.c",
     ],
+    LIBDEPS=[
+        "utf8_range",
+    ],
+)
+
+upb_collections_env = grpc_env.Clone()
+upb_collections_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/upb'),
+    ], )
+
+upb_collections_env.Library(
+    target='upb_collections',
+    source=[
+        "dist/third_party/upb/upb/base/status.c",
+        "dist/third_party/upb/upb/collections/array.c",
+        "dist/third_party/upb/upb/collections/map.c",
+        "dist/third_party/upb/upb/collections/map_sorter.c",
+        "dist/third_party/upb/upb/hash/common.c",
+        "dist/third_party/upb/upb/mem/alloc.c",
+        "dist/third_party/upb/upb/mem/arena.c",
+        "dist/third_party/upb/upb/message/message.c",
+        "dist/third_party/upb/upb/mini_table/extension_registry.c",
+        "dist/third_party/upb/upb/mini_table/internal/message.c",
+        "dist/third_party/upb/upb/mini_table/message.c",
+    ],
+)
+
+upb_common_env = grpc_env.Clone()
+upb_common_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/upb'),
+        grpc_root.Dir('dist/src/core/ext/upb-generated'),
+    ], )
+
+upb_common_env.Library(
+    target='upb_common',
+    source=[
+        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
+        "dist/third_party/upb/upb/message/accessors.c",
+        "dist/third_party/upb/upb/mini_descriptor/build_enum.c",
+        "dist/third_party/upb/upb/mini_descriptor/decode.c",
+        "dist/third_party/upb/upb/mini_descriptor/internal/base92.c",
+        "dist/third_party/upb/upb/mini_descriptor/internal/encode.c",
+        "dist/third_party/upb/upb/mini_descriptor/link.c",
+        "dist/third_party/upb/upb/reflection/def_builder.c",
+        "dist/third_party/upb/upb/reflection/def_pool.c",
+        "dist/third_party/upb/upb/reflection/def_type.c",
+        "dist/third_party/upb/upb/reflection/desc_state.c",
+        "dist/third_party/upb/upb/reflection/enum_def.c",
+        "dist/third_party/upb/upb/reflection/enum_reserved_range.c",
+        "dist/third_party/upb/upb/reflection/enum_value_def.c",
+        "dist/third_party/upb/upb/reflection/extension_range.c",
+        "dist/third_party/upb/upb/reflection/field_def.c",
+        "dist/third_party/upb/upb/reflection/file_def.c",
+        "dist/third_party/upb/upb/reflection/message.c",
+        "dist/third_party/upb/upb/reflection/message_def.c",
+        "dist/third_party/upb/upb/reflection/message_reserved_range.c",
+        "dist/third_party/upb/upb/reflection/method_def.c",
+        "dist/third_party/upb/upb/reflection/oneof_def.c",
+        "dist/third_party/upb/upb/reflection/service_def.c",
+    ],
+    LIBDEPS=[
+        "upb",
+        "upb_collections",
+    ],
+)
+
+
+upb_textformat_env = grpc_env.Clone()
+upb_textformat_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/upb'),
+        grpc_root.Dir('dist/third_party/utf8_range'),
+        grpc_root.Dir('dist/src/core/ext/upb-generated'),
+    ], )
+
+upb_textformat_env.Library(
+    target='upb_textformat',
+    source=[
+        "dist/third_party/upb/upb/text/encode.c",
+    ],
+    LIBDEPS=[
+        "upb",
+        "upb_collections",
+        "upb_common",
+    ],
+)
+
+upb_json_env = grpc_env.Clone()
+upb_json_env.Append(
+    CPPPATH=[
+        grpc_root.Dir('dist/third_party/upb'),
+        grpc_root.Dir('dist/src/core/ext/upb-generated'),
+    ], )
+
+upb_json_env.Library(
+    target='upb_json',
+    source=[
+        "dist/third_party/upb/upb/json/decode.c",
+        "dist/third_party/upb/upb/json/encode.c",
+    ],
+    LIBDEPS=[
+        "upb",
+        "upb_collections",
+        "upb_common",
+    ],
 )
 
 address_sorting_env = grpc_env.Clone()
@@ -101,6 +224,7 @@ grpc_env.Append(
         grpc_root.Dir('dist/src/core/ext/upbdefs-generated'),
         grpc_root.Dir('dist/third_party/address_sorting/include'),
         grpc_root.Dir('dist/third_party/address_sorting/include'),
+        grpc_root.Dir('dist/third_party/utf8_range'),
     ], )
 
 protobuf_plugin_env = grpc_env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
@@ -216,6 +340,8 @@ gpr_env.Library(
         '$BUILD_DIR/third_party/abseil-cpp/absl_debugging_internal',
         '$BUILD_DIR/third_party/abseil-cpp/absl_demangle_internal',
         '$BUILD_DIR/third_party/abseil-cpp/absl_exponential_biased',
+        '$BUILD_DIR/third_party/abseil-cpp/absl_flags',
+        '$BUILD_DIR/third_party/abseil-cpp/absl_flags_marshalling',
         '$BUILD_DIR/third_party/abseil-cpp/absl_graphcycles_internal',
         '$BUILD_DIR/third_party/abseil-cpp/absl_int128',
         '$BUILD_DIR/third_party/abseil-cpp/absl_log_severity',
@@ -1035,6 +1161,7 @@ grpc_env.Library(
         '$BUILD_DIR/third_party/abseil-cpp/absl_hash',
         '$BUILD_DIR/third_party/abseil-cpp/absl_hashtablez_sampler',
         '$BUILD_DIR/third_party/abseil-cpp/absl_low_level_hash',
+        '$BUILD_DIR/third_party/abseil-cpp/absl_random_distributions',
         '$BUILD_DIR/third_party/abseil-cpp/absl_raw_hash_set',
         '$BUILD_DIR/third_party/abseil-cpp/absl_statusor',
         '$BUILD_DIR/third_party/cares/cares',
@@ -1042,6 +1169,9 @@ grpc_env.Library(
         '$BUILD_DIR/third_party/shim_zlib',
         'address_sorting',
         'gpr',
+        'upb_collections',
+        'upb_json',
+        'upb_textformat',
     ],
 )
 
