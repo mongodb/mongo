@@ -281,4 +281,12 @@ void Server::shutdown() {
     _services.clear();
 }
 
+void Server::stopAcceptingRequests() {
+    stdx::lock_guard lk(_mutex);
+
+    for (auto& service : _services) {
+        service->stopAcceptingRequests();
+    }
+}
+
 }  // namespace mongo::transport::grpc

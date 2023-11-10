@@ -511,12 +511,10 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             mongosTopCoord->enterQuiesceModeAndWait(opCtx, quiesceTime);
         }
 
-        // Shutdown the TransportLayer so that new connections aren't accepted
-        if (auto tl = serviceContext->getTransportLayerManager()) {
-            LOGV2_OPTIONS(
-                22843, {LogComponent::kNetwork}, "shutdown: going to close all sockets...");
-
-            tl->shutdown();
+        // Inform the TransportLayers to stop accepting new connections.
+        if (auto tlm = serviceContext->getTransportLayerManager()) {
+            LOGV2_OPTIONS(8314101, {LogComponent::kNetwork}, "Shutdown: Closing listener sockets");
+            tlm->stopAcceptingSessions();
         }
 
         if (audit::shutdownSynchronizeJob) {
@@ -592,13 +590,11 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
             CatalogCacheLoader::get(serviceContext).shutDown();
         }
 
-        // Shutdown the SessionManager and its sessions and give it a grace period to complete.
-        if (auto mgr = serviceContext->getTransportLayerManager()) {
-            if (!mgr->shutdownSessionManagers(Seconds(10))) {
-                LOGV2_OPTIONS(22844,
-                              {LogComponent::kNetwork},
-                              "SessionManager did not shutdown within the time limit");
-            }
+        // Finish shutting down the TransportLayers
+        if (auto tlm = serviceContext->getTransportLayerManager()) {
+            LOGV2_OPTIONS(
+                22843, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
+            tlm->shutdown();
         }
 
         // Shutdown Full-Time Data Capture

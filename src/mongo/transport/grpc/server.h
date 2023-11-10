@@ -89,6 +89,11 @@ public:
      */
     void shutdown();
 
+    /**
+     * Stop accepting new sessions, but allow existing ones to complete.
+     */
+    void stopAcceptingRequests();
+
     bool isRunning() const;
 
     Status rotateCertificates();

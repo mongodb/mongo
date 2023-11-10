@@ -59,12 +59,6 @@ GRPCTransportLayerImpl::GRPCTransportLayerImpl(ServiceContext* svcCtx,
                                                std::unique_ptr<SessionManager> sm)
     : _svcCtx{svcCtx}, _options{std::move(options)}, _sessionManager(std::move(sm)) {}
 
-GRPCTransportLayerImpl::~GRPCTransportLayerImpl() {
-    if (_sessionManager) {
-        _sessionManager->shutdown(kSessionManagerShutdownTimeout);
-    }
-}
-
 Status GRPCTransportLayerImpl::registerService(std::unique_ptr<Service> svc) {
     try {
         stdx::lock_guard lk(_mutex);
@@ -225,6 +219,16 @@ void GRPCTransportLayerImpl::shutdown() {
     }
     if (_client) {
         _client->shutdown();
+    }
+
+    if (_sessionManager) {
+        _sessionManager->shutdown(kSessionManagerShutdownTimeout);
+    }
+}
+
+void GRPCTransportLayerImpl::stopAcceptingSessions() {
+    if (_server) {
+        _server->stopAcceptingRequests();
     }
 }
 

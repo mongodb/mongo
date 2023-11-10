@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
-#include "mongo/util/duration.h"
 
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
@@ -65,7 +64,6 @@ public:
 
     virtual Status start() = 0;
     virtual void shutdown() = 0;
-    virtual bool shutdownSessionManagers(Milliseconds timeout) = 0;
     virtual Status setup() = 0;
     virtual void appendStatsForServerStatus(BSONObjBuilder* bob) const = 0;
     virtual void appendStatsForFTDC(BSONObjBuilder& bob) const = 0;
@@ -97,6 +95,11 @@ public:
      * End all sessions that do not match the mask in tags.
      */
     virtual void endAllSessions(Client::TagMask tags) = 0;
+
+    /**
+     * Instruct transport layers to discontinue accepting new sessions.
+     */
+    virtual void stopAcceptingSessions() = 0;
 };
 
 }  // namespace mongo::transport

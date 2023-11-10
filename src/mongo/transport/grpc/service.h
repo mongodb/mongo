@@ -54,6 +54,8 @@ public:
 
     virtual void shutdown() = 0;
 
+    virtual void stopAcceptingRequests() = 0;
+
     std::string toString() const {
         return name().toString();
     }
@@ -98,6 +100,8 @@ public:
 
     void shutdown() override;
 
+    void stopAcceptingRequests() override;
+
 private:
     friend class MockServer;
 
@@ -115,6 +119,7 @@ private:
     mutable stdx::mutex _mutex;  // NOLINT
     stdx::condition_variable _shutdownCV;
     std::list<InSessionPtr> _sessions;
+    bool _acceptNewRequests = true;
     bool _shutdown = false;
 };
 }  // namespace mongo::transport::grpc

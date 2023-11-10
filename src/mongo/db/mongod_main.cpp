@@ -1716,14 +1716,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }
 
-    // Shutdown the TransportLayer so that new connections aren't accepted
-    if (auto tl = serviceContext->getTransportLayerManager()) {
-        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
-                                                  "Shut down the transport layer",
-                                                  &shutdownTimeElapsedBuilder);
-        LOGV2_OPTIONS(
-            20562, {LogComponent::kNetwork}, "Shutdown: going to close listening sockets");
-        tl->shutdown();
+    // Inform the TransportLayers to stop accepting new connections.
+    if (auto tlm = serviceContext->getTransportLayerManager()) {
+        LOGV2_OPTIONS(8314100, {LogComponent::kNetwork}, "Shutdown: Closing listener sockets");
+        tlm->stopAcceptingSessions();
     }
 
     // Shut down the global dbclient pool so callers stop waiting for connections.
@@ -1944,15 +1940,13 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         CatalogCacheLoader::get(serviceContext).shutDown();
     }
 
-    // Shutdown the Session Manager and its sessions and give it a grace period to complete.
-    if (auto mgr = serviceContext->getTransportLayerManager()) {
-        LOGV2_OPTIONS(
-            4784923, {LogComponent::kCommand}, "Shutting down the transport SessionManager");
-        if (!mgr->shutdownSessionManagers(Seconds(10))) {
-            LOGV2_OPTIONS(20563,
-                          {LogComponent::kNetwork},
-                          "SessionManager did not shutdown within the time limit");
-        }
+    // Finish shutting down the TransportLayers
+    if (auto tlm = serviceContext->getTransportLayerManager()) {
+        TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
+                                                  "Shut down the transport layer",
+                                                  &shutdownTimeElapsedBuilder);
+        LOGV2_OPTIONS(20562, {LogComponent::kNetwork}, "Shutdown: Closing open transport sessions");
+        tlm->shutdown();
     }
 
     if (auto* healthLog = HealthLogInterface::get(serviceContext)) {

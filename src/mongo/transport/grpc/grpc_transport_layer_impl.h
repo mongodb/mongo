@@ -47,7 +47,6 @@ public:
     GRPCTransportLayerImpl(ServiceContext* svcCtx,
                            Options options,
                            std::unique_ptr<SessionManager> sessionManager);
-    ~GRPCTransportLayerImpl();
 
     Status registerService(std::unique_ptr<Service> svc) override;
 
@@ -56,6 +55,8 @@ public:
     Status start() override;
 
     void shutdown() override;
+
+    void stopAcceptingSessions() override;
 
     StatusWith<std::shared_ptr<Session>> connectWithAuthToken(
         HostAndPort peer,

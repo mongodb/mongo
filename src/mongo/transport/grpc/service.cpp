@@ -257,7 +257,7 @@ CommandService::CommandService(TransportLayer* tl,
     {
         stdx::lock_guard lk{_mutex};
 
-        if (_shutdown) {
+        if (_shutdown || !_acceptNewRequests) {
             session->terminate(makeShutdownTerminationStatus());
             return util::convertStatus(*session->terminationStatus());
         }
@@ -313,6 +313,11 @@ void CommandService::shutdown() {
                 1,
                 "CommandService shutdown complete",
                 "terminatedSessionsCount"_attr = nSessionsTerminated);
+}
+
+void CommandService::stopAcceptingRequests() {
+    stdx::unique_lock lk{_mutex};
+    _acceptNewRequests = false;
 }
 
 }  // namespace mongo::transport::grpc
