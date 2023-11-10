@@ -15,10 +15,10 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Makes an query instance of the find command with an optional filter clause.
+     * Makes an query instance of the find command.
      */
-    makeFindQueryInstance(filter = {}) {
-        return {find: this.collName, $db: this.db.getName(), filter};
+    makeFindQueryInstance(findObj) {
+        return {find: this.collName, $db: this.db.getName(), ...findObj};
     }
 
     /**

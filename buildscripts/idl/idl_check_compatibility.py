@@ -127,6 +127,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'find-param-projection',
     'find-param-sort',
     'find-param-hint',
+    'find-param-allowedIndexes',
     'find-param-collation',
     'find-param-singleBatch',
     'find-param-allowDiskUse',
