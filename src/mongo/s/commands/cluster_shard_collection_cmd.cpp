@@ -115,13 +115,21 @@ public:
         uassert(6464401,
                 "Sharding a Queryable Encryption state collection is not allowed",
                 !nss.isFLE2StateCollection());
-        auto clusterRequest = ShardCollection::parse(IDLParserContext("ShardCollection"), cmdObj);
+
+        // Parse the cluster request using the shardsvr request. This ensures the cluster and the
+        // shardsvr requests are always compatible.
         auto shardsvrRequest =
             ShardsvrCreateCollectionRequest::parse(IDLParserContext("ShardCollection"), cmdObj);
+
+        auto clusterRequest = ShardCollection::parse(IDLParserContext("ShardCollection"), cmdObj);
         shardsvrRequest.setShardKey(clusterRequest.getKey());
+        shardsvrRequest.setCollation(clusterRequest.getCollation());
+        shardsvrRequest.setPresplitHashedZones(clusterRequest.getPresplitHashedZones());
+        shardsvrRequest.setUnique(clusterRequest.getUnique());
+        shardsvrRequest.setNumInitialChunks(clusterRequest.getNumInitialChunks());
 
         ShardsvrCreateCollection shardsvrCollCmd(nss);
-        shardsvrCollCmd.setShardsvrCreateCollectionRequest(shardsvrRequest);
+        shardsvrCollCmd.setShardsvrCreateCollectionRequest(std::move(shardsvrRequest));
         shardsvrCollCmd.setDbName(nss.dbName());
 
         cluster::createCollection(opCtx, shardsvrCollCmd);
