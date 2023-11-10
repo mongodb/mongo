@@ -20,8 +20,8 @@ for (let i = 0; i < nDocs; i++) {
 assert.commandWorked(bulk.execute());
 
 const res = coll.explain().aggregate([{$match: {'a': {$lt: 2}}}]);
-assert(res.queryPlanner.winningPlan.optimizerPlan.hasOwnProperty("properties"));
-const props = res.queryPlanner.winningPlan.optimizerPlan.properties;
+assert(res.queryPlanner.winningPlan.queryPlan.hasOwnProperty("properties"));
+const props = res.queryPlanner.winningPlan.queryPlan.properties;
 
 // Verify the winning plan cardinality is within roughly 25% of the expected documents.
 assert.lt(nDocs * 0.2 * 0.75, props.adjustedCE);

@@ -13,7 +13,7 @@ Plan skeleton:
 {
 	"queryPlanner" : {
 		"winningPlan" : {
-			"optimizerPlan" : {
+			"queryPlan" : {
 				"nodeType" : "Root",
 				"child" : {
 					"nodeType" : "Evaluation",
@@ -47,7 +47,7 @@ Plan skeleton:
 {
 	"queryPlanner" : {
 		"winningPlan" : {
-			"optimizerPlan" : {
+			"queryPlan" : {
 				"nodeType" : "Root",
 				"child" : {
 					"nodeType" : "Evaluation",

@@ -103,6 +103,10 @@ BSONObj ABTPrinter::explainBSON() const {
                                                     nullptr /*memoInterface*/,
                                                     _planAndProps._map);
 
+        case ExplainVersion::UserFacingExplain: {
+            UserFacingExplain ex(_planAndProps._map);
+            return ex.explain(_planAndProps._node);
+        }
         case ExplainVersion::Vmax:
             // Should not be seeing this value here.
             break;

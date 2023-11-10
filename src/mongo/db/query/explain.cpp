@@ -163,6 +163,12 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("maxIndexedOrSolutionsReached", enumeratorInfo.hitIndexedOrLimit);
     plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
     plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
+
+    auto framework = exec->getQueryFramework();
+    if (framework == PlanExecutor::QueryFramework::kCQF) {
+        plannerBob.append("queryFramework", "cqf");
+    }
+
     auto&& [winningStats, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     plannerBob.append("winningPlan", winningStats);

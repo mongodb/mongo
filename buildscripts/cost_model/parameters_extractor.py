@@ -118,7 +118,7 @@ def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
 
     try:
         et = execution_tree.build_execution_tree(explain['executionStats'])
-        pt = physical_tree.build(explain['queryPlanner']['winningPlan']['optimizerPlan'])
+        pt = physical_tree.build(explain['queryPlanner']['winningPlan']['queryPlan'])
     except Exception as exception:
         print(f'*** Failed to parse explain with the followinf error: {exception}')
         print(explain)

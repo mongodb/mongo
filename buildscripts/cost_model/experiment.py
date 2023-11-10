@@ -115,7 +115,7 @@ async def load_calibration_data(database: DatabaseInstance, collection_name: str
     df['sbe'] = df.explain.apply(lambda e: sbe.build_execution_tree(
         json.loads(e)['executionStats']))
     df['abt'] = df.explain.apply(lambda e: abt.build(
-        json.loads(e)['queryPlanner']['winningPlan']['optimizerPlan']))
+        json.loads(e)['queryPlanner']['winningPlan']['queryPlan']))
     df['total_execution_time'] = df.sbe.apply(lambda t: t.total_execution_time)
     return df
 

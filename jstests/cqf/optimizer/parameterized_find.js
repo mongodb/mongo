@@ -1,5 +1,4 @@
 import {
-    assertValueOnNonOptimizerPlanPath,
     assertValueOnPlanPath,
     checkCascadesOptimizerEnabled,
     checkPlanCacheParameterization
@@ -47,7 +46,7 @@ function verifyCommandParameterization(
     let res = coll.explain("executionStats").find(findCmd).finish();
     assert.eq(nReturnedExpected, res.executionStats.nReturned);
     if (indexed)
-        assertValueOnNonOptimizerPlanPath(stage, res, path);
+        assertValueOnPlanPath(stage, res, path);
     else
         assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }

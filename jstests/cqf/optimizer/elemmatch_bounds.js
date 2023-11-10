@@ -59,7 +59,7 @@ assert.commandWorked(coll.createIndex({'c': 1}));
 // Return the results with the _id field excluded.
 function run({pipeline, plan: expectedPlan}) {
     const explain = coll.explain().aggregate(pipeline);
-    const plan = getPlanSkeleton(explain.queryPlanner.winningPlan.optimizerPlan, {
+    const plan = getPlanSkeleton(explain.queryPlanner.winningPlan.queryPlan, {
         extraKeepKeys: ['indexDefName', 'interval'],
     });
     assert.eq(plan, expectedPlan, plan);

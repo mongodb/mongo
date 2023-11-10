@@ -9,7 +9,7 @@ Plan skeleton:
 {
 	"queryPlanner" : {
 		"winningPlan" : {
-			"optimizerPlan" : {
+			"queryPlan" : {
 				"nodeType" : "Root",
 				"child" : {
 					"nodeType" : "Filter",
@@ -32,7 +32,7 @@ Plan skeleton:
 {
 	"queryPlanner" : {
 		"winningPlan" : {
-			"optimizerPlan" : {
+			"queryPlan" : {
 				"nodeType" : "Root",
 				"child" : {
 					"nodeType" : "NestedLoopJoin",

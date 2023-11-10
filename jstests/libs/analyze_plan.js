@@ -259,6 +259,26 @@ export function getExecutionStages(root) {
 }
 
 /**
+ * Returns the winningPlan.queryPlan of each shard in the explain in a list.
+ */
+export function getShardQueryPlans(root) {
+    let result = [];
+
+    if (root.hasOwnProperty("shards")) {
+        for (let shardName of Object.keys(root.shards)) {
+            let shard = root.shards[shardName];
+            result.push(shard.queryPlanner.winningPlan.queryPlan);
+        }
+    } else {
+        for (let shard of root.queryPlanner.winningPlan.shards) {
+            result.push(shard.winningPlan.queryPlan);
+        }
+    }
+
+    return result;
+}
+
+/**
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. This can either be an agg stage name like "$cursor" or
  * "$sort", or a query stage name like "IXSCAN" or "SORT".

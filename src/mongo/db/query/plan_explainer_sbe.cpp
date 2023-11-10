@@ -489,7 +489,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     invariant(execPlanDebugInfo);
     BSONObjBuilder plan;
     if (optimizerExplain) {
-        plan.append("optimizerPlan", *optimizerExplain);
+        plan.append("queryPlan", *optimizerExplain);
     } else {
         plan.append("queryPlan", bob.obj());
     }

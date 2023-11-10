@@ -197,7 +197,7 @@ async def benchmark(config: BenchmarkConfig, database: DatabaseInstance, task: B
 
 def make_variant(explain: Sequence[dict[str, any]]) -> ExperimentResult:
     """Make one variant of the A/B test."""
-    pt = [physical_tree.build(e['queryPlanner']['winningPlan']['optimizerPlan']) for e in explain]
+    pt = [physical_tree.build(e['queryPlanner']['winningPlan']['queryPlan']) for e in explain]
     et = [execution_tree.build_execution_tree(e['executionStats']) for e in explain]
     mean = sum(et.total_execution_time for et in et) / len(et)
     return ExperimentResult(explain=explain, physical_tree=pt, execution_tree=et, mean=mean)

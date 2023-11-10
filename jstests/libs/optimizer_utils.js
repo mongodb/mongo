@@ -40,8 +40,7 @@ export function usedBonsaiOptimizer(explain) {
     if (explain.hasOwnProperty("shards")) {
         // This section handles the explain output for aggregations against sharded colls.
         for (let shardName of Object.keys(explain.shards)) {
-            if (!explain.shards[shardName].queryPlanner.winningPlan.hasOwnProperty(
-                    "optimizerPlan")) {
+            if (explain.shards[shardName].queryPlanner.queryFramework !== "cqf") {
                 return false;
             }
         }
@@ -50,7 +49,7 @@ export function usedBonsaiOptimizer(explain) {
                explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
         // This section handles the explain output for find queries against sharded colls.
         for (let shardExplain of explain.queryPlanner.winningPlan.shards) {
-            if (!shardExplain.winningPlan.hasOwnProperty("optimizerPlan")) {
+            if (shardExplain.queryFramework !== "cqf") {
                 return false;
             }
         }
@@ -58,17 +57,7 @@ export function usedBonsaiOptimizer(explain) {
     }
 
     // This section handles the explain output for unsharded queries.
-
-    if (!isAggregationPlan(explain)) {
-        return explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
-    }
-
-    const plannerOutput = getAggPlanStage(explain, "$cursor");
-    if (plannerOutput != null) {
-        return plannerOutput["$cursor"].queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
-    } else {
-        return explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
-    }
+    return explain.hasOwnProperty("queryPlanner") && explain.queryPlanner.queryFramework === "cqf";
 }
 
 /**
@@ -83,10 +72,12 @@ export function leftmostLeafStage(node) {
             node = node.queryPlanner;
         } else if (node.winningPlan) {
             node = node.winningPlan;
-        } else if (node.optimizerPlan) {
-            node = node.optimizerPlan;
+        } else if (node.queryPlan) {
+            node = node.queryPlan;
         } else if (node.child) {
             node = node.child;
+        } else if (node.inputStage) {
+            node = node.inputStage;
         } else if (node.leftChild) {
             node = node.leftChild;
         } else if (node.children) {
@@ -119,7 +110,7 @@ export function getPlanSkeleton(node, options = {}) {
 
         'queryPlanner',
         'winningPlan',
-        'optimizerPlan',
+        'queryPlan',
         'child',
         'children',
         'leftChild',
@@ -328,7 +319,7 @@ export function prettyOp(op) {
  */
 export function removeUUIDsFromExplain(db, explain) {
     const listCollsRes = db.runCommand({listCollections: 1}).cursor.firstBatch;
-    let plan = explain.queryPlanner.winningPlan.optimizerPlan.plan.toString();
+    let plan = explain.queryPlanner.winningPlan.queryPlan.plan.toString();
 
     for (let entry of listCollsRes) {
         const uuidStr = entry.info.uuid.toString().slice(6).slice(0, -2);
@@ -357,15 +348,11 @@ export function navigateToPath(doc, path) {
 }
 
 export function navigateToPlanPath(doc, path) {
-    return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan." + path);
-}
-
-function navigateToNonOptimizerPlanPath(doc, path) {
     return navigateToPath(doc, "queryPlanner.winningPlan.queryPlan." + path);
 }
 
 export function navigateToRootNode(doc) {
-    return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan");
+    return navigateToPath(doc, "queryPlanner.winningPlan.queryPlan");
 }
 
 export function assertValueOnPathFn(value, doc, path, fn) {
@@ -384,10 +371,6 @@ export function assertValueOnPath(value, doc, path) {
 
 export function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
-}
-
-export function assertValueOnNonOptimizerPlanPath(value, doc, path) {
-    assertValueOnPathFn(value, doc, path, navigateToNonOptimizerPlanPath);
 }
 
 export function runWithParams(keyValPairs, fn) {

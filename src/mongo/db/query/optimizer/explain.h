@@ -46,7 +46,7 @@
 
 namespace mongo::optimizer {
 
-enum class ExplainVersion { V1, V2, V2Compact, V3, Vmax };
+enum class ExplainVersion { V1, V2, V2Compact, V3, UserFacingExplain, Vmax };
 
 /**
  * This structure holds any data that is required by the explain. It is self-sufficient and separate
@@ -64,6 +64,166 @@ private:
     Metadata _metadata;
     PlanAndProps _planAndProps;
     ExplainVersion _explainVersion;
+};
+
+class UserFacingExplain {
+public:
+    UserFacingExplain(const NodeToGroupPropsMap& nodeMap = {}) : _nodeMap(nodeMap) {}
+
+    // Constants relevant to all stages.
+    constexpr static StringData kStage = "stage"_sd;
+    constexpr static StringData kNodeId = "planNodeId"_sd;
+    constexpr static StringData kProj = "projections"_sd;
+    constexpr static StringData kCE = "cardinalityEstimate"_sd;
+    constexpr static StringData kInput = "inputStage"_sd;
+
+    // Specific to PhysicalScanNode.
+    constexpr static StringData kScanName = "COLLSCAN"_sd;
+    constexpr static StringData kDir = "direction"_sd;
+    constexpr static StringData kForward = "forward"_sd;
+    constexpr static StringData kBackward = "backward"_sd;
+
+    // Specific to FilterNode.
+    constexpr static StringData kFilterName = "FILTER"_sd;
+    constexpr static StringData kFilter = "filter"_sd;
+
+    // Specific to EvaluationNode.
+    constexpr static StringData kEvalName = "EVALUATION"_sd;
+
+    // Specific to RootNode.
+    constexpr static StringData kRootName = "ROOT"_sd;
+    constexpr static StringData kCost = "costEstimate"_sd;
+
+    // Specific to EOF.
+    constexpr static StringData kEOF = "EOF"_sd;
+
+    // The default noop case.
+    template <typename T, typename... Ts>
+    void walk(const T&, BSONObjBuilder* bob, Ts&&...) {
+        // If we get here, that means we are trying to generate explain for an unsupported node. We
+        // should never generate an unsupported node to explain to begin with.
+        tasserted(8075606, "Trying to generate explain for an unsupported node.");
+    }
+
+    void walk(const RootNode& node, BSONObjBuilder* bob, const ABT& child, const ABT& /* refs */) {
+        auto it = _nodeMap.find(&node);
+        tassert(8075600, "Failed to find node properties", it != _nodeMap.end());
+        const NodeProps& props = it->second;
+
+        bob->append(kStage, kRootName);
+        bob->append(kProj, "<todo>");
+        bob->append(kCE, "<todo>");
+        bob->append(kCost, props._cost.getCost());
+
+        BSONObjBuilder inputBob(bob->subobjStart(kInput));
+        generateExplain(child, &inputBob);
+    }
+
+    void walk(const FilterNode& node,
+              BSONObjBuilder* bob,
+              const ABT& child,
+              const ABT& /* expr */) {
+        auto it = _nodeMap.find(&node);
+        tassert(8075601, "Failed to find node properties", it != _nodeMap.end());
+        const NodeProps& props = it->second;
+
+        bob->append(kStage, kFilterName);
+        bob->append(kNodeId, props._planNodeId);
+        bob->append(kFilter, "<todo>");
+        bob->append(kCE, "<todo>");
+
+        BSONObjBuilder inputBob(bob->subobjStart(kInput));
+        generateExplain(child, &inputBob);
+    }
+
+    void walk(const EvaluationNode& node,
+              BSONObjBuilder* bob,
+              const ABT& child,
+              const ABT& /* expr */) {
+        auto it = _nodeMap.find(&node);
+        tassert(8075602, "Failed to find node properties", it != _nodeMap.end());
+        const NodeProps& props = it->second;
+
+        bob->append(kStage, kEvalName);
+        bob->append(kNodeId, props._planNodeId);
+        bob->append(kProj, "<todo>");
+        bob->append(kCE, "<todo>");
+
+        BSONObjBuilder inputBob(bob->subobjStart(kInput));
+        generateExplain(child, &inputBob);
+    }
+
+    void walk(const PhysicalScanNode& node, BSONObjBuilder* bob, const ABT& /* bind */) {
+        auto it = _nodeMap.find(&node);
+        tassert(8075603, "Failed to find node properties", it != _nodeMap.end());
+        const NodeProps& props = it->second;
+
+        bob->append(kStage, kScanName);
+        bob->append(kNodeId, props._planNodeId);
+        // TOOD SERVER-82876: Populate the scan direction here accordingly.
+        bob->append(kDir, "<todo>");
+        bob->append(kProj, "<todo>");
+        bob->append(kCE, "<todo>");
+    }
+
+    void generateExplain(const ABT::reference_type n, BSONObjBuilder* bob) {
+        algebra::walk<false>(n, *this, bob);
+    }
+
+    BSONObj generateEOFPlan(const ABT::reference_type node) {
+        BSONObjBuilder bob;
+
+        auto it = _nodeMap.find(node.cast<Node>());
+        tassert(8075605, "Failed to find node properties", it != _nodeMap.end());
+        const NodeProps& props = it->second;
+
+        bob.append(kStage, kEOF);
+        bob.append(kNodeId, props._planNodeId);
+
+        return bob.obj();
+    }
+
+    bool isEOFPlan(const ABT::reference_type node) {
+        // This function expects the full ABT to be the argument. So we must have a RootNode.
+        auto root = node.cast<RootNode>();
+        if (!root->getChild().is<EvaluationNode>()) {
+            // An EOF plan will have an EvaluationNode as the child of the RootNode.
+            return false;
+        }
+
+        auto eval = root->getChild().cast<EvaluationNode>();
+        if (eval->getProjection() != Constant::nothing()) {
+            // The EvaluationNode of an EOF plan will have Nothing as the projection.
+            return false;
+        }
+
+        // This is the rest of an EOF plan.
+        ABT eofChild =
+            make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, make<CoScanNode>());
+        return eval->getChild() == eofChild;
+    }
+
+    BSONObj explain(const ABT::reference_type node) {
+        // Short circuit to return EOF stage if the collection is empty.
+        if (isEOFPlan(node)) {
+            return generateEOFPlan(node);
+        }
+
+        BSONObjBuilder bob;
+        generateExplain(node, &bob);
+
+        BSONObj result = bob.obj();
+
+        // If at this point (after the walk) the explain BSON is empty, that means the ABT had no
+        // nodes (if it had any unsupported nodes, we would have hit the MONGO_UNREACHABLE in the
+        // default case above).
+        tassert(8075604, "The ABT has no nodes.", !result.isEmpty());
+
+        return result;
+    }
+
+private:
+    const NodeToGroupPropsMap& _nodeMap;
 };
 
 class ExplainGenerator {
