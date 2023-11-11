@@ -30,12 +30,11 @@
 
 #include "mongo/db/keys_collection_util.h"
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/shard_role.h"
-#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 namespace keys_collection_util {

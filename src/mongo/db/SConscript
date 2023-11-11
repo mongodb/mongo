@@ -829,7 +829,7 @@ env.Library(
         'catalog/collection.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/common_s',
         'catalog/clustered_collection_options',
         'catalog/index_catalog',
         'server_base',
@@ -877,8 +877,6 @@ env.Library(
         'catalog/collection_uuid_mismatch.cpp',
         'catalog/collection_yield_restore.cpp',
         'db_raii.cpp',
-        'shard_role.cpp',
-        'transaction_resources.cpp',
     ],
     LIBDEPS=[
         'catalog/collection_catalog',
@@ -2624,7 +2622,6 @@ if wiredtiger:
             'session/session_catalog_mongod_test.cpp',
             'session/session_catalog_test.cpp',
             'shard_id_test.cpp',
-            'shard_role_test.cpp',
             'startup_warnings_mongod_test.cpp',
             'thread_client_test.cpp',
             'time_proof_service_test.cpp',

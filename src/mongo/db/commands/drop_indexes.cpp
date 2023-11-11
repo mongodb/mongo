@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+
+#include "mongo/platform/basic.h"
+
 #include <string>
 #include <vector>
 
@@ -42,12 +45,12 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/drop_indexes_gen.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/vector_clock.h"
@@ -58,7 +61,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
+
 namespace mongo {
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(reIndexCrashAfterDrop);
@@ -168,21 +173,17 @@ public:
                     << toReIndexNss << "' while replication is active");
         }
 
-        auto acquisition = [&] {
-            auto collOrViewAcquisition = acquireCollectionOrView(
-                opCtx,
-                CollectionOrViewAcquisitionRequest::fromOpCtx(
-                    opCtx, toReIndexNss, AcquisitionPrerequisites::OperationType::kWrite),
-                MODE_X);
-            uassert(ErrorCodes::CommandNotSupportedOnView,
-                    "can't re-index a view",
-                    !std::holds_alternative<ScopedViewAcquisition>(collOrViewAcquisition));
-            return std::move(std::get<ScopedCollectionAcquisition>(collOrViewAcquisition));
-        }();
-        uassert(ErrorCodes::NamespaceNotFound, "collection does not exist", acquisition.exists());
+        AutoGetCollection autoColl(opCtx, toReIndexNss, MODE_X);
+        if (!autoColl) {
+            if (CollectionCatalog::get(opCtx)->lookupView(opCtx, toReIndexNss))
+                uasserted(ErrorCodes::CommandNotSupportedOnView, "can't re-index a view");
+            else
+                uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
+        }
 
+        CollectionWriter collection(opCtx, autoColl);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            acquisition.uuid());
+            collection->uuid());
 
         // This is necessary to set up CurOp and update the Top stats.
         OldClientContext ctx(opCtx, toReIndexNss);
@@ -194,7 +195,7 @@ public:
             std::vector<std::string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", toReIndexNss.ns(), [&] {
                 indexNames.clear();
-                acquisition.getCollectionPtr()->getAllIndexes(&indexNames);
+                collection->getAllIndexes(&indexNames);
             });
 
             all.reserve(indexNames.size());
@@ -202,7 +203,7 @@ public:
             for (size_t i = 0; i < indexNames.size(); i++) {
                 const std::string& name = indexNames[i];
                 BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss.ns(), [&] {
-                    return acquisition.getCollectionPtr()->getIndexSpec(name);
+                    return collection->getIndexSpec(name);
                 });
 
                 {
@@ -243,7 +244,6 @@ public:
                                                             "Uninitialized");
         writeConflictRetry(opCtx, "dropAllIndexes", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            CollectionWriter collection(opCtx, &acquisition);
             collection.getWritableCollection(opCtx)->getIndexCatalog()->dropAllIndexes(
                 opCtx, collection.getWritableCollection(opCtx), true, {});
 
@@ -258,7 +258,6 @@ public:
 
         // The 'indexer' can throw, so ensure build cleanup occurs.
         ScopeGuard abortOnExit([&] {
-            CollectionWriter collection(opCtx, &acquisition);
             indexer->abortIndexBuild(opCtx, collection, MultiIndexBlock::kNoopOnCleanUpFn);
         });
 
@@ -269,14 +268,12 @@ public:
 
         // The following function performs its own WriteConflict handling, so don't wrap it in a
         // writeConflictRetry loop.
-        uassertStatusOK(
-            indexer->insertAllDocumentsInCollection(opCtx, acquisition.getCollectionPtr()));
+        uassertStatusOK(indexer->insertAllDocumentsInCollection(opCtx, collection.get()));
 
-        uassertStatusOK(indexer->checkConstraints(opCtx, acquisition.getCollectionPtr()));
+        uassertStatusOK(indexer->checkConstraints(opCtx, collection.get()));
 
         writeConflictRetry(opCtx, "commitReIndex", toReIndexNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            CollectionWriter collection(opCtx, &acquisition);
             uassertStatusOK(indexer->commit(opCtx,
                                             collection.getWritableCollection(opCtx),
                                             MultiIndexBlock::kNoopOnCreateEachFn,
