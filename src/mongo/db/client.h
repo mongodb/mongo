@@ -159,13 +159,6 @@ public:
     }
 
     /**
-     * Returns true if this client is connected to the router port of a mongod with router role.
-     */
-    bool isRouterClient() const {
-        return _isRouterClient;
-    }
-
-    /**
      * Returns the ServiceContext that owns this client session context.
      */
     ServiceContext* getServiceContext() const {
@@ -427,9 +420,6 @@ private:
     // Whether this client used { helloOk: true } when opening its connection, indicating that
     // it supports the hello command.
     bool _supportsHello = false;
-
-    // Whether this client is connected to the router port of a mongod with router role.
-    const bool _isRouterClient = false;
 
     UUID _uuid;
 

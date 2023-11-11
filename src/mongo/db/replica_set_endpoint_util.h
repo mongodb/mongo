@@ -29,44 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/operation_context.h"
-
 namespace mongo {
 namespace replica_set_endpoint {
 
-// The set of commands that need to run on the mongod it arrives on (i.e. must not go through the
-// router code paths).
-const std::set<StringData> kTargetedCmdNames = {"clearLog",
-                                                "configureFailPoint",
-                                                "connectionStatus",
-                                                "currentOp",
-                                                "getLog",
-                                                "getParameter",
-                                                "getShardVersion",
-                                                "hello",
-                                                "isMaster",
-                                                "ismaster",
-                                                "logout",
-                                                "ping",
-                                                "refreshLogicalSessionCacheNow",
-                                                "replSetGetStatus",
-                                                "saslStart",
-                                                "saslContinue",
-                                                "setParameter",
-                                                "serverStatus",
-                                                "_flushRoutingTableCacheUpdates"};
-
-/**
- * Returns true if this is a client on the shard port of a shardsvr mongod that supports
- * replica set endpoint.
- */
-bool isReplicaSetEndpointClient(Client* client);
-
-/**
- * Returns true if a request on the shard port of a shardsvr mongod should go through the router
- * code paths instead of the shard code paths.
- */
-bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq);
+bool isFeatureFlagEnabled();
 
 }  // namespace replica_set_endpoint
 }  // namespace mongo

@@ -46,33 +46,23 @@ public:
     static ReplicaSetEndpointShardingState* get(OperationContext* opCtx);
 
     /**
-     * Sets '_isConfigShard' to true or false. Can only be invoked on a mongod with the configsvr
+     * Sets '_isConfigShard' to true or false. Can only be invoked on a node with the configsvr
      * role.
      */
     void setIsConfigShard(bool value);
 
     /**
-     * Returns true if this mongod belongs to a config shard.
+     * Returns true if this node belongs to a config shard.
      */
     bool isConfigShardForTest();
 
-    /**
-     * Returns true if this mongod supports replica set endpoint, meaning it is part of
-     * a single-shard cluster consisting of config shard with router role.
-     */
-    bool supportsReplicaSetEndpoint();
-
 private:
-    mutable std::shared_mutex _mutex;  // NOLINT
+    Mutex _mutex =
+        MONGO_MAKE_LATCH("replica_set_endpoint::ReplicaSetEndpointShardingState::_mutex");
 
-    // Set to true if this mongod belongs to a config shard.
+    // Set to true if this node belongs to a config shard.
     bool _isConfigShard;
 };
-
-/**
- * Returns true if the feature flag is enabled, not ignoring the feature compatibility version.
- */
-bool isFeatureFlagEnabled();
 
 }  // namespace replica_set_endpoint
 }  // namespace mongo

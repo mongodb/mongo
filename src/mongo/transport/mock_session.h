@@ -110,27 +110,22 @@ class MockSession : public MockSessionBase {
     MockSession& operator=(const MockSession&) = delete;
 
 public:
-    static std::shared_ptr<MockSession> create(TransportLayer* tl, bool isFromRouterPort = false) {
-        auto handle = std::make_shared<MockSession>(tl, isFromRouterPort);
+    static std::shared_ptr<MockSession> create(TransportLayer* tl) {
+        auto handle = std::make_shared<MockSession>(tl);
         return handle;
     }
 
     static std::shared_ptr<MockSession> create(HostAndPort remote,
                                                SockAddr remoteAddr,
                                                SockAddr localAddr,
-                                               TransportLayer* tl,
-                                               bool isFromRouterPort = false) {
+                                               TransportLayer* tl) {
         auto handle = std::make_shared<MockSession>(
-            std::move(remote), std::move(remoteAddr), std::move(localAddr), tl, isFromRouterPort);
+            std::move(remote), std::move(remoteAddr), std::move(localAddr), tl);
         return handle;
     }
 
     TransportLayer* getTransportLayer() const override {
         return _tl;
-    }
-
-    bool isFromRouterPort() const override {
-        return _isFromRouterPort;
     }
 
     void end() override {
@@ -192,22 +187,17 @@ public:
         return Future<void>::makeReady(sinkMessage(message));
     }
 
-    explicit MockSession(TransportLayer* tl, bool isFromRouterPort = false)
-        : MockSessionBase(),
-          _tl(checked_cast<TransportLayerMock*>(tl)),
-          _isFromRouterPort(isFromRouterPort) {}
+    explicit MockSession(TransportLayer* tl)
+        : MockSessionBase(), _tl(checked_cast<TransportLayerMock*>(tl)) {}
     explicit MockSession(HostAndPort remote,
                          SockAddr remoteAddr,
                          SockAddr localAddr,
-                         TransportLayer* tl,
-                         bool isFromRouterPort = false)
+                         TransportLayer* tl)
         : MockSessionBase(std::move(remote), std::move(remoteAddr), std::move(localAddr)),
-          _tl(checked_cast<TransportLayerMock*>(tl)),
-          _isFromRouterPort(isFromRouterPort) {}
+          _tl(checked_cast<TransportLayerMock*>(tl)) {}
 
 protected:
     TransportLayerMock* const _tl;
-    const bool _isFromRouterPort;
 
     mutable Mutex _waitForDataMutex = MONGO_MAKE_LATCH("MockSession::_waitForDataMutex");
     std::list<Promise<void>> _waitForDataQueue;

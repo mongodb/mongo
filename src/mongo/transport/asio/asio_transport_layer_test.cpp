@@ -406,7 +406,7 @@ TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
 
     // We set the timeout to ensure that the setsockopt calls are actually made in ensureSync()
     auto& st = *mockSessionCreated.get();
-    st.session()->setTimeout(Milliseconds{500});
+    st.session().setTimeout(Milliseconds{500});
 
     // Synchronize with the connection thread to ensure the connection is closed only after the
     // connection thread returns from calling `setsockopt`.
@@ -418,7 +418,7 @@ TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
     // We allow for either exception here.
     using namespace unittest::match;
     ASSERT_THAT(
-        st.session()->sourceMessage().getStatus(),
+        st.session().sourceMessage().getStatus(),
         StatusIs(AnyOf(Eq(ErrorCodes::HostUnreachable), Eq(ErrorCodes::SocketException)), Any()));
 }
 
@@ -427,7 +427,7 @@ TEST(AsioTransportLayer, SourceSyncTimeoutTimesOut) {
     TestFixture tf;
     Notification<StatusWith<Message>> received;
     tf.sessionManager().setOnStartSession([&](test::SessionThread& st) {
-        st.session()->setTimeout(Milliseconds{500});
+        st.session().setTimeout(Milliseconds{500});
         st.schedule([&](auto& session) { received.set(session.sourceMessage()); });
     });
     SyncClient conn(tf.tla().listenerPort());
@@ -439,7 +439,7 @@ TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
     TestFixture tf;
     Notification<StatusWith<Message>> received;
     tf.sessionManager().setOnStartSession([&](test::SessionThread& st) {
-        st.session()->setTimeout(Milliseconds{500});
+        st.session().setTimeout(Milliseconds{500});
         st.schedule([&](auto& session) { received.set(session.sourceMessage()); });
     });
     SyncClient conn(tf.tla().listenerPort());
@@ -865,7 +865,7 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 #endif  // _WIN32
 #endif  // MONGO_CONFIG_SSL
 
-class AsioTransportLayerWithRouterPortTest : public ServiceContextTest {
+class AsioTransportLayerWithRouterPortTest : public unittest::Test {
 public:
     // We opted to use static ports for simplicity. If this results in test failures due to busy
     // ports, we may change the fixture, as well as the underlying transport layer, to dynamically
@@ -893,26 +893,21 @@ public:
     }
 
     void doDifferentiatesConnectionsCase(bool useRouterPort) {
-        auto onStartSession = std::make_shared<Notification<void>>();
-        sessionManager().setOnStartSession([&](test::SessionThread& st) {
-            ASSERT_EQ(st.session()->isFromRouterPort(), useRouterPort);
-
-            auto client =
-                getServiceContext()->getService()->makeClient("RouterPortTest", st.session());
-            ASSERT_EQ(client->isRouterClient(), useRouterPort);
-
-            onStartSession->set();
+        auto isFromRouterPort = std::make_shared<Notification<bool>>();
+        sessionManager().setOnStartSession([isFromRouterPort](test::SessionThread& st) {
+            isFromRouterPort->set(st.session().isFromRouterPort());
         });
         HostAndPort target{testHostName(), useRouterPort ? kRouterPort : kMainPort};
         auto conn = connect(target);
         ASSERT_OK(conn) << " target={}"_format(target);
-        onStartSession->get();
+        ASSERT_FALSE(conn.getValue()->isFromRouterPort());
+        ASSERT_EQ(isFromRouterPort->get(), useRouterPort);
     }
 
 private:
     RAIIServerParameterControllerForTest _scopedFeature{"featureFlagEmbeddedRouter", true};
-    ScopedValueGuard<ClusterRole> _scopedClusterRole{
-        serverGlobalParams.clusterRole, {ClusterRole::RouterServer, ClusterRole::ShardServer}};
+    ScopedValueGuard<ClusterRole> _changeClusterRole{serverGlobalParams.clusterRole,
+                                                     ClusterRole::RouterServer};
     std::shared_ptr<void> _disableTfo = tfo::setConfigForTest(0, 0, 0, 1024, Status::OK());
     std::unique_ptr<TestFixture> _fixture;
 };

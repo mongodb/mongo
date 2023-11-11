@@ -100,8 +100,8 @@ struct SessionThread {
         _tasks.push(std::move(task));
     }
 
-    std::shared_ptr<transport::Session> session() const {
-        return _session;
+    transport::Session& session() const {
+        return *_session;
     }
 
 private:

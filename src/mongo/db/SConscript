@@ -982,17 +982,10 @@ env.CppUnitTest(
     target='replica_set_endpoint_test',
     source=[
         'replica_set_endpoint_sharding_state_test.cpp',
-        'replica_set_endpoint_test_fixture.cpp',
-        'replica_set_endpoint_util_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
-        '$BUILD_DIR/mongo/rpc/message',
-        '$BUILD_DIR/mongo/transport/transport_layer_mock',
-        'commands',
-        'commands_test_example',
-        'service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         'shard_role_api',
     ],
 )
@@ -1153,7 +1146,6 @@ env.Library(
         'storage/storage_engine_common',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         'auth/auth',
         'command_can_run_here',
         'commands/fsync_locked',
