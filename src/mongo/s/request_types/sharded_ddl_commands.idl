@@ -150,7 +150,7 @@ structs:
             unique:
                 type: bool
                 description: "Whether the shard key index should enforce a unique constraint."
-                optional: true
+                default: false
             # TODO SERVER-83006: remove deprecated numInitialChunks parameter.
             numInitialChunks:
                 type: safeInt64
@@ -163,7 +163,7 @@ structs:
                 description: >-
                     True if the chunks should be pre-split based on the existing zones when
                     sharding a collection with hashed shard key.
-                optional: true
+                default: false
             collectionUUID:
                 type: uuid
                 description: "The expected UUID of the collection."
@@ -246,7 +246,7 @@ structs:
                 optional: true
             collation:
                 description: "Specifies the default collation for the collection or the view."
-                type: object_owned
+                type: Collation
                 optional: true
             changeStreamPreAndPostImages:
                 description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
