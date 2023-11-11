@@ -75,6 +75,69 @@ static constexpr StringData kNonDuplicateKeyErrorContext =
 /**
  * TODO SERVER-67429 Remove this function.
  *
+ * Handles performing a shard key update that changes a document's owning shard when the update is
+ * being run in a transaction. This is utilized by the 'update' and 'bulkWrite' commands.
+ *
+ * - 'nss' specifies the namespace the update is to be performed on.
+ * - 'documentKeyChangeInfo' specifies the information returned from the document's current owning
+ *    shard which is used to construct the necessary commands to perform the shard key update.
+ *
+ * Returns a std::pair containing:
+ *  - a boolean indicating whether a document shard key update was actually performed.
+ *  - if an upsert was performed, the _id for the upserted document.
+ */
+std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorTransactionLegacy(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const mongo::WouldChangeOwningShardInfo& documentKeyChangeInfo);
+
+/**
+ *  A function provided by the caller of 'handleWouldChangeOwningShardErrorRetryableWriteLegacy'
+ *  to rerun the original write command that generated the WCOS error - either the 'update' or
+ * 'bulkWrite' command.
+ */
+typedef std::function<boost::optional<WouldChangeOwningShardInfo>()> RerunOriginalWriteFn;
+/**
+ *  A function provided by the caller of 'handleWouldChangeOwningShardErrorRetryableWriteLegacy'
+ *  to do custom processing of a WriteConcernError encountered while committing the transaction,
+ *  i.e. saving the error to  set on the command response. The logic for this differs between
+ * 'update' and 'bulkWrite' as they have different response types.
+ */
+typedef std::function<void(WriteConcernErrorDetail*)> ProcessWCErrorFn;
+/**
+ *  A function provided by the caller of 'handleWouldChangeOwningShardErrorRetryableWriteLegacy'
+ *  to do custom processing of any exception that occurs while executing the transaction. The logic
+ * for this differs between 'update' and 'bulkWrite' as they have different response types.
+ */
+typedef std::function<void(DBException&)> ProcessWriteErrorFn;
+
+/**
+ * TODO SERVER-67429 Remove this function.
+ *
+ * Handles performing a shard key update that changes a document's owning shard when the update is
+ * being run in a retryable write, by starting a transaction and performing the necessary delete and
+ * update within that transaction, and committing it. This is utilized by the 'update' and
+ * 'bulkWrite' commands.
+ *
+ * - 'nss' specifies the namespace the update is to be performed on.
+ * - 'rerunWriteFn', 'processWCErrorFn', and 'processWriteErrorFn' specify functions containing
+ *   logic specific to the write command that is calling this function; see the types' doc comments
+ *   for more information.
+ *
+ * Returns a std::pair containing:
+ *  - a boolean indicating whether a document shard key update was actually performed.
+ *  - if an upsert was performed, the _id for the upserted document.
+ */
+std::pair<bool, boost::optional<BSONObj>> handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    RerunOriginalWriteFn rerunWriteFn,
+    ProcessWCErrorFn processWCErrorFn,
+    ProcessWriteErrorFn processWriteErrorFn);
+
+/**
+ * TODO SERVER-67429 Remove this function.
+ *
  * Coordinating method and external point of entry for updating a document's shard key. This method
  * creates the necessary extra operations. It will then run each operation using the ClusterWriter.
  * If any statement throws, an exception will leave this method, and must be handled by external

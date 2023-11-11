@@ -93,9 +93,12 @@ selector:
   # infrastructure. See SERVER-77039 for full details.
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
 
-  # TODO SERVER-72793 These tests cause WouldChangeOwningShard error which bulkWrite doesn't handle yet.
-  - jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key_kill_sessions.js
-  - jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js
+  # TODO SERVER-80989: Remove this.
+  # This test can downgrade the FCV from latest to lastContinuousFCV and lastLTSFCV, but until
+  # SERVER-80989 is done, the testing infrastructure will only enable the bulkWrite feature flag
+  # as of the latest FCV, and so when the FCV is downgraded via this test the bulkWrite command
+  # starts to error. However, once this feature flag is marked as not being FCV gated that will
+  # not be a problem.
   - jstests/concurrency/fsm_workloads/random_internal_transactions_setFCV_operations.js
 
   exclude_with_any_tags:

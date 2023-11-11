@@ -281,6 +281,10 @@ public:
         return _clientRequest;
     }
 
+    bool getAborted_forTest() const {
+        return _aborted;
+    }
+
 private:
     // The OperationContext the client bulkWrite request is run on.
     OperationContext* const _opCtx;
@@ -310,7 +314,7 @@ private:
     // Set to true if we encountered an error that prevents us from executing the rest of the
     // bulkWrite. Note this does *not* include cases where we saw an error for an individual
     // statement in an ordered bulkWrite, but instead covers these cases:
-    // - Any error encountered while in a transaction.
+    // - Any error encountered while in a transaction besides WouldChangeOwningShard.
     // - A local error indicating that this process is shutting down.
     bool _aborted = false;
 

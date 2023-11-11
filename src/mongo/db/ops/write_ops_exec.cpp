@@ -735,7 +735,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
 
 boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
                                          PlanExecutor* exec,
-                                         bool isRemove) {
+                                         bool isRemove,
+                                         StringData operationName) {
     BSONObj value;
     PlanExecutor::ExecState state;
     try {
@@ -746,11 +747,12 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
         auto&& explainer = exec->getPlanExplainer();
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         LOGV2_WARNING(7267501,
-                      "Plan executor error during findAndModify",
+                      "Plan executor error",
+                      "operation"_attr = operationName,
                       "error"_attr = exception.toStatus(),
                       "stats"_attr = redact(stats));
 
-        exception.addContext("Plan executor error during findAndModify");
+        exception.addContext("Plan executor error during " + operationName);
         throw;
     }
 
@@ -874,7 +876,10 @@ UpdateResult performUpdate(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
-    docFound = advanceExecutor(opCtx, exec.get(), remove);
+    docFound = advanceExecutor(opCtx,
+                               exec.get(),
+                               remove,
+                               updateRequest->shouldReturnAnyDocs() ? "findAndModify" : "update");
     // Nothing after advancing the plan executor should throw a WriteConflictException,
     // so the following bookkeeping with execution stats won't end up being done
     // multiple times.
@@ -983,7 +988,8 @@ long long performDelete(OperationContext* opCtx,
         CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
-    docFound = advanceExecutor(opCtx, exec.get(), true);
+    docFound = advanceExecutor(
+        opCtx, exec.get(), true, deleteRequest->getReturnDeleted() ? "findAndModify" : "delete");
     // Nothing after advancing the plan executor should throw a WriteConflictException,
     // so the following bookkeeping with execution stats won't end up being done
     // multiple times.

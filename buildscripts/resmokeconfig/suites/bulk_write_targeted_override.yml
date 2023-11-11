@@ -21,17 +21,21 @@ selector:
   - jstests/sharding/timeseries_user_system_buckets_sharding.js
   - jstests/sharding/timeseries_delete_one_without_shard_key.js
   - jstests/sharding/timeseries_write_one_stale_sharding_state.js
-  # TODO (SERVER-72793): WouldChangeOwningShard.
-  # - jstests/sharding/timeseries_shardkey_update.js
-  # - jstests/sharding/timeseries_update_one.js
-  # - jstests/sharding/timeseries_upsert.js
+  - jstests/sharding/timeseries_shardkey_update.js
+  - jstests/sharding/timeseries_update_one.js
+  - jstests/sharding/timeseries_upsert.js
+  # The following tests are to get coverage of updates that change a document's shard key.
+  - jstests/sharding/update_shard_key_doc_moves_shards.js
+  - jstests/sharding/update_shard_key_pipeline_update.js
+  - jstests/sharding/update_shard_key_doc_moves_shards_without_txn_number.js
+  - jstests/sharding/update_shard_key_doc_on_same_shard.js
+  - jstests/sharding/update_compound_shard_key.js
+  - jstests/sharding/update_shard_key_conflicting_writes.js
+  - jstests/sharding/move_chunk_update_shard_key_in_retryable_write.js
+  - jstests/sharding/resharding_update_shard_key_in_retryable_write.js
   # TODO (SERVER-80831): Explain.
   # - jstests/sharding/timeseries_update_multi_explain.js
   exclude_files:
-  # TODO (SERVER-72793): WouldChangeOwningShard.
-  - jstests/sharding/updateOne_without_shard_key/updateOne_without_shard_key_basic.js
-  - jstests/sharding/updateOne_without_shard_key/write_without_shard_key_metrics.js
-  - jstests/sharding/updateOne_without_shard_key/would_change_owning_shard_test.js
   # TODO (SERVER-80174): Handle transaction errors.
   - jstests/sharding/updateOne_without_shard_key/errors.js
   # Update API version tests should not be run with bulkWrite override.

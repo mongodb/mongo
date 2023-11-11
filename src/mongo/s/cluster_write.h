@@ -62,8 +62,10 @@ void write(OperationContext* opCtx,
  *
  * Note: Caller is responsible for passing in a valid BulkWriteCommandRequest.
  */
-bulk_write_exec::BulkWriteReplyInfo bulkWrite(OperationContext* opCtx,
-                                              const BulkWriteCommandRequest& request);
+bulk_write_exec::BulkWriteReplyInfo bulkWrite(
+    OperationContext* opCtx,
+    const BulkWriteCommandRequest& request,
+    const std::vector<std::unique_ptr<NSTargeter>>& targeters);
 
 }  // namespace cluster
 }  // namespace mongo

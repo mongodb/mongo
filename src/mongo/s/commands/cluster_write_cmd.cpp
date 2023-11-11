@@ -95,11 +95,11 @@
 
 
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(hangAfterThrowWouldChangeOwningShardRetryableWrite);
 namespace {
 
 using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
-
-MONGO_FAIL_POINT_DEFINE(hangAfterThrowWouldChangeOwningShardRetryableWrite);
 
 void batchErrorToNotPrimaryErrorTracker(const BatchedCommandRequest& request,
                                         const BatchedCommandResponse& response,
@@ -375,117 +375,44 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
         opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
 
         if (isRetryableWrite) {
-            if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
-                LOGV2(22759, "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");
-                hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
-            }
-            RouterOperationContextSession routerSession(opCtx);
-            try {
-                // Start transaction and re-run the original update command
-                auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-                readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-                // Ensure the retried operation does not include WC inside the transaction.  The
-                // transaction commit will still use the WC, because it uses the WC from the opCtx
-                // (which has been set previously in Strategy).
-                request->unsetWriteConcern();
-
-                documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-                // Clear the error details from the response object before sending the write again
-                response->unsetErrDetails();
-
-                cluster::write(opCtx, *request, nullptr /* nss */, &stats, response);
-                wouldChangeOwningShardErrorInfo = getWouldChangeOwningShardErrorInfo(
-                    opCtx, *request, response, !isRetryableWrite);
-                if (!wouldChangeOwningShardErrorInfo)
-                    uassertStatusOK(response->toStatus());
-
-                // If we do not get WouldChangeOwningShard when re-running the update, the document
-                // has been modified or deleted concurrently and we do not need to delete it and
-                // insert a new one.
-                updatedShardKey = wouldChangeOwningShardErrorInfo &&
-                    documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                                      opCtx,
-                                      nss,
-                                      *wouldChangeOwningShardErrorInfo,
-                                      nss.isTimeseriesBucketsCollection());
-
-                // If the operation was an upsert, record the _id of the new document.
-                if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                    // For timeseries collections, the 'userPostImage' is returned back
-                    // through WouldChangeOwningShardInfo from the old shard as well and it should
-                    // be returned to the user instead of the post-image.
-                    auto postImage = [&] {
-                        return wouldChangeOwningShardErrorInfo->getUserPostImage()
-                            ? *wouldChangeOwningShardErrorInfo->getUserPostImage()
-                            : wouldChangeOwningShardErrorInfo->getPostImage();
-                    }();
-                    upsertedId = postImage["_id"].wrap();
-                }
-
-                // Commit the transaction
-                auto commitResponse =
-                    documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
-
-                uassertStatusOK(getStatusFromCommandResult(commitResponse));
-
-                auto writeConcernDetail = getWriteConcernErrorDetailFromBSONObj(commitResponse);
-                if (writeConcernDetail && !writeConcernDetail->toStatus().isOK())
-                    response->setWriteConcernError(writeConcernDetail.release());
-            } catch (DBException& e) {
-                if (e.code() == ErrorCodes::DuplicateKey &&
-                    e.extraInfo<DuplicateKeyErrorInfo>()->getKeyPattern().hasField("_id")) {
-                    e.addContext(documentShardKeyUpdateUtil::kDuplicateKeyErrorContext);
-                } else {
-                    e.addContext(documentShardKeyUpdateUtil::kNonDuplicateKeyErrorContext);
-                }
-
-                if (!response->isErrDetailsSet()) {
-                    response->addToErrDetails(
-                        {0,
-                         Status(ErrorCodes::InternalError, "Will be replaced by the code below")});
-                }
-
-                // Set the error status to the status of the failed command and abort the
-                // transaction
-                auto status = e.toStatus();
-                response->getErrDetails().back().setStatus(status);
-
-                auto txnRouterForAbort = TransactionRouter::get(opCtx);
-                if (txnRouterForAbort)
-                    txnRouterForAbort.implicitlyAbortTransaction(opCtx, status);
-
-                return false;
-            }
-        } else {
-            try {
-                // Delete the original document and insert the new one
-                updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
+            std::tie(updatedShardKey, upsertedId) =
+                documentShardKeyUpdateUtil::handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                     opCtx,
                     nss,
-                    *wouldChangeOwningShardErrorInfo,
-                    nss.isTimeseriesBucketsCollection());
-
-                // If the operation was an upsert, record the _id of the new document.
-                if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                    // For timeseries collections, the 'userPostImage' is returned back
-                    // through WouldChangeOwningShardInfo from the old shard as well and it should
-                    // be returned to the user instead of the post-image.
-                    auto postImage = [&] {
-                        return wouldChangeOwningShardErrorInfo->getUserPostImage()
-                            ? *wouldChangeOwningShardErrorInfo->getUserPostImage()
-                            : wouldChangeOwningShardErrorInfo->getPostImage();
-                    }();
-
-                    upsertedId = postImage["_id"].wrap();
-                }
-            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                Status status = ex->getKeyPattern().hasField("_id")
-                    ? ex.toStatus().withContext(
-                          documentShardKeyUpdateUtil::kDuplicateKeyErrorContext)
-                    : ex.toStatus();
-                uassertStatusOK(status);
-            }
+                    // RerunOriginalWriteFn:
+                    [&]() {
+                        // Ensure the retried operation does not include WC inside the transaction.
+                        // The transaction commit will still use the WC, because it uses the WC from
+                        // the opCtx (which has been set previously in Strategy).
+                        request->unsetWriteConcern();
+                        // Clear the error details from the response object before sending the write
+                        // again
+                        response->unsetErrDetails();
+                        cluster::write(opCtx, *request, nullptr /* nss */, &stats, response);
+                        wouldChangeOwningShardErrorInfo = getWouldChangeOwningShardErrorInfo(
+                            opCtx, *request, response, !isRetryableWrite);
+                        if (!wouldChangeOwningShardErrorInfo)
+                            uassertStatusOK(response->toStatus());
+                        return wouldChangeOwningShardErrorInfo;
+                    },
+                    // ProcessWCEFn:
+                    [&](WriteConcernErrorDetail* wce) { response->setWriteConcernError(wce); },
+                    // ProcessWriteErrorFn:
+                    [&](DBException& e) {
+                        if (!response->isErrDetailsSet()) {
+                            response->addToErrDetails(
+                                {0,
+                                 Status(ErrorCodes::InternalError,
+                                        "Will be replaced by the code below")});
+                        }
+                        // Set the error status to the status of the failed command.
+                        auto status = e.toStatus();
+                        response->getErrDetails().back().setStatus(status);
+                    });
+        } else {
+            std::tie(updatedShardKey, upsertedId) =
+                documentShardKeyUpdateUtil::handleWouldChangeOwningShardErrorTransactionLegacy(
+                    opCtx, nss, *wouldChangeOwningShardErrorInfo);
         }
     }
 

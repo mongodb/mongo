@@ -96,7 +96,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     let thread = new Thread(
         conflictingUpdate, st.s.host, kDbName, {"x": originalShardKeyValue}, {$inc: {"a": 1}});
     thread.start();
-    assert.soon(() => opStarted("update"));
+    // We check both update and bulkWrite since this test is run in bulk_write_targeted_override
+    // which rewrites the updates as bulkWrites.
+    assert.soon(() => opStarted("update") || opStarted("bulkWrite"));
     // Once we commit the transaction, the non-transaction update should finish, but it should
     // not actually modify any documents since the transaction commited first.
     assert.commandWorked(session.commitTransaction_forTesting());
@@ -266,7 +268,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
         "hangBeforeInsertOnUpdateShardKey", "alwaysOn", st.s, codeToRunInParallelShell);
     let awaitShell2 = startParallelShell(codeToRunInParallelShell2, st.s.port);
-    assert.soon(() => opStarted("update"));
+    // We check both update and bulkWrite since this test is run in bulk_write_targeted_override
+    // which rewrites the updates as bulkWrites.
+    assert.soon(() => opStarted("update") || opStarted("bulkWrite"));
     assert.commandWorked(st.s.adminCommand({
         configureFailPoint: "hangBeforeInsertOnUpdateShardKey",
         mode: "off",
@@ -305,7 +309,9 @@ function setFailPointAndSendUpdateToShardKeyInParallelShell(
     let awaitShell = setFailPointAndSendUpdateToShardKeyInParallelShell(
         "hangBeforeInsertOnUpdateShardKey", "alwaysOn", st.s, codeToRunInParallelShell);
     let awaitShell2 = startParallelShell(codeToRunInParallelShell2, st.s.port);
-    assert.soon(() => opStarted("remove"));
+    // We check both remove and bulkWrite since this test is run in bulk_write_targeted_override
+    // which rewrites the removes as bulkWrites.
+    assert.soon(() => opStarted("remove") || opStarted("bulkWrite"));
     assert.commandWorked(st.s.adminCommand({
         configureFailPoint: "hangBeforeInsertOnUpdateShardKey",
         mode: "off",

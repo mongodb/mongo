@@ -905,9 +905,13 @@ void BulkWriteOp::processChildBatchResponseFromRemote(
     } else {
         noteChildBatchError(writeBatch, childBatchStatus);
 
-        // If we are in a transaction, we must abort execution on any error.
-        // TODO SERVER-72793: handle WouldChangeOwningShard errors.
-        if (TransactionRouter::get(_opCtx)) {
+        // If we are in a transaction, we must abort execution on any error, excluding
+        // WouldChangeOwningShard. We do not abort on WouldChangeOwningShard because the error is
+        // returned from the shard and recorded here as a placeholder, as we will end up processing
+        // the update (as a delete + insert on the corresponding shards in a txn) at the level of
+        // ClusterBulkWriteCmd.
+        if (TransactionRouter::get(_opCtx) &&
+            childBatchStatus != ErrorCodes::WouldChangeOwningShard) {
             _aborted = true;
 
             auto errorReply =

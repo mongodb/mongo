@@ -86,6 +86,7 @@
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
@@ -2383,6 +2384,62 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnOr
     auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
     ASSERT_EQ(replies.size(), 1);
     ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::Interrupted);
+    ASSERT_EQ(summaryFields.nErrors, 1);
+}
+
+// Test handling of a WouldChangeOwningShard error in a transaction.
+TEST_F(BulkWriteOpChildBatchErrorTest, WouldChangeOwningShardInTxn) {
+    // Set up lsid/txnNumber to simulate txn.
+    _opCtx->setLogicalSessionId(LogicalSessionId(UUID::gen(), SHA256Block()));
+    _opCtx->setTxnNumber(TxnNumber(0));
+    // Necessary for TransactionRouter::get to be non-null for this opCtx. The presence of that is
+    // how we set _inTransaction for a BulkWriteOp.
+    RouterOperationContextSession rocs(_opCtx);
+
+    auto request = BulkWriteCommandRequest(
+        {BulkWriteUpdateOp(0, BSON("x" << 1), BSON("$set" << BSON("x" << -1)))}, {kNss1, kNss2});
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+
+    ASSERT_EQUALS(targeted.size(), 1);
+    ASSERT_EQUALS(targeted[kShardId1]->getWrites().size(), 1);
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
+
+    auto wcosInfo = WouldChangeOwningShardInfo(
+                        BSON("x" << 1), BSON("x" << -1), false, kNss1, boost::none, boost::none)
+                        .toBSON();
+    auto errInfo =
+        ErrorReply(
+            0, ErrorCodes::WouldChangeOwningShard, "WouldChangeOwningShard", "simulating WCOS")
+            .toBSON();
+    wcosInfo = wcosInfo.addFields(errInfo);
+
+    AsyncRequestsSender::Response wcosResponse = AsyncRequestsSender::Response{
+        kShardId1,
+        StatusWith<executor::RemoteCommandResponse>(
+            executor::RemoteCommandResponse(wcosInfo, Microseconds(0))),
+        boost::none};
+
+    // Simulate a WouldChangeOwningShardError.
+    bulkWriteOp.processChildBatchResponseFromRemote(
+        *targeted[kShardId1], wcosResponse, boost::none);
+
+    // The command should be considered finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    // We should not have set the _aborted flag, unlike we would for other top-level errors,
+    // since WouldChangeOwningShard errors do not abort their transactions.
+    ASSERT_FALSE(bulkWriteOp.getAborted_forTest());
+
+    // The error for the first op should be the WCOS error.
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
+              ErrorCodes::WouldChangeOwningShard);
+    auto [replies, summaryFields, _, __] = bulkWriteOp.generateReplyInfo(false);
+    ASSERT_EQ(replies.size(), 1);
+    ASSERT_EQ(replies[0].getStatus().code(), ErrorCodes::WouldChangeOwningShard);
     ASSERT_EQ(summaryFields.nErrors, 1);
 }
 

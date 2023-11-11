@@ -68,6 +68,8 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_client_cursor_guard.h"
@@ -77,6 +79,7 @@
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
 #include "mongo/s/query/router_stage_queued_data.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
@@ -293,8 +296,18 @@ public:
                      BulkWriteCommandRequest& bulkRequest,
                      BSONObjBuilder& result) const {
             BulkWriteCommandReply response;
+            // We pre-create the targeters to pass in, as having access to the targeters is
+            // necessary for handling WouldChangeOwningShard errors, as for TS views we need to be
+            // able to obtain the bucket namespace to write to which we get via targeter.
+            std::vector<std::unique_ptr<NSTargeter>> targeters;
+            targeters.reserve(bulkRequest.getNsInfo().size());
+            for (const auto& nsInfo : bulkRequest.getNsInfo()) {
+                targeters.push_back(
+                    std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs()));
+            }
 
-            auto bulkWriteReply = cluster::bulkWrite(opCtx, bulkRequest);
+            auto bulkWriteReply = cluster::bulkWrite(opCtx, bulkRequest, targeters);
+            handleWouldChangeOwningShardError(opCtx, bulkRequest, bulkWriteReply, targeters);
             response = _populateCursorReply(opCtx, bulkRequest, request, std::move(bulkWriteReply));
             result.appendElements(response.toBSON());
             return true;
@@ -307,6 +320,132 @@ public:
             bool ok = runImpl(opCtx, *_opMsgRequest, _request, bob);
             if (!ok) {
                 CommandHelpers::appendSimpleCommandStatus(bob, ok);
+            }
+        }
+
+        /**
+         * Inspects the provided response to determine if it contains any 'WouldChangeOwningShard'
+         * errors.
+         * - If none are found, returns boost::none.
+         * - If exactly 1 is found and the batchSize is 1, returns the contained information.
+         * - If 1+ are found and the batchSize is > 1, it means the user sent a write that changes
+         *   a document's owning shard but did not send it in its own batch, which is currently
+         *   unsupported behavior. Accordingly, if we see this behavior:
+         *     - In a txn, we raise a top-level error.
+         *     - Otherwise, we set the reply status for the corresponding write(s) to a new error.
+         */
+        boost::optional<WouldChangeOwningShardInfo> getWouldChangeOwningShardErrorInfo(
+            bulk_write_exec::BulkWriteReplyInfo& response, bool inTransaction) const {
+            if (response.summaryFields.nErrors == 0) {
+                return boost::none;
+            }
+
+            auto batchSize = _request.getOps().size();
+            for (auto& replyItem : response.replyItems) {
+                if (replyItem.getStatus() == ErrorCodes::WouldChangeOwningShard) {
+                    if (batchSize != 1) {
+                        if (inTransaction)
+                            uasserted(ErrorCodes::InvalidOptions,
+                                      "Document shard key value updates that cause the doc to move "
+                                      "shards must be sent with write batch of size 1");
+
+                        replyItem.setStatus(
+                            {ErrorCodes::InvalidOptions,
+                             "Document shard key value updates that cause the doc to move shards "
+                             "must be sent with write batch of size 1"});
+                    } else {
+                        BSONObjBuilder extraInfoBuilder;
+                        replyItem.getStatus().extraInfo()->serialize(&extraInfoBuilder);
+                        auto extraInfo = extraInfoBuilder.obj();
+                        return WouldChangeOwningShardInfo::parseFromCommandError(extraInfo);
+                    }
+                }
+            }
+
+            return boost::none;
+        }
+
+        /**
+         * If the provided response contains a WouldChangeOwningShardError, handles executing the
+         * transactional delete from old shard and insert to new shard, and updates the response
+         * accordingly. If it does not contain such an error, does nothing.
+         */
+        void handleWouldChangeOwningShardError(
+            OperationContext* opCtx,
+            const BulkWriteCommandRequest& request,
+            bulk_write_exec::BulkWriteReplyInfo& response,
+            const std::vector<std::unique_ptr<NSTargeter>>& targeters) const {
+            auto wcosInfo =
+                getWouldChangeOwningShardErrorInfo(response, opCtx->inMultiDocumentTransaction());
+            if (!wcosInfo)
+                return;
+
+            // A shard should only give us back this error if one of these conditions are true. If
+            // neither are, we would get back an IllegalOperation error instead.
+            tassert(7279300,
+                    "Unexpectedly got a WouldChangeOwningShard error back from a shard outside of "
+                    "a retryable write or transaction",
+                    opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction());
+
+            // Obtain the targeted namespace that we got the WCOS error for.This is always the
+            // targeted namespace for the first op, as a write that change's a document's owning
+            // shard must be the only write in the incoming request.
+            auto firstWriteNSIndex = BulkWriteCRUDOp(request.getOps()[0]).getNsInfoIdx();
+            auto nss = targeters[firstWriteNSIndex]->getNS();
+
+            bool updatedShardKey = false;
+            boost::optional<BSONObj> upsertedId;
+
+            opCtx->setQuerySamplingOptions(OperationContext::QuerySamplingOptions::kOptOut);
+
+            if (opCtx->inMultiDocumentTransaction()) {
+                std::tie(updatedShardKey, upsertedId) =
+                    documentShardKeyUpdateUtil::handleWouldChangeOwningShardErrorTransactionLegacy(
+                        opCtx, nss, *wcosInfo);
+            } else {
+                // We must be in a retryable write.
+                std::tie(updatedShardKey, upsertedId) = documentShardKeyUpdateUtil::
+                    handleWouldChangeOwningShardErrorRetryableWriteLegacy(
+                        opCtx,
+                        nss,
+                        // RerunOriginalWriteFn:
+                        [&]() {
+                            response = cluster::bulkWrite(opCtx, request, targeters);
+                            return getWouldChangeOwningShardErrorInfo(
+                                response, opCtx->inMultiDocumentTransaction());
+                        },
+                        // ProcessWCEFn:
+                        [&](WriteConcernErrorDetail* wce) {
+                            auto bwWce = BulkWriteWriteConcernError::parseOwned(
+                                IDLParserContext("BulkWriteWriteConcernError"), wce->toBSON());
+                            response.wcErrors = bwWce;
+                        },
+                        // ProcessWriteErrorFn:
+                        [&](DBException& e) { response.replyItems[0].setStatus(e.toStatus()); });
+            }
+
+            if (updatedShardKey) {
+                // Remove the WCOS error from the count. Since this write must have been sent in its
+                // own batch it is not possible there are statistics for any other writes in
+                // summaryFields.
+                response.summaryFields.nErrors = 0;
+
+                auto successReply = BulkWriteReplyItem(0);
+                // 'n' is always 1 for an update, regardless of it was an upsert, and indicates the
+                // number matched *or* inserted.
+                successReply.setN(1);
+
+                if (upsertedId) {
+                    successReply.setNModified(0);
+                    successReply.setUpserted(IDLAnyTypeOwned(upsertedId->getField("_id")));
+                    response.summaryFields.nUpserted = 1;
+                } else {
+                    successReply.setNModified(1);
+                    response.summaryFields.nMatched = 1;
+                    response.summaryFields.nModified = 1;
+                }
+
+                response.replyItems[0] = successReply;
             }
         }
 
