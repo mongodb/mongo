@@ -44,6 +44,7 @@ let result = curDB.runCommand({
     }],
     cursor: {},
     writeConcern: {w: "majority"},
+    readConcern: {},
     apiVersion: "1",
     apiStrict: true
 });
@@ -121,6 +122,7 @@ result = curDB.runCommand({
     pipeline: [{$project: {_id: 0}}],
     cursor: {},
     writeConcern: {w: "majority"},
+    readConcern: {},
     apiVersion: "1",
     apiStrict: true
 });

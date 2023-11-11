@@ -83,10 +83,6 @@ selector:
   - jstests/aggregation/sources/lookup/lookup_query_stats.js
   # TODO SERVER-81009: fix VTS missing from opCtx for distinct transactions
   - jstests/core/txns/view_reads_in_transaction.js
-  # failed on: prefix check in response
-  - jstests/aggregation/sources/documents.js
-  - jstests/aggregation/sources/densify/internal_parse.js
-  - jstests/aggregation/api_version_stage_allowance_checks.js
 
 executor:
   archive:

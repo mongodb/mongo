@@ -30,31 +30,29 @@ export function checkExpectedDbNameInString(
                   dbName}". The response is "${originalRes}"`);
 }
 
-export function checkExpectedDbInErrorMsg(errMsg, dbName, prefixedDbName, originalRes) {
-    // The db name in error message should always include tenant prefixed db name regardless how the
-    // tenantId was received in the request.
-
-    // If the dbName doesn't exist in the error message at all, there is no need to check that it's
-    // prefixed.
-    if (!wordInString(errMsg, dbName)) {
-        return;
-    }
+export function checkDbInErrorMsg(errMsg, dbName) {
+    // The db name and namesapce string in error message should always include tenant prefix
+    // regardless how the tenantId was received in the request.
 
     // Skip check system db names (admin, local and config) which could be tenant prefixed or not.
     if (dbName == "admin" || dbName == "local" || dbName == "config") {
-        return;
+        return true;
     }
 
-    // Do not check change stream NoMatchingDocument error which does not contain prefixed db name.
-    if (errMsg.includes("Change stream was configured to require a post-image") ||
-        errMsg.includes("Change stream was configured to require a pre-image")) {
-        return;
+    let words = errMsg.split(/[ ,]+/);
+    const findExactDbName = words.includes(dbName);
+    if (findExactDbName) {
+        return false;
     }
 
-    assert.eq(true,
-              errMsg.includes(prefixedDbName),
-              `The db name in the errmsg does not contain expected tenant prefixed db name "${
-                  prefixedDbName}". The response is "${originalRes}"`);
+    // We expect ns starts with `<tenantId>_<dbName>_` instead of `<dbName>_`.
+    let dbPrefix = dbName + "_";
+    for (const word in words) {
+        if (word.startsWith(dbPrefix)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**
@@ -135,7 +133,11 @@ export function assertExpectedDbNameInResponse(
                 checkExpectedDbNameInString(
                     v, requestDbName, prefixedDbName, originalResForLogging, expectPrefix);
             } else if (k === "errmsg") {
-                checkExpectedDbInErrorMsg(v, requestDbName, prefixedDbName, originalResForLogging);
+                assert.eq(
+                    true,
+                    checkDbInErrorMsg(v, requestDbName),
+                    `The db name in the errmsg ${
+                        v} does not contain expected tenant prefixed db name ${prefixedDbName}.`);
             }
         } else if (Array.isArray(v)) {
             v.forEach((item) => {

@@ -17,11 +17,6 @@ selector:
   - jstests/core/administrative/builtin_roles_external.js
   # QueryExecutorStats assertions are hardcoded for single-node results
   - jstests/aggregation/sources/lookup/lookup_query_stats.js
-  # failed with: BSON field '$densify.range.bounds' is missing but a required field
-  - jstests/aggregation/sources/densify/internal_parse.js
-  # failed on: Tests that the internal stage '$mergeCursors' does not throw 'ApiStrictError' with an
-  # internal client and 'apiStrict' set to true.
-  - jstests/aggregation/api_version_stage_allowance_checks.js
   # failed on: The aggregate should always use the view on 'testDB', not an empty collection on 'siblingDB'
   - jstests/aggregation/view_resolution_namespace_collision.js
 

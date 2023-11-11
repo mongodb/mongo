@@ -32,4 +32,5 @@ const internalColl = internalDB[collName];
 
 parseUtil(internalDB, internalColl, "$_internalDensify", {
     writeConcern: {w: "majority"},
+    readConcern: {},
 });
