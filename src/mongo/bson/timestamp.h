@@ -41,6 +41,7 @@ class BSONObj;
  */
 class Timestamp {
 public:
+    void reset();
     // Timestamp to signal that the storage engine should take unstable checkpoints.
     static const Timestamp kAllowUnstableCheckpointsSentinel;
 

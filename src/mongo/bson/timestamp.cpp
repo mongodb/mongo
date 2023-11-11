@@ -41,6 +41,11 @@ namespace mongo {
 
 const Timestamp Timestamp::kAllowUnstableCheckpointsSentinel = Timestamp(0, 1);
 
+void Timestamp::reset() {
+    i = 0;
+    secs = 0;
+}
+
 Timestamp Timestamp::max() {
     unsigned int t = static_cast<unsigned int>(std::numeric_limits<uint32_t>::max());
     unsigned int i = std::numeric_limits<uint32_t>::max();
@@ -72,4 +77,4 @@ BSONObj Timestamp::toBSON() const {
     bldr.append("", *this);
     return bldr.obj();
 }
-}
+}  // namespace mongo

@@ -26,13 +26,12 @@
  *    it in the license file.
  */
 
+
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/storage_engine_init.h"
-
-#include <map>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -335,7 +334,7 @@ class StorageClientObserver final : public ServiceContext::ClientObserver {
 public:
     void onCreateClient(Client* client) override{};
     void onDestroyClient(Client* client) override{};
-    void onCreateOperationContext(OperationContext* opCtx) {
+    void onCreateOperationContext(OperationContext* opCtx) override {
         auto service = opCtx->getServiceContext();
         auto storageEngine = service->getStorageEngine();
         // NOTE(schwerin): The following uassert would be more desirable than the early return when
@@ -349,16 +348,27 @@ public:
             return;
         }
         if (storageEngine->getUseNoopLockImpl()) {
-            opCtx->setLockState(stdx::make_unique<MonographLockerNoop>());
+            if (opCtx->lockState()) {
+                opCtx->resetLockState();
+            } else {
+                opCtx->setLockState(stdx::make_unique<MonographLockerNoop>());
+            }
         } else if (storageEngine->isMmapV1()) {
+            MONGO_UNREACHABLE;
             opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
         } else {
+            MONGO_UNREACHABLE;
             opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
         }
-        opCtx->setRecoveryUnit(storageEngine->newRecoveryUnit(),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+        if (opCtx->recoveryUnit()) {
+            opCtx->resetRecoveryUnit(WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        } else {
+            opCtx->setRecoveryUnit(storageEngine->newRecoveryUnit(),
+                                   WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        }
     }
-    void onDestroyOperationContext(OperationContext* opCtx) {}
+    void onDestroyOperationContext(OperationContext* opCtx) override {}
 };
 
 ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{

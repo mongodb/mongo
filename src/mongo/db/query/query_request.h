@@ -28,7 +28,11 @@
 
 #pragma once
 
+
+#include "mongo/base/object_pool.h"
 #include <boost/optional.hpp>
+#include <functional>
+#include <memory>
 #include <string>
 
 #include "mongo/db/catalog/collection_options.h"
@@ -50,12 +54,22 @@ class StatusWith;
  */
 class QueryRequest {
 public:
+    using UPtr = std::unique_ptr<QueryRequest, ObjectPool<QueryRequest>::Deleter>;
     static const char kFindCommandName[];
     static const char kShardVersionField[];
 
-    QueryRequest(NamespaceString nss);
+    QueryRequest() = default;
+    ~QueryRequest() = default;
+    QueryRequest(const QueryRequest&) = default;
+    QueryRequest(QueryRequest&&) = default;
+    QueryRequest& operator=(const QueryRequest&) = default;
 
-    QueryRequest(CollectionUUID uuid);
+    explicit QueryRequest(NamespaceString nss);
+    explicit QueryRequest(CollectionUUID uuid);
+
+    void reset(NamespaceString nss);
+    void reset(CollectionUUID uuid);
+    void reset(const QueryRequest&);
 
     /**
      * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
@@ -72,9 +86,12 @@ public:
      * Returns a heap allocated QueryRequest on success or an error if 'cmdObj' is not well
      * formed.
      */
-    static StatusWith<std::unique_ptr<QueryRequest>> makeFromFindCommand(NamespaceString nss,
-                                                                         const BSONObj& cmdObj,
-                                                                         bool isExplain);
+    static StatusWith<UPtr> makeFromFindCommand(NamespaceString&& nss,
+                                                const BSONObj& cmdObj,
+                                                bool isExplain);
+    static StatusWith<UPtr> makeFromFindCommand(const NamespaceString& nss,
+                                                const BSONObj& cmdObj,
+                                                bool isExplain);
 
     /**
      * If _uuid exists for this QueryRequest, use it to update the value of _nss via the
@@ -396,21 +413,20 @@ public:
      * Parse the provided QueryMessage and return a heap constructed QueryRequest, which
      * represents it or an error.
      */
-    static StatusWith<std::unique_ptr<QueryRequest>> fromLegacyQueryMessage(const QueryMessage& qm);
+    static StatusWith<UPtr> fromLegacyQueryMessage(const QueryMessage& qm);
 
     /**
      * Parse the provided legacy query object and parameters to construct a QueryRequest.
      */
-    static StatusWith<std::unique_ptr<QueryRequest>> fromLegacyQuery(NamespaceString nss,
-                                                                     const BSONObj& queryObj,
-                                                                     const BSONObj& proj,
-                                                                     int ntoskip,
-                                                                     int ntoreturn,
-                                                                     int queryOptions);
+    static StatusWith<UPtr> fromLegacyQuery(NamespaceString nss,
+                                            const BSONObj& queryObj,
+                                            const BSONObj& proj,
+                                            int ntoskip,
+                                            int ntoreturn,
+                                            int queryOptions);
 
 private:
-    static StatusWith<std::unique_ptr<QueryRequest>> parseFromFindCommand(
-        std::unique_ptr<QueryRequest> qr, const BSONObj& cmdObj, bool isExplain);
+    static StatusWith<UPtr> parseFromFindCommand(UPtr qr, const BSONObj& cmdObj, bool isExplain);
     Status init(int ntoskip,
                 int ntoreturn,
                 int queryOptions,

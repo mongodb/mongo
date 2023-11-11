@@ -35,13 +35,16 @@ namespace mongo {
 namespace {
 struct OperationTimeTrackerHolder {
     OperationTimeTrackerHolder() : opTimeTracker(std::make_shared<OperationTimeTracker>()) {}
+    void reset() {
+        opTimeTracker.reset();
+    }
     static const OperationContext::Decoration<OperationTimeTrackerHolder> get;
     std::shared_ptr<OperationTimeTracker> opTimeTracker;
 };
 
 const OperationContext::Decoration<OperationTimeTrackerHolder> OperationTimeTrackerHolder::get =
     OperationContext::declareDecoration<OperationTimeTrackerHolder>();
-}
+}  // namespace
 
 std::shared_ptr<OperationTimeTracker> OperationTimeTracker::get(OperationContext* opCtx) {
     auto timeTrackerHolder = OperationTimeTrackerHolder::get(opCtx);

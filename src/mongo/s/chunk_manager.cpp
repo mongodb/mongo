@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
 
 #include "mongo/platform/basic.h"
@@ -124,7 +126,8 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
-    auto qr = stdx::make_unique<QueryRequest>(_rt->getns());
+    // auto qr = stdx::make_unique<QueryRequest>(_rt->getns());
+    auto qr = ObjectPool<QueryRequest>::newObject(_rt->getns());
     qr->setFilter(query);
 
     if (!collation.isEmpty()) {
@@ -446,15 +449,12 @@ ShardVersionMap RoutingTableHistory::_constructShardVersionMap(const OID& epoch,
                     str::stream()
                         << "Metadata contains chunks with the same or out-of-order max value; "
                            "expected "
-                        << lastMax.get()
-                        << " < "
-                        << rangeMax,
+                        << lastMax.get() << " < " << rangeMax,
                     SimpleBSONObjComparator::kInstance.evaluate(lastMax.get() < rangeMax));
             // Make sure there are no gaps in the ranges
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Gap or an overlap between ranges "
-                                  << ChunkRange(rangeMin, rangeMax).toString()
-                                  << " and "
+                                  << ChunkRange(rangeMin, rangeMax).toString() << " and "
                                   << lastMax.get(),
                     SimpleBSONObjComparator::kInstance.evaluate(lastMax.get() == rangeMin));
         }

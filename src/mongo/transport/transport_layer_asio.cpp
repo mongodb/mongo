@@ -26,6 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include <memory>
+#include <vector>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
@@ -231,7 +237,7 @@ TransportLayerASIO::Options::Options(const ServerGlobalParams* params)
 
 TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
                                        ServiceEntryPoint* sep)
-    : _ingressReactor(std::make_shared<ASIOReactor>()),
+    :  //_ingressReactor(std::make_shared<ASIOReactor>()),
       _egressReactor(std::make_shared<ASIOReactor>()),
       _acceptorReactor(std::make_shared<ASIOReactor>()),
 #ifdef MONGO_CONFIG_SSL
@@ -240,6 +246,10 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
 #endif
       _sep(sep),
       _listenerOptions(opts) {
+    _ingressReactors.reserve(serverGlobalParams.adaptiveThreadNum);
+    for (int i = 0; i < serverGlobalParams.adaptiveThreadNum; ++i) {
+        _ingressReactors.emplace_back(std::make_shared<ASIOReactor>());
+    }
 }
 
 TransportLayerASIO::~TransportLayerASIO() = default;
@@ -446,8 +456,9 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
 #else
     auto globalSSLMode = _sslMode();
     if (sslMode == kEnableSSL ||
-        (sslMode == kGlobalSSLMode && ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
-                                       (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+        (sslMode == kGlobalSSLMode &&
+         ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
+          (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
         auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
         if (!sslStatus.isOK()) {
             return sslStatus;
@@ -582,8 +593,9 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(HostAndPort peer,
 #else
             auto globalSSLMode = _sslMode();
             if (sslMode == kEnableSSL ||
-                (sslMode == kGlobalSSLMode && ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
-                                               (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
+                (sslMode == kGlobalSSLMode &&
+                 ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
+                  (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
                 return connector->session
                     ->handshakeSSLForEgressWithLock(std::move(lk), connector->peer)
                     .then([connector] { return Status::OK(); });
@@ -818,7 +830,8 @@ void TransportLayerASIO::shutdown() {
 ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
     switch (which) {
         case TransportLayer::kIngress:
-            return _ingressReactor;
+            MONGO_UNREACHABLE;
+            // return _ingressReactor;
         case TransportLayer::kEgress:
             return _egressReactor;
         case TransportLayer::kNewReactor:
@@ -828,7 +841,17 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
     MONGO_UNREACHABLE;
 }
 
+std::vector<ReactorHandle> TransportLayerASIO::getIngressReactors() {
+    std::vector<ReactorHandle> reactorHandles;
+    reactorHandles.reserve(_ingressReactors.size());
+    for (auto& asioReactor : _ingressReactors) {
+        reactorHandles.emplace_back(std::static_pointer_cast<Reactor>(asioReactor));
+    }
+    return reactorHandles;
+}
+
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
+
     auto acceptCb = [this, &acceptor](const std::error_code& ec, GenericSocket peerSocket) mutable {
         if (!_running.load())
             return;
@@ -850,8 +873,11 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
 
         _acceptConnection(acceptor);
     };
-
-    acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
+    _acceptedCount++;
+    MONGO_LOG(0) << "accept thread name: " << getThreadName()
+                 << " ingressReactor: " << _acceptedCount % serverGlobalParams.adaptiveThreadNum;
+    acceptor.async_accept(*_ingressReactors[_acceptedCount % serverGlobalParams.adaptiveThreadNum],
+                          std::move(acceptCb));
 }
 
 #ifdef MONGO_CONFIG_SSL

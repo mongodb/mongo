@@ -55,7 +55,7 @@ using std::vector;
 namespace {
 const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logger::LogSeverity::Debug(2);
-}
+}  // namespace
 
 class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
 public:
@@ -105,8 +105,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
         if (status.code() == ErrorCodes::DataModifiedByRepair) {
             warning() << "Catalog data modified by repair: " << status.reason();
-            repairObserver->onModification(str::stream() << "KVCatalog repaired: "
-                                                         << status.reason());
+            repairObserver->onModification(str::stream()
+                                           << "KVCatalog repaired: " << status.reason());
         } else {
             fassertNoTrace(50926, status);
         }
@@ -223,8 +223,8 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->onModification(str::stream() << "Collection " << coll << " dropped: "
-                                                           << status.reason());
+                            ->onModification(str::stream() << "Collection " << coll
+                                                           << " dropped: " << status.reason());
                     }
                     wuow.commit();
                     continue;
@@ -294,8 +294,8 @@ Status KVStorageEngine::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     if (dataModified) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->onModification(str::stream() << "Collection " << collectionName.ns() << " recovered: "
-                                           << status.reason());
+            ->onModification(str::stream() << "Collection " << collectionName.ns()
+                                           << " recovered: " << status.reason());
     }
     wuow.commit();
     return Status::OK();
@@ -376,8 +376,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
             if (engineIdents.find(identForColl) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
                         str::stream() << "Expected collection does not exist. Collection: " << coll
-                                      << " Ident: "
-                                      << identForColl};
+                                      << " Ident: " << identForColl};
             }
         }
     }
@@ -439,8 +438,8 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
 
         for (auto&& indexName : indexesToDrop) {
             invariant(metaData.eraseIndex(indexName),
-                      str::stream() << "Index is missing. Collection: " << coll << " Index: "
-                                    << indexName);
+                      str::stream()
+                          << "Index is missing. Collection: " << coll << " Index: " << indexName);
         }
         if (indexesToDrop.size() > 0) {
             WriteUnitOfWork wuow(opCtx);
@@ -475,6 +474,14 @@ RecoveryUnit* KVStorageEngine::newRecoveryUnit() {
         return NULL;
     }
     return _engine->newRecoveryUnit();
+}
+
+RecoveryUnit::UPtr KVStorageEngine::newRecoveryUnitUPtr() {
+    if (!_engine) {
+        // shutdown
+        return {nullptr, nullptr};
+    }
+    return _engine->newRecoveryUnitUPtr();
 }
 
 void KVStorageEngine::listDatabases(std::vector<std::string>* out) const {
@@ -608,8 +615,8 @@ Status KVStorageEngine::repairRecordStore(OperationContext* opCtx, const std::st
     }
 
     if (_options.forRepair && dataModified) {
-        repairObserver->onModification(str::stream() << "Collection " << ns << ": "
-                                                     << status.reason());
+        repairObserver->onModification(str::stream()
+                                       << "Collection " << ns << ": " << status.reason());
     }
     _dbs[nsToDatabase(ns)]->reinitCollectionAfterRepair(opCtx, ns);
 
@@ -699,8 +706,8 @@ void KVStorageEngine::_dumpCatalog(OperationContext* opCtx) {
     while (rec) {
         // This should only be called by a parent that's done an appropriate `shouldLog` check. Do
         // not duplicate the log level policy.
-        LOG_FOR_RECOVERY(kCatalogLogLevel) << "\tId: " << rec->id
-                                           << " Value: " << rec->data.toBson();
+        LOG_FOR_RECOVERY(kCatalogLogLevel)
+            << "\tId: " << rec->id << " Value: " << rec->data.toBson();
         rec = cursor->next();
     }
     opCtx->recoveryUnit()->abandonSnapshot();

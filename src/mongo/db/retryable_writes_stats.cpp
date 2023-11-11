@@ -50,6 +50,12 @@ RetryableWritesStats* RetryableWritesStats::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
+void RetryableWritesStats::reset() {
+    _retriedCommandsCount.store(0);
+    _retriedStatementsCount.store(0);
+    _transactionsCollectionWriteCount.store(0);
+}
+
 void RetryableWritesStats::incrementRetriedCommandsCount() {
     _retriedCommandsCount.fetchAndAdd(1);
 }

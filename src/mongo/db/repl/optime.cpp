@@ -43,6 +43,11 @@ const char OpTime::kTimestampFieldName[] = "ts";
 const char OpTime::kTermFieldName[] = "t";
 const long long OpTime::kInitialTerm = 0;
 
+void OpTime::reset() {
+    _timestamp.reset();
+    _term = kInitialTerm;
+}
+
 // static
 OpTime OpTime::max() {
     return OpTime(Timestamp::max(), std::numeric_limits<decltype(OpTime::_term)>::max());

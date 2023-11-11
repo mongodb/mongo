@@ -51,6 +51,15 @@ ServerTransactionsMetrics* ServerTransactionsMetrics::get(OperationContext* opCt
     return get(opCtx->getServiceContext());
 }
 
+void ServerTransactionsMetrics::reset() {
+    _currentActive.store(0);
+    _currentInactive.store(0);
+    _currentOpen.store(0);
+    _totalStarted.store(0);
+    _totalAborted.store(0);
+    _totalCommitted.store(0);
+}
+
 unsigned long long ServerTransactionsMetrics::getCurrentActive() const {
     return _currentActive.load();
 }

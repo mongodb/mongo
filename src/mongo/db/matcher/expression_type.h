@@ -56,7 +56,7 @@ public:
         if (getTag()) {
             expr->setTag(getTag()->clone());
         }
-        return std::move(expr);
+        return expr;
     }
 
     bool matchesSingleElement(const BSONElement& elem,

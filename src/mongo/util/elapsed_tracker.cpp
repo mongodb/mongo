@@ -45,6 +45,14 @@ ElapsedTracker::ElapsedTracker(ClockSource* cs,
       _pings(0),
       _last(cs->now()) {}
 
+void ElapsedTracker::reset(ClockSource* cs, int32_t hitsBetweenMarks, Milliseconds msBetweenMarks) {
+    _clock = cs;
+    _hitsBetweenMarks = hitsBetweenMarks;
+    _msBetweenMarks = msBetweenMarks;
+    _pings = 0;
+    _last = cs->now();
+}
+
 bool ElapsedTracker::intervalHasElapsed() {
     if (++_pings >= _hitsBetweenMarks) {
         _pings = 0;

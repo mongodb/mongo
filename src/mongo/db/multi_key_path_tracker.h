@@ -53,6 +53,7 @@ using WorkerMultikeyPathInfo = std::vector<MultikeyPathInfo>;
  */
 class MultikeyPathTracker {
 public:
+    void reset();
     static const OperationContext::Decoration<MultikeyPathTracker> get;
 
     static void mergeMultikeyPaths(MultikeyPaths* toMergeInto, const MultikeyPaths& newPaths);

@@ -146,7 +146,7 @@ private:
 std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
                                                      const OpMsgRequest& request) {
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
-    std::string dbname = request.getDatabase().toString();
+    auto dbname = request.getDatabase();//.toString();
     const BSONObj& cmdObj = request.body;
     ExplainOptions::Verbosity verbosity = uassertStatusOK(ExplainOptions::parseCmdBSON(cmdObj));
     uassert(ErrorCodes::BadValue,

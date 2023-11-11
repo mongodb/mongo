@@ -51,6 +51,8 @@ class ConfigServerMetadata {
 public:
     static const OperationContext::Decoration<ConfigServerMetadata> get;
 
+    void reset();
+    
     ConfigServerMetadata() = default;
     explicit ConfigServerMetadata(repl::OpTime opTime);
 

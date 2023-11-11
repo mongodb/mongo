@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include <memory>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"

@@ -50,6 +50,10 @@ WorkingSet::~WorkingSet() {
     }
 }
 
+void WorkingSet::reset(){
+    // 
+}
+
 WorkingSetID WorkingSet::allocate() {
     if (_freeList == INVALID_ID) {
         // The free list is empty so we need to make a single new WSM to return. This relies on

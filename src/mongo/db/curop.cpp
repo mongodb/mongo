@@ -1,33 +1,34 @@
 /**
-*    Copyright (C) 2009 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2009 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 // CHECK_LOG_REDACTION
 
+#include "mongo/rpc/message.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
@@ -152,6 +153,12 @@ class CurOp::CurOpStack {
 public:
     CurOpStack() : _base(nullptr, this) {}
 
+    void reset() {
+        _opCtx = nullptr;
+        _top = nullptr;
+        _base.reset(nullptr, this);
+    }
+
     /**
      * Returns the top of the CurOp stack.
      */
@@ -212,7 +219,7 @@ private:
     CurOp* _top = nullptr;
 
     // The bottom-most CurOp for a client.
-    const CurOp _base;
+    CurOp _base;
 };
 
 const OperationContext::Decoration<CurOp::CurOpStack> CurOp::_curopStack =
@@ -277,6 +284,34 @@ CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     } else {
         _stack->push_nolock(this);
     }
+}
+
+void CurOp::reset(OperationContext* opCtx, CurOpStack* stack) {
+    _stack = stack;
+    if (opCtx) {
+        _stack->push(opCtx, this);
+    } else {
+        _stack->push_nolock(this);
+    }
+
+    _parent = nullptr;
+    _command = nullptr;
+    _start = 0;
+    _end = 0;
+    _lastPauseTime = 0;
+    _totalPausedDuration = Microseconds{0};
+    _networkOp = NetworkOp::opInvalid;
+    _logicalOp = LogicalOp::opInvalid;
+    _isCommand = false;
+    _dbprofile = 0;
+    _ns.clear();
+    _opDescription.reset();
+    _originatingCommand.reset();
+    _debug.reset();
+    _message.clear();
+    _progressMeter.reset();
+    _numYields = 0;
+    _planSummary.clear();
 }
 
 CurOp::~CurOp() {
@@ -501,6 +536,29 @@ StringData getProtoString(int op) {
     if (y)                                   \
     s << " " x ":" << (*y)
 
+void OpDebug::reset() {
+    networkOp = NetworkOp::opInvalid;
+    logicalOp = LogicalOp::opInvalid;
+    iscommand = false;
+    cursorid = -1;
+    ntoreturn = -1;
+    ntoskip = -1;
+    exhaust = false;
+    hasSortStage = false;
+    fromMultiPlanner = false;
+    replanned = false;
+    fastmodinsert = false;
+    upsert = false;
+    cursorExhausted = false;
+    execStats.reset();
+    errInfo = Status::OK();
+    executionTimeMicros = 0;
+    nreturned = -1;
+    responseLength = -1;
+    nShards = -1;
+    additiveMetrics.reset();
+}
+
 string OpDebug::report(Client* client,
                        const CurOp& curop,
                        const SingleThreadedLockStats* lockStats) const {
@@ -712,6 +770,20 @@ boost::optional<long long> addOptionalLongs(const boost::optional<long long>& lh
     return lhs ? (*lhs + *rhs) : rhs;
 }
 }  // namespace
+
+void OpDebug::AdditiveMetrics::reset() {
+    keysExamined.reset();
+    docsExamined.reset();
+    nMatched.reset();
+    nModified.reset();
+    ninserted.reset();
+    ndeleted.reset();
+    nmoved.reset();
+    keysInserted.reset();
+    keysDeleted.reset();
+    prepareReadConflicts.reset();
+    writeConflicts.reset();
+}
 
 void OpDebug::AdditiveMetrics::add(const AdditiveMetrics& otherMetrics) {
     keysExamined = addOptionalLongs(keysExamined, otherMetrics.keysExamined);

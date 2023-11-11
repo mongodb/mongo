@@ -104,7 +104,7 @@ public:
                                   const CollectionOptions& options) = 0;
 
         virtual Collection* getCollection(OperationContext* opCtx, StringData ns) const = 0;
-
+        virtual Collection* getCollection(OperationContext* opCtx, const NamespaceString& nss) const = 0;
         virtual ViewCatalog* getViewCatalog() = 0;
 
         virtual Collection* getOrCreateCollection(OperationContext* opCtx,
@@ -321,7 +321,7 @@ public:
     }
 
     inline Collection* getCollection(OperationContext* opCtx, const NamespaceString& ns) const {
-        return this->_impl().getCollection(opCtx, ns.ns());
+        return this->_impl().getCollection(opCtx, ns);
     }
 
     /**

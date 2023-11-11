@@ -73,6 +73,19 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInte
       _documentComparator(_collator),
       _valueComparator(_collator) {}
 
+
+void ExpressionContext::reset(OperationContext* opCtx, const CollatorInterface* collator) {
+    this->opCtx = opCtx;
+    mongoProcessInterface->reset();
+    timeZoneDatabase = opCtx && opCtx->getServiceContext()
+        ? TimeZoneDatabase::get(opCtx->getServiceContext())
+        : nullptr;
+    variablesParseState = VariablesParseState{variables.useIdGenerator()};
+    _collator = collator;
+    _documentComparator = {_collator};
+    _valueComparator = {_collator};
+}
+
 ExpressionContext::ExpressionContext(NamespaceString nss,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      const TimeZoneDatabase* tzDb)

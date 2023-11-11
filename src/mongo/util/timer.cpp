@@ -50,6 +50,12 @@ Timer::Timer(TickSource* tickSource)
     reset();
 }
 
+void Timer::reset(TickSource* tickSource) {
+    _tickSource = tickSource;
+    _microsPerCount = static_cast<double>(kMicrosPerSecond) / _tickSource->getTicksPerSecond();
+    reset();
+}
+
 long long Timer::now() const {
     return _tickSource->getTicks();
 }

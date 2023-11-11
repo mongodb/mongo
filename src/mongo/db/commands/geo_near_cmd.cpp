@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
 #include <vector>
@@ -208,7 +210,8 @@ public:
         BSONObj projObj = BSON("$pt" << BSON("$meta" << QueryRequest::metaGeoNearPoint) << "$dis"
                                      << BSON("$meta" << QueryRequest::metaGeoNearDistance));
 
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        // auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr=ObjectPool<QueryRequest>::newObject(nss);
         qr->setFilter(rewritten);
         qr->setProj(projObj);
         qr->setLimit(numWanted);
@@ -225,7 +228,7 @@ public:
             errmsg = "Can't parse filter / create query";
             return false;
         }
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::move(statusWithCQ.getValue());
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into geoNear.

@@ -30,6 +30,7 @@
 
 #include <queue>
 
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"

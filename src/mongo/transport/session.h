@@ -173,7 +173,7 @@ public:
      * of the 'mutateFunc' call. The 'kPending' tag is only for new sessions; callers should never
      * try to set it.
      */
-    virtual void mutateTags(const stdx::function<TagMask(TagMask)>& mutateFunc);
+    virtual void mutateTags(const std::function<TagMask(TagMask)>& mutateFunc);
 
     virtual TagMask getTags() const;
 

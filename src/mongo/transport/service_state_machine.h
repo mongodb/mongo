@@ -74,17 +74,17 @@ public:
     static std::shared_ptr<ServiceStateMachine> create(ServiceContext* svcContext,
                                                        transport::SessionHandle session,
                                                        transport::Mode transportMode,
-                                                       uint16_t group_id = 0);
+                                                       uint16_t groupId = 0);
 
     ServiceStateMachine(ServiceContext* svcContext,
                         transport::SessionHandle session,
                         transport::Mode transportMode,
-                        uint16_t group_id = 0);
+                        uint16_t groupId = 0);
 
-    void Reset(ServiceContext* svcContext,
+    void reset(ServiceContext* svcContext,
                transport::SessionHandle session,
                transport::Mode transportMode,
-               uint16_t group_id = 0);
+               uint16_t groupId = 0);
     /*
      * Any state may transition to EndSession in case of an error, otherwise the valid state
      * transitions are:

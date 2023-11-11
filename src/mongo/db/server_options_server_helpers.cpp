@@ -136,6 +136,10 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                "reservedThreadNum",
                                moe::Unsigned,
                                "set the thread num for coroutine service executor mode");
+    options->addOptionChaining("net.adaptiveThreadNum",
+                               "adaptiveThreadNum",
+                               moe::Unsigned,
+                               "set the thread num for adaptive service executor mode");
 
 #if MONGO_ENTERPRISE_VERSION
     options->addOptionChaining("security.redactClientLogData",
@@ -572,6 +576,12 @@ Status storeServerOptions(const moe::Environment& params) {
         serverGlobalParams.reservedThreadNum = params["net.reservedThreadNum"].as<unsigned>();
         if (serverGlobalParams.reservedThreadNum < 1) {
             return Status(ErrorCodes::BadValue, "reservedThreadNum has to be at least 1");
+        }
+    }
+        if (params.count("net.adaptiveThreadNum")) {
+        serverGlobalParams.adaptiveThreadNum = params["net.adaptiveThreadNum"].as<unsigned>();
+        if (serverGlobalParams.adaptiveThreadNum < 1) {
+            return Status(ErrorCodes::BadValue, "adaptiveThreadNum has to be at least 1");
         }
     }
 

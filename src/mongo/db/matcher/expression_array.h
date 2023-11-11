@@ -82,7 +82,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return std::move(e);
+        return e;
     }
 
     virtual void debugString(StringBuilder& debug, int level) const;
@@ -137,7 +137,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return std::move(e);
+        return e;
     }
 
     virtual void debugString(StringBuilder& debug, int level) const;
@@ -174,7 +174,7 @@ public:
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
-        return std::move(e);
+        return e;
     }
 
     size_t numChildren() const override {

@@ -30,7 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database_holder_impl.h"
+
 
 #include "mongo/base/init.h"
 #include "mongo/db/audit.h"
@@ -45,10 +47,13 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/util/concurrency/monograph_read_write_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+extern thread_local uint16_t localThreadId;
+
 namespace {
 
 const auto dbHolderStorage = ServiceContext::declareDecoration<DatabaseHolder>();
@@ -83,7 +88,7 @@ StringData _todb(StringData ns) {
 
     const StringData d = ns.substr(0, i);
     uassert(13280,
-            "invalid db name: " + ns.toString(),
+            "invalid db name: " + ns,
             NamespaceString::validDBName(d, NamespaceString::DollarInDbNameBehavior::Allow));
 
     return d;
@@ -91,14 +96,18 @@ StringData _todb(StringData ns) {
 
 }  // namespace
 
-
 Database* DatabaseHolderImpl::get(OperationContext* opCtx, StringData ns) const {
+    // _registerReadLock();
     const StringData db = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS));
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
-    DBs::const_iterator it = _dbs.find(db);
-    if (it != _dbs.end()) {
+    // stdx::lock_guard<SimpleMutex> lk(_m);
+
+    // ReadLock rlk_;
+    const auto& localDBCache = _dbCaches[localThreadId];
+    ThreadlocalLock lk(_lockVector[localThreadId]);
+    DBCache::const_iterator it = localDBCache.find(db);
+    if (it != localDBCache.end()) {
         return it->second;
     }
 
@@ -107,55 +116,64 @@ Database* DatabaseHolderImpl::get(OperationContext* opCtx, StringData ns) const 
 
 std::set<std::string> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(StringData name) {
     std::set<std::string> duplicates;
-
-    for (const auto& nameAndPointer : _dbs) {
+    const auto& dbCache = _dbCaches[localThreadId];
+    for (const auto& nameAndPointer : dbCache) {
         // A name that's equal with case-insensitive match must be identical, or it's a duplicate.
-        if (name.equalCaseInsensitive(nameAndPointer.first) && name != nameAndPointer.first)
+        if (name.equalCaseInsensitive(nameAndPointer.first) && name != nameAndPointer.first) {
             duplicates.insert(nameAndPointer.first);
+        }
     }
     return duplicates;
 }
 
 std::set<std::string> DatabaseHolderImpl::getNamesWithConflictingCasing(StringData name) {
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    // stdx::lock_guard<SimpleMutex> lk(_m);
+    // _registerReadLock();
+    ThreadlocalLock lk(_lockVector[localThreadId]);
     return _getNamesWithConflictingCasing_inlock(name);
 }
 
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, bool* justCreated) {
+    // _registerReadLock();
     const StringData dbname = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(dbname, MODE_X));
 
     if (justCreated)
         *justCreated = false;  // Until proven otherwise.
 
-    stdx::unique_lock<SimpleMutex> lk(_m);
+    // stdx::unique_lock<SimpleMutex> lk(_m);
+    // std::unique_lock<std::mutex> lk(_localReadLockVectorMutex);
+    auto& localDbCache = _dbCaches[localThreadId];
+    {
+        ThreadlocalLock lk(_lockVector[localThreadId]);
 
-    // The following will insert a nullptr for dbname, which will treated the same as a non-
-    // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
-    if (auto db = _dbs[dbname])
-        return db;
+        // The following will insert a nullptr for dbname, which will treated the same as a non-
+        // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
+        if (auto db = localDbCache[dbname]) {
+            return db;
+        }
 
+        // Check casing in lock to avoid transient duplicates.
+        auto duplicates = _getNamesWithConflictingCasing_inlock(dbname);
+        uassert(ErrorCodes::DatabaseDifferCase,
+                str::stream() << "db already exists with different case already have: ["
+                              << *duplicates.cbegin() << "] trying to create [" << dbname.toString()
+                              << "]",
+                duplicates.empty());
+
+
+        // Do the catalog lookup and database creation outside of the scoped lock, because these may
+        // block. Only one thread can be inside this method for the same DB name, because of the
+        // requirement for X-lock on the database when we enter. So there is no way we can insert
+        // two different databases for the same name.
+    }
     // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
-    auto removeDbGuard = MakeGuard([this, &lk, dbname] {
-        if (!lk.owns_lock())
-            lk.lock();
-        _dbs.erase(dbname);
+    auto removeDbGuard = MakeGuard([&localDbCache, this, dbname] {
+        // if (!lk.owns_lock())
+        //     lk.lock();
+        ThreadlocalLock lk(_lockVector[localThreadId]);
+        localDbCache.erase(dbname);
     });
-
-    // Check casing in lock to avoid transient duplicates.
-    auto duplicates = _getNamesWithConflictingCasing_inlock(dbname);
-    uassert(ErrorCodes::DatabaseDifferCase,
-            str::stream() << "db already exists with different case already have: ["
-                          << *duplicates.cbegin() << "] trying to create [" << dbname.toString()
-                          << "]",
-            duplicates.empty());
-
-
-    // Do the catalog lookup and database creation outside of the scoped lock, because these may
-    // block. Only one thread can be inside this method for the same DB name, because of the
-    // requirement for X-lock on the database when we enter. So there is no way we can insert two
-    // different databases for the same name.
-    lk.unlock();
     StorageEngine* storageEngine = getGlobalServiceContext()->getStorageEngine();
     DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(opCtx, dbname);
 
@@ -165,21 +183,30 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
             *justCreated = true;
     }
 
-    auto newDb = stdx::make_unique<Database>(opCtx, dbname, entry);
-
     // Finally replace our nullptr entry with the new Database pointer.
-    removeDbGuard.Dismiss();
-    lk.lock();
-    auto it = _dbs.find(dbname);
-    // invariant(it != _dbs.end() && it->second == nullptr);
-    invariant(it != _dbs.end());
-    if (it->second == nullptr) {
-        it->second = newDb.release();
-    }
-    
-    invariant(_getNamesWithConflictingCasing_inlock(dbname.toString()).empty());
+    // auto newDb = stdx::make_unique<Database>(opCtx, dbname, entry);
+    auto newDbPtr = new Database(opCtx, dbname, entry);
 
-    return it->second;
+    removeDbGuard.Dismiss();
+
+    {
+        SyncAllThreadsLock lk(_lockVector);
+        for (auto& dbCache : _dbCaches) {
+            dbCache[dbname] = newDbPtr;
+            // auto it = dbCache.find(dbname);
+            // dassert(it != _dbs.end() && it->second == nullptr);
+            // if (it->second == nullptr) {
+            //     it->second = newDbPtr;
+            // }
+        }
+    }
+
+    DEV {
+        ThreadlocalLock lk(_lockVector[localThreadId]);
+        invariant(_getNamesWithConflictingCasing_inlock(dbname).empty());
+    }
+
+    return newDbPtr;
 }
 
 namespace {
@@ -192,61 +219,64 @@ void evictDatabaseFromUUIDCatalog(OperationContext* opCtx, Database* db) {
 }  // namespace
 
 void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns, const std::string& reason) {
+    // _registerReadLock();
     invariant(opCtx->lockState()->isW());
 
     const StringData dbName = _todb(ns);
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    // stdx::lock_guard<SimpleMutex> lk(_m);
+    {
+        // std::unique_lock<std::mutex> lk(_localReadLockVectorMutex);
+        SyncAllThreadsLock lk(_lockVector);
+        const auto& dbCache = _dbCaches[localThreadId];
+        DBCache::const_iterator it = dbCache.find(dbName);
+        if (it == dbCache.end()) {
+            return;
+        }
 
-    DBs::const_iterator it = _dbs.find(dbName);
-    if (it == _dbs.end()) {
-        return;
+        auto db = it->second;
+        repl::oplogCheckCloseDatabase(opCtx, db);
+        evictDatabaseFromUUIDCatalog(opCtx, db);
+
+        // only close and delete db pointer once
+        db->close(opCtx, reason);
+        delete db;
+        db = nullptr;
+
+        // but erase on all maps
+        for (auto& dbCache : _dbCaches) {
+            dbCache.erase(dbName);
+        }
     }
-
-    auto db = it->second;
-    repl::oplogCheckCloseDatabase(opCtx, db);
-    evictDatabaseFromUUIDCatalog(opCtx, db);
-
-    db->close(opCtx, reason);
-    delete db;
-    db = nullptr;
-
-    _dbs.erase(it);
 
     getGlobalServiceContext()
         ->getStorageEngine()
-        ->closeDatabase(opCtx, dbName.toString())
+        ->closeDatabase(opCtx, dbName)
         .transitional_ignore();
 }
 
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx, const std::string& reason) {
+    // _registerReadLock();
     invariant(opCtx->lockState()->isW());
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    // stdx::lock_guard<SimpleMutex> lk(_m);
+    // std::unique_lock<std::mutex> lk(_localReadLockVectorMutex);
+    SyncAllThreadsLock lk(_lockVector);
 
-    set<string> dbs;
-    for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
-        BackgroundOperation::assertNoBgOpInProgForDb(i->first);
-        dbs.insert(i->first);
-    }
-
-    for (set<string>::iterator i = dbs.begin(); i != dbs.end(); ++i) {
-        string name = *i;
-
+    auto& dbCache = _dbCaches[localThreadId];
+    for (auto& [name, db] : dbCache) {
+        BackgroundOperation::assertNoBgOpInProgForDb(name);
         LOG(2) << "DatabaseHolder::closeAll name:" << name;
-
-        Database* db = _dbs[name];
         repl::oplogCheckCloseDatabase(opCtx, db);
         evictDatabaseFromUUIDCatalog(opCtx, db);
         db->close(opCtx, reason);
         delete db;
-
-        _dbs.erase(name);
 
         getGlobalServiceContext()
             ->getStorageEngine()
             ->closeDatabase(opCtx, name)
             .transitional_ignore();
     }
+    _dbCaches.clear();
 }
 }  // namespace mongo

@@ -85,16 +85,9 @@ StatusWith<ReadPreference> parseReadPreferenceMode(StringData prefStr) {
     }
     return Status(ErrorCodes::FailedToParse,
                   str::stream() << "Could not parse $readPreference mode '" << prefStr
-                                << "'. Only the modes '"
-                                << kPrimaryOnly
-                                << "', '"
-                                << kPrimaryPreferred
-                                << "', "
-                                << kSecondaryOnly
-                                << "', '"
-                                << kSecondaryPreferred
-                                << "', and '"
-                                << kNearest
+                                << "'. Only the modes '" << kPrimaryOnly << "', '"
+                                << kPrimaryPreferred << "', " << kSecondaryOnly << "', '"
+                                << kSecondaryPreferred << "', and '" << kNearest
                                 << "' are supported.");
 }
 
@@ -121,6 +114,13 @@ const Seconds ReadPreferenceSetting::kMinimalMaxStalenessValue(90);
 
 const OperationContext::Decoration<ReadPreferenceSetting> ReadPreferenceSetting::get =
     OperationContext::declareDecoration<ReadPreferenceSetting>();
+
+void ReadPreferenceSetting::reset() {
+    pref = {};
+    tags = {};
+    maxStalenessSeconds = {};
+    minOpTime.reset();
+}
 
 const BSONObj& ReadPreferenceSetting::secondaryPreferredMetadata() {
     // This is a static method rather than a static member only because it is used by another TU
@@ -205,8 +205,8 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
 
     if (maxStalenessSecondsValue && maxStalenessSecondsValue < 0) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessSecondsFieldName
-                                    << " must be a non-negative integer");
+                      str::stream()
+                          << kMaxStalenessSecondsFieldName << " must be a non-negative integer");
     }
 
     if (maxStalenessSecondsValue && maxStalenessSecondsValue >= Seconds::max().count()) {
@@ -217,9 +217,9 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
 
     if (maxStalenessSecondsValue && maxStalenessSecondsValue < kMinimalMaxStalenessValue.count()) {
         return Status(ErrorCodes::MaxStalenessOutOfRange,
-                      str::stream() << kMaxStalenessSecondsFieldName
-                                    << " value can not be less than "
-                                    << kMinimalMaxStalenessValue.count());
+                      str::stream()
+                          << kMaxStalenessSecondsFieldName << " value can not be less than "
+                          << kMinimalMaxStalenessValue.count());
     }
 
     if ((mode == ReadPreference::PrimaryOnly) && maxStalenessSecondsValue) {
@@ -235,9 +235,7 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
     if (elem.type() != mongo::Object) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream() << "$readPreference has incorrect type: expected "
-                                    << mongo::Object
-                                    << " but got "
-                                    << elem.type());
+                                    << mongo::Object << " but got " << elem.type());
     }
     return fromInnerBSON(elem.Obj());
 }

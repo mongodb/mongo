@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/shard_key_pattern.h"
@@ -158,10 +160,7 @@ Status ShardKeyPattern::checkShardKeySize(const BSONObj& shardKey) {
 
     return {ErrorCodes::ShardKeyTooBig,
             str::stream() << "shard keys must be less than " << kMaxShardKeySizeBytes
-                          << " bytes, but key "
-                          << shardKey
-                          << " is "
-                          << shardKey.objsize()
+                          << " bytes, but key " << shardKey << " is " << shardKey.objsize()
                           << " bytes"};
 }
 
@@ -277,7 +276,8 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const BSONObj& basicQuery) const {
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    // auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    auto qr = ObjectPool<QueryRequest>::newObject(NamespaceString(""));
     qr->setFilter(basicQuery);
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;

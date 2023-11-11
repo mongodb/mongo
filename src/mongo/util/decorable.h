@@ -61,6 +61,7 @@
 
 #include "mongo/util/decoration_container.h"
 #include "mongo/util/decoration_registry.h"
+#include <cstddef>
 
 namespace mongo {
 
@@ -129,6 +130,17 @@ public:
     template <typename T>
     static Decoration<T> declareDecoration() {
         return Decoration<T>(getRegistry()->template declareDecoration<T>());
+    }
+
+    /*
+     * Called by Decorable class manually.
+     */
+    void resetAllDecorations() {
+        getRegistry()->resetAll(&_decorations);
+    }
+
+    size_t sizeBytes() {
+        return getRegistry()->getDecorationBufferSizeBytes();
     }
 
 protected:

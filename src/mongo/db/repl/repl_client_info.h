@@ -45,6 +45,8 @@ class ReplClientInfo {
 public:
     static const Client::Decoration<ReplClientInfo> forClient;
 
+    void reset();
+
     void setLastOp(const OpTime& op);
 
     OpTime getLastOp() const {

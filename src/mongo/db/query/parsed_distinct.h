@@ -51,7 +51,7 @@ public:
     static const char kCollationField[];
     static const char kCommentField[];
 
-    ParsedDistinct(std::unique_ptr<CanonicalQuery> query, const std::string key)
+    ParsedDistinct(CanonicalQuery::UPtr query, const std::string key)
         : _query(std::move(query)), _key(std::move(key)) {}
 
     const CanonicalQuery* getQuery() const {
@@ -61,7 +61,7 @@ public:
     /**
      * Releases ownership of the canonical query to the caller.
      */
-    std::unique_ptr<CanonicalQuery> releaseQuery() {
+    CanonicalQuery::UPtr releaseQuery() {
         invariant(_query.get());
         return std::move(_query);
     }
@@ -86,7 +86,7 @@ public:
                                             bool isExplain);
 
 private:
-    std::unique_ptr<CanonicalQuery> _query;
+    CanonicalQuery::UPtr _query;
 
     // The field for which we are getting distinct values.
     const std::string _key;

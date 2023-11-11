@@ -72,6 +72,8 @@ public:
         bool attachCursorSource = true;
     };
 
+    void reset(){}
+
     virtual ~MongoProcessInterface(){};
 
     /**

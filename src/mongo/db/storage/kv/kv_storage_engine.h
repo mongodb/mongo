@@ -82,6 +82,7 @@ public:
     virtual void finishInit();
 
     virtual RecoveryUnit* newRecoveryUnit();
+    virtual RecoveryUnit::UPtr newRecoveryUnitUPtr();
 
     virtual void listDatabases(std::vector<std::string>* out) const;
 

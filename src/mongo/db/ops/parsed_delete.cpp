@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kWrite
 
 #include "mongo/platform/basic.h"
@@ -73,7 +75,8 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
-    auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    // auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    auto qr = ObjectPool<QueryRequest>::newObject(_request->getNamespaceString());
     qr->setFilter(_request->getQuery());
     qr->setSort(_request->getSort());
     qr->setCollation(_request->getCollation());
@@ -116,7 +119,7 @@ bool ParsedDelete::hasParsedQuery() const {
     return _canonicalQuery.get() != NULL;
 }
 
-std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
+CanonicalQuery::UPtr ParsedDelete::releaseParsedQuery() {
     invariant(_canonicalQuery.get() != NULL);
     return std::move(_canonicalQuery);
 }

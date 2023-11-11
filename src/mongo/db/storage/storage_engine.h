@@ -30,6 +30,8 @@
 
 #pragma once
 
+
+#include "mongo/util/assert_util.h"
 #include <string>
 #include <vector>
 
@@ -37,13 +39,14 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
 class DatabaseCatalogEntry;
 class JournalListener;
 class OperationContext;
-class RecoveryUnit;
+// class RecoveryUnit;
 class SnapshotManager;
 struct StorageGlobalParams;
 class StorageEngineLockFile;
@@ -157,6 +160,9 @@ public:
      * Caller owns the returned pointer.
      */
     virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual RecoveryUnit::UPtr newRecoveryUnitUPtr() {
+        MONGO_UNREACHABLE;
+    }
 
     /**
      * List the databases stored in this storage engine.

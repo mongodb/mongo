@@ -42,6 +42,10 @@ public:
     AlwaysTimeOutYieldPolicy(PlanExecutor* exec)
         : PlanYieldPolicy(exec, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT) {}
 
+    void reset(PlanExecutor* exec) {
+        PlanYieldPolicy::reset(exec, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT);
+    }
+
     AlwaysTimeOutYieldPolicy(ClockSource* cs)
         : PlanYieldPolicy(PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, cs) {}
 
@@ -67,6 +71,10 @@ class AlwaysPlanKilledYieldPolicy : public PlanYieldPolicy {
 public:
     AlwaysPlanKilledYieldPolicy(PlanExecutor* exec)
         : PlanYieldPolicy(exec, PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED) {}
+
+    void reset(PlanExecutor* exec) {
+        PlanYieldPolicy::reset(exec, PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED);
+    }
 
     AlwaysPlanKilledYieldPolicy(ClockSource* cs)
         : PlanYieldPolicy(PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED, cs) {}

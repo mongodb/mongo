@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "asio/write.hpp"
 #include <utility>
 
 #include "mongo/base/system_error.h"
@@ -79,9 +80,7 @@ public:
     // If the socket is disconnected while any of these options are being set, this constructor
     // may throw, but it is guaranteed to throw a mongo DBException.
     ASIOSession(TransportLayerASIO* tl, GenericSocket socket, bool isIngressSession) try
-        : _socket(std::move(socket)),
-          _tl(tl),
-          _isIngressSession(isIngressSession) {
+        : _socket(std::move(socket)), _tl(tl), _isIngressSession(isIngressSession) {
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
             _socket.set_option(asio::ip::tcp::no_delay(true));
@@ -347,7 +346,7 @@ private:
         auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
         auto ptr = headerBuffer.get();
         return read(asio::buffer(ptr, kHeaderSize), baton)
-            .then([ headerBuffer = std::move(headerBuffer), this, baton ]() mutable {
+            .then([headerBuffer = std::move(headerBuffer), this, baton]() mutable {
                 if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), kHeaderSize))) {
                     return sendHTTPResponse(baton);
                 }
@@ -376,7 +375,7 @@ private:
 
                 MsgData::View msgView(buffer.get());
                 return read(asio::buffer(msgView.data(), msgView.dataLen()), baton)
-                    .then([ this, buffer = std::move(buffer), msgLen ]() mutable {
+                    .then([this, buffer = std::move(buffer), msgLen]() mutable {
                         if (_isIngressSession) {
                             networkCounter.hitPhysicalIn(msgLen);
                         }

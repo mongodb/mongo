@@ -171,3 +171,5 @@ build*/
 src/mongo/installer/compass/install_compass
 out.perf
 perf.txt
+rpc_data/
+core

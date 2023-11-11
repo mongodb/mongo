@@ -35,6 +35,6 @@
 
 namespace mongo {
 
-bool commandCanRunHere(OperationContext* opCtx, const std::string& dbname, const Command* command);
+bool commandCanRunHere(OperationContext* opCtx, StringData dbname, const Command* command);
 
 }  // namespace mongo

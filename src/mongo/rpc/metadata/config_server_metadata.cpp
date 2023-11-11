@@ -49,6 +49,10 @@ const char kOpTimeFieldName[] = "opTime";
 const OperationContext::Decoration<ConfigServerMetadata> ConfigServerMetadata::get =
     OperationContext::declareDecoration<ConfigServerMetadata>();
 
+void ConfigServerMetadata::reset() {
+    _opTime.reset();
+}
+
 ConfigServerMetadata::ConfigServerMetadata(OpTime opTime) : _opTime(std::move(opTime)) {}
 
 StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
@@ -63,9 +67,7 @@ StatusWith<ConfigServerMetadata> ConfigServerMetadata::readFromMetadata(
     } else if (metadataElem.type() != mongo::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "ConfigServerMetadata element has incorrect type: expected"
-                              << mongo::Object
-                              << " but got "
-                              << metadataElem.type()};
+                              << mongo::Object << " but got " << metadataElem.type()};
     }
 
     BSONObj configMetadataObj = metadataElem.Obj();

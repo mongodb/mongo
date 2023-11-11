@@ -49,6 +49,8 @@ class NamespaceUUIDCache {
     MONGO_DISALLOW_COPYING(NamespaceUUIDCache);
 
 public:
+    void reset();
+
     static const OperationContext::Decoration<NamespaceUUIDCache> get;
     NamespaceUUIDCache() = default;
 

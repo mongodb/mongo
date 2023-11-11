@@ -54,6 +54,7 @@ namespace mongo {
  */
 class SizeRecoveryState {
 public:
+    void reset();
     /**
      * If replication recovery is ongoing, returns false unless 'ident' has been specifically marked
      * as requiring adjustment even during recovery.

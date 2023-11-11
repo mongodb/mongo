@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/assert_util.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -46,13 +48,16 @@ namespace mongo {
 class IndexDescriptor;
 class JournalListener;
 class OperationContext;
-class RecoveryUnit;
+// class RecoveryUnit;
 class SortedDataInterface;
 class SnapshotManager;
 
 class KVEngine {
 public:
     virtual RecoveryUnit* newRecoveryUnit() = 0;
+    virtual RecoveryUnit::UPtr newRecoveryUnitUPtr() {
+        MONGO_UNREACHABLE;
+    }
 
     // ---------
 
@@ -361,4 +366,4 @@ public:
      */
     virtual ~KVEngine() {}
 };
-}
+}  // namespace mongo

@@ -77,6 +77,7 @@ class OperationContext : public Decorable<OperationContext> {
 
 public:
     OperationContext(Client* client, unsigned int opId);
+    void reset(Client* client, unsigned int opId);
 
     virtual ~OperationContext() = default;
 
@@ -110,12 +111,18 @@ public:
     WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(RecoveryUnit* unit,
                                                        WriteUnitOfWork::RecoveryUnitState state);
 
+    WriteUnitOfWork::RecoveryUnitState resetRecoveryUnit(WriteUnitOfWork::RecoveryUnitState state);
+
+    // WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(RecoveryUnit::UPtr unit,
+    //                                                    WriteUnitOfWork::RecoveryUnitState state);
     /**
      * Interface for locking.  Caller DOES NOT own pointer.
      */
     Locker* lockState() const {
         return _locker.get();
     }
+
+    void resetLockState();
 
     /**
      * Sets the locker for use by this OperationContext. Call during OperationContext
@@ -471,15 +478,17 @@ private:
 
     friend class WriteUnitOfWork;
     friend class repl::UnreplicatedWritesBlock;
-    Client* const _client;
-    const unsigned int _opId;
+    Client* _client;
+    unsigned int _opId;
 
     boost::optional<LogicalSessionId> _lsid;
     boost::optional<TxnNumber> _txnNumber;
 
-    std::unique_ptr<Locker> _locker;
+    std::unique_ptr<Locker> _locker{nullptr};
 
-    std::unique_ptr<RecoveryUnit> _recoveryUnit;
+    // RecoveryUnit::UPtr _recoveryUnit{nullptr, RecoveryUnit::DefaultDeleter};
+    std::unique_ptr<RecoveryUnit> _recoveryUnit{nullptr};
+
     WriteUnitOfWork::RecoveryUnitState _ruState =
         WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
 

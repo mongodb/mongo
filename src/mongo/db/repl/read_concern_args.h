@@ -55,6 +55,8 @@ public:
 
     static const OperationContext::Decoration<ReadConcernArgs> get;
 
+    void reset();
+
     ReadConcernArgs();
 
     ReadConcernArgs(boost::optional<ReadConcernLevel> level);

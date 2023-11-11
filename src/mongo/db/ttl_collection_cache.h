@@ -44,6 +44,9 @@ namespace mongo {
 class TTLCollectionCache {
 public:
     static TTLCollectionCache& get(ServiceContext* ctx);
+
+    void reset();
+
     // Caller is responsible for ensuring no duplicates are registered.
     void registerCollection(const NamespaceString& collectionNS);
     void unregisterCollection(const NamespaceString& collectionNS);

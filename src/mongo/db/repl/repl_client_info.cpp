@@ -44,6 +44,10 @@ namespace repl {
 const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
     Client::declareDecoration<ReplClientInfo>();
 
+void ReplClientInfo::reset() {
+    _lastOp.reset();
+}
+
 void ReplClientInfo::setLastOp(const OpTime& ot) {
     invariant(ot >= _lastOp);
     _lastOp = ot;

@@ -47,6 +47,10 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(debugCollectionUUIDs, bool, false);
 const OperationContext::Decoration<NamespaceUUIDCache> NamespaceUUIDCache::get =
     OperationContext::declareDecoration<NamespaceUUIDCache>();
 
+void NamespaceUUIDCache::reset() {
+    _cache.clear();
+}
+
 void NamespaceUUIDCache::ensureNamespaceInCache(const NamespaceString& nss, CollectionUUID uuid) {
     StringData ns(nss.ns());
     CollectionUUIDMap::const_iterator it = _cache.find(ns);

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/query/query_request.h"
 #include <boost/filesystem/path.hpp>
 #include <memory>
 
@@ -76,7 +77,7 @@ struct Helpers {
 
     static RecordId findOne(OperationContext* opCtx,
                             Collection* collection,
-                            std::unique_ptr<QueryRequest> qr,
+                            QueryRequest::UPtr qr,
                             bool requireIndex);
 
     /**

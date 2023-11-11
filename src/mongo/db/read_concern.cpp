@@ -67,6 +67,10 @@ class WriteRequestSynchronizer {
 public:
     WriteRequestSynchronizer() = default;
 
+    void reset() {
+        _writeRequests.clear();
+    }
+
     /**
      * Returns a tuple <false, existingWriteRequest> if it can  find the one that happened after or
      * at clusterTime.
@@ -163,10 +167,9 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
                     opCtx,
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     "admin",
-                    BSON("appendOplogNote" << 1 << "maxClusterTime" << clusterTime.asTimestamp()
-                                           << "data"
-                                           << BSON("noop write for afterClusterTime read concern"
-                                                   << 1)),
+                    BSON("appendOplogNote"
+                         << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
+                         << BSON("noop write for afterClusterTime read concern" << 1)),
                     Shard::RetryPolicy::kIdempotent);
                 status = swRes.getStatus();
                 std::get<1>(myWriteRequest)->set(status);
@@ -278,8 +281,7 @@ Status waitForReadConcern(OperationContext* opCtx,
                                       << " value must not be greater than the current clusterTime. "
                                          "Requested clusterTime: "
                                       << targetClusterTime->toString()
-                                      << "; current clusterTime: "
-                                      << currentTime.toString()};
+                                      << "; current clusterTime: " << currentTime.toString()};
             }
 
             auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);

@@ -47,6 +47,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(setInterruptOnlyPlansCheckForInterruptHang);
 }  // namespace
 
+
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)
     : _policy(exec->getOpCtx()->lockState()->isGlobalLockedRecursively() ? PlanExecutor::NO_YIELD
                                                                          : policy),
@@ -56,6 +57,15 @@ PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy p
                       Milliseconds(internalQueryExecYieldPeriodMS.load())),
       _planYielding(exec) {}
 
+void PlanYieldPolicy::reset(PlanExecutor* exec, PlanExecutor::YieldPolicy policy) {
+    _policy = exec->getOpCtx()->lockState()->isGlobalLockedRecursively() ? PlanExecutor::NO_YIELD
+                                                                         : policy;
+    _forceYield = false;
+    _elapsedTracker.reset(exec->getOpCtx()->getServiceContext()->getFastClockSource(),
+                          internalQueryExecYieldIterations.load(),
+                          Milliseconds(internalQueryExecYieldPeriodMS.load()));
+    _planYielding = exec;
+}
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs)
     : _policy(policy),

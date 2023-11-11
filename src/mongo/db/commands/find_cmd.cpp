@@ -160,7 +160,7 @@ public:
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
-        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::move(statusWithCQ.getValue());
 
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -232,7 +232,7 @@ public:
             NamespaceString(parseNs(dbname, cmdObj)), cmdObj, isExplain);
         uassertStatusOK(qrStatus.getStatus());
 
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        // auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         auto& qr = qrStatus.getValue();
         const auto session = OperationContextSession::get(opCtx);
         uassert(ErrorCodes::InvalidOptions,
@@ -240,11 +240,11 @@ public:
                 session == nullptr || !(session->inMultiDocumentTransaction() && qr->isTailable()));
 
         // Validate term before acquiring locks, if provided.
-        if (auto term = qr->getReplicationTerm()) {
-            Status status = replCoord->updateTerm(opCtx, *term);
-            // Note: updateTerm returns ok if term stayed the same.
-            uassertStatusOK(status);
-        }
+        // if (auto term = qr->getReplicationTerm()) {
+        //     Status status = replCoord->updateTerm(opCtx, *term);
+        //     // Note: updateTerm returns ok if term stayed the same.
+        //     uassertStatusOK(status);
+        // }
 
         // Acquire locks. If the query is on a view, we release our locks and convert the query
         // request into an aggregation command.
@@ -257,8 +257,8 @@ public:
         qr->refreshNSS(opCtx);
 
         // Check whether we are allowed to read from this node after acquiring our locks.
-        uassertStatusOK(replCoord->checkCanServeReadsFor(
-            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+        // uassertStatusOK(replCoord->checkCanServeReadsFor(
+        //     opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
         // Fill out curop information.
         //
@@ -279,7 +279,7 @@ public:
                                          extensionsCallback,
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
         uassertStatusOK(statusWithCQ.getStatus());
-        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::move(statusWithCQ.getValue());
 
         if (ctx->getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -362,8 +362,9 @@ public:
 
         // Before saving the cursor, ensure that whatever plan we established happened with the
         // expected collection version
-        auto css = CollectionShardingState::get(opCtx, nss);
-        css->checkShardVersionOrThrow(opCtx);
+        // no need
+        // auto css = CollectionShardingState::get(opCtx, nss);
+        // css->checkShardVersionOrThrow(opCtx);
 
         // Set up the cursor for getMore.
         CursorId cursorId = 0;

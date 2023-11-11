@@ -52,6 +52,8 @@ class AuditMetadata {
 public:
     static const OperationContext::Decoration<AuditMetadata> get;
 
+    void reset();
+
     // Decorable requires a default constructor.
     AuditMetadata() = default;
 

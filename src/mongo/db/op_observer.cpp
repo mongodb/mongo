@@ -41,6 +41,11 @@ auto OpObserver::Times::get(OperationContext* const opCtx) -> Times& {
     return getOpObserverTimes(opCtx);
 }
 
+void OpObserver::Times::reset() {
+    reservedOpTimes.clear();
+    _recursionDepth = 0;
+}
+
 OpObserver::ReservedTimes::ReservedTimes(OperationContext* const opCtx)
     : _times(Times::get(opCtx)) {
     // Every time that a `ReservedTimes` scope object is instantiated, we have to track if there was

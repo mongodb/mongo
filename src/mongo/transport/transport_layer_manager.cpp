@@ -143,9 +143,10 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);
 
     if (config->serviceExecutor == "adaptive") {
-        auto reactor = transportLayerASIO->getReactor(TransportLayer::kIngress);
+        // auto reactor = transportLayerASIO->getReactor(TransportLayer::kIngress);
+        auto reactors = transportLayerASIO->getIngressReactors();
         ctx->setServiceExecutor(
-            stdx::make_unique<ServiceExecutorAdaptive>(ctx, std::move(reactor)));
+            stdx::make_unique<ServiceExecutorAdaptive>(ctx, std::move(reactors)));
     } else if (config->serviceExecutor == "synchronous") {
         ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorSynchronous>(ctx));
     }

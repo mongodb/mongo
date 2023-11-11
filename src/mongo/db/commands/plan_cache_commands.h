@@ -90,7 +90,7 @@ public:
     /**
      * Validatess query shape from command object and returns canonical query.
      */
-    static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
+    static StatusWith<CanonicalQuery::UPtr> canonicalize(OperationContext* opCtx,
                                                                     const std::string& ns,
                                                                     const BSONObj& cmdObj);
 

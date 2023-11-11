@@ -30,6 +30,7 @@
 
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/object_pool.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
@@ -37,6 +38,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/update/log_builder.h"
 #include "mongo/db/update/modifier_table.h"
@@ -85,19 +87,15 @@ modifiertable::ModifierType validateMod(BSONElement mod) {
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "Modifiers operate on fields but we found type "
-                          << typeName(mod.type())
-                          << " instead. For example: {$mod: {<field>: ...}}"
-                          << " not {"
-                          << mod
-                          << "}",
+                          << typeName(mod.type()) << " instead. For example: {$mod: {<field>: ...}}"
+                          << " not {" << mod << "}",
             mod.type() == BSONType::Object);
 
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "'" << mod.fieldName()
                           << "' is empty. You must specify a field like so: "
                              "{"
-                          << mod.fieldName()
-                          << ": {<field>: ...}}",
+                          << mod.fieldName() << ": {<field>: ...}}",
             !mod.embeddedObject().isEmpty());
 
     return modType;
@@ -136,8 +134,7 @@ bool parseUpdateExpression(
     for (const auto& arrayFilter : arrayFilters) {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "The array filter for identifier '" << arrayFilter.first
-                              << "' was not used in the update "
-                              << updateExpr,
+                              << "' was not used in the update " << updateExpr,
                 foundIdentifiers.find(arrayFilter.first.toString()) != foundIdentifiers.end());
     }
 
@@ -201,7 +198,8 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     // We canonicalize the query to collapse $and/$or, and the namespace is not needed.  Also,
     // because this is for the upsert case, where we insert a new document if one was not found, the
     // $where/$text clauses do not make sense, hence empty ExtensionsCallback.
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    // auto qr = stdx::make_unique<QueryRequest>(NamespaceString(""));
+    auto qr = ObjectPool<QueryRequest>::newObject(NamespaceString(""));
     qr->setFilter(query);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     // $expr is not allowed in the query for an upsert, since it is not clear what the equality
@@ -216,7 +214,8 @@ Status UpdateDriver::populateDocumentWithQueryFields(OperationContext* opCtx,
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
+    auto cq = std::move(statusWithCQ.getValue());
 
     return populateDocumentWithQueryFields(*cq, immutablePaths, doc);
 }

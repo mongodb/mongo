@@ -28,10 +28,11 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
 #include <climits>  // For UINT_MAX
 #include <vector>
 
-#include "mongo/db/concurrency/lock_manager.h"
+// #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/thread.h"
@@ -51,6 +52,9 @@ class Locker {
 
 public:
     virtual ~Locker() {}
+    virtual void reset(){
+        MONGO_UNREACHABLE;
+    }
 
     /**
      * Returns true if this is an instance of LockerNoop. Because LockerNoop doesn't implement many

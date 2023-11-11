@@ -49,6 +49,13 @@ const char kParentOperIdFieldName[] = "parentOperId";
 const OperationContext::Decoration<TrackingMetadata> TrackingMetadata::get =
     OperationContext::declareDecoration<TrackingMetadata>();
 
+void TrackingMetadata::reset() {
+    _operId.reset();
+    _operName.reset();
+    _parentOperId.reset();
+    _isLogged = false;
+}
+
 TrackingMetadata::TrackingMetadata(OID operId, std::string operName)
     : _operId(std::move(operId)), _operName(std::move(operName)) {}
 
@@ -98,9 +105,7 @@ StatusWith<TrackingMetadata> TrackingMetadata::readFromMetadata(const BSONElemen
     } else if (metadataElem.type() != mongo::Object) {
         return {ErrorCodes::TypeMismatch,
                 str::stream() << "TrackingMetadata element has incorrect type: expected"
-                              << mongo::Object
-                              << " but got "
-                              << metadataElem.type()};
+                              << mongo::Object << " but got " << metadataElem.type()};
     }
 
     BSONObj metadataObj = metadataElem.Obj();

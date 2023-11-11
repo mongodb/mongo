@@ -48,6 +48,10 @@ class AtomicWord;
 template <typename _WordType>
 class AtomicWord<_WordType, stdx::enable_if_t<std::is_integral<_WordType>::value>> {
 public:
+    void reset() {
+        _value = {};
+    }
+
     /**
      * Underlying value type.
      */

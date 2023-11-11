@@ -42,6 +42,7 @@
                     "ignoreFailures": true
                 },
             ],
+            "preLaunchTask": "clean",
             "postRemoteConnectCommands": [
                 {
                     "description": "privided by mongodb",

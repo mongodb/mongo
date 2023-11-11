@@ -90,6 +90,10 @@ public:
         explicit TypeBits(Version version) : version(version) {
             reset();
         }
+        void reset(Version version) {
+            this->version = version;
+            reset();
+        }
 
         /**
          * If there are no bytes remaining, assumes AllZeros. Otherwise, reads bytes out of the
@@ -244,7 +248,7 @@ public:
             const TypeBits& _typeBits;
         };
 
-        const Version version;
+        Version version;
 
     private:
         /**
@@ -289,6 +293,11 @@ public:
     };
 
     explicit KeyString(Version version) : version(version), _typeBits(version) {}
+
+    void reset(Version version) {
+        this->version = version;
+        this->_typeBits.reset(version);
+    }
 
     KeyString(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
         : KeyString(version) {
@@ -384,7 +393,7 @@ public:
      * Version to use for conversion to/from KeyString. V1 has different encodings for numeric
      * values.
      */
-    const Version version;
+    Version version;
 
 private:
     void _appendRecordIdLong(int64_t val);

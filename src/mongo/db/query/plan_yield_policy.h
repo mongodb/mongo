@@ -29,9 +29,10 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/plan_executor.h"
+// #include "mongo/db/query/plan_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/elapsed_tracker.h"
+#include <memory>
 
 namespace mongo {
 
@@ -43,6 +44,7 @@ public:
     virtual ~PlanYieldPolicy() {}
 
     PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
+    void reset(PlanExecutor* exec, PlanExecutor::YieldPolicy policy);
 
     /**
      * Only used in dbtests since we don't have access to a PlanExecutor. Since we don't have
@@ -144,14 +146,14 @@ public:
     }
 
 private:
-    const PlanExecutor::YieldPolicy _policy;
+    PlanExecutor::YieldPolicy _policy;
 
     bool _forceYield;
     ElapsedTracker _elapsedTracker;
 
     // The plan executor which this yield policy is responsible for yielding. Must
     // not outlive the plan executor.
-    PlanExecutor* const _planYielding;
+    PlanExecutor* _planYielding;
 
     // Returns true to indicate it's time to release locks or storage engine state.
     bool shouldYield();

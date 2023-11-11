@@ -49,6 +49,16 @@ const Milliseconds kMaxWaitForMovePrimaryCriticalSection = Minutes(5);
 constexpr auto kDbVersionField = "databaseVersion"_sd;
 }  // namespace
 
+void OperationShardingState::reset() {
+    _allowImplicitCollectionCreation = true;
+    _globalUnshardedShardVersion = false;
+    _shardVersions.clear();
+    _databaseVersions.clear();
+    _migrationCriticalSectionSignal.reset();
+    _movePrimaryCriticalSectionSignal.reset();
+    _shardingOperationFailedStatus.reset();
+}
+
 OperationShardingState::OperationShardingState() = default;
 
 OperationShardingState::~OperationShardingState() {

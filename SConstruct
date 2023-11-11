@@ -1527,7 +1527,7 @@ elif env.TargetOSIs('windows'):
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
 
 # ---- other build setup -----
-if debugBuild:
+if debugBuild and not optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
 else:
     env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )

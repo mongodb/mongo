@@ -54,6 +54,10 @@ const auto operationSessionDecoration =
 
 }  // namespace
 
+void SessionCatalog::reset() {
+    _txnTable.clear();
+}
+
 SessionCatalog::~SessionCatalog() {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     for (const auto& entry : _txnTable) {
@@ -112,11 +116,10 @@ void SessionCatalog::onStepUp(OperationContext* opCtx) {
         return;
     }
 
-    uassertStatusOKWithContext(status,
-                               str::stream()
-                                   << "Failed to create the "
-                                   << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                                   << " collection");
+    uassertStatusOKWithContext(
+        status,
+        str::stream() << "Failed to create the "
+                      << NamespaceString::kSessionTransactionsTableNamespace.ns() << " collection");
 }
 
 ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx) {

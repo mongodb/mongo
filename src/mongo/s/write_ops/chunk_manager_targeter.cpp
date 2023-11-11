@@ -402,7 +402,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
     }
 
     // Parse update query.
-    auto qr = stdx::make_unique<QueryRequest>(getNS());
+    // auto qr = stdx::make_unique<QueryRequest>(getNS());
+    auto qr=ObjectPool<QueryRequest>::newObject(getNS());
     qr->setFilter(updateDoc.getQ());
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
@@ -484,7 +485,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
     // We failed to target a single shard.
 
     // Parse delete query.
-    auto qr = stdx::make_unique<QueryRequest>(getNS());
+    // auto qr = stdx::make_unique<QueryRequest>(getNS());
+    auto qr=ObjectPool<QueryRequest>::newObject(getNS());
     qr->setFilter(deleteDoc.getQ());
     if (!collation.isEmpty()) {
         qr->setCollation(collation);

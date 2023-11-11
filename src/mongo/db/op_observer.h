@@ -341,8 +341,10 @@ protected:
 struct OpObserver::Times {
     static Times& get(OperationContext*);
 
+    void reset();
+    
     std::vector<repl::OpTime> reservedOpTimes;
-
+    
 private:
     friend OpObserver::ReservedTimes;
 

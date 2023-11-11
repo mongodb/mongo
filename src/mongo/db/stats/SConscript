@@ -32,6 +32,7 @@ env.Library(
         'operation_latency_histogram.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )

@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
 
 #include "mongo/platform/basic.h"
@@ -242,7 +244,8 @@ private:
         const char* keyFieldName = key.firstElement().fieldName();
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationTime));
-        auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
+        // auto qr = stdx::make_unique<QueryRequest>(collectionNSS);
+        auto qr = ObjectPool<QueryRequest>::newObject(collectionNSS);
         qr->setFilter(query);
         auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
         invariant(canonicalQuery.getStatus());

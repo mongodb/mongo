@@ -44,6 +44,8 @@ class RetryableWritesStats {
 public:
     RetryableWritesStats() = default;
 
+    void reset();
+    
     static RetryableWritesStats* get(ServiceContext* service);
     static RetryableWritesStats* get(OperationContext* opCtx);
 

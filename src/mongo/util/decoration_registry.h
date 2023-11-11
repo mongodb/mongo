@@ -31,16 +31,18 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <mutex>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/stdx/functional.h"
 #include "mongo/util/decoration_container.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+class OperationContext;
 
 /**
  * Registry of decorations.
@@ -69,8 +71,11 @@ public:
                                 "Decorations must be nothrow destructible");
         return
             typename DecorationContainer<DecoratedType>::template DecorationDescriptorWithType<T>(
-                std::move(declareDecoration(
-                    sizeof(T), std::alignment_of<T>::value, &constructAt<T>, &destroyAt<T>)));
+                std::move(declareDecoration(sizeof(T),
+                                            std::alignment_of<T>::value,
+                                            &constructAt<T>,
+                                            &destroyAt<T>,
+                                            &resetAt<T>)));
     }
 
     size_t getDecorationBufferSizeBytes() const {
@@ -88,7 +93,7 @@ public:
 
         auto iter = cbegin(_decorationInfo);
 
-        auto cleanupFunction = [&iter, container, this ]() noexcept->void {
+        auto cleanupFunction = [&iter, container, this]() noexcept -> void {
             using std::crend;
             std::for_each(std::make_reverse_iterator(iter),
                           crend(this->_decorationInfo),
@@ -122,6 +127,17 @@ public:
         std::terminate();
     }
 
+    /**
+     * reset all decorations declared in this registry on the given instance of "decorable".
+     *
+     * Called by the Decorable class when reuse.
+     */
+    void resetAll(DecorationContainer<DecoratedType>* const container) {
+        for (auto& decoration : _decorationInfo) {
+            decoration.resetor(container->getDecoration(decoration.descriptor));
+        }
+    }
+
 private:
     /**
      * Function that constructs (initializes) a single instance of a decoration.
@@ -133,19 +149,27 @@ private:
      */
     using DecorationDestructorFn = void (*)(void*);
 
+    /**
+     * Function that reset a single instance of a decoration.
+     */
+    using DecorationResetorFn = void (*)(void*);
+
     struct DecorationInfo {
         DecorationInfo() {}
         DecorationInfo(
             typename DecorationContainer<DecoratedType>::DecorationDescriptor inDescriptor,
             DecorationConstructorFn inConstructor,
-            DecorationDestructorFn inDestructor)
+            DecorationDestructorFn inDestructor,
+            DecorationResetorFn inResetor)
             : descriptor(std::move(inDescriptor)),
-              constructor(std::move(inConstructor)),
-              destructor(std::move(inDestructor)) {}
+              constructor(inConstructor),
+              destructor(inDestructor),
+              resetor(inResetor) {}
 
         typename DecorationContainer<DecoratedType>::DecorationDescriptor descriptor;
         DecorationConstructorFn constructor;
         DecorationDestructorFn destructor;
+        DecorationResetorFn resetor;
     };
 
     using DecorationInfoVector = std::vector<DecorationInfo>;
@@ -160,6 +184,25 @@ private:
         static_cast<T*>(location)->~T();
     }
 
+    template <typename T>
+    static void resetAt(void* location) {
+        // reset decorations only apply on class OperationContext
+        if constexpr (!std::is_same_v<DecoratedType, OperationContext>) {
+            return;
+        } else {
+            T* ptr = static_cast<T*>(location);
+            // fundamental type do not has reset() function
+            // just set it to the default value
+            if constexpr (std::is_fundamental_v<T>) {
+                *ptr = T{};
+            } else if constexpr (std::is_same_v<T, std::mutex>) {
+                // no operation for theses types
+            } else {
+                ptr->reset();
+            }
+        }
+    }
+
     /**
      * Declares a decoration with given "constructor" and "destructor" functions,
      * of "sizeBytes" bytes.
@@ -170,13 +213,14 @@ private:
         const size_t sizeBytes,
         const size_t alignBytes,
         const DecorationConstructorFn constructor,
-        const DecorationDestructorFn destructor) {
+        const DecorationDestructorFn destructor,
+        const DecorationResetorFn resetor) {
         const size_t misalignment = _totalSizeBytes % alignBytes;
         if (misalignment) {
             _totalSizeBytes += alignBytes - misalignment;
         }
         typename DecorationContainer<DecoratedType>::DecorationDescriptor result(_totalSizeBytes);
-        _decorationInfo.push_back(DecorationInfo(result, constructor, destructor));
+        _decorationInfo.push_back(DecorationInfo(result, constructor, destructor, resetor));
         _totalSizeBytes += sizeBytes;
         return result;
     }

@@ -42,6 +42,7 @@ class ClockSource;
 class ElapsedTracker {
 public:
     ElapsedTracker(ClockSource* cs, int32_t hitsBetweenMarks, Milliseconds msBetweenMarks);
+    void reset(ClockSource* cs, int32_t hitsBetweenMarks, Milliseconds msBetweenMarks);
 
     /**
      * Call this for every iteration.
@@ -52,9 +53,9 @@ public:
     void resetLastTime();
 
 private:
-    ClockSource* const _clock;
-    const int32_t _hitsBetweenMarks;
-    const Milliseconds _msBetweenMarks;
+    ClockSource* _clock;
+    int32_t _hitsBetweenMarks;
+    Milliseconds _msBetweenMarks;
 
     int32_t _pings;
 

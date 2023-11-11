@@ -156,9 +156,10 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     curop->debug().errInfo = exception.toStatus();
 
     log(LogComponent::kQuery) << "assertion " << exception.toString() << " ns:" << queryMessage.ns
-                              << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
-                                                   ? redact(queryMessage.query)
-                                                   : "query object is corrupt");
+                              << " query:"
+                              << (queryMessage.query.valid(BSONVersion::kLatest)
+                                      ? redact(queryMessage.query)
+                                      : "query object is corrupt");
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
         log(LogComponent::kQuery) << " ntoskip:" << queryMessage.ntoskip
                                   << " ntoreturn:" << queryMessage.ntoreturn;
@@ -658,7 +659,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         evaluateFailCommandFailPoint(opCtx, command->getName());
 
-        const auto dbname = request.getDatabase().toString();
+        auto dbname = request.getDatabase();  //.toString();
         uassert(
             ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid database name: '" << dbname << "'",
@@ -849,25 +850,26 @@ void execCommandDatabase(OperationContext* opCtx,
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
         }
 
-        auto& oss = OperationShardingState::get(opCtx);
+        // @starrysky no need for sharding
+        // auto& oss = OperationShardingState::get(opCtx);
 
-        if (!opCtx->getClient()->isInDirectClient() &&
-            readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
-            (iAmPrimary ||
-             (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-            oss.initializeClientRoutingVersions(invocation->ns(), request.body);
+        // if (!opCtx->getClient()->isInDirectClient() &&
+        //     readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
+        //     (iAmPrimary ||
+        //      (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
+        //     oss.initializeClientRoutingVersions(invocation->ns(), request.body);
 
-            auto const shardingState = ShardingState::get(opCtx);
-            if (oss.hasShardVersion() || oss.hasDbVersion()) {
-                uassertStatusOK(shardingState->canAcceptShardedCommands());
-            }
+        //     auto const shardingState = ShardingState::get(opCtx);
+        //     if (oss.hasShardVersion() || oss.hasDbVersion()) {
+        //         uassertStatusOK(shardingState->canAcceptShardedCommands());
+        //     }
 
-            // Handle config optime information that may have been sent along with the command.
-            rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
-        }
+        //     // Handle config optime information that may have been sent along with the command.
+        //     rpc::advanceConfigOptimeFromRequestMetadata(opCtx);
+        // }
 
-        oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
-        ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
+        // oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
+        // ScopedOperationCompletionShardingActions operationCompletionShardingActions(opCtx);
 
         // This may trigger the maxTimeAlwaysTimeOut failpoint.
         auto status = opCtx->checkForInterruptNoAssert();
@@ -1019,8 +1021,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
             // However, the complete command object will still be echoed to the client.
             if (!(c = CommandHelpers::findCommand(request.getCommandName()))) {
                 globalCommandRegistry()->incrementUnknownCommands();
-                std::string msg = str::stream() << "no such command: '" << request.getCommandName()
-                                                << "'";
+                std::string msg = str::stream()
+                    << "no such command: '" << request.getCommandName() << "'";
                 LOG(2) << msg;
                 uasserted(ErrorCodes::CommandNotFound, str::stream() << msg);
             }
@@ -1345,10 +1347,8 @@ DbResponse ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
                 if (!opCtx->getClient()->isInDirectClient()) {
                     uassert(18663,
                             str::stream() << "legacy writeOps not longer supported for "
-                                          << "versioned connections, ns: "
-                                          << nsString.ns()
-                                          << ", op: "
-                                          << networkOpToString(op),
+                                          << "versioned connections, ns: " << nsString.ns()
+                                          << ", op: " << networkOpToString(op),
                             !ShardedConnectionInfo::get(&c, false));
                 }
 

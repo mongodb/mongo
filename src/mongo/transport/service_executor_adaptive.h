@@ -81,10 +81,12 @@ public:
         virtual int recursionLimit() const = 0;
     };
 
-    explicit ServiceExecutorAdaptive(ServiceContext* ctx, ReactorHandle reactor);
-    explicit ServiceExecutorAdaptive(ServiceContext* ctx,
-                                     ReactorHandle reactor,
-                                     std::unique_ptr<Options> config);
+    explicit ServiceExecutorAdaptive(ServiceContext* ctx, std::vector<ReactorHandle>&& reactors);
+    explicit ServiceExecutorAdaptive(ServiceContext* ctx, std::vector<ReactorHandle>&& reactors,std::unique_ptr<Options> config);
+    // explicit ServiceExecutorAdaptive(ServiceContext* ctx, ReactorHandle reactor);
+    // explicit ServiceExecutorAdaptive(ServiceContext* ctx,
+    //                                  ReactorHandle reactor,
+    //                                  std::unique_ptr<Options> config);
 
     ServiceExecutorAdaptive(ServiceExecutorAdaptive&&) = default;
     ServiceExecutorAdaptive& operator=(ServiceExecutorAdaptive&&) = default;
@@ -205,7 +207,8 @@ private:
     TickSource::Tick _getThreadTimerTotal(ThreadTimer which,
                                           const stdx::unique_lock<stdx::mutex>& lk) const;
 
-    ReactorHandle _reactorHandle;
+    // ReactorHandle _reactorHandle;
+    std::vector<ReactorHandle> _reactorHandles;
 
     std::unique_ptr<Options> _config;
 

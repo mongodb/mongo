@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/parsed_distinct.h"
@@ -126,7 +127,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     }
     auto key = keyElt.valuestrsafe();
 
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    // auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = ObjectPool<QueryRequest>::newObject(nss);
 
     // Extract the query field. If the query field is nonexistent, an empty query is used.
     if (BSONElement queryElt = cmdObj[kQueryField]) {
@@ -134,12 +136,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
             qr->setFilter(queryElt.embeddedObject());
         } else if (queryElt.type() != BSONType::jstNULL) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << kQueryField << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << " or "
-                                        << typeName(BSONType::jstNULL)
-                                        << ", found "
-                                        << typeName(queryElt.type()));
+                          str::stream()
+                              << "\"" << kQueryField << "\" had the wrong type. Expected "
+                              << typeName(BSONType::Object) << " or " << typeName(BSONType::jstNULL)
+                              << ", found " << typeName(queryElt.type()));
         }
     }
 
@@ -147,11 +147,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (BSONElement collationElt = cmdObj[kCollationField]) {
         if (collationElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << kCollationField
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << ", found "
-                                        << typeName(collationElt.type()));
+                          str::stream()
+                              << "\"" << kCollationField << "\" had the wrong type. Expected "
+                              << typeName(BSONType::Object) << ", found "
+                              << typeName(collationElt.type()));
         }
         qr->setCollation(collationElt.embeddedObject());
     }
@@ -159,11 +158,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (BSONElement readConcernElt = cmdObj[repl::ReadConcernArgs::kReadConcernFieldName]) {
         if (readConcernElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << ", found "
-                                        << typeName(readConcernElt.type()));
+                          str::stream()
+                              << "\"" << repl::ReadConcernArgs::kReadConcernFieldName
+                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
+                              << ", found " << typeName(readConcernElt.type()));
         }
         qr->setReadConcern(readConcernElt.embeddedObject());
     }
@@ -171,11 +169,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (BSONElement commentElt = cmdObj[kCommentField]) {
         if (commentElt.type() != BSONType::String) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << kCommentField
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::String)
-                                        << ", found "
-                                        << typeName(commentElt.type()));
+                          str::stream()
+                              << "\"" << kCommentField << "\" had the wrong type. Expected "
+                              << typeName(BSONType::String) << ", found "
+                              << typeName(commentElt.type()));
         }
         qr->setComment(commentElt.str());
     }
@@ -183,11 +180,10 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (BSONElement queryOptionsElt = cmdObj[QueryRequest::kUnwrappedReadPrefField]) {
         if (queryOptionsElt.type() != BSONType::Object) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "\"" << QueryRequest::kUnwrappedReadPrefField
-                                        << "\" had the wrong type. Expected "
-                                        << typeName(BSONType::Object)
-                                        << ", found "
-                                        << typeName(queryOptionsElt.type()));
+                          str::stream()
+                              << "\"" << QueryRequest::kUnwrappedReadPrefField
+                              << "\" had the wrong type. Expected " << typeName(BSONType::Object)
+                              << ", found " << typeName(queryOptionsElt.type()));
         }
         qr->setUnwrappedReadPref(queryOptionsElt.embeddedObject());
     }

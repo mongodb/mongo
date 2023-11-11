@@ -64,7 +64,7 @@ bool lessThanOrEqualToMaxPossibleTime(LogicalTime time, uint64_t nTicks) {
     return time.asTimestamp().getSecs() <= LogicalClock::kMaxSignedInt &&
         time.asTimestamp().getInc() <= (LogicalClock::kMaxSignedInt - nTicks);
 }
-}
+}  // namespace
 
 LogicalTime LogicalClock::getClusterTimeForReplicaSet(OperationContext* opCtx) {
     if (getGlobalReplSettings().usingReplSets()) {
@@ -180,8 +180,7 @@ Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
         return Status(ErrorCodes::ClusterTimeFailsRateLimiter,
                       str::stream() << "New cluster time, " << newTimeSecs
                                     << ", is too far from this node's wall clock time, "
-                                    << wallClockSecs
-                                    << ".");
+                                    << wallClockSecs << ".");
     }
 
     uassert(40484,
@@ -192,8 +191,9 @@ Status LogicalClock::_passesRateLimiter_inlock(LogicalTime newTime) {
 }
 
 bool LogicalClock::isEnabled() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _isEnabled;
+    return false;
+    // stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // return _isEnabled;
 }
 
 void LogicalClock::disable() {

@@ -39,6 +39,7 @@
 #include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
+#include <utility>
 
 namespace mongo {
 
@@ -96,12 +97,21 @@ public:
     /**
      * Constructs a NamespaceString from the fully qualified namespace named in "ns".
      */
-    explicit NamespaceString(StringData ns) {
-        _ns = ns.toString();  // copy to our buffer
-        _dotIndex = _ns.find('.');
+    explicit NamespaceString(StringData ns) : _ns(ns.toString()), _dotIndex(_ns.find('.')) {
+        // copy to our buffer
         uassert(ErrorCodes::InvalidNamespace,
                 "namespaces cannot have embedded null characters",
                 _ns.find('\0') == std::string::npos);
+    }
+
+    explicit NamespaceString(std::string&& ns) : _ns(std::move(ns)), _dotIndex(_ns.find('.')) {
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                _ns.find('\0') == std::string::npos);
+    }
+
+    explicit NamespaceString(const char* data) : NamespaceString(StringData(data)) {
+        //
     }
 
     /**
@@ -194,7 +204,7 @@ public:
     const std::string& toString() const {
         return ns();
     }
-    
+
     const StringData toStringData() const {
         return StringData(_ns);
     }

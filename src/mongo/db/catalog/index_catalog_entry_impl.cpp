@@ -1,30 +1,31 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2013 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
 
@@ -47,13 +48,17 @@
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/monograph_read_write_lock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+extern thread_local uint16_t localThreadId;
+
 MONGO_REGISTER_SHIM(IndexCatalogEntry::makeImpl)
 (IndexCatalogEntry* const this_,
  OperationContext* const opCtx,
@@ -99,17 +104,24 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(IndexCatalogEntry* const this_,
       _infoCache(infoCache),
       _headManager(stdx::make_unique<HeadManagerImpl>(this_)),
       _ordering(Ordering::make(_descriptor->keyPattern())),
-      _isReady(false),
+      _isReady(_catalogIsReady(opCtx)),
+      _indexMultikeyPathsVector{serverGlobalParams.reservedThreadNum},
       _prefix(collection->getIndexPrefix(opCtx, _descriptor->indexName())) {
     _descriptor->_cachedEntry = this_;
 
-    _isReady = _catalogIsReady(opCtx);
+
     _head = _catalogHead(opCtx);
 
     {
-        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        _isMultikey.store(_catalogIsMultikey(opCtx, &_indexMultikeyPaths));
-        _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPaths.empty();
+        // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        SyncAllThreadsLock lk(_lockVector);
+
+        bool isMutilkey;
+        for (auto& indexMultikeyPaths : _indexMultikeyPathsVector) {
+            isMutilkey = _catalogIsMultikey(opCtx, &indexMultikeyPaths);
+        }
+        _isMultikey.store(isMutilkey);
+        _indexTracksPathLevelMultikeyInfo = !_indexMultikeyPathsVector.front().empty();
     }
 
     if (BSONElement collationElement = _descriptor->getInfoElement("collation")) {
@@ -207,14 +219,15 @@ bool IndexCatalogEntryImpl::isMultikey(OperationContext* opCtx) const {
 }
 
 MultikeyPaths IndexCatalogEntryImpl::getMultikeyPaths(OperationContext* opCtx) const {
-    stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+    // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+    ThreadlocalLock lk(_lockVector[localThreadId]);
 
     auto session = OperationContextSession::get(opCtx);
     if (!session || !session->inMultiDocumentTransaction()) {
-        return _indexMultikeyPaths;
+        return _indexMultikeyPathsVector[localThreadId];
     }
 
-    MultikeyPaths ret = _indexMultikeyPaths;
+    MultikeyPaths ret = _indexMultikeyPathsVector[localThreadId];
     for (const MultikeyPathInfo& path : session->getMultikeyPathInfo()) {
         if (path.nss == NamespaceString(_ns) && path.indexName == _descriptor->indexName()) {
             MultikeyPathTracker::mergeMultikeyPaths(&ret, path.multikeyPaths);
@@ -259,13 +272,14 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     }
 
     if (_indexTracksPathLevelMultikeyInfo) {
-        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        invariant(multikeyPaths.size() == _indexMultikeyPaths.size());
+        // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        ThreadlocalLock lk(_lockVector[localThreadId]);
+        invariant(multikeyPaths.size() == _indexMultikeyPathsVector.front().size());
 
         bool newPathIsMultikey = false;
         for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            if (!std::includes(_indexMultikeyPaths[i].begin(),
-                               _indexMultikeyPaths[i].end(),
+            if (!std::includes(_indexMultikeyPathsVector.front()[i].begin(),
+                               _indexMultikeyPathsVector.front()[i].end(),
                                multikeyPaths[i].begin(),
                                multikeyPaths[i].end())) {
                 // If 'multikeyPaths' contains a new path component that causes this index to be
@@ -323,23 +337,26 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
 
     // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
     // if the index metadata has changed.
-    opCtx->recoveryUnit()->onCommit(
-        [this, multikeyPaths, indexMetadataHasChanged](boost::optional<Timestamp>) {
-            _isMultikey.store(true);
+    opCtx->recoveryUnit()->onCommit([this, multikeyPaths, indexMetadataHasChanged](
+                                        boost::optional<Timestamp>) {
+        _isMultikey.store(true);
 
-            if (_indexTracksPathLevelMultikeyInfo) {
-                stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+        if (_indexTracksPathLevelMultikeyInfo) {
+            // stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+            SyncAllThreadsLock lk(_lockVector);
+            for (auto& indexMultikeyPaths : _indexMultikeyPathsVector) {
                 for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-                    _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+                    indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
                 }
             }
+        }
 
-            if (indexMetadataHasChanged && _infoCache) {
-                LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
-                       << " set to multi key.";
-                _infoCache->clearQueryCache();
-            }
-        });
+        if (indexMetadataHasChanged && _infoCache) {
+            LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
+                   << " set to multi key.";
+            _infoCache->clearQueryCache();
+        }
+    });
 
     // Keep multikey changes in memory to correctly service later reads using this index.
     auto session = OperationContextSession::get(opCtx);

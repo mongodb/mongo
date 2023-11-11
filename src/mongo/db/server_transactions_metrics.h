@@ -43,6 +43,8 @@ class ServerTransactionsMetrics {
 public:
     ServerTransactionsMetrics() = default;
 
+    void reset();
+
     static ServerTransactionsMetrics* get(ServiceContext* service);
     static ServerTransactionsMetrics* get(OperationContext* opCtx);
 

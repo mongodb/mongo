@@ -83,6 +83,40 @@ OperationContext::OperationContext(Client* client, unsigned int opId)
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
+void OperationContext::reset(Client* client, unsigned int opId) {
+    MONGO_LOG(1) << "OperationContext::reset";
+    resetAllDecorations();
+
+    _client = client;
+    _opId = opId;
+    if (client) {
+        _elapsedTime.reset(client->getServiceContext()->getTickSource());
+    } else {
+        _elapsedTime.reset(SystemTickSource::get());
+    }
+
+    _lsid.reset();
+    _txnNumber.reset();
+
+    // reset lock and recoveryunit in OnCreate()
+    // _locker->reset();
+    // _recoveryUnit->reset();
+    _ruState = WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork;
+    _writeUnitOfWork.reset();
+    _killCode.store(ErrorCodes::OK);
+    _baton.reset();
+    _waitMutex = nullptr;
+    _waitCV = nullptr;
+    _numKillers = 0;
+    _writeConcern = {};
+    _deadline = Date_t::max();
+    _timeoutError = ErrorCodes::ExceededTimeLimit;
+    _maxTime = Microseconds::max();
+    _writesAreReplicated = true;
+    _coroYield = nullptr;
+    _coroResume = nullptr;
+}
+
 void OperationContext::setDeadlineAndMaxTime(Date_t when,
                                              Microseconds maxTime,
                                              ErrorCodes::Error timeoutError) {
@@ -390,6 +424,25 @@ WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
     _ruState = state;
     return oldState;
 }
+
+WriteUnitOfWork::RecoveryUnitState OperationContext::resetRecoveryUnit(
+    WriteUnitOfWork::RecoveryUnitState state) {
+    _recoveryUnit->reset();
+    WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
+    _ruState = state;
+    return oldState;
+}
+
+void OperationContext::resetLockState() {
+    _locker->reset();
+}
+// WriteUnitOfWork::RecoveryUnitState OperationContext::setRecoveryUnit(
+//     RecoveryUnit::UPtr unit, WriteUnitOfWork::RecoveryUnitState state) {
+//     _recoveryUnit = std::move(unit);
+//     WriteUnitOfWork::RecoveryUnitState oldState = _ruState;
+//     _ruState = state;
+//     return oldState;
+// }
 
 void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
     invariant(!_locker);

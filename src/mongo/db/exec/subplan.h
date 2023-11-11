@@ -137,7 +137,7 @@ private:
         BranchPlanningResult() {}
 
         // A parsed version of one branch of the $or.
-        std::unique_ptr<CanonicalQuery> canonicalQuery;
+        CanonicalQuery::UPtr canonicalQuery;
 
         // If there is cache data available, then we store it here rather than generating
         // a set of alternate plans for the branch. The index tags from the cache data

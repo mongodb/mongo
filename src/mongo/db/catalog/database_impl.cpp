@@ -532,7 +532,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     audit::logDropCollection(&cc(), fullns.toString());
 
-    Top::get(opCtx->getServiceContext()).collectionDropped(fullns.toString());
+    Top::get(opCtx->getServiceContext()).collectionDropped(fullns.toStringData());
 
     // Drop unreplicated collections immediately.
     // If 'dropOpTime' is provided, we should proceed to rename the collection.

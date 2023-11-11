@@ -55,6 +55,8 @@ class TrackingMetadata {
 public:
     static const OperationContext::Decoration<TrackingMetadata> get;
 
+    void reset();
+
     TrackingMetadata() = default;
     explicit TrackingMetadata(OID operId, std::string operName);
     explicit TrackingMetadata(OID operId, std::string operName, std::string parentOperId);

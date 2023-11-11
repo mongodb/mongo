@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
@@ -66,12 +68,12 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::ios_base;
 using std::ofstream;
 using std::set;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 
 /* fetch a single object from collection ns that matches query
    set your db SavedContext first
@@ -98,14 +100,15 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (!collection)
         return RecordId();
 
-    auto qr = stdx::make_unique<QueryRequest>(collection->ns());
+    // auto qr = stdx::make_unique<QueryRequest>(collection->ns());
+    auto qr = ObjectPool<QueryRequest>::newObject(collection->ns());
     qr->setFilter(query);
     return findOne(opCtx, collection, std::move(qr), requireIndex);
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
                           Collection* collection,
-                          std::unique_ptr<QueryRequest> qr,
+                          QueryRequest::UPtr qr,
                           bool requireIndex) {
     if (!collection)
         return RecordId();
@@ -121,7 +124,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
                                      MatchExpressionParser::kAllowAllSpecialFeatures);
 
     massertStatusOK(statusWithCQ.getStatus());
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::move(statusWithCQ.getValue());
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
     auto exec = uassertStatusOK(

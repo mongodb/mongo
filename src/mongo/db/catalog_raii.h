@@ -105,7 +105,7 @@ public:
      * can be resolved, but the resulting collection is in the wrong database.
      */
     static NamespaceString resolveNamespaceStringOrUUID(OperationContext* opCtx,
-                                                        NamespaceStringOrUUID nsOrUUID);
+                                                        const NamespaceStringOrUUID &nsOrUUID);
 
     /**
      * Returns nullptr if the database didn't exist.

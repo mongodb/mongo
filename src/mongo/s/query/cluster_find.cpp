@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
@@ -85,7 +87,7 @@ static const int kPerDocumentOverheadBytesUpperBound = 10;
  * Given the QueryRequest 'qr' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
  */
-StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
+StatusWith<QueryRequest::UPtr> transformQueryForShards(
     const QueryRequest& qr, bool appendGeoNearDistanceProjection) {
     // If there is a limit, we forward the sum of the limit and the skip.
     boost::optional<long long> newLimit;
@@ -153,7 +155,8 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
         newProjection = projectionBuilder.obj();
     }
 
-    auto newQR = stdx::make_unique<QueryRequest>(qr);
+    // auto newQR = stdx::make_unique<QueryRequest>(qr);
+    auto newQR = ObjectPool<QueryRequest>::newObject(qr);
     newQR->setProj(newProjection);
     newQR->setSkip(boost::none);
     newQR->setLimit(newLimit);

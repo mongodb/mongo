@@ -54,6 +54,9 @@ class SessionCatalog {
 
 public:
     SessionCatalog() = default;
+
+    void reset();
+
     ~SessionCatalog();
 
     /**
@@ -144,9 +147,8 @@ private:
         Session txnState;
     };
 
-    using SessionRuntimeInfoMap = stdx::unordered_map<LogicalSessionId,
-                                                      std::shared_ptr<SessionRuntimeInfo>,
-                                                      LogicalSessionIdHash>;
+    using SessionRuntimeInfoMap = stdx::
+        unordered_map<LogicalSessionId, std::shared_ptr<SessionRuntimeInfo>, LogicalSessionIdHash>;
 
     /**
      * May release and re-acquire it zero or more times before returning. The returned

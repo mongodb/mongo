@@ -105,7 +105,7 @@ public:
     /**
      * Releases ownership of the canonical query to the caller.
      */
-    std::unique_ptr<CanonicalQuery> releaseParsedQuery();
+    CanonicalQuery::UPtr releaseParsedQuery();
 
     /**
      * Get the collator of the parsed update.
@@ -154,7 +154,7 @@ private:
     UpdateDriver _driver;
 
     // Parsed query object, or NULL if the query proves to be an id hack query.
-    std::unique_ptr<CanonicalQuery> _canonicalQuery;
+    CanonicalQuery::UPtr _canonicalQuery;
 };
 
 }  // namespace mongo

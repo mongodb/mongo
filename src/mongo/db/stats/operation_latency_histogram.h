@@ -58,11 +58,26 @@ public:
      */
     void append(bool includeHistograms, BSONObjBuilder* builder) const;
 
+    void operator+=(const OperationLatencyHistogram& other) {
+        _reads += other._reads;
+        _writes += other._writes;
+        _commands += other._commands;
+        _transactions += other._transactions;
+    }
+
 private:
     struct HistogramData {
         std::array<uint64_t, kMaxBuckets> buckets{};
         uint64_t entryCount = 0;
         uint64_t sum = 0;
+
+        void operator+=(const HistogramData& other) {
+            for (size_t i = 0; i < buckets.size(); ++i) {
+                buckets[i] += other.buckets[i];
+            }
+            entryCount += other.entryCount;
+            sum += other.entryCount;
+        }
     };
 
     static int _getBucket(uint64_t latency);

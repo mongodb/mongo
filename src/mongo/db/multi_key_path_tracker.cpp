@@ -35,6 +35,11 @@ namespace mongo {
 const OperationContext::Decoration<MultikeyPathTracker> MultikeyPathTracker::get =
     OperationContext::declareDecoration<MultikeyPathTracker>();
 
+void MultikeyPathTracker::reset() {
+    _multikeyPathInfo.clear();
+    _trackMultikeyPathInfo = false;
+}
+
 void MultikeyPathTracker::mergeMultikeyPaths(MultikeyPaths* toMergeInto,
                                              const MultikeyPaths& newPaths) {
     invariant(toMergeInto->size() == newPaths.size());

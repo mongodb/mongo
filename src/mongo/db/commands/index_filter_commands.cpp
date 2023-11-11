@@ -259,7 +259,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
             return statusWithCQ.getStatus();
         }
 
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::move(statusWithCQ.getValue());
         querySettings->removeAllowedIndices(planCache->computeKey(*cq));
 
         // Remove entry from plan cache
@@ -302,7 +302,8 @@ Status ClearFilters::clear(OperationContext* opCtx,
         AllowedIndexEntry entry = *i;
 
         // Create canonical query.
-        auto qr = stdx::make_unique<QueryRequest>(nss);
+        // auto qr = stdx::make_unique<QueryRequest>(nss);
+        auto qr=ObjectPool<QueryRequest>::newObject(nss);
         qr->setFilter(entry.query);
         qr->setSort(entry.sort);
         qr->setProj(entry.projection);
@@ -315,7 +316,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
                                          extensionsCallback,
                                          MatchExpressionParser::kAllowAllSpecialFeatures);
         invariant(statusWithCQ.getStatus());
-        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::move(statusWithCQ.getValue());
 
         // Remove plan cache entry.
         planCache->remove(*cq).transitional_ignore();
@@ -390,7 +391,7 @@ Status SetFilter::set(OperationContext* opCtx,
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::move(statusWithCQ.getValue());
 
     // Add allowed indices to query settings, overriding any previous entries.
     querySettings->setAllowedIndices(*cq, planCache->computeKey(*cq), indexes, indexNames);

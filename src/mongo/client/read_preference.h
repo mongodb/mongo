@@ -116,6 +116,7 @@ private:
 };
 
 struct ReadPreferenceSetting {
+    void reset();
     static const OperationContext::Decoration<ReadPreferenceSetting> get;
 
     /**

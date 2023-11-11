@@ -97,7 +97,7 @@ public:
     /**
      * Releases ownership of the canonical query to the caller.
      */
-    std::unique_ptr<CanonicalQuery> releaseParsedQuery();
+    CanonicalQuery::UPtr releaseParsedQuery();
 
 private:
     // Transactional context.  Not owned by us.
@@ -107,7 +107,7 @@ private:
     const DeleteRequest* const _request;
 
     // Parsed query object, or NULL if the query proves to be an id hack query.
-    std::unique_ptr<CanonicalQuery> _canonicalQuery;
+    CanonicalQuery::UPtr _canonicalQuery;
 };
 
 }  // namespace mongo

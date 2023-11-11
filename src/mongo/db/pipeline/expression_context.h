@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/object_pool.h"
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
 #include <memory>
@@ -52,7 +53,7 @@
 
 namespace mongo {
 
-class ExpressionContext : public RefCountable {
+class ExpressionContext {
 public:
     struct ResolvedNamespace {
         ResolvedNamespace() = default;
@@ -110,6 +111,27 @@ public:
      * of aggregation.
      */
     ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator);
+
+    void reset(OperationContext* opCtx, const CollatorInterface* collator);
+
+
+    /// If false you have exclusive access to this object. This is useful for implementing COW.
+    bool isShared() const {
+        // TODO: switch to unfenced read method after SERVER-6973
+        return reinterpret_cast<unsigned&>(_count) > 1;
+    }
+
+    friend void intrusive_ptr_add_ref(const ExpressionContext* ptr) {
+        ptr->_count.addAndFetch(1);
+    };
+
+    friend void intrusive_ptr_release(const ExpressionContext* ptr) {
+        if (ptr->_count.subtractAndFetch(1) == 0) {
+            // delete ptr;  // uses subclass destructor and operator delete
+            ObjectPool<ExpressionContext>::recycleObject(const_cast<ExpressionContext*>(ptr));
+        }
+    };
+
 
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
@@ -277,6 +299,8 @@ protected:
     StringMap<ResolvedNamespace> _resolvedNamespaces;
 
     int _interruptCounter = kInterruptCheckPeriod;
+    // private:
+    mutable AtomicUInt32 _count;  // default initialized to 0
 };
 
 }  // namespace mongo

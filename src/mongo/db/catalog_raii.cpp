@@ -46,9 +46,7 @@ void uassertLockTimeout(std::string resourceName,
                         bool isLocked) {
     uassert(ErrorCodes::LockTimeout,
             str::stream() << "Failed to acquire " << modeName(lockMode) << " lock for "
-                          << resourceName
-                          << " since deadline "
-                          << dateToISOStringLocal(deadline)
+                          << resourceName << " since deadline " << dateToISOStringLocal(deadline)
                           << " has passed.",
             isLocked);
 }
@@ -62,7 +60,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
           return DatabaseHolder::getDatabaseHolder().get(opCtx, dbName);
       }()) {
     if (_db) {
-        DatabaseShardingState::get(_db).checkDbVersion(opCtx);
+        // DatabaseShardingState::get(_db).checkDbVersion(opCtx);
     }
 }
 
@@ -82,8 +80,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     //
     // Holding a database lock prevents collection renames, so this guarantees a stable UUID to
     // NamespaceString mapping.
-    if (nsOrUUID.uuid())
+    if (nsOrUUID.uuid()) {
         _resolvedNss = resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+    }
 
     _collLock.emplace(opCtx->lockState(), _resolvedNss.ns(), modeColl, deadline);
     uassertLockTimeout(str::stream() << "collection " << nsOrUUID.toString(),
@@ -126,8 +125,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                 ErrorCodes::SnapshotUnavailable,
                 str::stream() << "Unable to read from a snapshot due to pending collection catalog "
                                  "changes; please retry the operation. Snapshot timestamp is "
-                              << mySnapshot->toString()
-                              << ". Collection minimum is "
+                              << mySnapshot->toString() << ". Collection minimum is "
                               << minSnapshot->toString(),
                 !minSnapshot || *mySnapshot >= *minSnapshot);
         }
@@ -142,8 +140,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             !_view || viewMode == kViewsPermitted);
 }
 
-NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext* opCtx,
-                                                                NamespaceStringOrUUID nsOrUUID) {
+NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(
+    OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
     if (nsOrUUID.nss())
         return *nsOrUUID.nss();
 

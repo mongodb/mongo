@@ -26,6 +26,9 @@
 *    it in the license file.
 */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
+#include <utility>
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
@@ -147,7 +150,7 @@ Status PlanCacheCommand::checkAuthForCommand(Client* client,
 }
 
 // static
-StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationContext* opCtx,
+StatusWith<CanonicalQuery::UPtr> PlanCacheCommand::canonicalize(OperationContext* opCtx,
                                                                       const string& ns,
                                                                       const BSONObj& cmdObj) {
     // query - required
@@ -198,7 +201,8 @@ StatusWith<unique_ptr<CanonicalQuery>> PlanCacheCommand::canonicalize(OperationC
 
     // Create canonical query
     const NamespaceString nss(ns);
-    auto qr = stdx::make_unique<QueryRequest>(std::move(nss));
+    // auto qr = stdx::make_unique<QueryRequest>(std::move(nss));
+    auto qr = ObjectPool<QueryRequest>::newObject(std::move(nss));
     qr->setFilter(queryObj);
     qr->setSort(sortObj);
     qr->setProj(projObj);
@@ -308,7 +312,7 @@ Status PlanCacheClear::clear(OperationContext* opCtx,
             return statusWithCQ.getStatus();
         }
 
-        unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+        auto cq = std::move(statusWithCQ.getValue());
 
         if (!planCache->contains(*cq)) {
             // Log if asked to clear non-existent query shape.
@@ -379,7 +383,7 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    auto cq = std::move(statusWithCQ.getValue());
 
     if (!planCache.contains(*cq)) {
         // Return empty plans in results if query shape does not

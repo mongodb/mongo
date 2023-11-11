@@ -29,6 +29,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -44,6 +45,7 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_types.h"
+#include <vector>
 
 namespace asio {
 class io_context;
@@ -125,6 +127,7 @@ public:
     Status setup() final;
 
     ReactorHandle getReactor(WhichReactor which) final;
+    std::vector<ReactorHandle> getIngressReactors();
 
     Status start() final;
 
@@ -180,9 +183,12 @@ private:
     // state that is associated with the reactors), so that we destroy any existing acceptors or
     // other reactor associated state before we drop the refcount on the reactor, which may destroy
     // it.
-    std::shared_ptr<ASIOReactor> _ingressReactor;
+    // std::shared_ptr<ASIOReactor> _ingressReactor;
+    std::vector<std::shared_ptr<ASIOReactor>> _ingressReactors;
     std::shared_ptr<ASIOReactor> _egressReactor;
     std::shared_ptr<ASIOReactor> _acceptorReactor;
+
+    size_t _acceptedCount{0};
 
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _ingressSSLContext;

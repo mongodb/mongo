@@ -76,15 +76,15 @@ const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
 const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
 const std::string AuthorizationManager::V1_USER_SOURCE_FIELD_NAME = "userSource";
 
-const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
-const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
-const NamespaceString AuthorizationManager::usersAltCollectionNamespace("admin.system.new_users");
+const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd"_sd);
+const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles"_sd);
+const NamespaceString AuthorizationManager::usersAltCollectionNamespace("admin.system.new_users"_sd);
 const NamespaceString AuthorizationManager::usersBackupCollectionNamespace(
-    "admin.system.backup_users");
-const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
-const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
-const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace("admin.tempusers");
-const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace("admin.temproles");
+    "admin.system.backup_users"_sd);
+const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users"_sd);
+const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version"_sd);
+const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace("admin.tempusers"_sd);
+const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace("admin.temproles"_sd);
 
 const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
                                                               "Authentication failed.");

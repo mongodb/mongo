@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
@@ -111,7 +113,7 @@ namespace {
 /**
  * Sets the profiling level, logging/profiling threshold, and logging/profiling sample rate for the
  * given database.
-*/
+ */
 class CmdProfile : public ProfileCmdBase {
 public:
     CmdProfile() = default;
@@ -202,8 +204,7 @@ public:
                 uassert(50847,
                         str::stream() << "The element that calls binDataClean() must be type of "
                                          "BinData, but type of "
-                                      << typeName(stateElem.type())
-                                      << " found.",
+                                      << typeName(stateElem.type()) << " found.",
                         (stateElem.type() == BSONType::BinData));
 
                 int len;
@@ -218,7 +219,8 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         return writeConflictRetry(opCtx, "filemd5", dbname, [&] {
-            auto qr = stdx::make_unique<QueryRequest>(nss);
+            // auto qr = stdx::make_unique<QueryRequest>(nss);
+            auto qr = ObjectPool<QueryRequest>::newObject(nss);
             qr->setFilter(query);
             qr->setSort(sort);
 
@@ -227,7 +229,7 @@ public:
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return false;
             }
-            unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+            auto cq = std::move(statusWithCQ.getValue());
 
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
@@ -290,8 +292,7 @@ public:
                 uassert(50849,
                         str::stream() << "The element that calls binDataClean() must be type "
                                          "of BinData, but type of "
-                                      << owned["data"].type()
-                                      << " found.",
+                                      << owned["data"].type() << " found.",
                         owned["data"].type() == BSONType::BinData);
 
                 exec->saveState();

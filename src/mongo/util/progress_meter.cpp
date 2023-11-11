@@ -40,6 +40,19 @@ using namespace std;
 
 namespace mongo {
 
+void ProgressMeter::reset() {
+    _active = false;
+    _total = 0;
+    _showTotal = true;
+    _secondsBetween = 3;
+    _checkInterval = 100;
+    _done = 0;
+    _hits = 0;
+    _lastTime = static_cast<int>(time(0));
+    _units.clear();
+    _name = "Progress";
+}
+
 void ProgressMeter::reset(unsigned long long total, int secondsBetween, int checkInterval) {
     _total = total;
     _secondsBetween = secondsBetween;
@@ -98,4 +111,4 @@ string ProgressMeter::toString() const {
 
     return buf.str();
 }
-}
+}  // namespace mongo

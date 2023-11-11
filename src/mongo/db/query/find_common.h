@@ -36,6 +36,11 @@ namespace mongo {
  * The state associated with tailable cursors.
  */
 struct AwaitDataState {
+    void reset() {
+        waitForInsertsDeadline = {};
+        shouldWaitForInserts = {};
+    }
+
     /**
      * The deadline for how long we wait on the tail of capped collection before returning IS_EOF.
      */

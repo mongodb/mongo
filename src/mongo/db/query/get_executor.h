@@ -82,7 +82,7 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
     Collection* collection,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    CanonicalQuery::UPtr canonicalQuery,
     PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions = 0);
 
@@ -98,7 +98,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
-    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    CanonicalQuery::UPtr canonicalQuery,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
 
 /**
@@ -108,7 +108,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLega
     OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
-    std::unique_ptr<CanonicalQuery> canonicalQuery);
+    CanonicalQuery::UPtr canonicalQuery);
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode

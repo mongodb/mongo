@@ -50,6 +50,7 @@ public:
      * must keep it in scope until Timer goes out of scope.
      */
     explicit Timer(TickSource* tickSource);
+    void reset(TickSource* tickSource);
 
     long long micros() const {
         return static_cast<long long>((now() - _old) * _microsPerCount);
@@ -73,11 +74,11 @@ public:
     }
 
 private:
-    TickSource* const _tickSource;
+    TickSource*  _tickSource;
 
     // Derived value from _countsPerSecond. This represents the conversion ratio
     // from clock ticks to microseconds.
-    const double _microsPerCount;
+     double _microsPerCount;
 
     long long now() const;
 

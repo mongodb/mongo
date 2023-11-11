@@ -52,6 +52,12 @@ ClientMetadataIsMasterState& ClientMetadataIsMasterState::get(Client* client) {
     return getClientMetadataIsMasterState(*client);
 }
 
+void ClientMetadataIsMasterState::reset() {
+    _clientMetadata.reset();
+    _hasSeenIsMaster = false;
+    _setViaMetadata = false;
+}
+
 bool ClientMetadataIsMasterState::hasSeenIsMaster() const {
     return _hasSeenIsMaster;
 }

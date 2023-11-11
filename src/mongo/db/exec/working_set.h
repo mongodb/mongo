@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -58,11 +60,14 @@ class WorkingSet {
     MONGO_DISALLOW_COPYING(WorkingSet);
 
 public:
+    using Deleter = std::function<void(WorkingSet*)>;
+    using UPtr = std::unique_ptr<WorkingSet, Deleter>;
+
     static const WorkingSetID INVALID_ID = WorkingSetID(-1);
 
     WorkingSet();
     ~WorkingSet();
-
+    void reset();
     /**
      * Allocate a new query result and return the ID used to get and free it.
      */

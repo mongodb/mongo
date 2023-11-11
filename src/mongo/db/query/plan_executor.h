@@ -28,7 +28,10 @@
 
 #pragma once
 
+
+#include "mongo/db/exec/working_set.h"
 #include <boost/optional.hpp>
+#include <memory>
 #include <queue>
 
 #include "mongo/base/status.h"
@@ -37,6 +40,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/stdx/unordered_set.h"
+
 
 namespace mongo {
 
@@ -51,6 +55,7 @@ class PlanYieldPolicy;
 class RecordId;
 struct PlanStageStats;
 class WorkingSet;
+using PlanYieldPolicyUPtr = std::unique_ptr<PlanYieldPolicy, void (*)(PlanYieldPolicy*)>;
 
 /**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
@@ -71,6 +76,7 @@ extern const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommitte
  * EOF or if the plan errors.
  */
 class PlanExecutor {
+
 public:
     enum ExecState {
         // We successfully populated the out parameter.
@@ -172,6 +178,37 @@ public:
         bool _dismissed = false;
     };
 
+    using UPtr = std::unique_ptr<PlanExecutor, Deleter>;
+
+
+    /**
+     * New PlanExecutor instances are created with the static make() methods above.
+     */
+    PlanExecutor(OperationContext* opCtx,
+                 WorkingSet::UPtr ws,
+                 std::unique_ptr<PlanStage> rt,
+                 std::unique_ptr<QuerySolution> qs,
+                 CanonicalQuery::UPtr cq,
+                 const Collection* collection,
+                 NamespaceString nss,
+                 YieldPolicy yieldPolicy);
+
+    /**
+     * A PlanExecutor must be disposed before destruction. In most cases, this will happen
+     * automatically through a PlanExecutor::Deleter or a ClientCursor.
+     */
+    ~PlanExecutor();
+
+    void reset(OperationContext* opCtx,
+               WorkingSet::UPtr ws,
+               std::unique_ptr<PlanStage> rt,
+               std::unique_ptr<QuerySolution> qs,
+               CanonicalQuery::UPtr cq,
+               const Collection* collection,
+               NamespaceString nss,
+               YieldPolicy yieldPolicy);
+
+
     //
     // Factory methods.
     //
@@ -196,7 +233,7 @@ public:
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
         OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
+        WorkingSet::UPtr ws,
         std::unique_ptr<PlanStage> rt,
         const Collection* collection,
         YieldPolicy yieldPolicy);
@@ -207,7 +244,7 @@ public:
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
         OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
+        WorkingSet::UPtr ws,
         std::unique_ptr<PlanStage> rt,
         NamespaceString nss,
         YieldPolicy yieldPolicy);
@@ -218,9 +255,9 @@ public:
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
         OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
+        WorkingSet::UPtr ws,
         std::unique_ptr<PlanStage> rt,
-        std::unique_ptr<CanonicalQuery> cq,
+        CanonicalQuery::UPtr cq,
         const Collection* collection,
         YieldPolicy yieldPolicy);
 
@@ -230,10 +267,10 @@ public:
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
         OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
+        WorkingSet::UPtr ws,
         std::unique_ptr<PlanStage> rt,
         std::unique_ptr<QuerySolution> qs,
-        std::unique_ptr<CanonicalQuery> cq,
+        CanonicalQuery::UPtr cq,
         const Collection* collection,
         YieldPolicy yieldPolicy);
 
@@ -502,33 +539,16 @@ private:
 
     ExecState getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut);
 
-    /**
-     * New PlanExecutor instances are created with the static make() methods above.
-     */
-    PlanExecutor(OperationContext* opCtx,
-                 std::unique_ptr<WorkingSet> ws,
-                 std::unique_ptr<PlanStage> rt,
-                 std::unique_ptr<QuerySolution> qs,
-                 std::unique_ptr<CanonicalQuery> cq,
-                 const Collection* collection,
-                 NamespaceString nss,
-                 YieldPolicy yieldPolicy);
-
-    /**
-     * A PlanExecutor must be disposed before destruction. In most cases, this will happen
-     * automatically through a PlanExecutor::Deleter or a ClientCursor.
-     */
-    ~PlanExecutor();
 
     /**
      * Public factory methods delegate to this private factory to do their work.
      */
     static StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
         OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
+        WorkingSet::UPtr ws,
         std::unique_ptr<PlanStage> rt,
         std::unique_ptr<QuerySolution> qs,
-        std::unique_ptr<CanonicalQuery> cq,
+        CanonicalQuery::UPtr cq,
         const Collection* collection,
         NamespaceString nss,
         YieldPolicy yieldPolicy);
@@ -554,8 +574,8 @@ private:
     // detachFromOperationContext() and reattachToOperationContext().
     OperationContext* _opCtx;
 
-    std::unique_ptr<CanonicalQuery> _cq;
-    std::unique_ptr<WorkingSet> _workingSet;
+    CanonicalQuery::UPtr _cq;
+    WorkingSet::UPtr _workingSet;
     std::unique_ptr<QuerySolution> _qs;
     std::unique_ptr<PlanStage> _root;
 
@@ -569,7 +589,7 @@ private:
     // This is used to handle automatic yielding when allowed by the YieldPolicy. Never NULL.
     // TODO make this a non-pointer member. This requires some header shuffling so that this
     // file includes plan_yield_policy.h rather than the other way around.
-    const std::unique_ptr<PlanYieldPolicy> _yieldPolicy;
+    PlanYieldPolicyUPtr _yieldPolicy;
 
     // A stash of results generated by this plan that the user of the PlanExecutor didn't want
     // to consume yet. We empty the queue before retrieving further results from the plan

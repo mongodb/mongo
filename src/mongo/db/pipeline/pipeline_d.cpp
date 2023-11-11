@@ -26,6 +26,8 @@
  * it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
@@ -180,7 +182,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     BSONObj sortObj,
     const AggregationRequest* aggRequest,
     const size_t plannerOpts) {
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    // auto qr = stdx::make_unique<QueryRequest>(nss);
+    auto qr = ObjectPool<QueryRequest>::newObject(nss);
     qr->setTailableMode(pExpCtx->tailableMode);
     qr->setOplogReplay(oplogReplay);
     qr->setFilter(queryObj);
@@ -653,8 +656,7 @@ Status PipelineD::MongoDInterface::renameIfOptionsAndIndexesHaveNotChanged(
                 str::stream() << "collection options of target collection " << targetNs.ns()
                               << " changed during processing. Original options: "
                               << originalCollectionOptions
-                              << ", new options: "
-                              << getCollectionOptions(targetNs)};
+                              << ", new options: " << getCollectionOptions(targetNs)};
     }
 
     auto currentIndexes = _client.getIndexSpecs(targetNs.ns());
@@ -670,8 +672,9 @@ Status PipelineD::MongoDInterface::renameIfOptionsAndIndexesHaveNotChanged(
 
     BSONObj info;
     bool ok = _client.runCommand("admin", renameCommandObj, info);
-    return ok ? Status::OK() : Status{ErrorCodes::CommandFailed,
-                                      str::stream() << "renameCollection failed: " << info};
+    return ok
+        ? Status::OK()
+        : Status{ErrorCodes::CommandFailed, str::stream() << "renameCollection failed: " << info};
 }
 
 StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> PipelineD::MongoDInterface::makePipeline(
@@ -823,12 +826,8 @@ boost::optional<Document> PipelineD::MongoDInterface::lookupSingleDocument(
     if (auto next = pipeline->getNext()) {
         uasserted(ErrorCodes::TooManyMatchingDocuments,
                   str::stream() << "found more than one document with document key "
-                                << documentKey.toString()
-                                << " ["
-                                << lookedUpDocument->toString()
-                                << ", "
-                                << next->toString()
-                                << "]");
+                                << documentKey.toString() << " [" << lookedUpDocument->toString()
+                                << ", " << next->toString() << "]");
     }
     return lookedUpDocument;
 }
@@ -872,14 +871,13 @@ void PipelineD::MongoDInterface::_reportCurrentOpsForIdleSessions(OperationConte
                               ? makeSessionFilterForAuthenticatedUsers(opCtx)
                               : KillAllSessionsByPatternSet{{}});
 
-    sessionCatalog->scanSessions(opCtx,
-                                 {std::move(sessionFilter)},
-                                 [&](OperationContext* opCtx, Session* session) {
-                                     auto op = session->reportStashedState();
-                                     if (!op.isEmpty()) {
-                                         ops->emplace_back(op);
-                                     }
-                                 });
+    sessionCatalog->scanSessions(
+        opCtx, {std::move(sessionFilter)}, [&](OperationContext* opCtx, Session* session) {
+            auto op = session->reportStashedState();
+            if (!op.isEmpty()) {
+                ops->emplace_back(op);
+            }
+        });
 }
 
 std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(

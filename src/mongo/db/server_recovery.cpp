@@ -38,6 +38,10 @@ const auto getInReplicationRecovery = ServiceContext::declareDecoration<bool>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 
+void SizeRecoveryState::reset() {
+    _collectionsAlwaysNeedingSizeAdjustment.clear();
+}
+
 bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) const {
     if (!inReplicationRecovery(getGlobalServiceContext())) {
         return true;

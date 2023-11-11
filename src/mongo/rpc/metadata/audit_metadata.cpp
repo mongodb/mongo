@@ -43,6 +43,10 @@ namespace rpc {
 const OperationContext::Decoration<AuditMetadata> AuditMetadata::get =
     OperationContext::declareDecoration<AuditMetadata>();
 
+void AuditMetadata::reset() {
+    _impersonatedUsersAndRoles.reset();
+}
+
 AuditMetadata::AuditMetadata(boost::optional<UsersAndRoles> impersonatedUsersAndRoles)
     : _impersonatedUsersAndRoles(std::move(impersonatedUsersAndRoles)) {}
 

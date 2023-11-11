@@ -72,6 +72,10 @@ public:
 
     inline explicit DatabaseHolder() : _pimpl(makeImpl(PrivateCall<DatabaseHolder>{})) {}
 
+    void reset() {
+        _pimpl.reset();
+    }
+
     /**
      * Retrieves an already opened database or returns NULL. Must be called with the database
      * locked in at least IS-mode.

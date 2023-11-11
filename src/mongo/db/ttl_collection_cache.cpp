@@ -44,6 +44,10 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
     return getTTLCollectionCache(ctx);
 }
 
+void TTLCollectionCache::reset() {
+    _ttlCollections.clear();
+}
+
 void TTLCollectionCache::registerCollection(const NamespaceString& collectionNS) {
     stdx::lock_guard<stdx::mutex> lock(_ttlCollectionsLock);
     _ttlCollections.push_back(collectionNS.ns());

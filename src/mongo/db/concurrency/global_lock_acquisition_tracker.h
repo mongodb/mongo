@@ -41,6 +41,10 @@ class GlobalLockAcquisitionTracker {
 public:
     static const OperationContext::Decoration<GlobalLockAcquisitionTracker> get;
 
+    void reset() {
+        _globalExclusiveLockTaken = false;
+    }
+
     // Decoration requires a default constructor.
     GlobalLockAcquisitionTracker() = default;
 

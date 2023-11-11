@@ -28,11 +28,9 @@
 
 #pragma once
 
-
-#include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
-#include <map>
 #include <utility>
+
+#include "mongo/db/concurrency/locker.h"
 
 namespace mongo {
 
@@ -41,9 +39,14 @@ namespace mongo {
  * whether a particular resource is locked. Do not use it for cases where actual locking
  * behaviour is expected or locking is performed.
  */
-class MonographLockerNoop : public Locker {
+class MonographLockerNoop final : public Locker {
 public:
     MonographLockerNoop() {}
+
+    void reset() override {
+        _lockMode = LockMode::MODE_NONE;
+        _wuowNestingLevel = 0;
+    }
 
     bool isNoop() const override {
         return true;
@@ -269,7 +272,6 @@ public:
     // Delays release of exclusive/intent-exclusive locked resources until the write unit of
     // work completes. Value of 0 means we are not inside a write unit of work.
     int _wuowNestingLevel{0};
-    std::map<ResourceId, LockMode> _lockMap;
 };
 
 }  // namespace mongo

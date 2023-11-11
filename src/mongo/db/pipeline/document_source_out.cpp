@@ -103,8 +103,9 @@ void DocumentSourceOut::initialize() {
 
     // We will write all results into a temporary collection, then rename the temporary collection
     // to be the target collection once we are done.
-    _tempNs = NamespaceString(str::stream() << _outputNs.db() << ".tmp.agg_out."
-                                            << aggOutCounter.addAndFetch(1));
+    std::string tmp = str::stream()
+        << _outputNs.db() << ".tmp.agg_out." << aggOutCounter.addAndFetch(1);
+    _tempNs = NamespaceString(std::move(tmp));
 
     // Create output collection, copying options from existing collection if any.
     {
@@ -117,8 +118,7 @@ void DocumentSourceOut::initialize() {
         bool ok = conn->runCommand(_outputNs.db().toString(), cmd.done(), info);
         uassert(16994,
                 str::stream() << "failed to create temporary $out collection '" << _tempNs.ns()
-                              << "': "
-                              << info.toString(),
+                              << "': " << info.toString(),
                 ok);
     }
 
@@ -135,10 +135,7 @@ void DocumentSourceOut::initialize() {
         BSONObj err = conn->getLastErrorDetailed();
         uassert(16995,
                 str::stream() << "copying index for $out failed."
-                              << " index: "
-                              << indexBson
-                              << " error: "
-                              << err,
+                              << " index: " << indexBson << " error: " << err,
                 DBClientBase::getLastErrorString(err).empty());
     }
     _initialized = true;
@@ -171,8 +168,9 @@ DocumentSource::GetNextResult DocumentSourceOut::getNext() {
         BSONObj toInsert = nextInput.releaseDocument().toBson();
 
         bufferedBytes += toInsert.objsize();
-        if (!bufferedObjects.empty() && (bufferedBytes > BSONObjMaxUserSize ||
-                                         bufferedObjects.size() >= write_ops::kMaxWriteBatchSize)) {
+        if (!bufferedObjects.empty() &&
+            (bufferedBytes > BSONObjMaxUserSize ||
+             bufferedObjects.size() >= write_ops::kMaxWriteBatchSize)) {
             spill(bufferedObjects);
             bufferedObjects.clear();
             bufferedBytes = toInsert.objsize();
@@ -248,4 +246,4 @@ DocumentSource::GetDepsReturn DocumentSourceOut::getDependencies(DepsTracker* de
     deps->needWholeDocument = true;
     return EXHAUSTIVE_ALL;
 }
-}
+}  // namespace mongo

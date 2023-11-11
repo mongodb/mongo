@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#include "mongo/base/object_pool.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/parsed_update.h"
@@ -98,7 +100,8 @@ Status ParsedUpdate::parseQueryToCQ() {
 
     // The projection needs to be applied after the update operation, so we do not specify a
     // projection during canonicalization.
-    auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    // auto qr = stdx::make_unique<QueryRequest>(_request->getNamespaceString());
+    auto qr= ObjectPool<QueryRequest>::newObject(_request->getNamespaceString());
     qr->setFilter(_request->getQuery());
     qr->setSort(_request->getSort());
     qr->setCollation(_request->getCollation());
@@ -193,7 +196,7 @@ bool ParsedUpdate::hasParsedQuery() const {
     return _canonicalQuery.get() != NULL;
 }
 
-std::unique_ptr<CanonicalQuery> ParsedUpdate::releaseParsedQuery() {
+CanonicalQuery::UPtr ParsedUpdate::releaseParsedQuery() {
     invariant(_canonicalQuery.get() != NULL);
     return std::move(_canonicalQuery);
 }
