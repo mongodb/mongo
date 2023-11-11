@@ -2449,25 +2449,35 @@ public:
         unsupportedExpression("$map");
     }
     void visit(const ExpressionMeta* expr) final {
-        auto pushMetadataABT = [this](boost::optional<sbe::value::SlotId> slot) {
+        auto pushMetadataABT = [this](boost::optional<sbe::value::SlotId> slot, uint32_t typeMask) {
             if (slot) {
-                pushABT(makeABTVariable(*slot));
+                pushABT(optimizer::make<optimizer::If>(
+                    makeFillEmptyTrue(makeABTFunction("typeMatch"_sd,
+                                                      makeABTVariable(*slot),
+                                                      optimizer::Constant::int32(typeMask))),
+                    makeABTVariable(*slot),
+                    makeABTFail(ErrorCodes::Error{8107800}, "Unexpected metadata type")));
             } else {
                 pushABT(optimizer::Constant::nothing());
             }
         };
         switch (expr->getMetaType()) {
             case DocumentMetadataFields::MetaType::kSearchScore:
-                pushMetadataABT(_context->state.data->metadataSlots.searchScoreSlot);
+                pushMetadataABT(_context->state.data->metadataSlots.searchScoreSlot,
+                                getBSONTypeMask(BSONType::NumberDouble) |
+                                    getBSONTypeMask(BSONType::NumberLong));
                 break;
             case DocumentMetadataFields::MetaType::kSearchHighlights:
-                pushMetadataABT(_context->state.data->metadataSlots.searchHighlightsSlot);
+                pushMetadataABT(_context->state.data->metadataSlots.searchHighlightsSlot,
+                                getBSONTypeMask(BSONType::Array));
                 break;
             case DocumentMetadataFields::MetaType::kSearchScoreDetails:
-                pushMetadataABT(_context->state.data->metadataSlots.searchDetailsSlot);
+                pushMetadataABT(_context->state.data->metadataSlots.searchDetailsSlot,
+                                getBSONTypeMask(BSONType::Object));
                 break;
             case DocumentMetadataFields::MetaType::kSearchSequenceToken:
-                pushMetadataABT(_context->state.data->metadataSlots.searchSequenceToken);
+                pushMetadataABT(_context->state.data->metadataSlots.searchSequenceToken,
+                                getBSONTypeMask(BSONType::String));
                 break;
             default:
                 unsupportedExpression("$meta");

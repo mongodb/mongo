@@ -52,26 +52,48 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- * search_cursor_stage resultSlot? [metaSlot1, ..., metadataSlotN] [fieldSlot1, ..., fieldSlotN]
- *     remoteCursorId isStoredSource sortSpecSlot? limitSlot? sortKeySlot? collatorSlot?
+ * search_cursor_stage idSlot? resultSlot? [metaSlot1, ..., metadataSlotN] [fieldSlot1, ...,
+ * fieldSlotN] remoteCursorId isStoredSource sortSpecSlot? limitSlot? sortKeySlot? collatorSlot?
  */
 class SearchCursorStage final : public PlanStage {
 public:
-    SearchCursorStage(NamespaceString nss,
-                      boost::optional<UUID> collUuid,
-                      boost::optional<value::SlotId> resultSlot,
-                      std::vector<std::string> metadataNames,
-                      value::SlotVector metadataSlots,
-                      std::vector<std::string> fieldNames,
-                      value::SlotVector fieldSlots,
-                      size_t remoteCursorId,
-                      bool isStoredSource,
-                      boost::optional<value::SlotId> sortSpecSlot,
-                      boost::optional<value::SlotId> limitSlot,
-                      boost::optional<value::SlotId> sortKeySlot,
-                      boost::optional<value::SlotId> collatorSlot,
-                      PlanYieldPolicy* yieldPolicy,
-                      PlanNodeId planNodeId);
+    static std::unique_ptr<SearchCursorStage> createForStoredSource(
+        NamespaceString nss,
+        boost::optional<UUID> collUuid,
+        boost::optional<value::SlotId> resultSlot,
+        std::vector<std::string> metadataNames,
+        value::SlotVector metadataSlots,
+        std::vector<std::string> fieldNames,
+        value::SlotVector fieldSlots,
+        size_t remoteCursorId,
+        boost::optional<value::SlotId> sortSpecSlot,
+        boost::optional<value::SlotId> limitSlot,
+        boost::optional<value::SlotId> sortKeySlot,
+        boost::optional<value::SlotId> collatorSlot,
+        PlanYieldPolicy* yieldPolicy,
+        PlanNodeId planNodeId);
+
+    static std::unique_ptr<SearchCursorStage> createForNonStoredSource(
+        NamespaceString nss,
+        boost::optional<UUID> collUuid,
+        boost::optional<value::SlotId> idSlot,
+        std::vector<std::string> metadataNames,
+        value::SlotVector metadataSlots,
+        size_t remoteCursorId,
+        boost::optional<value::SlotId> sortSpecSlot,
+        boost::optional<value::SlotId> limitSlot,
+        boost::optional<value::SlotId> sortKeySlot,
+        boost::optional<value::SlotId> collatorSlot,
+        PlanYieldPolicy* yieldPolicy,
+        PlanNodeId planNodeId);
+
+    static std::unique_ptr<SearchCursorStage> createForMetadata(
+        NamespaceString nss,
+        boost::optional<UUID> collUuid,
+        boost::optional<value::SlotId> resultSlot,
+        size_t remoteCursorId,
+        PlanYieldPolicy* yieldPolicy,
+        PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -86,13 +108,37 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final override;
     size_t estimateCompileTimeSize() const final;
 
-private:
-    bool shouldReturnEOF();
+    /**
+     * Calculate the number of documents needed to satisfy a user-defined limit. This information
+     * can be used in a getMore sent to mongot.
+     */
+    boost::optional<long long> calcDocsNeeded();
 
 private:
+    SearchCursorStage(NamespaceString nss,
+                      boost::optional<UUID> collUuid,
+                      boost::optional<value::SlotId> idSlot,
+                      boost::optional<value::SlotId> resultSlot,
+                      std::vector<std::string> metadataNames,
+                      value::SlotVector metadataSlots,
+                      std::vector<std::string> fieldNames,
+                      value::SlotVector fieldSlots,
+                      size_t remoteCursorId,
+                      bool isStoredSource,
+                      boost::optional<value::SlotId> sortSpecSlot,
+                      boost::optional<value::SlotId> limitSlot,
+                      boost::optional<value::SlotId> sortKeySlot,
+                      boost::optional<value::SlotId> collatorSlot,
+                      PlanYieldPolicy* yieldPolicy,
+                      PlanNodeId planNodeId);
+
+    PlanState doGetNext();
+    bool shouldReturnEOF();
+
     const NamespaceString _namespace;
     const boost::optional<UUID> _collUuid;
     // Output slots.
+    const boost::optional<value::SlotId> _idSlot;
     const boost::optional<value::SlotId> _resultSlot;
     const StringListSet _metadataNames;
     const value::SlotVector _metadataSlots;
@@ -110,6 +156,7 @@ private:
     const boost::optional<value::SlotId> _collatorSlot;
 
     // Output slot accessors.
+    value::OwnedValueAccessor _idAccessor;
     value::OwnedValueAccessor _resultAccessor;
     absl::InlinedVector<value::OwnedValueAccessor, 3> _metadataAccessors;
     value::SlotAccessorMap _metadataAccessorsMap;

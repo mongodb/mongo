@@ -364,21 +364,12 @@ buildSearchMetadataExecutorSBE(OperationContext* opCtx,
     sbe::value::SlotIdGenerator slotIdGenerator;
     data->resultSlot = slotIdGenerator.generate();
 
-    auto stage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
-                                                    expCtx->uuid,
-                                                    data->resultSlot,
-                                                    std::vector<std::string>() /* metadataNames */,
-                                                    sbe::makeSV() /* metadataSlots */,
-                                                    std::vector<std::string>() /* fieldNames */,
-                                                    sbe::makeSV() /* fieldSlots */,
-                                                    remoteCursorId,
-                                                    false /* isStoredSource */,
-                                                    boost::none /* sortSpecSlot */,
-                                                    boost::none /* limitSlot */,
-                                                    boost::none /* sortKeySlot */,
-                                                    boost::none /* collatorSlot */,
-                                                    yieldPolicy,
-                                                    PlanNodeId{} /* planNodeId */);
+    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->ns,
+                                                           expCtx->uuid,
+                                                           data->resultSlot,
+                                                           remoteCursorId,
+                                                           yieldPolicy,
+                                                           PlanNodeId{} /* planNodeId */);
 
     env.ctx.remoteCursors = remoteCursors;
     stage->attachToOperationContext(opCtx);
@@ -5146,21 +5137,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
 
     auto searchResultSlot = slotIdGenerator->generate();
 
-    auto stage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
-                                                    expCtx->uuid,
-                                                    searchResultSlot,
-                                                    std::vector<std::string>() /* metadataNames */,
-                                                    sbe::makeSV() /* metadataSlots */,
-                                                    std::vector<std::string>() /* fieldNames */,
-                                                    sbe::makeSV() /* fieldSlots */,
-                                                    root->remoteCursorId,
-                                                    false /* isStoredSource */,
-                                                    boost::none /* sortSpecSlot */,
-                                                    boost::none /* limitSlot */,
-                                                    boost::none /* sortKeySlot */,
-                                                    boost::none /* collatorSlot */,
-                                                    yieldPolicy,
-                                                    root->nodeId());
+    auto stage = sbe::SearchCursorStage::createForMetadata(expCtx->ns,
+                                                           expCtx->uuid,
+                                                           searchResultSlot,
+                                                           root->remoteCursorId,
+                                                           yieldPolicy,
+                                                           root->nodeId());
     outputs.set(PlanStageSlots::kResult, searchResultSlot);
     state.data->cursorType = CursorTypeEnum::SearchMetaResult;
 
@@ -5223,34 +5205,43 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     _data->metadataSlots.sortKeySlot = _slotIdGenerator.generate();
 
-    std::vector<std::string> fieldNames =
-        isStoredSource ? topLevelFields : std::vector<std::string>{"_id"};
-    auto fieldSlots =
-        isStoredSource ? topLevelFieldSlots : _slotIdGenerator.generateMultiple(fieldNames.size());
-
     auto collatorSlot = _state.getCollatorSlot();
-    auto searchCursorStage = sbe::makeS<sbe::SearchCursorStage>(expCtx->ns,
-                                                                expCtx->uuid,
-                                                                searchResultSlot,
-                                                                metadataNames,
-                                                                metadataSlots,
-                                                                fieldNames,
-                                                                fieldSlots,
-                                                                sn->remoteCursorId,
-                                                                isStoredSource,
-                                                                sortSpecSlot,
-                                                                limitSlot,
-                                                                _data->metadataSlots.sortKeySlot,
-                                                                collatorSlot,
-                                                                _yieldPolicy,
-                                                                sn->nodeId());
     if (isStoredSource) {
         if (searchResultSlot) {
             outputs.set(kResult, searchResultSlot.value());
         }
 
-        return {std::move(searchCursorStage), std::move(outputs)};
+        return {sbe::SearchCursorStage::createForStoredSource(expCtx->ns,
+                                                              expCtx->uuid,
+                                                              searchResultSlot,
+                                                              metadataNames,
+                                                              metadataSlots,
+                                                              topLevelFields,
+                                                              topLevelFieldSlots,
+                                                              sn->remoteCursorId,
+                                                              sortSpecSlot,
+                                                              limitSlot,
+                                                              _data->metadataSlots.sortKeySlot,
+                                                              collatorSlot,
+                                                              _yieldPolicy,
+                                                              sn->nodeId()),
+                std::move(outputs)};
     }
+
+    auto idSlot = _slotIdGenerator.generate();
+    auto searchCursorStage =
+        sbe::SearchCursorStage::createForNonStoredSource(expCtx->ns,
+                                                         expCtx->uuid,
+                                                         idSlot,
+                                                         metadataNames,
+                                                         metadataSlots,
+                                                         sn->remoteCursorId,
+                                                         sortSpecSlot,
+                                                         limitSlot,
+                                                         _data->metadataSlots.sortKeySlot,
+                                                         collatorSlot,
+                                                         _yieldPolicy,
+                                                         sn->nodeId());
 
     // Make a project stage to convert '_id' field value into keystring.
     auto catalog = collection->getIndexCatalog();
@@ -5265,7 +5256,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sbe::EExpression::Vector args;
         args.emplace_back(makeInt64Constant(static_cast<int64_t>(version)));
         args.emplace_back(makeInt32Constant(ordering.getBits()));
-        args.emplace_back(makeVariable(fieldSlots[0]));
+        args.emplace_back(makeVariable(idSlot));
         args.emplace_back(makeInt64Constant(static_cast<int64_t>(discriminator)));
         if (collatorSlot) {
             args.emplace_back(makeVariable(*collatorSlot));
@@ -5323,7 +5314,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         sbe::makeS<sbe::LimitSkipStage>(
             std::move(fetchStage), 1, boost::none /* skip */, sn->nodeId()),
         std::move(outerProjVec),
-        sbe::makeSV(fieldSlots[0]),
+        sbe::makeSV(idSlot),
         nullptr /* predicate */,
         sn->nodeId());
 

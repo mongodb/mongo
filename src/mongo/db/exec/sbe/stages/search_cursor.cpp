@@ -39,8 +39,100 @@
 
 namespace mongo::sbe {
 
+std::unique_ptr<SearchCursorStage> SearchCursorStage::createForStoredSource(
+    NamespaceString nss,
+    boost::optional<UUID> collUuid,
+    boost::optional<value::SlotId> resultSlot,
+    std::vector<std::string> metadataNames,
+    value::SlotVector metadataSlots,
+    std::vector<std::string> fieldNames,
+    value::SlotVector fieldSlots,
+    size_t remoteCursorId,
+    boost::optional<value::SlotId> sortSpecSlot,
+    boost::optional<value::SlotId> limitSlot,
+    boost::optional<value::SlotId> sortKeySlot,
+    boost::optional<value::SlotId> collatorSlot,
+    PlanYieldPolicy* yieldPolicy,
+    PlanNodeId planNodeId) {
+    return std::unique_ptr<SearchCursorStage>(new SearchCursorStage(nss,
+                                                                    collUuid,
+                                                                    boost::none /* idSlot */,
+                                                                    resultSlot,
+                                                                    metadataNames,
+                                                                    metadataSlots,
+                                                                    fieldNames,
+                                                                    fieldSlots,
+                                                                    remoteCursorId,
+                                                                    true /* isStoredSource */,
+                                                                    sortSpecSlot,
+                                                                    limitSlot,
+                                                                    sortKeySlot,
+                                                                    collatorSlot,
+                                                                    yieldPolicy,
+                                                                    planNodeId));
+}
+
+std::unique_ptr<SearchCursorStage> SearchCursorStage::createForNonStoredSource(
+    NamespaceString nss,
+    boost::optional<UUID> collUuid,
+    boost::optional<value::SlotId> idSlot,
+    std::vector<std::string> metadataNames,
+    value::SlotVector metadataSlots,
+    size_t remoteCursorId,
+    boost::optional<value::SlotId> sortSpecSlot,
+    boost::optional<value::SlotId> limitSlot,
+    boost::optional<value::SlotId> sortKeySlot,
+    boost::optional<value::SlotId> collatorSlot,
+    PlanYieldPolicy* yieldPolicy,
+    PlanNodeId planNodeId) {
+    return std::unique_ptr<SearchCursorStage>(
+        new SearchCursorStage(nss,
+                              collUuid,
+                              idSlot,
+                              boost::none /* resultSlot */,
+                              metadataNames,
+                              metadataSlots,
+                              std::vector<std::string>() /* fieldNames */,
+                              sbe::makeSV() /* fieldSlots */,
+                              remoteCursorId,
+                              false /* isStoredSource */,
+                              sortSpecSlot,
+                              limitSlot,
+                              sortKeySlot,
+                              collatorSlot,
+                              yieldPolicy,
+                              planNodeId));
+}
+
+std::unique_ptr<SearchCursorStage> SearchCursorStage::createForMetadata(
+    NamespaceString nss,
+    boost::optional<UUID> collUuid,
+    boost::optional<value::SlotId> resultSlot,
+    size_t remoteCursorId,
+    PlanYieldPolicy* yieldPolicy,
+    PlanNodeId planNodeId) {
+    return std::unique_ptr<SearchCursorStage>(
+        new SearchCursorStage(nss,
+                              collUuid,
+                              boost::none /* idSlot */,
+                              resultSlot,
+                              std::vector<std::string>() /* metadataNames */,
+                              sbe::makeSV() /* metadataSlots */,
+                              std::vector<std::string>() /* fieldNames */,
+                              sbe::makeSV() /* fieldSlots */,
+                              remoteCursorId,
+                              false /* isStoredSource */,
+                              boost::none /* sortSpecSlot */,
+                              boost::none /* limitSlot */,
+                              boost::none /* sortKeySlot */,
+                              boost::none /* collatorSlot */,
+                              yieldPolicy,
+                              planNodeId));
+}
+
 SearchCursorStage::SearchCursorStage(NamespaceString nss,
                                      boost::optional<UUID> collUuid,
+                                     boost::optional<value::SlotId> idSlot,
                                      boost::optional<value::SlotId> resultSlot,
                                      std::vector<std::string> metadataNames,
                                      value::SlotVector metadataSlots,
@@ -57,6 +149,7 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
     : PlanStage("search_cursor"_sd, yieldPolicy, planNodeId, false),
       _namespace(nss),
       _collUuid(collUuid),
+      _idSlot(idSlot),
       _resultSlot(resultSlot),
       _metadataNames(std::move(metadataNames)),
       _metadataSlots(std::move(metadataSlots)),
@@ -70,21 +163,23 @@ SearchCursorStage::SearchCursorStage(NamespaceString nss,
       _collatorSlot(collatorSlot) {}
 
 std::unique_ptr<PlanStage> SearchCursorStage::clone() const {
-    return std::make_unique<SearchCursorStage>(_namespace,
-                                               _collUuid,
-                                               _resultSlot,
-                                               _metadataNames.getUnderlyingVector(),
-                                               _metadataSlots,
-                                               _fieldNames.getUnderlyingVector(),
-                                               _fieldSlots,
-                                               _remoteCursorId,
-                                               _isStoredSource,
-                                               _sortSpecSlot,
-                                               _limitSlot,
-                                               _sortKeySlot,
-                                               _collatorSlot,
-                                               _yieldPolicy,
-                                               _commonStats.nodeId);
+    return std::unique_ptr<SearchCursorStage>(
+        new SearchCursorStage(_namespace,
+                              _collUuid,
+                              _idSlot,
+                              _resultSlot,
+                              _metadataNames.getUnderlyingVector(),
+                              _metadataSlots,
+                              _fieldNames.getUnderlyingVector(),
+                              _fieldSlots,
+                              _remoteCursorId,
+                              _isStoredSource,
+                              _sortSpecSlot,
+                              _limitSlot,
+                              _sortKeySlot,
+                              _collatorSlot,
+                              _yieldPolicy,
+                              _commonStats.nodeId));
 }
 
 namespace {
@@ -151,6 +246,10 @@ void SearchCursorStage::prepare(CompileCtx& ctx) {
 
 value::SlotAccessor* SearchCursorStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     // Allow access to the outputs for this stage.
+    if (_idSlot && *_idSlot == slot) {
+        return &_idAccessor;
+    }
+
     if (_resultSlot && *_resultSlot == slot) {
         return &_resultAccessor;
     }
@@ -187,7 +286,7 @@ void SearchCursorStage::open(bool reOpen) {
     if (_cursor && _limit != 0) {
         _cursor->updateGetMoreFunc(
             getSearchHelpers(_opCtx->getServiceContext())->buildSearchGetMoreFunc([this] {
-                return _limit;
+                return calcDocsNeeded();
             }));
     }
 
@@ -238,8 +337,7 @@ PlanState SearchCursorStage::getNext() {
 
     _opCtx->checkForInterrupt();
 
-    // Get BSONObj response from Mongot
-    _response = _cursor->getNext(_opCtx);
+    auto state = doGetNext();
 
     // Update search stats.
     _specificStats.msWaitingForMongot += durationCount<Milliseconds>(_cursor->resetWaitingTime());
@@ -251,76 +349,101 @@ PlanState SearchCursorStage::getNext() {
     opDebug.msWaitingForMongot = _specificStats.msWaitingForMongot;
     opDebug.mongotBatchNum = _specificStats.batchNum;
 
-    // If there's no response, return EOF
-    if (!_response) {
-        return trackPlanState(PlanState::IS_EOF);
-    }
+    return trackPlanState(state);
+}
 
-    // Put results/values in slots and advance plan state
-    for (auto& accessor : _metadataAccessors) {
-        accessor.reset();
-    }
+PlanState SearchCursorStage::doGetNext() {
+    for (;;) {
+        // Get BSONObj response from Mongot
+        _response = _cursor->getNext(_opCtx);
 
-    for (auto& accessor : _fieldAccessors) {
-        accessor.reset();
-    }
-
-    for (auto& elem : *_response) {
-
-        auto elemName = elem.fieldNameStringData();
-        if (size_t pos = _metadataNames.findPos(elemName); pos != StringListSet::npos) {
-            auto [tag, val] = bson::convertFrom<true>(elem);
-            _metadataAccessors[pos].reset(false, tag, val);
+        // If there's no response, return EOF
+        if (!_response) {
+            return PlanState::IS_EOF;
         }
-        if (!_isStoredSource) {
-            if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
+
+        // Put results/values in slots and advance plan state
+        for (auto& accessor : _metadataAccessors) {
+            accessor.reset();
+        }
+
+        for (auto& accessor : _fieldAccessors) {
+            accessor.reset();
+        }
+
+        _idAccessor.reset();
+
+        for (auto& elem : *_response) {
+
+            auto elemName = elem.fieldNameStringData();
+            if (size_t pos = _metadataNames.findPos(elemName); pos != StringListSet::npos) {
                 auto [tag, val] = bson::convertFrom<true>(elem);
-                _fieldAccessors[pos].reset(false, tag, val);
+                _metadataAccessors[pos].reset(false, tag, val);
+            }
+            if (_idSlot && elemName == "_id") {
+                auto [tag, val] = bson::convertFrom<true>(elem);
+                _idAccessor.reset(false, tag, val);
             }
         }
-    }
 
-    if (_resultSlot || _isStoredSource) {
-        // Remove all metadata fields from response.
-        _resultObj = Document::fromBsonWithMetaData(_response.value()).toBson();
-        if (_isStoredSource) {
-            uassert(7856301,
-                    "StoredSource field must exist in mongot response.",
-                    _resultObj->hasField("storedSource"));
-            _resultObj = _resultObj->getObjectField("storedSource").getOwned();
+        if (!_isStoredSource && _idSlot &&
+            _idAccessor.getViewOfValue().first == value::TypeTags::Nothing) {
+            // For non-storedSource case, document without _id field is not valid.
+            continue;
+        }
 
-            for (auto& elem : *_resultObj) {
-                auto elemName = elem.fieldNameStringData();
-                if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
-                    auto [tag, val] = bson::convertFrom<true>(elem);
-                    _fieldAccessors[pos].reset(false, tag, val);
+        if (_resultSlot || _isStoredSource) {
+            // Remove all metadata fields from response.
+            _resultObj = Document::fromBsonWithMetaData(_response.value()).toBson();
+            if (_isStoredSource) {
+                uassert(7856301,
+                        "StoredSource field must exist in mongot response.",
+                        _resultObj->hasField("storedSource"));
+                _resultObj = _resultObj->getObjectField("storedSource").getOwned();
+
+                for (auto& elem : *_resultObj) {
+                    auto elemName = elem.fieldNameStringData();
+                    if (size_t pos = _fieldNames.findPos(elemName); pos != StringListSet::npos) {
+                        auto [tag, val] = bson::convertFrom<true>(elem);
+                        _fieldAccessors[pos].reset(false, tag, val);
+                    }
                 }
             }
+            if (_resultSlot) {
+                _resultAccessor.reset(false,
+                                      value::TypeTags::bsonObject,
+                                      value::bitcastFrom<const char*>(_resultObj->objdata()));
+            }
         }
-        if (_resultSlot) {
-            _resultAccessor.reset(false,
-                                  value::TypeTags::bsonObject,
-                                  value::bitcastFrom<const char*>(_resultObj->objdata()));
-        }
-    }
 
-    if (_sortKeySlot) {
-        _sortKeyAccessor.reset();
-        if (_sortSpecSlot && _sortKeyGen) {
-            auto sortKey = _sortKeyGen->computeSortKeyFromDocument(Document(*_response));
-            auto [tag, val] = value::makeValue(sortKey);
-            _sortKeyAccessor.reset(tag, val);
-        } else if (_response->hasField(Document::metaFieldSearchScore)) {
-            // If this stage is getting metadata documents from mongot, those don't include
-            // searchScore.
-            _sortKeyAccessor.reset(
-                value::TypeTags::NumberDouble,
-                value::bitcastFrom<double>(
-                    _response->getField(Document::metaFieldSearchScore).number()));
+        if (_sortKeySlot) {
+            _sortKeyAccessor.reset();
+            if (_sortSpecSlot && _sortKeyGen) {
+                auto sortKey = _sortKeyGen->computeSortKeyFromDocument(Document(*_response));
+                auto [tag, val] = value::makeValue(sortKey);
+                _sortKeyAccessor.reset(tag, val);
+            } else if (_response->hasField(Document::metaFieldSearchScore)) {
+                // If this stage is getting metadata documents from mongot, those don't include
+                // searchScore.
+                _sortKeyAccessor.reset(
+                    value::TypeTags::NumberDouble,
+                    value::bitcastFrom<double>(
+                        _response->getField(Document::metaFieldSearchScore).number()));
+            }
         }
-    }
 
-    return trackPlanState(PlanState::ADVANCED);
+        return PlanState::ADVANCED;
+    }
+}
+
+boost::optional<long long> SearchCursorStage::calcDocsNeeded() {
+    if (_limit == 0) {
+        return boost::none;
+    }
+    // For the stored source case, we know exact how many documents we returned so we can calculate
+    // the correct number we still need; for non stored source case, we don't know the correct
+    // number because the _id returned may not be valid.
+    return _isStoredSource ? _limit - _commonStats.advances : _limit;
 }
 
 void SearchCursorStage::close() {
@@ -339,6 +462,9 @@ std::unique_ptr<PlanStageStats> SearchCursorStage::getStats(bool includeDebugInf
         BSONObjBuilder bob;
         if (_resultSlot) {
             bob.appendNumber("resultSlot", static_cast<long long>(*_resultSlot));
+        }
+        if (_idSlot) {
+            bob.appendNumber("idSlot", static_cast<long long>(*_idSlot));
         }
 
         bob.append("metadataNames", _metadataNames.getUnderlyingVector());
@@ -380,6 +506,7 @@ const SpecificStats* SearchCursorStage::getSpecificStats() const {
 std::vector<DebugPrinter::Block> SearchCursorStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
+    addDebugOptionalSlotIdentifier(ret, _idSlot);
     addDebugOptionalSlotIdentifier(ret, _resultSlot);
 
     addDebugSlotVector(ret, _metadataSlots);
