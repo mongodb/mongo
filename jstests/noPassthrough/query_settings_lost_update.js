@@ -15,9 +15,9 @@ rst.initiate();
 const testDB = rst.getPrimary().getDB("test");
 const qsutils = new QuerySettingsUtils(testDB, jsTestName());
 
-const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
-const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
-const queryC = qsutils.makeFindQueryInstance({filter: {c: 1}});
+const queryA = qsutils.makeFindQueryInstance({a: 1});
+const queryB = qsutils.makeFindQueryInstance({b: "string"});
+const queryC = qsutils.makeFindQueryInstance({c: 1});
 const querySettingsA = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };

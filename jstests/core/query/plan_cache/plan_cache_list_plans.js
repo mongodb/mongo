@@ -219,7 +219,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "QuerySettings")) {
     // solution plan, that won't be cached in classic.
     const settings = {indexHints: {allowedIndexes: ["a_1", "a_1_b_1"]}};
     const filter = {a: 1};
-    const query = qsutils.makeFindQueryInstance({filter});
+    const query = qsutils.makeFindQueryInstance(filter);
     assert.commandWorked(db.adminCommand({setQuerySettings: query, settings: settings}));
     qsutils.assertQueryShapeConfiguration([qsutils.makeQueryShapeConfiguration(settings, query)]);
 

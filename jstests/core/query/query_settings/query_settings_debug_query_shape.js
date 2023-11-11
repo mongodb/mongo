@@ -53,7 +53,7 @@ function runTest({queryInstance, expectedDebugQueryShape}) {
 
 // Test the find command case.
 runTest({
-    queryInstance: qsutils.makeFindQueryInstance({filter: {evil: true}}),
+    queryInstance: qsutils.makeFindQueryInstance({evil: true}),
     expectedDebugQueryShape: {
         cmdNs: {db: db.getName(), coll: collName},
         command: "find",
