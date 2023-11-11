@@ -450,6 +450,17 @@ TEST(ShredDocument, HandlesModifiedDocuments) {
     ASSERT(!shredded["subObj"]["b"].missing());
 }
 
+TEST(ShredDocument, HandlesMetadata) {
+    BSONObj bson = BSON("a" << 1 << "subObj" << BSON("a" << 1));
+    Document original = fromBson(bson);
+    MutableDocument md(original);
+    DocumentMetadataFields meta;
+    meta.setSearchScore(6);
+    md.setMetadata(std::move(meta));
+    Document shredded = md.freeze().shred();
+    ASSERT_EQ(6, shredded.metadata().getSearchScore());
+}
+
 /** Add Document fields. */
 class AddField {
 public:
