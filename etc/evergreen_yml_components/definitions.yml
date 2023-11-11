@@ -3262,6 +3262,29 @@ tasks:
       ninja_file: "opt.ninja"
       targets: "install-devcore compiledb"
 
+- name: compile_ninja_bazel
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_compile_flags: >-
+        --build-profile=fast
+        BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
+        BAZEL_FLAGS=--config=local
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "fast.ninja"
+      targets: "install-wiredtiger compiledb"
+
 - name: compile_ninja_fast_profile
   tags: []
   depends_on:
@@ -9449,6 +9472,7 @@ task_groups:
   - compile_bazel_c_and_asm_targets
   - compile_bazel_libunwind
   - compile_bazel_program
+  - compile_ninja_bazel
   - run_bazel_program
 
 - <<: *compile_bazel_task_group_template
@@ -9456,6 +9480,7 @@ task_groups:
   tasks:
   - compile_bazel_dist_test_windows
   - run_bazel_program_windows
+  - compile_ninja_bazel
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

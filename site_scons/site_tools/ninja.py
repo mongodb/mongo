@@ -643,6 +643,20 @@ class NinjaState:
                 "restat": 1,
             },
         }
+
+        if self.env.get('BAZEL_BUILD_ENABLED'):
+            self.rules.update({
+                "RUN_BAZEL_BUILD": {
+                    "command": (
+                        f"{sys.executable} " + "site_scons/mongo/ninja_bazel_build.py " +
+                        f"--ninja-file={self.env.get('NINJA_PREFIX')}.{self.env.get('NINJA_SUFFIX')} "
+                        + "--debug" if self.env.get('BAZEL_INTEGRATION_DEBUG') else ""),
+                    "description": "Running bazel build",
+                    "pool": "console",
+                    "restat": 1,
+                }
+            })
+
         num_jobs = self.env.get('NINJA_MAX_JOBS', self.env.GetOption("num_jobs"))
         self.pools = {
             "local_pool": num_jobs,
@@ -1007,6 +1021,14 @@ class NinjaState:
                 "self": ninja_file_path,
             },
         )
+
+        if self.env.get("BAZEL_BUILD_ENABLED"):
+            ninja_sorted_build(
+                ninja,
+                outputs=self.env["NINJA_BAZEL_OUTPUTS"],
+                inputs=self.env["NINJA_BAZEL_INPUTS"],
+                rule="RUN_BAZEL_BUILD",
+            )
 
         # This sets up a dependency edge between build.ninja.in and build.ninja
         # without actually taking any action to transform one into the other

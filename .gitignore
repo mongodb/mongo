@@ -274,6 +274,8 @@ bazel-out
 bazel-testlogs
 bazelisk
 .bazelrc.local
+.bazel_info_for_ninja.txt
+.ninja_last_command_line_targets.txt
 
 # generated configs for external fixture suites
 docker_compose/

@@ -1,5 +1,6 @@
 import atexit
 import functools
+import json
 import os
 import platform
 import queue
@@ -9,7 +10,7 @@ import stat
 import subprocess
 import threading
 import time
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Set, Tuple, Any
 import urllib.request
 import sys
 
@@ -27,8 +28,8 @@ _SUPPORTED_PLATFORM_MATRIX = [
 
 class Globals:
 
-    # key: scons target, value: bazel target
-    scons2bazel_targets: Dict[str, str] = dict()
+    # key: scons target, value: {bazel target, bazel output}
+    scons2bazel_targets: Dict[str, Dict[str, str]] = dict()
 
     # key: scons output, value: bazel outputs
     scons_output_to_bazel_outputs: Dict[str, List[str]] = dict()
@@ -85,14 +86,6 @@ def bazel_target_emitter(
         env: SCons.Environment.Environment) -> Tuple[List[SCons.Node.Node], List[SCons.Node.Node]]:
     """This emitter will map any scons outputs to bazel outputs so copy can be done later."""
 
-    # sometimes there are multiple outputs, here we are mapping all the
-    # bazel outputs to the first scons output as the key. Later the targets
-    # will be lined up for the copy.
-    Globals.scons_output_to_bazel_outputs[target[0]] = []
-
-    # only the first target in a multi target node will represent the nodes
-    Globals.scons2bazel_targets[target[0].abspath] = convert_scons_node_to_bazel_target(target[0])
-
     for t in target:
 
         # normally scons emitters conveniently build-ify the target paths so it will
@@ -105,7 +98,10 @@ def bazel_target_emitter(
         # output location and then set that as the new source for the builders.
         bazel_out_dir = env.get("BAZEL_OUT_DIR")
         bazel_out_target = f'{bazel_out_dir}/{bazel_dir}/{os.path.basename(bazel_path)}'
-        Globals.scons_output_to_bazel_outputs[target[0]] += [bazel_out_target]
+
+        Globals.scons2bazel_targets[t.path] = {
+            'bazel_target': convert_scons_node_to_bazel_target(t), 'bazel_output': bazel_out_target
+        }
 
     return (target, source)
 
@@ -136,8 +132,9 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
 
         return False
 
-    bazel_target = Globals.scons2bazel_targets[target[0].abspath]
-    bazel_debug(f"Checking if {bazel_target} is done...")
+    bazel_output = Globals.scons2bazel_targets[target[0].path]['bazel_output']
+    bazel_target = Globals.scons2bazel_targets[target[0].path]['bazel_target']
+    bazel_debug(f"Checking if {bazel_output} is done...")
 
     # put the target into the work queue the poll until its
     # been placed into the done queue
@@ -159,7 +156,8 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
 
     # now copy all the targets out to the scons tree, note that target is a
     # list of nodes so we need to stringify it for copyfile
-    for s, t in zip(Globals.scons_output_to_bazel_outputs[target[0]], target):
+    for t in target:
+        s = Globals.scons2bazel_targets[t.path]['bazel_output']
         bazel_debug(f"Copying {s} from bazel tree to {t} in the scons tree.")
         shutil.copyfile(s, str(t))
 
@@ -168,6 +166,35 @@ BazelCopyOutputsAction = SCons.Action.FunctionAction(
     bazel_builder_action,
     {"cmdstr": "Asking bazel to build $TARGET", "varlist": ['BAZEL_FLAGS_STR']},
 )
+
+
+# the ninja tool has some API that doesn't support using SCons env methods
+# instead of adding more API to the ninja tool which has a short life left
+# we just add the unused arg _dup_env
+def ninja_bazel_builder(env: SCons.Environment.Environment, _dup_env: SCons.Environment.Environment,
+                        node: SCons.Node.Node) -> Dict[str, Any]:
+    """
+    Translator for ninja which turns the scons bazel_builder_action
+    into a build node that ninja can digest.
+    """
+
+    outs = env.NinjaGetOutputs(node)
+    ins = [Globals.scons2bazel_targets[out]['bazel_output'] for out in outs]
+
+    # this represents the values the ninja_syntax.py will use to generate to real
+    # ninja syntax defined in the ninja manaul: https://ninja-build.org/manual.html#ref_ninja_file
+    return {
+        "outputs": outs,
+        "inputs": ins,
+        "rule": "CMD",
+        "variables": {
+            "cmd":
+                ' '.join([
+                    f"$COPY {input_node} {output_node};"
+                    for input_node, output_node in zip(ins, outs)
+                ])
+        },
+    }
 
 
 def bazel_batch_build_thread(log_dir: str) -> None:
@@ -261,7 +288,7 @@ def bazel_batch_build_thread(log_dir: str) -> None:
         raise exc
 
 
-def create_bazel_builder(builder):
+def create_bazel_builder(builder: SCons.Builder.Builder) -> SCons.Builder.Builder:
     return SCons.Builder.Builder(
         action=BazelCopyOutputsAction,
         prefix=builder.prefix,
@@ -285,6 +312,38 @@ def create_library_builder(env: SCons.Environment.Environment) -> None:
 
 def create_program_builder(env: SCons.Environment.Environment) -> None:
     env['BUILDERS']['BazelProgram'] = create_bazel_builder(env['BUILDERS']["Program"])
+
+
+def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
+    # create a json file which contains all the relevant info from this generation
+    # that bazel will need to construct the correct command line for any given targets
+    ninja_bazel_build_json = {
+        'bazel_cmd': Globals.bazel_base_build_command,
+        'defaults': [str(t) for t in SCons.Script.DEFAULT_TARGETS],
+        'targets': Globals.scons2bazel_targets
+    }
+    with open('.bazel_info_for_ninja.txt', 'w') as f:
+        json.dump(ninja_bazel_build_json, f)
+
+    # we also store the outputs in the env (the passed env is intended to be
+    # the same main env ninja tool is constructed with) so that ninja can
+    # use these to contruct a build node for running bazel where bazel list the
+    # correct bazel outputs to be copied to the scons tree. We also handle
+    # calculating the inputs. This will be the all the inputs of the outs,
+    # but and input can not also be an output. If a node is found in both
+    # inputs and outputs, remove it from the inputs, as it will be taken care
+    # internally by bazel build.
+    ninja_bazel_outs = []
+    ninja_bazel_ins = []
+    for scons_t, bazel_t in Globals.scons2bazel_targets.items():
+        ninja_bazel_outs += [bazel_t['bazel_output']]
+        ninja_bazel_ins += env.NinjaGetInputs(env.File(scons_t))
+        if scons_t in ninja_bazel_ins:
+            ninja_bazel_ins.remove(scons_t)
+
+    # This is to be used directly by ninja later during generation of the ninja file
+    env["NINJA_BAZEL_OUTPUTS"] = ninja_bazel_outs
+    env["NINJA_BAZEL_INPUTS"] = ninja_bazel_ins
 
 
 # Establishes logic for BazelLibrary build rule
@@ -372,15 +431,21 @@ def generate(env: SCons.Environment.Environment) -> None:
         create_library_builder(env)
         create_program_builder(env)
 
-        def shutdown_bazel_builer():
-            Globals.kill_bazel_thread_flag = True
+        if env.GetOption('ninja') == "disabled":
 
-        atexit.register(shutdown_bazel_builer)
+            def shutdown_bazel_builer():
+                Globals.kill_bazel_thread_flag = True
 
-        bazel_build_thread = threading.Thread(target=bazel_batch_build_thread,
-                                              args=(env.Dir("$BUILD_ROOT/scons/bazel").path, ))
-        bazel_build_thread.daemon = True
-        bazel_build_thread.start()
+            atexit.register(shutdown_bazel_builer)
+
+            # ninja will handle the build so do not launch the bazel batch thread
+            bazel_build_thread = threading.Thread(target=bazel_batch_build_thread,
+                                                  args=(env.Dir("$BUILD_ROOT/scons/bazel").path, ))
+            bazel_build_thread.daemon = True
+            bazel_build_thread.start()
+
+        env.AddMethod(generate_bazel_info_for_ninja, "GenerateBazelInfoForNinja")
+        env.AddMethod(ninja_bazel_builder, "NinjaBazelBuilder")
     else:
         env['BUILDERS']['BazelLibrary'] = env['BUILDERS']['Library']
         env['BUILDERS']['BazelProgram'] = env['BUILDERS']['Program']

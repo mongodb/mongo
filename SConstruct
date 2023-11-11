@@ -6591,3 +6591,16 @@ for i, s in enumerate(BUILD_TARGETS):
 # SConscripts have been read but before building begins.
 libdeps.LibdepLinter(env).final_checks()
 libdeps.generate_libdeps_graph(env)
+
+# We put this next section at the end of the SConstruct since all the targets
+# have been declared, and we know all possible bazel targets so
+# we can now generate this info into a file for the ninja build to consume.
+if env.get("BAZEL_BUILD_ENABLED") and env.GetOption('ninja') != "disabled":
+
+    # convert the SCons FunctioAction into a format that ninja can understand
+    env.NinjaRegisterFunctionHandler("bazel_builder_action", env.NinjaBazelBuilder)
+
+    # we generate the list of all targets that were labeled Bazel* builder targets
+    # via the emitter, this outputs a json file which will be read during the ninja
+    # build.
+    env.GenerateBazelInfoForNinja()

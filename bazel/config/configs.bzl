@@ -127,7 +127,7 @@ use_wait_for_debugger = rule(
 # =========
 
 use_disable_ref_track_provider = provider(
-    doc = "Disables runtime tracking of REF state changes for pages within wiredtiger. "
+    doc = "Disables runtime tracking of REF state changes for pages within wiredtiger. " + 
     "Tracking the REF state changes is useful for debugging but there is a small performance cost.",
     fields = ["enabled"],
 )
