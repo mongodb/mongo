@@ -42,6 +42,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
@@ -693,6 +694,46 @@ private:
     }
 };
 
+class PauseAndResume : public Basic {
+    void addData(IWSorter* sorter) override {
+        sorter->add(0, 0);
+        sorter->add(3, -3);
+        sorter->add(4, -4);
+        IWIterator* iter = sorter->pause();
+        int unsorted[] = {0, 3, 4};
+        for (int i = 0; i < 3; i++) {
+            ASSERT_EQ(unsorted[i], iter->next().first);
+        }
+        ASSERT_FALSE(iter->more());
+        delete iter;
+        sorter->resume();
+        sorter->add(2, -2);
+        sorter->add(1, -1);
+        iter = sorter->pause();
+        int unsorted1[] = {0, 3, 4, 2, 1};
+        for (int i = 0; i < 5; i++) {
+            ASSERT_EQ(unsorted1[i], iter->next().first);
+        }
+        ASSERT_FALSE(iter->more());
+        delete iter;
+        sorter->resume();
+    }
+
+    size_t numAdded() const {
+        return 5;
+    }
+
+    // returns an iterator with the correct results
+    std::shared_ptr<IWIterator> correct() {
+        return std::make_shared<IntIterator>(0, 5);  // 0, 1, ... 4
+    }
+
+    // like correct but with opposite sort direction
+    std::shared_ptr<IWIterator> correctReverse() {
+        return std::make_shared<IntIterator>(4, -1, -1);  // 4, 3, ... 0
+    }
+};
+
 class Limit : public Basic {
     SortOptions adjustSortOptions(SortOptions opts) override {
         return opts.Limit(5);
@@ -722,6 +763,96 @@ class LimitExtreme : public Basic {
         return opts.Limit(Limit);
     }
 };
+
+class PauseAndResumeLimit : public Limit {
+    SortOptions adjustSortOptions(SortOptions opts) override {
+        return opts.Limit(5);
+    }
+    void addData(IWSorter* sorter) override {
+        sorter->add(3, -3);
+        sorter->add(0, 0);
+        sorter->add(4, -4);
+        IWIterator* iter = sorter->pause();
+        // pause returns data still in the original order because we havent reached the limit
+        int unsorted[] = {3, 0, 4};
+        for (int i = 0; i < 3; i++) {
+            ASSERT_EQ(unsorted[i], iter->next().first);
+        }
+        ASSERT_FALSE(iter->more());
+        delete iter;
+        sorter->resume();
+        sorter->add(2, -2);
+        sorter->add(1, -1);
+        sorter->add(-1, 1);
+        iter = sorter->pause();
+        // pause will return top 5 elements in some order (they are from a heap but not yet sorted)
+        std::vector<int> vec;
+        for (int i = 0; i < 5; i++) {
+            vec.push_back(iter->next().first);
+        }
+        sort(vec.begin(), vec.end());
+        ASSERT_TRUE(vec.back() == 3 || vec.back() == 4);  // either 4 or 3 depending on asc or desc
+        ASSERT_EQ(vec.size(), 5);
+        ASSERT_FALSE(iter->more());  // check to make sure we only got limit number of entries
+        delete iter;
+        sorter->resume();
+    }
+
+    size_t numAdded() const {
+        return 6;
+    }
+
+    // returns an iterator with the correct results
+    std::shared_ptr<IWIterator> correct() {
+        return std::make_shared<IntIterator>(-1, 4);
+    }
+
+    // like correct but with opposite sort direction
+    std::shared_ptr<IWIterator> correctReverse() {
+        return std::make_shared<IntIterator>(4, -1, -1);
+    }
+};
+
+class PauseAndResumeLimitOne : public Limit {
+    SortOptions adjustSortOptions(SortOptions opts) override {
+        return opts.Limit(1);
+    }
+    void addData(IWSorter* sorter) override {
+        sorter->add(3, -3);
+        sorter->add(0, 0);
+        sorter->add(4, -4);
+        IWIterator* iter = sorter->pause();
+        auto val = iter->next().first;
+        ASSERT_TRUE(val == 0 || val == 4);
+        ASSERT_FALSE(iter->more());
+        sorter->resume();
+        sorter->add(2, -2);
+        sorter->add(1, -1);
+        sorter->add(-1, 1);
+        delete iter;
+        iter = sorter->pause();
+        val = iter->next().first;
+        ASSERT_TRUE(val == -1 || val == 4);  // either 4 or -1 depending on asc or desc
+        ASSERT_FALSE(iter->more());  // check to make sure we only got limit number of entries
+        delete iter;
+        sorter->resume();
+    }
+
+    size_t numAdded() const {
+        return 6;
+    }
+
+    // returns an iterator with the correct results
+    std::shared_ptr<IWIterator> correct() {
+        return std::make_shared<IntIterator>(-1, 0);
+    }
+
+    // like correct but with opposite sort direction
+    std::shared_ptr<IWIterator> correctReverse() {
+        return std::make_shared<IntIterator>(4, 3, -1);
+    }
+};
+
 
 class Dupes : public Basic {
     void addData(IWSorter* sorter) override {
@@ -884,6 +1015,9 @@ public:
         add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> - 1>>();
         add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> + 1>>();
         add<SorterTests::LimitExtreme<kMaxAsU64<int64_t> / 8 + 1>>();
+        add<SorterTests::PauseAndResume>();
+        add<SorterTests::PauseAndResumeLimit>();
+        add<SorterTests::PauseAndResumeLimitOne>();
     }
 };
 

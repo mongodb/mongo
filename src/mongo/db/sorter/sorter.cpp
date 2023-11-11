@@ -221,6 +221,49 @@ private:
 };
 
 /**
+ * This class is used to return the in-memory state from the sorter in read-only mode.
+ * This is used by streams checkpoint use case mainly to save in-memory state on persistent
+ * storage."
+ */
+template <typename Key, typename Value, typename Container>
+class InMemReadOnlyIterator : public SortIteratorInterface<Key, Value> {
+public:
+    typedef std::pair<Key, Value> Data;
+
+    InMemReadOnlyIterator(const Container& data) : _data(data) {
+        _iterator = _data.begin();
+    }
+
+    void openSource() override {}
+    void closeSource() override {}
+
+    bool more() override {
+        return _iterator != _data.end();
+    }
+
+    Data next() override {
+        Data out = *_iterator++;
+        return out;
+    }
+
+    Key nextWithDeferredValue() override {
+        MONGO_UNIMPLEMENTED_TASSERT(8248302);
+    }
+
+    Value getDeferredValue() override {
+        MONGO_UNIMPLEMENTED_TASSERT(8248303);
+    }
+
+    const Key& current() override {
+        return std::prev(_iterator)->first;
+    }
+
+private:
+    const Container& _data;
+    typename Container::const_iterator _iterator;
+};
+
+/**
  * Returns results from a sorted range within a file. Each instance is given a file name and start
  * and end offsets.
  *
@@ -782,6 +825,7 @@ public:
     template <typename DataProducer>
     void addImpl(DataProducer dataProducer) {
         invariant(!_done);
+        invariant(!_paused);
 
         auto& keyVal = _data.emplace_back(dataProducer());
 
@@ -827,6 +871,22 @@ public:
         this->_mergeSpillsToRespectMemoryLimits();
 
         return Iterator::merge(this->_iters, this->_opts, this->_comp);
+    }
+
+    Iterator* pause() override {
+        invariant(!_done);
+        invariant(!_paused);
+
+        _paused = true;
+        if (this->_iters.empty()) {
+            return new InMemReadOnlyIterator<Key, Value, std::deque<Data>>(_data);
+        }
+        tassert(8248300, "Spilled sort cannot be paused", this->_iters.empty());
+        return nullptr;
+    }
+
+    void resume() override {
+        _paused = false;
     }
 
 private:
@@ -895,6 +955,7 @@ private:
 
     bool _done = false;
     std::deque<Data> _data;  // Data that has not been spilled.
+    bool _paused = false;
 };
 
 template <typename Key, typename Value, typename Comparator>
@@ -951,6 +1012,17 @@ public:
         }
     }
 
+    Iterator* pause() override {
+        if (_haveData) {
+            // ok to return InMemIterator as this is a single value constructed from copy
+            return new InMemIterator<Key, Value>(_best);
+        } else {
+            return new InMemIterator<Key, Value>();
+        }
+    }
+
+    void resume() override {}
+
 private:
     void spill() {
         invariant(false, "LimitOneSorter does not spill to disk");
@@ -991,6 +1063,7 @@ public:
     template <typename DataProducer>
     void addImpl(const Key& key, DataProducer dataProducer) {
         invariant(!_done);
+        invariant(!_paused);
 
         this->_stats.incrementNumSorted();
 
@@ -1069,6 +1142,22 @@ public:
         Iterator* iterator = Iterator::merge(this->_iters, this->_opts, this->_comp);
         _done = true;
         return iterator;
+    }
+
+    Iterator* pause() override {
+        invariant(!_done);
+        invariant(!_paused);
+        _paused = true;
+
+        if (this->_iters.empty()) {
+            return new InMemReadOnlyIterator<Key, Value, std::vector<Data>>(_data);
+        }
+        tassert(8248301, "Spilled sort cannot be paused", this->_iters.empty());
+        return nullptr;
+    }
+
+    void resume() override {
+        _paused = false;
     }
 
 private:
@@ -1210,6 +1299,7 @@ private:
     }
 
     bool _done = false;
+    bool _paused = false;
 
     // Data that has not been spilled. Organized as max-heap if size == limit.
     std::vector<Data> _data;

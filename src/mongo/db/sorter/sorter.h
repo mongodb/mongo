@@ -410,6 +410,20 @@ public:
      */
     virtual Iterator* done() = 0;
 
+    /**
+     * Pauses loading and returns the iterator that can be used to get the current state. Clients of
+     * this class can call this method to pause loading and get the current state available in
+     * read-only mode for storing it to a persistent storage which is used by streaming query use
+     * cases. New documents cannot be added until resume is called. The iterator returned is
+     * reflecting current in memory state and is not guaranteed to be sorted.
+     */
+    virtual Iterator* pause() = 0;
+
+    /**
+     * Resumes loading and cleans up internal state created during pause().
+     */
+    virtual void resume() = 0;
+
     virtual ~Sorter() {}
 
     PersistedState persistDataForShutdown();

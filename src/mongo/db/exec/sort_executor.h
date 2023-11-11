@@ -152,9 +152,7 @@ public:
      * Should only be called before 'loadingDone()' is called.
      */
     void add(const Value& sortKey, const T& data) {
-        if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
-        }
+        ensureSorter();
         _sorter->add(sortKey, data);
     }
 
@@ -162,10 +160,7 @@ public:
      * Signals to the sort executor that there will be no more input documents.
      */
     void loadingDone() {
-        // This conditional should only pass if no documents were added to the sorter.
-        if (!_sorter) {
-            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
-        }
+        ensureSorter();
         _output.reset(_sorter->done());
         _stats.keysSorted += _sorter->stats().numSorted();
         _stats.spills += _sorter->stats().spilledRanges();
@@ -205,6 +200,31 @@ public:
         return _stats.maxMemoryUsageBytes;
     }
 
+    /**
+     * Pauses Loading and creates an iterator which can be used to get the current state in
+     * read-only mode. The stream code needs this to pause and get the current internal state which
+     * can be used to store it to a persistent storage which will constitute a checkpoint for
+     * streaming processing.
+     */
+    void pauseLoading() {
+        invariant(!_paused);
+        _paused = true;
+        ensureSorter();
+        _output.reset(_sorter->pause());
+    }
+
+    /**
+     * Resumes Loading. This will remove the iterator created in pauseLoading().
+     */
+    void resumeLoading() {
+        invariant(_paused);
+        _paused = false;
+        ensureSorter();
+        _output.reset();
+        _sorter->resume();
+        _isEOF = false;
+    }
+
 private:
     SortOptions makeSortOptions() const {
         SortOptions opts;
@@ -223,6 +243,13 @@ private:
         return opts;
     }
 
+    void ensureSorter() {
+        // This conditional should only pass if no documents were added to the sorter.
+        if (!_sorter) {
+            _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
+        }
+    }
+
     const SortPattern _sortPattern;
     const std::string _tempDir;
     const bool _diskUseAllowed;
@@ -235,5 +262,6 @@ private:
     mutable SortStats _stats;
 
     bool _isEOF = false;
+    bool _paused = false;
 };
 }  // namespace mongo
