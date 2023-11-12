@@ -84,7 +84,7 @@ operation_tracker::load()
 void
 operation_tracker::do_work()
 {
-    WT_DECL_RET;
+    int ret = 0;
     wt_timestamp_t ts, oldest_ts;
     uint64_t collection_id;
     uint64_t sweep_collection_id = 0;

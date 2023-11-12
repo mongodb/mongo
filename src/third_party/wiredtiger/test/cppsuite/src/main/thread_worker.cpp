@@ -105,7 +105,7 @@ bool
 thread_worker::update(
   scoped_cursor &cursor, uint64_t collection_id, const std::string &key, const std::string &value)
 {
-    WT_DECL_RET;
+    int ret = 0;
 
     testutil_assert(op_tracker != nullptr);
     testutil_assert(cursor.get() != nullptr);
@@ -146,7 +146,7 @@ bool
 thread_worker::insert(
   scoped_cursor &cursor, uint64_t collection_id, const std::string &key, const std::string &value)
 {
-    WT_DECL_RET;
+    int ret = 0;
 
     testutil_assert(op_tracker != nullptr);
     testutil_assert(cursor.get() != nullptr);
@@ -186,7 +186,7 @@ thread_worker::insert(
 bool
 thread_worker::remove(scoped_cursor &cursor, uint64_t collection_id, const std::string &key)
 {
-    WT_DECL_RET;
+    int ret = 0;
     testutil_assert(op_tracker != nullptr);
     testutil_assert(cursor.get() != nullptr);
 
@@ -230,7 +230,7 @@ bool
 thread_worker::truncate(uint64_t collection_id, std::optional<std::string> start_key,
   std::optional<std::string> stop_key, const std::string &config)
 {
-    WT_DECL_RET;
+    int ret = 0;
 
     wt_timestamp_t ts = tsm->get_next_ts();
     ret = txn.set_commit_timestamp(ts);

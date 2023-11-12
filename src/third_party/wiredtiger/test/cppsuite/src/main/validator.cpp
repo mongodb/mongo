@@ -38,7 +38,7 @@ void
 validator::validate(
   const std::string &operation_table_name, const std::string &schema_table_name, database &db)
 {
-    WT_DECL_RET;
+    int ret = 0;
     wt_timestamp_t tracked_timestamp;
     std::vector<uint64_t> created_collections, deleted_collections;
     uint64_t tracked_collection_id;
@@ -260,7 +260,7 @@ void
 validator::verify_key_value(scoped_session &session, const uint64_t collection_id,
   const std::string &key, const key_state &key_state)
 {
-    WT_DECL_RET;
+    int ret = 0;
     const char *retrieved_value;
 
     scoped_cursor cursor =

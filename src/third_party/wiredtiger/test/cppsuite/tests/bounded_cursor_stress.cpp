@@ -443,7 +443,7 @@ public:
                      * If we cannot find any record, finish the current transaction as we might be
                      * able to see new records after starting a new one.
                      */
-                    WT_IGNORE_RET_BOOL(tc->txn.commit());
+                    testutil_ignore_ret_bool(tc->txn.commit());
                     continue;
                 } else if (ret == WT_ROLLBACK)
                     break;

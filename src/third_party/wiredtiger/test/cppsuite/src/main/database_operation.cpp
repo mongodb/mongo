@@ -332,7 +332,7 @@ database_operation::remove_operation(thread_worker *tc)
              * one.
              */
             if (ret == WT_NOTFOUND) {
-                WT_IGNORE_RET_BOOL(tc->txn.commit());
+                testutil_ignore_ret_bool(tc->txn.commit());
             } else if (ret == WT_ROLLBACK) {
                 tc->txn.rollback();
             } else {
@@ -354,7 +354,7 @@ database_operation::remove_operation(thread_worker *tc)
 
         /* Commit the current transaction if we're able to. */
         if (tc->txn.can_commit())
-            WT_IGNORE_RET_BOOL(tc->txn.commit());
+            testutil_ignore_ret_bool(tc->txn.commit());
     }
 
     /* Make sure the last operation is rolled back now the work is finished. */
@@ -413,7 +413,7 @@ database_operation::update_operation(thread_worker *tc)
 
         /* Commit the current transaction if we're able to. */
         if (tc->txn.can_commit())
-            WT_IGNORE_RET_BOOL(tc->txn.commit());
+            testutil_ignore_ret_bool(tc->txn.commit());
     }
 
     /* Make sure the last operation is rolled back now the work is finished. */
