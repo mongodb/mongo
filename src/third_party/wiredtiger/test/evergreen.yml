@@ -195,7 +195,7 @@ functions:
           DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
         fi
 
-        if [ "${build_variant|}" = "macos-1100" ]; then
+        if [[ "${build_variant|}" =~ "macos-1100" ]]; then
           # For mac builds, we want explicitly tell cmake which python to use, as
           # well as the matching library directory and header files. The find_libpython
           # module gives us the library.
@@ -214,13 +214,18 @@ functions:
              SYSPYDIR=$(dirname $SYSPYLIB)
              NSYSPYLIB=$(ls $SYSPYDIR/lib/libpython*.dylib 2>/dev/null | head -1)
              if [ -f "$NSYSPYLIB" ]; then
-                 SYSPYLIB=$NSYSPYLIB
+               SYSPYLIB=$NSYSPYLIB
              fi
              if [ -d "$SYSPYDIR/Headers" ]; then
-                 SYSPYINCDEF="-DPYTHON_INCLUDE_DIR=$SYSPYDIR/Headers"
+               SYSPYINCDEF="$SYSPYDIR/Headers"
              fi
           fi
-          DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPYTHON_EXECUTABLE:FILEPATH=$SYSPY -DPYTHON_LIBRARY=$SYSPYLIB $SYSPYINCDEF"
+
+          if [ "${build_variant|}" = "macos-1100-arm64" ]; then
+            DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPython3_EXECUTABLE=$SYSPY -DPython3_LIBRARY=$SYSPYLIB -DPython3_INCLUDE_DIR=$SYSPYINCDEF"
+          else
+            DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPYTHON_EXECUTABLE:FILEPATH=$SYSPY -DPYTHON_LIBRARY=$SYSPYLIB -DPYTHON_INCLUDE_DIR=$SYSPYINCDEF"
+          fi
         fi
 
         if [ "$OS" = "Windows_NT" ]; then
@@ -1309,7 +1314,7 @@ variables:
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
 
 
-# Template for Mac tests
+  # Template for Mac tests
   - &mac_test_template
     expansions: &mac_test_template_expansions
       # The cmake toolchain file is set to the mongodb toolchain gcc by default.
