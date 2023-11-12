@@ -49,6 +49,7 @@ existing example in the source code and copy it.
     WT_CONNECTION_IMPL *conn;
 
 * Comments should:
+
   * Describe intended functionality
   * Not reference variable names where possible
   * Not reference JIRA ticket numbers nor pull request numbers
@@ -101,21 +102,21 @@ existing example in the source code and copy it.
   that the caller is never surprised by finding random data in the
   return value (or at least we drop core if we're not doing the
   correct error handling).
-* Variable declaration blocks should not contain initializers
-* Variable initializations should follow either alphabetical order or
-  variable declaration order.
 * Use descriptive variable and function names. Use all lowercase
   letters with a ``_`` separator.  Use standard names for common
   WiredTiger structures (``WT_SESSION`` and ``WT_CONNECTION`` are
   "wt_session" and "wt_conn", ``WT_SESSION_IMPL`` and
   ``WT_CONNECTION_IMPL`` are "session" and "conn)
-* Pointers are compared to ``NULL`` , so "``(p == NULL)``",
-  not "``(p == 0)``" or "``(!p)``"
+* Variable declaration blocks should not contain initializers
+* Variable initialisation should be in a block at the beginning of a
+  function.
+* Variable initializations should follow either alphabetical order or
+  variable declaration order.
 * For the cases where the initialization isn't required, but a
   compiler wants it, tag them with this comment
   ``/* -Werror=maybe-uninitialized */``
-* Variable initialisation should be in a block at the beginning of a
-  function.
+* Pointers are compared to ``NULL`` , so "``(p == NULL)``",
+  not "``(p == 0)``" or "``(!p)``"
 * Use ``for(;;)`` to create an infinite loop, rather than
   ``while(true)``
 * When returning a value from a function, use parentheses around the
