@@ -88,6 +88,12 @@ int64_t generateSeed(const std::string& desc) {
     boost::hash_combine(seed, desc);
     return seed;
 }
+
+bool checkIfRouterClient(const std::shared_ptr<transport::Session>& session) {
+    return serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) &&
+        serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) && session &&
+        session->isFromRouterPort();
+}
 }  // namespace
 
 Client::Client(std::string desc, Service* service, std::shared_ptr<transport::Session> session)
@@ -96,6 +102,7 @@ Client::Client(std::string desc, Service* service, std::shared_ptr<transport::Se
       _desc(std::move(desc)),
       _connectionId(_session ? _session->id() : 0),
       _prng(generateSeed(_desc)),
+      _isRouterClient(checkIfRouterClient(_session)),
       _uuid(UUID::gen()),
       _tags(kPending) {}
 

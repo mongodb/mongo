@@ -148,7 +148,7 @@ private:
         return std::make_unique<test::MockSessionManager>(
             [this](test::SessionThread& sessionThread) {
                 if (_serverCb) {
-                    _serverCb(sessionThread.session());
+                    _serverCb(*sessionThread.session());
                 }
             });
     }

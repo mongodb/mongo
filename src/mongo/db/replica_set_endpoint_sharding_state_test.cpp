@@ -30,26 +30,31 @@
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/replica_set_endpoint_test_fixture.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
 namespace replica_set_endpoint {
 namespace {
 
-class ReplicaSetEndpointShardingStateTest : public ServiceContextMongoDTest {
+class ReplicaSetEndpointShardingStateTest : public ServiceContextMongoDTest,
+                                            public ReplicaSetEndpointTest {
 protected:
     explicit ReplicaSetEndpointShardingStateTest(Options options = {})
         : ServiceContextMongoDTest(options.useReplSettings(true)) {}
+
+private:
+    RAIIServerParameterControllerForTest _replicaSetEndpointController{
+        "featureFlagReplicaSetEndpoint", true};
 };
 
 TEST_F(ReplicaSetEndpointShardingStateTest, SetUnSetGetIsConfigShard) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
-
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
     ASSERT_FALSE(shardingState->isConfigShardForTest());
 
     shardingState->setIsConfigShard(true);
@@ -62,10 +67,7 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SetUnSetGetIsConfigShard) {
 TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShardMultipleTimes) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
-
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
     ASSERT_FALSE(shardingState->isConfigShardForTest());
 
     shardingState->setIsConfigShard(true);
@@ -78,11 +80,9 @@ TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShardMultipleTimes) {
 TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShardMultipleTimes) {
     serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
-
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
     ASSERT_FALSE(shardingState->isConfigShardForTest());
+
     shardingState->setIsConfigShard(true);
     ASSERT(shardingState->isConfigShardForTest());
 
@@ -96,28 +96,87 @@ TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShardMultipleTimes) {
 DEATH_TEST_F(ReplicaSetEndpointShardingStateTest, SetIsConfigShard_NotConfigServer, "invariant") {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
     shardingState->setIsConfigShard(true);
 }
 
 DEATH_TEST_F(ReplicaSetEndpointShardingStateTest, UnSetIsConfigShard_NotConfigServer, "invariant") {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
     shardingState->setIsConfigShard(false);
 }
 
 TEST_F(ReplicaSetEndpointShardingStateTest, GetIsConfigShard_NotConfigServer) {
     serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-    auto shardingState = ReplicaSetEndpointShardingState::get(opCtx);
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
     ASSERT_FALSE(shardingState->isConfigShardForTest());
+}
+
+TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint) {
+    serverGlobalParams.clusterRole = {
+        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    setHasTwoOrShardsClusterParameter(false);
+    ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
+
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+    shardingState->setIsConfigShard(true);
+
+    ASSERT(shardingState->isConfigShardForTest());
+    ASSERT(shardingState->supportsReplicaSetEndpoint());
+}
+
+TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotRouterServer) {
+    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    setHasTwoOrShardsClusterParameter(false);
+    ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
+
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+    shardingState->setIsConfigShard(true);
+
+    ASSERT(shardingState->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+}
+
+TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_NotConfigShard) {
+    serverGlobalParams.clusterRole = {
+        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    setHasTwoOrShardsClusterParameter(false);
+    ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
+
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+
+    ASSERT_FALSE(shardingState->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+}
+
+TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_HasTwoOrMoreShards) {
+    serverGlobalParams.clusterRole = {
+        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    setHasTwoOrShardsClusterParameter(true);
+    ASSERT(getHasTwoOrShardsClusterParameter());
+
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+    shardingState->setIsConfigShard(true);
+
+    ASSERT_TRUE(shardingState->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
+}
+
+TEST_F(ReplicaSetEndpointShardingStateTest, SupportsReplicaSetEndpoint_FeatureFlagDisabled) {
+    serverGlobalParams.clusterRole = {
+        ClusterRole::ShardServer, ClusterRole::ConfigServer, ClusterRole::RouterServer};
+    setHasTwoOrShardsClusterParameter(false);
+    ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
+    RAIIServerParameterControllerForTest replicaSetEndpointController{
+        "featureFlagReplicaSetEndpoint", false};
+
+    auto shardingState = ReplicaSetEndpointShardingState::get(getServiceContext());
+    shardingState->setIsConfigShard(true);
+
+    ASSERT_TRUE(shardingState->isConfigShardForTest());
+    ASSERT_FALSE(shardingState->supportsReplicaSetEndpoint());
 }
 
 }  // namespace

@@ -128,6 +128,7 @@ void Grid::clearForUnitTests() {
     _executorPool.reset();
     _network = nullptr;
     _isGridInitialized.store(false);
+    _shardingInitialized.store(false);
 }
 
 }  // namespace mongo

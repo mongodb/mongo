@@ -47,8 +47,9 @@ namespace transport {
 TransportLayerMock::TransportLayerMock()
     : TransportLayerMock(std::make_unique<SessionManagerNoop>()) {}
 
-std::shared_ptr<Session> TransportLayerMock::createSession() {
-    auto session = createSessionHook ? createSessionHook(this) : MockSession::create(this);
+std::shared_ptr<Session> TransportLayerMock::createSession(bool isFromRouterPort) {
+    auto session =
+        createSessionHook ? createSessionHook(this) : MockSession::create(this, isFromRouterPort);
     Session::Id sessionId = session->id();
 
     _sessions[sessionId] = Connection{false, session, SSLPeerInfo()};

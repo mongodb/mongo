@@ -27,62 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/db/replica_set_endpoint_sharding_state.h"
-#include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
+#include "mongo/db/replica_set_endpoint_test_fixture.h"
+
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace replica_set_endpoint {
 
-namespace {
+void ReplicaSetEndpointTest::setHasTwoOrShardsClusterParameter(bool value) {
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* clusterCardinalityParam =
+        clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+            "shardedClusterCardinalityForDirectConns");
+    uassertStatusOK(clusterCardinalityParam->set(
+        BSON("shardedClusterCardinalityForDirectConns"
+             << BSON(ShardedClusterCardinalityParam::kHasTwoOrMoreShardsFieldName << value))
+            .firstElement(),
+        boost::none));
+}
 
-const auto getReplicaSetEndpointShardingState =
-    ServiceContext::declareDecoration<ReplicaSetEndpointShardingState>();
-
-bool clusterHasTwoOrMoreShards() {
+bool ReplicaSetEndpointTest::getHasTwoOrShardsClusterParameter() {
     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
     auto* clusterCardinalityParam =
         clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
             "shardedClusterCardinalityForDirectConns");
     return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-}
-
-}  // namespace
-
-ReplicaSetEndpointShardingState* ReplicaSetEndpointShardingState::get(
-    ServiceContext* serviceContext) {
-    return &getReplicaSetEndpointShardingState(serviceContext);
-}
-
-ReplicaSetEndpointShardingState* ReplicaSetEndpointShardingState::get(OperationContext* opCtx) {
-    return ReplicaSetEndpointShardingState::get(opCtx->getServiceContext());
-}
-
-void ReplicaSetEndpointShardingState::setIsConfigShard(bool value) {
-    invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-
-    stdx::unique_lock wLock(_mutex);  // NOLINT
-    _isConfigShard = value;
-}
-
-bool ReplicaSetEndpointShardingState::isConfigShardForTest() {
-    std::shared_lock rLock(_mutex);  // NOLINT
-    return _isConfigShard;
-}
-
-bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint() {
-    std::shared_lock rLock(_mutex);  // NOLINT
-    return isFeatureFlagEnabled() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) && _isConfigShard &&
-        !clusterHasTwoOrMoreShards();
-}
-
-bool isFeatureFlagEnabled() {
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagReplicaSetEndpoint.isEnabled(fcvSnapshot);
 }
 
 }  // namespace replica_set_endpoint
