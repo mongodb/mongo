@@ -27,23 +27,22 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-import random
 from wtscenario import make_scenarios
-from wtdataset import SimpleDataSet, simple_value
 
 # test_app_thread_evict01.py
 # Test to trigger application threads to perform eviction.
-
-@wttest.skip_for_hook("timestamp", "This test uses dataset and hooks assume that timestamp are used and fails.")
 class test_app_thread_evict01(wttest.WiredTigerTestCase):
     uri = "table:test_app_thread_evict001"
     format_values = [
     ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
-    conn_config = "cache_size=50MB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true)," \
-        "eviction=(threads_max=1),eviction_updates_trigger=5"
-    rows = 20000
+    # 100MB cache, 52MB trigger, 50MB target
+    conn_config = "cache_size=100MB,statistics=(all),statistics_log=(wait=1,json=true,on_close=true)," \
+        "eviction=(threads_max=1)," \
+        "eviction_updates_trigger=52,eviction_dirty_trigger=52,eviction_trigger=52," \
+        "eviction_updates_target=50,eviction_dirty_target=50,eviction_target=50,"
+
     scenarios = make_scenarios(format_values)
 
     def get_stat(self, stat):
@@ -52,47 +51,31 @@ class test_app_thread_evict01(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return val
 
-    def insert_range(self,uri,rows):
-        cursor = self.session.open_cursor(uri)
-
-        for i in range(rows):
-            self.session.begin_transaction()
-            cursor.set_key(i+1)
-            value = simple_value(cursor, i) + 'abcdef' * random.randint(500,1000)
-            cursor.set_value((value))
-            cursor.insert()
-            self.session.commit_transaction()
-
     def test_app_thread_evict01(self):
-        self.skipTest("This test fails randomly when it cannot pull application threads to perform eviction.")
-        num_app_evict_snapshot_refreshed = 0
-
         format='key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(self.uri, format)
-        # Create our table.
-        ds = SimpleDataSet(self, self.uri, 1000, key_format=self.key_format, value_format=self.value_format)
-        ds.populate()
-
-        # Start a long running transaction.
-        session2 = self.conn.open_session()
-        session2.begin_transaction()
-        cursor = self.session.open_cursor(self.uri)
-        key = 350
-        cursor.set_key(key)
-        cursor.set_value(str(key))
-        cursor.insert()
 
         # For our target stat to be incremented we need our application thread to evict a page, but
         # this is probabilistic as the application thread is always racing against the internal
         # eviction threads. Give the application thread a few chances to beat the internal thread
-        for _ in range(0, 10):
-            for i in range(500):
-                self.insert_range(self.uri, i)
+        for _ in range(0, 20):
+            # Insert 40MB of data and perform lots of small inserts so we'll have a lot of
+            # pages to evict. We are below target levels so no eviction takes place
+            cursor = self.session.open_cursor(self.uri)
+            for i in range(40 * 1024):
+                cursor[i+1] = 'a' * 1024
 
-            cursor.set_key(key)
-            self.assertEquals(cursor.search(), 0)
+            # Perform two large updates. The first causes us to exceed trigger levels,
+            # and on the second insert the app thread is pulled into eviction since
+            # trigger levels are exceeded.
+            self.session.begin_transaction()
+            cursor[100001] = 'a' * 20 * 1024 * 1024
+            cursor[100002] = 'a' * 20 * 1024 * 1024
+            self.session.commit_transaction()
 
             num_app_evict_snapshot_refreshed = self.get_stat(wiredtiger.stat.conn.application_evict_snapshot_refreshed)
+            cursor.close()
+
             if num_app_evict_snapshot_refreshed > 0:
                 break
 
