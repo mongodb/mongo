@@ -2,6 +2,8 @@ import gdb
 import bson
 from pprint import pprint
 
+# FIXME-WT-9286 Update to use gdb.Command like the other python scripts.
+
 # Usage examples:
 # To dump data from the original file handle.
 # coll_dh = get_data_handle(conn, 'file:collection-5550--7194480883124807592.wt', NULL)
