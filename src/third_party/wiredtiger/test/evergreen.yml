@@ -455,7 +455,7 @@ functions:
             if [[ $(git status "$branch" --porcelain) ]]; then
               git add $branch
               git commit -m "Update auto-generated docs for $branch" \
-                        --author="svc-bot-doc-build <svc-wiredtiger-doc-build@10gen.com>"
+                        --author="doc-build-bot <svc-wiredtiger-doc-build@10gen.com>"
             else
               echo "No documentation changes for $branch."
             fi
@@ -475,8 +475,16 @@ functions:
             exit 0
           fi
 
-          cd wiredtiger.github.com
-          git push https://"${doc-update-github-token}"@github.com/wiredtiger/wiredtiger.github.com
+          # Push the above-generated commit
+          ${PREPARE_PATH}
+          virtualenv -p python3 venv
+          source venv/bin/activate
+          python -m pip install PyGithub
+          export GITHUB_OWNER="wiredtiger"
+          export GITHUB_REPO="wiredtiger.github.com"
+          export GITHUB_APP_ID="${doc_update_github_app_id}"
+          export GITHUB_APP_PRIVATE_KEY="${doc_update_github_app_private_key}"
+          python wiredtiger/test/evergreen/doc_update.py
 
   "make check directory":
     command: shell.exec
