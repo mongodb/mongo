@@ -237,7 +237,8 @@ public:
                        int64_t* keysDeletedOut,
                        CheckRecordId checkRecordId = CheckRecordId::Off) const override;
 
-    Status compactIndexes(OperationContext* opCtx) const override;
+    Status compactIndexes(OperationContext* opCtx,
+                          boost::optional<int64_t> freeSpaceTargetMB) const override;
 
     inline std::string getAccessMethodName(const BSONObj& keyPattern) override {
         return _getAccessMethodName(keyPattern);

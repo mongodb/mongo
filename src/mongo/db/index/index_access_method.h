@@ -203,7 +203,7 @@ public:
      * Attempt compaction to regain disk space if the indexed record store supports
      * compaction-in-place.
      */
-    virtual Status compact(OperationContext* opCtx) = 0;
+    virtual Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) = 0;
 
     /**
      * Fetches the Ident for this index.
@@ -589,7 +589,7 @@ public:
 
     long long getFreeStorageBytes(OperationContext* opCtx) const final;
 
-    Status compact(OperationContext* opCtx) final;
+    Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) final;
 
     std::shared_ptr<Ident> getSharedIdent() const final;
 

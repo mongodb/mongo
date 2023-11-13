@@ -102,7 +102,9 @@ bool WiredTigerIndexUtil::appendCustomStats(OperationContext* opCtx,
     return true;
 }
 
-Status WiredTigerIndexUtil::compact(OperationContext* opCtx, const std::string& uri) {
+Status WiredTigerIndexUtil::compact(OperationContext* opCtx,
+                                    const std::string& uri,
+                                    boost::optional<int64_t> freeSpaceTargetMB) {
     dassert(opCtx->lockState()->isWriteLocked());
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (!cache->isEphemeral()) {
@@ -113,7 +115,12 @@ Status WiredTigerIndexUtil::compact(OperationContext* opCtx, const std::string& 
         // check for interrupts.
         SessionDataRAII sessionRaii(s, opCtx);
 
-        int ret = s->compact(s, uri.c_str(), "timeout=0");
+        StringBuilder config;
+        config << "timeout=0";
+        if (freeSpaceTargetMB) {
+            config << ",free_space_target=" + std::to_string(*freeSpaceTargetMB) + "MB";
+        }
+        int ret = s->compact(s, uri.c_str(), config.str().c_str());
         if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
             return Status(ErrorCodes::Interrupted,
                           str::stream() << "Storage compaction interrupted on " << uri.c_str());

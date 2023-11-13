@@ -1978,7 +1978,8 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
     }
 }
 
-Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) const {
+Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx,
+                                        boost::optional<int64_t> freeSpaceTargetMB) const {
     for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
          it != _readyIndexes.end();
          ++it) {
@@ -1988,7 +1989,7 @@ Status IndexCatalogImpl::compactIndexes(OperationContext* opCtx) const {
                     1,
                     "compacting index: {entry_descriptor}",
                     "entry_descriptor"_attr = *(entry->descriptor()));
-        Status status = entry->accessMethod()->compact(opCtx);
+        Status status = entry->accessMethod()->compact(opCtx, freeSpaceTargetMB);
         if (!status.isOK()) {
             LOGV2_ERROR(20377,
                         "Failed to compact index",

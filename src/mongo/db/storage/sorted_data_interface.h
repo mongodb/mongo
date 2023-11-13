@@ -131,9 +131,11 @@ public:
 
     /**
      * Attempt to reduce the storage space used by this index via compaction. Only called if the
-     * indexed record store supports compaction-in-place.
+     * indexed record store supports compaction-in-place.  If the freeSpaceTargetMB is provided,
+     * compaction will only proceed if the free storage space available is greater than the provided
+     * value.
      */
-    virtual Status compact(OperationContext* opCtx) {
+    virtual Status compact(OperationContext* opCtx, boost::optional<int64_t> freeSpaceTargetMB) {
         return Status::OK();
     }
 

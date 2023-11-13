@@ -140,7 +140,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
         return status;
 
     // Compact all indexes (not including unfinished indexes)
-    status = indexCatalog->compactIndexes(opCtx);
+    status = indexCatalog->compactIndexes(opCtx, freeSpaceTargetMB);
     if (!status.isOK())
         return status;
 
