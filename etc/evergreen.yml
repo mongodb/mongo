@@ -61,6 +61,7 @@ include:
 - filename: etc/evergreen_yml_components/variants/compile_static_analysis.yml
 - filename: etc/evergreen_yml_components/variants/config_shard.yml
 - filename: etc/evergreen_yml_components/perf_tasks.yml
+- filename: etc/evergreen_yml_components/variants/perf.yml
 
 variables:
 
@@ -78,16 +79,6 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
     variant: linux-x86-dynamic-compile
 
-- &amazon2_x86_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &amazon2_x86_compile_variant_name amazon2-x86-compile #static compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    omit_generated_tasks: true
-  - name: generate_buildid_to_debug_symbols_mapping
-    variant: amazon2-x86-compile
-
 - &amazon_linux2_arm64_dynamic_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
@@ -99,16 +90,6 @@ variables:
     omit_generated_tasks: true
   - name: generate_buildid_to_debug_symbols_mapping
     variant: amazon-linux2-arm64-dynamic-compile
-
-- &amazon_linux2_arm64_compile_variant_dependency
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile #static compile
-  - name: version_gen
-    variant: generate-tasks-for-version
-    omit_generated_tasks: true
-  - name: generate_buildid_to_debug_symbols_mapping
-    variant: amazon-linux2-arm64-compile
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
   depends_on:
@@ -155,13 +136,7 @@ variables:
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
-- &amazon2_x86_expansions
-  multiversion_platform: amazon2
-  multiversion_edition: enterprise
-  repo_edition: enterprise
-  num_scons_link_jobs_available: 0.99
-  compile_variant: *amazon2_x86_compile_variant_name
-
+# THIS WAS COPIED TO perf.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &linux_arm64_generic_expansions
   multiversion_platform: amazon2
   multiversion_edition: enterprise
@@ -329,117 +304,117 @@ parameters:
 #######################################
 buildvariants:
 
-- <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-1-node-replSet.arm.aws.2023-09
-  display_name: PERF 1-Node ReplSet ARM AWS 2023-09
-  # Leave off for now
-  modules: &perf_modules
-    - enterprise
-    - dsi
-    - genny
-    - workloads
-    - linkbench
-    - linkbench2
-    - tsbs
-    - YCSB
-    - PrivateWorkloads
-    - flamegraph
-  expansions:
-    <<: *linux_arm64_generic_expansions
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    mongodb_setup_release: 2022-11
-    mongodb_setup: single-replica
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: single
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: &perf_project_dir dsi
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: *amazon_linux2_arm64_compile_variant_name
-  run_on:
-    - rhel70-small
-  tasks:
-  - name: industry_benchmarks
-  - name: ycsb_60GB
-  - name: ycsb_60GB.long
-  - name: crud_workloads_majority
-  - name: misc_workloads
-  - name: map_reduce_workloads
-  - name: smoke_test
-  - name: canaries_only
-  - name: non_sharded_workloads
-  # - name: bestbuy_agg
-  # - name: bestbuy_agg_merge_different_db
-  # - name: bestbuy_agg_merge_same_db
-  # - name: bestbuy_agg_merge_wordcount
-  # - name: bestbuy_query
-  - name: change_streams_latency
-  - name: change_streams_listen_throughput
-  - name: snapshot_reads
-  - name: linkbench
-  - name: linkbench2
-  - name: tsbs_load
-  # - name: tsbs_query
-  # - name: tsbs_query_finance
-  - name: tsbs_query_manual_bucketing
-  # - name: tsbs_query_fixed_bucketing
-  # - name: tsbs-query-genny
-  # - name: tsbs-query-optimizations
-  # - name: tpcc
-  # - name: tpcc_majority
-  # - name: tpch_1_normalized
-  # - name: tpch_1_denormalized
-  # - name: tpch_10_normalized
-  # - name: tpch_10_denormalized
+# - <<: *amazon_linux2_arm64_compile_variant_dependency
+#   name: perf-1-node-replSet.arm.aws.2023-09
+#   display_name: PERF 1-Node ReplSet ARM AWS 2023-09
+#   # Leave off for now
+#   modules: &perf_modules
+#     - enterprise
+#     - dsi
+#     - genny
+#     - workloads
+#     - linkbench
+#     - linkbench2
+#     - tsbs
+#     - YCSB
+#     - PrivateWorkloads
+#     - flamegraph
+#   expansions:
+#     <<: *linux_arm64_generic_expansions
+#     idle_timeout_factor: 1.5
+#     exec_timeout_factor: 1.5
+#     mongodb_setup_release: 2022-11
+#     mongodb_setup: single-replica
+#     infrastructure_provisioning_release: 2023-09
+#     infrastructure_provisioning: single
+#     workload_setup: 2022-11
+#     platform: linux
+#     project_dir: &perf_project_dir dsi
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#     compile_variant: *amazon_linux2_arm64_compile_variant_name
+#   run_on:
+#     - rhel70-small
+#   tasks:
+#   - name: industry_benchmarks
+#   - name: ycsb_60GB
+#   - name: ycsb_60GB.long
+#   - name: crud_workloads_majority
+#   - name: misc_workloads
+#   - name: map_reduce_workloads
+#   - name: smoke_test
+#   - name: canaries_only
+#   - name: non_sharded_workloads
+#   # - name: bestbuy_agg
+#   # - name: bestbuy_agg_merge_different_db
+#   # - name: bestbuy_agg_merge_same_db
+#   # - name: bestbuy_agg_merge_wordcount
+#   # - name: bestbuy_query
+#   - name: change_streams_latency
+#   - name: change_streams_listen_throughput
+#   - name: snapshot_reads
+#   - name: linkbench
+#   - name: linkbench2
+#   - name: tsbs_load
+#   # - name: tsbs_query
+#   # - name: tsbs_query_finance
+#   - name: tsbs_query_manual_bucketing
+#   # - name: tsbs_query_fixed_bucketing
+#   # - name: tsbs-query-genny
+#   # - name: tsbs-query-optimizations
+#   # - name: tpcc
+#   # - name: tpcc_majority
+#   # - name: tpch_1_normalized
+#   # - name: tpch_1_denormalized
+#   # - name: tpch_10_normalized
+#   # - name: tpch_10_denormalized
 
-###########################################
-#         Linux buildvariants             #
-###########################################
-- <<: *amazon2_x86_compile_variant_dependency
-  name: perf-standalone-classic-query-engine.intel.aws.2023-09
-  display_name: PERF Standalone (Classic Query Engine) Intel AWS 2023-09
-  # cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
-  activate: false
-  modules: *perf_modules
-  expansions:
-    <<: *amazon2_x86_expansions
-    idle_timeout_factor: 1.5
-    exec_timeout_factor: 1.5
-    mongodb_setup_release: 2022-11
-    mongodb_setup: standalone-classic-query-engine
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: single-intel
-    workload_setup: 2022-11
-    platform: linux
-    project_dir: *perf_project_dir
-    authentication: enabled
-    storageEngine: wiredTiger
-    compile_variant: *amazon2_x86_compile_variant_name
-  run_on:
-    - amazon2
-  tasks: &classic_engine_tasks
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
-    - name: industry_benchmarks
-    - name: ycsb_60GB
-    - name: ycsb_60GB.long
-    - name: crud_workloads_majority
-    # - name: bestbuy_agg
-    # - name: bestbuy_agg_merge_different_db
-    # - name: bestbuy_agg_merge_same_db
-    # - name: bestbuy_agg_merge_wordcount
-    # - name: bestbuy_query
-    # - name: cursor_manager
-    # - name: map_reduce_workloads
-    # - name: tpcc
-    # - name: tpcc_majority
-    # - name: tpch_1_normalized
-    # - name: tpch_1_denormalized
-    # - name: tpch_10_normalized
-    # - name: tpch_10_denormalized
-    - name: canaries_only
+# ###########################################
+# #         Linux buildvariants             #
+# ###########################################
+# - <<: *amazon2_x86_compile_variant_dependency
+#   name: perf-standalone-classic-query-engine.intel.aws.2023-09
+#   display_name: PERF Standalone (Classic Query Engine) Intel AWS 2023-09
+#   # cron: &cron_query_perf_schedule "0 0 * * 4"  # 00:00 on Thursday
+#   activate: false
+#   modules: *perf_modules
+#   expansions:
+#     <<: *amazon2_x86_expansions
+#     idle_timeout_factor: 1.5
+#     exec_timeout_factor: 1.5
+#     mongodb_setup_release: 2022-11
+#     mongodb_setup: standalone-classic-query-engine
+#     infrastructure_provisioning_release: 2023-09
+#     infrastructure_provisioning: single-intel
+#     workload_setup: 2022-11
+#     platform: linux
+#     project_dir: *perf_project_dir
+#     authentication: enabled
+#     storageEngine: wiredTiger
+#     compile_variant: *amazon2_x86_compile_variant_name
+#   run_on:
+#     - amazon2
+#   tasks: &classic_engine_tasks
+#     - name: schedule_patch_auto_tasks
+#     - name: schedule_variant_auto_tasks
+#     - name: industry_benchmarks
+#     - name: ycsb_60GB
+#     - name: ycsb_60GB.long
+#     - name: crud_workloads_majority
+#     # - name: bestbuy_agg
+#     # - name: bestbuy_agg_merge_different_db
+#     # - name: bestbuy_agg_merge_same_db
+#     # - name: bestbuy_agg_merge_wordcount
+#     # - name: bestbuy_query
+#     # - name: cursor_manager
+#     # - name: map_reduce_workloads
+#     # - name: tpcc
+#     # - name: tpcc_majority
+#     # - name: tpch_1_normalized
+#     # - name: tpch_1_denormalized
+#     # - name: tpch_10_normalized
+#     # - name: tpch_10_denormalized
+#     - name: canaries_only
 
 - &linux-64-debug-required-template
   <<: *linux_x86_dynamic_debug_compile_variant_dependency
