@@ -53,7 +53,8 @@ feature_flags:
   featureFlagCheckForDirectShardOperations:
     description: "Feature flag for checking for direct shard operations."
     cpp_varname: feature_flags::gCheckForDirectShardOperations
-    default: false
+    default: true
+    version: 7.3
     shouldBeFCVGated: true
   # TODO (SERVER-73632): Remove once 8.0 becomes last LTS.
   featureFlagEmbeddedRouter:
