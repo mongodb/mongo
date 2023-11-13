@@ -37,6 +37,7 @@ function verifyNameOnly(listDatabasesOut) {
 // creates 'num' databases on 'conn', each belonging to a different tenant
 function createMultitenantDatabases(conn, tokenConn, num) {
     let tenantIds = [];
+    let tokens = [];
     let expectedDatabases = [];
 
     for (let i = 0; i < num; i++) {
@@ -44,15 +45,19 @@ function createMultitenantDatabases(conn, tokenConn, num) {
         let kTenant = ObjectId();
         tenantIds.push(kTenant.str);
 
+        // Set the tenant token to create the user
+        conn._setSecurityToken(_createTenantToken({tenant: kTenant}));
+
         // Create a user for kTenant and then set the security token on the connection.
         assert.commandWorked(conn.getDB('$external').runCommand({
             createUser: "readWriteUserTenant" + i.toString(),
-            '$tenant': kTenant,
             roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
         }));
-        tokenConn._setSecurityToken(_createSecurityToken(
+        let token = _createSecurityToken(
             {user: "readWriteUserTenant" + i.toString(), db: '$external', tenant: kTenant},
-            kVTSKey));
+            kVTSKey);
+        tokens.push(token);
+        tokenConn._setSecurityToken(token);
 
         // Create a collection for the tenant and then insert into it.
         const tokenDB = tokenConn.getDB('auto_gen_db_' + i.toString());
@@ -61,7 +66,9 @@ function createMultitenantDatabases(conn, tokenConn, num) {
         expectedDatabases.push(
             {"name": 'auto_gen_db_' + i.toString(), "tenantId": kTenant, "empty": false});
     }
-    return [tenantIds, expectedDatabases];
+    // Reset token
+    conn._setSecurityToken("");
+    return [tenantIds, tokens, expectedDatabases];
 }
 
 // Given the output from the listDatabasesForAllTenants command, ensures that the database entries
@@ -75,15 +82,15 @@ function verifyDatabaseEntries(listDatabasesOut, expectedDatabases) {
 
 // Check that command properly lists all databases created by users authenticated with a security
 // token
-function runTestCheckMultitenantDatabases(primary, numDBs) {
+function runTestCheckMultitenantDatabases(primary, tokenConn, numDBs) {
     const adminDB = primary.getDB("admin");
-    const tokenConn = new Mongo(primary.host);
 
     // Add a root user that is unauthorized to run the command
     assert.commandWorked(adminDB.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 
     // Create numDBs databases, each belonging to a different tenant
-    const [tenantIds, expectedDatabases] = createMultitenantDatabases(primary, tokenConn, numDBs);
+    const [tenantIds, tokens, expectedDatabases] =
+        createMultitenantDatabases(primary, tokenConn, numDBs);
 
     // Check that all numDB databases were created of the proper size and include the correct
     // database entries
@@ -93,26 +100,22 @@ function runTestCheckMultitenantDatabases(primary, numDBs) {
     verifySizeSum(cmdRes);
     verifyDatabaseEntries(cmdRes, expectedDatabases);
 
-    return tenantIds;
+    return [tenantIds, tokens];
 }
 
 // Test correctness of filter and nameonly options
-function runTestCheckCmdOptions(primary, tenantIds) {
+function runTestCheckCmdOptions(primary, tenantIds, tokenConn, tokens) {
     const adminDB = primary.getDB("admin");
 
-    // Create 4 databases to verify the correctness of filter and nameOnly
-    assert.commandWorked(primary.getDB("jstest_list_databases_foo").createCollection("coll0", {
-        '$tenant': ObjectId(tenantIds[0])
-    }));
-    assert.commandWorked(primary.getDB("jstest_list_databases_bar").createCollection("coll0", {
-        '$tenant': ObjectId(tenantIds[1])
-    }));
-    assert.commandWorked(primary.getDB("jstest_list_databases_baz").createCollection("coll0", {
-        '$tenant': ObjectId(tenantIds[2])
-    }));
-    assert.commandWorked(primary.getDB("jstest_list_databases_zap").createCollection("coll0", {
-        '$tenant': ObjectId(tenantIds[3])
-    }));
+    // Create 5 databases to verify the correctness of filter and nameOnly
+    tokenConn._setSecurityToken(tokens[0]);
+    assert.commandWorked(tokenConn.getDB("jstest_list_databases_foo").createCollection("coll0"));
+    tokenConn._setSecurityToken(tokens[1]);
+    assert.commandWorked(tokenConn.getDB("jstest_list_databases_bar").createCollection("coll0"));
+    tokenConn._setSecurityToken(tokens[2]);
+    assert.commandWorked(tokenConn.getDB("jstest_list_databases_baz").createCollection("coll0"));
+    tokenConn._setSecurityToken(tokens[3]);
+    assert.commandWorked(tokenConn.getDB("jstest_list_databases_zap").createCollection("coll0"));
 
     // use to verify that the database entries are correct
     const expectedDatabases2 = [
@@ -215,11 +218,12 @@ function runTestInvalidCommands(primary) {
 
     // Add user authenticated with security token and check that they cannot run the command
     const kTenant = ObjectId();
+    primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "unauthorizedUsr",
-        '$tenant': kTenant,
         roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
+    primary._setSecurityToken("");
     tokenConn._setSecurityToken(
         _createSecurityToken({user: "unauthorizedUsr", db: '$external', tenant: kTenant}, kVTSKey));
     const tokenAdminDB = tokenConn.getDB("admin");
@@ -245,6 +249,7 @@ function runTestsWithMultiTenancySupport() {
 
     const primary = rst.getPrimary();
     const adminDB = primary.getDB('admin');
+    const tokenConn = new Mongo(primary.host);
 
     // Create internal system user that is authorized to run the command
     assert.commandWorked(
@@ -252,8 +257,8 @@ function runTestsWithMultiTenancySupport() {
     assert(adminDB.auth("internalUsr", "pwd"));
 
     const numDBs = 5;
-    const tenantIds = runTestCheckMultitenantDatabases(primary, numDBs);
-    runTestCheckCmdOptions(primary, tenantIds);
+    const [tenantIds, tokens] = runTestCheckMultitenantDatabases(primary, tokenConn, numDBs);
+    runTestCheckCmdOptions(primary, tenantIds, tokenConn, tokens);
     runTestInvalidCommands(primary);
 
     rst.stopSet();

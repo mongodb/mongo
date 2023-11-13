@@ -26,8 +26,6 @@ rst.initiate();
 const primary = rst.getPrimary();
 const adminDb = primary.getDB('admin');
 
-// Prepare a user for testing pass tenant via $tenant.
-// Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
 assert.commandWorked(adminDb.runCommand({createUser: 'admin', pwd: 'pwd', roles: ['root']}));
 assert(adminDb.auth('admin', 'pwd'));
 
@@ -53,9 +51,9 @@ const tokenDB = tokenConn.getDB(kDbName);
 // Test commands using a security token for one tenant.
 {
     // Create a user for kTenant and then set the security token on the connection.
+    primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant1",
-        '$tenant': kTenant,
         roles:
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
@@ -507,9 +505,9 @@ const tokenDB = tokenConn.getDB(kDbName);
 {
     // Create a user for a different tenant, and set the security token on the connection.
     // We reuse the same connection, but swap the token out.
+    primary._setSecurityToken(_createTenantToken({tenant: kOtherTenant}));
     assert.commandWorked(primary.getDB('$external').runCommand({
         createUser: "userTenant2",
-        '$tenant': kOtherTenant,
         roles:
             [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
@@ -626,68 +624,53 @@ const tokenDB = tokenConn.getDB(kDbName);
     }
 }
 
-// Test commands using a privleged user with ActionType::useTenant and check the user can still
-// run commands on the doc when passing the correct tenant, but not when passing a different
-// tenant.
+// Test commands using a privleged user with an unsigned security token and check that the user can
+// still run commands on the doc when on the correct connection, but not when on a different
+// connection.
 {
     const privelegedConn = new Mongo(primary.host);
     assert(privelegedConn.getDB('admin').auth('admin', 'pwd'));
+    privelegedConn._setSecurityToken(_createTenantToken({tenant: kTenant}));
     const privelegedDB = privelegedConn.getDB(kDbName);
 
-    // Find and modify the document using $tenant.
-    {
-        const fadCorrectDollarTenant = assert.commandWorked(privelegedDB.runCommand({
-            findAndModify: kCollName,
-            query: {b: 1},
-            update: {$inc: {b: 10}},
-            '$tenant': kTenant
-        }));
-        assert.eq(
-            {_id: 0, a: 1, b: 1}, fadCorrectDollarTenant.value, tojson(fadCorrectDollarTenant));
+    const otherPrivelegedConn = new Mongo(primary.host);
+    assert(otherPrivelegedConn.getDB('admin').auth('admin', 'pwd'));
+    otherPrivelegedConn._setSecurityToken(_createTenantToken({tenant: kOtherTenant}));
+    const otherPrivelegedDB = otherPrivelegedConn.getDB(kDbName);
 
-        const fadOtherDollarTenant = assert.commandWorked(privelegedDB.runCommand({
-            findAndModify: kCollName,
-            query: {b: 11},
-            update: {$inc: {b: 10}},
-            '$tenant': kOtherTenant
-        }));
-        assert.eq(null, fadOtherDollarTenant.value, tojson(fadOtherDollarTenant));
+    // Find and modify the document
+    {
+        const fadCorrectConnection = assert.commandWorked(privelegedDB.runCommand(
+            {findAndModify: kCollName, query: {b: 1}, update: {$inc: {b: 10}}}));
+        assert.eq({_id: 0, a: 1, b: 1}, fadCorrectConnection.value, tojson(fadCorrectConnection));
+
+        const fadOtherConnection = assert.commandWorked(otherPrivelegedDB.runCommand(
+            {findAndModify: kCollName, query: {b: 11}, update: {$inc: {b: 10}}}));
+        assert.eq(null, fadOtherConnection.value, tojson(fadOtherConnection));
 
         // Reset document data.
-        assert.commandWorked(privelegedDB.runCommand({
-            findAndModify: kCollName,
-            query: {b: 11},
-            update: {$set: {a: 1, b: 1}},
-            '$tenant': kTenant
-        }));
+        assert.commandWorked(privelegedDB.runCommand(
+            {findAndModify: kCollName, query: {b: 11}, update: {$set: {a: 1, b: 1}}}));
     }
 
-    // Rename the collection using $tenant.
+    // Rename the collection
     {
         const fromName = kDbName + '.' + kCollName;
         const toName = fromName + "_renamed";
         const privelegedAdminDB = privelegedConn.getDB('admin');
         assert.commandWorked(privelegedAdminDB.runCommand(
-            {renameCollection: fromName, to: toName, dropTarget: true, '$tenant': kTenant}));
+            {renameCollection: fromName, to: toName, dropTarget: true}));
 
         // Verify the the renamed collection by findAndModify existing documents.
-        const fad1 = assert.commandWorked(privelegedDB.runCommand({
-            findAndModify: kCollName + "_renamed",
-            query: {a: 1},
-            update: {$set: {a: 11, b: 1}},
-            '$tenant': kTenant
-        }));
+        const fad1 = assert.commandWorked(privelegedDB.runCommand(
+            {findAndModify: kCollName + "_renamed", query: {a: 1}, update: {$set: {a: 11, b: 1}}}));
         assert.eq({_id: 0, a: 1, b: 1}, fad1.value, tojson(fad1));
 
         // Reset the collection name and document data.
         assert.commandWorked(privelegedAdminDB.runCommand(
-            {renameCollection: toName, to: fromName, dropTarget: true, '$tenant': kTenant}));
-        assert.commandWorked(privelegedDB.runCommand({
-            findAndModify: kCollName,
-            query: {a: 11},
-            update: {$set: {a: 1, b: 1}},
-            '$tenant': kTenant
-        }));
+            {renameCollection: toName, to: fromName, dropTarget: true}));
+        assert.commandWorked(privelegedDB.runCommand(
+            {findAndModify: kCollName, query: {a: 11}, update: {$set: {a: 1, b: 1}}}));
     }
 }
 
@@ -714,5 +697,7 @@ const tokenDB = tokenConn.getDB(kDbName);
 // Test dbCheck command.
 // This should fail since dbCheck is not supporting using a security token.
 { assert.commandFailedWithCode(tokenDB.runCommand({dbCheck: kCollName}), ErrorCodes.Unauthorized); }
+
+primary._setSecurityToken("");
 
 rst.stopSet();

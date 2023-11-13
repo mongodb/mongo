@@ -5,10 +5,18 @@
 
 import {reInitiateWithoutThrowingOnAbortedMember} from "jstests/replsets/rslib.js";
 
+const kVTSKey = 'secret';
+
 const rst = new ReplSetTest({
     nodes: 1,
-    nodeOptions:
-        {auth: '', setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true}}
+    nodeOptions: {
+        auth: '',
+        setParameter: {
+            multitenancySupport: true,
+            featureFlagSecurityToken: true,
+            testOnlyValidatedTenancyScopeKey: kVTSKey,
+        }
+    }
 });
 rst.startSet({keyFile: 'jstests/libs/key1'});
 rst.initiate();
@@ -21,18 +29,19 @@ const adminDb = primary.getDB('admin');
 assert.commandWorked(
     adminDb.runCommand({createUser: 'internalUser', pwd: 'pwd', roles: ['__system']}));
 assert(adminDb.auth('internalUser', 'pwd'));
+primary._setSecurityToken(_createTenantToken({tenant: kTenant}));
 
 // Create a tenant user.
 assert.commandWorked(primary.getDB('$external').runCommand({
     createUser: "userTenant1",
-    '$tenant': kTenant,
     roles: [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
 }));
 
 // Check we see a user doc in the tenant's admin.system.user collection.
-let res =
-    assert.commandWorked(adminDb.runCommand({find: "system.users", filter: {}, $tenant: kTenant}));
+let res = assert.commandWorked(adminDb.runCommand({find: "system.users", filter: {}}));
 assert.eq(1, res.cursor.firstBatch.length);
+
+primary._setSecurityToken("");
 
 // Delete the auth schema doc. This should cause initial sync to fail, because a user exists
 // without an auth schema doc.

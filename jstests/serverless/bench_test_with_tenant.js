@@ -27,15 +27,15 @@ const tenantDB = (() => {
     const tokenConn = new Mongo(primary.host);
     const user = ObjectId().str;
 
-    // Create and the login to the root user such that the '$tenant' can be used.
+    // Create and login to the root user.
     assert.commandWorked(
         tokenConn.getDB("admin").runCommand({createUser: "root", pwd: "pwd", roles: ["root"]}));
     assert(tokenConn.getDB("admin").auth("root", "pwd"));
 
+    tokenConn._setSecurityToken(_createTenantToken({tenant: tenantId}));
     // Create the user with the required privileges.
     assert.commandWorked(tokenConn.getDB("$external").runCommand({
         createUser: user,
-        '$tenant': tenantId,
         roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
 
