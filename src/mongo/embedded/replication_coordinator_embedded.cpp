@@ -362,7 +362,8 @@ BSONObj ReplicationCoordinatorEmbedded::getConfigBSON() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-const MemberConfig* ReplicationCoordinatorEmbedded::findConfigMemberByHostAndPort(
+boost::optional<MemberConfig>
+ReplicationCoordinatorEmbedded::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     UASSERT_NOT_IMPLEMENTED;
 }

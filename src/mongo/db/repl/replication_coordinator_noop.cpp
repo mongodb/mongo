@@ -341,7 +341,7 @@ BSONObj ReplicationCoordinatorNoOp::getConfigBSON() const {
     MONGO_UNREACHABLE;
 }
 
-const MemberConfig* ReplicationCoordinatorNoOp::findConfigMemberByHostAndPort(
+boost::optional<MemberConfig> ReplicationCoordinatorNoOp::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     MONGO_UNREACHABLE;
 }

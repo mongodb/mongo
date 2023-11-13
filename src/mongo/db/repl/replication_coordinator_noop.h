@@ -232,7 +232,8 @@ public:
 
     BSONObj getConfigBSON() const final;
 
-    const MemberConfig* findConfigMemberByHostAndPort(const HostAndPort& hap) const final;
+    boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
+        const HostAndPort& hap) const final;
 
     bool isConfigLocalHostAllowed() const final;
 

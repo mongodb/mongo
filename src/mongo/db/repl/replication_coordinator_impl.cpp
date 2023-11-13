@@ -3384,10 +3384,11 @@ BSONObj ReplicationCoordinatorImpl::getConfigBSON() const {
     return _rsConfig.toBSON();
 }
 
-const MemberConfig* ReplicationCoordinatorImpl::findConfigMemberByHostAndPort(
+boost::optional<MemberConfig> ReplicationCoordinatorImpl::findConfigMemberByHostAndPort_deprecated(
     const HostAndPort& hap) const {
     stdx::lock_guard<Latch> lock(_mutex);
-    return _rsConfig.findMemberByHostAndPort(hap);
+    const MemberConfig* result = _rsConfig.findMemberByHostAndPort(hap);
+    return boost::make_optional(result, *result);
 }
 
 bool ReplicationCoordinatorImpl::isConfigLocalHostAllowed() const {

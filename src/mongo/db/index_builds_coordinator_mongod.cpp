@@ -570,7 +570,7 @@ Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx
                                                          const StringData& reason) {
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto memberConfig = replCoord->findConfigMemberByHostAndPort(votingNode);
+    auto memberConfig = replCoord->findConfigMemberByHostAndPort_deprecated(votingNode);
     if (!memberConfig || memberConfig->isArbiter()) {
         return Status{ErrorCodes::Error{7329201},
                       "Non-member and arbiter nodes cannot vote to abort an index build"};

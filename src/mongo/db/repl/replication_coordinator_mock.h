@@ -261,7 +261,7 @@ public:
 
     virtual BSONObj getConfigBSON() const override;
 
-    virtual const MemberConfig* findConfigMemberByHostAndPort(
+    virtual boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
         const HostAndPort& hap) const override;
 
     virtual Status validateWriteConcern(const WriteConcernOptions& writeConcern) const override;

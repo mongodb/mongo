@@ -719,10 +719,16 @@ public:
     virtual Status validateWriteConcern(const WriteConcernOptions& writeConcern) const = 0;
 
     /**
-     * Returns a pointer to the MemberConfig corresponding to the member with the given
-     * HostAndPort in the current ReplSetConfig, or NULL if there is no member with that address.
+     * Returns a copy of the MemberConfig corresponding to the member with the given
+     * HostAndPort in the current ReplSetConfig, or boost::none if there is no member with that
+     * address.
+     *
+     * This is deprecated because the previous version of this method returned a pointer to an
+     * internal structure that could change at any time, and getting member information is
+     * inherently racy; member configuration can change at any time.
      */
-    virtual const MemberConfig* findConfigMemberByHostAndPort(const HostAndPort& hap) const = 0;
+    virtual boost::optional<MemberConfig> findConfigMemberByHostAndPort_deprecated(
+        const HostAndPort& hap) const = 0;
 
     /**
      * Returns whether all members of the current ReplSetConfig set have hostname localhost.
