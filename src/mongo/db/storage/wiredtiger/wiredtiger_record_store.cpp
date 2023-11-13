@@ -324,7 +324,7 @@ void WiredTigerRecordStore::OplogTruncateMarkers::awaitHasExcessMarkersOrDead(
                 return;
             }
         }
-        _reclaimCv.wait(lock);
+        _reclaimCv.wait_for(lock, stdx::chrono::seconds{gOplogTruncationCheckPeriodSeconds});
     }
 }
 
