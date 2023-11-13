@@ -40,9 +40,12 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/query_settings_manager.h"
+#include "mongo/db/query/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_utils.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -54,6 +57,42 @@
 #include "mongo/s/query/cluster_find.h"
 
 namespace mongo {
+
+namespace {
+/**
+ * Performs the lookup for the QuerySettings given the 'parsedRequest'.
+ */
+query_settings::QuerySettings lookupQuerySettingsForFind(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const ParsedFindCommand& parsedRequest,
+    const NamespaceString& nss) {
+    // No QuerySettings lookup for IDHACK queries.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+        isIdHackEligibleQueryWithoutCollator(*parsedRequest.findCommandRequest)) {
+        return query_settings::QuerySettings();
+    }
+
+    auto opCtx = expCtx->opCtx;
+    auto& manager = query_settings::QuerySettingsManager::get(opCtx);
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.queryStatsKey) {
+            return opDebug.queryStatsKey->getQueryShapeHash(
+                opCtx, parsedRequest.findCommandRequest->getSerializationContext());
+        }
+
+        return std::make_unique<query_shape::FindCmdShape>(parsedRequest, expCtx)
+            ->sha256Hash(opCtx, parsedRequest.findCommandRequest->getSerializationContext());
+    };
+
+    // Return the found query settings or an empty one.
+    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
+        .get_value_or({})
+        .first;
+}
+
+}  // namespace
 
 /**
  * Implements the find command for a router.
@@ -144,14 +183,20 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-            // Parse the command BSON to a FindCommandRequest.
-            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+            Impl::checkCanExplainHere(opCtx);
+
+            auto&& [expCtx, parsedFind] = parseQueryAndLookupQuerySettings(opCtx);
+
+            // Update 'findCommand' by setting the looked up query settings, such that they can be
+            // applied on the shards.
+            auto& findCommand = parsedFind->findCommandRequest;
+            if (!expCtx->getQuerySettings().toBSON().isEmpty()) {
+                findCommand->setQuerySettings(expCtx->getQuerySettings());
+            }
 
             try {
                 const auto explainCmd =
                     ClusterExplain::wrapAsExplain(findCommand->toBSON(BSONObj()), verbosity);
-
-                Impl::checkCanExplainHere(opCtx);
 
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
@@ -187,63 +232,24 @@ public:
                                                                    &bodyBuilder));
 
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                auto bodyBuilder = result->getBodyBuilder();
-                bodyBuilder.resetToEmpty();
-
-                auto aggRequestOnView =
-                    query_request_conversion::asAggregateCommandRequest(*findCommand);
-                aggRequestOnView.setExplain(verbosity);
-
-                // An empty PrivilegeVector is acceptable because these privileges are only checked
-                // on getMore and explain will not open a cursor.
-                uassertStatusOK(ClusterAggregate::retryOnViewError(opCtx,
-                                                                   aggRequestOnView,
-                                                                   *ex.extraInfo<ResolvedView>(),
-                                                                   ns(),
-                                                                   PrivilegeVector(),
-                                                                   &bodyBuilder));
+                retryOnViewError(opCtx,
+                                 result,
+                                 *findCommand,
+                                 *ex.extraInfo<ResolvedView>(),
+                                 // An empty PrivilegeVector is acceptable because these privileges
+                                 // are only checked on getMore and explain will not open a cursor.
+                                 {},
+                                 verbosity);
             }
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
-            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-
             Impl::checkCanRunHere(opCtx);
 
-            auto findRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            auto collator = [&]() -> std::unique_ptr<mongo::CollatorInterface> {
-                if (!findRequest->getCollation().isEmpty()) {
-                    return uassertStatusOKWithContext(
-                        CollatorFactoryInterface::get(opCtx->getServiceContext())
-                            ->makeFromBSON(findRequest->getCollation()),
-                        "unable to parse collation");
-                }
-                return nullptr;
-            }();
-            auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, *findRequest, std::move(collator), true /* mayDbProfile */);
-            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
-                expCtx,
-                {.findCommand = std::move(findRequest),
-                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
-
-            if (!_didDoFLERewrite) {
-                query_stats::registerRequest(
-                    opCtx,
-                    expCtx->ns,
-                    [&]() {
-                        // This callback is either never invoked or invoked immediately within
-                        // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        return std::make_unique<query_stats::FindKey>(expCtx, *parsedFind);
-                    },
-                    /*requiresFullQueryStatsFeatureFlag*/ false);
-            }
-
-            // TODO: SERVER-77469 Propagate QueryShapeHash/QuerySettings from mongos to the shards.
+            auto&& [expCtx, parsedFind] = parseQueryAndLookupQuerySettings(opCtx);
+            registerRequestForQueryStats(expCtx, *parsedFind);
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-                .expCtx = std::move(expCtx),
-                .parsedFind = std::move(parsedFind),
-            });
+                .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
 
             try {
                 // Do the work to generate the first batch of results. This blocks waiting to get
@@ -267,19 +273,12 @@ public:
                 firstBatch.setPartialResultsReturned(partialResultsReturned);
                 firstBatch.done(cursorId, cq->nss());
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-                result->reset();
-
-                auto aggRequestOnView = query_request_conversion::asAggregateCommandRequest(
-                    cq->getFindCommandRequest());
-
-                auto bodyBuilder = result->getBodyBuilder();
-                uassertStatusOK(ClusterAggregate::retryOnViewError(
+                retryOnViewError(
                     opCtx,
-                    aggRequestOnView,
+                    result,
+                    cq->getFindCommandRequest(),
                     *ex.extraInfo<ResolvedView>(),
-                    ns(),
-                    {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::find)},
-                    &bodyBuilder));
+                    {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::find)});
             }
         }
 
@@ -310,6 +309,11 @@ public:
                     "Cannot specify runtime constants option to a mongos",
                     !findCommand->getLegacyRuntimeConstants());
 
+            // Forbid users from passing 'querySettings' explicitly.
+            uassert(7746900,
+                    "BSON field 'querySettings' is an unknown field",
+                    !findCommand->getQuerySettings().has_value());
+
             if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
 
@@ -325,6 +329,57 @@ public:
             }
 
             return findCommand;
+        }
+
+        void registerRequestForQueryStats(const boost::intrusive_ptr<ExpressionContext> expCtx,
+                                          const ParsedFindCommand& parsedFind) {
+            if (!_didDoFLERewrite) {
+                query_stats::registerRequest(
+                    expCtx->opCtx,
+                    expCtx->ns,
+                    [&]() {
+                        // This callback is either never invoked or invoked immediately within
+                        // registerRequest, so use-after-move of parsedFind isn't an issue.
+                        return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
+                    },
+                    /*requiresFullQueryStatsFeatureFlag*/ false);
+            }
+        }
+
+        /**
+         * Parses the '_request' into ParsedFindCommand, looks up the query settings and attaches
+         * them to the ExpressionContext.
+         */
+        std::pair<boost::intrusive_ptr<ExpressionContext>, std::unique_ptr<ParsedFindCommand>>
+        parseQueryAndLookupQuerySettings(OperationContext* opCtx) {
+            auto findRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+            auto expCtx = makeExpressionContext(opCtx, *findRequest);
+            auto parsedFind = uassertStatusOK(parsed_find_command::parse(
+                expCtx,
+                {.findCommand = std::move(findRequest),
+                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
+
+            // Look up the query settings and attach them to the ExpressionContext.
+            expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedFind, expCtx->ns));
+            return {std::move(expCtx), std::move(parsedFind)};
+        }
+
+        void retryOnViewError(
+            OperationContext* opCtx,
+            rpc::ReplyBuilderInterface* result,
+            const FindCommandRequest& findCommand,
+            const ResolvedView& resolvedView,
+            const PrivilegeVector& privileges,
+            boost::optional<mongo::ExplainOptions::Verbosity> verbosity = boost::none) {
+            auto bodyBuilder = result->getBodyBuilder();
+            bodyBuilder.resetToEmpty();
+
+            auto aggRequestOnView =
+                query_request_conversion::asAggregateCommandRequest(findCommand);
+            aggRequestOnView.setExplain(verbosity);
+
+            uassertStatusOK(ClusterAggregate::retryOnViewError(
+                opCtx, aggRequestOnView, resolvedView, ns(), privileges, &bodyBuilder));
         }
 
         const OpMsgRequest& _request;
