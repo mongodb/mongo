@@ -72,8 +72,6 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
     const auto& computedFromMeta = unpackNode->bucketSpec.computedMetaProjFields();
 
     CellPathReqsRet ret;
-    ret.topLevelPaths.reserve(fieldSet.size() - computedFromMeta.size());
-    ret.traversePaths.reserve(fieldSet.size() - computedFromMeta.size());
     for (const auto& field : fieldSet) {
         if (computedFromMeta.find(field) == computedFromMeta.end()) {
             // For each path requested by the query we generate a 'topLevelPath' version, which is
