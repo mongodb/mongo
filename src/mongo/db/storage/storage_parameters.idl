@@ -163,6 +163,13 @@ server_parameters:
         - oplogSamplingLogIntervalSeconds
         default: 10
         validator: { gte: 0 }
+    collectionTruncationCheckPeriodSeconds:
+        description: 'The number of seconds the truncation thread wakes up periodically to check and truncate collection.'
+        set_at: [ startup ]
+        cpp_vartype: 'int'
+        cpp_varname: gCollectionTruncationCheckPeriodSeconds
+        default: 300
+        validator: { gt: 300 }
 
     allowUnsafeUntimestampedWrites:
         description: >- 

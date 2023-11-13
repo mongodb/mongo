@@ -83,7 +83,7 @@ void CollectionTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* op
                 return;
             }
         }
-        _reclaimCv.wait(lock);
+        _reclaimCv.wait_for(lock, stdx::chrono::seconds{gCollectionTruncationCheckPeriodSeconds});
     }
 }
 
