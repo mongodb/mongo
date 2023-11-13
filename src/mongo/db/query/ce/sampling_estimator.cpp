@@ -224,7 +224,6 @@ private:
 };
 
 class SamplingTransport {
-    static constexpr size_t kMaxSampleSize = 1000;
 
 public:
     SamplingTransport(OptPhaseManager phaseManager,
@@ -232,7 +231,9 @@ public:
                       std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
                       std::unique_ptr<SamplingExecutor> executor)
         : _phaseManager(std::move(phaseManager)),
-          _sampleSize(std::min<int64_t>(numRecords, kMaxSampleSize)),
+          _sampleSize(std::min<int64_t>(
+              _phaseManager.getHints()._sqrtSampleSizeEnabled ? std::sqrt(numRecords) : numRecords,
+              _phaseManager.getHints()._samplingCollectionSizeMax)),
           _fallbackCE(std::move(fallbackCE)),
           _executor(std::move(executor)) {}
 

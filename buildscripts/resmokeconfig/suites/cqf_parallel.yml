@@ -32,6 +32,8 @@ executor:
         internalQueryCardinalityEstimatorMode: "sampling"
         internalQueryFrameworkControl: "forceBonsai"
         internalQueryDefaultDOP: 5
+        internalCascadesOptimizerSampleSizeMin: 1
+        internalCascadesOptimizerEnableSqrtSampleSize: false
         # TODO: SERVER-75423: Allow exchange to work independently on the storage concurrency settings.
         storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions"
         storageEngineConcurrentReadTransactions: 128
