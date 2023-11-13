@@ -17,7 +17,8 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     const res0 = assert.commandWorked(shard0Primary.adminCommand({hello: 1}));
     assert(res0.isWritablePrimary, res0);
 
-    assert.commandWorked(shard0Primary.adminCommand({replSetStepDown: 1, force: true}));
+    assert.commandWorked(
+        shard0Primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     const res1 = assert.commandWorked(shard0Primary.adminCommand({hello: 1}));
     assert(!res1.isWritablePrimary, res1);
 
