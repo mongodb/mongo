@@ -170,9 +170,10 @@ public:
     size_t getNumDropPendingIdents() const final {
         return 0;
     }
-    void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             std::shared_ptr<Ident> ident,
-                             DropIdentCallback&& onDrop) final {}
+    void addDropPendingIdent(
+        const stdx::variant<Timestamp, StorageEngine::CheckpointIteration>& dropTime,
+        std::shared_ptr<Ident> ident,
+        DropIdentCallback&& onDrop) final {}
     void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) final {}
     std::shared_ptr<Ident> markIdentInUse(StringData ident) final {
         return nullptr;
@@ -180,6 +181,14 @@ public:
     void startTimestampMonitor() final {}
 
     void checkpoint(OperationContext* opCtx) final {}
+
+    StorageEngine::CheckpointIteration getCheckpointIteration() const final {
+        return StorageEngine::CheckpointIteration{0};
+    }
+
+    bool hasDataBeenCheckpointed(StorageEngine::CheckpointIteration checkpointIteration) const {
+        return false;
+    }
 
     int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) final {
         return 0;
