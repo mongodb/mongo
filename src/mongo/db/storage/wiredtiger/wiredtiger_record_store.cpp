@@ -265,7 +265,7 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
                 }
             }
         }
-        _oplogReclaimCv.wait(lock);
+        _oplogReclaimCv.wait_for(lock, stdx::chrono::seconds{gOplogTruncationCheckPeriodSeconds});
     }
 }
 
