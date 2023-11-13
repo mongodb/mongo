@@ -268,7 +268,8 @@ void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones);
  * Builds documents to insert into config.tags from zones provided to reshardCollection cmd.
  */
 std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
-                                            const std::vector<ReshardingZoneType>& zones);
+                                            const std::vector<ReshardingZoneType>& zones,
+                                            const ShardKeyPattern& shardKey);
 
 /**
  * Creates a pipeline that can be serialized into a query for fetching oplog entries. `startAfter`
