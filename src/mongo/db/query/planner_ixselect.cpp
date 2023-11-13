@@ -959,7 +959,10 @@ void QueryPlannerIXSelect::stripUnneededAssignments(MatchExpression* node,
  */
 static void removeIndexRelevantTag(MatchExpression* node, size_t idx) {
     RelevantTag* tag = static_cast<RelevantTag*>(node->getTag());
-    MONGO_verify(tag);
+    if (!tag) {
+        return;
+    }
+
     vector<size_t>::iterator firstIt = std::find(tag->first.begin(), tag->first.end(), idx);
     if (firstIt != tag->first.end()) {
         tag->first.erase(firstIt);
@@ -984,9 +987,8 @@ void stripInvalidAssignmentsToPartialIndexNode(MatchExpression* node,
                                                size_t idxNo,
                                                const IndexEntry& idxEntry,
                                                bool inNegationOrElemMatchObj) {
-    if (node->getTag()) {
-        removeIndexRelevantTag(node, idxNo);
-    }
+    removeIndexRelevantTag(node, idxNo);
+
     inNegationOrElemMatchObj |= nodeIsNegationOrElemMatchObj(node);
     for (size_t i = 0; i < node->numChildren(); ++i) {
         // If 'node' is an OR and our current clause satisfies the filter expression, then we may be
