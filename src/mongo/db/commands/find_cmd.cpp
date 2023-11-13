@@ -111,7 +111,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -201,14 +200,6 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     const ParsedFindCommand& parsedRequest,
     const CollectionPtr& collection,
     const NamespaceString& nss) {
-    auto opCtx = expCtx->opCtx;
-
-    // TODO: SERVER-73632 Remove Feature Flag for PM-635.
-    // Remove query settings lookup as it is only done on mongos.
-    if (ShardingState::get(opCtx)->enabled()) {
-        return parsedRequest.findCommandRequest->getQuerySettings().get_value_or({});
-    }
-
     // No QuerySettings lookup for IDHACK queries.
     if (!feature_flags::gFeatureFlagQuerySettings.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
@@ -218,6 +209,7 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
         return query_settings::QuerySettings();
     }
 
+    auto opCtx = expCtx->opCtx;
     auto& manager = query_settings::QuerySettingsManager::get(opCtx);
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
@@ -276,7 +268,8 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
             /*requiresFullQueryStatsFeatureFlag*/ false);
     }
 
-    expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss));
+    auto querySettings = lookupQuerySettingsForFind(expCtx, *parsedRequest, collection, nss);
+    expCtx->setQuerySettings(std::move(querySettings));
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = std::move(parsedRequest),
@@ -975,14 +968,6 @@ public:
                 std::move(nss),
                 reqSc,
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
-
-            // TODO: SERVER-73632 Remove Feature Flag for PM-635.
-            // Forbid users from passing 'querySettings' explicitly.
-            if (!ShardingState::get(opCtx)->enabled()) {
-                uassert(7746901,
-                        "BSON field 'querySettings' is an unknown field",
-                        !findCommand->getQuerySettings().has_value());
-            }
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {

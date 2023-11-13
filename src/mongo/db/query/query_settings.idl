@@ -50,12 +50,8 @@ structs:
       Struct representing a namespace. An alternative definition of the
       NamespaceString.
     fields:
-      db:
-        type: string
-        stability: unstable
-      coll:
-        type: string
-        stability: unstable
+      db: string
+      coll: string
 
   IndexHintSpec:
     description: "Struct representing the index hint spec."
@@ -63,10 +59,8 @@ structs:
       ns:
         type: Namespace
         optional: true
-        stability: unstable
       allowedIndexes:
         type: array<IndexHint>
-        stability: unstable
 
   QuerySettings:
     description: >-
@@ -76,11 +70,9 @@ structs:
         type:
           variant: [IndexHintSpec, array<IndexHintSpec>]
         optional: true
-        stability: unstable
       queryEngineVersion:
         type: QueryEngineVersion
         optional: true
-        stability: unstable
 
   QueryShapeConfiguration:
     description: >-

@@ -201,52 +201,8 @@ StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
     return std::move(newQR);
 }
 
-std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* opCtx,
-                                                             const std::set<ShardId>& shardIds,
-                                                             const CanonicalQuery& query,
-                                                             const boost::optional<UUID> sampleId,
-                                                             bool appendGeoNearDistanceProjection) {
-    std::unique_ptr<FindCommandRequest> findCommand;
-    if (shardIds.size() > 1) {
-        findCommand = uassertStatusOK(transformQueryForShards(query.getFindCommandRequest(),
-                                                              appendGeoNearDistanceProjection));
-    } else {
-        // Forwards the FindCommandRequest as is to a single shard so that limit and skip can
-        // be applied on mongod.
-        findCommand = std::make_unique<FindCommandRequest>(query.getFindCommandRequest());
-    }
-
-    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    if (readConcernArgs.wasAtClusterTimeSelected()) {
-        // If mongos selected atClusterTime or received it from client, transmit it to shard.
-        findCommand->setReadConcern(readConcernArgs.toBSONInner());
-    }
-
-    // Replace the 'letParams' expressions with their values.
-    if (auto letParams = findCommand->getLet()) {
-        BSONObjBuilder result;
-
-        const auto& vars = query.getExpCtx()->variables;
-        const auto& vps = query.getExpCtx()->variablesParseState;
-        for (BSONElement elem : *letParams) {
-            StringData name = elem.fieldNameStringData();
-            result << name << vars.getUserDefinedValue(vps.getVariable(name));
-        }
-
-        findCommand->setLet(result.obj());
-    }
-
-    // ExpressionContext may contain query settings that were looked up in QuerySettingsManager.
-    // Propagate it to the shards.
-    if (!query.getExpCtx()->getQuerySettings().toBSON().isEmpty()) {
-        findCommand->setQuerySettings(query.getExpCtx()->getQuerySettings());
-    }
-
-    return findCommand;
-}
-
 /**
- * Constructs the shard requests (ShardId, BSONObj) pairs for the find command by attaching the
+ * Constructs the find commands sent to each targeted shard to establish cursors, attaching the
  * shardVersion, txnNumber and sampleId if necessary.
  */
 std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
@@ -258,54 +214,68 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     bool appendGeoNearDistanceProjection) {
     const auto& cm = cri.cm;
 
+    std::unique_ptr<FindCommandRequest> findCommandToForward;
+    if (shardIds.size() > 1) {
+        findCommandToForward = uassertStatusOK(transformQueryForShards(
+            query.getFindCommandRequest(), appendGeoNearDistanceProjection));
+    } else {
+        // Forwards the FindCommandRequest as is to a single shard so that limit and skip can
+        // be applied on mongod.
+        findCommandToForward = std::make_unique<FindCommandRequest>(query.getFindCommandRequest());
+    }
+
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    if (readConcernArgs.wasAtClusterTimeSelected()) {
+        // If mongos selected atClusterTime or received it from client, transmit it to shard.
+        findCommandToForward->setReadConcern(readConcernArgs.toBSONInner());
+    }
+
     // Choose the shard to sample the query on if needed.
     const auto sampleShardId = sampleId
         ? boost::make_optional(analyze_shard_key::getRandomShardId(shardIds))
         : boost::none;
 
-    // Helper methods for appending additional attributes to the shard command.
-    auto appendTxnNumber = [&](auto& cmdBuilder) {
-        if (opCtx->getTxnNumber()) {
-            cmdBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
-                              *opCtx->getTxnNumber());
+    // Replace the letParams expressions with their values.
+    if (auto letParams = findCommandToForward->getLet()) {
+        BSONObjBuilder result;
+
+        const auto& vars = query.getExpCtx()->variables;
+        const auto& vps = query.getExpCtx()->variablesParseState;
+        for (BSONElement elem : *letParams) {
+            StringData name = elem.fieldNameStringData();
+            result << name << vars.getUserDefinedValue(vps.getVariable(name));
         }
-    };
-    auto appendShardVersion = [&](auto shardId, auto& cmdBuilder) {
+
+        findCommandToForward->setLet(result.obj());
+    }
+
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardId : shardIds) {
+        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
+        invariant(!shard->isConfig() || shard->getConnString());
+
+        BSONObjBuilder cmdBuilder;
+        findCommandToForward->serialize(BSONObj(), &cmdBuilder);
+
         if (cm.hasRoutingTable()) {
             cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
             cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
         }
-    };
-    auto appendSampleId = [&](auto shardId, auto& cmdBuilder) {
+
+        if (opCtx->getTxnNumber()) {
+            cmdBuilder.append(OperationSessionInfoFromClient::kTxnNumberFieldName,
+                              *opCtx->getTxnNumber());
+        }
         if (shardId == sampleShardId) {
             analyze_shard_key::appendSampleId(&cmdBuilder, *sampleId);
         }
-    };
 
-    // Constructs the shard request by appending additional attributes to the serialized
-    // 'findCommandToForward'.
-    auto findCommandToForward =
-        makeFindCommandForShards(opCtx, shardIds, query, sampleId, appendGeoNearDistanceProjection);
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto makeShardRequest = [&](const auto& shardId) {
-        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        invariant(!shard->isConfig() || shard->getConnString());
+        requests.emplace_back(shardId, cmdBuilder.obj());
+    }
 
-        BSONObjBuilder cmdBuilder;
-        findCommandToForward->serialize(BSONObj(), &cmdBuilder);
-        appendTxnNumber(cmdBuilder);
-        appendShardVersion(shardId, cmdBuilder);
-        appendSampleId(shardId, cmdBuilder);
-
-        return AsyncRequestsSender::Request(shardId, cmdBuilder.obj());
-    };
-
-    std::vector<AsyncRequestsSender::Request> requests;
-    requests.reserve(shardIds.size());
-    std::transform(
-        shardIds.begin(), shardIds.end(), std::back_inserter(requests), makeShardRequest);
     return requests;
 }
 

@@ -346,7 +346,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         'cursor_response_idl',
-        'query_settings',
     ],
 )
 
