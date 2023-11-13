@@ -139,6 +139,8 @@ last-continuous:
     ticket: SERVER-72703
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-86419
+  - test_file: jstests/core/query/internal_strip_invalid_assignment.js
+    ticket: SERVER-82717
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -340,6 +342,8 @@ last-lts:
     ticket: SERVER-72703
   - test_file: jstests/core/query/bittest.js
     ticket: SERVER-86419
+  - test_file: jstests/core/query/internal_strip_invalid_assignment.js
+    ticket: SERVER-82717
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
