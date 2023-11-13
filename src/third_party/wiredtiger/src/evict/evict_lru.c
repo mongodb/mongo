@@ -2400,6 +2400,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
     if (app_thread)
         time_start = __wt_clock(session);
 
+    /*
+     * Note that this for loop is designed to reset expected eviction error codes before exiting,
+     * namely, the busy return and empty eviction queue. We do not need the calling functions to
+     * have to deal with internal eviction return codes.
+     */
     for (initial_progress = cache->eviction_progress;; ret = 0) {
         /*
          * If eviction is stuck, check if this thread is likely causing problems and should be
@@ -2427,6 +2432,13 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
          */
         if (__wt_op_timer_fired(session))
             break;
+
+        /* Check if we have exceeded the global or the session timeout for waiting on the cache. */
+        if (app_thread && cache_max_wait_us != 0) {
+            time_stop = __wt_clock(session);
+            if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) > cache_max_wait_us)
+                break;
+        }
 
         /*
          * Check if we have become busy.
@@ -2462,12 +2474,6 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
         default:
             goto err;
         }
-        /* Stop if we've exceeded the time out. */
-        if (app_thread && cache_max_wait_us != 0) {
-            time_stop = __wt_clock(session);
-            if (session->cache_wait_us + WT_CLOCKDIFF_US(time_stop, time_start) > cache_max_wait_us)
-                goto err;
-        }
     }
 
 err:
@@ -2477,8 +2483,13 @@ err:
         WT_STAT_CONN_INCRV(session, application_cache_time, elapsed);
         WT_STAT_SESSION_INCRV(session, cache_time, elapsed);
         session->cache_wait_us += elapsed;
-        if (cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
-            WT_TRET(WT_CACHE_FULL);
+        /*
+         * Check if a rollback is required only if there has not been an error. Returning an error
+         * takes precedence over asking for a rollback. We can not do both.
+         */
+        if (ret == 0 && cache_max_wait_us != 0 && session->cache_wait_us > cache_max_wait_us) {
+            ret = __wt_txn_rollback_required(session, WT_TXN_ROLLBACK_REASON_CACHE);
+            --cache->evict_aggressive_score;
             WT_STAT_CONN_INCR(session, cache_timed_out_ops);
         }
     }
