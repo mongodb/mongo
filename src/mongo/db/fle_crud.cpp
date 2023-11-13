@@ -1757,18 +1757,21 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
             updateReply.getWriteCommandReplyBase().setRetriedStmtIds(
                 std::vector<std::int32_t>{reply.getRetriedStmtId().value()});
         }
-        updateReply.getWriteCommandReplyBase().setN(reply.getLastErrorObject().getNumDocs());
 
-        if (reply.getLastErrorObject().getUpserted().has_value()) {
+        auto& lastErrorObject = reply.getLastErrorObject();
+
+        updateReply.getWriteCommandReplyBase().setN(lastErrorObject.getNumDocs());
+
+        if (lastErrorObject.getUpserted().has_value()) {
             write_ops::Upserted upserted;
             upserted.setIndex(0);
-            upserted.set_id(reply.getLastErrorObject().getUpserted().value());
+            upserted.set_id(lastErrorObject.getUpserted().value());
             updateReply.setUpserted(std::vector<mongo::write_ops::Upserted>{upserted});
-        }
-
-        if (reply.getLastErrorObject().getNumDocs() > 0) {
-            updateReply.setNModified(1);
-            updateReply.getWriteCommandReplyBase().setN(1);
+        } else {
+            dassert(lastErrorObject.getUpdatedExisting().has_value());
+            if (lastErrorObject.getUpdatedExisting().value()) {
+                updateReply.setNModified(1);
+            }
         }
     }
 

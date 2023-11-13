@@ -501,6 +501,10 @@ last-continuous:
     ticket: SERVER-80842
   - test_file: jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js
     ticket: SERVER-75604
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    ticket: SERVER-82984
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
+    ticket: SERVER-82984
   suites: null
 last-lts:
   all:
@@ -1064,4 +1068,8 @@ last-lts:
     ticket: SERVER-80842
   - test_file: jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js
     ticket: SERVER-75604
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    ticket: SERVER-82984
+  - test_file: src/mongo/db/modules/enterprise/jstests/fle2/basic_replace.js
+    ticket: SERVER-82984
   suites: null
