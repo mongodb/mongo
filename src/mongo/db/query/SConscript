@@ -79,6 +79,7 @@ env.Library(
         'query_planner.cpp',
         'query_settings.cpp',
         'query_solution.cpp',
+        'record_id_range.cpp',
         'stage_types.cpp',
     ],
     LIBDEPS=[
@@ -520,6 +521,7 @@ env.CppUnitTest(
         "query_settings_test.cpp",
         "query_settings_validation_test.cpp",
         "query_solution_test.cpp",
+        "record_id_range_test.cpp",
         "sbe_and_hash_test.cpp",
         "sbe_and_sorted_test.cpp",
         "sbe_shard_filter_test.cpp",
@@ -548,6 +550,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/pipeline/document_source_mock",
         '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
         "$BUILD_DIR/mongo/db/query_exec",
+        '$BUILD_DIR/mongo/db/record_id_helpers',
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",

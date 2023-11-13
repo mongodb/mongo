@@ -170,23 +170,24 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         // beyond the range, so in calls to testLT() and testRange() its value will be one lower.
         // This is accounted for by delegations to the assertDocsExamined() helper function.
 
-        // Expect docsExamined == nReturned + 2 due to the collection scan bounds being always
-        // inclusive and due to the by-design additional cursor 'next' beyond the range.
-        testLT("$lt", 10, 10, 12);
+        // As of SERVER-75604, clustered collection scans can be inclusive or exclusive at either
+        // end; the filter does not need to examine a record at the lower bound to then discard it.
+        // Expect docsExamined == nReturned + 1 due to the by-design additional cursor 'next' beyond
+        // the range.
+        testLT("$lt", 10, 10, 11);
         // Expect docsExamined == nReturned + 1 due to the by-design additional cursor 'next' beyond
         // the range.
         testLT("$lte", 10, 11, 12);
-        // Expect docsExamined == nReturned + 1 due to the collection scan bounds being always
-        // inclusive. Note that unlike the 'testLT' cases, there's no additional cursor 'next'
-        // beyond the range because we hit EOF.
-        testGT("$gt", 89, 10, 11);
+        // Expect docsExamined == nReturned. Note that unlike the 'testLT' cases, there's no
+        // additional cursor 'next' beyond the range because we hit EOF.
+        testGT("$gt", 89, 10, 10);
         // Expect docsExamined == nReturned.
         testGT("$gte", 89, 11, 11);
-        // docsExamined reflects the fact that collection scan bounds are always inclusive and
-        // that by design we do an additional cursor 'next' beyond the range.
-        testRange("$gt", 20, "$lt", 40, 19, 22);
-        testRange("$gte", 20, "$lt", 40, 20, 22);
-        testRange("$gt", 20, "$lte", 40, 20, 22);
+        // docsExamined reflects the fact that by design we do an additional cursor 'next' beyond
+        // the range.
+        testRange("$gt", 20, "$lt", 40, 19, 20);
+        testRange("$gte", 20, "$lt", 40, 20, 21);
+        testRange("$gt", 20, "$lte", 40, 20, 21);
         testRange("$gte", 20, "$lte", 40, 21, 22);
         testIn();
 

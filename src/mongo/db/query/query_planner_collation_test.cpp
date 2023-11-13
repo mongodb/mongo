@@ -33,6 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_planner_test_fixture.h"
@@ -793,6 +794,67 @@ TEST_F(QueryPlannerTest, NoSortStageWhenMinMaxIndexCollationDoesNotMatchButBound
 
     assertNumSolutions(1U);
     assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1, c: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NoFilterWhenMinMaxRecordSufficientAndCollationSame) {
+    // Test that a clustered collection scan can drop elements from the filter if the underlying
+    // scan can apply equivalent filtering using min/max record id.
+    params.clusteredInfo = mongo::clustered_util::makeDefaultClusteredIdIndex();
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {_id: {$gte: 'x', $lt: 'z'}}, hint: {_id: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {}}}");
+}
+
+TEST_F(QueryPlannerTest, PartialFilterCollationSame) {
+    // Test that a clustered collection scan can drop elements from the filter if the underlying
+    // scan can apply equivalent filtering using min/max record id, but will retain any
+    // other filter terms which _cannot_ be so represented as limits on the record id.
+    params.clusteredInfo = mongo::clustered_util::makeDefaultClusteredIdIndex();
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$and: [ { _id: { $gte: 'x' } }, { foo: { $lt: 'z' } } "
+                 "]}, hint: {_id: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1, filter: { $and: [ { foo: { $lt: 'z' } } ] }}}");
+}
+
+TEST_F(QueryPlannerTest, FilterWhenMinMaxRecordNotSufficientWhenCollationIsNotSame) {
+    // Test that a clustered collection scan will NOT drop elements from the filter
+    // if collation differs between the clustered collection and the query.
+    params.clusteredInfo = mongo::clustered_util::makeDefaultClusteredIdIndex();
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {_id: {$gte: 'x', $lt: 'z'}}, hint: {_id: 1}, "
+                 "collation: {locale: 'lt'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {dir: 1, filter: { $and: [ { _id: { $gte: 'x' } }, { _id: { $lt: 'z' } } ] }, "
+        "collation: {locale: 'lt'}}}");
+}
+
+TEST_F(QueryPlannerTest, FilterWhenCollationIsNotSameEvenForUnaffected) {
+    // Test that a clustered collection scan will NOT drop elements from the filter
+    // if collation differs between the clustered collection and the query, _even_ if
+    // the parameters to the query are not affected by collation (e.g., numbers).
+
+    // For a single specific query, the filter _could_ be simplified, but it would not
+    // be correct to allow that query to be cached, as a later reuse may use
+    // values which _are_ affected.
+    params.clusteredInfo = mongo::clustered_util::makeDefaultClusteredIdIndex();
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {_id: {$gte: 1, $lt: 2}}, hint: {_id: 1}, "
+                 "collation: {locale: 'lt'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {dir: 1, filter: { $and: [ { _id: { $gte: 1 } }, { _id: { $lt: 2 } } ] }, "
+        "collation: {locale: 'lt'}}}");
 }
 
 }  // namespace

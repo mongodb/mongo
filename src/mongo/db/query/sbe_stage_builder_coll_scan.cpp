@@ -316,10 +316,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
         ParameterizedClusteredScanSlots{minRecordSlot, maxRecordSlot});
 
     // Create the ScanStage.
-    bool excludeScanEndRecordId =
+    bool includeScanStartRecordId =
         (csn->boundInclusion ==
-             CollectionScanParams::ScanBoundInclusion::kExcludeBothStartAndEndRecords ||
+             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
          csn->boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly);
+    bool includeScanEndRecordId =
+        (csn->boundInclusion ==
+             CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
+         csn->boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly);
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
@@ -340,7 +344,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
                                             false /* lowPriority default */,
                                             false /* useRandomCursor default */,
                                             true /* participateInTrialRunTracking default */,
-                                            excludeScanEndRecordId);
+                                            includeScanStartRecordId,
+                                            includeScanEndRecordId);
 
     // Iff this is a resume or fetch, build the subtree to start the scan from the seekRecordId.
     if (seekRecordIdSlot) {
@@ -360,7 +365,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     // from the "min" (always inclusive) and/or "max" (always exclusive) keywords, there may be no
     // filter, so ScanStage->getNext() must directly enforce the bounds. min's inclusivity matches
     // getNext()'s default behavior, but max's exclusivity does not and thus is enforced by the
-    // excludeScanEndRecordId argument to the ScanStage constructor above.
+    // includeScanEndRecordId argument to the ScanStage constructor above.
     SbExpr filterExpr = generateFilter(
         state, csn->filter.get(), TypedSlot{resultSlot, TypeSignature::kAnyScalarType}, nullptr);
     if (!filterExpr.isNull()) {

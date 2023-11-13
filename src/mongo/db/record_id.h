@@ -34,6 +34,7 @@
 #include <boost/functional/hash.hpp>
 #include <boost/optional.hpp>
 #include <climits>
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -307,6 +308,16 @@ public:
         }
         MONGO_UNREACHABLE;
     }
+
+    std::strong_ordering operator<=>(const RecordId& rhs) const {
+        return compare(rhs) <=> 0;
+    }
+
+    bool operator==(const RecordId& rhs) const {
+        return std::is_eq(*this <=> rhs);
+    }
+
+    bool operator!=(const RecordId& rhs) const = default;
 
     size_t hash() const {
         size_t hash = 0;
@@ -590,25 +601,6 @@ class RecordIdChecks {
     static_assert(std::alignment_of_v<RecordId> == std::alignment_of_v<int64_t>);
 };
 }  // namespace details
-
-inline bool operator==(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) == 0;
-}
-inline bool operator!=(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs);
-}
-inline bool operator<(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) < 0;
-}
-inline bool operator<=(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) <= 0;
-}
-inline bool operator>(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) > 0;
-}
-inline bool operator>=(const RecordId& lhs, const RecordId& rhs) {
-    return lhs.compare(rhs) >= 0;
-}
 
 inline StringBuilder& operator<<(StringBuilder& stream, const RecordId& id) {
     return stream << "RecordId(" << id.toString() << ')';

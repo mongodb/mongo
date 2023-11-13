@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <compare>
 #include <fmt/format.h>
 #include <ostream>
 
@@ -80,6 +81,15 @@ public:
     int compare(const RecordIdBound& rhs) const {
         return _recordId.compare(rhs._recordId);
     }
+
+    std::strong_ordering operator<=>(const RecordIdBound& rhs) const {
+        return compare(rhs) <=> 0;
+    }
+
+    bool operator==(const RecordIdBound& rhs) const {
+        return std::is_eq(*this <=> rhs);
+    }
+    bool operator!=(const RecordIdBound& rhs) const = default;
 
 private:
     RecordId _recordId;

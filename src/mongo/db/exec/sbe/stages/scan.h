@@ -145,7 +145,8 @@ public:
               bool lowPriority = false,
               bool useRandomCursor = false,
               bool participateInTrialRunTracking = true,
-              bool excludeScanEndRecordId = false);
+              bool includeScanStartRecordId = true,
+              bool includeScanEndRecordId = true);
 
     std::unique_ptr<PlanStage> clone() const final;
 
@@ -260,8 +261,11 @@ private:
     value::SlotAccessor* _maxRecordIdAccessor{nullptr};
     RecordId _maxRecordId;
 
-    // Only for clustered collection scans: must ScanStage::getNext() exclude the ending bound?
-    bool _excludeScanEndRecordId = false;
+    // Only for clustered collection scans: must ScanStage::getNext() include the starting bound?
+    bool _includeScanStartRecordId = true;
+
+    // Only for clustered collection scans: must ScanStage::getNext() include the ending bound?
+    bool _includeScanEndRecordId = true;
 
     // Only for clustered collection scans: does the scan have an end bound?
     bool _hasScanEndRecordId = false;

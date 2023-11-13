@@ -528,14 +528,8 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
 
     for (size_t i = 0; i < clusteredBoundInfos.size(); ++i) {
         // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
-        boost::optional<RecordIdBound> minRecord;  // scan start bound
-        boost::optional<RecordIdBound> maxRecord;  // scan end bound
-
-        // 'boundInclusion' is needed for handleRIDRangeMinMax, but we don't need to bind it to a
-        // slot because it is always the same as the original in a plan matched from cache since
-        // only the "max" keyword can change it from its default, and plans using "max" are not
-        // cached.
-        CollectionScanParams::ScanBoundInclusion boundInclusion;  // whether end bound is inclusive
+        // Scan start/end bounds.
+        RecordIdRange recordRange;
 
         // Cast the return value to void since we are not building a CollectionScanNode here so do
         // not need to set it in its 'hasCompatibleCollation' member.
@@ -544,16 +538,14 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
                                                    queryCollator,
                                                    data->staticData->ccCollator.get(),
                                                    data->staticData->clusterKeyFieldName,
-                                                   minRecord,
-                                                   maxRecord));
+                                                   recordRange));
         QueryPlannerAccess::handleRIDRangeMinMax(cq,
                                                  data->staticData->direction,
                                                  queryCollator,
                                                  data->staticData->ccCollator.get(),
-                                                 minRecord,
-                                                 maxRecord,
-                                                 boundInclusion);
+                                                 recordRange);
         // Bind the scan bounds to input slots.
+        const auto& minRecord = recordRange.getMin();
         if (minRecord) {
             boost::optional<sbe::value::SlotId> minRecordId =
                 data->staticData->clusteredCollBoundsInfos[i].minRecord;
@@ -561,6 +553,7 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
             auto [tag, val] = sbe::value::makeCopyRecordId(minRecord->recordId());
             runtimeEnvironment->resetSlot(minRecordId.value(), tag, val, true);
         }
+        const auto& maxRecord = recordRange.getMax();
         if (maxRecord) {
             boost::optional<sbe::value::SlotId> maxRecordId =
                 data->staticData->clusteredCollBoundsInfos[i].maxRecord;

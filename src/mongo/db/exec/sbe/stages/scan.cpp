@@ -82,7 +82,8 @@ ScanStage::ScanStage(UUID collectionUuid,
                      bool lowPriority,
                      bool useRandomCursor,
                      bool participateInTrialRunTracking,
-                     bool excludeScanEndRecordId)
+                     bool includeScanStartRecordId,
+                     bool includeScanEndRecordId)
     : PlanStage(seekRecordIdSlot ? "seek"_sd : "scan"_sd,
                 yieldPolicy,
                 nodeId,
@@ -103,7 +104,8 @@ ScanStage::ScanStage(UUID collectionUuid,
       _useRandomCursor(useRandomCursor),
       _collUuid(collectionUuid),
       _scanCallbacks(std::move(scanCallbacks)),
-      _excludeScanEndRecordId(excludeScanEndRecordId),
+      _includeScanStartRecordId(includeScanStartRecordId),
+      _includeScanEndRecordId(includeScanEndRecordId),
       _lowPriority(lowPriority) {
     invariant(_scanFieldNames.size() == _scanFieldSlots.size());
     invariant(!_seekRecordIdSlot || _forward);
@@ -132,7 +134,8 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _lowPriority,
                                        _useRandomCursor,
                                        _participateInTrialRunTracking,
-                                       _excludeScanEndRecordId);
+                                       _includeScanStartRecordId,
+                                       _includeScanEndRecordId);
 }
 
 void ScanStage::prepare(CompileCtx& ctx) {
@@ -494,6 +497,14 @@ PlanState ScanStage::getNext() {
             nextRecord = _cursor->next();
         } else {
             _firstGetNext = false;
+            auto seekAndSkipUntil =
+                [](auto& cursor, const auto& startRecordId, const auto& condition) {
+                    auto record = cursor->seekNear(startRecordId);
+                    while (record && !condition(record->id <=> startRecordId)) {
+                        record = cursor->next();
+                    }
+                    return record;
+                };
             if (_seekRecordIdAccessor) {  // fetch or scan resume
                 if (_seekRecordId.isNull()) {
                     // Attempting to resume from a null record ID gives a null '_seekRecordId'.
@@ -507,17 +518,15 @@ PlanState ScanStage::getNext() {
                 doSeekExact = true;
                 nextRecord = _cursor->seekExact(_seekRecordId);
             } else if (_minRecordIdAccessor && _forward) {
-                nextRecord = _cursor->seekNear(_minRecordId);
-                // Skip first record if seekNear() landed on the record just before the start bound.
-                if (nextRecord && nextRecord->id < _minRecordId) {
-                    nextRecord = _cursor->next();
-                }
+                // seekNear() may land on the record just before the start bound.
+                // Additionally, the range may be exclusive of the start record.
+                // Keep advancing until the first record equal to _minRecordId
+                // or, if exclusive, the first record "after" it.
+                nextRecord = seekAndSkipUntil(
+                    _cursor, _minRecordId, _includeScanStartRecordId ? std::is_gteq : std::is_gt);
             } else if (_maxRecordIdAccessor && !_forward) {
-                nextRecord = _cursor->seekNear(_maxRecordId);
-                // Skip first record if seekNear() landed on the record just before the start bound.
-                if (nextRecord && nextRecord->id > _maxRecordId) {
-                    nextRecord = _cursor->next();
-                }
+                nextRecord = seekAndSkipUntil(
+                    _cursor, _maxRecordId, _includeScanStartRecordId ? std::is_lteq : std::is_lt);
             } else {
                 nextRecord = _cursor->next();
             }
@@ -566,12 +575,12 @@ PlanState ScanStage::getNext() {
     if (_recordIdSlot) {
         _recordId = std::move(nextRecord->id);
         if (_hasScanEndRecordId) {
-            if (_excludeScanEndRecordId) {
-                _havePassedScanEndRecordId =
-                    _forward ? (_recordId >= _maxRecordId) : (_recordId <= _minRecordId);
-            } else {
+            if (_includeScanEndRecordId) {
                 _havePassedScanEndRecordId =
                     _forward ? (_recordId > _maxRecordId) : (_recordId < _minRecordId);
+            } else {
+                _havePassedScanEndRecordId =
+                    _forward ? (_recordId >= _maxRecordId) : (_recordId <= _minRecordId);
             }
         }
         if (_havePassedScanEndRecordId) {

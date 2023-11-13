@@ -48,6 +48,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/record_id_range.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -165,18 +166,13 @@ public:
      *   (in) direction - 'query's scan direction: 1: forward; -1: reverse
      *   (in) queryCollator - 'query's collator
      *   (in) ccCollator - clustered collection's collator
-     *   (out) minRecord - scan start bound
-     *   (out) maxRecord - scan end bound
-     *   (out) boundInclusion - whether to exclude 'maxRecord' because it was specified by the 'max'
-     *     keyword
+     *   (out) recordRange - scan start/end bounds
      */
     static void handleRIDRangeMinMax(const CanonicalQuery& query,
                                      int direction,
                                      const CollatorInterface* queryCollator,
                                      const CollatorInterface* ccCollator,
-                                     boost::optional<RecordIdBound>& minRecord,
-                                     boost::optional<RecordIdBound>& maxRecord,
-                                     CollectionScanParams::ScanBoundInclusion& boundInclusion);
+                                     RecordIdRange& recordRange);
 
     /**
      * Helper method to add an RID range to collection scans. If the query solution tree contains a
@@ -204,15 +200,26 @@ public:
      *   (in) queryCollator - current query's collator
      *   (in) ccCollator - clustered collection's collator
      *   (in) clusterKeyFieldName - only "_id" is officially supported, but this may change someday
-     *   (out) minRecord - scan start bound
-     *   (out) maxRecord - scan end bound
+     *   (out) recordRange - scan start/end bounds
+     *   (out) redundant - if provided, will be called with pointers to expressions which
+     *                     do not require a filter, _if_ the collection scan can enforce
+     *                     recordRange
      */
-    [[nodiscard]] static bool handleRIDRangeScan(const MatchExpression* conjunct,
-                                                 const CollatorInterface* queryCollator,
-                                                 const CollatorInterface* ccCollator,
-                                                 const StringData& clusterKeyFieldName,
-                                                 boost::optional<RecordIdBound>& minRecord,
-                                                 boost::optional<RecordIdBound>& maxRecord);
+    [[nodiscard]] static bool handleRIDRangeScan(
+        const MatchExpression* conjunct,
+        const CollatorInterface* queryCollator,
+        const CollatorInterface* ccCollator,
+        const StringData& clusterKeyFieldName,
+        RecordIdRange& recordRange,
+        const std::function<void(const MatchExpression*)>& redundant = [](auto) {});
+
+    /**
+     * Removes elements from a MatchExpression tree, recursively.
+     *
+     * Only descends into AndMatchExpressions.
+     */
+    static void simplifyFilter(std::unique_ptr<MatchExpression>& expr,
+                               const std::set<const MatchExpression*>& toRemove);
 
 private:
     /**

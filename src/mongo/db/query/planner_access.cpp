@@ -28,8 +28,12 @@
  */
 
 
+#include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
 #include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
@@ -76,6 +80,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/record_id_range.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
@@ -308,14 +313,11 @@ bool compatibleCollator(const CollatorInterface* collCollator,
 }
 }  // namespace
 
-void QueryPlannerAccess::handleRIDRangeMinMax(
-    const CanonicalQuery& query,
-    const int direction,
-    const CollatorInterface* queryCollator,
-    const CollatorInterface* ccCollator,
-    boost::optional<RecordIdBound>& minRecord,
-    boost::optional<RecordIdBound>& maxRecord,
-    CollectionScanParams::ScanBoundInclusion& boundInclusion) {
+void QueryPlannerAccess::handleRIDRangeMinMax(const CanonicalQuery& query,
+                                              const int direction,
+                                              const CollatorInterface* queryCollator,
+                                              const CollatorInterface* ccCollator,
+                                              RecordIdRange& recordRange) {
     BSONObj minObj = query.getFindCommandRequest().getMin();
     BSONObj maxObj = query.getFindCommandRequest().getMax();
     if (minObj.isEmpty() && maxObj.isEmpty()) {
@@ -335,15 +337,16 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
     if (!maxObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, maxObj.firstElement())) {
         // max() is exclusive.
         // Assumes clustered collection scans are only supported with the forward direction.
-        boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
-        setLowestRecord(maxRecord,
-                        IndexBoundsBuilder::objFromElement(maxObj.firstElement(), queryCollator));
+        recordRange.maybeNarrowMax(
+            IndexBoundsBuilder::objFromElement(maxObj.firstElement(), queryCollator),
+            false /* NOT inclusive*/);
     }
 
     if (!minObj.isEmpty() && compatibleCollator(ccCollator, queryCollator, minObj.firstElement())) {
         // The min() is inclusive as are bounded collection scans by default.
-        setHighestRecord(minRecord,
-                         IndexBoundsBuilder::objFromElement(minObj.firstElement(), queryCollator));
+        recordRange.maybeNarrowMin(
+            IndexBoundsBuilder::objFromElement(minObj.firstElement(), queryCollator),
+            true /* inclusive*/);
     }
 }
 
@@ -352,8 +355,8 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
     const CollatorInterface* queryCollator,
     const CollatorInterface* ccCollator,
     const StringData& clusterKeyFieldName,
-    boost::optional<RecordIdBound>& minRecord,
-    boost::optional<RecordIdBound>& maxRecord) {
+    RecordIdRange& recordRange,
+    const std::function<void(const MatchExpression*)>& redundant) {
     if (conjunct == nullptr) {
         return false;
     }
@@ -367,8 +370,8 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
                                    queryCollator,
                                    ccCollator,
                                    clusterKeyFieldName,
-                                   minRecord,
-                                   maxRecord)) {
+                                   recordRange,
+                                   redundant)) {
                 atLeastOneConjunctCompatibleCollation = true;
             }
         }
@@ -412,13 +415,12 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
             }
         }
 
+        // {min,max}RecordId will bound the range of ids scanned to the highest and lowest present
+        // in the InMatchExpression, but the filter is still required to filter to _exactly_ the
+        // requested matches.
+
         // Finally, tighten the collscan bounds with the min/max bounds for the $in.
-        if (minBound) {
-            setHighestRecord(minRecord, *minBound);
-        }
-        if (maxBound) {
-            setLowestRecord(maxRecord, *maxBound);
-        }
+        recordRange.intersectRange(minBound, maxBound);
         return allEltsCollationCompatible;
     }
 
@@ -432,11 +434,11 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
     // Set coarse min/max bounds based on type in case we can't set tight bounds.
     BSONObjBuilder minb;
     minb.appendMinForType("", element.type());
-    setHighestRecord(minRecord, minb.obj());
+    recordRange.maybeNarrowMin(minb.obj(), true /* inclusive */);
 
     BSONObjBuilder maxb;
     maxb.appendMaxForType("", element.type());
-    setLowestRecord(maxRecord, maxb.obj());
+    recordRange.maybeNarrowMax(maxb.obj(), true /* inclusive */);
 
     bool compatible = compatibleCollator(ccCollator, queryCollator, element);
     if (!compatible) {
@@ -445,20 +447,61 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
     }
 
     // Even if the collations don't match at this point, it's fine,
-    // because the bounds exclude values that use it
+    // because the bounds exclude values that use it.
     const BSONObj collated = IndexBoundsBuilder::objFromElement(element, queryCollator);
     if (dynamic_cast<const EqualityMatchExpression*>(match)) {
-        setHighestRecord(minRecord, collated);
-        setLowestRecord(maxRecord, collated);
-    } else if (dynamic_cast<const LTMatchExpression*>(match) ||
-               dynamic_cast<const LTEMatchExpression*>(match)) {
-        setLowestRecord(maxRecord, collated);
-    } else if (dynamic_cast<const GTMatchExpression*>(match) ||
-               dynamic_cast<const GTEMatchExpression*>(match)) {
-        setHighestRecord(minRecord, collated);
+        recordRange.maybeNarrowMin(collated, true /* inclusive */);
+        recordRange.maybeNarrowMax(collated, true /* inclusive */);
+    } else if (dynamic_cast<const LTMatchExpression*>(match)) {
+        recordRange.maybeNarrowMax(collated, false /* EXclusive */);
+    } else if (dynamic_cast<const LTEMatchExpression*>(match)) {
+        recordRange.maybeNarrowMax(collated, true /* inclusive */);
+    } else if (dynamic_cast<const GTMatchExpression*>(match)) {
+        recordRange.maybeNarrowMin(collated, false /* EXclusive */);
+    } else if (dynamic_cast<const GTEMatchExpression*>(match)) {
+        recordRange.maybeNarrowMin(collated, true /* inclusive */);
+    } else {
+        // This expr is _not_ redundant, it could not be re-expressed via {min,max} record
+        return true;
     }
-
+    // Report that this expression does not need to be retained in the filter
+    // _if_ recordRange is enforced - {min,max}Record will already apply equivalent
+    // limits.
+    redundant(match);
     return true;
+}
+
+void simplifyFilterInner(std::unique_ptr<MatchExpression>& expr,
+                         const std::set<const MatchExpression*>& toRemove) {
+    if (toRemove.contains(expr.get())) {
+        expr.reset();
+        return;
+    }
+    if (auto conjunct = dynamic_cast<AndMatchExpression*>(expr.get())) {
+        auto& childVector = *conjunct->getChildVector();
+        for (auto& child : childVector) {
+            simplifyFilterInner(child, toRemove);
+        }
+        // The recursive calls may have nulled some children; remove them from the
+        // conjunction.
+        childVector.erase(std::remove(childVector.begin(), childVector.end(), nullptr),
+                          childVector.end());
+        if (conjunct->isTriviallyTrue()) {
+            // Removing redundant children may have made this conjunct trivially true in turn;
+            // reset it.
+            expr.reset();
+        }
+    }
+}
+
+void QueryPlannerAccess::simplifyFilter(std::unique_ptr<MatchExpression>& expr,
+                                        const std::set<const MatchExpression*>& toRemove) {
+    simplifyFilterInner(expr, toRemove);
+    if (!expr) {
+        // Simplifying the filter might remove everything; filter can't be left
+        // null, so populate with a trivially true expression.
+        expr = std::make_unique<AndMatchExpression>();
+    }
 }
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
@@ -568,28 +611,45 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     auto collCollator = params.clusteredCollectionCollator;
     csn->hasCompatibleCollation = CollatorInterface::collatorsMatch(queryCollator, collCollator);
 
+    // If collation _exactly_ matches, it is safe to drop expressions from the filter which can be
+    // entirely encoded as a {min,max}Record.
+    // handleRIDRangeScan later updates hasCompatibleCollation if the filter restricts the id range
+    // to values unaffected by collation e.g., numbers. This is insufficient to allow the filter to
+    // be safely modified; a query which has compatible collation _given the current filter args_
+    // could be cached and reused for a query with different args which _are_ affected by collation.
+    const bool canSimplifyFilter = csn->hasCompatibleCollation;
+    std::set<const MatchExpression*> redundantExprs;
+
     if (csn->isClustered && !csn->resumeAfterRecordId) {
         // This is a clustered collection. Attempt to perform an efficient, bounded collection scan
         // via minRecord and maxRecord if applicable. During this process, we will check if the
         // query is guaranteed to exclude values of the cluster key which are affected by collation.
         // If so, then even if the query and collection collations differ, the collation difference
         // won't affect the query results. In that case, we can say hasCompatibleCollation is true.
+
+        RecordIdRange recordRange;
+        // min/max records may have been set if oplog or change collection.
+        recordRange.intersectRange(csn->minRecord, csn->maxRecord);
         bool compatibleCollation = handleRIDRangeScan(
             csn->filter.get(),
             queryCollator,
             collCollator,
             clustered_util::getClusterKeyFieldName(params.clusteredInfo->getIndexSpec()),
-            csn->minRecord,
-            csn->maxRecord);
+            recordRange,
+            [&](const auto& expr) { redundantExprs.insert(expr); });
         csn->hasCompatibleCollation |= compatibleCollation;
 
-        handleRIDRangeMinMax(query,
-                             csn->direction,
-                             queryCollator,
-                             collCollator,
-                             csn->minRecord,
-                             csn->maxRecord,
-                             csn->boundInclusion);
+        handleRIDRangeMinMax(query, csn->direction, queryCollator, collCollator, recordRange);
+
+        csn->minRecord = recordRange.getMin();
+        csn->maxRecord = recordRange.getMax();
+
+        csn->boundInclusion = CollectionScanParams::makeInclusion(recordRange.isMinInclusive(),
+                                                                  recordRange.isMaxInclusive());
+    }
+
+    if (canSimplifyFilter) {
+        simplifyFilter(csn->filter, redundantExprs);
     }
 
     return csn;
