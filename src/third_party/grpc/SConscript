@@ -66,6 +66,20 @@ upb_env.Append(
         grpc_root.Dir('dist/src/core/ext/upbdefs-generated'),
     ], )
 
+upb_generated_protobuf_any_obj = upb_env.LibraryObject(
+    target="upb_generated_protobuf_any",
+    source=[
+        "dist/src/core/ext/upb-generated/google/protobuf/any.upb.c",
+    ]
+)[0]
+
+upb_generated_protobuf_descriptor_obj = upb_env.LibraryObject(
+    target="upb_generated_protobuf_descriptor",
+    source=[
+        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
+    ]
+)[0]
+
 upb_env.Library(
     target='upb',
     source=[
@@ -128,7 +142,6 @@ upb_common_env.Append(
 upb_common_env.Library(
     target='upb_common',
     source=[
-        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
         "dist/third_party/upb/upb/message/accessors.c",
         "dist/third_party/upb/upb/mini_descriptor/build_enum.c",
         "dist/third_party/upb/upb/mini_descriptor/decode.c",
@@ -151,6 +164,7 @@ upb_common_env.Library(
         "dist/third_party/upb/upb/reflection/method_def.c",
         "dist/third_party/upb/upb/reflection/oneof_def.c",
         "dist/third_party/upb/upb/reflection/service_def.c",
+        "upb_generated_protobuf_descriptor_obj",
     ],
     LIBDEPS=[
         "upb",
@@ -279,7 +293,6 @@ if gpr_env['TARGET_ARCH'] in ['x86_64', 's390x', 'ppc64le']:
 gpr_env.Library(
     target='gpr',
     source=[
-        "dist/src/core/ext/upb-generated/google/protobuf/any.upb.c",
         "dist/src/core/ext/upb-generated/google/rpc/status.upb.c",
         "dist/src/core/lib/config/config_vars.cc",
         "dist/src/core/lib/config/config_vars_non_generated.cc",
@@ -327,6 +340,7 @@ gpr_env.Library(
         "dist/src/core/lib/gprpp/windows/env.cc",
         "dist/src/core/lib/gprpp/windows/stat.cc",
         "dist/src/core/lib/gprpp/windows/thd.cc",
+        "upb_generated_protobuf_any_obj",
     ],
     LIBDEPS=[
         '$BUILD_DIR/third_party/abseil-cpp/absl_bad_optional_access',
@@ -604,8 +618,6 @@ grpc_env.Library(
         "dist/src/core/ext/upb-generated/google/api/expr/v1alpha1/syntax.upb.c",
         "dist/src/core/ext/upb-generated/google/api/http.upb.c",
         "dist/src/core/ext/upb-generated/google/api/httpbody.upb.c",
-        "dist/src/core/ext/upb-generated/google/protobuf/any.upb.c",
-        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
         "dist/src/core/ext/upb-generated/google/protobuf/duration.upb.c",
         "dist/src/core/ext/upb-generated/google/protobuf/empty.upb.c",
         "dist/src/core/ext/upb-generated/google/protobuf/struct.upb.c",
@@ -1153,6 +1165,8 @@ grpc_env.Library(
         "dist/src/core/tsi/ssl_transport_security_utils.cc",
         "dist/src/core/tsi/transport_security.cc",
         "dist/src/core/tsi/transport_security_grpc.cc",
+        "upb_generated_protobuf_any_obj",
+        "upb_generated_protobuf_descriptor_obj",
     ],
     OBJPREFIX=env.get('OBJPREFIX', '') + 'grpc_',
     LIBDEPS=[
