@@ -97,8 +97,7 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     rs.reset(nullptr);
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        auto& info = *ss.load(opCtx.get(), uri);
+        auto& info = *ss.load(uri);
         ASSERT_EQUALS(N, info.numRecords.load());
     }
 
@@ -143,10 +142,9 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
     }
 
     {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         const bool enableWtLogging = false;
         WiredTigerSizeStorer ss2(harnessHelper->conn(), indexUri, enableWtLogging);
-        auto info = ss2.load(opCtx.get(), uri);
+        auto info = ss2.load(uri);
         ASSERT_EQUALS(N, info->numRecords.load());
     }
 
@@ -176,12 +174,12 @@ private:
     }
 
 protected:
-    long long getNumRecords(OperationContext* opCtx) const {
-        return sizeStorer->load(opCtx, uri)->numRecords.load();
+    long long getNumRecords() const {
+        return sizeStorer->load(uri)->numRecords.load();
     }
 
-    long long getDataSize(OperationContext* opCtx) const {
-        return sizeStorer->load(opCtx, uri)->dataSize.load();
+    long long getDataSize() const {
+        return sizeStorer->load(uri)->dataSize.load();
     }
 
     std::unique_ptr<WiredTigerHarnessHelper> harnessHelper;
@@ -196,8 +194,8 @@ TEST_F(SizeStorerUpdateTest, Basic) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
     long long val = 5;
     rs->updateStatsAfterRepair(opCtx.get(), val, val);
-    ASSERT_EQUALS(getNumRecords(opCtx.get()), val);
-    ASSERT_EQUALS(getDataSize(opCtx.get()), val);
+    ASSERT_EQUALS(getNumRecords(), val);
+    ASSERT_EQUALS(getDataSize(), val);
 }
 
 // Verify that the size storer contains accurate data after a transaction rollback just before a
@@ -220,8 +218,8 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
         auto rId = rs->insertRecord(opCtx.get(), "12345", 5, Timestamp{2});
         ASSERT_TRUE(rId.isOK());
 
-        ASSERT_EQ(getNumRecords(opCtx.get()), 2);
-        ASSERT_EQ(getDataSize(opCtx.get()), 10);
+        ASSERT_EQ(getNumRecords(), 2);
+        ASSERT_EQ(getDataSize(), 10);
         // Mark size info as clean, before rollback is done.
         sizeStorer->flush(false);
     }
@@ -236,8 +234,8 @@ TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     // As the operation was rolled back, numRecords and dataSize should be for the first op only. If
     // rollback does not properly mark the sizeInfo as dirty, on load sizeInfo will account for the
     // two operations, as the rollback sizeInfo update has not been flushed.
-    ASSERT_EQ(getNumRecords(opCtx.get()), 1);
-    ASSERT_EQ(getDataSize(opCtx.get()), 5);
+    ASSERT_EQ(getNumRecords(), 1);
+    ASSERT_EQ(getDataSize(), 5);
 };
 
 }  // namespace

@@ -72,6 +72,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/snapshot_window_options_gen.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/storage/storage_options.h"
@@ -1657,6 +1658,10 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         }
         _sessionCache->closeCursorsForQueuedDrops();
         return Status::OK();
+    }
+
+    if (DurableCatalog::isCollectionIdent(ident)) {
+        _sizeStorer->remove(uri);
     }
 
     if (onDrop) {

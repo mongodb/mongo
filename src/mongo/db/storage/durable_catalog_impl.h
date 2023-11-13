@@ -91,8 +91,6 @@ public:
 
     bool isResumableIndexBuildIdent(StringData ident) const;
 
-    bool isCollectionIdent(StringData ident) const;
-
     FeatureTracker* getFeatureTracker() const {
         invariant(_featureTracker);
         return _featureTracker.get();
