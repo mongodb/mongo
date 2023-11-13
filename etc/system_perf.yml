@@ -3668,37 +3668,37 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
-        cron: &query-stats-cron "0 */4 * * 1-5" # runs every weekday, every 4 hours
+        cron: *high-value-workload-cron
       - name: ycsb_60GB
       - name: ycsb_60GB.long
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: crud_workloads_majority
       - name: smoke_test
       - name: bestbuy_agg
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
       - name: tpcc_majority
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: linkbench
       - name: linkbench2
         cron: *high-value-workload-cron
       - name: tsbs_query
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: mixed_workloads_genny_rate_limited_high_value
         cron: *high-value-workload-cron
       - name: load_test_high_value
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: majority_reads10_k_threads_high_value
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: large_indexed_ins_high_value
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: expressive_queries_high_value
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
       - name: time_series_sort_high_value
-        cron: *query-stats-cron
+        cron: *high-value-workload-cron
 
   - name: linux-3-node-replSet-intel-query-stats.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11 (QueryStats)
@@ -3722,7 +3722,7 @@ buildvariants:
   - &3node-query-stats-rate-limit
     name: linux-3-node-replSet-intel-limited-1-query-stats.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11 (Rate Limited with 1, QueryStats)
-    cron: *query-stats-cron
+    cron: *high-value-workload-cron
     modules: *modules
     expansions: &3node-query-stats-rate-limit-expansions
       mongodb_setup_release: 2022-11
@@ -4255,10 +4255,9 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
 
-  # Template below used to create an anchor for linux microbenchmarks standalone arm without the high-value-workload cron override that would transfer to any variant that uses this
   - &linux-microbenchmarks-standalone-arm
-    name: linux-microbenchmarks-standalone-arm-template
-    display_name: Linux Microbenchmarks Standalone Template (Don't Use)
+    name: linux-microbenchmarks-standalone-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01
     # TODO SERVER-74399 Reduce frequency back to baseline.
     # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
     cron: &linux-microbench-cron "0 0 * * *"  # Everyday at 00:00
@@ -4278,41 +4277,6 @@ buildvariants:
     run_on:
     - "rhel70-perf-microbenchmarks"
     depends_on: *_compile_amazon_linux2_arm64
-    tasks:
-    - name: big_collection
-    - name: genny_scale_InsertRemove
-    - name: genny_execution_UserAcquisition
-    - name: aggregation_read_commands
-    - name: aggregation_read_commands_large_dataset
-    - name: agg-query-comparison_read_commands
-    - name: query_read_commands
-    - name: query_read_commands_large_dataset
-    - name: views-aggregation
-    - name: views-query
-    - name: where_read_commands
-    - name: update_read_commands
-    - name: insert_read_commands
-    - name: wildcard-index-read_read_commands
-    - name: wildcard-index-write_read_commands
-    - name: geo_read_commands
-    - name: misc_read_commands
-    - name: misc_custom_filter_default_read_commands
-    - name: misc_custom_filter_slow_or_sample_read_commands
-    - name: misc_custom_filter_complex_read_commands
-    - name: misc_custom_filter_whole_doc_read_commands
-    - name: misc_slowms_everything_read_commands
-    - name: singleThreaded_read_commands
-    - name: pipeline-updates
-    - name: javascript
-    - name: compound_wildcard_index_write_commands
-    - name: compound_wildcard_index_read_commands
-    - name: tie-breaking-heuristics
-
-  - <<: *linux-microbenchmarks-standalone-arm
-    name: linux-microbenchmarks-standalone-arm.2023-01
-    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01
-    modules: *modules
-    expansions: *standalone-arm-expansions
     tasks:
     - name: big_collection
     - name: genny_scale_InsertRemove
@@ -4405,6 +4369,36 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-query-stats
+    tasks:
+      - name: big_collection
+      - name: genny_scale_InsertRemove
+      - name: genny_execution_UserAcquisition
+      - name: aggregation_read_commands
+      - name: aggregation_read_commands_large_dataset
+      - name: agg-query-comparison_read_commands
+        cron: *linux-microbench-cron # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+      - name: views-aggregation
+      - name: views-query
+      - name: where_read_commands
+      - name: update_read_commands
+      - name: insert_read_commands
+      - name: wildcard-index-read_read_commands
+      - name: wildcard-index-write_read_commands
+      - name: geo_read_commands
+      - name: misc_read_commands
+      - name: misc_custom_filter_default_read_commands
+      - name: misc_custom_filter_slow_or_sample_read_commands
+      - name: misc_custom_filter_complex_read_commands
+      - name: misc_custom_filter_whole_doc_read_commands
+      - name: misc_slowms_everything_read_commands
+      - name: singleThreaded_read_commands
+      - name: pipeline-updates
+      - name: javascript
+      - name: compound_wildcard_index_write_commands
+      - name: compound_wildcard_index_read_commands
+      - name: tie-breaking-heuristics
 
   # Variant: Microbenchmarks with rate limited QueryStats
   - <<: *linux-microbenchmarks-standalone-arm
@@ -4413,6 +4407,36 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
+    tasks:
+      - name: big_collection
+      - name: genny_scale_InsertRemove
+      - name: genny_execution_UserAcquisition
+      - name: aggregation_read_commands
+      - name: aggregation_read_commands_large_dataset
+      - name: agg-query-comparison_read_commands
+        cron: *linux-microbench-cron # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+      - name: views-aggregation
+      - name: views-query
+      - name: where_read_commands
+      - name: update_read_commands
+      - name: insert_read_commands
+      - name: wildcard-index-read_read_commands
+      - name: wildcard-index-write_read_commands
+      - name: geo_read_commands
+      - name: misc_read_commands
+      - name: misc_custom_filter_default_read_commands
+      - name: misc_custom_filter_slow_or_sample_read_commands
+      - name: misc_custom_filter_complex_read_commands
+      - name: misc_custom_filter_whole_doc_read_commands
+      - name: misc_slowms_everything_read_commands
+      - name: singleThreaded_read_commands
+      - name: pipeline-updates
+      - name: javascript
+      - name: compound_wildcard_index_write_commands
+      - name: compound_wildcard_index_read_commands
+      - name: tie-breaking-heuristics
 
   - &linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-arm.2023-01
@@ -4458,6 +4482,7 @@ buildvariants:
     - name: aggregation_read_commands
     - name: aggregation_read_commands_large_dataset
     - name: agg-query-comparison_read_commands
+      cron: "0 0 * * 0,2,3,4,5" # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting correct cron
     - name: query_read_commands
     - name: query_read_commands_large_dataset
     - name: views-aggregation
@@ -4488,6 +4513,36 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
+    tasks: &mirobenchmarks-all-feature-flags-tasks
+    - name: big_collection
+    - name: genny_scale_InsertRemove
+    - name: genny_execution_UserAcquisition
+    - name: aggregation_read_commands
+    - name: aggregation_read_commands_large_dataset
+    - name: agg-query-comparison_read_commands
+      cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting to correct cron
+    - name: query_read_commands
+    - name: query_read_commands_large_dataset
+    - name: views-aggregation
+    - name: views-query
+    - name: where_read_commands
+    - name: update_read_commands
+    - name: insert_read_commands
+    - name: wildcard-index-read_read_commands
+    - name: wildcard-index-write_read_commands
+    - name: geo_read_commands
+    - name: misc_read_commands
+    - name: misc_custom_filter_default_read_commands
+    - name: misc_custom_filter_slow_or_sample_read_commands
+    - name: misc_custom_filter_complex_read_commands
+    - name: misc_custom_filter_whole_doc_read_commands
+    - name: misc_slowms_everything_read_commands
+    - name: singleThreaded_read_commands
+    - name: pipeline-updates
+    - name: javascript
+    - name: compound_wildcard_index_write_commands
+    - name: compound_wildcard_index_read_commands
+    - name: tie-breaking-heuristics
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4501,6 +4556,36 @@ buildvariants:
     expansions:
       <<: *standalone-arm-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
+    tasks: &mirobenchmarks-all-feature-flags-tasks
+    - name: big_collection
+    - name: genny_scale_InsertRemove
+    - name: genny_execution_UserAcquisition
+    - name: aggregation_read_commands
+    - name: aggregation_read_commands_large_dataset
+    - name: agg-query-comparison_read_commands
+      cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting to correct cron
+    - name: query_read_commands
+    - name: query_read_commands_large_dataset
+    - name: views-aggregation
+    - name: views-query
+    - name: where_read_commands
+    - name: update_read_commands
+    - name: insert_read_commands
+    - name: wildcard-index-read_read_commands
+    - name: wildcard-index-write_read_commands
+    - name: geo_read_commands
+    - name: misc_read_commands
+    - name: misc_custom_filter_default_read_commands
+    - name: misc_custom_filter_slow_or_sample_read_commands
+    - name: misc_custom_filter_complex_read_commands
+    - name: misc_custom_filter_whole_doc_read_commands
+    - name: misc_slowms_everything_read_commands
+    - name: singleThreaded_read_commands
+    - name: pipeline-updates
+    - name: javascript
+    - name: compound_wildcard_index_write_commands
+    - name: compound_wildcard_index_read_commands
+    - name: tie-breaking-heuristics
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4553,6 +4638,36 @@ buildvariants:
     run_on:
     - "rhel70-perf-microbenchmarks"
     depends_on: *_compile_amazon2
+    tasks:
+      - name: big_collection
+      - name: genny_scale_InsertRemove
+      - name: genny_execution_UserAcquisition
+      - name: aggregation_read_commands
+      - name: aggregation_read_commands_large_dataset
+      - name: agg-query-comparison_read_commands
+        cron: "0 0 * * 0,2,3,4,5" # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. resetting to correct cron
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+      - name: views-aggregation
+      - name: views-query
+      - name: where_read_commands
+      - name: update_read_commands
+      - name: insert_read_commands
+      - name: wildcard-index-read_read_commands
+      - name: wildcard-index-write_read_commands
+      - name: geo_read_commands
+      - name: misc_read_commands
+      - name: misc_custom_filter_default_read_commands
+      - name: misc_custom_filter_slow_or_sample_read_commands
+      - name: misc_custom_filter_complex_read_commands
+      - name: misc_custom_filter_whole_doc_read_commands
+      - name: misc_slowms_everything_read_commands
+      - name: singleThreaded_read_commands
+      - name: pipeline-updates
+      - name: javascript
+      - name: compound_wildcard_index_write_commands
+      - name: compound_wildcard_index_read_commands
+      - name: tie-breaking-heuristics
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4592,6 +4707,36 @@ buildvariants:
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
+    tasks:
+      - name: big_collection
+      - name: genny_scale_InsertRemove
+      - name: genny_execution_UserAcquisition
+      - name: aggregation_read_commands
+      - name: aggregation_read_commands_large_dataset
+      - name: agg-query-comparison_read_commands
+        cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+      - name: views-aggregation
+      - name: views-query
+      - name: where_read_commands
+      - name: update_read_commands
+      - name: insert_read_commands
+      - name: wildcard-index-read_read_commands
+      - name: wildcard-index-write_read_commands
+      - name: geo_read_commands
+      - name: misc_read_commands
+      - name: misc_custom_filter_default_read_commands
+      - name: misc_custom_filter_slow_or_sample_read_commands
+      - name: misc_custom_filter_complex_read_commands
+      - name: misc_custom_filter_whole_doc_read_commands
+      - name: misc_slowms_everything_read_commands
+      - name: singleThreaded_read_commands
+      - name: pipeline-updates
+      - name: javascript
+      - name: compound_wildcard_index_write_commands
+      - name: compound_wildcard_index_read_commands
+      - name: tie-breaking-heuristics
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
@@ -4603,6 +4748,36 @@ buildvariants:
     expansions:
       <<: *standalone-intel-expansions
       mongodb_setup: mongo-perf-standalone-sbe.2023-02
+    tasks:
+      - name: big_collection
+      - name: genny_scale_InsertRemove
+      - name: genny_execution_UserAcquisition
+      - name: aggregation_read_commands
+      - name: aggregation_read_commands_large_dataset
+      - name: agg-query-comparison_read_commands
+        cron: *cron_query_perf_schedule # *linux-microbenchmarks-standalone-arm contains high-value cron for this task. Resetting to correct cron
+      - name: query_read_commands
+      - name: query_read_commands_large_dataset
+      - name: views-aggregation
+      - name: views-query
+      - name: where_read_commands
+      - name: update_read_commands
+      - name: insert_read_commands
+      - name: wildcard-index-read_read_commands
+      - name: wildcard-index-write_read_commands
+      - name: geo_read_commands
+      - name: misc_read_commands
+      - name: misc_custom_filter_default_read_commands
+      - name: misc_custom_filter_slow_or_sample_read_commands
+      - name: misc_custom_filter_complex_read_commands
+      - name: misc_custom_filter_whole_doc_read_commands
+      - name: misc_slowms_everything_read_commands
+      - name: singleThreaded_read_commands
+      - name: pipeline-updates
+      - name: javascript
+      - name: compound_wildcard_index_write_commands
+      - name: compound_wildcard_index_read_commands
+      - name: tie-breaking-heuristics
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
     # If diverging from that list, add the entire list of desired tasks here
