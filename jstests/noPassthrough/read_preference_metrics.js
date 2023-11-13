@@ -78,17 +78,20 @@ let serverStatus = assert.commandWorked(standalone.getDB("admin").runCommand({se
 assert(!serverStatus.hasOwnProperty("readPreferenceCounters"), tojson(serverStatus));
 MongoRunner.stopMongod(standalone);
 
-// Test that replica set nodes tracks metrics around read preference.
+// Test that replica set nodes tracks metrics around read preference. The assert.soon() that
+// checks for a periodic job to complete below assumes the replica set will have two nodes, so
+// we should keep that consistent.
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
-// On startup, the replica set node will run a periodic job to refresh keys for HMAC computation.
+// On startup, the replica set nodes will run a periodic job to refresh keys for HMAC computation.
 // This job will perform two find operations on system collections, and this will increment the
 // external 'nearest' read preference counter twice. We should wait for this periodic job to
-// complete, so the counters aren't incremented during the test.
+// complete on both nodes, so the counters aren't incremented during the test.
 assert.soon(() => {
-    return getReadPreferenceMetrics(rst.getPrimary()).executedOnPrimary.nearest.external >= 2;
+    return getReadPreferenceMetrics(rst.getPrimary()).executedOnPrimary.nearest.external >= 2 &&
+        getReadPreferenceMetrics(rst.getSecondary()).executedOnSecondary.nearest.external >= 2;
 });
 jsTestLog("Testing against replica set");
 runTest(rst);
@@ -96,14 +99,16 @@ runTest(rst);
 rst.stopSet();
 
 // Test that mongos omits metrics around read preference, and shard servers include them.
+// The assert.soon() below assumes two shard server nodes, similar to the replica set case above.
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
 serverStatus = assert.commandWorked(st.s.getDB("admin").runCommand({serverStatus: 1}));
 assert(serverStatus.process.startsWith("mongos"), tojson(serverStatus));
 assert(!serverStatus.hasOwnProperty("readPreferenceCounters"), tojson(serverStatus));
-// The newly started shard server will also run the same periodic job mentioned above.
+// The newly started shard servers will also run the same periodic job mentioned above.
 assert.soon(() => {
-    return getReadPreferenceMetrics(st.rs0.getPrimary()).executedOnPrimary.nearest.external >= 2;
+    return getReadPreferenceMetrics(st.rs0.getPrimary()).executedOnPrimary.nearest.external >= 2 &&
+        getReadPreferenceMetrics(st.rs0.getSecondary()).executedOnSecondary.nearest.external >= 2;
 });
 
 jsTestLog("Testing against sharded cluster");
