@@ -377,6 +377,7 @@ Document DocumentStorage::shred() const {
             md[it.fieldName()] = valueElem.val.shred();
         }
     }
+    md.setMetadata(DocumentMetadataFields(metadata()));
     return md.freeze();
 }
 
